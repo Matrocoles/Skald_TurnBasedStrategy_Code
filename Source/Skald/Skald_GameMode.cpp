@@ -3,6 +3,7 @@
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
 #include "Skald_TurnManager.h"
+#include "WorldMap.h"
 #include "Engine/World.h"
 
 ASkaldGameMode::ASkaldGameMode()
@@ -11,6 +12,7 @@ ASkaldGameMode::ASkaldGameMode()
     PlayerControllerClass = ASkaldPlayerController::StaticClass();
     PlayerStateClass = ASkaldPlayerState::StaticClass();
     TurnManager = nullptr;
+    WorldMap = nullptr;
 }
 
 void ASkaldGameMode::BeginPlay()
@@ -20,6 +22,11 @@ void ASkaldGameMode::BeginPlay()
     if (!TurnManager)
     {
         TurnManager = GetWorld()->SpawnActor<ATurnManager>();
+    }
+
+    if (!WorldMap)
+    {
+        WorldMap = GetWorld()->SpawnActor<AWorldMap>();
     }
 }
 
