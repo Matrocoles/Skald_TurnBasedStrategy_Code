@@ -1,6 +1,6 @@
 #include "Skald_PlayerController.h"
 #include "Skald_TurnManager.h"
-#include "AIController.h"
+#include "Skald_PlayerState.h"
 
 ASkaldPlayerController::ASkaldPlayerController()
 {
@@ -12,9 +12,9 @@ void ASkaldPlayerController::BeginPlay()
 {
     Super::BeginPlay();
 
-    if (Cast<AAIController>(GetPawn()))
+    if (ASkaldPlayerState* PS = GetPlayerState<ASkaldPlayerState>())
     {
-        bIsAI = true;
+        bIsAI = PS->bIsAI;
     }
 }
 
