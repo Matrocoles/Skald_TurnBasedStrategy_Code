@@ -8,6 +8,7 @@ class ATurnManager;
 class ASkaldGameState;
 class ASkaldPlayerController;
 class ASkaldPlayerState;
+class AWorldMap;
 
 /**
  * GameMode responsible for managing player login and spawning the turn manager.
@@ -27,5 +28,9 @@ protected:
     /** Handles turn sequencing for the match. */
     UPROPERTY()
     ATurnManager* TurnManager;
+
+    /** Holds all territory actors for the current map. */
+    UPROPERTY()
+    AWorldMap* WorldMap;
 };
 
