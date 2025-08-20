@@ -23,17 +23,17 @@ public:
 
     virtual void BeginPlay() override;
 
-    /** Owning player of this territory. */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory")
-    ASkaldPlayerState* Owner;
+    /** Owning player of this territory (renamed to avoid AActor::Owner shadowing). */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory", meta = (DisplayName = "Owner"))
+    ASkaldPlayerState* OwningPlayer = nullptr;
 
     /** Amount of resources produced by this territory. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory")
-    int32 Resources;
+    int32 Resources = 0;
 
     /** Unique identifier for this territory. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory")
-    int32 TerritoryID;
+    int32 TerritoryID = 0;
 
     /** Adjacent territories that units may move to. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory")
@@ -57,7 +57,6 @@ public:
 
 protected:
     /** Visual representation of the territory. */
-    UPROPERTY(VisibleAnywhere)
-    UStaticMeshComponent* MeshComponent;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Territory")
+    UStaticMeshComponent* MeshComponent = nullptr;
 };
-

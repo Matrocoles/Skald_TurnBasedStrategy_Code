@@ -1,36 +1,39 @@
 #pragma once
 
 #include "CoreMinimal.h"
-
 #include "SkaldTypes.generated.h"
 
+// Keep generated.h last among includes in this header!
+
 UENUM(BlueprintType)
-enum class SKALD_API E_TurnPhase : uint8
+enum class E_TurnPhase : uint8
 {
-    Reinforcement UMETA(DisplayName="Reinforcement"),
-    Attack        UMETA(DisplayName="Attack"),
-    Engineering   UMETA(DisplayName="Engineering"),
-    Treasure      UMETA(DisplayName="Treasure"),
-    Movement      UMETA(DisplayName="Movement"),
-    EndTurn       UMETA(DisplayName="EndTurn"),
-    Revolt        UMETA(DisplayName="Revolt"),
+    Reinforcement UMETA(DisplayName = "Reinforcement"),
+    Attack        UMETA(DisplayName = "Attack"),
+    Engineering   UMETA(DisplayName = "Engineering"),
+    Treasure      UMETA(DisplayName = "Treasure"),
+    Movement      UMETA(DisplayName = "Movement"),
+    EndTurn       UMETA(DisplayName = "EndTurn"),
+    Revolt        UMETA(DisplayName = "Revolt"),
 };
 
 UENUM(BlueprintType)
-enum class SKALD_API Enum_SiegeWeapons : uint8
+enum class E_SiegeWeapons : uint8   // (Consider “E” prefix instead of “Enum_” for UE style)
 {
-    BatteringRam UMETA(DisplayName="BatteringRam"),
-    Trebuchet    UMETA(DisplayName="Trebuchet"),
-    SiegeTower   UMETA(DisplayName="SiegeTower"),
-    Catapult     UMETA(DisplayName="Catapult"),
+    BatteringRam UMETA(DisplayName = "BatteringRam"),
+    Trebuchet    UMETA(DisplayName = "Trebuchet"),
+    SiegeTower   UMETA(DisplayName = "SiegeTower"),
+    Catapult     UMETA(DisplayName = "Catapult"),
 };
 
 UENUM(BlueprintType)
-enum class SKALD_API Enum_BattleStats : uint8
+enum class EBattleStats : uint8
 {
-    NewEnumerator0 UMETA(DisplayName="NewEnumerator0"),
-    NewEnumerator1 UMETA(DisplayName="NewEnumerator1"),
-    NewEnumerator2 UMETA(DisplayName="NewEnumerator2"),
+    // Example entries; keep your real ones
+    Attack       UMETA(DisplayName = "Attack"),
+    Defense      UMETA(DisplayName = "Defense"),
+    Speed        UMETA(DisplayName = "Speed"),
+    // ...
 };
 
 USTRUCT(BlueprintType)
@@ -141,7 +144,7 @@ struct SKALD_API FS_Siege
     int32 SiegeID = 0;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
-    Enum_SiegeWeapons Type = Enum_SiegeWeapons::BatteringRam;
+    E_SiegeWeapons Type = E_SiegeWeapons::BatteringRam;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     int32 BuiltAtTerritoryID = 0;
@@ -208,7 +211,7 @@ struct SKALD_API FS_Territory
 };
 
 USTRUCT(BlueprintType)
-struct SKALD_API PlayerSaveStruct
+struct SKALD_API FPlayerSaveStruct
 {
     GENERATED_BODY()
 
