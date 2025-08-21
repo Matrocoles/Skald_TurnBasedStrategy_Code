@@ -14,6 +14,10 @@ ASkaldGameMode::ASkaldGameMode()
     PlayerStateClass = ASkaldPlayerState::StaticClass();
     TurnManager = nullptr;
     WorldMap = nullptr;
+
+    // Preallocate two slots so blueprint scripts can safely write
+    // player data to indices without hitting "invalid index" warnings.
+    PlayersData.SetNum(2);
 }
 
 void ASkaldGameMode::BeginPlay()
@@ -50,6 +54,14 @@ void ASkaldGameMode::PostLogin(APlayerController* NewPlayer)
             if (ASkaldPlayerState* PS = PC->GetPlayerState<ASkaldPlayerState>())
             {
                 GS->AddPlayerState(PS);
+
+                // Ensure PlayersData can hold at least as many entries as there
+                // are connected players. Never shrink to avoid index issues in
+                // existing blueprint logic.
+                if (PlayersData.Num() < GS->PlayerArray.Num())
+                {
+                    PlayersData.SetNum(GS->PlayerArray.Num());
+                }
             }
         }
     }
