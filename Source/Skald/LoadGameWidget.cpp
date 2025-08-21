@@ -7,14 +7,13 @@
 
 static const TCHAR* SlotNames[3] = { TEXT("Slot0"), TEXT("Slot1"), TEXT("Slot2") };
 
-template<typename TFunc>
-static void AddSlotButton(UWidgetTree* Tree, UVerticalBox* Root, const FString& Label, TFunc&& Handler)
+static void AddSlotButton(UWidgetTree* Tree, UVerticalBox* Root, const FString& Label, ULoadGameWidget* Widget, void (ULoadGameWidget::*Handler)())
 {
     UButton* Button = Tree->ConstructWidget<UButton>(UButton::StaticClass());
     UTextBlock* Text = Tree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
     Text->SetText(FText::FromString(Label));
     Button->AddChild(Text);
-    Button->OnClicked.AddLambda(Handler);
+    Button->OnClicked.AddDynamic(Widget, Handler);
     Root->AddChild(Button);
 }
 
@@ -30,17 +29,17 @@ void ULoadGameWidget::NativeConstruct()
         // Slot 0
         if (UGameplayStatics::DoesSaveGameExist(SlotNames[0], 0))
         {
-            AddSlotButton(WidgetTree, Root, SlotNames[0], [this]() { OnLoadSlot0(); });
+            AddSlotButton(WidgetTree, Root, SlotNames[0], this, &ULoadGameWidget::OnLoadSlot0);
         }
         // Slot 1
         if (UGameplayStatics::DoesSaveGameExist(SlotNames[1], 0))
         {
-            AddSlotButton(WidgetTree, Root, SlotNames[1], [this]() { OnLoadSlot1(); });
+            AddSlotButton(WidgetTree, Root, SlotNames[1], this, &ULoadGameWidget::OnLoadSlot1);
         }
         // Slot 2
         if (UGameplayStatics::DoesSaveGameExist(SlotNames[2], 0))
         {
-            AddSlotButton(WidgetTree, Root, SlotNames[2], [this]() { OnLoadSlot2(); });
+            AddSlotButton(WidgetTree, Root, SlotNames[2], this, &ULoadGameWidget::OnLoadSlot2);
         }
     }
 }
