@@ -119,10 +119,13 @@ void ATerritory::HandleMouseLeave(UPrimitiveComponent* TouchedComponent)
 
 void ATerritory::HandleClicked(UPrimitiveComponent* TouchedComponent, FKey ButtonPressed)
 {
-    Select();
     if (!bIsSelected)
     {
         Select();
+    }
+    else
+    {
+        Deselect();
     }
 }
 
