@@ -41,7 +41,10 @@ void ATerritory::BeginPlay()
     // Automatically register this territory with the world map so that
     // selection and movement logic can be centrally managed without any
     // additional setup in Blueprints or the level.
-    if (AWorldMap* WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass())))
+    // Use this actor as the world context when searching for the world map.
+    // Passing the world directly caused a compile error because the
+    // GameplayStatics helper expects a UObject rather than a UWorld pointer.
+    if (AWorldMap* WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(this, AWorldMap::StaticClass())))
     {
         WorldMap->RegisterTerritory(this);
     }
@@ -122,3 +125,4 @@ void ATerritory::HandleClicked(UPrimitiveComponent* TouchedComponent, FKey Butto
         Select();
     }
 }
+
