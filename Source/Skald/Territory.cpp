@@ -93,6 +93,7 @@ bool ATerritory::MoveTo(ATerritory* TargetTerritory)
         return false;
     }
 
+    // Movement logic would be handled here. For now we simply select the target.
     // Movement logic would be handled here. For now we simply deselect this territory
     // and select the target.
     Deselect();
@@ -118,6 +119,7 @@ void ATerritory::HandleMouseLeave(UPrimitiveComponent* TouchedComponent)
 
 void ATerritory::HandleClicked(UPrimitiveComponent* TouchedComponent, FKey ButtonPressed)
 {
+    Select();
     if (!bIsSelected)
     {
         Select();

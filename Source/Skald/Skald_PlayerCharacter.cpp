@@ -7,6 +7,8 @@
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "Engine/World.h"
+#include "Components/InputComponent.h"
 
 // Sets default values
 ASkald_PlayerCharacter::ASkald_PlayerCharacter()
@@ -32,7 +34,7 @@ void ASkald_PlayerCharacter::Tick(float DeltaTime)
         Super::Tick(DeltaTime);
 
         // Example tick behavior: keep track of selection validity
-        if (CurrentSelection && CurrentSelection->IsPendingKill())
+        if (!IsValid(CurrentSelection))
         {
                 CurrentSelection = nullptr;
         }
