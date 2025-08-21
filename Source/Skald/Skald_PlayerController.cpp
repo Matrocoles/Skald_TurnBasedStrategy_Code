@@ -6,6 +6,10 @@ ASkaldPlayerController::ASkaldPlayerController()
 {
     bIsAI = false;
     TurnManager = nullptr;
+
+    bShowMouseCursor = true;
+    bEnableClickEvents = true;
+    bEnableMouseOverEvents = true;
 }
 
 void ASkaldPlayerController::BeginPlay()
@@ -34,13 +38,11 @@ void ASkaldPlayerController::StartTurn()
     {
         FInputModeGameAndUI InputMode;
         SetInputMode(InputMode);
-        bShowMouseCursor = true;
     }
 }
 
 void ASkaldPlayerController::EndTurn()
 {
-    bShowMouseCursor = false;
     SetInputMode(FInputModeGameOnly());
 
     if (TurnManager)
