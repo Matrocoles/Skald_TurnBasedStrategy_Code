@@ -7,7 +7,7 @@
 /**
  * Menu shown after pressing Start Game, to choose single or multiplayer.
  */
-UCLASS()
+UCLASS(Blueprintable, BlueprintType)
 class SKALD_API UStartGameWidget : public UUserWidget
 {
     GENERATED_BODY()
@@ -15,10 +15,10 @@ class SKALD_API UStartGameWidget : public UUserWidget
 protected:
     virtual void NativeConstruct() override;
 
-    UFUNCTION()
+    UFUNCTION(BlueprintCallable)
     void OnSingleplayer();
 
-    UFUNCTION()
+    UFUNCTION(BlueprintCallable)
     void OnMultiplayer();
 };
 

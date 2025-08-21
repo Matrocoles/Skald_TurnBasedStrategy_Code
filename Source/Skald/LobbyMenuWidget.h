@@ -7,7 +7,7 @@
 /**
  * Main menu widget shown on the lobby map.
  */
-UCLASS()
+UCLASS(Blueprintable, BlueprintType)
 class SKALD_API ULobbyMenuWidget : public UUserWidget
 {
     GENERATED_BODY()
@@ -15,16 +15,16 @@ class SKALD_API ULobbyMenuWidget : public UUserWidget
 protected:
     virtual void NativeConstruct() override;
 
-    UFUNCTION()
+    UFUNCTION(BlueprintCallable)
     void OnStartGame();
 
-    UFUNCTION()
+    UFUNCTION(BlueprintCallable)
     void OnLoadGame();
 
-    UFUNCTION()
+    UFUNCTION(BlueprintCallable)
     void OnSettings();
 
-    UFUNCTION()
+    UFUNCTION(BlueprintCallable)
     void OnExit();
 };
 

@@ -10,7 +10,7 @@ class ATerritory;
 
 #include "Skald_PlayerCharacter.generated.h"
 
-UCLASS()
+UCLASS(Blueprintable, BlueprintType)
 class SKALD_API ASkald_PlayerCharacter : public ACharacter
 {
 	GENERATED_BODY()
@@ -39,16 +39,24 @@ public:
         virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
         /** Handle forward/backward movement input */
+        UFUNCTION(BlueprintCallable, Category="Input")
         void MoveForward(float Value);
 
         /** Handle right/left movement input */
+        UFUNCTION(BlueprintCallable, Category="Input")
         void MoveRight(float Value);
 
         /** Handle selection action */
+        UFUNCTION(BlueprintCallable, Category="Input")
         void Select();
 
         /** Ability triggers */
+        UFUNCTION(BlueprintCallable, Category="Abilities")
         void AbilityOne();
+
+        UFUNCTION(BlueprintCallable, Category="Abilities")
         void AbilityTwo();
+
+        UFUNCTION(BlueprintCallable, Category="Abilities")
         void AbilityThree();
 };

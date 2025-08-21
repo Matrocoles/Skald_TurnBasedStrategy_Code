@@ -10,7 +10,7 @@ class UUserWidget;
 /**
  * Player controller capable of participating in turn based gameplay.
  */
-UCLASS()
+UCLASS(Blueprintable, BlueprintType)
 class SKALD_API ASkaldPlayerController : public APlayerController
 {
     GENERATED_BODY()
@@ -20,10 +20,17 @@ public:
 
     virtual void BeginPlay() override;
 
+    UFUNCTION(BlueprintCallable, Category="Turn")
     void StartTurn();
+
+    UFUNCTION(BlueprintCallable, Category="Turn")
     void EndTurn();
+
+    UFUNCTION(BlueprintCallable, Category="Turn")
     void MakeAIDecision();
-    bool IsAIController() const { return bIsAI; }
+
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="Turn")
+    bool IsAIController() const;
 
     /** Set the turn manager responsible for sequencing play. */
     UFUNCTION(BlueprintCallable, Category="Turn")
@@ -31,6 +38,7 @@ public:
 
 protected:
     /** Whether this controller is controlled by AI. */
+    UPROPERTY(BlueprintReadOnly, Category="Turn")
     bool bIsAI;
 
     /** Widget class to instantiate for the player's HUD. */

@@ -16,7 +16,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FTerritorySelectedSignature, ATerrit
 /**
  * Actor representing a single territory on the world map.
  */
-UCLASS()
+UCLASS(Blueprintable, BlueprintType)
 class SKALD_API ATerritory : public AActor
 {
     GENERATED_BODY()

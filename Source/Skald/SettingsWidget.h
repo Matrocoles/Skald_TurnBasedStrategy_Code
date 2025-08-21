@@ -7,7 +7,7 @@
 /**
  * Basic settings menu allowing to apply current user settings.
  */
-UCLASS()
+UCLASS(Blueprintable, BlueprintType)
 class SKALD_API USettingsWidget : public UUserWidget
 {
     GENERATED_BODY()
@@ -15,7 +15,7 @@ class SKALD_API USettingsWidget : public UUserWidget
 protected:
     virtual void NativeConstruct() override;
 
-    UFUNCTION()
+    UFUNCTION(BlueprintCallable)
     void OnApply();
 };
 

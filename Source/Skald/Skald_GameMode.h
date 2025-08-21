@@ -14,7 +14,7 @@ class AWorldMap;
 /**
  * GameMode responsible for managing player login and spawning the turn manager.
  */
-UCLASS()
+UCLASS(Blueprintable, BlueprintType)
 class SKALD_API ASkaldGameMode : public AGameModeBase
 {
     GENERATED_BODY()
@@ -27,11 +27,11 @@ public:
 
 protected:
     /** Handles turn sequencing for the match. */
-    UPROPERTY()
+    UPROPERTY(BlueprintReadOnly, Category="GameMode")
     ATurnManager* TurnManager;
 
     /** Holds all territory actors for the current map. */
-    UPROPERTY()
+    UPROPERTY(BlueprintReadOnly, Category="GameMode")
     AWorldMap* WorldMap;
 
     /** Data describing each player in the match. Pre-sized so blueprints can
@@ -40,6 +40,7 @@ protected:
     TArray<FS_PlayerData> PlayersData;
 
     /** Setup initial territories, armies, and initiative. */
+    UFUNCTION(BlueprintCallable, Category="GameMode")
     void InitializeWorld();
 };
 

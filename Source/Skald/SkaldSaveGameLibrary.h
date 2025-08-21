@@ -9,7 +9,7 @@ class USkaldSaveGame;
 /**
  * Blueprint-callable helpers for saving and loading Skald game data.
  */
-UCLASS()
+UCLASS(BlueprintType)
 class SKALD_API USkaldSaveGameLibrary : public UBlueprintFunctionLibrary
 {
     GENERATED_BODY()
