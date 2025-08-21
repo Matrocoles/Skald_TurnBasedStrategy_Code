@@ -32,5 +32,8 @@ protected:
     /** Holds all territory actors for the current map. */
     UPROPERTY()
     AWorldMap* WorldMap;
+
+    /** Setup initial territories, armies, and initiative. */
+    void InitializeWorld();
 };
 

@@ -23,6 +23,7 @@ public:
     void RegisterController(ASkaldPlayerController* Controller);
     void StartTurns();
     void AdvanceTurn();
+    void SortControllersByInitiative();
 
 protected:
     UPROPERTY()

@@ -1,5 +1,6 @@
 #include "Skald_TurnManager.h"
 #include "Skald_PlayerController.h"
+#include "Skald_PlayerState.h"
 
 ATurnManager::ATurnManager()
 {
@@ -44,5 +45,17 @@ void ATurnManager::AdvanceTurn()
 
     CurrentIndex = (CurrentIndex + 1) % Controllers.Num();
     Controllers[CurrentIndex]->StartTurn();
+}
+
+void ATurnManager::SortControllersByInitiative()
+{
+    Controllers.Sort([](const ASkaldPlayerController& A, const ASkaldPlayerController& B)
+    {
+        const ASkaldPlayerState* PSA = A.GetPlayerState<ASkaldPlayerState>();
+        const ASkaldPlayerState* PSB = B.GetPlayerState<ASkaldPlayerState>();
+        int32 RollA = PSA ? PSA->InitiativeRoll : 0;
+        int32 RollB = PSB ? PSB->InitiativeRoll : 0;
+        return RollA > RollB;
+    });
 }
 

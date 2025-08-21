@@ -2,11 +2,14 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "InputCoreTypes.h"
 #include "Territory.generated.h"
 
 class ASkaldPlayerState;
 class ATerritory;
 class UStaticMeshComponent;
+class UPrimitiveComponent;
+class UMaterialInstanceDynamic;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FTerritorySelectedSignature, ATerritory*, Territory);
 
@@ -39,6 +42,10 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory")
     TArray<ATerritory*> AdjacentTerritories;
 
+    /** Number of armies stationed in this territory. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory")
+    int32 ArmyStrength = 0;
+
     /** Called when the territory is selected. */
     UPROPERTY(BlueprintAssignable, Category = "Territory")
     FTerritorySelectedSignature OnTerritorySelected;
@@ -55,8 +62,30 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Territory")
     bool MoveTo(ATerritory* TargetTerritory);
 
+    /** React to mouse entering the territory. */
+    UFUNCTION()
+    void HandleMouseEnter(UPrimitiveComponent* TouchedComponent);
+
+    /** React to mouse leaving the territory. */
+    UFUNCTION()
+    void HandleMouseLeave(UPrimitiveComponent* TouchedComponent);
+
+    /** React to the territory being clicked. */
+    UFUNCTION()
+    void HandleClicked(UPrimitiveComponent* TouchedComponent, FKey ButtonPressed);
+
 protected:
     /** Visual representation of the territory. */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Territory")
     UStaticMeshComponent* MeshComponent = nullptr;
+
+    /** Dynamic material used for highlighting. */
+    UPROPERTY()
+    UMaterialInstanceDynamic* DynamicMaterial = nullptr;
+
+    /** Base color of the territory mesh. */
+    FLinearColor DefaultColor;
+
+    /** Whether the territory has been selected. */
+    bool bIsSelected = false;
 };
