@@ -30,10 +30,17 @@ ATerritory* AWorldMap::GetTerritoryById(int32 TerritoryId) const
 
 void AWorldMap::SelectTerritory(ATerritory* Territory)
 {
-    if (Territory)
+    if (Territory == SelectedTerritory)
     {
-        SelectedTerritory = Territory;
+        return;
     }
+
+    if (SelectedTerritory)
+    {
+        SelectedTerritory->Deselect();
+    }
+
+    SelectedTerritory = Territory;
 }
 
 bool AWorldMap::MoveBetween(ATerritory* From, ATerritory* To)
@@ -43,12 +50,6 @@ bool AWorldMap::MoveBetween(ATerritory* From, ATerritory* To)
         return false;
     }
 
-    if (From->MoveTo(To))
-    {
-        SelectedTerritory = To;
-        return true;
-    }
-
-    return false;
+    return From->MoveTo(To);
 }
 
