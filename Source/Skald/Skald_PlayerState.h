@@ -17,5 +17,13 @@ public:
 
     UPROPERTY(BlueprintReadWrite)
     bool bIsAI;
+
+    /** Army units available for placement. */
+    UPROPERTY(BlueprintReadWrite)
+    int32 ArmyPool;
+
+    /** Initiative roll determining turn order. */
+    UPROPERTY(BlueprintReadWrite)
+    int32 InitiativeRoll;
 };
 

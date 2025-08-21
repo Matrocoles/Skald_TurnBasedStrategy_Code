@@ -8,9 +8,10 @@ ATerritory::ATerritory()
     MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
     RootComponent = MeshComponent;
 
-    Owner = nullptr;
+    OwningPlayer = nullptr;
     Resources = 0;
     TerritoryID = 0;
+    ArmyStrength = 0;
 }
 
 void ATerritory::BeginPlay()
