@@ -54,6 +54,10 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Territory")
     void Select();
 
+    /** Remove selection state from this territory. */
+    UFUNCTION(BlueprintCallable, Category = "Territory")
+    void Deselect();
+
     /** Check if another territory is adjacent to this one. */
     UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Territory")
     bool IsAdjacentTo(const ATerritory* Other) const;
