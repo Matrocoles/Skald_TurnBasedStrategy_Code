@@ -44,7 +44,7 @@ struct FTerritorySpawnData
 /**
  * Actor owning and managing all territories in the map.
  */
-UCLASS()
+UCLASS(Blueprintable, BlueprintType)
 class SKALD_API AWorldMap : public AActor
 {
     GENERATED_BODY()

@@ -68,3 +68,8 @@ void ASkaldPlayerController::MakeAIDecision()
     UE_LOG(LogTemp, Log, TEXT("AI %s making decision"), *GetName());
 }
 
+bool ASkaldPlayerController::IsAIController() const
+{
+    return bIsAI;
+}
+

@@ -7,7 +7,7 @@
 /**
  * Simple load game menu listing a few save slots.
  */
-UCLASS()
+UCLASS(Blueprintable, BlueprintType)
 class SKALD_API ULoadGameWidget : public UUserWidget
 {
     GENERATED_BODY()
@@ -15,13 +15,13 @@ class SKALD_API ULoadGameWidget : public UUserWidget
 protected:
     virtual void NativeConstruct() override;
 
-    UFUNCTION()
+    UFUNCTION(BlueprintCallable)
     void OnLoadSlot0();
 
-    UFUNCTION()
+    UFUNCTION(BlueprintCallable)
     void OnLoadSlot1();
 
-    UFUNCTION()
+    UFUNCTION(BlueprintCallable)
     void OnLoadSlot2();
 };
 

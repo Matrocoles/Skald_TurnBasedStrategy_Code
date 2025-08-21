@@ -10,7 +10,7 @@ class ASkaldPlayerController;
 /**
  * Handles turn sequencing for all registered player controllers.
  */
-UCLASS()
+UCLASS(Blueprintable, BlueprintType)
 class SKALD_API ATurnManager : public AActor
 {
     GENERATED_BODY()
@@ -20,15 +20,23 @@ public:
 
     virtual void BeginPlay() override;
 
+    UFUNCTION(BlueprintCallable, Category="Turn")
     void RegisterController(ASkaldPlayerController* Controller);
+
+    UFUNCTION(BlueprintCallable, Category="Turn")
     void StartTurns();
+
+    UFUNCTION(BlueprintCallable, Category="Turn")
     void AdvanceTurn();
+
+    UFUNCTION(BlueprintCallable, Category="Turn")
     void SortControllersByInitiative();
 
 protected:
-    UPROPERTY()
+    UPROPERTY(BlueprintReadOnly, Category="Turn")
     TArray<ASkaldPlayerController*> Controllers;
 
+    UPROPERTY(BlueprintReadOnly, Category="Turn")
     int32 CurrentIndex;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Turn")
