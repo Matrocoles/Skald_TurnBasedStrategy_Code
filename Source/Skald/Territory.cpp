@@ -5,7 +5,6 @@
 #include "Components/PrimitiveComponent.h"
 #include "WorldMap.h"
 #include "Kismet/GameplayStatics.h"
-#include "Engine/World.h"
 
 ATerritory::ATerritory()
 {
@@ -16,6 +15,9 @@ ATerritory::ATerritory()
     OwningPlayer = nullptr;
     Resources = 0;
     TerritoryID = 0;
+    TerritoryName = TEXT("");
+    bIsCapital = false;
+    ContinentID = 0;
     ArmyStrength = 0;
 }
 
@@ -47,6 +49,11 @@ void ATerritory::BeginPlay()
 
 void ATerritory::Select()
 {
+    if (bIsSelected)
+    {
+        return;
+    }
+
     bIsSelected = true;
     if (DynamicMaterial)
     {
@@ -84,6 +91,9 @@ bool ATerritory::MoveTo(ATerritory* TargetTerritory)
     }
 
     // Movement logic would be handled here. For now we simply select the target.
+    // Movement logic would be handled here. For now we simply deselect this territory
+    // and select the target.
+    Deselect();
     TargetTerritory->Select();
     return true;
 }
@@ -107,5 +117,8 @@ void ATerritory::HandleMouseLeave(UPrimitiveComponent* TouchedComponent)
 void ATerritory::HandleClicked(UPrimitiveComponent* TouchedComponent, FKey ButtonPressed)
 {
     Select();
+    if (!bIsSelected)
+    {
+        Select();
+    }
 }
-
