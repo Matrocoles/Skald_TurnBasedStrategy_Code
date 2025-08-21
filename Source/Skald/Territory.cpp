@@ -44,6 +44,15 @@ void ATerritory::Select()
     OnTerritorySelected.Broadcast(this);
 }
 
+void ATerritory::Deselect()
+{
+    bIsSelected = false;
+    if (DynamicMaterial)
+    {
+        DynamicMaterial->SetVectorParameterValue(FName("Color"), DefaultColor);
+    }
+}
+
 bool ATerritory::IsAdjacentTo(const ATerritory* Other) const
 {
     for (const ATerritory* Adjacent : AdjacentTerritories)
