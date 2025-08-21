@@ -3,6 +3,8 @@
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Components/PrimitiveComponent.h"
+#include "WorldMap.h"
+#include "Kismet/GameplayStatics.h"
 
 ATerritory::ATerritory()
 {
@@ -13,6 +15,9 @@ ATerritory::ATerritory()
     OwningPlayer = nullptr;
     Resources = 0;
     TerritoryID = 0;
+    TerritoryName = TEXT("");
+    bIsCapital = false;
+    ContinentID = 0;
     ArmyStrength = 0;
 }
 
@@ -32,6 +37,14 @@ void ATerritory::BeginPlay()
             DynamicMaterial->GetVectorParameterValue(FName("Color"), DefaultColor);
         }
     }
+
+    // Automatically register this territory with the world map so that
+    // selection and movement logic can be centrally managed without any
+    // additional setup in Blueprints or the level.
+    if (AWorldMap* WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass())))
+    {
+        WorldMap->RegisterTerritory(this);
+    }
 }
 
 void ATerritory::Select()
@@ -42,6 +55,15 @@ void ATerritory::Select()
         DynamicMaterial->SetVectorParameterValue(FName("Color"), FLinearColor::Yellow);
     }
     OnTerritorySelected.Broadcast(this);
+}
+
+void ATerritory::Deselect()
+{
+    bIsSelected = false;
+    if (DynamicMaterial)
+    {
+        DynamicMaterial->SetVectorParameterValue(FName("Color"), DefaultColor);
+    }
 }
 
 bool ATerritory::IsAdjacentTo(const ATerritory* Other) const

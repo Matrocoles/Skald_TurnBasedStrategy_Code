@@ -38,6 +38,18 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory")
     int32 TerritoryID = 0;
 
+    /** Display name for this territory. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory")
+    FString TerritoryName;
+
+    /** Whether this territory is a capital. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory")
+    bool bIsCapital = false;
+
+    /** Optional identifier describing which continent this territory belongs to. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory")
+    int32 ContinentID = 0;
+
     /** Adjacent territories that units may move to. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory")
     TArray<ATerritory*> AdjacentTerritories;
@@ -53,6 +65,10 @@ public:
     /** Mark this territory as selected. */
     UFUNCTION(BlueprintCallable, Category = "Territory")
     void Select();
+
+    /** Remove selection state from this territory. */
+    UFUNCTION(BlueprintCallable, Category = "Territory")
+    void Deselect();
 
     /** Check if another territory is adjacent to this one. */
     UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Territory")
