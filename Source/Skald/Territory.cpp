@@ -5,6 +5,7 @@
 #include "Components/PrimitiveComponent.h"
 #include "WorldMap.h"
 #include "Kismet/GameplayStatics.h"
+#include "Engine/World.h"
 
 ATerritory::ATerritory()
 {

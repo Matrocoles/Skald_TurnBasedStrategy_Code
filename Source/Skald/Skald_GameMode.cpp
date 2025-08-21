@@ -98,8 +98,9 @@ void ASkaldGameMode::InitializeWorld()
     {
         if (Territory && PlayerCount > 0)
         {
-            ASkaldPlayerState* Owner = Cast<ASkaldPlayerState>(GS->PlayerArray[Index % PlayerCount]);
-            Territory->OwningPlayer = Owner;
+            // Rename local variable to avoid hiding AActor::Owner
+            ASkaldPlayerState* TerritoryOwner = Cast<ASkaldPlayerState>(GS->PlayerArray[Index % PlayerCount]);
+            Territory->OwningPlayer = TerritoryOwner;
             Territory->ArmyStrength = 1;
             ++Index;
         }
