@@ -5,6 +5,7 @@
 #include "Skald_PlayerController.generated.h"
 
 class ATurnManager;
+class UUserWidget;
 
 /**
  * Player controller capable of participating in turn based gameplay.
@@ -23,13 +24,29 @@ public:
     void EndTurn();
     void MakeAIDecision();
     bool IsAIController() const { return bIsAI; }
+
+    /** Set the turn manager responsible for sequencing play. */
+    UFUNCTION(BlueprintCallable, Category="Turn")
     void SetTurnManager(ATurnManager* Manager);
 
 protected:
     /** Whether this controller is controlled by AI. */
     bool bIsAI;
 
-    UPROPERTY()
-    ATurnManager* TurnManager;
+    /** Widget class to instantiate for the player's HUD. */
+    UPROPERTY(EditDefaultsOnly, Category="UI")
+    TSubclassOf<UUserWidget> HUDWidgetClass;
+
+    /** Reference to the HUD widget instance. */
+    UPROPERTY(BlueprintReadOnly, Category="UI", meta=(AllowPrivateAccess="true"))
+    TObjectPtr<UUserWidget> HUDRef;
+
+    /** Reference to the game's turn manager.
+     *  Exposed to Blueprints so BP_Skald_PlayerController can bind to
+     *  turn events without keeping an external pointer that might be
+     *  uninitialised.
+     */
+    UPROPERTY(BlueprintReadOnly, Category="Turn", meta=(AllowPrivateAccess="true"))
+    TObjectPtr<ATurnManager> TurnManager;
 };
 
