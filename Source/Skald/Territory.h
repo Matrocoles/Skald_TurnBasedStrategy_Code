@@ -39,6 +39,10 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory")
     TArray<ATerritory*> AdjacentTerritories;
 
+    /** Number of armies stationed in this territory. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory")
+    int32 ArmyStrength = 0;
+
     /** Called when the territory is selected. */
     UPROPERTY(BlueprintAssignable, Category = "Territory")
     FTerritorySelectedSignature OnTerritorySelected;
