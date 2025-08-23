@@ -36,11 +36,11 @@ void ATurnManager::AdvanceTurn() {
 
 void ATurnManager::SortControllersByInitiative() {
   Controllers.Sort(
-      [](const ASkaldPlayerController *A, const ASkaldPlayerController *B) {
+      [](const ASkaldPlayerController &A, const ASkaldPlayerController &B) {
         const ASkaldPlayerState *PSA =
-            A ? A->GetPlayerState<ASkaldPlayerState>() : nullptr;
+            A.GetPlayerState<ASkaldPlayerState>();
         const ASkaldPlayerState *PSB =
-            B ? B->GetPlayerState<ASkaldPlayerState>() : nullptr;
+            B.GetPlayerState<ASkaldPlayerState>();
         const int32 RollA = PSA ? PSA->InitiativeRoll : 0;
         const int32 RollB = PSB ? PSB->InitiativeRoll : 0;
         return RollA > RollB;

@@ -5,11 +5,12 @@ using System.Collections.Generic;
 
 public class SkaldEditorTarget : TargetRules
 {
-	public SkaldEditorTarget(TargetInfo Target) : base(Target)
-	{
-		Type = TargetType.Editor;
-		DefaultBuildSettings = BuildSettingsVersion.V5;
+        public SkaldEditorTarget(TargetInfo Target) : base(Target)
+        {
+                Type = TargetType.Editor;
+                DefaultBuildSettings = BuildSettingsVersion.V5;
+                IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_5;
 
-		ExtraModuleNames.AddRange( new string[] { "Skald" } );
-	}
+                ExtraModuleNames.AddRange( new string[] { "Skald" } );
+        }
 }
