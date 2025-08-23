@@ -6,6 +6,15 @@
 #include "WorldMap.h"
 #include "Territory.h"
 #include "Engine/World.h"
+#include "TimerManager.h"
+
+namespace
+{
+    constexpr int32 ExpectedPlayerCount = 2;
+    constexpr float StartGameTimeout = 10.f;
+    FTimerHandle StartGameTimerHandle;
+    bool bTurnsStarted = false;
+}
 
 ASkaldGameMode::ASkaldGameMode()
 {
@@ -35,6 +44,20 @@ void ASkaldGameMode::BeginPlay()
     }
 
     InitializeWorld();
+
+    GetWorldTimerManager().SetTimer(
+        StartGameTimerHandle,
+        FTimerDelegate::CreateLambda([this]()
+        {
+            if (!bTurnsStarted && TurnManager)
+            {
+                bTurnsStarted = true;
+                TurnManager->SortControllersByInitiative();
+                TurnManager->StartTurns();
+            }
+        }),
+        StartGameTimeout,
+        false);
 }
 
 void ASkaldGameMode::PostLogin(APlayerController* NewPlayer)
@@ -61,6 +84,17 @@ void ASkaldGameMode::PostLogin(APlayerController* NewPlayer)
                 if (PlayersData.Num() < GS->PlayerArray.Num())
                 {
                     PlayersData.SetNum(GS->PlayerArray.Num());
+                }
+            }
+
+            if (GS->PlayerArray.Num() >= ExpectedPlayerCount && !bTurnsStarted)
+            {
+                bTurnsStarted = true;
+                GetWorldTimerManager().ClearTimer(StartGameTimerHandle);
+                if (TurnManager)
+                {
+                    TurnManager->SortControllersByInitiative();
+                    TurnManager->StartTurns();
                 }
             }
         }
@@ -128,10 +162,5 @@ void ASkaldGameMode::InitializeWorld()
         PS->InitiativeRoll = FMath::RandRange(1, 6);
     }
 
-    if (TurnManager)
-    {
-        TurnManager->SortControllersByInitiative();
-        TurnManager->StartTurns();
-    }
 }
 

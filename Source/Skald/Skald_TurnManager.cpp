@@ -19,11 +19,6 @@ void ATurnManager::RegisterController(ASkaldPlayerController* Controller)
     {
         Controllers.Add(Controller);
         Controller->SetTurnManager(this);
-
-        if (Controllers.Num() == 1)
-        {
-            StartTurns();
-        }
     }
 }
 
