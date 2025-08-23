@@ -6,11 +6,13 @@ ASkaldGameState::ASkaldGameState()
 {
 }
 
-void ASkaldGameState::AddPlayerState(ASkaldPlayerState* PlayerState)
+void ASkaldGameState::AddPlayerState(APlayerState* PlayerState)
 {
-    if (PlayerState)
+    Super::AddPlayerState(PlayerState);
+
+    if (ASkaldPlayerState* SkaldPlayer = Cast<ASkaldPlayerState>(PlayerState))
     {
-        Players.Add(PlayerState);
+        Players.Add(SkaldPlayer);
     }
 }
 

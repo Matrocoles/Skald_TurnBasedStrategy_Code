@@ -91,7 +91,7 @@ void AWorldMap::RegisterTerritory(ATerritory *Territory) {
 }
 
 ATerritory *AWorldMap::GetTerritoryById(int32 TerritoryId) const {
-  if (ATerritory **Found = Territories.FindByPredicate(
+  if (ATerritory * const* Found = Territories.FindByPredicate(
           [TerritoryId](ATerritory *Territory) {
             return Territory && Territory->TerritoryID == TerritoryId;
           })) {

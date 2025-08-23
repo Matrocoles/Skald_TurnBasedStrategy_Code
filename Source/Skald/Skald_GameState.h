@@ -25,8 +25,7 @@ public:
     UPROPERTY(BlueprintReadOnly, Category="GameState")
     int32 CurrentTurnIndex;
 
-    UFUNCTION(BlueprintCallable, Category="GameState")
-    void AddPlayerState(ASkaldPlayerState* PlayerState);
+    virtual void AddPlayerState(APlayerState* PlayerState) override;
 
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="GameState")
     ASkaldPlayerState* GetCurrentPlayer() const;
