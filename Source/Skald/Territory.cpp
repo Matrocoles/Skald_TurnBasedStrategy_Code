@@ -1,131 +1,103 @@
 #include "Territory.h"
-#include "Skald_PlayerState.h"
+#include "Components/PrimitiveComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
-#include "Components/PrimitiveComponent.h"
-#include "WorldMap.h"
-#include "Kismet/GameplayStatics.h"
+#include "Skald_PlayerState.h"
 
-ATerritory::ATerritory()
-{
-    PrimaryActorTick.bCanEverTick = false;
-    MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
-    RootComponent = MeshComponent;
+ATerritory::ATerritory() {
+  PrimaryActorTick.bCanEverTick = false;
+  MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
+  RootComponent = MeshComponent;
 
-    OwningPlayer = nullptr;
-    Resources = 0;
-    TerritoryID = 0;
-    TerritoryName = TEXT("");
-    bIsCapital = false;
-    ContinentID = 0;
-    ArmyStrength = 0;
+  OwningPlayer = nullptr;
+  Resources = 0;
+  TerritoryID = 0;
+  TerritoryName = TEXT("");
+  bIsCapital = false;
+  ContinentID = 0;
+  ArmyStrength = 0;
 }
 
-void ATerritory::BeginPlay()
-{
-    Super::BeginPlay();
+void ATerritory::BeginPlay() {
+  Super::BeginPlay();
 
-    if (MeshComponent)
-    {
-        MeshComponent->OnBeginCursorOver.AddDynamic(this, &ATerritory::HandleMouseEnter);
-        MeshComponent->OnEndCursorOver.AddDynamic(this, &ATerritory::HandleMouseLeave);
-        MeshComponent->OnClicked.AddDynamic(this, &ATerritory::HandleClicked);
+  if (MeshComponent) {
+    MeshComponent->OnBeginCursorOver.AddDynamic(this,
+                                                &ATerritory::HandleMouseEnter);
+    MeshComponent->OnEndCursorOver.AddDynamic(this,
+                                              &ATerritory::HandleMouseLeave);
+    MeshComponent->OnClicked.AddDynamic(this, &ATerritory::HandleClicked);
 
-        DynamicMaterial = MeshComponent->CreateAndSetMaterialInstanceDynamic(0);
-        if (DynamicMaterial)
-        {
-            DynamicMaterial->GetVectorParameterValue(FName("Color"), DefaultColor);
-        }
+    DynamicMaterial = MeshComponent->CreateAndSetMaterialInstanceDynamic(0);
+    if (DynamicMaterial) {
+      DynamicMaterial->GetVectorParameterValue(FName("Color"), DefaultColor);
     }
+  }
 
-    // Automatically register this territory with the world map so that
-    // selection and movement logic can be centrally managed without any
-    // additional setup in Blueprints or the level.
-    // Use this actor as the world context when searching for the world map.
-    // Passing the world directly caused a compile error because the
-    // GameplayStatics helper expects a UObject rather than a UWorld pointer.
-    if (AWorldMap* WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(this, AWorldMap::StaticClass())))
-    {
-        WorldMap->RegisterTerritory(this);
-    }
+  // Territories are registered with the world map immediately after
+  // spawning, so no self-registration is required here.
 }
 
-void ATerritory::Select()
-{
-    if (bIsSelected)
-    {
-        return;
-    }
+void ATerritory::Select() {
+  if (bIsSelected) {
+    return;
+  }
 
-    bIsSelected = true;
-    if (DynamicMaterial)
-    {
-        DynamicMaterial->SetVectorParameterValue(FName("Color"), FLinearColor::Yellow);
-    }
-    OnTerritorySelected.Broadcast(this);
+  bIsSelected = true;
+  if (DynamicMaterial) {
+    DynamicMaterial->SetVectorParameterValue(FName("Color"),
+                                             FLinearColor::Yellow);
+  }
+  OnTerritorySelected.Broadcast(this);
 }
 
-void ATerritory::Deselect()
-{
-    bIsSelected = false;
-    if (DynamicMaterial)
-    {
-        DynamicMaterial->SetVectorParameterValue(FName("Color"), DefaultColor);
-    }
+void ATerritory::Deselect() {
+  bIsSelected = false;
+  if (DynamicMaterial) {
+    DynamicMaterial->SetVectorParameterValue(FName("Color"), DefaultColor);
+  }
 }
 
-bool ATerritory::IsAdjacentTo(const ATerritory* Other) const
-{
-    for (const ATerritory* Adjacent : AdjacentTerritories)
-    {
-        if (Adjacent == Other)
-        {
-            return true;
-        }
+bool ATerritory::IsAdjacentTo(const ATerritory *Other) const {
+  for (const ATerritory *Adjacent : AdjacentTerritories) {
+    if (Adjacent == Other) {
+      return true;
     }
+  }
+  return false;
+}
+
+bool ATerritory::MoveTo(ATerritory *TargetTerritory) {
+  if (!TargetTerritory || !IsAdjacentTo(TargetTerritory)) {
     return false;
+  }
+
+  // Movement logic would be handled here. For now we simply select the target.
+  // Movement logic would be handled here. For now we simply deselect this
+  // territory and select the target.
+  Deselect();
+  TargetTerritory->Select();
+  return true;
 }
 
-bool ATerritory::MoveTo(ATerritory* TargetTerritory)
-{
-    if (!TargetTerritory || !IsAdjacentTo(TargetTerritory))
-    {
-        return false;
-    }
+void ATerritory::HandleMouseEnter(UPrimitiveComponent *TouchedComponent) {
+  if (DynamicMaterial && !bIsSelected) {
+    DynamicMaterial->SetVectorParameterValue(FName("Color"),
+                                             FLinearColor::White);
+  }
+}
 
-    // Movement logic would be handled here. For now we simply select the target.
-    // Movement logic would be handled here. For now we simply deselect this territory
-    // and select the target.
+void ATerritory::HandleMouseLeave(UPrimitiveComponent *TouchedComponent) {
+  if (DynamicMaterial && !bIsSelected) {
+    DynamicMaterial->SetVectorParameterValue(FName("Color"), DefaultColor);
+  }
+}
+
+void ATerritory::HandleClicked(UPrimitiveComponent *TouchedComponent,
+                               FKey ButtonPressed) {
+  if (!bIsSelected) {
+    Select();
+  } else {
     Deselect();
-    TargetTerritory->Select();
-    return true;
+  }
 }
-
-void ATerritory::HandleMouseEnter(UPrimitiveComponent* TouchedComponent)
-{
-    if (DynamicMaterial && !bIsSelected)
-    {
-        DynamicMaterial->SetVectorParameterValue(FName("Color"), FLinearColor::White);
-    }
-}
-
-void ATerritory::HandleMouseLeave(UPrimitiveComponent* TouchedComponent)
-{
-    if (DynamicMaterial && !bIsSelected)
-    {
-        DynamicMaterial->SetVectorParameterValue(FName("Color"), DefaultColor);
-    }
-}
-
-void ATerritory::HandleClicked(UPrimitiveComponent* TouchedComponent, FKey ButtonPressed)
-{
-    if (!bIsSelected)
-    {
-        Select();
-    }
-    else
-    {
-        Deselect();
-    }
-}
-

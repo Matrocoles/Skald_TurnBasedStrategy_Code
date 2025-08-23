@@ -1,6 +1,6 @@
 #include "WorldMap.h"
-#include "Territory.h"
 #include "Engine/World.h"
+#include "Territory.h"
 
 // Table describing each territory that should exist in the world. This
 // mirrors the data supplied by design and is used to spawn the territories at
@@ -48,87 +48,73 @@ const TArray<FTerritorySpawnData> AWorldMap::DefaultTerritories = {
     FTerritorySpawnData(39, TEXT("Armens Grasp"), false, 5),
     FTerritorySpawnData(40, TEXT("Volkridge"), true, 5),
     FTerritorySpawnData(41, TEXT("Bakas"), false, 5),
-    FTerritorySpawnData(42, TEXT("Kesis"), false, 5)
-};
+    FTerritorySpawnData(42, TEXT("Kesis"), false, 5)};
 
-AWorldMap::AWorldMap()
-{
-    PrimaryActorTick.bCanEverTick = false;
-    SelectedTerritory = nullptr;
+AWorldMap::AWorldMap() {
+  PrimaryActorTick.bCanEverTick = false;
+  SelectedTerritory = nullptr;
 }
 
-void AWorldMap::BeginPlay()
-{
-    Super::BeginPlay();
+void AWorldMap::BeginPlay() {
+  Super::BeginPlay();
 
-    if (!TerritoryClass)
-    {
-        return;
+  if (!TerritoryClass) {
+    return;
+  }
+
+  // Spawn each predefined territory at a random location inside the spawn area.
+  for (const FTerritorySpawnData &Data : DefaultTerritories) {
+    const float X = FMath::FRandRange(SpawnAreaMin.X, SpawnAreaMax.X);
+    const float Y = FMath::FRandRange(SpawnAreaMin.Y, SpawnAreaMax.Y);
+    const FVector SpawnLocation = GetActorLocation() + FVector(X, Y, 0.f);
+
+    FActorSpawnParameters Params;
+    Params.Owner = this;
+    ATerritory *Territory = GetWorld()->SpawnActor<ATerritory>(
+        TerritoryClass, SpawnLocation, FRotator::ZeroRotator, Params);
+    if (Territory) {
+      Territory->TerritoryID = Data.TerritoryID;
+      Territory->TerritoryName = Data.TerritoryName;
+      Territory->bIsCapital = Data.bIsCapital;
+      Territory->ContinentID = Data.ContinentID;
+      RegisterTerritory(Territory);
     }
-
-    // Spawn each predefined territory at a random location inside the spawn area.
-    for (const FTerritorySpawnData& Data : DefaultTerritories)
-    {
-        const float X = FMath::FRandRange(SpawnAreaMin.X, SpawnAreaMax.X);
-        const float Y = FMath::FRandRange(SpawnAreaMin.Y, SpawnAreaMax.Y);
-        const FVector SpawnLocation = GetActorLocation() + FVector(X, Y, 0.f);
-
-        FActorSpawnParameters Params;
-        ATerritory* Territory = GetWorld()->SpawnActor<ATerritory>(TerritoryClass, SpawnLocation, FRotator::ZeroRotator, Params);
-        if (Territory)
-        {
-            Territory->TerritoryID = Data.TerritoryID;
-            Territory->TerritoryName = Data.TerritoryName;
-            Territory->bIsCapital = Data.bIsCapital;
-            Territory->ContinentID = Data.ContinentID;
-            RegisterTerritory(Territory);
-        }
-    }
+  }
 }
 
-void AWorldMap::RegisterTerritory(ATerritory* Territory)
-{
-    if (Territory && !Territories.Contains(Territory))
-    {
-        Territories.Add(Territory);
-        Territory->OnTerritorySelected.AddDynamic(this, &AWorldMap::SelectTerritory);
-    }
+void AWorldMap::RegisterTerritory(ATerritory *Territory) {
+  if (Territory && !Territories.Contains(Territory)) {
+    Territories.Add(Territory);
+    Territory->OnTerritorySelected.AddDynamic(this,
+                                              &AWorldMap::SelectTerritory);
+  }
 }
 
-ATerritory* AWorldMap::GetTerritoryById(int32 TerritoryId) const
-{
-    for (ATerritory* Territory : Territories)
-    {
-        if (Territory && Territory->TerritoryID == TerritoryId)
-        {
-            return Territory;
-        }
+ATerritory *AWorldMap::GetTerritoryById(int32 TerritoryId) const {
+  for (ATerritory *Territory : Territories) {
+    if (Territory && Territory->TerritoryID == TerritoryId) {
+      return Territory;
     }
-    return nullptr;
+  }
+  return nullptr;
 }
 
-void AWorldMap::SelectTerritory(ATerritory* Territory)
-{
-    if (Territory == SelectedTerritory)
-    {
-        return;
-    }
+void AWorldMap::SelectTerritory(ATerritory *Territory) {
+  if (Territory == SelectedTerritory) {
+    return;
+  }
 
-    if (SelectedTerritory)
-    {
-        SelectedTerritory->Deselect();
-    }
+  if (SelectedTerritory) {
+    SelectedTerritory->Deselect();
+  }
 
-    SelectedTerritory = Territory;
+  SelectedTerritory = Territory;
 }
 
-bool AWorldMap::MoveBetween(ATerritory* From, ATerritory* To)
-{
-    if (!From || !To)
-    {
-        return false;
-    }
+bool AWorldMap::MoveBetween(ATerritory *From, ATerritory *To) {
+  if (!From || !To) {
+    return false;
+  }
 
-    return From->MoveTo(To);
+  return From->MoveTo(To);
 }
-
