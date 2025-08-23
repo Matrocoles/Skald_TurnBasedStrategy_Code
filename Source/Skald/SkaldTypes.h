@@ -6,7 +6,7 @@
 // Keep generated.h last among includes in this header!
 
 UENUM(BlueprintType)
-enum class E_TurnPhase : uint8
+enum class ETurnPhase : uint8
 {
     Reinforcement UMETA(DisplayName = "Reinforcement"),
     Attack        UMETA(DisplayName = "Attack"),
@@ -18,7 +18,7 @@ enum class E_TurnPhase : uint8
 };
 
 UENUM(BlueprintType)
-enum class E_SiegeWeapons : uint8   // (Consider “E” prefix instead of “Enum_” for UE style)
+enum class E_SiegeWeapons : uint8   // (Consider E prefix instead of Enum_ for UE style)
 {
     BatteringRam UMETA(DisplayName = "BatteringRam"),
     Trebuchet    UMETA(DisplayName = "Trebuchet"),

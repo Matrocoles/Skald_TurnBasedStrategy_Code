@@ -40,7 +40,7 @@ protected:
     int32 CurrentIndex;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Turn")
-    E_TurnPhase CurrentPhase = E_TurnPhase::Reinforcement;
+    ETurnPhase CurrentPhase = ETurnPhase::Reinforcement;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Turn")
     FS_BattlePayload PendingBattle;

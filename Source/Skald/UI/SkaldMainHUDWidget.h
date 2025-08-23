@@ -5,8 +5,6 @@
 #include "SkaldTypes.h"
 #include "SkaldMainHUDWidget.generated.h"
 
-// Alias existing enum to expected name without underscore
-using ETurnPhase = E_TurnPhase;
 
 // Delegates broadcasting user UI actions to game logic
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FSkaldAttackRequested, int32, FromID, int32, ToID, int32, ArmySent);
