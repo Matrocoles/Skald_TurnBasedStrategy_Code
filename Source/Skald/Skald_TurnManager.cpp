@@ -1,6 +1,7 @@
 #include "Skald_TurnManager.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
+#include "Kismet/GameplayStatics.h"
 
 ATurnManager::ATurnManager() {
   PrimaryActorTick.bCanEverTick = false;
@@ -44,4 +45,10 @@ void ATurnManager::SortControllersByInitiative() {
         const int32 RollB = PSB ? PSB->InitiativeRoll : 0;
         return RollA > RollB;
       });
+}
+
+void ATurnManager::TriggerGridBattle(const FS_BattlePayload& Battle) {
+  PendingBattle = Battle;
+  // Load a battle map where the grid based combat takes place.
+  UGameplayStatics::OpenLevel(this, FName("BattleMap"));
 }

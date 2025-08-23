@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerState.h"
+#include "SkaldTypes.h"
 #include "Skald_PlayerState.generated.h"
 
 /**
@@ -25,5 +26,13 @@ public:
     /** Initiative roll determining turn order. */
     UPROPERTY(BlueprintReadWrite, Category="PlayerState")
     int32 InitiativeRoll;
+
+    /** Player chosen display name. */
+    UPROPERTY(BlueprintReadWrite, Category="PlayerState")
+    FString DisplayName;
+
+    /** Selected faction for this player. */
+    UPROPERTY(BlueprintReadWrite, Category="PlayerState")
+    EFaction Faction;
 };
 

@@ -4,6 +4,7 @@
 #include "Components/VerticalBox.h"
 #include "Blueprint/WidgetTree.h"
 #include "Kismet/GameplayStatics.h"
+#include "PlayerSetupWidget.h"
 
 void UStartGameWidget::NativeConstruct()
 {
@@ -33,11 +34,31 @@ void UStartGameWidget::NativeConstruct()
 
 void UStartGameWidget::OnSingleplayer()
 {
-    UGameplayStatics::OpenLevel(this, FName("OverviewMap"));
+    if (UWorld* World = GetWorld())
+    {
+        TSubclassOf<UPlayerSetupWidget> ClassToUse = PlayerSetupWidgetClass
+            ? PlayerSetupWidgetClass
+            : UPlayerSetupWidget::StaticClass();
+        if (UPlayerSetupWidget* Widget = CreateWidget<UPlayerSetupWidget>(World, ClassToUse))
+        {
+            Widget->bMultiplayer = false;
+            Widget->AddToViewport();
+        }
+    }
 }
 
 void UStartGameWidget::OnMultiplayer()
 {
-    UGameplayStatics::OpenLevel(this, FName("OverviewMap"), true, TEXT("listen"));
+    if (UWorld* World = GetWorld())
+    {
+        TSubclassOf<UPlayerSetupWidget> ClassToUse = PlayerSetupWidgetClass
+            ? PlayerSetupWidgetClass
+            : UPlayerSetupWidget::StaticClass();
+        if (UPlayerSetupWidget* Widget = CreateWidget<UPlayerSetupWidget>(World, ClassToUse))
+        {
+            Widget->bMultiplayer = true;
+            Widget->AddToViewport();
+        }
+    }
 }
 
