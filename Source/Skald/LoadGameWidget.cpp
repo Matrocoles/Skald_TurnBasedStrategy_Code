@@ -4,6 +4,7 @@
 #include "Components/VerticalBox.h"
 #include "Blueprint/WidgetTree.h"
 #include "Kismet/GameplayStatics.h"
+#include "GameFramework/SaveGame.h"
 
 static const TCHAR* SlotNames[3] = { TEXT("Slot0"), TEXT("Slot1"), TEXT("Slot2") };
 
@@ -46,19 +47,29 @@ void ULoadGameWidget::NativeConstruct()
 
 void ULoadGameWidget::OnLoadSlot0()
 {
-    UGameplayStatics::LoadGameFromSlot(SlotNames[0], 0);
-    UGameplayStatics::OpenLevel(this, FName("OverviewMap"));
+    HandleLoadSlot(0);
 }
 
 void ULoadGameWidget::OnLoadSlot1()
 {
-    UGameplayStatics::LoadGameFromSlot(SlotNames[1], 0);
-    UGameplayStatics::OpenLevel(this, FName("OverviewMap"));
+    HandleLoadSlot(1);
 }
 
 void ULoadGameWidget::OnLoadSlot2()
 {
-    UGameplayStatics::LoadGameFromSlot(SlotNames[2], 0);
-    UGameplayStatics::OpenLevel(this, FName("OverviewMap"));
+    HandleLoadSlot(2);
+}
+
+void ULoadGameWidget::HandleLoadSlot(int32 SlotIndex)
+{
+    USaveGame* LoadedGame = UGameplayStatics::LoadGameFromSlot(SlotNames[SlotIndex], 0);
+    if (LoadedGame)
+    {
+        UGameplayStatics::OpenLevel(this, FName("OverviewMap"));
+    }
+    else
+    {
+        UE_LOG(LogTemp, Error, TEXT("Failed to load save slot %s"), SlotNames[SlotIndex]);
+    }
 }
 
