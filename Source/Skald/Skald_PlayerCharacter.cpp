@@ -9,6 +9,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Engine/World.h"
 #include "Components/InputComponent.h"
+#include "GameFramework/PlayerController.h"
 
 // Sets default values
 ASkald_PlayerCharacter::ASkald_PlayerCharacter()
@@ -74,13 +75,14 @@ void ASkald_PlayerCharacter::MoveRight(float Value)
 
 void ASkald_PlayerCharacter::Select()
 {
-        if (!Controller)
+        APlayerController* PlayerController = Cast<APlayerController>(Controller);
+        if (!PlayerController)
         {
                 return;
         }
 
         FHitResult Hit;
-        if (GetWorld()->GetFirstPlayerController()->GetHitResultUnderCursor(ECC_Visibility, false, Hit))
+        if (PlayerController->GetHitResultUnderCursor(ECC_Visibility, false, Hit))
         {
                 if (ATerritory* Territory = Cast<ATerritory>(Hit.GetActor()))
                 {
