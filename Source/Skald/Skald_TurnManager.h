@@ -32,6 +32,10 @@ public:
     UFUNCTION(BlueprintCallable, Category="Turn")
     void SortControllersByInitiative();
 
+    /** Transition into the grid based battle mode using the provided payload. */
+    UFUNCTION(BlueprintCallable, Category="Battle")
+    void TriggerGridBattle(const FS_BattlePayload& Battle);
+
 protected:
     UPROPERTY(BlueprintReadOnly, Category="Turn")
     TArray<ASkaldPlayerController*> Controllers;

@@ -1,0 +1,40 @@
+#include "PlayerSetupWidget.h"
+#include "Skald_PlayerState.h"
+#include "Kismet/GameplayStatics.h"
+#include "GameFramework/PlayerController.h"
+
+void UPlayerSetupWidget::NativeConstruct()
+{
+    Super::NativeConstruct();
+    // UI is expected to be created in Blueprint or elsewhere.
+    // Defaults
+    SelectedFaction = EFaction::None;
+    DisplayName = TEXT("Player");
+    bMultiplayer = false;
+}
+
+void UPlayerSetupWidget::OnFactionSelected(EFaction NewFaction)
+{
+    SelectedFaction = NewFaction;
+}
+
+void UPlayerSetupWidget::OnConfirm()
+{
+    if (APlayerController* PC = GetOwningPlayer())
+    {
+        if (ASkaldPlayerState* PS = PC->GetPlayerState<ASkaldPlayerState>())
+        {
+            PS->DisplayName = DisplayName;
+            PS->Faction = SelectedFaction;
+        }
+
+        FName LevelName(TEXT("OverviewMap"));
+        FString Options;
+        if (bMultiplayer)
+        {
+            Options = TEXT("listen");
+        }
+        UGameplayStatics::OpenLevel(this, LevelName, true, Options);
+    }
+}
+

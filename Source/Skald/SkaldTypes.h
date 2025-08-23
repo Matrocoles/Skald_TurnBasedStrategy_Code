@@ -17,6 +17,16 @@ enum class ETurnPhase : uint8
     Revolt        UMETA(DisplayName = "Revolt"),
 };
 
+/** Factions a player or fighter can belong to. */
+UENUM(BlueprintType)
+enum class EFaction : uint8
+{
+    None   UMETA(DisplayName = "None"),
+    Empire UMETA(DisplayName = "Empire"),
+    Orcs   UMETA(DisplayName = "Orcs"),
+    Undead UMETA(DisplayName = "Undead"),
+};
+
 UENUM(BlueprintType)
 enum class E_SiegeWeapons : uint8   // (Consider E prefix instead of Enum_ for UE style)
 {

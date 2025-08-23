@@ -4,6 +4,8 @@
 #include "Blueprint/UserWidget.h"
 #include "StartGameWidget.generated.h"
 
+class UPlayerSetupWidget;
+
 /**
  * Menu shown after pressing Start Game, to choose single or multiplayer.
  */
@@ -20,5 +22,9 @@ protected:
 
     UFUNCTION(BlueprintCallable)
     void OnMultiplayer();
+
+    /** Widget class used for player setup. */
+    UPROPERTY(EditDefaultsOnly, Category="UI")
+    TSubclassOf<UPlayerSetupWidget> PlayerSetupWidgetClass;
 };
 
