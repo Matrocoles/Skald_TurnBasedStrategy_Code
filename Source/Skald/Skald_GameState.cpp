@@ -2,8 +2,8 @@
 #include "Skald_PlayerState.h"
 
 ASkaldGameState::ASkaldGameState()
+    : CurrentTurnIndex(0)
 {
-    CurrentTurnIndex = 0;
 }
 
 void ASkaldGameState::AddPlayerState(ASkaldPlayerState* PlayerState)

@@ -77,12 +77,7 @@ void ATerritory::Deselect() {
 }
 
 bool ATerritory::IsAdjacentTo(const ATerritory *Other) const {
-  for (const ATerritory *Adjacent : AdjacentTerritories) {
-    if (Adjacent == Other) {
-      return true;
-    }
-  }
-  return false;
+  return AdjacentTerritories.Contains(Other);
 }
 
 bool ATerritory::MoveTo(ATerritory *TargetTerritory) {

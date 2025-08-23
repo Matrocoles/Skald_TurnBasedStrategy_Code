@@ -3,8 +3,8 @@
 #include "Blueprint/UserWidget.h"
 
 ALobbyGameMode::ALobbyGameMode()
+    : LobbyWidgetClass(ULobbyMenuWidget::StaticClass())
 {
-    LobbyWidgetClass = ULobbyMenuWidget::StaticClass();
 }
 
 void ALobbyGameMode::BeginPlay()
