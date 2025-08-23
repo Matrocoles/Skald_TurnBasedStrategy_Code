@@ -36,7 +36,9 @@ void UStartGameWidget::OnSingleplayer()
 {
     if (UWorld* World = GetWorld())
     {
-        TSubclassOf<UPlayerSetupWidget> ClassToUse = PlayerSetupWidgetClass ? PlayerSetupWidgetClass : UPlayerSetupWidget::StaticClass();
+        TSubclassOf<UPlayerSetupWidget> ClassToUse = PlayerSetupWidgetClass
+            ? PlayerSetupWidgetClass
+            : UPlayerSetupWidget::StaticClass();
         if (UPlayerSetupWidget* Widget = CreateWidget<UPlayerSetupWidget>(World, ClassToUse))
         {
             Widget->bMultiplayer = false;
@@ -49,7 +51,9 @@ void UStartGameWidget::OnMultiplayer()
 {
     if (UWorld* World = GetWorld())
     {
-        TSubclassOf<UPlayerSetupWidget> ClassToUse = PlayerSetupWidgetClass ? PlayerSetupWidgetClass : UPlayerSetupWidget::StaticClass();
+        TSubclassOf<UPlayerSetupWidget> ClassToUse = PlayerSetupWidgetClass
+            ? PlayerSetupWidgetClass
+            : UPlayerSetupWidget::StaticClass();
         if (UPlayerSetupWidget* Widget = CreateWidget<UPlayerSetupWidget>(World, ClassToUse))
         {
             Widget->bMultiplayer = true;
