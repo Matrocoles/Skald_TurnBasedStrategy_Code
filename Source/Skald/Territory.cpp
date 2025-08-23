@@ -3,9 +3,11 @@
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Skald_PlayerState.h"
+#include "Net/UnrealNetwork.h"
 
 ATerritory::ATerritory() {
   PrimaryActorTick.bCanEverTick = false;
+  bReplicates = true;
   MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
   RootComponent = MeshComponent;
 
@@ -34,8 +36,24 @@ void ATerritory::BeginPlay() {
     }
   }
 
+  UpdateTerritoryColor();
+
   // Territories are registered with the world map immediately after
   // spawning, so no self-registration is required here.
+}
+
+void ATerritory::GetLifetimeReplicatedProps(
+    TArray<FLifetimeProperty>& OutLifetimeProps) const {
+  Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+  DOREPLIFETIME(ATerritory, OwningPlayer);
+  DOREPLIFETIME(ATerritory, Resources);
+  DOREPLIFETIME(ATerritory, TerritoryID);
+  DOREPLIFETIME(ATerritory, TerritoryName);
+  DOREPLIFETIME(ATerritory, bIsCapital);
+  DOREPLIFETIME(ATerritory, ContinentID);
+  DOREPLIFETIME(ATerritory, AdjacentTerritories);
+  DOREPLIFETIME(ATerritory, ArmyStrength);
 }
 
 void ATerritory::Select() {
@@ -99,5 +117,17 @@ void ATerritory::HandleClicked(UPrimitiveComponent *TouchedComponent,
     Select();
   } else {
     Deselect();
+  }
+}
+
+void ATerritory::OnRep_OwningPlayer() { UpdateTerritoryColor(); }
+
+void ATerritory::UpdateTerritoryColor() {
+  if (DynamicMaterial) {
+    FLinearColor NewColor = DefaultColor;
+    if (OwningPlayer) {
+      NewColor = FLinearColor::Red;
+    }
+    DynamicMaterial->SetVectorParameterValue(FName("Color"), NewColor);
   }
 }

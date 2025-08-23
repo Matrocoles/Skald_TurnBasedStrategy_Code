@@ -26,36 +26,39 @@ public:
 
     virtual void BeginPlay() override;
 
+    virtual void GetLifetimeReplicatedProps(
+        TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
     /** Owning player of this territory (renamed to avoid AActor::Owner shadowing). */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory", meta = (DisplayName = "Owner"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory", meta = (DisplayName = "Owner"), ReplicatedUsing = OnRep_OwningPlayer)
     ASkaldPlayerState* OwningPlayer = nullptr;
 
     /** Amount of resources produced by this territory. */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory", Replicated)
     int32 Resources = 0;
 
     /** Unique identifier for this territory. */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory", Replicated)
     int32 TerritoryID = 0;
 
     /** Display name for this territory. */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory", Replicated)
     FString TerritoryName;
 
     /** Whether this territory is a capital. */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory", Replicated)
     bool bIsCapital = false;
 
     /** Optional identifier describing which continent this territory belongs to. */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory", Replicated)
     int32 ContinentID = 0;
 
     /** Adjacent territories that units may move to. */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory", Replicated)
     TArray<ATerritory*> AdjacentTerritories;
 
     /** Number of armies stationed in this territory. */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory", Replicated)
     int32 ArmyStrength = 0;
 
     /** Called when the territory is selected. */
@@ -90,6 +93,9 @@ public:
     UFUNCTION()
     void HandleClicked(UPrimitiveComponent* TouchedComponent, FKey ButtonPressed);
 
+    UFUNCTION()
+    void OnRep_OwningPlayer();
+
 protected:
     /** Visual representation of the territory. */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Territory")
@@ -104,4 +110,6 @@ protected:
 
     /** Whether the territory has been selected. */
     bool bIsSelected = false;
+
+    void UpdateTerritoryColor();
 };
