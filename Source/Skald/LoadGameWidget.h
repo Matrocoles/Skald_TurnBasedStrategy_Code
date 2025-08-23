@@ -23,5 +23,9 @@ protected:
 
     UFUNCTION(BlueprintCallable)
     void OnLoadSlot2();
+
+private:
+    /** Shared implementation for the individual load slot handlers. */
+    void HandleLoadSlot(int32 SlotIndex);
 };
 
