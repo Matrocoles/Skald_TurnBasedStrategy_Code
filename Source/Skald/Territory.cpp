@@ -30,9 +30,14 @@ void ATerritory::BeginPlay() {
                                               &ATerritory::HandleMouseLeave);
     MeshComponent->OnClicked.AddDynamic(this, &ATerritory::HandleClicked);
 
-    DynamicMaterial = MeshComponent->CreateAndSetMaterialInstanceDynamic(0);
-    if (DynamicMaterial) {
-      DynamicMaterial->GetVectorParameterValue(FName("Color"), DefaultColor);
+    if (MeshComponent->GetNumMaterials() > 0) {
+      DynamicMaterial = MeshComponent->CreateAndSetMaterialInstanceDynamic(0);
+      if (DynamicMaterial) {
+        DynamicMaterial->GetVectorParameterValue(FName("Color"), DefaultColor);
+      }
+    } else {
+      UE_LOG(LogTemp, Warning,
+             TEXT("Territory %s has no material at index 0"), *GetName());
     }
   }
 
