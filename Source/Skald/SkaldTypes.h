@@ -5,6 +5,13 @@
 
 // Keep generated.h last among includes in this header!
 
+// Gameplay-wide constants
+namespace SkaldConstants
+{
+    // Minimum army units required to attack a capital
+    static constexpr int32 CapitalAttackArmyRequirement = 10;
+}
+
 UENUM(BlueprintType)
 enum class ETurnPhase : uint8
 {
@@ -34,6 +41,19 @@ enum class EBattleStats : uint8
     Defense      UMETA(DisplayName = "Defense"),
     Speed        UMETA(DisplayName = "Speed"),
     // ...
+};
+
+// Factions available for players to choose at game start
+UENUM(BlueprintType)
+enum class EFaction : uint8
+{
+    Human       UMETA(DisplayName = "Human Faction"),
+    Orc         UMETA(DisplayName = "Orc Faction"),
+    Dwarf       UMETA(DisplayName = "Dwarf Faction"),
+    Elf         UMETA(DisplayName = "Elf Faction"),
+    LizardFolk  UMETA(DisplayName = "Lizard Folk Faction"),
+    Undead      UMETA(DisplayName = "Undead Faction"),
+    Gnoll       UMETA(DisplayName = "Gnoll Faction"),
 };
 
 USTRUCT(BlueprintType)
@@ -123,7 +143,7 @@ struct SKALD_API FS_PlayerData
     int32 Resources = 0;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
-    FString FactionName;
+    EFaction Faction = EFaction::Human;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     TArray<int32> CapitalTerritoryIDs;
@@ -225,7 +245,7 @@ struct SKALD_API FPlayerSaveStruct
     bool IsAI = false;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
-    FString FactionName;
+    EFaction Faction = EFaction::Human;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     TArray<int32> CapitalTerritoryIDs;
