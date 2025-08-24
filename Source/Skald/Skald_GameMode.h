@@ -42,5 +42,9 @@ protected:
     /** Setup initial territories, armies, and initiative. */
     UFUNCTION(BlueprintCallable, Category="GameMode")
     void InitializeWorld();
+
+    /** Allow players to position initial armies based on initiative. */
+    UFUNCTION(BlueprintCallable, Category="GameMode")
+    void BeginArmyPlacementPhase();
 };
 

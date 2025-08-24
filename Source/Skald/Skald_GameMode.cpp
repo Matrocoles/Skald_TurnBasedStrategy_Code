@@ -44,6 +44,7 @@ void ASkaldGameMode::BeginPlay()
     }
 
     InitializeWorld();
+    BeginArmyPlacementPhase();
 
     GetWorldTimerManager().SetTimer(
         StartGameTimerHandle,
@@ -98,6 +99,16 @@ void ASkaldGameMode::PostLogin(APlayerController* NewPlayer)
                 }
             }
         }
+    }
+}
+
+void ASkaldGameMode::BeginArmyPlacementPhase()
+{
+    if (TurnManager)
+    {
+        // Initiative order determines who places armies first. The actual
+        // placement UI is expected to be handled in blueprints.
+        TurnManager->SortControllersByInitiative();
     }
 }
 
