@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
 #include "SkaldTypes.h"
+#include "TimerManager.h"
 #include "Skald_GameMode.generated.h"
 
 class ATurnManager;
@@ -46,5 +47,12 @@ protected:
     /** Allow players to position initial armies based on initiative. */
     UFUNCTION(BlueprintCallable, Category="GameMode")
     void BeginArmyPlacementPhase();
+
+private:
+    /** Timer that triggers auto-start of the turn sequence. */
+    FTimerHandle StartGameTimerHandle;
+
+    /** Tracks whether turns have already begun to avoid duplicates. */
+    bool bTurnsStarted;
 };
 
