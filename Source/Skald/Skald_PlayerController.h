@@ -5,7 +5,7 @@
 #include "Skald_PlayerController.generated.h"
 
 class ATurnManager;
-class UUserWidget;
+class USkaldMainHUDWidget;
 
 /**
  * Player controller capable of participating in turn based gameplay.
@@ -43,11 +43,27 @@ protected:
 
     /** Widget class to instantiate for the player's HUD. */
     UPROPERTY(EditDefaultsOnly, Category="UI")
-    TSubclassOf<UUserWidget> HUDWidgetClass;
+    TSubclassOf<USkaldMainHUDWidget> HUDWidgetClass;
 
     /** Reference to the HUD widget instance. */
     UPROPERTY(BlueprintReadOnly, Category="UI", meta=(AllowPrivateAccess="true"))
-    TObjectPtr<UUserWidget> HUDRef;
+    TObjectPtr<USkaldMainHUDWidget> HUDRef;
+
+    /** Handle HUD attack submissions. */
+    UFUNCTION()
+    void HandleAttackRequested(int32 FromID, int32 ToID, int32 ArmySent);
+
+    /** Handle HUD move submissions. */
+    UFUNCTION()
+    void HandleMoveRequested(int32 FromID, int32 ToID, int32 Troops);
+
+    /** Handle HUD end-attack confirmations. */
+    UFUNCTION()
+    void HandleEndAttackRequested(bool bConfirmed);
+
+    /** Handle HUD end-movement confirmations. */
+    UFUNCTION()
+    void HandleEndMovementRequested(bool bConfirmed);
 
     /** Reference to the game's turn manager.
      *  Exposed to Blueprints so BP_Skald_PlayerController can bind to
