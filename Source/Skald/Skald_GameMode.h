@@ -5,6 +5,7 @@
 #include "TimerManager.h"
 #include "SkaldTypes.h"
 #include "Skald_GameMode.generated.h"
+#include "TimerManager.h"
 
 class ATurnManager;
 class ASkaldGameState;
