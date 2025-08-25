@@ -7,6 +7,7 @@
 #include "Skald_GameMode.generated.h"
 #include "TimerManager.h"
 
+struct FTimerHandle;
 class ATurnManager;
 class ASkaldGameState;
 class ASkaldPlayerController;
