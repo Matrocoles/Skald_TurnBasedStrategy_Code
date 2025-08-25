@@ -34,6 +34,41 @@ void ASkaldPlayerController::BeginPlay() {
           this, &ASkaldPlayerController::HandleEndAttackRequested);
       MainHudWidget->OnEndMovementRequested.AddDynamic(
           this, &ASkaldPlayerController::HandleEndMovementRequested);
+void ASkaldPlayerController::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // Load a default HUD class if one hasn't been specified in the blueprint.
+    if (!MainHudWidgetClass)
+    {
+        TSoftClassPtr<USkaldMainHUDWidget> HudClassRef(
+            FSoftObjectPath(TEXT("/Game/C++_BPs/Skald_MainHudBP.Skald_MainHudBP_C")));
+        MainHudWidgetClass = HudClassRef.LoadSynchronous();
+    }
+
+    // Create and show the HUD widget if a class has been assigned.
+    if (MainHudWidgetClass)
+    {
+        MainHudWidget = CreateWidget<USkaldMainHUDWidget>(this, MainHudWidgetClass);
+        if (MainHudWidget)
+        {
+            HUDRef = MainHudWidget;
+            MainHudWidget->AddToViewport();
+
+            MainHudWidget->OnAttackRequested.AddDynamic(this, &ASkaldPlayerController::HandleAttackRequested);
+            MainHudWidget->OnMoveRequested.AddDynamic(this, &ASkaldPlayerController::HandleMoveRequested);
+            MainHudWidget->OnEndAttackRequested.AddDynamic(this, &ASkaldPlayerController::HandleEndAttackRequested);
+            MainHudWidget->OnEndMovementRequested.AddDynamic(this, &ASkaldPlayerController::HandleEndMovementRequested);
+        }
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("MainHudWidgetClass is null; HUD will not be displayed."));
+    }
+
+    if (ASkaldPlayerState* PS = GetPlayerState<ASkaldPlayerState>())
+    {
+        bIsAI = PS->bIsAI;
     }
   } else {
     UE_LOG(LogTemp, Warning,
