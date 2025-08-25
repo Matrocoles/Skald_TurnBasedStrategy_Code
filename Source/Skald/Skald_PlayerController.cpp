@@ -5,7 +5,6 @@
 #include "UObject/SoftObjectPtr.h"
 #include "UObject/SoftObjectPath.h"
 #include "Blueprint/UserWidget.h"
-#include "UI/SkaldMainHUDWidget.h"
 
 ASkaldPlayerController::ASkaldPlayerController()
 {
@@ -26,7 +25,8 @@ void ASkaldPlayerController::BeginPlay()
     // Load a default HUD class if one hasn't been specified in the blueprint.
     if (!MainHudWidgetClass)
     {
-        TSoftClassPtr<USkaldMainHUDWidget> HudClassRef(FSoftObjectPath(TEXT("/Game/C++_BPs/Skald_MainHudBP.Skald_MainHudBP_C")));
+        TSoftClassPtr<USkaldMainHUDWidget> HudClassRef(
+            FSoftObjectPath(TEXT("/Game/C++_BPs/Skald_MainHudBP.Skald_MainHudBP_C")));
         MainHudWidgetClass = HudClassRef.LoadSynchronous();
     }
 
@@ -36,15 +36,7 @@ void ASkaldPlayerController::BeginPlay()
         MainHudWidget = CreateWidget<USkaldMainHUDWidget>(this, MainHudWidgetClass);
         if (MainHudWidget)
         {
-    if (HUDWidgetClass)
-    if (MainHudWidgetClass)
-    {
-        HUDRef = CreateWidget<UUserWidget>(this, HUDWidgetClass);
-        if (HUDRef)
-        MainHudWidget = CreateWidget<USkaldMainHUDWidget>(this, MainHudWidgetClass);
-        if (MainHudWidget)
-        {
-            HUDRef->AddToViewport();
+            HUDRef = MainHudWidget;
             MainHudWidget->AddToViewport();
 
             MainHudWidget->OnAttackRequested.AddDynamic(this, &ASkaldPlayerController::HandleAttackRequested);

@@ -42,7 +42,6 @@ protected:
     UPROPERTY(BlueprintReadOnly, Category="Turn")
     bool bIsAI;
 
-    /** Widget class to instantiate for the player's HUD. */
     /** Widget class to instantiate for the player's HUD.
      *  Expected to be assigned in the Blueprint subclass to avoid
      *  hard loading during CDO construction. */
@@ -50,12 +49,10 @@ protected:
     TSubclassOf<USkaldMainHUDWidget> MainHudWidgetClass;
 
     /** Reference to the HUD widget instance. */
-    TSubclassOf<UUserWidget> HUDWidgetClass;
-    TSubclassOf<USkaldMainHUDWidget> MainHudWidgetClass;
-
-    /** Reference to the HUD widget instance. */
     UPROPERTY(BlueprintReadOnly, Category="UI", meta=(AllowPrivateAccess="true"))
     TObjectPtr<UUserWidget> HUDRef;
+
+    /** Typed reference to the main HUD widget. */
     UPROPERTY()
     USkaldMainHUDWidget* MainHudWidget;
 
