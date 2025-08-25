@@ -1,8 +1,9 @@
 #include "Skald_PlayerController.h"
 #include "Skald_TurnManager.h"
 #include "Skald_PlayerState.h"
+#include "Blueprint/UserWidget.h"
 #include "UI/SkaldMainHUDWidget.h"
-#include "UObject/ConstructorHelpers.h"
+#include "UObject/SoftObjectPath.h"
 
 ASkaldPlayerController::ASkaldPlayerController()
 {
@@ -10,17 +11,11 @@ ASkaldPlayerController::ASkaldPlayerController()
     TurnManager = nullptr;
     HUDRef = nullptr;
 
-    // Load the blueprint HUD widget if available.
-    static ConstructorHelpers::FClassFinder<USkaldMainHUDWidget> MainHUD(
-        TEXT("/Game/C++_BPs/Skald_MainHudBP"));
-    if (MainHUD.Succeeded())
-    {
-        HUDWidgetClass = MainHUD.Class;
-    }
-    else
-    {
-        UE_LOG(LogTemp, Warning, TEXT("Skald_MainHudBP widget not found; HUD will not be displayed."));
-    }
+    // Use a soft reference so the HUD blueprint is not loaded until BeginPlay,
+    // avoiding async loading deadlocks when this controller is subclassed in
+    // a blueprint.
+    HUDWidgetClass = TSoftClassPtr<USkaldMainHUDWidget>(
+        FSoftClassPath(TEXT("/Game/C++_BPs/Skald_MainHudBP.Skald_MainHudBP_C")));
 
     bShowMouseCursor = true;
     bEnableClickEvents = true;
@@ -33,8 +28,10 @@ void ASkaldPlayerController::BeginPlay()
 
     // Create and show the HUD widget if a class has been assigned.
     if (HUDWidgetClass)
+    if (UClass* LoadedHUDClass = HUDWidgetClass.LoadSynchronous())
     {
-        HUDRef = CreateWidget<USkaldMainHUDWidget>(this, HUDWidgetClass);
+        HUDRef = CreateWidget<UUserWidget>(this, HUDWidgetClass);
+        HUDRef = CreateWidget<USkaldMainHUDWidget>(this, LoadedHUDClass);
         if (HUDRef)
         {
             HUDRef->AddToViewport();
@@ -44,6 +41,10 @@ void ASkaldPlayerController::BeginPlay()
             HUDRef->OnEndAttackRequested.AddDynamic(this, &ASkaldPlayerController::HandleEndAttackRequested);
             HUDRef->OnEndMovementRequested.AddDynamic(this, &ASkaldPlayerController::HandleEndMovementRequested);
         }
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Skald_MainHudBP widget failed to load; HUD will not be displayed."));
     }
 
     if (ASkaldPlayerState* PS = GetPlayerState<ASkaldPlayerState>())
