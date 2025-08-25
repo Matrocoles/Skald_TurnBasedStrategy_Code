@@ -7,22 +7,48 @@
 #include "Territory.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
+#include "UObject/ConstructorHelpers.h"
 
 namespace
 {
     constexpr int32 ExpectedPlayerCount = 2;
     constexpr float StartGameTimeout = 10.f;
-    FTimerHandle StartGameTimerHandle;
-    bool bTurnsStarted = false;
+    // Instance variables moved into ASkaldGameMode to avoid cross-instance
+    // interference; see header for declarations.
 }
 
 ASkaldGameMode::ASkaldGameMode()
 {
     GameStateClass = ASkaldGameState::StaticClass();
-    PlayerControllerClass = ASkaldPlayerController::StaticClass();
     PlayerStateClass = ASkaldPlayerState::StaticClass();
+
+    // Use blueprint subclasses for the controller and pawn if they exist.
+    static ConstructorHelpers::FClassFinder<APlayerController> BPController(
+        TEXT("/Game/C++_BPs/Skald_PController"));
+    if (BPController.Succeeded())
+    {
+        PlayerControllerClass = BPController.Class;
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Skald_PController blueprint not found. Falling back to C++ class."));
+        PlayerControllerClass = ASkaldPlayerController::StaticClass();
+    }
+
+    static ConstructorHelpers::FClassFinder<APawn> BPPawn(
+        TEXT("/Game/C++_BPs/Skald_PC"));
+    if (BPPawn.Succeeded())
+    {
+        DefaultPawnClass = BPPawn.Class;
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Skald_PC blueprint not found. Using default pawn."));
+    }
+
     TurnManager = nullptr;
     WorldMap = nullptr;
+    bTurnsStarted = false;
 
     // Preallocate two slots so blueprint scripts can safely write
     // player data to indices without hitting "invalid index" warnings.

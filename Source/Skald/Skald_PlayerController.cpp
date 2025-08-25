@@ -1,13 +1,26 @@
 #include "Skald_PlayerController.h"
 #include "Skald_TurnManager.h"
 #include "Skald_PlayerState.h"
-#include "Blueprint/UserWidget.h"
+#include "UI/SkaldMainHUDWidget.h"
+#include "UObject/ConstructorHelpers.h"
 
 ASkaldPlayerController::ASkaldPlayerController()
 {
     bIsAI = false;
     TurnManager = nullptr;
     HUDRef = nullptr;
+
+    // Load the blueprint HUD widget if available.
+    static ConstructorHelpers::FClassFinder<USkaldMainHUDWidget> MainHUD(
+        TEXT("/Game/C++_BPs/Skald_MainHudBP"));
+    if (MainHUD.Succeeded())
+    {
+        HUDWidgetClass = MainHUD.Class;
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Skald_MainHudBP widget not found; HUD will not be displayed."));
+    }
 
     bShowMouseCursor = true;
     bEnableClickEvents = true;
@@ -21,10 +34,15 @@ void ASkaldPlayerController::BeginPlay()
     // Create and show the HUD widget if a class has been assigned.
     if (HUDWidgetClass)
     {
-        HUDRef = CreateWidget<UUserWidget>(this, HUDWidgetClass);
+        HUDRef = CreateWidget<USkaldMainHUDWidget>(this, HUDWidgetClass);
         if (HUDRef)
         {
             HUDRef->AddToViewport();
+
+            HUDRef->OnAttackRequested.AddDynamic(this, &ASkaldPlayerController::HandleAttackRequested);
+            HUDRef->OnMoveRequested.AddDynamic(this, &ASkaldPlayerController::HandleMoveRequested);
+            HUDRef->OnEndAttackRequested.AddDynamic(this, &ASkaldPlayerController::HandleEndAttackRequested);
+            HUDRef->OnEndMovementRequested.AddDynamic(this, &ASkaldPlayerController::HandleEndMovementRequested);
         }
     }
 
@@ -71,5 +89,25 @@ void ASkaldPlayerController::MakeAIDecision()
 bool ASkaldPlayerController::IsAIController() const
 {
     return bIsAI;
+}
+
+void ASkaldPlayerController::HandleAttackRequested(int32 FromID, int32 ToID, int32 ArmySent)
+{
+    UE_LOG(LogTemp, Log, TEXT("HUD attack from %d to %d with %d"), FromID, ToID, ArmySent);
+}
+
+void ASkaldPlayerController::HandleMoveRequested(int32 FromID, int32 ToID, int32 Troops)
+{
+    UE_LOG(LogTemp, Log, TEXT("HUD move from %d to %d with %d"), FromID, ToID, Troops);
+}
+
+void ASkaldPlayerController::HandleEndAttackRequested(bool bConfirmed)
+{
+    UE_LOG(LogTemp, Log, TEXT("HUD end attack %s"), bConfirmed ? TEXT("confirmed") : TEXT("cancelled"));
+}
+
+void ASkaldPlayerController::HandleEndMovementRequested(bool bConfirmed)
+{
+    UE_LOG(LogTemp, Log, TEXT("HUD end move %s"), bConfirmed ? TEXT("confirmed") : TEXT("cancelled"));
 }
 
