@@ -7,26 +7,56 @@
 #include "Territory.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
+#include "UObject/SoftObjectPath.h"
 
 namespace
 {
     constexpr int32 ExpectedPlayerCount = 2;
     constexpr float StartGameTimeout = 10.f;
-    FTimerHandle StartGameTimerHandle;
-    bool bTurnsStarted = false;
+    // Instance variables moved into ASkaldGameMode to avoid cross-instance
+    // interference; see header for declarations.
 }
 
 ASkaldGameMode::ASkaldGameMode()
 {
     GameStateClass = ASkaldGameState::StaticClass();
-    PlayerControllerClass = ASkaldPlayerController::StaticClass();
     PlayerStateClass = ASkaldPlayerState::StaticClass();
+
+    // Record soft references to blueprint subclasses for deferred loading.
+    PlayerControllerBPClass = TSoftClassPtr<APlayerController>(FSoftObjectPath(TEXT("/Game/C++_BPs/Skald_PController.Skald_PController_C")));
+    PawnBPClass = TSoftClassPtr<APawn>(FSoftObjectPath(TEXT("/Game/C++_BPs/Skald_PC.Skald_PC_C")));
+
     TurnManager = nullptr;
     WorldMap = nullptr;
+    bTurnsStarted = false;
 
     // Preallocate two slots so blueprint scripts can safely write
     // player data to indices without hitting "invalid index" warnings.
     PlayersData.SetNum(2);
+}
+
+void ASkaldGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
+{
+    Super::InitGame(MapName, Options, ErrorMessage);
+
+    if (UClass* PCClass = PlayerControllerBPClass.LoadSynchronous())
+    {
+        PlayerControllerClass = PCClass;
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Skald_PController blueprint not found. Falling back to C++ class."));
+        PlayerControllerClass = ASkaldPlayerController::StaticClass();
+    }
+
+    if (UClass* PawnClass = PawnBPClass.LoadSynchronous())
+    {
+        DefaultPawnClass = PawnClass;
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Skald_PC blueprint not found. Using default pawn."));
+    }
 }
 
 void ASkaldGameMode::BeginPlay()

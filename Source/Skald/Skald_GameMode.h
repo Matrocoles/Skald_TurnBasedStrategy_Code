@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
 #include "SkaldTypes.h"
+#include "TimerManager.h"
+#include "UObject/SoftObjectPtr.h"
 #include "Skald_GameMode.generated.h"
 
 class ATurnManager;
@@ -10,6 +12,8 @@ class ASkaldGameState;
 class ASkaldPlayerController;
 class ASkaldPlayerState;
 class AWorldMap;
+class APlayerController;
+class APawn;
 
 /**
  * GameMode responsible for managing player login and spawning the turn manager.
@@ -22,6 +26,7 @@ class SKALD_API ASkaldGameMode : public AGameModeBase
 public:
     ASkaldGameMode();
 
+    virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
     virtual void BeginPlay() override;
     virtual void PostLogin(APlayerController* NewPlayer) override;
 
@@ -46,5 +51,20 @@ protected:
     /** Allow players to position initial armies based on initiative. */
     UFUNCTION(BlueprintCallable, Category="GameMode")
     void BeginArmyPlacementPhase();
+
+private:
+    /** Timer that triggers auto-start of the turn sequence. */
+    FTimerHandle StartGameTimerHandle;
+
+    /** Tracks whether turns have already begun to avoid duplicates. */
+    bool bTurnsStarted;
+
+    /** Soft reference to the player controller blueprint to allow delayed loading. */
+    UPROPERTY(EditDefaultsOnly, Category="GameMode")
+    TSoftClassPtr<APlayerController> PlayerControllerBPClass;
+
+    /** Soft reference to the player pawn blueprint. */
+    UPROPERTY(EditDefaultsOnly, Category="GameMode")
+    TSoftClassPtr<APawn> PawnBPClass;
 };
 
