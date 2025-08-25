@@ -47,6 +47,9 @@ protected:
      *  Expected to be assigned in the Blueprint subclass to avoid
      *  hard loading during CDO construction. */
     UPROPERTY(EditDefaultsOnly, Category="UI")
+    TSubclassOf<USkaldMainHUDWidget> MainHudWidgetClass;
+
+    /** Reference to the HUD widget instance. */
     TSubclassOf<UUserWidget> HUDWidgetClass;
     TSubclassOf<USkaldMainHUDWidget> MainHudWidgetClass;
 

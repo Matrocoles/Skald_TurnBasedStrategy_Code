@@ -1,6 +1,9 @@
 #include "Skald_PlayerController.h"
 #include "Skald_TurnManager.h"
 #include "Skald_PlayerState.h"
+#include "UI/SkaldMainHUDWidget.h"
+#include "UObject/SoftObjectPtr.h"
+#include "UObject/SoftObjectPath.h"
 #include "Blueprint/UserWidget.h"
 #include "UI/SkaldMainHUDWidget.h"
 
@@ -20,7 +23,19 @@ void ASkaldPlayerController::BeginPlay()
 {
     Super::BeginPlay();
 
+    // Load a default HUD class if one hasn't been specified in the blueprint.
+    if (!MainHudWidgetClass)
+    {
+        TSoftClassPtr<USkaldMainHUDWidget> HudClassRef(FSoftObjectPath(TEXT("/Game/C++_BPs/Skald_MainHudBP.Skald_MainHudBP_C")));
+        MainHudWidgetClass = HudClassRef.LoadSynchronous();
+    }
+
     // Create and show the HUD widget if a class has been assigned.
+    if (MainHudWidgetClass)
+    {
+        MainHudWidget = CreateWidget<USkaldMainHUDWidget>(this, MainHudWidgetClass);
+        if (MainHudWidget)
+        {
     if (HUDWidgetClass)
     if (MainHudWidgetClass)
     {
