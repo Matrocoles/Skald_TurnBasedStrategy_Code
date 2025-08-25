@@ -46,7 +46,7 @@ struct FFighter
     FFighterStats Stats;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Fighter")
-    EFaction Faction = EFaction::None;
+    ESkaldFaction Faction = ESkaldFaction::None;
 };
 
 /**

@@ -23,7 +23,7 @@ public:
 
     /** Set the faction chosen from the UI. */
     UFUNCTION(BlueprintCallable)
-    void OnFactionSelected(EFaction NewFaction);
+    void OnFactionSelected(ESkaldFaction NewFaction);
 
     /** Display name entered by the player. */
     UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Setup")
@@ -31,10 +31,9 @@ public:
 
     /** Currently selected faction. */
     UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Setup")
-    EFaction SelectedFaction;
+    ESkaldFaction SelectedFaction;
 
     /** Whether the game should start in multiplayer. */
     UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Setup")
     bool bMultiplayer;
 };
-

@@ -5,7 +5,7 @@ ASkaldPlayerState::ASkaldPlayerState()
     , ArmyPool(0)
     , InitiativeRoll(0)
     , DisplayName(TEXT("Player"))
-    , Faction(EFaction::None)
+    , Faction(ESkaldFaction::None)
 {
 }
 
