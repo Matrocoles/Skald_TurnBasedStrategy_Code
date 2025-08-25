@@ -28,10 +28,15 @@ enum class ETurnPhase : uint8
 UENUM(BlueprintType)
 enum class EFaction : uint8
 {
-    None   UMETA(DisplayName = "None"),
-    Empire UMETA(DisplayName = "Empire"),
-    Orcs   UMETA(DisplayName = "Orcs"),
-    Undead UMETA(DisplayName = "Undead"),
+    None       UMETA(DisplayName = "None"),
+    Human      UMETA(DisplayName = "Human Faction"),
+    Orc        UMETA(DisplayName = "Orc Faction"),
+    Dwarf      UMETA(DisplayName = "Dwarf Faction"),
+    Elf        UMETA(DisplayName = "Elf Faction"),
+    LizardFolk UMETA(DisplayName = "Lizard Folk Faction"),
+    Undead     UMETA(DisplayName = "Undead Faction"),
+    Gnoll      UMETA(DisplayName = "Gnoll Faction"),
+    Empire     UMETA(DisplayName = "Empire"),
 };
 
 UENUM(BlueprintType)
@@ -51,19 +56,6 @@ enum class EBattleStats : uint8
     Defense      UMETA(DisplayName = "Defense"),
     Speed        UMETA(DisplayName = "Speed"),
     // ...
-};
-
-// Factions available for players to choose at game start
-UENUM(BlueprintType)
-enum class EFaction : uint8
-{
-    Human       UMETA(DisplayName = "Human Faction"),
-    Orc         UMETA(DisplayName = "Orc Faction"),
-    Dwarf       UMETA(DisplayName = "Dwarf Faction"),
-    Elf         UMETA(DisplayName = "Elf Faction"),
-    LizardFolk  UMETA(DisplayName = "Lizard Folk Faction"),
-    Undead      UMETA(DisplayName = "Undead Faction"),
-    Gnoll       UMETA(DisplayName = "Gnoll Faction"),
 };
 
 USTRUCT(BlueprintType)
