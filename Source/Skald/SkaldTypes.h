@@ -26,7 +26,7 @@ enum class ETurnPhase : uint8
 
 /** Factions a player or fighter can belong to. */
 UENUM(BlueprintType)
-enum class EFaction : uint8
+enum class ESkaldFaction : uint8
 {
     None       UMETA(DisplayName = "None"),
     Human      UMETA(DisplayName = "Human Faction"),
@@ -145,7 +145,7 @@ struct SKALD_API FS_PlayerData
     int32 Resources = 0;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
-    EFaction Faction = EFaction::Human;
+    ESkaldFaction Faction = ESkaldFaction::Human;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     TArray<int32> CapitalTerritoryIDs;
@@ -247,7 +247,7 @@ struct SKALD_API FPlayerSaveStruct
     bool IsAI = false;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
-    EFaction Faction = EFaction::Human;
+    ESkaldFaction Faction = ESkaldFaction::Human;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     TArray<int32> CapitalTerritoryIDs;

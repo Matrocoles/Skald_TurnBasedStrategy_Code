@@ -8,12 +8,12 @@ void UPlayerSetupWidget::NativeConstruct()
     Super::NativeConstruct();
     // UI is expected to be created in Blueprint or elsewhere.
     // Defaults
-    SelectedFaction = EFaction::None;
+    SelectedFaction = ESkaldFaction::None;
     DisplayName = TEXT("Player");
     bMultiplayer = false;
 }
 
-void UPlayerSetupWidget::OnFactionSelected(EFaction NewFaction)
+void UPlayerSetupWidget::OnFactionSelected(ESkaldFaction NewFaction)
 {
     SelectedFaction = NewFaction;
 }

@@ -33,6 +33,6 @@ public:
 
     /** Selected faction for this player. */
     UPROPERTY(BlueprintReadWrite, Category="PlayerState")
-    EFaction Faction;
+    ESkaldFaction Faction;
 };
 
