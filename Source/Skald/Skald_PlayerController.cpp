@@ -3,19 +3,13 @@
 #include "Skald_PlayerState.h"
 #include "Blueprint/UserWidget.h"
 #include "UI/SkaldMainHUDWidget.h"
-#include "UObject/SoftObjectPath.h"
 
 ASkaldPlayerController::ASkaldPlayerController()
 {
     bIsAI = false;
     TurnManager = nullptr;
     HUDRef = nullptr;
-
-    // Use a soft reference so the HUD blueprint is not loaded until BeginPlay,
-    // avoiding async loading deadlocks when this controller is subclassed in
-    // a blueprint.
-    HUDWidgetClass = TSoftClassPtr<USkaldMainHUDWidget>(
-        FSoftClassPath(TEXT("/Game/C++_BPs/Skald_MainHudBP.Skald_MainHudBP_C")));
+    MainHudWidget = nullptr;
 
     bShowMouseCursor = true;
     bEnableClickEvents = true;
@@ -28,23 +22,25 @@ void ASkaldPlayerController::BeginPlay()
 
     // Create and show the HUD widget if a class has been assigned.
     if (HUDWidgetClass)
-    if (UClass* LoadedHUDClass = HUDWidgetClass.LoadSynchronous())
+    if (MainHudWidgetClass)
     {
         HUDRef = CreateWidget<UUserWidget>(this, HUDWidgetClass);
-        HUDRef = CreateWidget<USkaldMainHUDWidget>(this, LoadedHUDClass);
         if (HUDRef)
+        MainHudWidget = CreateWidget<USkaldMainHUDWidget>(this, MainHudWidgetClass);
+        if (MainHudWidget)
         {
             HUDRef->AddToViewport();
+            MainHudWidget->AddToViewport();
 
-            HUDRef->OnAttackRequested.AddDynamic(this, &ASkaldPlayerController::HandleAttackRequested);
-            HUDRef->OnMoveRequested.AddDynamic(this, &ASkaldPlayerController::HandleMoveRequested);
-            HUDRef->OnEndAttackRequested.AddDynamic(this, &ASkaldPlayerController::HandleEndAttackRequested);
-            HUDRef->OnEndMovementRequested.AddDynamic(this, &ASkaldPlayerController::HandleEndMovementRequested);
+            MainHudWidget->OnAttackRequested.AddDynamic(this, &ASkaldPlayerController::HandleAttackRequested);
+            MainHudWidget->OnMoveRequested.AddDynamic(this, &ASkaldPlayerController::HandleMoveRequested);
+            MainHudWidget->OnEndAttackRequested.AddDynamic(this, &ASkaldPlayerController::HandleEndAttackRequested);
+            MainHudWidget->OnEndMovementRequested.AddDynamic(this, &ASkaldPlayerController::HandleEndMovementRequested);
         }
     }
     else
     {
-        UE_LOG(LogTemp, Warning, TEXT("Skald_MainHudBP widget failed to load; HUD will not be displayed."));
+        UE_LOG(LogTemp, Warning, TEXT("MainHudWidgetClass is null; HUD will not be displayed."));
     }
 
     if (ASkaldPlayerState* PS = GetPlayerState<ASkaldPlayerState>())
@@ -111,4 +107,3 @@ void ASkaldPlayerController::HandleEndMovementRequested(bool bConfirmed)
 {
     UE_LOG(LogTemp, Log, TEXT("HUD end move %s"), bConfirmed ? TEXT("confirmed") : TEXT("cancelled"));
 }
-

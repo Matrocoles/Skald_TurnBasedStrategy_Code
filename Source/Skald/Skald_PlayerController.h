@@ -2,7 +2,6 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
-#include "UObject/SoftObjectPtr.h"
 #include "Skald_PlayerController.generated.h"
 
 class ATurnManager;
@@ -44,18 +43,18 @@ protected:
     bool bIsAI;
 
     /** Widget class to instantiate for the player's HUD. */
-    /** Widget class to instantiate for the player's HUD. Soft reference to
-     *  avoid hard loading during class construction which can deadlock the
-     *  async loader when the controller is itself being loaded via
-     *  a blueprint subclass. */
+    /** Widget class to instantiate for the player's HUD.
+     *  Expected to be assigned in the Blueprint subclass to avoid
+     *  hard loading during CDO construction. */
     UPROPERTY(EditDefaultsOnly, Category="UI")
     TSubclassOf<UUserWidget> HUDWidgetClass;
-    TSoftClassPtr<USkaldMainHUDWidget> HUDWidgetClass;
+    TSubclassOf<USkaldMainHUDWidget> MainHudWidgetClass;
 
     /** Reference to the HUD widget instance. */
     UPROPERTY(BlueprintReadOnly, Category="UI", meta=(AllowPrivateAccess="true"))
     TObjectPtr<UUserWidget> HUDRef;
-    TObjectPtr<USkaldMainHUDWidget> HUDRef;
+    UPROPERTY()
+    USkaldMainHUDWidget* MainHudWidget;
 
     /** Handle HUD attack submissions. */
     UFUNCTION()
