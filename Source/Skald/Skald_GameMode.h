@@ -3,9 +3,8 @@
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
 #include "SkaldTypes.h"
-#include "TimerManager.h"
-#include "UObject/SoftObjectPtr.h"
 #include "Skald_GameMode.generated.h"
+#include "TimerManager.h"
 
 class ATurnManager;
 class ASkaldGameState;
@@ -13,58 +12,46 @@ class ASkaldPlayerController;
 class ASkaldPlayerState;
 class AWorldMap;
 class APlayerController;
-class APawn;
 
 /**
  * GameMode responsible for managing player login and spawning the turn manager.
  */
 UCLASS(Blueprintable, BlueprintType)
-class SKALD_API ASkaldGameMode : public AGameModeBase
-{
-    GENERATED_BODY()
+class SKALD_API ASkaldGameMode : public AGameModeBase {
+  GENERATED_BODY()
 
 public:
-    ASkaldGameMode();
+  ASkaldGameMode();
 
-    virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
-    virtual void BeginPlay() override;
-    virtual void PostLogin(APlayerController* NewPlayer) override;
+  virtual void BeginPlay() override;
+  virtual void PostLogin(APlayerController *NewPlayer) override;
 
 protected:
-    /** Handles turn sequencing for the match. */
-    UPROPERTY(BlueprintReadOnly, Category="GameMode")
-    ATurnManager* TurnManager;
+  /** Handles turn sequencing for the match. */
+  UPROPERTY(BlueprintReadOnly, Category = "GameMode")
+  ATurnManager *TurnManager;
 
-    /** Holds all territory actors for the current map. */
-    UPROPERTY(BlueprintReadOnly, Category="GameMode")
-    AWorldMap* WorldMap;
+  /** Holds all territory actors for the current map. */
+  UPROPERTY(BlueprintReadOnly, Category = "GameMode")
+  AWorldMap *WorldMap;
 
-    /** Data describing each player in the match. Pre-sized so blueprints can
-     * safely write to indices without hitting invalid array warnings. */
-    UPROPERTY(BlueprintReadOnly, Category="Players")
-    TArray<FS_PlayerData> PlayersData;
+  /** Data describing each player in the match. Pre-sized so blueprints can
+   * safely write to indices without hitting invalid array warnings. */
+  UPROPERTY(BlueprintReadOnly, Category = "Players")
+  TArray<FS_PlayerData> PlayersData;
 
-    /** Setup initial territories, armies, and initiative. */
-    UFUNCTION(BlueprintCallable, Category="GameMode")
-    void InitializeWorld();
+  /** Setup initial territories, armies, and initiative. */
+  UFUNCTION(BlueprintCallable, Category = "GameMode")
+  void InitializeWorld();
 
-    /** Allow players to position initial armies based on initiative. */
-    UFUNCTION(BlueprintCallable, Category="GameMode")
-    void BeginArmyPlacementPhase();
+  /** Allow players to position initial armies based on initiative. */
+  UFUNCTION(BlueprintCallable, Category = "GameMode")
+  void BeginArmyPlacementPhase();
 
 private:
-    /** Timer that triggers auto-start of the turn sequence. */
-    FTimerHandle StartGameTimerHandle;
+  /** Timer that triggers auto-start of the turn sequence. */
+  FTimerHandle StartGameTimerHandle;
 
-    /** Tracks whether turns have already begun to avoid duplicates. */
-    bool bTurnsStarted;
-
-    /** Soft reference to the player controller blueprint to allow delayed loading. */
-    UPROPERTY(EditDefaultsOnly, Category="GameMode")
-    TSoftClassPtr<APlayerController> PlayerControllerBPClass;
-
-    /** Soft reference to the player pawn blueprint. */
-    UPROPERTY(EditDefaultsOnly, Category="GameMode")
-    TSoftClassPtr<APawn> PawnBPClass;
+  /** Tracks whether turns have already begun to avoid duplicates. */
+  bool bTurnsStarted;
 };
-
