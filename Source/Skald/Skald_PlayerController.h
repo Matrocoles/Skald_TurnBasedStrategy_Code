@@ -5,6 +5,7 @@
 #include "Skald_PlayerController.generated.h"
 
 class ATurnManager;
+class UUserWidget;
 class USkaldMainHUDWidget;
 
 /**
@@ -41,13 +42,17 @@ protected:
     UPROPERTY(BlueprintReadOnly, Category="Turn")
     bool bIsAI;
 
+    /** Widget class to instantiate for the player's HUD. */
     /** Widget class to instantiate for the player's HUD.
      *  Expected to be assigned in the Blueprint subclass to avoid
      *  hard loading during CDO construction. */
     UPROPERTY(EditDefaultsOnly, Category="UI")
+    TSubclassOf<UUserWidget> HUDWidgetClass;
     TSubclassOf<USkaldMainHUDWidget> MainHudWidgetClass;
 
     /** Reference to the HUD widget instance. */
+    UPROPERTY(BlueprintReadOnly, Category="UI", meta=(AllowPrivateAccess="true"))
+    TObjectPtr<UUserWidget> HUDRef;
     UPROPERTY()
     USkaldMainHUDWidget* MainHudWidget;
 
@@ -75,4 +80,3 @@ protected:
     UPROPERTY(BlueprintReadOnly, Category="Turn", meta=(AllowPrivateAccess="true"))
     TObjectPtr<ATurnManager> TurnManager;
 };
-
