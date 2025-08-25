@@ -8,6 +8,7 @@
 #include "Engine/World.h"
 #include "TimerManager.h"
 #include "UObject/SoftObjectPath.h"
+#include "UObject/ConstructorHelpers.h"
 
 namespace
 {
@@ -25,6 +26,29 @@ ASkaldGameMode::ASkaldGameMode()
     // Record soft references to blueprint subclasses for deferred loading.
     PlayerControllerBPClass = TSoftClassPtr<APlayerController>(FSoftObjectPath(TEXT("/Game/C++_BPs/Skald_PController.Skald_PController_C")));
     PawnBPClass = TSoftClassPtr<APawn>(FSoftObjectPath(TEXT("/Game/C++_BPs/Skald_PC.Skald_PC_C")));
+    // Use blueprint subclasses for the controller and pawn if they exist.
+    static ConstructorHelpers::FClassFinder<APlayerController> BPController(
+        TEXT("/Game/C++_BPs/Skald_PController"));
+    if (BPController.Succeeded())
+    {
+        PlayerControllerClass = BPController.Class;
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Skald_PController blueprint not found. Falling back to C++ class."));
+        PlayerControllerClass = ASkaldPlayerController::StaticClass();
+    }
+
+    static ConstructorHelpers::FClassFinder<APawn> BPPawn(
+        TEXT("/Game/C++_BPs/Skald_PC"));
+    if (BPPawn.Succeeded())
+    {
+        DefaultPawnClass = BPPawn.Class;
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Skald_PC blueprint not found. Using default pawn."));
+    }
 
     TurnManager = nullptr;
     WorldMap = nullptr;

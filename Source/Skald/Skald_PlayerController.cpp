@@ -4,11 +4,14 @@
 #include "UI/SkaldMainHUDWidget.h"
 #include "UObject/SoftObjectPtr.h"
 #include "UObject/SoftObjectPath.h"
+#include "Blueprint/UserWidget.h"
+#include "UI/SkaldMainHUDWidget.h"
 
 ASkaldPlayerController::ASkaldPlayerController()
 {
     bIsAI = false;
     TurnManager = nullptr;
+    HUDRef = nullptr;
     MainHudWidget = nullptr;
 
     bShowMouseCursor = true;
@@ -33,6 +36,15 @@ void ASkaldPlayerController::BeginPlay()
         MainHudWidget = CreateWidget<USkaldMainHUDWidget>(this, MainHudWidgetClass);
         if (MainHudWidget)
         {
+    if (HUDWidgetClass)
+    if (MainHudWidgetClass)
+    {
+        HUDRef = CreateWidget<UUserWidget>(this, HUDWidgetClass);
+        if (HUDRef)
+        MainHudWidget = CreateWidget<USkaldMainHUDWidget>(this, MainHudWidgetClass);
+        if (MainHudWidget)
+        {
+            HUDRef->AddToViewport();
             MainHudWidget->AddToViewport();
 
             MainHudWidget->OnAttackRequested.AddDynamic(this, &ASkaldPlayerController::HandleAttackRequested);
@@ -110,4 +122,3 @@ void ASkaldPlayerController::HandleEndMovementRequested(bool bConfirmed)
 {
     UE_LOG(LogTemp, Log, TEXT("HUD end move %s"), bConfirmed ? TEXT("confirmed") : TEXT("cancelled"));
 }
-
