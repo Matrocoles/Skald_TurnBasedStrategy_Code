@@ -5,6 +5,9 @@
 #include "UI/SkaldMainHUDWidget.h"
 #include "Skald_GameState.h"
 #include "Territory.h"
+#include "WorldMap.h"
+#include "Kismet/GameplayStatics.h"
+=======
 #include "Engine/Engine.h"
 
 ASkaldPlayerController::ASkaldPlayerController() {
@@ -108,6 +111,33 @@ void ASkaldPlayerController::HandleAttackRequested(int32 FromID, int32 ToID,
                                                    int32 ArmySent) {
   UE_LOG(LogTemp, Log, TEXT("HUD attack from %d to %d with %d"), FromID, ToID,
          ArmySent);
+
+  FS_BattlePayload Battle;
+  if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+    Battle.AttackerPlayerID = PS->GetPlayerId();
+  }
+  if (AWorldMap *WorldMap =
+          Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+              GetWorld(), AWorldMap::StaticClass()))) {
+    if (ATerritory *Source = WorldMap->GetTerritoryById(FromID)) {
+      if (Source->OwningPlayer) {
+        Battle.AttackerPlayerID = Source->OwningPlayer->GetPlayerId();
+      }
+    }
+    if (ATerritory *Target = WorldMap->GetTerritoryById(ToID)) {
+      if (Target->OwningPlayer) {
+        Battle.DefenderPlayerID = Target->OwningPlayer->GetPlayerId();
+      }
+      Battle.IsCapitalAttack = Target->bIsCapital;
+    }
+  }
+  Battle.FromTerritoryID = FromID;
+  Battle.TargetTerritoryID = ToID;
+  Battle.ArmyCountSent = ArmySent;
+
+  if (TurnManager) {
+    TurnManager->TriggerGridBattle(Battle);
+  }
 }
 
 void ASkaldPlayerController::HandleMoveRequested(int32 FromID, int32 ToID,
