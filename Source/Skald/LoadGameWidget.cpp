@@ -3,8 +3,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/SaveGame.h"
 #include "LobbyMenuWidget.h"
-
-static const TCHAR* SlotNames[3] = { TEXT("Slot0"), TEXT("Slot1"), TEXT("Slot2") };
+#include "SlotNameConstants.h"
 
 void ULoadGameWidget::NativeConstruct()
 {
