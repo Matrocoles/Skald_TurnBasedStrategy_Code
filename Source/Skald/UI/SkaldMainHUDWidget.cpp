@@ -7,6 +7,9 @@
 #include "Territory.h"
 #include "UI/ConfirmAttackWidget.h"
 #include "WorldMap.h"
+#include "Territory.h"
+#include "Skald_PlayerState.h"
+#include "Engine/Engine.h"
 
 void USkaldMainHUDWidget::NativeConstruct() {
   Super::NativeConstruct();
@@ -78,6 +81,15 @@ void USkaldMainHUDWidget::RefreshFromState(
   BP_SetPhaseButtons(CurrentPhase, CurrentPlayerID == LocalPlayerID);
 }
 
+void USkaldMainHUDWidget::ShowTurnAnnouncement(const FString &PlayerName) {
+  BP_ShowTurnAnnouncement(PlayerName);
+  if (GEngine) {
+    const FString Message =
+        FString::Printf(TEXT("%s's Turn"), *PlayerName);
+    GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Yellow, Message);
+  }
+}
+
 void USkaldMainHUDWidget::RebuildPlayerList(
     const TArray<FS_PlayerData> &Players) {
   if (!PlayerListBox) {
@@ -113,6 +125,10 @@ void USkaldMainHUDWidget::BeginAttackSelection() {
   bSelectingForMove = false;
   SelectedSourceID = -1;
   SelectedTargetID = -1;
+  if (SelectionPrompt) {
+    SelectionPrompt->SetText(FText::FromString(TEXT("Choose owned territory.")));
+    SelectionPrompt->SetVisibility(ESlateVisibility::Visible);
+  }
 }
 
 void USkaldMainHUDWidget::SubmitAttack(int32 FromID, int32 ToID,
@@ -174,8 +190,18 @@ void USkaldMainHUDWidget::CancelMoveSelection() {
   SelectedTargetID = -1;
 }
 
-void USkaldMainHUDWidget::OnTerritoryClickedUI(int32 TerritoryID,
-                                               bool bOwnedByLocal) {
+void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory* Territory) {
+  if (!Territory) {
+    return;
+  }
+
+  ASkaldPlayerState* LocalPS = nullptr;
+  if (APlayerController* PC = GetOwningPlayer()) {
+    LocalPS = PC->GetPlayerState<ASkaldPlayerState>();
+  }
+
+  const bool bOwnedByLocal = LocalPS && Territory->OwningPlayer == LocalPS;
+
   if (bSelectingForAttack) {
     if (SelectedSourceID == -1) {
       if (bOwnedByLocal) {
@@ -216,15 +242,25 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(int32 TerritoryID,
           }
         }
       }
+      if (bOwnedByLocal && Territory->ArmyStrength > 0) {
+        SelectedSourceID = Territory->TerritoryID;
+        Territory->Select(true);
+        if (SelectionPrompt) {
+          SelectionPrompt->SetText(
+              FText::FromString(TEXT("Choose enemy territory.")));
+        }
+      }
+    } else if (SelectedTargetID == -1) {
+      SelectedTargetID = Territory->TerritoryID;
     }
   } else if (bSelectingForMove) {
     if (SelectedSourceID == -1) {
       if (bOwnedByLocal) {
-        SelectedSourceID = TerritoryID;
+        SelectedSourceID = Territory->TerritoryID;
       }
     } else if (SelectedTargetID == -1) {
       if (bOwnedByLocal) {
-        SelectedTargetID = TerritoryID;
+        SelectedTargetID = Territory->TerritoryID;
       }
     }
   }

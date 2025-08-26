@@ -113,6 +113,9 @@ public:
                         ETurnPhase InPhase,
                         const TArray<FS_PlayerData> &Players);
 
+  UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
+  void ShowTurnAnnouncement(const FString &PlayerName);
+
   /** Rebuilds the cached player list into PlayerListBox. */
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
   void RebuildPlayerList(const TArray<FS_PlayerData> &Players);
@@ -137,7 +140,7 @@ public:
   void CancelMoveSelection();
 
   UFUNCTION(BlueprintCallable, Category = "Skald|Selection")
-  void OnTerritoryClickedUI(int32 TerritoryID, bool bOwnedByLocal);
+  void OnTerritoryClickedUI(ATerritory* Territory);
 
   // BlueprintImplementableEvent hooks — BP subclass draws UI
   UFUNCTION(BlueprintImplementableEvent, Category = "Skald|HUD")
@@ -153,6 +156,9 @@ public:
   UFUNCTION(BlueprintImplementableEvent, Category = "Skald|HUD")
   void BP_SetPhaseButtons(ETurnPhase InPhase, bool bIsMyTurn);
 
+  UFUNCTION(BlueprintImplementableEvent, Category = "Skald|HUD")
+  void BP_ShowTurnAnnouncement(const FString &PlayerName);
+
   // Helper so PlayerController can refresh button enable state after it knows
   // turn ownership
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
@@ -167,6 +173,10 @@ public:
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
             meta = (BindWidgetOptional))
   UTextBlock *PhaseText;
+
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
+            meta = (BindWidgetOptional))
+  UTextBlock *SelectionPrompt;
 
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
             meta = (BindWidgetOptional))
