@@ -206,7 +206,6 @@ public:
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
             meta = (BindWidgetOptional))
   UTextBlock *EndingTurnText;
-  UWidget *SelectionPrompt;
 
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Widgets")
   TSubclassOf<UConfirmAttackWidget> ConfirmAttackWidgetClass;
