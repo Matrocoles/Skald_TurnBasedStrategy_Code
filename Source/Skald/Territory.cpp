@@ -3,6 +3,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Skald_PlayerState.h"
+#include "Skald_PlayerController.h"
 #include "Net/UnrealNetwork.h"
 
 ATerritory::ATerritory() {
@@ -72,6 +73,10 @@ void ATerritory::Select() {
                                              FLinearColor::Yellow);
   }
   OnTerritorySelected.Broadcast(this);
+  if (ASkaldPlayerController* PC =
+          Cast<ASkaldPlayerController>(GetWorld()->GetFirstPlayerController())) {
+    PC->HandleTerritorySelected(this);
+  }
 }
 
 void ATerritory::Deselect() {

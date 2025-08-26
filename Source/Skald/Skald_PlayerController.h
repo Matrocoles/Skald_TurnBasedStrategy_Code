@@ -7,6 +7,7 @@
 class ATurnManager;
 class UUserWidget;
 class USkaldMainHUDWidget;
+class ATerritory;
 
 /**
  * Player controller capable of participating in turn based gameplay.
@@ -36,6 +37,9 @@ public:
     /** Set the turn manager responsible for sequencing play. */
     UFUNCTION(BlueprintCallable, Category="Turn")
     void SetTurnManager(ATurnManager* Manager);
+
+    UFUNCTION(BlueprintCallable, Category="UI")
+    void HandleTerritorySelected(ATerritory* Terr);
 
 protected:
     /** Whether this controller is controlled by AI. */

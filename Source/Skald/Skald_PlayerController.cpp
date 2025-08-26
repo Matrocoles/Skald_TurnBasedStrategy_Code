@@ -3,6 +3,8 @@
 #include "Skald_PlayerState.h"
 #include "Skald_TurnManager.h"
 #include "UI/SkaldMainHUDWidget.h"
+#include "Skald_GameState.h"
+#include "Territory.h"
 
 ASkaldPlayerController::ASkaldPlayerController() {
   bIsAI = false;
@@ -25,6 +27,25 @@ void ASkaldPlayerController::BeginPlay() {
     if (MainHudWidget) {
       HUDRef = MainHudWidget;
       MainHudWidget->AddToViewport();
+
+      if (ASkaldGameState* GS = GetWorld()->GetGameState<ASkaldGameState>()) {
+        TArray<FS_PlayerData> Players;
+        for (APlayerState* PSBase : GS->PlayerArray) {
+          if (ASkaldPlayerState* PS = Cast<ASkaldPlayerState>(PSBase)) {
+            FS_PlayerData Data;
+            Data.PlayerID = PS->GetPlayerId();
+            Data.PlayerName = PS->DisplayName;
+            Data.IsAI = PS->bIsAI;
+            Data.Faction = PS->Faction;
+            Players.Add(Data);
+          }
+        }
+
+        const ASkaldPlayerState* CurrentPS = GS->GetCurrentPlayer();
+        const int32 CurrentID = CurrentPS ? CurrentPS->GetPlayerId() : -1;
+        MainHudWidget->RefreshFromState(CurrentID, /*TurnNumber*/ 1,
+                                        ETurnPhase::Reinforcement, Players);
+      }
 
       MainHudWidget->OnAttackRequested.AddDynamic(
           this, &ASkaldPlayerController::HandleAttackRequested);
@@ -93,4 +114,18 @@ void ASkaldPlayerController::HandleEndAttackRequested(bool bConfirmed) {
 void ASkaldPlayerController::HandleEndMovementRequested(bool bConfirmed) {
   UE_LOG(LogTemp, Log, TEXT("HUD end move %s"),
          bConfirmed ? TEXT("confirmed") : TEXT("cancelled"));
+}
+
+void ASkaldPlayerController::HandleTerritorySelected(ATerritory* Terr) {
+  if (!MainHudWidget || !Terr) {
+    return;
+  }
+
+  FString OwnerName = TEXT("Neutral");
+  if (Terr->OwningPlayer) {
+    OwnerName = Terr->OwningPlayer->DisplayName;
+  }
+
+  MainHudWidget->UpdateTerritoryInfo(Terr->TerritoryName, OwnerName,
+                                     Terr->ArmyStrength);
 }
