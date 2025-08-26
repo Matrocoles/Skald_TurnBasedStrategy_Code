@@ -4,7 +4,27 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Skald_PlayerState.h"
 #include "Skald_PlayerController.h"
+#include "SkaldTypes.h"
 #include "Net/UnrealNetwork.h"
+
+namespace
+{
+FLinearColor GetFactionColor(ESkaldFaction Faction)
+{
+  switch (Faction)
+  {
+  case ESkaldFaction::Human: return FLinearColor::Blue;
+  case ESkaldFaction::Orc: return FLinearColor::Green;
+  case ESkaldFaction::Dwarf: return FLinearColor(0.6f, 0.6f, 0.6f, 1.f);
+  case ESkaldFaction::Elf: return FLinearColor(0.0f, 0.8f, 0.4f, 1.f);
+  case ESkaldFaction::LizardFolk: return FLinearColor(0.0f, 0.6f, 0.3f, 1.f);
+  case ESkaldFaction::Undead: return FLinearColor(0.5f, 0.0f, 0.5f, 1.f);
+  case ESkaldFaction::Gnoll: return FLinearColor(0.8f, 0.4f, 0.0f, 1.f);
+  case ESkaldFaction::Empire: return FLinearColor::Red;
+  default: return FLinearColor::White;
+  }
+}
+}
 
 ATerritory::ATerritory() {
   PrimaryActorTick.bCanEverTick = false;
@@ -133,7 +153,7 @@ void ATerritory::UpdateTerritoryColor() {
   if (DynamicMaterial) {
     FLinearColor NewColor = DefaultColor;
     if (OwningPlayer) {
-      NewColor = FLinearColor::Red;
+      NewColor = GetFactionColor(OwningPlayer->Faction);
     }
     DynamicMaterial->SetVectorParameterValue(FName("Color"), NewColor);
   }

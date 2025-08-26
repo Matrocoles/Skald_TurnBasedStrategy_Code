@@ -23,5 +23,9 @@ public:
     /** Whether the game was started in multiplayer mode. */
     UPROPERTY(BlueprintReadWrite, Category="Player")
     bool bIsMultiplayer;
+
+    /** Factions that have already been selected by players or AI. */
+    UPROPERTY(BlueprintReadWrite, Category="Player")
+    TArray<ESkaldFaction> TakenFactions;
 };
 

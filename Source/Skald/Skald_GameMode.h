@@ -54,4 +54,7 @@ private:
 
   /** Tracks whether turns have already begun to avoid duplicates. */
   bool bTurnsStarted;
+
+  /** Whether the world has been initialized and territories assigned. */
+  bool bWorldInitialized;
 };

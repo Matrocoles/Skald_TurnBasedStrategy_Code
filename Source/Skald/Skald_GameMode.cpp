@@ -27,6 +27,7 @@ ASkaldGameMode::ASkaldGameMode() {
   TurnManager = nullptr;
   WorldMap = nullptr;
   bTurnsStarted = false;
+  bWorldInitialized = false;
 
   // Preallocate slots so blueprint scripts can safely write
   // player data to indices without hitting "invalid index" warnings.
@@ -44,22 +45,7 @@ void ASkaldGameMode::BeginPlay() {
     WorldMap = GetWorld()->SpawnActor<AWorldMap>();
   }
 
-  InitializeWorld();
-  BeginArmyPlacementPhase();
-
-  GetWorldTimerManager().SetTimer(
-      StartGameTimerHandle, FTimerDelegate::CreateLambda([this]() {
-        if (!bTurnsStarted && TurnManager) {
-          bTurnsStarted = true;
-          TurnManager->SortControllersByInitiative();
-          TurnManager->StartTurns();
-          if (GEngine)
-          {
-            GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Green, TEXT("Game started"));
-          }
-        }
-      }),
-      StartGameTimeout, false);
+  // Initialization of the world occurs after players join in PostLogin.
 }
 
 void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
@@ -108,6 +94,7 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
                 Taken.Add(EPS->Faction);
               }
             }
+            Taken.Append(GI->TakenFactions);
             TArray<ESkaldFaction> Available;
             if (UEnum* Enum = StaticEnum<ESkaldFaction>())
             {
@@ -127,6 +114,7 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
             if (Available.Num() > 0)
             {
               AIState->Faction = Available[FMath::RandRange(0, Available.Num() - 1)];
+              GI->TakenFactions.AddUnique(AIState->Faction);
             }
 
             GS->AddPlayerState(AIState);
@@ -169,6 +157,26 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
         }
       }
 
+      if (!bWorldInitialized)
+      {
+        InitializeWorld();
+        BeginArmyPlacementPhase();
+        bWorldInitialized = true;
+        GetWorldTimerManager().SetTimer(
+            StartGameTimerHandle, FTimerDelegate::CreateLambda([this]() {
+              if (!bTurnsStarted && TurnManager) {
+                bTurnsStarted = true;
+                TurnManager->SortControllersByInitiative();
+                TurnManager->StartTurns();
+                if (GEngine)
+                {
+                  GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Green, TEXT("Game started"));
+                }
+              }
+            }),
+            StartGameTimeout, false);
+      }
+
       if (GS->PlayerArray.Num() >= ExpectedPlayerCount && !bTurnsStarted) {
         bTurnsStarted = true;
         GetWorldTimerManager().ClearTimer(StartGameTimerHandle);
@@ -198,12 +206,17 @@ void ASkaldGameMode::InitializeWorld() {
     return;
   }
 
-  // Spawn 43 territories with unique identifiers
-  for (int32 Id = 0; Id < 43; ++Id) {
-    ATerritory *Territory = GetWorld()->SpawnActor<ATerritory>();
-    if (Territory) {
-      Territory->TerritoryID = Id;
-      WorldMap->RegisterTerritory(Territory);
+  // If the world map has not spawned territories yet, create basic ones.
+  if (WorldMap->Territories.Num() == 0)
+  {
+    for (int32 Id = 0; Id < 43; ++Id)
+    {
+      ATerritory *Territory = GetWorld()->SpawnActor<ATerritory>();
+      if (Territory)
+      {
+        Territory->TerritoryID = Id;
+        WorldMap->RegisterTerritory(Territory);
+      }
     }
   }
 

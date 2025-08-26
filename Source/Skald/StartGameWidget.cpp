@@ -15,7 +15,7 @@ void UStartGameWidget::NativeConstruct()
 
     if (DisplayNameBox)
     {
-        DisplayNameBox->SetText(FText::FromString(TEXT("Player")));
+        DisplayNameBox->SetText(FText::GetEmpty());
         DisplayNameBox->OnTextChanged.AddDynamic(this, &UStartGameWidget::OnDisplayNameChanged);
     }
 
@@ -28,10 +28,22 @@ void UStartGameWidget::NativeConstruct()
             {
                 if (!Enum->HasMetaData(TEXT("Hidden"), i))
                 {
-                    FactionComboBox->AddOption(Enum->GetNameStringByIndex(i));
+                    const FString Option = Enum->GetNameStringByIndex(i);
+                    if (Option != TEXT("None"))
+                    {
+                        FactionComboBox->AddOption(Option);
+                    }
                 }
             }
-            FactionComboBox->SetSelectedIndex(0);
+            if (USkaldGameInstance* GI = GetWorld()->GetGameInstance<USkaldGameInstance>())
+            {
+                for (ESkaldFaction Taken : GI->TakenFactions)
+                {
+                    const FString Option = Enum->GetNameStringByValue(static_cast<int64>(Taken));
+                    FactionComboBox->RemoveOption(Option);
+                }
+            }
+            FactionComboBox->SetSelectedIndex(INDEX_NONE);
         }
         FactionComboBox->OnSelectionChanged.AddDynamic(this, &UStartGameWidget::OnFactionChanged);
     }
@@ -40,12 +52,14 @@ void UStartGameWidget::NativeConstruct()
     {
         SingleplayerButton->OnClicked.AddDynamic(this, &UStartGameWidget::OnSingleplayer);
         SingleplayerButton->SetIsEnabled(false);
+        SingleplayerButton->SetVisibility(ESlateVisibility::Collapsed);
     }
 
     if (MultiplayerButton)
     {
         MultiplayerButton->OnClicked.AddDynamic(this, &UStartGameWidget::OnMultiplayer);
         MultiplayerButton->SetIsEnabled(false);
+        MultiplayerButton->SetVisibility(ESlateVisibility::Collapsed);
     }
 
     if (MainMenuButton)
@@ -95,11 +109,13 @@ void UStartGameWidget::ValidateSelections()
     if (SingleplayerButton)
     {
         SingleplayerButton->SetIsEnabled(bEnable);
+        SingleplayerButton->SetVisibility(bEnable ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     }
 
     if (MultiplayerButton)
     {
         MultiplayerButton->SetIsEnabled(bEnable);
+        MultiplayerButton->SetVisibility(bEnable ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     }
 }
 
@@ -125,6 +141,7 @@ void UStartGameWidget::StartGame(bool bMultiplayer)
             GI->DisplayName = Name;
             GI->Faction = Faction;
             GI->bIsMultiplayer = bMultiplayer;
+            GI->TakenFactions.AddUnique(Faction);
         }
 
         if (APlayerController* PC = GetOwningPlayer())
