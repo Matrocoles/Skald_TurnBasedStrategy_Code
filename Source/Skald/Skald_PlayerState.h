@@ -28,11 +28,13 @@ public:
     int32 InitiativeRoll;
 
     /** Player chosen display name. */
-    UPROPERTY(BlueprintReadWrite, Category="PlayerState")
+    UPROPERTY(BlueprintReadWrite, Replicated, Category="PlayerState")
     FString DisplayName;
 
     /** Selected faction for this player. */
-    UPROPERTY(BlueprintReadWrite, Category="PlayerState")
+    UPROPERTY(BlueprintReadWrite, Replicated, Category="PlayerState")
     ESkaldFaction Faction;
+
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 };
 

@@ -1,4 +1,5 @@
 #include "Skald_PlayerState.h"
+#include "Net/UnrealNetwork.h"
 
 ASkaldPlayerState::ASkaldPlayerState()
     : bIsAI(false)
@@ -7,5 +8,14 @@ ASkaldPlayerState::ASkaldPlayerState()
     , DisplayName(TEXT("Player"))
     , Faction(ESkaldFaction::None)
 {
+}
+
+void ASkaldPlayerState::GetLifetimeReplicatedProps(
+    TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+    DOREPLIFETIME(ASkaldPlayerState, DisplayName);
+    DOREPLIFETIME(ASkaldPlayerState, Faction);
 }
 
