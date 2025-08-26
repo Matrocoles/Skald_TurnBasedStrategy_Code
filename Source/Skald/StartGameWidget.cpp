@@ -1,10 +1,6 @@
 #include "StartGameWidget.h"
-#include "Components/Button.h"
-#include "Components/TextBlock.h"
-#include "Components/VerticalBox.h"
 #include "Components/EditableTextBox.h"
 #include "Components/ComboBoxString.h"
-#include "Blueprint/WidgetTree.h"
 #include "Kismet/GameplayStatics.h"
 #include "Skald_GameInstance.h"
 #include "Skald_PlayerState.h"
@@ -15,16 +11,14 @@ void UStartGameWidget::NativeConstruct()
 {
     Super::NativeConstruct();
 
-    if (WidgetTree)
+    if (DisplayNameBox)
     {
-        UVerticalBox* Root = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-        WidgetTree->RootWidget = Root;
-
-        DisplayNameBox = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass());
         DisplayNameBox->SetText(FText::FromString(TEXT("Player")));
-        Root->AddChild(DisplayNameBox);
+    }
 
-        FactionComboBox = WidgetTree->ConstructWidget<UComboBoxString>(UComboBoxString::StaticClass());
+    if (FactionComboBox)
+    {
+        FactionComboBox->ClearOptions();
         if (UEnum* Enum = StaticEnum<ESkaldFaction>())
         {
             for (int32 i = 0; i < Enum->NumEnums(); ++i)
@@ -36,22 +30,6 @@ void UStartGameWidget::NativeConstruct()
             }
             FactionComboBox->SetSelectedIndex(0);
         }
-        Root->AddChild(FactionComboBox);
-
-        auto AddButton = [this, Root](const FString& Label, const FName& FuncName)
-        {
-            UButton* Button = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
-            UTextBlock* Text = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-            Text->SetText(FText::FromString(Label));
-            Button->AddChild(Text);
-            FScriptDelegate Delegate;
-            Delegate.BindUFunction(this, FuncName);
-            Button->OnClicked.Add(Delegate);
-            Root->AddChild(Button);
-        };
-
-        AddButton(TEXT("Singleplayer"), FName("OnSingleplayer"));
-        AddButton(TEXT("Multiplayer"), FName("OnMultiplayer"));
     }
 }
 
