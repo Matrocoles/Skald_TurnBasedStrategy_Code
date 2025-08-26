@@ -9,6 +9,7 @@
 #include "WorldMap.h"
 #include "Territory.h"
 #include "Skald_PlayerState.h"
+#include "Skald_GameMode.h"
 #include "Engine/Engine.h"
 
 void USkaldMainHUDWidget::NativeConstruct() {
@@ -25,6 +26,11 @@ void USkaldMainHUDWidget::NativeConstruct() {
   if (EndTurnButton) {
     EndTurnButton->OnClicked.AddDynamic(
         this, &USkaldMainHUDWidget::HandleEndTurnClicked);
+  }
+  if (DeployButton) {
+    DeployButton->OnClicked.AddDynamic(
+        this, &USkaldMainHUDWidget::HandleDeployClicked);
+    DeployButton->SetVisibility(ESlateVisibility::Collapsed);
   }
 
   BP_SetPhaseButtons(CurrentPhase, CurrentPlayerID == LocalPlayerID);
@@ -138,6 +144,14 @@ void USkaldMainHUDWidget::UpdateInitiativeText(const FString &Message) {
   if (InitiativeText) {
     InitiativeText->SetText(FText::FromString(Message));
     InitiativeText->SetVisibility(ESlateVisibility::Visible);
+  }
+}
+
+void USkaldMainHUDWidget::UpdateDeployableUnits(int32 UnitsRemaining) {
+  if (DeployableUnitsText) {
+    const FString Text = FString::Printf(TEXT("Deployable: %d"), UnitsRemaining);
+    DeployableUnitsText->SetText(FText::FromString(Text));
+    DeployableUnitsText->SetVisibility(ESlateVisibility::Visible);
   }
 }
 
@@ -284,6 +298,11 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory* Territory) {
         SelectedTargetID = Territory->TerritoryID;
       }
     }
+  } else if (CurrentPhase == ETurnPhase::Reinforcement && bOwnedByLocal) {
+    SelectedSourceID = Territory->TerritoryID;
+    if (DeployButton) {
+      DeployButton->SetVisibility(ESlateVisibility::Visible);
+    }
   }
 }
 
@@ -295,4 +314,38 @@ void USkaldMainHUDWidget::HandleAttackApproved() {
   const int32 ArmyCount =
       ActiveConfirmWidget ? ActiveConfirmWidget->ArmyCount : 0;
   SubmitAttack(SelectedSourceID, SelectedTargetID, ArmyCount);
+}
+
+void USkaldMainHUDWidget::HandleDeployClicked() {
+  APlayerController *PC = GetOwningPlayer();
+  if (!PC) {
+    return;
+  }
+
+  ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>();
+  if (!PS || PS->ArmyPool <= 0 || SelectedSourceID == -1) {
+    return;
+  }
+
+  if (AWorldMap *WorldMap =
+          Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+              GetWorld(), AWorldMap::StaticClass()))) {
+    if (ATerritory *Terr = WorldMap->GetTerritoryById(SelectedSourceID)) {
+      if (Terr->OwningPlayer == PS) {
+        ++Terr->ArmyStrength;
+        Terr->RefreshAppearance();
+        --PS->ArmyPool;
+        PS->ForceNetUpdate();
+        UpdateDeployableUnits(PS->ArmyPool);
+
+        if (PS->ArmyPool <= 0 && DeployButton) {
+          DeployButton->SetVisibility(ESlateVisibility::Collapsed);
+          if (ASkaldGameMode *GM =
+                  GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
+            GM->AdvanceArmyPlacement();
+          }
+        }
+      }
+    }
+  }
 }

@@ -132,6 +132,10 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
   void UpdateInitiativeText(const FString &Message);
 
+  /** Update the remaining deployable unit count display. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
+  void UpdateDeployableUnits(int32 UnitsRemaining);
+
   // BlueprintCallable functions — selection UX helpers
   UFUNCTION(BlueprintCallable, Category = "Skald|Selection")
   void BeginAttackSelection();
@@ -202,6 +206,10 @@ public:
             meta = (BindWidgetOptional))
   UButton *EndTurnButton;
 
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
+            meta = (BindWidgetOptional))
+  UButton *DeployButton;
+
   // Container where RebuildPlayerList will spawn entries
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
             meta = (BindWidgetOptional))
@@ -215,6 +223,10 @@ public:
             meta = (BindWidgetOptional))
   UTextBlock *InitiativeText;
 
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
+            meta = (BindWidgetOptional))
+  UTextBlock *DeployableUnitsText;
+
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Widgets")
   TSubclassOf<UConfirmAttackWidget> ConfirmAttackWidgetClass;
 
@@ -222,6 +234,9 @@ protected:
   // Internal handlers for widget actions
   UFUNCTION()
   void HandleEndTurnClicked();
+
+  UFUNCTION()
+  void HandleDeployClicked();
 
   UFUNCTION()
   void HandleAttackApproved();

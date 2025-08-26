@@ -20,7 +20,7 @@ public:
     bool bIsAI;
 
     /** Army units available for placement. */
-    UPROPERTY(BlueprintReadWrite, Category="PlayerState")
+    UPROPERTY(BlueprintReadWrite, Replicated, Category="PlayerState")
     int32 ArmyPool;
 
     /** Initiative roll determining turn order. */

@@ -198,10 +198,83 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
 }
 
 void ASkaldGameMode::BeginArmyPlacementPhase() {
-  if (TurnManager) {
-    // Initiative order determines who places armies first. The actual
-    // placement UI is expected to be handled in blueprints.
-    TurnManager->SortControllersByInitiative();
+  if (!TurnManager || !WorldMap) {
+    return;
+  }
+
+  // Ensure controllers are sorted before placement begins.
+  TurnManager->SortControllersByInitiative();
+
+  // Calculate army pools for each player based on owned territories.
+  for (ASkaldPlayerController *PC : TurnManager->GetControllers()) {
+    if (!PC) {
+      continue;
+    }
+    if (ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>()) {
+      int32 Owned = 0;
+      for (ATerritory *Territory : WorldMap->Territories) {
+        if (Territory && Territory->OwningPlayer == PS) {
+          ++Owned;
+        }
+      }
+      PS->ArmyPool = FMath::CeilToInt(Owned / 3.0f);
+      PS->ForceNetUpdate();
+    }
+  }
+
+  PlacementIndex = 0;
+  AdvanceArmyPlacement();
+}
+
+void ASkaldGameMode::AdvanceArmyPlacement() {
+  if (!TurnManager || !WorldMap) {
+    return;
+  }
+
+  const TArray<ASkaldPlayerController *> &Controllers =
+      TurnManager->GetControllers();
+  const int32 NumControllers = Controllers.Num();
+
+  while (PlacementIndex < NumControllers) {
+    ASkaldPlayerController *PC = Controllers[PlacementIndex];
+    ASkaldPlayerState *PS = PC ? PC->GetPlayerState<ASkaldPlayerState>() : nullptr;
+    if (!PC || !PS) {
+      ++PlacementIndex;
+      continue;
+    }
+
+    if (PS->ArmyPool <= 0) {
+      ++PlacementIndex;
+      continue;
+    }
+
+    // AI players automatically distribute their armies evenly.
+    if (PS->bIsAI) {
+      TArray<ATerritory *> OwnedTerritories;
+      for (ATerritory *Territory : WorldMap->Territories) {
+        if (Territory && Territory->OwningPlayer == PS) {
+          OwnedTerritories.Add(Territory);
+        }
+      }
+      int32 SpreadIndex = 0;
+      while (PS->ArmyPool > 0 && OwnedTerritories.Num() > 0) {
+        ATerritory *TargetTerritory =
+            OwnedTerritories[SpreadIndex % OwnedTerritories.Num()];
+        ++TargetTerritory->ArmyStrength;
+        TargetTerritory->RefreshAppearance();
+        --PS->ArmyPool;
+        ++SpreadIndex;
+      }
+      PS->ForceNetUpdate();
+      ++PlacementIndex;
+      continue;
+    }
+
+    // Human player: update HUD and wait for manual deployment.
+    if (USkaldMainHUDWidget *HUD = PC->GetHUDWidget()) {
+      HUD->UpdateDeployableUnits(PS->ArmyPool);
+    }
+    break;
   }
 }
 
@@ -295,7 +368,7 @@ void ASkaldGameMode::InitializeWorld() {
     }
   }
 
-  // Calculate starting armies and determine highest initiative roll
+  // Determine highest initiative roll
   ASkaldPlayerState *HighestPS = nullptr;
   int32 HighestRoll = 0;
   for (APlayerState *PSBase : GS->PlayerArray) {
@@ -304,14 +377,6 @@ void ASkaldGameMode::InitializeWorld() {
       continue;
     }
 
-    int32 Owned = 0;
-    for (ATerritory *Territory : WorldMap->Territories) {
-      if (Territory && Territory->OwningPlayer == PS) {
-        ++Owned;
-      }
-    }
-
-    PS->ArmyPool = Owned / 3;
     if (PS->InitiativeRoll > HighestRoll) {
       HighestRoll = PS->InitiativeRoll;
       HighestPS = PS;

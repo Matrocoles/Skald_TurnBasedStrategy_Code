@@ -36,6 +36,10 @@ public:
     UFUNCTION(BlueprintCallable, Category="Battle")
     void TriggerGridBattle(const FS_BattlePayload& Battle);
 
+    /** Access the controllers array in its current initiative order. */
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="Turn")
+    const TArray<ASkaldPlayerController*>& GetControllers() const { return Controllers; }
+
 protected:
     UPROPERTY(BlueprintReadOnly, Category="Turn")
     TArray<ASkaldPlayerController*> Controllers;
