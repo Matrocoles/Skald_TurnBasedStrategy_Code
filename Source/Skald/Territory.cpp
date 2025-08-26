@@ -2,29 +2,35 @@
 #include "Components/PrimitiveComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
-#include "Skald_PlayerState.h"
-#include "Skald_PlayerController.h"
-#include "SkaldTypes.h"
 #include "Net/UnrealNetwork.h"
+#include "SkaldTypes.h"
+#include "Skald_PlayerController.h"
+#include "Skald_PlayerState.h"
 
-namespace
-{
-FLinearColor GetFactionColor(ESkaldFaction Faction)
-{
-  switch (Faction)
-  {
-  case ESkaldFaction::Human: return FLinearColor::Blue;
-  case ESkaldFaction::Orc: return FLinearColor::Green;
-  case ESkaldFaction::Dwarf: return FLinearColor(0.6f, 0.6f, 0.6f, 1.f);
-  case ESkaldFaction::Elf: return FLinearColor(0.0f, 0.8f, 0.4f, 1.f);
-  case ESkaldFaction::LizardFolk: return FLinearColor(0.0f, 0.6f, 0.3f, 1.f);
-  case ESkaldFaction::Undead: return FLinearColor(0.5f, 0.0f, 0.5f, 1.f);
-  case ESkaldFaction::Gnoll: return FLinearColor(0.8f, 0.4f, 0.0f, 1.f);
-  case ESkaldFaction::Empire: return FLinearColor::Red;
-  default: return FLinearColor::White;
+namespace {
+FLinearColor GetFactionColor(ESkaldFaction Faction) {
+  switch (Faction) {
+  case ESkaldFaction::Human:
+    return FLinearColor::Blue;
+  case ESkaldFaction::Orc:
+    return FLinearColor::Red;
+  case ESkaldFaction::Dwarf:
+    return FLinearColor(0.6f, 0.3f, 0.0f, 1.f); // Brown
+  case ESkaldFaction::Elf:
+    return FLinearColor::Green;
+  case ESkaldFaction::LizardFolk:
+    return FLinearColor(0.0f, 0.5f, 0.5f, 1.f); // Teal
+  case ESkaldFaction::Undead:
+    return FLinearColor::Black;
+  case ESkaldFaction::Gnoll:
+    return FLinearColor(1.0f, 0.55f, 0.0f, 1.f); // Orange
+  case ESkaldFaction::Empire:
+    return FLinearColor(0.5f, 0.0f, 0.5f, 1.f); // Purple
+  default:
+    return FLinearColor::White;
   }
 }
-}
+} // namespace
 
 ATerritory::ATerritory() {
   PrimaryActorTick.bCanEverTick = false;
@@ -57,9 +63,12 @@ void ATerritory::BeginPlay() {
         DynamicMaterial->GetVectorParameterValue(FName("Color"), DefaultColor);
       }
     } else {
-      UE_LOG(LogTemp, Warning,
-             TEXT("Territory %s has no material at index 0"), *GetName());
+      UE_LOG(LogTemp, Warning, TEXT("Territory %s has no material at index 0"),
+             *GetName());
     }
+
+    // Ensure borders are not highlighted by default
+    MeshComponent->SetRenderCustomDepth(false);
   }
 
   UpdateTerritoryColor();
@@ -69,7 +78,7 @@ void ATerritory::BeginPlay() {
 }
 
 void ATerritory::GetLifetimeReplicatedProps(
-    TArray<FLifetimeProperty>& OutLifetimeProps) const {
+    TArray<FLifetimeProperty> &OutLifetimeProps) const {
   Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
   DOREPLIFETIME(ATerritory, OwningPlayer);
@@ -88,19 +97,25 @@ void ATerritory::Select() {
   }
 
   bIsSelected = true;
+  if (MeshComponent) {
+    MeshComponent->SetRenderCustomDepth(true);
+  }
   if (DynamicMaterial) {
-    DynamicMaterial->SetVectorParameterValue(FName("Color"),
-                                             FLinearColor::Yellow);
+    const FLinearColor Gold(1.0f, 0.84f, 0.0f, 1.0f);
+    DynamicMaterial->SetVectorParameterValue(FName("Color"), Gold);
   }
   OnTerritorySelected.Broadcast(this);
-  if (ASkaldPlayerController* PC =
-          Cast<ASkaldPlayerController>(GetWorld()->GetFirstPlayerController())) {
+  if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(
+          GetWorld()->GetFirstPlayerController())) {
     PC->HandleTerritorySelected(this);
   }
 }
 
 void ATerritory::Deselect() {
   bIsSelected = false;
+  if (MeshComponent) {
+    MeshComponent->SetRenderCustomDepth(false);
+  }
   if (DynamicMaterial) {
     DynamicMaterial->SetVectorParameterValue(FName("Color"), DefaultColor);
   }
@@ -124,15 +139,14 @@ bool ATerritory::MoveTo(ATerritory *TargetTerritory) {
 }
 
 void ATerritory::HandleMouseEnter(UPrimitiveComponent *TouchedComponent) {
-  if (DynamicMaterial && !bIsSelected) {
-    DynamicMaterial->SetVectorParameterValue(FName("Color"),
-                                             FLinearColor::White);
+  if (!bIsSelected && MeshComponent) {
+    MeshComponent->SetRenderCustomDepth(true);
   }
 }
 
 void ATerritory::HandleMouseLeave(UPrimitiveComponent *TouchedComponent) {
-  if (DynamicMaterial && !bIsSelected) {
-    DynamicMaterial->SetVectorParameterValue(FName("Color"), DefaultColor);
+  if (!bIsSelected && MeshComponent) {
+    MeshComponent->SetRenderCustomDepth(false);
   }
 }
 
@@ -156,5 +170,6 @@ void ATerritory::UpdateTerritoryColor() {
       NewColor = GetFactionColor(OwningPlayer->Faction);
     }
     DynamicMaterial->SetVectorParameterValue(FName("Color"), NewColor);
+    DefaultColor = NewColor;
   }
 }
