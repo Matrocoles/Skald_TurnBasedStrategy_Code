@@ -16,6 +16,7 @@ void UStartGameWidget::NativeConstruct()
     if (DisplayNameBox)
     {
         DisplayNameBox->SetText(FText::FromString(TEXT("Player")));
+        DisplayNameBox->OnTextChanged.AddDynamic(this, &UStartGameWidget::OnDisplayNameChanged);
     }
 
     if (FactionComboBox)
@@ -32,22 +33,27 @@ void UStartGameWidget::NativeConstruct()
             }
             FactionComboBox->SetSelectedIndex(0);
         }
+        FactionComboBox->OnSelectionChanged.AddDynamic(this, &UStartGameWidget::OnFactionChanged);
     }
 
     if (SingleplayerButton)
     {
         SingleplayerButton->OnClicked.AddDynamic(this, &UStartGameWidget::OnSingleplayer);
+        SingleplayerButton->SetIsEnabled(false);
     }
 
     if (MultiplayerButton)
     {
         MultiplayerButton->OnClicked.AddDynamic(this, &UStartGameWidget::OnMultiplayer);
+        MultiplayerButton->SetIsEnabled(false);
     }
 
     if (MainMenuButton)
     {
         MainMenuButton->OnClicked.AddDynamic(this, &UStartGameWidget::OnMainMenu);
     }
+
+    ValidateSelections();
 }
 
 void UStartGameWidget::OnSingleplayer()
@@ -66,6 +72,34 @@ void UStartGameWidget::OnMainMenu()
     if (OwningLobbyMenu.IsValid())
     {
         OwningLobbyMenu->SetVisibility(ESlateVisibility::Visible);
+    }
+}
+
+void UStartGameWidget::OnDisplayNameChanged(const FText& /*Text*/)
+{
+    ValidateSelections();
+}
+
+void UStartGameWidget::OnFactionChanged(FString /*SelectedItem*/, ESelectInfo::Type /*SelectionType*/)
+{
+    ValidateSelections();
+}
+
+void UStartGameWidget::ValidateSelections()
+{
+    const bool bHasName = DisplayNameBox && !DisplayNameBox->GetText().IsEmpty();
+    const bool bHasFaction = FactionComboBox && FactionComboBox->GetSelectedIndex() != INDEX_NONE;
+
+    const bool bEnable = bHasName && bHasFaction;
+
+    if (SingleplayerButton)
+    {
+        SingleplayerButton->SetIsEnabled(bEnable);
+    }
+
+    if (MultiplayerButton)
+    {
+        MultiplayerButton->SetIsEnabled(bEnable);
     }
 }
 

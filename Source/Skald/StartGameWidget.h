@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "SkaldTypes.h"
+#include "Components/ComboBoxString.h"
 #include "StartGameWidget.generated.h"
 
 class UEditableTextBox;
@@ -54,7 +55,15 @@ protected:
     UFUNCTION()
     void OnMainMenu();
 
+    UFUNCTION()
+    void OnDisplayNameChanged(const FText& Text);
+
+    UFUNCTION()
+    void OnFactionChanged(FString SelectedItem, ESelectInfo::Type SelectionType);
+
     void StartGame(bool bMultiplayer);
+
+    void ValidateSelections();
 
 private:
     /** Reference back to the owning lobby menu so it can be restored. */
