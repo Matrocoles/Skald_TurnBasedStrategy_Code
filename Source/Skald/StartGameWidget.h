@@ -28,6 +28,10 @@ public:
     UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta = (BindWidgetOptional))
     UComboBoxString* FactionComboBox;
 
+    /** Button to confirm the player's selections before starting. */
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta = (BindWidgetOptional))
+    UButton* LockInButton;
+
     /** Button to start singleplayer. */
     UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta = (BindWidgetOptional))
     UButton* SingleplayerButton;
@@ -54,6 +58,9 @@ protected:
 
     UFUNCTION()
     void OnMainMenu();
+
+    UFUNCTION()
+    void OnLockIn();
 
     UFUNCTION()
     void OnDisplayNameChanged(const FText& Text);
