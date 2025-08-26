@@ -21,7 +21,18 @@ void ATurnManager::StartTurns() {
   SortControllersByInitiative();
   CurrentIndex = 0;
   if (Controllers.IsValidIndex(CurrentIndex)) {
-    Controllers[CurrentIndex]->StartTurn();
+    ASkaldPlayerController *CurrentController = Controllers[CurrentIndex];
+    ASkaldPlayerState *PS =
+        CurrentController->GetPlayerState<ASkaldPlayerState>();
+    const FString PlayerName = PS ? PS->DisplayName : TEXT("Unknown");
+
+    for (ASkaldPlayerController *Controller : Controllers) {
+      if (Controller) {
+        Controller->ShowTurnAnnouncement(PlayerName);
+      }
+    }
+
+    CurrentController->StartTurn();
   }
 }
 
@@ -31,7 +42,18 @@ void ATurnManager::AdvanceTurn() {
   }
 
   CurrentIndex = (CurrentIndex + 1) % Controllers.Num();
-  Controllers[CurrentIndex]->StartTurn();
+  ASkaldPlayerController *CurrentController = Controllers[CurrentIndex];
+  ASkaldPlayerState *PS =
+      CurrentController->GetPlayerState<ASkaldPlayerState>();
+  const FString PlayerName = PS ? PS->DisplayName : TEXT("Unknown");
+
+  for (ASkaldPlayerController *Controller : Controllers) {
+    if (Controller) {
+      Controller->ShowTurnAnnouncement(PlayerName);
+    }
+  }
+
+  CurrentController->StartTurn();
 }
 
 void ATurnManager::SortControllersByInitiative() {

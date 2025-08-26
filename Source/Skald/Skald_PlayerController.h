@@ -38,6 +38,9 @@ public:
     UFUNCTION(BlueprintCallable, Category="Turn")
     void SetTurnManager(ATurnManager* Manager);
 
+    UFUNCTION(BlueprintCallable, Category="Turn")
+    void ShowTurnAnnouncement(const FString& PlayerName);
+
     UFUNCTION(BlueprintCallable, Category="UI")
     void HandleTerritorySelected(ATerritory* Terr);
 
