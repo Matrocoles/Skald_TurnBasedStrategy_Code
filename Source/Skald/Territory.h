@@ -93,6 +93,10 @@ public:
     UFUNCTION()
     void HandleClicked(UPrimitiveComponent* TouchedComponent, FKey ButtonPressed);
 
+    /** Refresh the visual appearance of this territory. */
+    UFUNCTION(BlueprintCallable, Category = "Territory")
+    void RefreshAppearance();
+
     UFUNCTION()
     void OnRep_OwningPlayer();
 

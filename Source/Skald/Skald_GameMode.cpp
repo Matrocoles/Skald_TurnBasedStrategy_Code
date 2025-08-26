@@ -125,6 +125,7 @@ void ASkaldGameMode::InitializeWorld() {
       ASkaldPlayerState *TerritoryOwner =
           Cast<ASkaldPlayerState>(GS->PlayerArray[Index % PlayerCount]);
       Territory->OwningPlayer = TerritoryOwner;
+      Territory->RefreshAppearance();
       Territory->ArmyStrength = 1;
       ++Index;
     }
