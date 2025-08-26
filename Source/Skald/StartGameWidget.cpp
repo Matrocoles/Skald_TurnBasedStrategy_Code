@@ -100,6 +100,11 @@ void UStartGameWidget::StartGame(bool bMultiplayer)
                 PS->Faction = Faction;
             }
 
+            PC->SetInputMode(FInputModeGameOnly());
+            PC->bShowMouseCursor = false;
+            PC->bEnableClickEvents = false;
+            PC->bEnableMouseOverEvents = false;
+
             FName LevelName(TEXT("/Game/Blueprints/Maps/OverviewMap"));
             FString Options;
             if (bMultiplayer)
