@@ -5,6 +5,8 @@
 #include "Components/EditableTextBox.h"
 #include "Components/ComboBoxString.h"
 #include "Blueprint/WidgetTree.h"
+#include "Components/EditableTextBox.h"
+#include "Components/ComboBoxString.h"
 #include "Kismet/GameplayStatics.h"
 #include "Skald_GameInstance.h"
 #include "Skald_PlayerState.h"
@@ -16,10 +18,10 @@ void UStartGameWidget::NativeConstruct()
 {
     Super::NativeConstruct();
 
-    if (WidgetTree)
+    if (DisplayNameBox)
     {
-        UVerticalBox* Root = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-        WidgetTree->RootWidget = Root;
+        DisplayNameBox->SetText(FText::FromString(TEXT("Player")));
+    }
 
         DisplayNameInput = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass());
         DisplayNameInput->SetText(FText::FromString(TEXT("Player")));
@@ -40,20 +42,54 @@ void UStartGameWidget::NativeConstruct()
         Root->AddChild(FactionCombo);
 
         auto AddButton = [this, Root](const FString& Label, const FName& FuncName)
-        {
-            UButton* Button = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
-            UTextBlock* Text = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-            Text->SetText(FText::FromString(Label));
-            Button->AddChild(Text);
-            FScriptDelegate Delegate;
-            Delegate.BindUFunction(this, FuncName);
-            Button->OnClicked.Add(Delegate);
-            Root->AddChild(Button);
-        };
+        DisplayNameBox = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass());
+        DisplayNameBox->SetText(FText::FromString(TEXT("Player")));
+        Root->AddChild(DisplayNameBox);
 
+        FactionComboBox = WidgetTree->ConstructWidget<UComboBoxString>(UComboBoxString::StaticClass());
+        if (UEnum* Enum = StaticEnum<ESkaldFaction>())
+        {
+            for (int32 i = 0; i < Enum->NumEnums(); ++i)
+            {
+                if (!Enum->HasMetaData(TEXT("Hidden"), i))
+                {
+                    FactionComboBox->AddOption(Enum->GetNameStringByIndex(i));
+                }
+            }
+            FactionComboBox->SetSelectedIndex(0);
+        }
+        Root->AddChild(FactionComboBox);
+
+        auto AddButton = [this, Root](const FString& Label, const FName& FuncName)
+        {
+            for (int32 i = 0; i < Enum->NumEnums(); ++i)
+            {
+                if (!Enum->HasMetaData(TEXT("Hidden"), i))
+                {
+                    FactionComboBox->AddOption(Enum->GetNameStringByIndex(i));
+                }
+            }
+            FactionComboBox->SetSelectedIndex(0);
+        }
+        Root->AddChild(FactionComboBox);
         AddButton(TEXT("Singleplayer"), FName("OnSingleplayer"));
         AddButton(TEXT("Multiplayer"), FName("OnMultiplayer"));
         AddButton(TEXT("Main Menu"), FName("OnMainMenu"));
+        auto AddButton = [this, Root](const FString& Label, const FName& FuncName)
+    if (FactionComboBox)
+    {
+        FactionComboBox->ClearOptions();
+        if (UEnum* Enum = StaticEnum<ESkaldFaction>())
+        {
+            for (int32 i = 0; i < Enum->NumEnums(); ++i)
+            {
+                if (!Enum->HasMetaData(TEXT("Hidden"), i))
+                {
+                    FactionComboBox->AddOption(Enum->GetNameStringByIndex(i));
+                }
+            }
+            FactionComboBox->SetSelectedIndex(0);
+        }
     }
 }
 
@@ -73,13 +109,29 @@ void UStartGameWidget::OnMainMenu()
     if (LobbyMenu.IsValid())
     {
         LobbyMenu->SetVisibility(ESlateVisibility::Visible);
+    {
+        LobbyMenu->SetVisibility(ESlateVisibility::Visible);
+void UStartGameWidget::StartGame(bool bMultiplayer)
+{
+    FString Name = DisplayNameBox ? DisplayNameBox->GetText().ToString() : TEXT("Player");
+    FString FactionName = FactionComboBox ? FactionComboBox->GetSelectedOption() : TEXT("None");
+
+    ESkaldFaction Faction = ESkaldFaction::None;
+    if (UEnum* Enum = StaticEnum<ESkaldFaction>())
+    {
+        int32 Value = Enum->GetValueByNameString(FactionName);
+        if (Value != INDEX_NONE)
+        {
+            Faction = static_cast<ESkaldFaction>(Value);
+        }
     }
-}
 
 void UStartGameWidget::StartGame(bool bMultiplayer)
 {
     FString Name = DisplayNameInput ? DisplayNameInput->GetText().ToString() : TEXT("Player");
     FString FactionName = FactionCombo ? FactionCombo->GetSelectedOption() : TEXT("None");
+    FString Name = DisplayNameBox ? DisplayNameBox->GetText().ToString() : TEXT("Player");
+    FString FactionName = FactionComboBox ? FactionComboBox->GetSelectedOption() : TEXT("None");
 
     ESkaldFaction Faction = ESkaldFaction::None;
     if (UEnum* Enum = StaticEnum<ESkaldFaction>())
@@ -94,6 +146,13 @@ void UStartGameWidget::StartGame(bool bMultiplayer)
     if (UWorld* World = GetWorld())
     {
         if (USkaldGameInstance* GI = World->GetGameInstance<USkaldGameInstance>())
+        {
+            GI->DisplayName = Name;
+            GI->Faction = Faction;
+        }
+
+        if (APlayerController* PC = GetOwningPlayer())
+        {
         {
             GI->DisplayName = Name;
             GI->Faction = Faction;
