@@ -35,12 +35,15 @@ void ULobbyMenuWidget::OnStartGame()
 {
     if (UWorld* World = GetWorld())
     {
-        UStartGameWidget* Widget = CreateWidget<UStartGameWidget>(World, UStartGameWidget::StaticClass());
-        if (Widget)
+        if (UClass* StartGameWidgetClass = LoadClass<UStartGameWidget>(nullptr, TEXT("/Game/Blueprints/UI/Skald_StartGameWidget.Skald_StartGameWidget_C")))
         {
             Widget->SetLobbyMenu(this);
             Widget->AddToViewport();
             SetVisibility(ESlateVisibility::Hidden);
+            if (UStartGameWidget* Widget = CreateWidget<UStartGameWidget>(World, StartGameWidgetClass))
+            {
+                Widget->AddToViewport();
+            }
         }
     }
 }
