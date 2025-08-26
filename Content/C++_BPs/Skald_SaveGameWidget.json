@@ -1,0 +1,15 @@
+{
+  "Blueprint": "WidgetBlueprint'/Game/C++_BPs/Skald_SaveGameWidget'",
+  "ParentClass": "/Script/UMG.UserWidget",
+  "Purpose": "UI for saving the current game state",
+  "Properties": {
+    "SaveNameField": {
+      "Type": "EditableTextBox",
+      "Purpose": "Enter the name for the save slot"
+    },
+    "SaveButton": {
+      "Type": "Button",
+      "OnClicked": "Calls USkaldSaveGameLibrary::SaveSkaldGame with text from SaveNameField"
+    }
+  }
+}

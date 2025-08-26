@@ -30,3 +30,7 @@ from Blueprints and level actors. To hook everything up:
 
 With this setup the C++ logic handles selection, deselection, and movement
 between adjacent territories without requiring additional Blueprint wiring.
+
+## Save Game UI
+
+The Save Game menu widget (`Skald_SaveGameWidget`) is not included in the repository. Create a UMG Widget Blueprint with this name under `Content/C++_BPs` and implement a text box for the save slot name and a button that calls `USkaldSaveGameLibrary::SaveSkaldGame`. A JSON description of the expected structure is provided in `Content/C++_BPs/Skald_SaveGameWidget.json`.
