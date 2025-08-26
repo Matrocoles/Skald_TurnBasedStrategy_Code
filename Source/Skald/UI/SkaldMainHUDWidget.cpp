@@ -2,6 +2,8 @@
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
+#include "Territory.h"
+#include "Skald_PlayerState.h"
 
 void USkaldMainHUDWidget::NativeConstruct() {
   Super::NativeConstruct();
@@ -108,6 +110,10 @@ void USkaldMainHUDWidget::BeginAttackSelection() {
   bSelectingForMove = false;
   SelectedSourceID = -1;
   SelectedTargetID = -1;
+  if (SelectionPrompt) {
+    SelectionPrompt->SetText(FText::FromString(TEXT("Choose owned territory.")));
+    SelectionPrompt->SetVisibility(ESlateVisibility::Visible);
+  }
 }
 
 void USkaldMainHUDWidget::SubmitAttack(int32 FromID, int32 ToID,
@@ -144,24 +150,39 @@ void USkaldMainHUDWidget::CancelMoveSelection() {
   SelectedTargetID = -1;
 }
 
-void USkaldMainHUDWidget::OnTerritoryClickedUI(int32 TerritoryID,
-                                               bool bOwnedByLocal) {
+void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory* Territory) {
+  if (!Territory) {
+    return;
+  }
+
+  ASkaldPlayerState* LocalPS = nullptr;
+  if (APlayerController* PC = GetOwningPlayer()) {
+    LocalPS = PC->GetPlayerState<ASkaldPlayerState>();
+  }
+
+  const bool bOwnedByLocal = LocalPS && Territory->OwningPlayer == LocalPS;
+
   if (bSelectingForAttack) {
     if (SelectedSourceID == -1) {
-      if (bOwnedByLocal) {
-        SelectedSourceID = TerritoryID;
+      if (bOwnedByLocal && Territory->ArmyStrength > 0) {
+        SelectedSourceID = Territory->TerritoryID;
+        Territory->Select(true);
+        if (SelectionPrompt) {
+          SelectionPrompt->SetText(
+              FText::FromString(TEXT("Choose enemy territory.")));
+        }
       }
     } else if (SelectedTargetID == -1) {
-      SelectedTargetID = TerritoryID;
+      SelectedTargetID = Territory->TerritoryID;
     }
   } else if (bSelectingForMove) {
     if (SelectedSourceID == -1) {
       if (bOwnedByLocal) {
-        SelectedSourceID = TerritoryID;
+        SelectedSourceID = Territory->TerritoryID;
       }
     } else if (SelectedTargetID == -1) {
       if (bOwnedByLocal) {
-        SelectedTargetID = TerritoryID;
+        SelectedTargetID = Territory->TerritoryID;
       }
     }
   }
