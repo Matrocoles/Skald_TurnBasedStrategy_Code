@@ -17,14 +17,17 @@ struct FTerritorySpawnData
         , TerritoryName(TEXT(""))
         , bIsCapital(false)
         , ContinentID(0)
+        , Location(FVector::ZeroVector)
     {
     }
 
-    FTerritorySpawnData(int32 InID, const FString& InName, bool bCapital = false, int32 InContinent = 0)
+    FTerritorySpawnData(int32 InID, const FString& InName, bool bCapital = false,
+                        int32 InContinent = 0, FVector InLocation = FVector::ZeroVector)
         : TerritoryID(InID)
         , TerritoryName(InName)
         , bIsCapital(bCapital)
         , ContinentID(InContinent)
+        , Location(InLocation)
     {
     }
 
@@ -39,6 +42,10 @@ struct FTerritorySpawnData
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     int32 ContinentID;
+
+    /** Location for spawning this territory relative to the world map actor. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    FVector Location;
 };
 
 /**
@@ -89,6 +96,10 @@ public:
     /** Maximum XY (in local space) for random spawn positions. */
     UPROPERTY(EditAnywhere, Category = "WorldMap")
     FVector2D SpawnAreaMax = FVector2D(500.f, 500.f);
+
+    /** Maximum distance to consider two territories adjacent. */
+    UPROPERTY(EditAnywhere, Category = "WorldMap")
+    float AdjacencyDistance = 210.f;
 
 protected:
     /** Predefined territory table used for spawning at begin play. */
