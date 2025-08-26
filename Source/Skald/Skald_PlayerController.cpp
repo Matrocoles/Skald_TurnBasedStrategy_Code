@@ -5,6 +5,7 @@
 #include "UI/SkaldMainHUDWidget.h"
 #include "Skald_GameState.h"
 #include "Territory.h"
+#include "Engine/Engine.h"
 
 ASkaldPlayerController::ASkaldPlayerController() {
   bIsAI = false;
@@ -68,6 +69,15 @@ void ASkaldPlayerController::BeginPlay() {
 
 void ASkaldPlayerController::SetTurnManager(ATurnManager *Manager) {
   TurnManager = Manager;
+}
+
+void ASkaldPlayerController::ShowTurnAnnouncement(const FString& PlayerName) {
+  if (MainHudWidget) {
+    MainHudWidget->ShowTurnAnnouncement(PlayerName);
+  } else if (GEngine) {
+    const FString Message = FString::Printf(TEXT("%s's Turn"), *PlayerName);
+    GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Yellow, Message);
+  }
 }
 
 void ASkaldPlayerController::StartTurn() {
