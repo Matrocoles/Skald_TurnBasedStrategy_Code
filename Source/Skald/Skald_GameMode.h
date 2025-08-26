@@ -48,6 +48,9 @@ protected:
   UFUNCTION(BlueprintCallable, Category = "GameMode")
   void BeginArmyPlacementPhase();
 
+  /** Advance army placement to the next controller. */
+  void AdvanceArmyPlacement();
+
 private:
   /** Timer that triggers auto-start of the turn sequence. */
   FTimerHandle StartGameTimerHandle;
@@ -57,4 +60,7 @@ private:
 
   /** Whether the world has been initialized and territories assigned. */
   bool bWorldInitialized;
+
+  /** Index of the controller currently placing armies. */
+  int32 PlacementIndex = 0;
 };
