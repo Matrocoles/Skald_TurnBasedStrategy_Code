@@ -24,6 +24,7 @@ void USkaldMainHUDWidget::NativeConstruct() {
 }
 
 void USkaldMainHUDWidget::HandleEndTurnClicked() {
+  ShowEndingTurn();
   if (CurrentPhase == ETurnPhase::Attack) {
     OnEndAttackRequested.Broadcast(true);
   } else if (CurrentPhase == ETurnPhase::Movement) {
@@ -100,6 +101,19 @@ void USkaldMainHUDWidget::RebuildPlayerList(
                         Player.IsAI ? TEXT(" [AI]") : TEXT(""));
     Entry->SetText(FText::FromString(Line));
     PlayerListBox->AddChildToVerticalBox(Entry);
+  }
+}
+
+void USkaldMainHUDWidget::ShowEndingTurn() {
+  if (EndingTurnText) {
+    EndingTurnText->SetText(FText::FromString(TEXT("Ending turn.")));
+    EndingTurnText->SetVisibility(ESlateVisibility::Visible);
+  }
+}
+
+void USkaldMainHUDWidget::HideEndingTurn() {
+  if (EndingTurnText) {
+    EndingTurnText->SetVisibility(ESlateVisibility::Collapsed);
   }
 }
 

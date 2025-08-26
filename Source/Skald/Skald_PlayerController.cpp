@@ -1,10 +1,10 @@
 #include "Skald_PlayerController.h"
 #include "Blueprint/UserWidget.h"
+#include "Skald_GameState.h"
 #include "Skald_PlayerState.h"
 #include "Skald_TurnManager.h"
-#include "UI/SkaldMainHUDWidget.h"
-#include "Skald_GameState.h"
 #include "Territory.h"
+#include "UI/SkaldMainHUDWidget.h"
 
 ASkaldPlayerController::ASkaldPlayerController() {
   bIsAI = false;
@@ -28,10 +28,10 @@ void ASkaldPlayerController::BeginPlay() {
       HUDRef = MainHudWidget;
       MainHudWidget->AddToViewport();
 
-      if (ASkaldGameState* GS = GetWorld()->GetGameState<ASkaldGameState>()) {
+      if (ASkaldGameState *GS = GetWorld()->GetGameState<ASkaldGameState>()) {
         TArray<FS_PlayerData> Players;
-        for (APlayerState* PSBase : GS->PlayerArray) {
-          if (ASkaldPlayerState* PS = Cast<ASkaldPlayerState>(PSBase)) {
+        for (APlayerState *PSBase : GS->PlayerArray) {
+          if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
             FS_PlayerData Data;
             Data.PlayerID = PS->GetPlayerId();
             Data.PlayerName = PS->DisplayName;
@@ -41,7 +41,7 @@ void ASkaldPlayerController::BeginPlay() {
           }
         }
 
-        const ASkaldPlayerState* CurrentPS = GS->GetCurrentPlayer();
+        const ASkaldPlayerState *CurrentPS = GS->GetCurrentPlayer();
         const int32 CurrentID = CurrentPS ? CurrentPS->GetPlayerId() : -1;
         MainHudWidget->RefreshFromState(CurrentID, /*TurnNumber*/ 1,
                                         ETurnPhase::Reinforcement, Players);
@@ -71,6 +71,9 @@ void ASkaldPlayerController::SetTurnManager(ATurnManager *Manager) {
 }
 
 void ASkaldPlayerController::StartTurn() {
+  if (MainHudWidget) {
+    MainHudWidget->HideEndingTurn();
+  }
   if (bIsAI) {
     MakeAIDecision();
     EndTurn();
@@ -116,7 +119,7 @@ void ASkaldPlayerController::HandleEndMovementRequested(bool bConfirmed) {
          bConfirmed ? TEXT("confirmed") : TEXT("cancelled"));
 }
 
-void ASkaldPlayerController::HandleTerritorySelected(ATerritory* Terr) {
+void ASkaldPlayerController::HandleTerritorySelected(ATerritory *Terr) {
   if (!MainHudWidget || !Terr) {
     return;
   }
