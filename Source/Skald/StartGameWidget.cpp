@@ -2,9 +2,15 @@
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
+#include "Components/EditableTextBox.h"
+#include "Components/ComboBoxString.h"
 #include "Blueprint/WidgetTree.h"
 #include "Kismet/GameplayStatics.h"
-#include "PlayerSetupWidget.h"
+#include "Skald_GameInstance.h"
+#include "Skald_PlayerState.h"
+#include "GameFramework/PlayerController.h"
+#include "UObject/UnrealType.h"
+#include "LobbyMenuWidget.h"
 
 void UStartGameWidget::NativeConstruct()
 {
@@ -14,6 +20,24 @@ void UStartGameWidget::NativeConstruct()
     {
         UVerticalBox* Root = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
         WidgetTree->RootWidget = Root;
+
+        DisplayNameInput = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass());
+        DisplayNameInput->SetText(FText::FromString(TEXT("Player")));
+        Root->AddChild(DisplayNameInput);
+
+        FactionSelector = WidgetTree->ConstructWidget<UComboBoxString>(UComboBoxString::StaticClass());
+        if (UEnum* Enum = StaticEnum<ESkaldFaction>())
+        {
+            for (int32 i = 0; i < Enum->NumEnums(); ++i)
+            {
+                if (!Enum->HasMetaData(TEXT("Hidden"), i))
+                {
+                    FactionSelector->AddOption(Enum->GetNameStringByIndex(i));
+                }
+            }
+            FactionSelector->SetSelectedIndex(0);
+        }
+        Root->AddChild(FactionSelector);
 
         auto AddButton = [this, Root](const FString& Label, const FName& FuncName)
         {
@@ -29,35 +53,68 @@ void UStartGameWidget::NativeConstruct()
 
         AddButton(TEXT("Singleplayer"), FName("OnSingleplayer"));
         AddButton(TEXT("Multiplayer"), FName("OnMultiplayer"));
+        AddButton(TEXT("Main Menu"), FName("OnMainMenu"));
     }
 }
 
 void UStartGameWidget::OnSingleplayer()
 {
-    if (UWorld* World = GetWorld())
-    {
-        const TSubclassOf<UPlayerSetupWidget> ClassToUse = PlayerSetupWidgetClass
-            ? PlayerSetupWidgetClass
-            : TSubclassOf<UPlayerSetupWidget>(UPlayerSetupWidget::StaticClass());
-        if (UPlayerSetupWidget* Widget = CreateWidget<UPlayerSetupWidget>(World, ClassToUse))
-        {
-            Widget->bMultiplayer = false;
-            Widget->AddToViewport();
-        }
-    }
+    StartGame(false);
 }
 
 void UStartGameWidget::OnMultiplayer()
 {
+    StartGame(true);
+}
+
+void UStartGameWidget::OnMainMenu()
+{
+    RemoveFromParent();
+    if (OwningLobbyMenu.IsValid())
+    {
+        OwningLobbyMenu->SetVisibility(ESlateVisibility::Visible);
+    }
+}
+
+void UStartGameWidget::StartGame(bool bMultiplayer)
+{
+    FString Name = DisplayNameInput ? DisplayNameInput->GetText().ToString() : TEXT("Player");
+    FString FactionName = FactionSelector ? FactionSelector->GetSelectedOption() : TEXT("None");
+
+    ESkaldFaction Faction = ESkaldFaction::None;
+    if (UEnum* Enum = StaticEnum<ESkaldFaction>())
+    {
+        int32 Value = Enum->GetValueByNameString(FactionName);
+        if (Value != INDEX_NONE)
+        {
+            Faction = static_cast<ESkaldFaction>(Value);
+        }
+    }
+
     if (UWorld* World = GetWorld())
     {
-        const TSubclassOf<UPlayerSetupWidget> ClassToUse = PlayerSetupWidgetClass
-            ? PlayerSetupWidgetClass
-            : TSubclassOf<UPlayerSetupWidget>(UPlayerSetupWidget::StaticClass());
-        if (UPlayerSetupWidget* Widget = CreateWidget<UPlayerSetupWidget>(World, ClassToUse))
+        if (USkaldGameInstance* GI = World->GetGameInstance<USkaldGameInstance>())
         {
-            Widget->bMultiplayer = true;
-            Widget->AddToViewport();
+            GI->DisplayName = Name;
+            GI->Faction = Faction;
+        }
+
+        if (APlayerController* PC = GetOwningPlayer())
+        {
+            if (ASkaldPlayerState* PS = PC->GetPlayerState<ASkaldPlayerState>())
+            {
+                PS->DisplayName = Name;
+                PS->Faction = Faction;
+            }
+
+            // Load the correct gameplay map
+            FName LevelName(TEXT("/Game/Blueprints/Maps/OverviewMap"));
+            FString Options;
+            if (bMultiplayer)
+            {
+                Options = TEXT("listen");
+            }
+            UGameplayStatics::OpenLevel(this, LevelName, true, Options);
         }
     }
 }
