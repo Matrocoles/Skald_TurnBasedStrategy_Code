@@ -5,6 +5,8 @@
 #include "Components/EditableTextBox.h"
 #include "Components/ComboBoxString.h"
 #include "Blueprint/WidgetTree.h"
+#include "Components/EditableTextBox.h"
+#include "Components/ComboBoxString.h"
 #include "Kismet/GameplayStatics.h"
 #include "Skald_GameInstance.h"
 #include "Skald_PlayerState.h"
@@ -15,10 +17,10 @@ void UStartGameWidget::NativeConstruct()
 {
     Super::NativeConstruct();
 
-    if (WidgetTree)
+    if (DisplayNameBox)
     {
-        UVerticalBox* Root = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-        WidgetTree->RootWidget = Root;
+        DisplayNameBox->SetText(FText::FromString(TEXT("Player")));
+    }
 
         DisplayNameBox = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass());
         DisplayNameBox->SetText(FText::FromString(TEXT("Player")));
@@ -39,19 +41,20 @@ void UStartGameWidget::NativeConstruct()
         Root->AddChild(FactionComboBox);
 
         auto AddButton = [this, Root](const FString& Label, const FName& FuncName)
+    if (FactionComboBox)
+    {
+        FactionComboBox->ClearOptions();
+        if (UEnum* Enum = StaticEnum<ESkaldFaction>())
         {
-            UButton* Button = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
-            UTextBlock* Text = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-            Text->SetText(FText::FromString(Label));
-            Button->AddChild(Text);
-            FScriptDelegate Delegate;
-            Delegate.BindUFunction(this, FuncName);
-            Button->OnClicked.Add(Delegate);
-            Root->AddChild(Button);
-        };
-
-        AddButton(TEXT("Singleplayer"), FName("OnSingleplayer"));
-        AddButton(TEXT("Multiplayer"), FName("OnMultiplayer"));
+            for (int32 i = 0; i < Enum->NumEnums(); ++i)
+            {
+                if (!Enum->HasMetaData(TEXT("Hidden"), i))
+                {
+                    FactionComboBox->AddOption(Enum->GetNameStringByIndex(i));
+                }
+            }
+            FactionComboBox->SetSelectedIndex(0);
+        }
     }
 }
 
