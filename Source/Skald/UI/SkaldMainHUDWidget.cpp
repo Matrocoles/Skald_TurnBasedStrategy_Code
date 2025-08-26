@@ -219,7 +219,7 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory* Territory) {
   if (bSelectingForAttack) {
     if (SelectedSourceID == -1) {
       if (bOwnedByLocal) {
-        SelectedSourceID = TerritoryID;
+        SelectedSourceID = Territory->TerritoryID;
 
         if (AWorldMap *WorldMap =
                 Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
@@ -236,7 +236,7 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory* Territory) {
         }
       }
     } else if (SelectedTargetID == -1) {
-      SelectedTargetID = TerritoryID;
+      SelectedTargetID = Territory->TerritoryID;
 
       if (SelectionPrompt) {
         SelectionPrompt->SetVisibility(ESlateVisibility::Collapsed);
