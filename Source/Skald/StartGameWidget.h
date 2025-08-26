@@ -7,6 +7,7 @@
 
 class UEditableTextBox;
 class UComboBoxString;
+class UButton;
 
 /**
  * Menu shown after pressing Start Game, to choose single or multiplayer.
@@ -20,12 +21,20 @@ protected:
     virtual void NativeConstruct() override;
 
     /** Entry box for the player's display name. */
-    UPROPERTY()
+    UPROPERTY(meta=(BindWidget))
     UEditableTextBox* DisplayNameBox;
 
     /** Combo box to choose a faction. */
-    UPROPERTY()
+    UPROPERTY(meta=(BindWidget))
     UComboBoxString* FactionComboBox;
+
+    /** Button to start singleplayer. */
+    UPROPERTY(meta=(BindWidget))
+    UButton* SingleplayerButton;
+
+    /** Button to start multiplayer. */
+    UPROPERTY(meta=(BindWidget))
+    UButton* MultiplayerButton;
 
     UFUNCTION()
     void OnSingleplayer();
