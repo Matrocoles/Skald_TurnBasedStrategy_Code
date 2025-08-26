@@ -254,6 +254,8 @@ void ASkaldGameMode::InitializeWorld() {
   }
 
   // Calculate starting armies and initiative rolls
+  ASkaldPlayerState *HighestPS = nullptr;
+  int32 HighestRoll = 0;
   for (APlayerState *PSBase : GS->PlayerArray) {
     ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase);
     if (!PS) {
@@ -269,5 +271,24 @@ void ASkaldGameMode::InitializeWorld() {
 
     PS->ArmyPool = Owned / 3;
     PS->InitiativeRoll = FMath::RandRange(1, 6);
+    if (PS->InitiativeRoll > HighestRoll) {
+      HighestRoll = PS->InitiativeRoll;
+      HighestPS = PS;
+    }
+  }
+
+  if (HighestPS) {
+    const FString Message = FString::Printf(
+        TEXT("%s wins initiative with a roll of %d"),
+        *HighestPS->DisplayName, HighestRoll);
+    for (FConstPlayerControllerIterator It =
+             GetWorld()->GetPlayerControllerIterator();
+         It; ++It) {
+      if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(*It)) {
+        if (USkaldMainHUDWidget *HUD = PC->GetHUDWidget()) {
+          HUD->UpdateInitiativeText(Message);
+        }
+      }
+    }
   }
 }

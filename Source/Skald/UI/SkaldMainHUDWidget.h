@@ -128,6 +128,10 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
   void HideEndingTurn();
 
+  /** Update and display the initiative announcement. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
+  void UpdateInitiativeText(const FString &Message);
+
   // BlueprintCallable functions — selection UX helpers
   UFUNCTION(BlueprintCallable, Category = "Skald|Selection")
   void BeginAttackSelection();
@@ -206,6 +210,10 @@ public:
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
             meta = (BindWidgetOptional))
   UTextBlock *EndingTurnText;
+
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
+            meta = (BindWidgetOptional))
+  UTextBlock *InitiativeText;
 
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Widgets")
   TSubclassOf<UConfirmAttackWidget> ConfirmAttackWidgetClass;
