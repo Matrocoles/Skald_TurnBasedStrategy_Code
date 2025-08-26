@@ -48,6 +48,10 @@ public:
     UFUNCTION(BlueprintCallable, Category="UI")
     USkaldMainHUDWidget* GetHUDWidget() const { return MainHudWidget; }
 
+    /** Retrieve the turn manager controlling this player. */
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="Turn")
+    ATurnManager* GetTurnManager() const { return TurnManager; }
+
 protected:
     /** Whether this controller is controlled by AI. */
     UPROPERTY(BlueprintReadOnly, Category="Turn")

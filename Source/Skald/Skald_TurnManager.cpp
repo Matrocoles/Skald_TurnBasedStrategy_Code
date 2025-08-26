@@ -1,6 +1,9 @@
 #include "Skald_TurnManager.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
+#include "UI/SkaldMainHUDWidget.h"
+#include "WorldMap.h"
+#include "Territory.h"
 #include "Kismet/GameplayStatics.h"
 
 ATurnManager::ATurnManager() {
@@ -26,9 +29,31 @@ void ATurnManager::StartTurns() {
         CurrentController->GetPlayerState<ASkaldPlayerState>();
     const FString PlayerName = PS ? PS->DisplayName : TEXT("Unknown");
 
+    // Determine reinforcements based on owned territories.
+    if (PS) {
+      int32 Owned = 0;
+      if (AWorldMap *WorldMap =
+              Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+                  GetWorld(), AWorldMap::StaticClass()))) {
+        for (ATerritory *Terr : WorldMap->Territories) {
+          if (Terr && Terr->OwningPlayer == PS) {
+            ++Owned;
+          }
+        }
+      }
+      const int32 Reinforcements = FMath::CeilToInt(Owned / 3.0f);
+      PS->ArmyPool += Reinforcements;
+      PS->ForceNetUpdate();
+      BroadcastArmyPool(PS);
+    }
+
+    CurrentPhase = ETurnPhase::Reinforcement;
     for (ASkaldPlayerController *Controller : Controllers) {
       if (Controller) {
         Controller->ShowTurnAnnouncement(PlayerName);
+        if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
+          HUD->UpdatePhaseBanner(CurrentPhase);
+        }
       }
     }
 
@@ -47,9 +72,31 @@ void ATurnManager::AdvanceTurn() {
       CurrentController->GetPlayerState<ASkaldPlayerState>();
   const FString PlayerName = PS ? PS->DisplayName : TEXT("Unknown");
 
+  // Calculate reinforcements for the new active player.
+  if (PS) {
+    int32 Owned = 0;
+    if (AWorldMap *WorldMap =
+            Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+                GetWorld(), AWorldMap::StaticClass()))) {
+      for (ATerritory *Terr : WorldMap->Territories) {
+        if (Terr && Terr->OwningPlayer == PS) {
+          ++Owned;
+        }
+      }
+    }
+    const int32 Reinforcements = FMath::CeilToInt(Owned / 3.0f);
+    PS->ArmyPool += Reinforcements;
+    PS->ForceNetUpdate();
+    BroadcastArmyPool(PS);
+  }
+
+  CurrentPhase = ETurnPhase::Reinforcement;
   for (ASkaldPlayerController *Controller : Controllers) {
     if (Controller) {
       Controller->ShowTurnAnnouncement(PlayerName);
+      if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
+        HUD->UpdatePhaseBanner(CurrentPhase);
+      }
     }
   }
 
@@ -73,4 +120,35 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload& Battle) {
   PendingBattle = Battle;
   // Load a battle map where the grid based combat takes place.
   UGameplayStatics::OpenLevel(this, FName("BattleMap"));
+}
+
+void ATurnManager::BeginAttackPhase() {
+  CurrentPhase = ETurnPhase::Attack;
+  if (!Controllers.IsValidIndex(CurrentIndex)) {
+    return;
+  }
+
+  ASkaldPlayerController *CurrentController = Controllers[CurrentIndex];
+  ASkaldPlayerState *PS =
+      CurrentController ? CurrentController->GetPlayerState<ASkaldPlayerState>() : nullptr;
+
+  for (ASkaldPlayerController *Controller : Controllers) {
+    if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
+      HUD->UpdatePhaseBanner(CurrentPhase);
+      if (PS) {
+        HUD->UpdateDeployableUnits(PS->ArmyPool);
+      }
+    }
+  }
+}
+
+void ATurnManager::BroadcastArmyPool(ASkaldPlayerState *ForPlayer) {
+  if (!ForPlayer) {
+    return;
+  }
+  for (ASkaldPlayerController *Controller : Controllers) {
+    if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
+      HUD->UpdateDeployableUnits(ForPlayer->ArmyPool);
+    }
+  }
 }
