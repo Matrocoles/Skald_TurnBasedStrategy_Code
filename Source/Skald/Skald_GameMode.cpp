@@ -67,6 +67,19 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
         if (PlayersData.Num() < GS->PlayerArray.Num()) {
           PlayersData.SetNum(GS->PlayerArray.Num());
         }
+
+        if (USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>()) {
+          PS->DisplayName = GI->DisplayName;
+          PS->Faction = GI->Faction;
+        }
+
+        const int32 Index = GS->PlayerArray.IndexOfByKey(PS);
+        if (PlayersData.IsValidIndex(Index)) {
+          PlayersData[Index].PlayerID = PS->GetPlayerId();
+          PlayersData[Index].PlayerName = PS->DisplayName;
+          PlayersData[Index].IsAI = PS->bIsAI;
+          PlayersData[Index].Faction = PS->Faction;
+        }
       }
 
       // In singleplayer fill remaining slots with AI opponents
