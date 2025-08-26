@@ -91,7 +91,7 @@ void ATerritory::GetLifetimeReplicatedProps(
   DOREPLIFETIME(ATerritory, ArmyStrength);
 }
 
-void ATerritory::Select() {
+void ATerritory::Select(bool bSelectingForAttack) {
   if (bIsSelected) {
     return;
   }
@@ -102,7 +102,9 @@ void ATerritory::Select() {
   }
   if (DynamicMaterial) {
     const FLinearColor Gold(1.0f, 0.84f, 0.0f, 1.0f);
-    DynamicMaterial->SetVectorParameterValue(FName("Color"), Gold);
+    const FLinearColor White(1.0f, 1.0f, 1.0f, 1.0f);
+    DynamicMaterial->SetVectorParameterValue(
+        FName("Color"), bSelectingForAttack ? White : Gold);
   }
   OnTerritorySelected.Broadcast(this);
   if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(

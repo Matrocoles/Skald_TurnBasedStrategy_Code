@@ -5,6 +5,9 @@
 #include "Skald_TurnManager.h"
 #include "Territory.h"
 #include "UI/SkaldMainHUDWidget.h"
+#include "WorldMap.h"
+#include "Kismet/GameplayStatics.h"
+#include "Engine/Engine.h"
 
 ASkaldPlayerController::ASkaldPlayerController() {
   bIsAI = false;
@@ -70,6 +73,15 @@ void ASkaldPlayerController::SetTurnManager(ATurnManager *Manager) {
   TurnManager = Manager;
 }
 
+void ASkaldPlayerController::ShowTurnAnnouncement(const FString& PlayerName) {
+  if (MainHudWidget) {
+    MainHudWidget->ShowTurnAnnouncement(PlayerName);
+  } else if (GEngine) {
+    const FString Message = FString::Printf(TEXT("%s's Turn"), *PlayerName);
+    GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Yellow, Message);
+  }
+}
+
 void ASkaldPlayerController::StartTurn() {
   if (MainHudWidget) {
     MainHudWidget->HideEndingTurn();
@@ -101,6 +113,33 @@ void ASkaldPlayerController::HandleAttackRequested(int32 FromID, int32 ToID,
                                                    int32 ArmySent) {
   UE_LOG(LogTemp, Log, TEXT("HUD attack from %d to %d with %d"), FromID, ToID,
          ArmySent);
+
+  FS_BattlePayload Battle;
+  if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+    Battle.AttackerPlayerID = PS->GetPlayerId();
+  }
+  if (AWorldMap *WorldMap =
+          Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+              GetWorld(), AWorldMap::StaticClass()))) {
+    if (ATerritory *Source = WorldMap->GetTerritoryById(FromID)) {
+      if (Source->OwningPlayer) {
+        Battle.AttackerPlayerID = Source->OwningPlayer->GetPlayerId();
+      }
+    }
+    if (ATerritory *Target = WorldMap->GetTerritoryById(ToID)) {
+      if (Target->OwningPlayer) {
+        Battle.DefenderPlayerID = Target->OwningPlayer->GetPlayerId();
+      }
+      Battle.IsCapitalAttack = Target->bIsCapital;
+    }
+  }
+  Battle.FromTerritoryID = FromID;
+  Battle.TargetTerritoryID = ToID;
+  Battle.ArmyCountSent = ArmySent;
+
+  if (TurnManager) {
+    TurnManager->TriggerGridBattle(Battle);
+  }
 }
 
 void ASkaldPlayerController::HandleMoveRequested(int32 FromID, int32 ToID,
