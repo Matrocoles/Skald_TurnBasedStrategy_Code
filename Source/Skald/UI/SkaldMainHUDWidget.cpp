@@ -62,6 +62,20 @@ void USkaldMainHUDWidget::UpdatePhaseBanner(ETurnPhase InPhase) {
 
   BP_SetPhaseText(CurrentPhase);
   BP_SetPhaseButtons(CurrentPhase, CurrentPlayerID == LocalPlayerID);
+
+  // Toggle phase-specific widgets.
+  if (AttackButton) {
+    AttackButton->SetIsEnabled(CurrentPhase == ETurnPhase::Attack);
+  }
+  if (DeployButton) {
+    const ESlateVisibility Visibility =
+        CurrentPhase == ETurnPhase::Reinforcement ? DeployButton->GetVisibility()
+                                                  : ESlateVisibility::Collapsed;
+    DeployButton->SetVisibility(Visibility);
+  }
+  if (DeployableUnitsText && CurrentPhase != ETurnPhase::Reinforcement) {
+    DeployableUnitsText->SetVisibility(ESlateVisibility::Collapsed);
+  }
 }
 
 void USkaldMainHUDWidget::UpdateTerritoryInfo(const FString &TerritoryName,

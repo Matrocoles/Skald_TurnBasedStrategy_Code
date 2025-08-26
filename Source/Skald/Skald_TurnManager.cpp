@@ -123,20 +123,13 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload& Battle) {
 }
 
 void ATurnManager::BeginAttackPhase() {
+  // Enter the attack phase and notify all HUDs so they can swap controls.
   CurrentPhase = ETurnPhase::Attack;
-  if (!Controllers.IsValidIndex(CurrentIndex)) {
-    return;
-  }
-
-  ASkaldPlayerController *CurrentController = Controllers[CurrentIndex];
-  ASkaldPlayerState *PS =
-      CurrentController ? CurrentController->GetPlayerState<ASkaldPlayerState>() : nullptr;
 
   for (ASkaldPlayerController *Controller : Controllers) {
-    if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
-      HUD->UpdatePhaseBanner(CurrentPhase);
-      if (PS) {
-        HUD->UpdateDeployableUnits(PS->ArmyPool);
+    if (Controller) {
+      if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
+        HUD->UpdatePhaseBanner(ETurnPhase::Attack);
       }
     }
   }
