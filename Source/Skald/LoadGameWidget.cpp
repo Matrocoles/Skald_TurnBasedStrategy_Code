@@ -5,6 +5,7 @@
 #include "Blueprint/WidgetTree.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/SaveGame.h"
+#include "LobbyMenuWidget.h"
 
 static const TCHAR* SlotNames[3] = { TEXT("Slot0"), TEXT("Slot1"), TEXT("Slot2") };
 
@@ -42,6 +43,13 @@ void ULoadGameWidget::NativeConstruct()
         {
             AddSlotButton(WidgetTree, Root, SlotNames[2], this, &ULoadGameWidget::OnLoadSlot2);
         }
+
+        UButton* MainMenuButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
+        UTextBlock* MainMenuText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+        MainMenuText->SetText(FText::FromString(TEXT("Main Menu")));
+        MainMenuButton->AddChild(MainMenuText);
+        MainMenuButton->OnClicked.AddDynamic(this, &ULoadGameWidget::OnMainMenu);
+        Root->AddChild(MainMenuButton);
     }
 }
 
@@ -60,12 +68,22 @@ void ULoadGameWidget::OnLoadSlot2()
     HandleLoadSlot(2);
 }
 
+void ULoadGameWidget::OnMainMenu()
+{
+    RemoveFromParent();
+    if (LobbyMenu.IsValid())
+    {
+        LobbyMenu->SetVisibility(ESlateVisibility::Visible);
+    }
+}
+
 void ULoadGameWidget::HandleLoadSlot(int32 SlotIndex)
 {
     USaveGame* LoadedGame = UGameplayStatics::LoadGameFromSlot(SlotNames[SlotIndex], 0);
     if (LoadedGame)
     {
-        UGameplayStatics::OpenLevel(this, FName("OverviewMap"));
+        // After loading, transition to the main gameplay map
+        UGameplayStatics::OpenLevel(this, FName("Skald_OverTop"));
     }
     else
     {

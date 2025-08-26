@@ -4,6 +4,7 @@
 #include "Blueprint/UserWidget.h"
 #include "LoadGameWidget.generated.h"
 
+class ULobbyMenuWidget;
 /**
  * Simple load game menu listing a few save slots.
  */
@@ -24,8 +25,17 @@ protected:
     UFUNCTION(BlueprintCallable)
     void OnLoadSlot2();
 
+    UFUNCTION()
+    void OnMainMenu();
+
 private:
     /** Shared implementation for the individual load slot handlers. */
     void HandleLoadSlot(int32 SlotIndex);
+
+    UPROPERTY()
+    TWeakObjectPtr<ULobbyMenuWidget> LobbyMenu;
+
+public:
+    void SetLobbyMenu(ULobbyMenuWidget* InMenu) { LobbyMenu = InMenu; }
 };
 
