@@ -28,6 +28,11 @@ void UPlayerSetupWidget::OnConfirm()
             PS->Faction = SelectedFaction;
         }
 
+        PC->SetInputMode(FInputModeGameOnly());
+        PC->bShowMouseCursor = false;
+        PC->bEnableClickEvents = false;
+        PC->bEnableMouseOverEvents = false;
+
         // Launch the main gameplay map once setup is confirmed
         FName LevelName(TEXT("Skald_OverTop"));
         FString Options;
