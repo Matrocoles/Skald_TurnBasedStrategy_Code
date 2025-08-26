@@ -125,6 +125,8 @@ void ATerritory::HandleClicked(UPrimitiveComponent *TouchedComponent,
   }
 }
 
+void ATerritory::RefreshAppearance() { UpdateTerritoryColor(); }
+
 void ATerritory::OnRep_OwningPlayer() { UpdateTerritoryColor(); }
 
 void ATerritory::UpdateTerritoryColor() {
