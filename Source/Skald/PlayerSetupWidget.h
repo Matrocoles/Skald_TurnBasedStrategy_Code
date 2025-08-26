@@ -5,6 +5,9 @@
 #include "SkaldTypes.h"
 #include "PlayerSetupWidget.generated.h"
 
+class UEditableTextBox;
+class UComboBoxString;
+
 /**
  * Widget shown after selecting single or multiplayer that allows the
  * player to choose a display name and faction before entering the game.
@@ -24,6 +27,14 @@ public:
     /** Set the faction chosen from the UI. */
     UFUNCTION(BlueprintCallable)
     void OnFactionSelected(ESkaldFaction NewFaction);
+
+    /** Optional binding to the player's name entry box. */
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta=(BindWidgetOptional))
+    UEditableTextBox* NameEntryBox;
+
+    /** Optional binding to the faction selection combo box. */
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta=(BindWidgetOptional))
+    UComboBoxString* FactionSelectionBox;
 
     /** Display name entered by the player. */
     UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Setup")

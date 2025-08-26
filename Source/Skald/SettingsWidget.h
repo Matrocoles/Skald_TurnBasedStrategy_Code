@@ -14,14 +14,17 @@ class SKALD_API USettingsWidget : public UUserWidget
 {
     GENERATED_BODY()
 
-protected:
-    virtual void NativeConstruct() override;
-
-    UPROPERTY(meta = (BindWidget))
+public:
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta = (BindWidgetOptional))
     UButton* ApplyButton;
 
-    UPROPERTY(meta = (BindWidget))
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta = (BindWidgetOptional))
     UButton* MainMenuButton;
+
+    void SetLobbyMenu(ULobbyMenuWidget* InMenu) { LobbyMenu = InMenu; }
+
+protected:
+    virtual void NativeConstruct() override;
 
     UFUNCTION(BlueprintCallable)
     void OnApply();
@@ -32,8 +35,5 @@ protected:
 private:
     UPROPERTY()
     TWeakObjectPtr<ULobbyMenuWidget> LobbyMenu;
-
-public:
-    void SetLobbyMenu(ULobbyMenuWidget* InMenu) { LobbyMenu = InMenu; }
 };
 
