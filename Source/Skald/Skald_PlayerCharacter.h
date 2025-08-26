@@ -24,7 +24,7 @@ protected:
         virtual void BeginPlay() override;
 
         /** Reference to the world map actor for selection and movement */
-        UPROPERTY()
+        UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Selection", meta=(ExposeOnSpawn=true))
         AWorldMap* WorldMap;
 
         /** Currently selected territory, if any */
