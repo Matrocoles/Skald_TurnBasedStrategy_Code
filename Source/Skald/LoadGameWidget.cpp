@@ -1,55 +1,36 @@
 #include "LoadGameWidget.h"
 #include "Components/Button.h"
-#include "Components/TextBlock.h"
-#include "Components/VerticalBox.h"
-#include "Blueprint/WidgetTree.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/SaveGame.h"
 #include "LobbyMenuWidget.h"
 
 static const TCHAR* SlotNames[3] = { TEXT("Slot0"), TEXT("Slot1"), TEXT("Slot2") };
 
-static void AddSlotButton(UWidgetTree* Tree, UVerticalBox* Root, const FString& Label, ULoadGameWidget* Widget, void (ULoadGameWidget::*Handler)())
-{
-    UButton* Button = Tree->ConstructWidget<UButton>(UButton::StaticClass());
-    UTextBlock* Text = Tree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-    Text->SetText(FText::FromString(Label));
-    Button->AddChild(Text);
-    Button->OnClicked.AddDynamic(Widget, Handler);
-    Root->AddChild(Button);
-}
-
 void ULoadGameWidget::NativeConstruct()
 {
     Super::NativeConstruct();
 
-    if (WidgetTree)
+    if (Slot0Button)
     {
-        UVerticalBox* Root = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-        WidgetTree->RootWidget = Root;
+        Slot0Button->OnClicked.AddDynamic(this, &ULoadGameWidget::OnLoadSlot0);
+        Slot0Button->SetVisibility(UGameplayStatics::DoesSaveGameExist(SlotNames[0], 0) ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+    }
 
-        // Slot 0
-        if (UGameplayStatics::DoesSaveGameExist(SlotNames[0], 0))
-        {
-            AddSlotButton(WidgetTree, Root, SlotNames[0], this, &ULoadGameWidget::OnLoadSlot0);
-        }
-        // Slot 1
-        if (UGameplayStatics::DoesSaveGameExist(SlotNames[1], 0))
-        {
-            AddSlotButton(WidgetTree, Root, SlotNames[1], this, &ULoadGameWidget::OnLoadSlot1);
-        }
-        // Slot 2
-        if (UGameplayStatics::DoesSaveGameExist(SlotNames[2], 0))
-        {
-            AddSlotButton(WidgetTree, Root, SlotNames[2], this, &ULoadGameWidget::OnLoadSlot2);
-        }
+    if (Slot1Button)
+    {
+        Slot1Button->OnClicked.AddDynamic(this, &ULoadGameWidget::OnLoadSlot1);
+        Slot1Button->SetVisibility(UGameplayStatics::DoesSaveGameExist(SlotNames[1], 0) ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+    }
 
-        UButton* MainMenuButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
-        UTextBlock* MainMenuText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-        MainMenuText->SetText(FText::FromString(TEXT("Main Menu")));
-        MainMenuButton->AddChild(MainMenuText);
+    if (Slot2Button)
+    {
+        Slot2Button->OnClicked.AddDynamic(this, &ULoadGameWidget::OnLoadSlot2);
+        Slot2Button->SetVisibility(UGameplayStatics::DoesSaveGameExist(SlotNames[2], 0) ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+    }
+
+    if (MainMenuButton)
+    {
         MainMenuButton->OnClicked.AddDynamic(this, &ULoadGameWidget::OnMainMenu);
-        Root->AddChild(MainMenuButton);
     }
 }
 
