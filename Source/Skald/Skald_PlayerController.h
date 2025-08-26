@@ -56,20 +56,32 @@ protected:
     UPROPERTY()
     USkaldMainHUDWidget* MainHudWidget;
 
-    /** Handle HUD attack submissions. */
-    UFUNCTION()
+    /** Handle HUD attack submissions.
+     *  Bound to USkaldMainHUDWidget::OnAttackRequested in the HUD.
+     *  Blueprint widgets invoke this when an attack is submitted.
+     */
+    UFUNCTION(BlueprintCallable, Category="UI")
     void HandleAttackRequested(int32 FromID, int32 ToID, int32 ArmySent);
 
-    /** Handle HUD move submissions. */
-    UFUNCTION()
+    /** Handle HUD move submissions.
+     *  Bound to USkaldMainHUDWidget::OnMoveRequested in the HUD.
+     *  Called when a move action is confirmed from a widget.
+     */
+    UFUNCTION(BlueprintCallable, Category="UI")
     void HandleMoveRequested(int32 FromID, int32 ToID, int32 Troops);
 
-    /** Handle HUD end-attack confirmations. */
-    UFUNCTION()
+    /** Handle HUD end-attack confirmations.
+     *  Bound to USkaldMainHUDWidget::OnEndAttackRequested.
+     *  Widgets call this after the player finishes attacking.
+     */
+    UFUNCTION(BlueprintCallable, Category="UI")
     void HandleEndAttackRequested(bool bConfirmed);
 
-    /** Handle HUD end-movement confirmations. */
-    UFUNCTION()
+    /** Handle HUD end-movement confirmations.
+     *  Bound to USkaldMainHUDWidget::OnEndMovementRequested.
+     *  Invoked when the HUD signals the end of movement phase.
+     */
+    UFUNCTION(BlueprintCallable, Category="UI")
     void HandleEndMovementRequested(bool bConfirmed);
 
     /** Reference to the game's turn manager.
