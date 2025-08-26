@@ -41,6 +41,24 @@ void UStartGameWidget::NativeConstruct()
         }
         Root->AddChild(FactionCombo);
 
+        DisplayNameInput = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass());
+        DisplayNameInput->SetText(FText::FromString(TEXT("Player")));
+        Root->AddChild(DisplayNameInput);
+
+        FactionSelector = WidgetTree->ConstructWidget<UComboBoxString>(UComboBoxString::StaticClass());
+        if (UEnum* Enum = StaticEnum<ESkaldFaction>())
+        {
+            for (int32 i = 0; i < Enum->NumEnums(); ++i)
+            {
+                if (!Enum->HasMetaData(TEXT("Hidden"), i))
+                {
+                    FactionSelector->AddOption(Enum->GetNameStringByIndex(i));
+                }
+            }
+            FactionSelector->SetSelectedIndex(0);
+        }
+        Root->AddChild(FactionSelector);
+
         auto AddButton = [this, Root](const FString& Label, const FName& FuncName)
         DisplayNameBox = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass());
         DisplayNameBox->SetText(FText::FromString(TEXT("Player")));
@@ -106,6 +124,9 @@ void UStartGameWidget::OnMultiplayer()
 void UStartGameWidget::OnMainMenu()
 {
     RemoveFromParent();
+    if (OwningLobbyMenu.IsValid())
+    {
+        OwningLobbyMenu->SetVisibility(ESlateVisibility::Visible);
     if (LobbyMenu.IsValid())
     {
         LobbyMenu->SetVisibility(ESlateVisibility::Visible);
@@ -129,6 +150,7 @@ void UStartGameWidget::StartGame(bool bMultiplayer)
 void UStartGameWidget::StartGame(bool bMultiplayer)
 {
     FString Name = DisplayNameInput ? DisplayNameInput->GetText().ToString() : TEXT("Player");
+    FString FactionName = FactionSelector ? FactionSelector->GetSelectedOption() : TEXT("None");
     FString FactionName = FactionCombo ? FactionCombo->GetSelectedOption() : TEXT("None");
     FString Name = DisplayNameBox ? DisplayNameBox->GetText().ToString() : TEXT("Player");
     FString FactionName = FactionComboBox ? FactionComboBox->GetSelectedOption() : TEXT("None");

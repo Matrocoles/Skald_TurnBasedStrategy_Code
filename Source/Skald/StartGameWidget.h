@@ -27,6 +27,11 @@ protected:
 
     /** Combo box to choose a faction. */
     UPROPERTY()
+    UComboBoxString* FactionSelector;
+
+    /** Reference back to the owning lobby menu so it can be restored. */
+    UPROPERTY()
+    TWeakObjectPtr<ULobbyMenuWidget> OwningLobbyMenu;
     UComboBoxString* FactionCombo;
 
     UPROPERTY()
@@ -66,6 +71,8 @@ protected:
     void StartGame(bool bMultiplayer);
 
 public:
+    /** Record the lobby menu that spawned this widget so we can unhide it later. */
+    void SetLobbyMenu(ULobbyMenuWidget* InMenu) { OwningLobbyMenu = InMenu; }
     void SetLobbyMenu(ULobbyMenuWidget* InMenu) { LobbyMenu = InMenu; }
     void StartGame(bool bMultiplayer);
 };
