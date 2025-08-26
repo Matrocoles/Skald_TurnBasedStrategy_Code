@@ -6,6 +6,8 @@
 
 class UButton;
 class UVerticalBox;
+class ULoadGameWidget;
+class USettingsWidget;
 
 /**
  * Main menu widget shown on the lobby map.
@@ -30,6 +32,12 @@ public:
 
     UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta=(BindWidgetOptional))
     UButton* ExitButton;
+
+    UPROPERTY(EditAnywhere, Category="Lobby")
+    TSubclassOf<ULoadGameWidget> LoadGameWidgetClass;
+
+    UPROPERTY(EditAnywhere, Category="Lobby")
+    TSubclassOf<USettingsWidget> SettingsWidgetClass;
 
 protected:
     virtual void NativeConstruct() override;

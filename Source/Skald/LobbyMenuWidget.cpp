@@ -51,12 +51,14 @@ void ULobbyMenuWidget::OnLoadGame()
 {
     if (UWorld* World = GetWorld())
     {
-        ULoadGameWidget* Widget = CreateWidget<ULoadGameWidget>(World, ULoadGameWidget::StaticClass());
-        if (Widget)
+        if (LoadGameWidgetClass)
         {
-            Widget->SetLobbyMenu(this);
-            Widget->AddToViewport();
-            SetVisibility(ESlateVisibility::Hidden);
+            if (ULoadGameWidget* Widget = CreateWidget<ULoadGameWidget>(World, LoadGameWidgetClass))
+            {
+                Widget->SetLobbyMenu(this);
+                Widget->AddToViewport();
+                SetVisibility(ESlateVisibility::Hidden);
+            }
         }
     }
 }
@@ -65,12 +67,14 @@ void ULobbyMenuWidget::OnSettings()
 {
     if (UWorld* World = GetWorld())
     {
-        USettingsWidget* Widget = CreateWidget<USettingsWidget>(World, USettingsWidget::StaticClass());
-        if (Widget)
+        if (SettingsWidgetClass)
         {
-            Widget->SetLobbyMenu(this);
-            Widget->AddToViewport();
-            SetVisibility(ESlateVisibility::Hidden);
+            if (USettingsWidget* Widget = CreateWidget<USettingsWidget>(World, SettingsWidgetClass))
+            {
+                Widget->SetLobbyMenu(this);
+                Widget->AddToViewport();
+                SetVisibility(ESlateVisibility::Hidden);
+            }
         }
     }
 }
