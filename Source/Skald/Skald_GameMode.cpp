@@ -1,5 +1,7 @@
 #include "Skald_GameMode.h"
+#include "Algo/Shuffle.h"
 #include "Engine/World.h"
+#include "Skald_GameInstance.h"
 #include "Skald_GameState.h"
 #include "Skald_PlayerCharacter.h"
 #include "Skald_PlayerController.h"
@@ -7,9 +9,8 @@
 #include "Skald_TurnManager.h"
 #include "Territory.h"
 #include "TimerManager.h"
-#include "WorldMap.h"
-#include "Skald_GameInstance.h"
 #include "UI/SkaldMainHUDWidget.h"
+#include "WorldMap.h"
 
 namespace {
 constexpr int32 ExpectedPlayerCount = 4;
@@ -68,7 +69,7 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
           PlayersData.SetNum(GS->PlayerArray.Num());
         }
 
-        if (USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>()) {
+        if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
           PS->DisplayName = GI->DisplayName;
           PS->Faction = GI->Faction;
         }
@@ -83,57 +84,50 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
       }
 
       // In singleplayer fill remaining slots with AI opponents
-      if (USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>())
-      {
-        if (!GI->bIsMultiplayer)
-        {
+      if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+        if (!GI->bIsMultiplayer) {
           // Populate AI players up to the expected count
-          while (GS->PlayerArray.Num() < ExpectedPlayerCount)
-          {
-            ASkaldPlayerState* AIState = GetWorld()->SpawnActor<ASkaldPlayerState>(PlayerStateClass);
-            if (!AIState)
-            {
+          while (GS->PlayerArray.Num() < ExpectedPlayerCount) {
+            ASkaldPlayerState *AIState =
+                GetWorld()->SpawnActor<ASkaldPlayerState>(PlayerStateClass);
+            if (!AIState) {
               break;
             }
             AIState->bIsAI = true;
-            AIState->DisplayName = FString::Printf(TEXT("AI_%d"), GS->PlayerArray.Num());
+            AIState->DisplayName =
+                FString::Printf(TEXT("AI_%d"), GS->PlayerArray.Num());
 
             // Choose a faction not already taken
             TArray<ESkaldFaction> Taken;
-            for (APlayerState* ExistingPS : GS->PlayerArray)
-            {
-              if (ASkaldPlayerState* EPS = Cast<ASkaldPlayerState>(ExistingPS))
-              {
+            for (APlayerState *ExistingPS : GS->PlayerArray) {
+              if (ASkaldPlayerState *EPS =
+                      Cast<ASkaldPlayerState>(ExistingPS)) {
                 Taken.Add(EPS->Faction);
               }
             }
             Taken.Append(GI->TakenFactions);
             TArray<ESkaldFaction> Available;
-            if (UEnum* Enum = StaticEnum<ESkaldFaction>())
-            {
-              for (int32 i = 0; i < Enum->NumEnums(); ++i)
-              {
-                if (Enum->HasMetaData(TEXT("Hidden"), i))
-                {
+            if (UEnum *Enum = StaticEnum<ESkaldFaction>()) {
+              for (int32 i = 0; i < Enum->NumEnums(); ++i) {
+                if (Enum->HasMetaData(TEXT("Hidden"), i)) {
                   continue;
                 }
-                ESkaldFaction Fac = static_cast<ESkaldFaction>(Enum->GetValueByIndex(i));
-                if (Fac != ESkaldFaction::None && !Taken.Contains(Fac))
-                {
+                ESkaldFaction Fac =
+                    static_cast<ESkaldFaction>(Enum->GetValueByIndex(i));
+                if (Fac != ESkaldFaction::None && !Taken.Contains(Fac)) {
                   Available.Add(Fac);
                 }
               }
             }
-            if (Available.Num() > 0)
-            {
-              AIState->Faction = Available[FMath::RandRange(0, Available.Num() - 1)];
+            if (Available.Num() > 0) {
+              AIState->Faction =
+                  Available[FMath::RandRange(0, Available.Num() - 1)];
               GI->TakenFactions.AddUnique(AIState->Faction);
             }
 
             GS->AddPlayerState(AIState);
 
-            if (PlayersData.Num() < GS->PlayerArray.Num())
-            {
+            if (PlayersData.Num() < GS->PlayerArray.Num()) {
               PlayersData.SetNum(GS->PlayerArray.Num());
             }
             const int32 Index = GS->PlayerArray.Num() - 1;
@@ -145,10 +139,8 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
 
           // Refresh HUDs with the updated player list
           TArray<FS_PlayerData> AllPlayers;
-          for (APlayerState* PSBase : GS->PlayerArray)
-          {
-            if (ASkaldPlayerState* SPS = Cast<ASkaldPlayerState>(PSBase))
-            {
+          for (APlayerState *PSBase : GS->PlayerArray) {
+            if (ASkaldPlayerState *SPS = Cast<ASkaldPlayerState>(PSBase)) {
               FS_PlayerData Data;
               Data.PlayerID = SPS->GetPlayerId();
               Data.PlayerName = SPS->DisplayName;
@@ -157,12 +149,12 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
               AllPlayers.Add(Data);
             }
           }
-          for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
-          {
-            if (ASkaldPlayerController* RefreshPC = Cast<ASkaldPlayerController>(*It))
-            {
-              if (USkaldMainHUDWidget* HUD = RefreshPC->GetHUDWidget())
-              {
+          for (FConstPlayerControllerIterator It =
+                   GetWorld()->GetPlayerControllerIterator();
+               It; ++It) {
+            if (ASkaldPlayerController *RefreshPC =
+                    Cast<ASkaldPlayerController>(*It)) {
+              if (USkaldMainHUDWidget *HUD = RefreshPC->GetHUDWidget()) {
                 HUD->RefreshPlayerList(AllPlayers);
               }
             }
@@ -170,8 +162,7 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
         }
       }
 
-      if (!bWorldInitialized)
-      {
+      if (!bWorldInitialized) {
         InitializeWorld();
         BeginArmyPlacementPhase();
         bWorldInitialized = true;
@@ -181,9 +172,9 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
                 bTurnsStarted = true;
                 TurnManager->SortControllersByInitiative();
                 TurnManager->StartTurns();
-                if (GEngine)
-                {
-                  GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Green, TEXT("Game started"));
+                if (GEngine) {
+                  GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Green,
+                                                   TEXT("Game started"));
                 }
               }
             }),
@@ -196,9 +187,9 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
         if (TurnManager) {
           TurnManager->SortControllersByInitiative();
           TurnManager->StartTurns();
-          if (GEngine)
-          {
-            GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Green, TEXT("Game started"));
+          if (GEngine) {
+            GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Green,
+                                             TEXT("Game started"));
           }
         }
       }
@@ -220,13 +211,10 @@ void ASkaldGameMode::InitializeWorld() {
   }
 
   // If the world map has not spawned territories yet, create basic ones.
-  if (WorldMap->Territories.Num() == 0)
-  {
-    for (int32 Id = 0; Id < 43; ++Id)
-    {
+  if (WorldMap->Territories.Num() == 0) {
+    for (int32 Id = 0; Id < 43; ++Id) {
       ATerritory *Territory = GetWorld()->SpawnActor<ATerritory>();
-      if (Territory)
-      {
+      if (Territory) {
         Territory->TerritoryID = Id;
         WorldMap->RegisterTerritory(Territory);
       }
@@ -237,23 +225,77 @@ void ASkaldGameMode::InitializeWorld() {
   if (!GS) {
     return;
   }
+  // Shuffle territories before assignment
+  Algo::Shuffle(WorldMap->Territories);
 
-  // Assign territories round-robin to players
+  // Roll initiative and sort players accordingly
+  for (APlayerState *PSBase : GS->PlayerArray) {
+    if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
+      PS->InitiativeRoll = FMath::RandRange(1, 6);
+    }
+  }
+
+  GS->PlayerArray.Sort([](const APlayerState *A, const APlayerState *B) {
+    const ASkaldPlayerState *PSA = Cast<ASkaldPlayerState>(A);
+    const ASkaldPlayerState *PSB = Cast<ASkaldPlayerState>(B);
+    const int32 RollA = PSA ? PSA->InitiativeRoll : 0;
+    const int32 RollB = PSB ? PSB->InitiativeRoll : 0;
+    return RollA > RollB;
+  });
+
+  // Assign territories round-robin to players in initiative order
   const int32 PlayerCount = GS->PlayerArray.Num();
   int32 Index = 0;
   for (ATerritory *Territory : WorldMap->Territories) {
     if (Territory && PlayerCount > 0) {
-      // Rename local variable to avoid hiding AActor::Owner
       ASkaldPlayerState *TerritoryOwner =
           Cast<ASkaldPlayerState>(GS->PlayerArray[Index % PlayerCount]);
       Territory->OwningPlayer = TerritoryOwner;
-      Territory->RefreshAppearance();
+      Territory->bIsCapital = false;
       Territory->ArmyStrength = 1;
+      Territory->RefreshAppearance();
       ++Index;
     }
   }
 
-  // Calculate starting armies and initiative rolls
+  // Choose capitals for each player
+  for (APlayerState *PSBase : GS->PlayerArray) {
+    ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase);
+    if (!PS) {
+      continue;
+    }
+
+    TArray<ATerritory *> OwnedTerritories;
+    for (ATerritory *Territory : WorldMap->Territories) {
+      if (Territory && Territory->OwningPlayer == PS) {
+        OwnedTerritories.Add(Territory);
+      }
+    }
+    Algo::Shuffle(OwnedTerritories);
+
+    FS_PlayerData *PlayerData =
+        PlayersData.FindByPredicate([PS](const FS_PlayerData &Data) {
+          return Data.PlayerID == PS->GetPlayerId();
+        });
+    if (PlayerData) {
+      PlayerData->CapitalTerritoryIDs.Reset();
+    }
+
+    int32 CapitalsAssigned = 0;
+    for (ATerritory *Territory : OwnedTerritories) {
+      if (CapitalsAssigned >= 2) {
+        break;
+      }
+      Territory->bIsCapital = true;
+      Territory->RefreshAppearance();
+      if (PlayerData) {
+        PlayerData->CapitalTerritoryIDs.Add(Territory->TerritoryID);
+      }
+      ++CapitalsAssigned;
+    }
+  }
+
+  // Calculate starting armies and determine highest initiative roll
   ASkaldPlayerState *HighestPS = nullptr;
   int32 HighestRoll = 0;
   for (APlayerState *PSBase : GS->PlayerArray) {
@@ -270,7 +312,6 @@ void ASkaldGameMode::InitializeWorld() {
     }
 
     PS->ArmyPool = Owned / 3;
-    PS->InitiativeRoll = FMath::RandRange(1, 6);
     if (PS->InitiativeRoll > HighestRoll) {
       HighestRoll = PS->InitiativeRoll;
       HighestPS = PS;
@@ -278,9 +319,9 @@ void ASkaldGameMode::InitializeWorld() {
   }
 
   if (HighestPS) {
-    const FString Message = FString::Printf(
-        TEXT("%s wins initiative with a roll of %d"),
-        *HighestPS->DisplayName, HighestRoll);
+    const FString Message =
+        FString::Printf(TEXT("%s wins initiative with a roll of %d"),
+                        *HighestPS->DisplayName, HighestRoll);
     for (FConstPlayerControllerIterator It =
              GetWorld()->GetPlayerControllerIterator();
          It; ++It) {
