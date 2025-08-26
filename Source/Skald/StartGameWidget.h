@@ -22,42 +22,28 @@ protected:
     virtual void NativeConstruct() override;
 
     /** Entry box for the player's display name. */
-    UPROPERTY()
-    UEditableTextBox* DisplayNameInput;
+    UPROPERTY(meta = (BindWidget))
+    UEditableTextBox* DisplayNameBox;
 
     /** Combo box to choose a faction. */
-    UPROPERTY()
-    UComboBoxString* FactionSelector;
+    UPROPERTY(meta = (BindWidget))
+    UComboBoxString* FactionComboBox;
 
     /** Reference back to the owning lobby menu so it can be restored. */
     UPROPERTY()
     TWeakObjectPtr<ULobbyMenuWidget> OwningLobbyMenu;
-    UComboBoxString* FactionCombo;
-
-    UPROPERTY()
-    TWeakObjectPtr<ULobbyMenuWidget> LobbyMenu;
-    UEditableTextBox* DisplayNameBox;
-
-    /** Combo box to choose a faction. */
-    UPROPERTY()
-    UComboBoxString* FactionComboBox;
-
-    UPROPERTY()
-    TWeakObjectPtr<ULobbyMenuWidget> LobbyMenu;
-    UPROPERTY(meta=(BindWidget))
-    UEditableTextBox* DisplayNameBox;
-
-    /** Combo box to choose a faction. */
-    UPROPERTY(meta=(BindWidget))
-    UComboBoxString* FactionComboBox;
 
     /** Button to start singleplayer. */
-    UPROPERTY(meta=(BindWidget))
+    UPROPERTY(meta = (BindWidget))
     UButton* SingleplayerButton;
 
     /** Button to start multiplayer. */
-    UPROPERTY(meta=(BindWidget))
+    UPROPERTY(meta = (BindWidget))
     UButton* MultiplayerButton;
+
+    /** Button to return to the lobby menu. */
+    UPROPERTY(meta = (BindWidgetOptional))
+    UButton* MainMenuButton;
 
     UFUNCTION()
     void OnSingleplayer();
@@ -73,7 +59,5 @@ protected:
 public:
     /** Record the lobby menu that spawned this widget so we can unhide it later. */
     void SetLobbyMenu(ULobbyMenuWidget* InMenu) { OwningLobbyMenu = InMenu; }
-    void SetLobbyMenu(ULobbyMenuWidget* InMenu) { LobbyMenu = InMenu; }
-    void StartGame(bool bMultiplayer);
 };
 
