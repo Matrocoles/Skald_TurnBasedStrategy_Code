@@ -41,6 +41,10 @@ public:
     UFUNCTION(BlueprintCallable, Category="UI")
     void HandleTerritorySelected(ATerritory* Terr);
 
+    /** Accessor for the main HUD widget instance. */
+    UFUNCTION(BlueprintCallable, Category="UI")
+    USkaldMainHUDWidget* GetHUDWidget() const { return MainHudWidget; }
+
 protected:
     /** Whether this controller is controlled by AI. */
     UPROPERTY(BlueprintReadOnly, Category="Turn")
