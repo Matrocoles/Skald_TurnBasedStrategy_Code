@@ -67,7 +67,7 @@ public:
 
     /** Mark this territory as selected. */
     UFUNCTION(BlueprintCallable, Category = "Territory")
-    void Select();
+    void Select(bool bSelectingForAttack = false);
 
     /** Remove selection state from this territory. */
     UFUNCTION(BlueprintCallable, Category = "Territory")

@@ -8,6 +8,7 @@
 class UButton;
 class UTextBlock;
 class UVerticalBox;
+class ATerritory;
 
 // Delegates broadcasting user UI actions to game logic
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FSkaldAttackRequested, int32,
@@ -137,7 +138,7 @@ public:
   void CancelMoveSelection();
 
   UFUNCTION(BlueprintCallable, Category = "Skald|Selection")
-  void OnTerritoryClickedUI(int32 TerritoryID, bool bOwnedByLocal);
+  void OnTerritoryClickedUI(ATerritory* Territory);
 
   // BlueprintImplementableEvent hooks — BP subclass draws UI
   UFUNCTION(BlueprintImplementableEvent, Category = "Skald|HUD")
@@ -170,6 +171,10 @@ public:
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
             meta = (BindWidgetOptional))
   UTextBlock *PhaseText;
+
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
+            meta = (BindWidgetOptional))
+  UTextBlock *SelectionPrompt;
 
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
             meta = (BindWidgetOptional))
