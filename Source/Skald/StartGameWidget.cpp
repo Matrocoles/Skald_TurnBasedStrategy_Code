@@ -96,7 +96,8 @@ void UStartGameWidget::StartGame(bool bMultiplayer)
                 PS->Faction = Faction;
             }
 
-            FName LevelName(TEXT("OverviewMap"));
+            // Load the correct gameplay map
+            FName LevelName(TEXT("Skald_OverTop"));
             FString Options;
             if (bMultiplayer)
             {
