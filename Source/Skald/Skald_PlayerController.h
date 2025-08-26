@@ -45,7 +45,7 @@ protected:
     /** Widget class to instantiate for the player's HUD.
      *  Expected to be assigned in the Blueprint subclass to avoid
      *  hard loading during CDO construction. */
-    UPROPERTY(EditDefaultsOnly, Category="UI")
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="UI")
     TSubclassOf<USkaldMainHUDWidget> MainHudWidgetClass;
 
     /** Reference to the HUD widget instance. */
@@ -53,7 +53,7 @@ protected:
     TObjectPtr<UUserWidget> HUDRef;
 
     /** Typed reference to the main HUD widget. */
-    UPROPERTY()
+    UPROPERTY(BlueprintReadOnly, Category="UI", meta=(AllowPrivateAccess="true"))
     USkaldMainHUDWidget* MainHudWidget;
 
     /** Handle HUD attack submissions. */
@@ -77,6 +77,6 @@ protected:
      *  turn events without keeping an external pointer that might be
      *  uninitialised.
      */
-    UPROPERTY(BlueprintReadOnly, Category="Turn", meta=(AllowPrivateAccess="true"))
+    UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Turn", meta=(ExposeOnSpawn=true))
     TObjectPtr<ATurnManager> TurnManager;
 };
