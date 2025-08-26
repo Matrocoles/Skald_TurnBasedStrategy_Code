@@ -111,6 +111,9 @@ public:
                         ETurnPhase InPhase,
                         const TArray<FS_PlayerData> &Players);
 
+  UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
+  void ShowTurnAnnouncement(const FString &PlayerName);
+
   /** Rebuilds the cached player list into PlayerListBox. */
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
   void RebuildPlayerList(const TArray<FS_PlayerData> &Players);
@@ -150,6 +153,9 @@ public:
 
   UFUNCTION(BlueprintImplementableEvent, Category = "Skald|HUD")
   void BP_SetPhaseButtons(ETurnPhase InPhase, bool bIsMyTurn);
+
+  UFUNCTION(BlueprintImplementableEvent, Category = "Skald|HUD")
+  void BP_ShowTurnAnnouncement(const FString &PlayerName);
 
   // Helper so PlayerController can refresh button enable state after it knows
   // turn ownership

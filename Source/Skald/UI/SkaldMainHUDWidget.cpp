@@ -4,6 +4,7 @@
 #include "Components/VerticalBox.h"
 #include "Territory.h"
 #include "Skald_PlayerState.h"
+#include "Engine/Engine.h"
 
 void USkaldMainHUDWidget::NativeConstruct() {
   Super::NativeConstruct();
@@ -73,6 +74,15 @@ void USkaldMainHUDWidget::RefreshFromState(
   BP_SetPhaseText(CurrentPhase);
   RebuildPlayerList(CachedPlayers);
   BP_SetPhaseButtons(CurrentPhase, CurrentPlayerID == LocalPlayerID);
+}
+
+void USkaldMainHUDWidget::ShowTurnAnnouncement(const FString &PlayerName) {
+  BP_ShowTurnAnnouncement(PlayerName);
+  if (GEngine) {
+    const FString Message =
+        FString::Printf(TEXT("%s's Turn"), *PlayerName);
+    GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Yellow, Message);
+  }
 }
 
 void USkaldMainHUDWidget::RebuildPlayerList(
