@@ -124,6 +124,7 @@ void UStartGameWidget::StartGame(bool bMultiplayer)
         {
             GI->DisplayName = Name;
             GI->Faction = Faction;
+            GI->bIsMultiplayer = bMultiplayer;
         }
 
         if (APlayerController* PC = GetOwningPlayer())

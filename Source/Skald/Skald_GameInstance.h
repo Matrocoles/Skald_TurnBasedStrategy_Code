@@ -19,5 +19,9 @@ public:
     /** Selected faction for this player. */
     UPROPERTY(BlueprintReadWrite, Category="Player")
     ESkaldFaction Faction;
+
+    /** Whether the game was started in multiplayer mode. */
+    UPROPERTY(BlueprintReadWrite, Category="Player")
+    bool bIsMultiplayer;
 };
 
