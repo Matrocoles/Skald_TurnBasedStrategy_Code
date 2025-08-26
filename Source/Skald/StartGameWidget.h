@@ -18,32 +18,32 @@ class SKALD_API UStartGameWidget : public UUserWidget
 {
     GENERATED_BODY()
 
-protected:
-    virtual void NativeConstruct() override;
-
+public:
     /** Entry box for the player's display name. */
-    UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta = (BindWidgetOptional))
     UEditableTextBox* DisplayNameBox;
 
     /** Combo box to choose a faction. */
-    UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta = (BindWidgetOptional))
     UComboBoxString* FactionComboBox;
 
-    /** Reference back to the owning lobby menu so it can be restored. */
-    UPROPERTY()
-    TWeakObjectPtr<ULobbyMenuWidget> OwningLobbyMenu;
-
     /** Button to start singleplayer. */
-    UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta = (BindWidgetOptional))
     UButton* SingleplayerButton;
 
     /** Button to start multiplayer. */
-    UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta = (BindWidgetOptional))
     UButton* MultiplayerButton;
 
     /** Button to return to the lobby menu. */
-    UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta = (BindWidgetOptional))
     UButton* MainMenuButton;
+
+    /** Record the lobby menu that spawned this widget so we can unhide it later. */
+    void SetLobbyMenu(ULobbyMenuWidget* InMenu) { OwningLobbyMenu = InMenu; }
+
+protected:
+    virtual void NativeConstruct() override;
 
     UFUNCTION()
     void OnSingleplayer();
@@ -56,8 +56,9 @@ protected:
 
     void StartGame(bool bMultiplayer);
 
-public:
-    /** Record the lobby menu that spawned this widget so we can unhide it later. */
-    void SetLobbyMenu(ULobbyMenuWidget* InMenu) { OwningLobbyMenu = InMenu; }
+private:
+    /** Reference back to the owning lobby menu so it can be restored. */
+    UPROPERTY()
+    TWeakObjectPtr<ULobbyMenuWidget> OwningLobbyMenu;
 };
 

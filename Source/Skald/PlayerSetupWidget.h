@@ -29,11 +29,11 @@ public:
     void OnFactionSelected(ESkaldFaction NewFaction);
 
     /** Optional binding to the player's name entry box. */
-    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta=(BindWidgetOptional))
     UEditableTextBox* NameEntryBox;
 
     /** Optional binding to the faction selection combo box. */
-    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta=(BindWidgetOptional))
     UComboBoxString* FactionSelectionBox;
 
     /** Display name entered by the player. */

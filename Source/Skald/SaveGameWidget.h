@@ -14,21 +14,24 @@ class SKALD_API USaveGameWidget : public UUserWidget
 {
     GENERATED_BODY()
 
+public:
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta=(BindWidgetOptional))
+    UButton* Slot0Button;
+
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta=(BindWidgetOptional))
+    UButton* Slot1Button;
+
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta=(BindWidgetOptional))
+    UButton* Slot2Button;
+
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta=(BindWidgetOptional))
+    UButton* MainMenuButton;
+
+    void SetLobbyMenu(ULobbyMenuWidget* InMenu) { LobbyMenu = InMenu; }
+
 protected:
     virtual void NativeConstruct() override;
     virtual void NativeDestruct() override;
-
-    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-    UButton* Slot0Button;
-
-    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-    UButton* Slot1Button;
-
-    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-    UButton* Slot2Button;
-
-    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-    UButton* MainMenuButton;
 
     UFUNCTION(BlueprintCallable)
     void OnSaveSlot0();
@@ -48,8 +51,5 @@ private:
 
     UPROPERTY()
     TWeakObjectPtr<ULobbyMenuWidget> LobbyMenu;
-
-public:
-    void SetLobbyMenu(ULobbyMenuWidget* InMenu) { LobbyMenu = InMenu; }
 };
 

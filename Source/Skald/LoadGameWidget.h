@@ -14,20 +14,23 @@ class SKALD_API ULoadGameWidget : public UUserWidget
 {
     GENERATED_BODY()
 
-protected:
-    virtual void NativeConstruct() override;
-
-    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+public:
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta=(BindWidgetOptional))
     UButton* Slot0Button;
 
-    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta=(BindWidgetOptional))
     UButton* Slot1Button;
 
-    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta=(BindWidgetOptional))
     UButton* Slot2Button;
 
-    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta=(BindWidgetOptional))
     UButton* MainMenuButton;
+
+    void SetLobbyMenu(ULobbyMenuWidget* InMenu) { LobbyMenu = InMenu; }
+
+protected:
+    virtual void NativeConstruct() override;
 
     UFUNCTION(BlueprintCallable)
     void OnLoadSlot0();
@@ -47,8 +50,5 @@ private:
 
     UPROPERTY()
     TWeakObjectPtr<ULobbyMenuWidget> LobbyMenu;
-
-public:
-    void SetLobbyMenu(ULobbyMenuWidget* InMenu) { LobbyMenu = InMenu; }
 };
 

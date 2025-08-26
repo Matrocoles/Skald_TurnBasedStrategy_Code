@@ -138,23 +138,24 @@ public:
     UFUNCTION(BlueprintCallable, Category="Skald|HUD")
     void SyncPhaseButtons(bool bIsMyTurn);
 
-protected:
+public:
     // Bound widget references - optional so subclasses can customise layouts
-    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta=(BindWidgetOptional))
     UTextBlock* TurnText;
 
-    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta=(BindWidgetOptional))
     UTextBlock* PhaseText;
 
-    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta=(BindWidgetOptional))
     UButton* AttackButton;
 
-    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta=(BindWidgetOptional))
     UButton* MoveButton;
 
-    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta=(BindWidgetOptional))
     UButton* EndTurnButton;
 
+protected:
     // Internal handlers for widget actions
     UFUNCTION()
     void HandleEndTurnClicked();

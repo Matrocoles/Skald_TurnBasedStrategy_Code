@@ -15,23 +15,24 @@ class SKALD_API ULobbyMenuWidget : public UUserWidget
 {
     GENERATED_BODY()
 
-protected:
-    virtual void NativeConstruct() override;
-
-    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+public:
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta=(BindWidgetOptional))
     UVerticalBox* Root;
 
-    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta=(BindWidgetOptional))
     UButton* StartButton;
 
-    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta=(BindWidgetOptional))
     UButton* LoadButton;
 
-    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta=(BindWidgetOptional))
     UButton* SettingsButton;
 
-    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta=(BindWidgetOptional))
     UButton* ExitButton;
+
+protected:
+    virtual void NativeConstruct() override;
 
     UFUNCTION(BlueprintCallable)
     void OnStartGame();
