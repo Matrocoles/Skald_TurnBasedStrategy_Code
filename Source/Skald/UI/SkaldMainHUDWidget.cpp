@@ -134,6 +134,13 @@ void USkaldMainHUDWidget::HideEndingTurn() {
   }
 }
 
+void USkaldMainHUDWidget::UpdateInitiativeText(const FString &Message) {
+  if (InitiativeText) {
+    InitiativeText->SetText(FText::FromString(Message));
+    InitiativeText->SetVisibility(ESlateVisibility::Visible);
+  }
+}
+
 void USkaldMainHUDWidget::BeginAttackSelection() {
   bSelectingForAttack = true;
   bSelectingForMove = false;
