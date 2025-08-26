@@ -6,6 +6,7 @@
 #include "Skald_TurnManager.generated.h"
 
 class ASkaldPlayerController;
+class ASkaldPlayerState;
 
 /**
  * Handles turn sequencing for all registered player controllers.
@@ -28,6 +29,15 @@ public:
 
     UFUNCTION(BlueprintCallable, Category="Turn")
     void AdvanceTurn();
+
+    /** Called when all reinforcements have been deployed to transition
+     *  the active player into the attack phase. */
+    UFUNCTION(BlueprintCallable, Category="Turn")
+    void BeginAttackPhase();
+
+    /** Update all players' HUDs with the specified player's army pool. */
+    UFUNCTION(BlueprintCallable, Category="Turn")
+    void BroadcastArmyPool(class ASkaldPlayerState* ForPlayer);
 
     UFUNCTION(BlueprintCallable, Category="Turn")
     void SortControllersByInitiative();

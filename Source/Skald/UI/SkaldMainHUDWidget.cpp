@@ -10,6 +10,8 @@
 #include "Territory.h"
 #include "Skald_PlayerState.h"
 #include "Skald_GameMode.h"
+#include "Skald_PlayerController.h"
+#include "Skald_TurnManager.h"
 #include "Engine/Engine.h"
 
 void USkaldMainHUDWidget::NativeConstruct() {
@@ -336,13 +338,31 @@ void USkaldMainHUDWidget::HandleDeployClicked() {
         Terr->RefreshAppearance();
         --PS->ArmyPool;
         PS->ForceNetUpdate();
-        UpdateDeployableUnits(PS->ArmyPool);
+
+        if (ASkaldPlayerController *SKPC =
+                Cast<ASkaldPlayerController>(PC)) {
+          if (ATurnManager *TM = SKPC->GetTurnManager()) {
+            TM->BroadcastArmyPool(PS);
+          }
+        }
 
         if (PS->ArmyPool <= 0 && DeployButton) {
           DeployButton->SetVisibility(ESlateVisibility::Collapsed);
+          bool bHandled = false;
           if (ASkaldGameMode *GM =
                   GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
-            GM->AdvanceArmyPlacement();
+            if (!GM->HasMatchStarted()) {
+              GM->AdvanceArmyPlacement();
+              bHandled = true;
+            }
+          }
+          if (!bHandled) {
+            if (ASkaldPlayerController *SKPC =
+                    Cast<ASkaldPlayerController>(PC)) {
+              if (ATurnManager *TM = SKPC->GetTurnManager()) {
+                TM->BeginAttackPhase();
+              }
+            }
           }
         }
       }
