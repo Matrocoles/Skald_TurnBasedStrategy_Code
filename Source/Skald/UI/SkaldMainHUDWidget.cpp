@@ -1,11 +1,38 @@
 #include "UI/SkaldMainHUDWidget.h"
+#include "Components/Button.h"
+#include "Components/TextBlock.h"
 
 void USkaldMainHUDWidget::NativeConstruct()
 {
     Super::NativeConstruct();
 
+    if (AttackButton)
+    {
+        AttackButton->OnClicked.AddDynamic(this, &USkaldMainHUDWidget::BeginAttackSelection);
+    }
+    if (MoveButton)
+    {
+        MoveButton->OnClicked.AddDynamic(this, &USkaldMainHUDWidget::BeginMoveSelection);
+    }
+    if (EndTurnButton)
+    {
+        EndTurnButton->OnClicked.AddDynamic(this, &USkaldMainHUDWidget::HandleEndTurnClicked);
+    }
+
     BP_SetPhaseButtons(CurrentPhase, CurrentPlayerID == LocalPlayerID);
     BP_RebuildPlayerList(CachedPlayers);
+}
+
+void USkaldMainHUDWidget::HandleEndTurnClicked()
+{
+    if (CurrentPhase == ETurnPhase::Attack)
+    {
+        OnEndAttackRequested.Broadcast(true);
+    }
+    else if (CurrentPhase == ETurnPhase::Movement)
+    {
+        OnEndMovementRequested.Broadcast(true);
+    }
 }
 
 void USkaldMainHUDWidget::UpdateTurnBanner(int32 InCurrentPlayerID, int32 InTurnNumber)

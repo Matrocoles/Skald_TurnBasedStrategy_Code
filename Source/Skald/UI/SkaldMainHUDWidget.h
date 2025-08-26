@@ -5,6 +5,8 @@
 #include "SkaldTypes.h"
 #include "SkaldMainHUDWidget.generated.h"
 
+class UButton;
+class UTextBlock;
 
 // Delegates broadcasting user UI actions to game logic
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FSkaldAttackRequested, int32, FromID, int32, ToID, int32, ArmySent);
@@ -137,6 +139,26 @@ public:
     void SyncPhaseButtons(bool bIsMyTurn);
 
 protected:
+    // Bound widget references
+    UPROPERTY(meta=(BindWidget))
+    UTextBlock* TurnText;
+
+    UPROPERTY(meta=(BindWidget))
+    UTextBlock* PhaseText;
+
+    UPROPERTY(meta=(BindWidget))
+    UButton* AttackButton;
+
+    UPROPERTY(meta=(BindWidget))
+    UButton* MoveButton;
+
+    UPROPERTY(meta=(BindWidget))
+    UButton* EndTurnButton;
+
+    // Internal handlers for widget actions
+    UFUNCTION()
+    void HandleEndTurnClicked();
+
     virtual void NativeConstruct() override;
 };
 
