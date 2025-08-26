@@ -5,6 +5,7 @@
 #include "SettingsWidget.generated.h"
 
 class ULobbyMenuWidget;
+class UButton;
 /**
  * Basic settings menu allowing to apply current user settings.
  */
@@ -15,6 +16,12 @@ class SKALD_API USettingsWidget : public UUserWidget
 
 protected:
     virtual void NativeConstruct() override;
+
+    UPROPERTY(meta = (BindWidget))
+    UButton* ApplyButton;
+
+    UPROPERTY(meta = (BindWidget))
+    UButton* MainMenuButton;
 
     UFUNCTION(BlueprintCallable)
     void OnApply();
