@@ -2,9 +2,11 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "SkaldTypes.h"
 #include "StartGameWidget.generated.h"
 
-class UPlayerSetupWidget;
+class UEditableTextBox;
+class UComboBoxString;
 
 /**
  * Menu shown after pressing Start Game, to choose single or multiplayer.
@@ -17,14 +19,20 @@ class SKALD_API UStartGameWidget : public UUserWidget
 protected:
     virtual void NativeConstruct() override;
 
-    UFUNCTION(BlueprintCallable)
+    /** Entry box for the player's display name. */
+    UPROPERTY()
+    UEditableTextBox* DisplayNameBox;
+
+    /** Combo box to choose a faction. */
+    UPROPERTY()
+    UComboBoxString* FactionComboBox;
+
+    UFUNCTION()
     void OnSingleplayer();
 
-    UFUNCTION(BlueprintCallable)
+    UFUNCTION()
     void OnMultiplayer();
 
-    /** Widget class used for player setup. */
-    UPROPERTY(EditDefaultsOnly, Category="UI")
-    TSubclassOf<UPlayerSetupWidget> PlayerSetupWidgetClass;
+    void StartGame(bool bMultiplayer);
 };
 

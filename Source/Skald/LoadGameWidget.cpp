@@ -65,7 +65,8 @@ void ULoadGameWidget::HandleLoadSlot(int32 SlotIndex)
     USaveGame* LoadedGame = UGameplayStatics::LoadGameFromSlot(SlotNames[SlotIndex], 0);
     if (LoadedGame)
     {
-        UGameplayStatics::OpenLevel(this, FName("OverviewMap"));
+        // After loading, transition to the main gameplay map
+        UGameplayStatics::OpenLevel(this, FName("Skald_OverTop"));
     }
     else
     {
