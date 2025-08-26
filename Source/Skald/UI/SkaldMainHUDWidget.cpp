@@ -2,6 +2,11 @@
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
+#include "Components/Widget.h"
+#include "Kismet/GameplayStatics.h"
+#include "Territory.h"
+#include "UI/ConfirmAttackWidget.h"
+#include "WorldMap.h"
 
 void USkaldMainHUDWidget::NativeConstruct() {
   Super::NativeConstruct();
@@ -113,12 +118,37 @@ void USkaldMainHUDWidget::BeginAttackSelection() {
 void USkaldMainHUDWidget::SubmitAttack(int32 FromID, int32 ToID,
                                        int32 ArmySent) {
   OnAttackRequested.Broadcast(FromID, ToID, ArmySent);
-  bSelectingForAttack = false;
-  SelectedSourceID = -1;
-  SelectedTargetID = -1;
+  CancelAttackSelection();
 }
 
 void USkaldMainHUDWidget::CancelAttackSelection() {
+  if (AWorldMap *WorldMap =
+          Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+              GetWorld(), AWorldMap::StaticClass()))) {
+    if (SelectedSourceID != -1) {
+      if (ATerritory *Source = WorldMap->GetTerritoryById(SelectedSourceID)) {
+        Source->Deselect();
+      }
+    }
+    if (SelectedTargetID != -1) {
+      if (ATerritory *Target = WorldMap->GetTerritoryById(SelectedTargetID)) {
+        Target->Deselect();
+      }
+    }
+    for (ATerritory *Terr : HighlightedTerritories) {
+      if (Terr) {
+        Terr->Deselect();
+      }
+    }
+  }
+  HighlightedTerritories.Empty();
+  if (ActiveConfirmWidget) {
+    ActiveConfirmWidget->RemoveFromParent();
+    ActiveConfirmWidget = nullptr;
+  }
+  if (SelectionPrompt) {
+    SelectionPrompt->SetVisibility(ESlateVisibility::Visible);
+  }
   bSelectingForAttack = false;
   SelectedSourceID = -1;
   SelectedTargetID = -1;
@@ -150,9 +180,42 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(int32 TerritoryID,
     if (SelectedSourceID == -1) {
       if (bOwnedByLocal) {
         SelectedSourceID = TerritoryID;
+
+        if (AWorldMap *WorldMap =
+                Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+                    GetWorld(), AWorldMap::StaticClass()))) {
+          if (ATerritory *Source = WorldMap->GetTerritoryById(SelectedSourceID)) {
+            for (ATerritory *Terr : WorldMap->Territories) {
+              if (Terr && Source->IsAdjacentTo(Terr) &&
+                  Terr->OwningPlayer != Source->OwningPlayer) {
+                Terr->Select();
+                HighlightedTerritories.Add(Terr);
+              }
+            }
+          }
+        }
       }
     } else if (SelectedTargetID == -1) {
       SelectedTargetID = TerritoryID;
+
+      if (SelectionPrompt) {
+        SelectionPrompt->SetVisibility(ESlateVisibility::Collapsed);
+      }
+      if (ConfirmAttackWidgetClass) {
+        ActiveConfirmWidget = CreateWidget<UConfirmAttackWidget>(
+            GetWorld(), ConfirmAttackWidgetClass);
+        if (ActiveConfirmWidget) {
+          ActiveConfirmWidget->AddToViewport();
+          if (ActiveConfirmWidget->ApproveButton) {
+            ActiveConfirmWidget->ApproveButton->OnClicked.AddDynamic(
+                this, &USkaldMainHUDWidget::HandleAttackApproved);
+          }
+          if (ActiveConfirmWidget->CancelButton) {
+            ActiveConfirmWidget->CancelButton->OnClicked.AddDynamic(
+                this, &USkaldMainHUDWidget::CancelAttackSelection);
+          }
+        }
+      }
     }
   } else if (bSelectingForMove) {
     if (SelectedSourceID == -1) {
@@ -169,4 +232,10 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(int32 TerritoryID,
 
 void USkaldMainHUDWidget::SyncPhaseButtons(bool bIsMyTurn) {
   BP_SetPhaseButtons(CurrentPhase, bIsMyTurn);
+}
+
+void USkaldMainHUDWidget::HandleAttackApproved() {
+  const int32 ArmyCount =
+      ActiveConfirmWidget ? ActiveConfirmWidget->ArmyCount : 0;
+  SubmitAttack(SelectedSourceID, SelectedTargetID, ArmyCount);
 }

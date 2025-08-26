@@ -8,6 +8,9 @@
 class UButton;
 class UTextBlock;
 class UVerticalBox;
+class ATerritory;
+class UConfirmAttackWidget;
+class UWidget;
 
 // Delegates broadcasting user UI actions to game logic
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FSkaldAttackRequested, int32,
@@ -182,10 +185,26 @@ public:
             meta = (BindWidgetOptional))
   UVerticalBox *PlayerListBox;
 
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
+            meta = (BindWidgetOptional))
+  UWidget *SelectionPrompt;
+
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Widgets")
+  TSubclassOf<UConfirmAttackWidget> ConfirmAttackWidgetClass;
+
 protected:
   // Internal handlers for widget actions
   UFUNCTION()
   void HandleEndTurnClicked();
+
+  UFUNCTION()
+  void HandleAttackApproved();
+
+  UPROPERTY()
+  UConfirmAttackWidget *ActiveConfirmWidget = nullptr;
+
+  UPROPERTY()
+  TArray<ATerritory *> HighlightedTerritories;
 
   virtual void NativeConstruct() override;
 };
