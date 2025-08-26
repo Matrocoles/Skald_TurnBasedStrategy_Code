@@ -18,19 +18,19 @@ class SKALD_API ULobbyMenuWidget : public UUserWidget
 protected:
     virtual void NativeConstruct() override;
 
-    UPROPERTY(meta=(BindWidget))
+    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
     UVerticalBox* Root;
 
-    UPROPERTY(meta=(BindWidget))
+    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
     UButton* StartButton;
 
-    UPROPERTY(meta=(BindWidget))
+    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
     UButton* LoadButton;
 
-    UPROPERTY(meta=(BindWidget))
+    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
     UButton* SettingsButton;
 
-    UPROPERTY(meta=(BindWidget))
+    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
     UButton* ExitButton;
 
     UFUNCTION(BlueprintCallable)

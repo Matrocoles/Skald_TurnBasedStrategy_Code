@@ -22,11 +22,11 @@ protected:
     virtual void NativeConstruct() override;
 
     /** Entry box for the player's display name. */
-    UPROPERTY(meta = (BindWidget))
+    UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
     UEditableTextBox* DisplayNameBox;
 
     /** Combo box to choose a faction. */
-    UPROPERTY(meta = (BindWidget))
+    UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
     UComboBoxString* FactionComboBox;
 
     /** Reference back to the owning lobby menu so it can be restored. */
@@ -34,15 +34,15 @@ protected:
     TWeakObjectPtr<ULobbyMenuWidget> OwningLobbyMenu;
 
     /** Button to start singleplayer. */
-    UPROPERTY(meta = (BindWidget))
+    UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
     UButton* SingleplayerButton;
 
     /** Button to start multiplayer. */
-    UPROPERTY(meta = (BindWidget))
+    UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
     UButton* MultiplayerButton;
 
     /** Button to return to the lobby menu. */
-    UPROPERTY(meta = (BindWidgetOptional))
+    UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
     UButton* MainMenuButton;
 
     UFUNCTION()

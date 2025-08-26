@@ -17,16 +17,16 @@ class SKALD_API ULoadGameWidget : public UUserWidget
 protected:
     virtual void NativeConstruct() override;
 
-    UPROPERTY(meta=(BindWidget))
+    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
     UButton* Slot0Button;
 
-    UPROPERTY(meta=(BindWidget))
+    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
     UButton* Slot1Button;
 
-    UPROPERTY(meta=(BindWidget))
+    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
     UButton* Slot2Button;
 
-    UPROPERTY(meta=(BindWidget))
+    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
     UButton* MainMenuButton;
 
     UFUNCTION(BlueprintCallable)

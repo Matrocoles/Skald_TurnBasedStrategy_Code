@@ -139,20 +139,20 @@ public:
     void SyncPhaseButtons(bool bIsMyTurn);
 
 protected:
-    // Bound widget references
-    UPROPERTY(meta=(BindWidget))
+    // Bound widget references - optional so subclasses can customise layouts
+    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
     UTextBlock* TurnText;
 
-    UPROPERTY(meta=(BindWidget))
+    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
     UTextBlock* PhaseText;
 
-    UPROPERTY(meta=(BindWidget))
+    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
     UButton* AttackButton;
 
-    UPROPERTY(meta=(BindWidget))
+    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
     UButton* MoveButton;
 
-    UPROPERTY(meta=(BindWidget))
+    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
     UButton* EndTurnButton;
 
     // Internal handlers for widget actions

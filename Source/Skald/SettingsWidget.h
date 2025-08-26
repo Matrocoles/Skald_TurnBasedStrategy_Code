@@ -17,10 +17,10 @@ class SKALD_API USettingsWidget : public UUserWidget
 protected:
     virtual void NativeConstruct() override;
 
-    UPROPERTY(meta = (BindWidget))
+    UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
     UButton* ApplyButton;
 
-    UPROPERTY(meta = (BindWidget))
+    UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
     UButton* MainMenuButton;
 
     UFUNCTION(BlueprintCallable)

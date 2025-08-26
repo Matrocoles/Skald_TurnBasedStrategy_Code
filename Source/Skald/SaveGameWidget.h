@@ -18,16 +18,16 @@ protected:
     virtual void NativeConstruct() override;
     virtual void NativeDestruct() override;
 
-    UPROPERTY(meta=(BindWidget))
+    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
     UButton* Slot0Button;
 
-    UPROPERTY(meta=(BindWidget))
+    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
     UButton* Slot1Button;
 
-    UPROPERTY(meta=(BindWidget))
+    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
     UButton* Slot2Button;
 
-    UPROPERTY(meta=(BindWidget))
+    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
     UButton* MainMenuButton;
 
     UFUNCTION(BlueprintCallable)
