@@ -1,4 +1,10 @@
 #include "StartGameWidget.h"
+#include "Components/Button.h"
+#include "Components/TextBlock.h"
+#include "Components/VerticalBox.h"
+#include "Components/EditableTextBox.h"
+#include "Components/ComboBoxString.h"
+#include "Blueprint/WidgetTree.h"
 #include "Components/EditableTextBox.h"
 #include "Components/ComboBoxString.h"
 #include "Kismet/GameplayStatics.h"
@@ -16,6 +22,25 @@ void UStartGameWidget::NativeConstruct()
         DisplayNameBox->SetText(FText::FromString(TEXT("Player")));
     }
 
+        DisplayNameBox = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass());
+        DisplayNameBox->SetText(FText::FromString(TEXT("Player")));
+        Root->AddChild(DisplayNameBox);
+
+        FactionComboBox = WidgetTree->ConstructWidget<UComboBoxString>(UComboBoxString::StaticClass());
+        if (UEnum* Enum = StaticEnum<ESkaldFaction>())
+        {
+            for (int32 i = 0; i < Enum->NumEnums(); ++i)
+            {
+                if (!Enum->HasMetaData(TEXT("Hidden"), i))
+                {
+                    FactionComboBox->AddOption(Enum->GetNameStringByIndex(i));
+                }
+            }
+            FactionComboBox->SetSelectedIndex(0);
+        }
+        Root->AddChild(FactionComboBox);
+
+        auto AddButton = [this, Root](const FString& Label, const FName& FuncName)
     if (FactionComboBox)
     {
         FactionComboBox->ClearOptions();
@@ -75,7 +100,7 @@ void UStartGameWidget::StartGame(bool bMultiplayer)
             }
 
             // Load the correct gameplay map
-            FName LevelName(TEXT("Skald_OverTop"));
+            FName LevelName(TEXT("/Game/Blueprints/Maps/OverviewMap"));
             FString Options;
             if (bMultiplayer)
             {

@@ -21,6 +21,13 @@ protected:
     virtual void NativeConstruct() override;
 
     /** Entry box for the player's display name. */
+    UPROPERTY()
+    UEditableTextBox* DisplayNameBox;
+
+    /** Combo box to choose a faction. */
+    UPROPERTY()
+    UComboBoxString* FactionComboBox;
+
     UPROPERTY(meta=(BindWidget))
     UEditableTextBox* DisplayNameBox;
 
