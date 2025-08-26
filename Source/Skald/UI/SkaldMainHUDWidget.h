@@ -2,8 +2,8 @@
 
 #include "Blueprint/UserWidget.h"
 #include "CoreMinimal.h"
-#include "SkaldTypes.h"
 #include "SkaldMainHUDWidget.generated.h"
+#include "SkaldTypes.h"
 
 class UButton;
 class UTextBlock;
@@ -120,6 +120,14 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
   void RebuildPlayerList(const TArray<FS_PlayerData> &Players);
 
+  /** Show a message indicating the turn is ending. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
+  void ShowEndingTurn();
+
+  /** Hide the ending turn message. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
+  void HideEndingTurn();
+
   // BlueprintCallable functions — selection UX helpers
   UFUNCTION(BlueprintCallable, Category = "Skald|Selection")
   void BeginAttackSelection();
@@ -197,6 +205,7 @@ public:
 
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
             meta = (BindWidgetOptional))
+  UTextBlock *EndingTurnText;
   UWidget *SelectionPrompt;
 
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Widgets")
