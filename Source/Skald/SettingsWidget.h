@@ -4,6 +4,7 @@
 #include "Blueprint/UserWidget.h"
 #include "SettingsWidget.generated.h"
 
+class ULobbyMenuWidget;
 /**
  * Basic settings menu allowing to apply current user settings.
  */
@@ -17,5 +18,15 @@ protected:
 
     UFUNCTION(BlueprintCallable)
     void OnApply();
+
+    UFUNCTION()
+    void OnMainMenu();
+
+private:
+    UPROPERTY()
+    TWeakObjectPtr<ULobbyMenuWidget> LobbyMenu;
+
+public:
+    void SetLobbyMenu(ULobbyMenuWidget* InMenu) { LobbyMenu = InMenu; }
 };
 

@@ -28,7 +28,8 @@ void UPlayerSetupWidget::OnConfirm()
             PS->Faction = SelectedFaction;
         }
 
-        FName LevelName(TEXT("OverviewMap"));
+        // Launch the main gameplay map once setup is confirmed
+        FName LevelName(TEXT("Skald_OverTop"));
         FString Options;
         if (bMultiplayer)
         {
