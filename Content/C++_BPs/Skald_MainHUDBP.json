@@ -1,0 +1,22 @@
+{
+  "Blueprint": "WidgetBlueprint'/Game/C++_BPs/Skald_MainHUDBP'",
+  "ParentClass": "/Script/Skald.SkaldMainHUDWidget",
+  "Purpose": "Main HUD widget used during gameplay",
+  "Widgets": {
+    "PlayerListBox": {
+      "Type": "VerticalBox",
+      "Purpose": "Container for dynamically generated player entries"
+    }
+  },
+  "Events": {
+    "BP_RebuildPlayerList": {
+      "Parameters": "Array of FS_PlayerData",
+      "Steps": [
+        "Clear children of PlayerListBox",
+        "For each player in Players:",
+        "  - Create a TextBlock showing PlayerName and faction",
+        "  - Add the TextBlock to PlayerListBox"
+      ]
+    }
+  }
+}
