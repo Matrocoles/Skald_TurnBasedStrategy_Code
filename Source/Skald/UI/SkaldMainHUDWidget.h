@@ -2,8 +2,8 @@
 
 #include "Blueprint/UserWidget.h"
 #include "CoreMinimal.h"
-#include "SkaldMainHUDWidget.generated.h"
 #include "SkaldTypes.h"
+#include "SkaldMainHUDWidget.generated.h"
 
 class UButton;
 class UTextBlock;
