@@ -23,6 +23,25 @@ void UStartGameWidget::NativeConstruct()
         DisplayNameBox->SetText(FText::FromString(TEXT("Player")));
     }
 
+        DisplayNameInput = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass());
+        DisplayNameInput->SetText(FText::FromString(TEXT("Player")));
+        Root->AddChild(DisplayNameInput);
+
+        FactionCombo = WidgetTree->ConstructWidget<UComboBoxString>(UComboBoxString::StaticClass());
+        if (UEnum* Enum = StaticEnum<ESkaldFaction>())
+        {
+            for (int32 i = 0; i < Enum->NumEnums(); ++i)
+            {
+                if (!Enum->HasMetaData(TEXT("Hidden"), i))
+                {
+                    FactionCombo->AddOption(Enum->GetNameStringByIndex(i));
+                }
+            }
+            FactionCombo->SetSelectedIndex(0);
+        }
+        Root->AddChild(FactionCombo);
+
+        auto AddButton = [this, Root](const FString& Label, const FName& FuncName)
         DisplayNameBox = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass());
         DisplayNameBox->SetText(FText::FromString(TEXT("Player")));
         Root->AddChild(DisplayNameBox);
@@ -90,6 +109,8 @@ void UStartGameWidget::OnMainMenu()
     if (LobbyMenu.IsValid())
     {
         LobbyMenu->SetVisibility(ESlateVisibility::Visible);
+    {
+        LobbyMenu->SetVisibility(ESlateVisibility::Visible);
 void UStartGameWidget::StartGame(bool bMultiplayer)
 {
     FString Name = DisplayNameBox ? DisplayNameBox->GetText().ToString() : TEXT("Player");
@@ -107,6 +128,8 @@ void UStartGameWidget::StartGame(bool bMultiplayer)
 
 void UStartGameWidget::StartGame(bool bMultiplayer)
 {
+    FString Name = DisplayNameInput ? DisplayNameInput->GetText().ToString() : TEXT("Player");
+    FString FactionName = FactionCombo ? FactionCombo->GetSelectedOption() : TEXT("None");
     FString Name = DisplayNameBox ? DisplayNameBox->GetText().ToString() : TEXT("Player");
     FString FactionName = FactionComboBox ? FactionComboBox->GetSelectedOption() : TEXT("None");
 
@@ -123,6 +146,13 @@ void UStartGameWidget::StartGame(bool bMultiplayer)
     if (UWorld* World = GetWorld())
     {
         if (USkaldGameInstance* GI = World->GetGameInstance<USkaldGameInstance>())
+        {
+            GI->DisplayName = Name;
+            GI->Faction = Faction;
+        }
+
+        if (APlayerController* PC = GetOwningPlayer())
+        {
         {
             GI->DisplayName = Name;
             GI->Faction = Faction;

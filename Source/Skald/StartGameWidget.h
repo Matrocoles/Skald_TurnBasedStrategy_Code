@@ -23,6 +23,14 @@ protected:
 
     /** Entry box for the player's display name. */
     UPROPERTY()
+    UEditableTextBox* DisplayNameInput;
+
+    /** Combo box to choose a faction. */
+    UPROPERTY()
+    UComboBoxString* FactionCombo;
+
+    UPROPERTY()
+    TWeakObjectPtr<ULobbyMenuWidget> LobbyMenu;
     UEditableTextBox* DisplayNameBox;
 
     /** Combo box to choose a faction. */
