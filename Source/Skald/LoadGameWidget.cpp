@@ -4,6 +4,7 @@
 #include "GameFramework/SaveGame.h"
 #include "LobbyMenuWidget.h"
 #include "SlotNameConstants.h"
+#include "GameFramework/PlayerController.h"
 
 void ULoadGameWidget::NativeConstruct()
 {
@@ -62,6 +63,14 @@ void ULoadGameWidget::HandleLoadSlot(int32 SlotIndex)
     USaveGame* LoadedGame = UGameplayStatics::LoadGameFromSlot(SlotNames[SlotIndex], 0);
     if (LoadedGame)
     {
+        if (APlayerController* PC = GetOwningPlayer())
+        {
+            PC->SetInputMode(FInputModeGameOnly());
+            PC->bShowMouseCursor = false;
+            PC->bEnableClickEvents = false;
+            PC->bEnableMouseOverEvents = false;
+        }
+
         // After loading, transition to the main gameplay map
         UGameplayStatics::OpenLevel(this, FName("Skald_OverTop"));
     }
