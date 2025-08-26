@@ -12,6 +12,7 @@
 #include "Skald_PlayerState.h"
 #include "GameFramework/PlayerController.h"
 #include "UObject/UnrealType.h"
+#include "LobbyMenuWidget.h"
 
 void UStartGameWidget::NativeConstruct()
 {
@@ -41,6 +42,21 @@ void UStartGameWidget::NativeConstruct()
         Root->AddChild(FactionComboBox);
 
         auto AddButton = [this, Root](const FString& Label, const FName& FuncName)
+        {
+            for (int32 i = 0; i < Enum->NumEnums(); ++i)
+            {
+                if (!Enum->HasMetaData(TEXT("Hidden"), i))
+                {
+                    FactionComboBox->AddOption(Enum->GetNameStringByIndex(i));
+                }
+            }
+            FactionComboBox->SetSelectedIndex(0);
+        }
+        Root->AddChild(FactionComboBox);
+        AddButton(TEXT("Singleplayer"), FName("OnSingleplayer"));
+        AddButton(TEXT("Multiplayer"), FName("OnMultiplayer"));
+        AddButton(TEXT("Main Menu"), FName("OnMainMenu"));
+        auto AddButton = [this, Root](const FString& Label, const FName& FuncName)
     if (FactionComboBox)
     {
         FactionComboBox->ClearOptions();
@@ -67,6 +83,27 @@ void UStartGameWidget::OnMultiplayer()
 {
     StartGame(true);
 }
+
+void UStartGameWidget::OnMainMenu()
+{
+    RemoveFromParent();
+    if (LobbyMenu.IsValid())
+    {
+        LobbyMenu->SetVisibility(ESlateVisibility::Visible);
+void UStartGameWidget::StartGame(bool bMultiplayer)
+{
+    FString Name = DisplayNameBox ? DisplayNameBox->GetText().ToString() : TEXT("Player");
+    FString FactionName = FactionComboBox ? FactionComboBox->GetSelectedOption() : TEXT("None");
+
+    ESkaldFaction Faction = ESkaldFaction::None;
+    if (UEnum* Enum = StaticEnum<ESkaldFaction>())
+    {
+        int32 Value = Enum->GetValueByNameString(FactionName);
+        if (Value != INDEX_NONE)
+        {
+            Faction = static_cast<ESkaldFaction>(Value);
+        }
+    }
 
 void UStartGameWidget::StartGame(bool bMultiplayer)
 {

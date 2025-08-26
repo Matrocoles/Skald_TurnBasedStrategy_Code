@@ -7,6 +7,7 @@
 
 class UEditableTextBox;
 class UComboBoxString;
+class ULobbyMenuWidget;
 class UButton;
 
 /**
@@ -28,6 +29,8 @@ protected:
     UPROPERTY()
     UComboBoxString* FactionComboBox;
 
+    UPROPERTY()
+    TWeakObjectPtr<ULobbyMenuWidget> LobbyMenu;
     UPROPERTY(meta=(BindWidget))
     UEditableTextBox* DisplayNameBox;
 
@@ -49,6 +52,13 @@ protected:
     UFUNCTION()
     void OnMultiplayer();
 
+    UFUNCTION()
+    void OnMainMenu();
+
+    void StartGame(bool bMultiplayer);
+
+public:
+    void SetLobbyMenu(ULobbyMenuWidget* InMenu) { LobbyMenu = InMenu; }
     void StartGame(bool bMultiplayer);
 };
 
