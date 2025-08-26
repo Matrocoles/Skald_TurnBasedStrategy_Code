@@ -48,6 +48,12 @@ void UStartGameWidget::NativeConstruct()
         FactionComboBox->OnSelectionChanged.AddDynamic(this, &UStartGameWidget::OnFactionChanged);
     }
 
+    if (LockInButton)
+    {
+        LockInButton->OnClicked.AddDynamic(this, &UStartGameWidget::OnLockIn);
+        LockInButton->SetIsEnabled(true);
+    }
+
     if (SingleplayerButton)
     {
         SingleplayerButton->OnClicked.AddDynamic(this, &UStartGameWidget::OnSingleplayer);
@@ -101,36 +107,42 @@ void UStartGameWidget::OnFactionChanged(FString /*SelectedItem*/, ESelectInfo::T
 
 void UStartGameWidget::ValidateSelections()
 {
-    const bool bHasName = DisplayNameBox && !DisplayNameBox->GetText().IsEmpty();
-    const bool bHasFaction = FactionComboBox && FactionComboBox->GetSelectedIndex() != INDEX_NONE;
-
-    const bool bEnable = bHasName && bHasFaction;
-
-    if (SingleplayerButton)
+    if (LockInButton)
     {
-        SingleplayerButton->SetIsEnabled(bEnable);
-        SingleplayerButton->SetVisibility(bEnable ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
-    }
-
-    if (MultiplayerButton)
-    {
-        MultiplayerButton->SetIsEnabled(bEnable);
-        MultiplayerButton->SetVisibility(bEnable ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+        LockInButton->SetIsEnabled(true);
     }
 }
 
-void UStartGameWidget::StartGame(bool bMultiplayer)
+void UStartGameWidget::OnLockIn()
 {
-    FString Name = DisplayNameBox ? DisplayNameBox->GetText().ToString() : TEXT("Player");
-    FString FactionName = FactionComboBox ? FactionComboBox->GetSelectedOption() : TEXT("None");
+    FString Name = DisplayNameBox ? DisplayNameBox->GetText().ToString() : FString();
 
-    ESkaldFaction Faction = ESkaldFaction::None;
-    if (UEnum* Enum = StaticEnum<ESkaldFaction>())
+    if (Name.IsEmpty())
     {
-        int32 Value = Enum->GetValueByNameString(FactionName);
-        if (Value != INDEX_NONE)
+        if (APlayerController* PC = GetOwningPlayer())
         {
-            Faction = static_cast<ESkaldFaction>(Value);
+            if (APlayerState* PSBase = PC->PlayerState)
+            {
+                Name = FString::Printf(TEXT("Player%d"), PSBase->GetPlayerId());
+            }
+            else
+            {
+                Name = TEXT("Player");
+            }
+        }
+    }
+
+    ESkaldFaction Faction = ESkaldFaction::Human;
+    if (FactionComboBox && FactionComboBox->GetSelectedIndex() != INDEX_NONE)
+    {
+        FString FactionName = FactionComboBox->GetSelectedOption();
+        if (UEnum* Enum = StaticEnum<ESkaldFaction>())
+        {
+            int32 Value = Enum->GetValueByNameString(FactionName);
+            if (Value != INDEX_NONE)
+            {
+                Faction = static_cast<ESkaldFaction>(Value);
+            }
         }
     }
 
@@ -140,18 +152,58 @@ void UStartGameWidget::StartGame(bool bMultiplayer)
         {
             GI->DisplayName = Name;
             GI->Faction = Faction;
-            GI->bIsMultiplayer = bMultiplayer;
             GI->TakenFactions.AddUnique(Faction);
+        }
+    }
+
+    if (APlayerController* PC = GetOwningPlayer())
+    {
+        if (ASkaldPlayerState* PS = PC->GetPlayerState<ASkaldPlayerState>())
+        {
+            PS->DisplayName = Name;
+            PS->Faction = Faction;
+        }
+    }
+
+    if (DisplayNameBox)
+    {
+        DisplayNameBox->SetVisibility(ESlateVisibility::Collapsed);
+    }
+
+    if (FactionComboBox)
+    {
+        FactionComboBox->SetVisibility(ESlateVisibility::Collapsed);
+    }
+
+    if (LockInButton)
+    {
+        LockInButton->SetVisibility(ESlateVisibility::Collapsed);
+    }
+
+    if (SingleplayerButton)
+    {
+        SingleplayerButton->SetIsEnabled(true);
+        SingleplayerButton->SetVisibility(ESlateVisibility::Visible);
+    }
+
+    if (MultiplayerButton)
+    {
+        MultiplayerButton->SetIsEnabled(true);
+        MultiplayerButton->SetVisibility(ESlateVisibility::Visible);
+    }
+}
+
+void UStartGameWidget::StartGame(bool bMultiplayer)
+{
+    if (UWorld* World = GetWorld())
+    {
+        if (USkaldGameInstance* GI = World->GetGameInstance<USkaldGameInstance>())
+        {
+            GI->bIsMultiplayer = bMultiplayer;
         }
 
         if (APlayerController* PC = GetOwningPlayer())
         {
-            if (ASkaldPlayerState* PS = PC->GetPlayerState<ASkaldPlayerState>())
-            {
-                PS->DisplayName = Name;
-                PS->Faction = Faction;
-            }
-
             PC->SetInputMode(FInputModeGameOnly());
             PC->bShowMouseCursor = false;
             PC->bEnableClickEvents = false;
