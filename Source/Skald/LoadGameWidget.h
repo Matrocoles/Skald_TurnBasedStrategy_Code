@@ -4,6 +4,7 @@
 #include "Blueprint/UserWidget.h"
 #include "LoadGameWidget.generated.h"
 
+class UButton;
 class ULobbyMenuWidget;
 /**
  * Simple load game menu listing a few save slots.
@@ -15,6 +16,18 @@ class SKALD_API ULoadGameWidget : public UUserWidget
 
 protected:
     virtual void NativeConstruct() override;
+
+    UPROPERTY(meta=(BindWidget))
+    UButton* Slot0Button;
+
+    UPROPERTY(meta=(BindWidget))
+    UButton* Slot1Button;
+
+    UPROPERTY(meta=(BindWidget))
+    UButton* Slot2Button;
+
+    UPROPERTY(meta=(BindWidget))
+    UButton* MainMenuButton;
 
     UFUNCTION(BlueprintCallable)
     void OnLoadSlot0();
