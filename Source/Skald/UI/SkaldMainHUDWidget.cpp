@@ -13,6 +13,7 @@
 #include "Skald_TurnManager.h"
 #include "Territory.h"
 #include "UI/ConfirmAttackWidget.h"
+#include "UI/DeployWidget.h"
 #include "WorldMap.h"
 
 void USkaldMainHUDWidget::NativeConstruct() {
@@ -438,45 +439,23 @@ void USkaldMainHUDWidget::HandleDeployClicked() {
   }
 
   ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>();
-  if (!PS || PS->ArmyPool <= 0 || SelectedSourceID == -1) {
+  if (!PS || PS->ArmyPool <= 0 || SelectedSourceID == -1 || !DeployWidgetClass) {
     return;
   }
 
+  ATerritory *Territory = nullptr;
   if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
           GetWorld(), AWorldMap::StaticClass()))) {
-    if (ATerritory *Terr = WorldMap->GetTerritoryById(SelectedSourceID)) {
-      if (Terr->OwningPlayer == PS) {
-        ++Terr->ArmyStrength;
-        Terr->RefreshAppearance();
-        --PS->ArmyPool;
-        PS->ForceNetUpdate();
+    Territory = WorldMap->GetTerritoryById(SelectedSourceID);
+  }
 
-        if (ASkaldPlayerController *SKPC = Cast<ASkaldPlayerController>(PC)) {
-          if (ATurnManager *TM = SKPC->GetTurnManager()) {
-            TM->BroadcastArmyPool(PS);
-          }
-        }
+  if (!Territory || Territory->OwningPlayer != PS) {
+    return;
+  }
 
-        if (PS->ArmyPool <= 0 && DeployButton) {
-          DeployButton->SetVisibility(ESlateVisibility::Collapsed);
-          bool bHandled = false;
-          if (ASkaldGameMode *GM =
-                  GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
-            if (!GM->HasMatchStarted()) {
-              GM->AdvanceArmyPlacement();
-              bHandled = true;
-            }
-          }
-          if (!bHandled) {
-            if (ASkaldPlayerController *SKPC =
-                    Cast<ASkaldPlayerController>(PC)) {
-              if (ATurnManager *TM = SKPC->GetTurnManager()) {
-                TM->AdvancePhase();
-              }
-            }
-          }
-        }
-      }
-    }
+  ActiveDeployWidget = CreateWidget<UDeployWidget>(GetWorld(), DeployWidgetClass);
+  if (ActiveDeployWidget) {
+    ActiveDeployWidget->Setup(Territory, PS, this, PS->ArmyPool);
+    ActiveDeployWidget->AddToViewport();
   }
 }

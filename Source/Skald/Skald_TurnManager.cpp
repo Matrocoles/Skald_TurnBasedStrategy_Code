@@ -42,7 +42,7 @@ void ATurnManager::StartTurns() {
         }
       }
       const int32 Reinforcements = FMath::CeilToInt(Owned / 3.0f);
-      PS->ArmyPool += Reinforcements;
+      PS->ArmyPool = Reinforcements;
       PS->ForceNetUpdate();
       BroadcastArmyPool(PS);
     }
@@ -86,7 +86,7 @@ void ATurnManager::AdvanceTurn() {
       }
     }
     const int32 Reinforcements = FMath::CeilToInt(Owned / 3.0f);
-    PS->ArmyPool += Reinforcements;
+    PS->ArmyPool = Reinforcements;
     PS->ForceNetUpdate();
     BroadcastArmyPool(PS);
   }
