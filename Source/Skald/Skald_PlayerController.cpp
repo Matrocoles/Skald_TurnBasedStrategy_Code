@@ -104,7 +104,17 @@ void ASkaldPlayerController::BeginPlay() {
 }
 
 void ASkaldPlayerController::SetTurnManager(ATurnManager *Manager) {
+  if (TurnManager) {
+    TurnManager->OnWorldStateChanged.RemoveDynamic(
+        this, &ASkaldPlayerController::HandleWorldStateChanged);
+  }
+
   TurnManager = Manager;
+
+  if (TurnManager) {
+    TurnManager->OnWorldStateChanged.AddDynamic(
+        this, &ASkaldPlayerController::HandleWorldStateChanged);
+  }
 }
 
 void ASkaldPlayerController::ShowTurnAnnouncement(const FString &PlayerName,
@@ -517,4 +527,47 @@ void ASkaldPlayerController::HandlePlayersUpdated() {
 
 void ASkaldPlayerController::HandleFactionsUpdated() {
   UE_LOG(LogSkald, Log, TEXT("GameInstance factions updated."));
+}
+
+void ASkaldPlayerController::HandleWorldStateChanged() {
+  if (!MainHudWidget) {
+    return;
+  }
+
+  // Update territory info for the currently selected territory if available.
+  if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+          GetWorld(), AWorldMap::StaticClass()))) {
+    if (ATerritory *Terr = WorldMap->SelectedTerritory) {
+      FString OwnerName = Terr->OwningPlayer
+                               ? Terr->OwningPlayer->DisplayName
+                               : TEXT("Neutral");
+      MainHudWidget->UpdateTerritoryInfo(Terr->TerritoryName, OwnerName,
+                                         Terr->ArmyStrength);
+    }
+  }
+
+  // Refresh player list from the game state.
+  if (CachedGameState) {
+    TArray<FS_PlayerData> Players;
+    for (APlayerState *PSBase : CachedGameState->PlayerArray) {
+      if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
+        FS_PlayerData Data;
+        Data.PlayerID = PS->GetPlayerId();
+        Data.PlayerName = PS->DisplayName;
+        Data.IsAI = PS->bIsAI;
+        Data.Faction = PS->Faction;
+        Data.IsEliminated = PS->IsEliminated;
+        Players.Add(Data);
+      }
+    }
+    MainHudWidget->RefreshPlayerList(Players);
+  }
+
+  // Update deploy/phase banners.
+  if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+    MainHudWidget->UpdateDeployableUnits(PS->ArmyPool);
+  }
+  if (TurnManager) {
+    MainHudWidget->UpdatePhaseBanner(TurnManager->GetCurrentPhase());
+  }
 }

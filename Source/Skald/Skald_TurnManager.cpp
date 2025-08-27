@@ -77,6 +77,8 @@ void ATurnManager::StartTurns() {
       }
     }
   }
+
+  OnWorldStateChanged.Broadcast();
 }
 
 void ATurnManager::AdvanceTurn() {
@@ -145,6 +147,8 @@ void ATurnManager::AdvanceTurn() {
       GM->CheckVictoryConditions();
     }
   }
+
+  OnWorldStateChanged.Broadcast();
 }
 
 void ATurnManager::SortControllersByInitiative() {
@@ -223,6 +227,8 @@ void ATurnManager::ResolveGridBattleResult() {
           GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
     GM->CheckVictoryConditions();
   }
+
+  OnWorldStateChanged.Broadcast();
 }
 
 void ATurnManager::BeginAttackPhase() {
@@ -236,6 +242,8 @@ void ATurnManager::BeginAttackPhase() {
       }
     }
   }
+
+  OnWorldStateChanged.Broadcast();
 }
 
 void ATurnManager::AdvancePhase() {
@@ -259,6 +267,8 @@ void ATurnManager::AdvancePhase() {
       }
     }
   }
+
+  OnWorldStateChanged.Broadcast();
 }
 
 void ATurnManager::BroadcastArmyPool(ASkaldPlayerState *ForPlayer) {
@@ -272,4 +282,6 @@ void ATurnManager::BroadcastArmyPool(ASkaldPlayerState *ForPlayer) {
       }
     }
   }
+
+  OnWorldStateChanged.Broadcast();
 }
