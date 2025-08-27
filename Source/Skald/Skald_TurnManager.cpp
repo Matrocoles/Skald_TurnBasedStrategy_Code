@@ -1,5 +1,7 @@
 #include "Skald_TurnManager.h"
+#include "Engine/Engine.h"
 #include "Kismet/GameplayStatics.h"
+#include "Skald.h"
 #include "Skald_GameInstance.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
@@ -50,51 +52,103 @@ void ATurnManager::RegisterController(ASkaldPlayerController *Controller) {
 void ATurnManager::StartTurns() {
   SortControllersByInitiative();
   CurrentIndex = 0;
-  if (Controllers.IsValidIndex(CurrentIndex)) {
-    if (ASkaldPlayerController *CurrentController = Controllers[CurrentIndex].Get()) {
-      ASkaldPlayerState *PS =
-          CurrentController->GetPlayerState<ASkaldPlayerState>();
-      const FString PlayerName = PS ? PS->DisplayName : TEXT("Unknown");
+  if (Controllers.Num() == 0) {
+    UE_LOG(LogSkald, Error, TEXT("StartTurns failed: no controllers registered"));
+    if (GEngine) {
+      GEngine->AddOnScreenDebugMessage(
+          -1, 5.f, FColor::Red,
+          TEXT("StartTurns failed: no players"));
+    }
+    return;
+  }
 
-      // Determine reinforcements and resources based on owned territories.
-      if (PS) {
-        int32 Owned = 0;
-        int32 ResourceGain = 0;
-        if (AWorldMap *WorldMap =
-                Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
-                    GetWorld(), AWorldMap::StaticClass()))) {
-          for (ATerritory *Terr : WorldMap->Territories) {
-            if (Terr && Terr->OwningPlayer == PS) {
-              ++Owned;
-              ResourceGain += Terr->Resources;
-            }
+  if (!Controllers.IsValidIndex(CurrentIndex) ||
+      !Controllers[CurrentIndex].IsValid()) {
+    UE_LOG(LogSkald, Error,
+           TEXT("StartTurns failed: invalid starting controller"));
+    if (GEngine) {
+      GEngine->AddOnScreenDebugMessage(
+          -1, 5.f, FColor::Red,
+          TEXT("StartTurns: invalid starting controller"));
+    }
+    return;
+  }
+
+  ASkaldPlayerController *CurrentController = Controllers[CurrentIndex].Get();
+  ASkaldPlayerState *PS = CurrentController
+                              ? CurrentController->GetPlayerState<ASkaldPlayerState>()
+                              : nullptr;
+  const FString PlayerName = PS ? PS->DisplayName : TEXT("Unknown");
+
+  // Determine reinforcements and resources based on owned territories.
+  if (PS) {
+    int32 Owned = 0;
+    int32 ResourceGain = 0;
+    if (AWorldMap *WorldMap =
+            Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+                GetWorld(), AWorldMap::StaticClass()))) {
+      if (WorldMap->Territories.Num() == 0) {
+        UE_LOG(LogSkald, Error,
+               TEXT("StartTurns: WorldMap %s has no territories"),
+               *WorldMap->GetName());
+        if (GEngine) {
+          GEngine->AddOnScreenDebugMessage(
+              -1, 5.f, FColor::Red,
+              FString::Printf(TEXT("StartTurns: %s has no territories"),
+                              *WorldMap->GetName()));
+        }
+      } else {
+        for (ATerritory *Terr : WorldMap->Territories) {
+          if (Terr && Terr->OwningPlayer == PS) {
+            ++Owned;
+            ResourceGain += Terr->Resources;
           }
         }
-        const int32 Reinforcements = FMath::CeilToInt(Owned / 3.0f);
-        PS->ArmyPool = Reinforcements;
-        PS->Resources += ResourceGain;
-        PS->ForceNetUpdate();
-        BroadcastArmyPool(PS);
-        BroadcastResources(PS);
       }
+    } else {
+      UE_LOG(LogSkald, Error, TEXT("StartTurns: WorldMap actor missing"));
+      if (GEngine) {
+        GEngine->AddOnScreenDebugMessage(
+            -1, 5.f, FColor::Red,
+            TEXT("StartTurns: WorldMap missing"));
+      }
+    }
+    const int32 Reinforcements = FMath::CeilToInt(Owned / 3.0f);
+    PS->ArmyPool = Reinforcements;
+    PS->Resources += ResourceGain;
+    PS->ForceNetUpdate();
+    BroadcastArmyPool(PS);
+    BroadcastResources(PS);
+  }
 
-      CurrentPhase = ETurnPhase::Reinforcement;
-      for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr : Controllers) {
-        if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
-          const bool bIsActive = Controller == CurrentController;
-          Controller->ShowTurnAnnouncement(PlayerName, bIsActive);
-          if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
-            HUD->UpdateTurnBanner(PS ? PS->GetPlayerId() : -1, 1);
-            HUD->UpdatePhaseBanner(CurrentPhase);
-          }
+  CurrentPhase = ETurnPhase::Reinforcement;
+  for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr :
+       Controllers) {
+    if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
+      const bool bIsActive = Controller == CurrentController;
+      Controller->ShowTurnAnnouncement(PlayerName, bIsActive);
+      if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
+        HUD->UpdateTurnBanner(PS ? PS->GetPlayerId() : -1, 1);
+        HUD->UpdatePhaseBanner(CurrentPhase);
+      } else {
+        UE_LOG(LogSkald, Warning,
+               TEXT("StartTurns: Controller %s missing HUD widget"),
+               *Controller->GetName());
+        if (GEngine) {
+          GEngine->AddOnScreenDebugMessage(
+              -1, 5.f, FColor::Yellow,
+              FString::Printf(TEXT("StartTurns: no HUD for %s"),
+                              *Controller->GetName()));
         }
       }
+    }
+  }
 
-      CurrentController->StartTurn();
-      if (ASkaldGameMode *GM =
-              GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
-        GM->CheckVictoryConditions();
-      }
+  if (CurrentController) {
+    CurrentController->StartTurn();
+    if (ASkaldGameMode *GM =
+            GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
+      GM->CheckVictoryConditions();
     }
   }
 

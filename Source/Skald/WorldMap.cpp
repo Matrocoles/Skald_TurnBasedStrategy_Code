@@ -3,8 +3,10 @@
 #include "Containers/Queue.h"
 #include "Containers/Set.h"
 #include <float.h>
+#include "Components/StaticMeshComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "Skald.h"
 #include "Skald_GameMode.h"
 #include "Territory.h"
 
@@ -16,28 +18,59 @@ AWorldMap::AWorldMap() {
 void AWorldMap::BeginPlay() {
   Super::BeginPlay();
 
-  if (!TerritoryClass || !TerritoryTable) {
-    UE_LOG(LogTemp, Error,
-           TEXT("WorldMap requires valid TerritoryClass and TerritoryTable."));
-
+  if (!TerritoryClass) {
+    UE_LOG(LogSkald, Error, TEXT("WorldMap %s missing TerritoryClass"),
+           *GetName());
     if (GEngine) {
       GEngine->AddOnScreenDebugMessage(
           -1, 5.f, FColor::Red,
-          TEXT("World map failed to initialize: missing assets."));
+          FString::Printf(TEXT("WorldMap %s has no TerritoryClass"),
+                          *GetName()));
+    }
+    return;
+  }
+
+  if (!TerritoryTable) {
+    UE_LOG(LogSkald, Error, TEXT("WorldMap %s missing TerritoryTable"),
+           *GetName());
+    if (GEngine) {
+      GEngine->AddOnScreenDebugMessage(
+          -1, 5.f, FColor::Red,
+          FString::Printf(TEXT("WorldMap %s missing TerritoryTable"),
+                          *GetName()));
     }
 
-    if (TerritoryClass && !TerritoryTable) {
-      FActorSpawnParameters Params;
-      Params.Owner = this;
-      ATerritory *Placeholder = GetWorld()->SpawnActor<ATerritory>(
-          TerritoryClass, GetActorLocation(), FRotator::ZeroRotator, Params);
-      if (Placeholder) {
-        Placeholder->TerritoryID = -1;
-        Placeholder->TerritoryName = TEXT("Placeholder Territory");
-        RegisterTerritory(Placeholder);
-      }
+    FActorSpawnParameters Params;
+    Params.Owner = this;
+    ATerritory *Placeholder = GetWorld()->SpawnActor<ATerritory>(
+        TerritoryClass, GetActorLocation(), FRotator::ZeroRotator, Params);
+    if (Placeholder) {
+      Placeholder->TerritoryID = -1;
+      Placeholder->TerritoryName = TEXT("Placeholder Territory");
+      RegisterTerritory(Placeholder);
     }
 
+    return;
+  }
+
+  ATerritory *DefaultTerritory = TerritoryClass->GetDefaultObject<ATerritory>();
+  UStaticMeshComponent *MeshComp =
+      DefaultTerritory
+          ? DefaultTerritory->FindComponentByClass<UStaticMeshComponent>()
+          : nullptr;
+  if (!MeshComp || !MeshComp->GetStaticMesh() ||
+      MeshComp->GetNumMaterials() == 0) {
+    const FString MissingAsset =
+        (!MeshComp || !MeshComp->GetStaticMesh()) ? TEXT("mesh") : TEXT("material");
+    UE_LOG(LogSkald, Error,
+           TEXT("WorldMap %s TerritoryClass %s missing %s"), *GetName(),
+           *TerritoryClass->GetName(), *MissingAsset);
+    if (GEngine) {
+      GEngine->AddOnScreenDebugMessage(
+          -1, 5.f, FColor::Red,
+          FString::Printf(TEXT("%s missing %s"),
+                          *TerritoryClass->GetName(), *MissingAsset));
+    }
     return;
   }
 
