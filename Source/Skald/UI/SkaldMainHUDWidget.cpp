@@ -360,6 +360,7 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
     if (SelectedSourceID == -1) {
       if (bOwnedByLocal) {
         SelectedSourceID = Territory->TerritoryID;
+        Territory->Select();
 
         if (AWorldMap *WorldMap =
                 Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
@@ -399,7 +400,7 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
       }
       if (bOwnedByLocal && Territory->ArmyStrength > 0) {
         SelectedSourceID = Territory->TerritoryID;
-        Territory->Select(true);
+        Territory->Select();
         if (SelectionPrompt) {
           SelectionPrompt->SetText(
               FText::FromString(TEXT("Choose enemy territory.")));
