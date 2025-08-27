@@ -1,5 +1,61 @@
 #include "GridBattleManager.h"
 
+namespace
+{
+    /** Compute Manhattan distance between two positions. */
+    int32 Distance(const FIntPoint& A, const FIntPoint& B)
+    {
+        return FMath::Abs(A.X - B.X) + FMath::Abs(A.Y - B.Y);
+    }
+
+    /** Move a fighter towards a target up to their movement allowance. */
+    void MoveTowards(FFighter& Mover, const FFighter& Target)
+    {
+        int32 Required = Distance(Mover.Position, Target.Position) - Mover.Stats.AttackRange;
+        if (Required <= 0)
+        {
+            return;
+        }
+
+        int32 Steps = FMath::Min(Mover.Stats.Movement, Required);
+
+        if (Mover.Position.X < Target.Position.X)
+        {
+            int32 StepX = FMath::Min(Steps, Target.Position.X - Mover.Position.X);
+            Mover.Position.X += StepX;
+            Steps -= StepX;
+        }
+        else if (Mover.Position.X > Target.Position.X)
+        {
+            int32 StepX = FMath::Min(Steps, Mover.Position.X - Target.Position.X);
+            Mover.Position.X -= StepX;
+            Steps -= StepX;
+        }
+
+        if (Steps > 0)
+        {
+            if (Mover.Position.Y < Target.Position.Y)
+            {
+                int32 StepY = FMath::Min(Steps, Target.Position.Y - Mover.Position.Y);
+                Mover.Position.Y += StepY;
+            }
+            else if (Mover.Position.Y > Target.Position.Y)
+            {
+                int32 StepY = FMath::Min(Steps, Mover.Position.Y - Target.Position.Y);
+                Mover.Position.Y -= StepY;
+            }
+        }
+
+        Mover.Position.X = FMath::Clamp(Mover.Position.X, 0, UGridBattleManager::GridSize - 1);
+        Mover.Position.Y = FMath::Clamp(Mover.Position.Y, 0, UGridBattleManager::GridSize - 1);
+    }
+
+    bool IsInRange(const FFighter& Attacker, const FFighter& Defender)
+    {
+        return Distance(Attacker.Position, Defender.Position) <= Attacker.Stats.AttackRange;
+    }
+}
+
 void UGridBattleManager::InitBattle(const TArray<FFighter>& Attackers, const TArray<FFighter>& Defenders)
 {
     AttackerTeam = Attackers;
@@ -10,6 +66,83 @@ void UGridBattleManager::InitBattle(const TArray<FFighter>& Attackers, const TAr
 int32 UGridBattleManager::RollInitiative()
 {
     return FMath::RandRange(1, 6);
+}
+
+void UGridBattleManager::StartBattle()
+{
+    bool bAttackerTurn = RollInitiative() >= RollInitiative();
+
+    while (GetAttackerSurvivors() > 0 && GetDefenderSurvivors() > 0)
+    {
+        TArray<FFighter>& ActingTeam = bAttackerTurn ? AttackerTeam : DefenderTeam;
+        TArray<FFighter>& TargetTeam = bAttackerTurn ? DefenderTeam : AttackerTeam;
+
+        for (FFighter& Fighter : ActingTeam)
+        {
+            if (Fighter.Stats.Health <= 0)
+            {
+                continue;
+            }
+
+            FFighter* Target = nullptr;
+            for (FFighter& Candidate : TargetTeam)
+            {
+                if (Candidate.Stats.Health > 0)
+                {
+                    Target = &Candidate;
+                    break;
+                }
+            }
+            if (!Target)
+            {
+                break;
+            }
+
+            MoveTowards(Fighter, *Target);
+            if (IsInRange(Fighter, *Target))
+            {
+                int32 Damage = 0;
+                ResolveAttack(Fighter, *Target, Damage);
+            }
+
+            if (GetAttackerSurvivors() <= 0 || GetDefenderSurvivors() <= 0)
+            {
+                break;
+            }
+        }
+
+        bAttackerTurn = !bAttackerTurn;
+        ++CurrentRound;
+    }
+
+    ESkaldFaction Winner = ESkaldFaction::None;
+    if (GetAttackerSurvivors() > 0 && GetDefenderSurvivors() <= 0)
+    {
+        Winner = AttackerTeam.Num() > 0 ? AttackerTeam[0].Faction : ESkaldFaction::None;
+    }
+    else if (GetDefenderSurvivors() > 0 && GetAttackerSurvivors() <= 0)
+    {
+        Winner = DefenderTeam.Num() > 0 ? DefenderTeam[0].Faction : ESkaldFaction::None;
+    }
+
+    int32 AttackerCasualties = 0;
+    for (const FFighter& Fighter : AttackerTeam)
+    {
+        if (Fighter.Stats.Health <= 0)
+        {
+            ++AttackerCasualties;
+        }
+    }
+    int32 DefenderCasualties = 0;
+    for (const FFighter& Fighter : DefenderTeam)
+    {
+        if (Fighter.Stats.Health <= 0)
+        {
+            ++DefenderCasualties;
+        }
+    }
+
+    OnBattleEnded.Broadcast(Winner, AttackerCasualties, DefenderCasualties);
 }
 
 bool UGridBattleManager::ResolveAttack(FFighter& Attacker, FFighter& Defender, int32& OutDamage)
