@@ -290,6 +290,81 @@ void ASkaldPlayerController::HandleMoveRequested(int32 FromID, int32 ToID,
                                                  int32 Troops) {
   UE_LOG(LogSkald, Log, TEXT("HUD move from %d to %d with %d"), FromID, ToID,
          Troops);
+
+  AWorldMap *WorldMap = Cast<AWorldMap>(
+      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
+  if (!WorldMap) {
+    return;
+  }
+
+  ATerritory *Source = WorldMap->GetTerritoryById(FromID);
+  ATerritory *Target = WorldMap->GetTerritoryById(ToID);
+  if (!Source || !Target) {
+    return;
+  }
+
+  if (!Source->IsAdjacentTo(Target)) {
+    return;
+  }
+
+  if (Troops <= 0 || Troops >= Source->ArmyStrength) {
+    return;
+  }
+
+  ServerHandleMove(FromID, ToID, Troops);
+}
+
+void ASkaldPlayerController::ServerHandleMove_Implementation(int32 FromID,
+                                                             int32 ToID,
+                                                             int32 Troops) {
+  AWorldMap *WorldMap = Cast<AWorldMap>(
+      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
+  if (!WorldMap) {
+    return;
+  }
+
+  ATerritory *Source = WorldMap->GetTerritoryById(FromID);
+  ATerritory *Target = WorldMap->GetTerritoryById(ToID);
+  if (!Source || !Target || !Source->IsAdjacentTo(Target)) {
+    return;
+  }
+
+  if (Troops <= 0 || Troops >= Source->ArmyStrength) {
+    return;
+  }
+
+  if (!WorldMap->MoveBetween(Source, Target)) {
+    return;
+  }
+
+  Source->ArmyStrength -= Troops;
+  Target->ArmyStrength += Troops;
+
+  Source->RefreshAppearance();
+  Target->RefreshAppearance();
+
+  Source->ForceNetUpdate();
+  Target->ForceNetUpdate();
+
+  if (TurnManager) {
+    for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr :
+         TurnManager->GetControllers()) {
+      if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
+        if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
+          FString SourceOwner = Source->OwningPlayer
+                                   ? Source->OwningPlayer->DisplayName
+                                   : TEXT("Neutral");
+          HUD->UpdateTerritoryInfo(Source->TerritoryName, SourceOwner,
+                                   Source->ArmyStrength);
+          FString TargetOwner = Target->OwningPlayer
+                                   ? Target->OwningPlayer->DisplayName
+                                   : TEXT("Neutral");
+          HUD->UpdateTerritoryInfo(Target->TerritoryName, TargetOwner,
+                                   Target->ArmyStrength);
+        }
+      }
+    }
+  }
 }
 
 void ASkaldPlayerController::HandleEndAttackRequested(bool bConfirmed) {
