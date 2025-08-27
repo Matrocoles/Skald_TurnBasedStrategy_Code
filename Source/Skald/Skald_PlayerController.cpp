@@ -413,7 +413,8 @@ void ASkaldPlayerController::HandleMoveRequested(int32 FromID, int32 ToID,
     return;
   }
 
-  if (!Source->IsAdjacentTo(Target)) {
+  TArray<ATerritory *> Path;
+  if (!WorldMap->FindPath(Source, Target, Path)) {
     return;
   }
 
@@ -435,7 +436,7 @@ void ASkaldPlayerController::ServerHandleMove_Implementation(int32 FromID,
 
   ATerritory *Source = WorldMap->GetTerritoryById(FromID);
   ATerritory *Target = WorldMap->GetTerritoryById(ToID);
-  if (!Source || !Target || !Source->IsAdjacentTo(Target)) {
+  if (!Source || !Target) {
     return;
   }
 
