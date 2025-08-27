@@ -35,6 +35,10 @@ public:
     UFUNCTION(BlueprintCallable, Category="Turn")
     void BeginAttackPhase();
 
+    /** Move to the next phase in the turn sequence. */
+    UFUNCTION(BlueprintCallable, Category="Turn")
+    void AdvancePhase();
+
     /** Update all players' HUDs with the specified player's army pool. */
     UFUNCTION(BlueprintCallable, Category="Turn")
     void BroadcastArmyPool(class ASkaldPlayerState* ForPlayer);

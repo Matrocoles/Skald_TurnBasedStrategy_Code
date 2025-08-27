@@ -53,6 +53,7 @@ void ATurnManager::StartTurns() {
         const bool bIsActive = Controller == CurrentController;
         Controller->ShowTurnAnnouncement(PlayerName, bIsActive);
         if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
+          HUD->UpdateTurnBanner(PS ? PS->GetPlayerId() : -1, 1);
           HUD->UpdatePhaseBanner(CurrentPhase);
         }
       }
@@ -96,6 +97,7 @@ void ATurnManager::AdvanceTurn() {
       const bool bIsActive = Controller == CurrentController;
       Controller->ShowTurnAnnouncement(PlayerName, bIsActive);
       if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
+        HUD->UpdateTurnBanner(PS ? PS->GetPlayerId() : -1, 1);
         HUD->UpdatePhaseBanner(CurrentPhase);
       }
     }
@@ -129,6 +131,29 @@ void ATurnManager::BeginAttackPhase() {
     if (Controller) {
       if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
         HUD->UpdatePhaseBanner(ETurnPhase::Attack);
+      }
+    }
+  }
+}
+
+void ATurnManager::AdvancePhase() {
+  if (CurrentPhase == ETurnPhase::Reinforcement) {
+    BeginAttackPhase();
+    return;
+  }
+
+  if (CurrentPhase == ETurnPhase::Attack) {
+    CurrentPhase = ETurnPhase::Movement;
+  } else if (CurrentPhase == ETurnPhase::Movement) {
+    CurrentPhase = ETurnPhase::EndTurn;
+  } else {
+    return;
+  }
+
+  for (ASkaldPlayerController *Controller : Controllers) {
+    if (Controller) {
+      if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
+        HUD->UpdatePhaseBanner(CurrentPhase);
       }
     }
   }

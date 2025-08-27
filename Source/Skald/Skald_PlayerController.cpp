@@ -109,6 +109,12 @@ void ASkaldPlayerController::EndTurn() {
   }
 }
 
+void ASkaldPlayerController::EndPhase() {
+  if (TurnManager) {
+    TurnManager->AdvancePhase();
+  }
+}
+
 void ASkaldPlayerController::MakeAIDecision() {
   UE_LOG(LogTemp, Log, TEXT("AI %s making decision"), *GetName());
 }

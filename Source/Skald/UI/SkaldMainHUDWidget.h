@@ -212,6 +212,10 @@ public:
 
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
             meta = (BindWidgetOptional))
+  UButton *EndPhaseButton;
+
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
+            meta = (BindWidgetOptional))
   UButton *DeployButton;
 
   // Container where RebuildPlayerList will spawn entries
@@ -238,6 +242,9 @@ protected:
   // Internal handlers for widget actions
   UFUNCTION()
   void HandleEndTurnClicked();
+
+  UFUNCTION()
+  void HandleEndPhaseClicked();
 
   UFUNCTION()
   void HandleDeployClicked();
