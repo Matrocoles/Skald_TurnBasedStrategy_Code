@@ -187,6 +187,103 @@ void ASkaldPlayerController::HandleAttackRequested(int32 FromID, int32 ToID,
                                                    int32 ArmySent) {
   UE_LOG(LogSkald, Log, TEXT("HUD attack from %d to %d with %d"), FromID, ToID,
         ArmySent);
+
+  AWorldMap *WorldMap = Cast<AWorldMap>(
+      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
+  if (!WorldMap) {
+    return;
+  }
+
+  ATerritory *Source = WorldMap->GetTerritoryById(FromID);
+  ATerritory *Target = WorldMap->GetTerritoryById(ToID);
+  if (!Source || !Target) {
+    return;
+  }
+
+  if (!Source->IsAdjacentTo(Target)) {
+    return;
+  }
+
+  if (ArmySent <= 0 || ArmySent >= Source->ArmyStrength) {
+    return;
+  }
+
+  ServerHandleAttack(FromID, ToID, ArmySent);
+}
+
+void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
+                                                               int32 ToID,
+                                                               int32 ArmySent) {
+  AWorldMap *WorldMap = Cast<AWorldMap>(
+      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
+  if (!WorldMap) {
+    return;
+  }
+
+  ATerritory *Source = WorldMap->GetTerritoryById(FromID);
+  ATerritory *Target = WorldMap->GetTerritoryById(ToID);
+  if (!Source || !Target || !Source->IsAdjacentTo(Target)) {
+    return;
+  }
+
+  if (ArmySent <= 0 || ArmySent >= Source->ArmyStrength) {
+    return;
+  }
+
+  ASkaldPlayerState *AttackerPS = Source->OwningPlayer;
+  ASkaldPlayerState *DefenderPS = Target->OwningPlayer;
+
+  if (TurnManager) {
+    FS_BattlePayload Battle;
+    Battle.AttackerPlayerID = AttackerPS ? AttackerPS->GetPlayerId() : -1;
+    Battle.DefenderPlayerID = DefenderPS ? DefenderPS->GetPlayerId() : -1;
+    Battle.FromTerritoryID = FromID;
+    Battle.TargetTerritoryID = ToID;
+    Battle.ArmyCountSent = ArmySent;
+    Battle.IsCapitalAttack = Target->bIsCapital;
+    TurnManager->TriggerGridBattle(Battle);
+    return;
+  }
+
+  int32 AttackingForces = ArmySent;
+  int32 DefendingForces = Target->ArmyStrength;
+
+  Source->ArmyStrength -= ArmySent;
+
+  while (AttackingForces > 0 && DefendingForces > 0) {
+    const int32 AttackRoll = FMath::RandRange(1, 6);
+    const int32 DefendRoll = FMath::RandRange(1, 6);
+    if (AttackRoll > DefendRoll) {
+      --DefendingForces;
+    } else {
+      --AttackingForces;
+    }
+  }
+
+  if (DefendingForces <= 0) {
+    Target->OwningPlayer = AttackerPS;
+    Target->ArmyStrength = AttackingForces;
+  } else {
+    Target->ArmyStrength = DefendingForces;
+  }
+
+  Source->RefreshAppearance();
+  Target->RefreshAppearance();
+
+  if (TurnManager) {
+    for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr :
+         TurnManager->GetControllers()) {
+      if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
+        if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
+          FString OwnerName = Target->OwningPlayer
+                                  ? Target->OwningPlayer->DisplayName
+                                  : TEXT("Neutral");
+          HUD->UpdateTerritoryInfo(Target->TerritoryName, OwnerName,
+                                   Target->ArmyStrength);
+        }
+      }
+    }
+  }
 }
 
 void ASkaldPlayerController::HandleMoveRequested(int32 FromID, int32 ToID,
