@@ -2,10 +2,11 @@
 #include "Skald.h"
 #include "Components/Button.h"
 #include "Kismet/GameplayStatics.h"
-#include "GameFramework/SaveGame.h"
 #include "LobbyMenuWidget.h"
 #include "SlotNameConstants.h"
 #include "GameFramework/PlayerController.h"
+#include "SkaldSaveGame.h"
+#include "Skald_GameInstance.h"
 
 void ULoadGameWidget::NativeConstruct()
 {
@@ -61,9 +62,14 @@ void ULoadGameWidget::OnMainMenu()
 
 void ULoadGameWidget::HandleLoadSlot(int32 SlotIndex)
 {
-    USaveGame* LoadedGame = UGameplayStatics::LoadGameFromSlot(SlotNames[SlotIndex], 0);
+    USkaldSaveGame* LoadedGame = Cast<USkaldSaveGame>(UGameplayStatics::LoadGameFromSlot(SlotNames[SlotIndex], 0));
     if (LoadedGame)
     {
+        if (USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>())
+        {
+            GI->LoadedSaveGame = LoadedGame;
+        }
+
         if (APlayerController* PC = GetOwningPlayer())
         {
             PC->SetInputMode(FInputModeGameOnly());
