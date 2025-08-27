@@ -119,7 +119,6 @@ void ASkaldPlayerController::ShowTurnAnnouncement(const FString &PlayerName,
 void ASkaldPlayerController::StartTurn() {
   if (bIsAI) {
     MakeAIDecision();
-    EndTurn();
   } else {
     FInputModeGameAndUI InputMode;
     SetInputMode(InputMode);
@@ -141,7 +140,44 @@ void ASkaldPlayerController::EndPhase() {
 }
 
 void ASkaldPlayerController::MakeAIDecision() {
-  UE_LOG(LogTemp, Log, TEXT("AI %s making decision"), *GetName());
+  if (!TurnManager) {
+    EndTurn();
+    return;
+  }
+
+  ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
+  if (!PS) {
+    EndTurn();
+    return;
+  }
+
+  const ETurnPhase Phase = TurnManager->GetCurrentPhase();
+  // Auto deploy troops during reinforcement.
+  if (Phase == ETurnPhase::Reinforcement) {
+    if (AWorldMap *WorldMap = Cast<AWorldMap>(
+            UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()))) {
+      TArray<ATerritory *> OwnedTerritories;
+      for (ATerritory *Territory : WorldMap->Territories) {
+        if (Territory && Territory->OwningPlayer == PS) {
+          OwnedTerritories.Add(Territory);
+        }
+      }
+
+      int32 SpreadIndex = 0;
+      while (PS->ArmyPool > 0 && OwnedTerritories.Num() > 0) {
+        ATerritory *TargetTerritory =
+            OwnedTerritories[SpreadIndex % OwnedTerritories.Num()];
+        ++TargetTerritory->ArmyStrength;
+        TargetTerritory->RefreshAppearance();
+        --PS->ArmyPool;
+        ++SpreadIndex;
+      }
+      PS->ForceNetUpdate();
+      TurnManager->BroadcastArmyPool(PS);
+    }
+  }
+
+  EndTurn();
 }
 
 bool ASkaldPlayerController::IsAIController() const { return bIsAI; }
