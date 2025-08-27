@@ -1,5 +1,5 @@
 Name,TerritoryID,TerritoryName,bIsCapital,ContinentID,Location,AdjacentTerritoryIDs
-T0,0,Howling Veil,True,0,X=-600.0 Y=-600.0 Z=0.0,1;7
+T0,0,Howling Veil,True,0,X=-600.0 Y=-600.0, Z=0.0,1;7
 T1,1,Thond,False,0,X=-400.0 Y=-600.0 Z=0.0,0;2;8
 T2,2,Elmyre,False,0,X=-200.0 Y=-600.0 Z=0.0,1;3;9
 T3,3,Skarlstorm,False,0,X=0.0 Y=-600.0 Z=0.0,2;4;10
