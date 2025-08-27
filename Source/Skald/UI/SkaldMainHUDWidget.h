@@ -10,6 +10,7 @@ class UTextBlock;
 class UVerticalBox;
 class ATerritory;
 class UConfirmAttackWidget;
+class UDeployWidget;
 class UWidget;
 class ASkaldGameMode;
 class ASkaldGameState;
@@ -251,6 +252,9 @@ public:
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Widgets")
   TSubclassOf<UConfirmAttackWidget> ConfirmAttackWidgetClass;
 
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Widgets")
+  TSubclassOf<UDeployWidget> DeployWidgetClass;
+
 protected:
   // Internal handlers for widget actions
   UFUNCTION()
@@ -267,6 +271,9 @@ protected:
 
   UPROPERTY()
   UConfirmAttackWidget *ActiveConfirmWidget = nullptr;
+
+  UPROPERTY()
+  UDeployWidget *ActiveDeployWidget = nullptr;
 
   UPROPERTY()
   TArray<ATerritory *> HighlightedTerritories;
