@@ -1,10 +1,10 @@
 #include "Skald_TurnManager.h"
+#include "Kismet/GameplayStatics.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
+#include "Territory.h"
 #include "UI/SkaldMainHUDWidget.h"
 #include "WorldMap.h"
-#include "Territory.h"
-#include "Kismet/GameplayStatics.h"
 
 ATurnManager::ATurnManager() {
   PrimaryActorTick.bCanEverTick = false;
@@ -50,7 +50,8 @@ void ATurnManager::StartTurns() {
     CurrentPhase = ETurnPhase::Reinforcement;
     for (ASkaldPlayerController *Controller : Controllers) {
       if (Controller) {
-        Controller->ShowTurnAnnouncement(PlayerName);
+        const bool bIsActive = Controller == CurrentController;
+        Controller->ShowTurnAnnouncement(PlayerName, bIsActive);
         if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
           HUD->UpdatePhaseBanner(CurrentPhase);
         }
@@ -75,9 +76,8 @@ void ATurnManager::AdvanceTurn() {
   // Calculate reinforcements for the new active player.
   if (PS) {
     int32 Owned = 0;
-    if (AWorldMap *WorldMap =
-            Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
-                GetWorld(), AWorldMap::StaticClass()))) {
+    if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+            GetWorld(), AWorldMap::StaticClass()))) {
       for (ATerritory *Terr : WorldMap->Territories) {
         if (Terr && Terr->OwningPlayer == PS) {
           ++Owned;
@@ -93,7 +93,8 @@ void ATurnManager::AdvanceTurn() {
   CurrentPhase = ETurnPhase::Reinforcement;
   for (ASkaldPlayerController *Controller : Controllers) {
     if (Controller) {
-      Controller->ShowTurnAnnouncement(PlayerName);
+      const bool bIsActive = Controller == CurrentController;
+      Controller->ShowTurnAnnouncement(PlayerName, bIsActive);
       if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
         HUD->UpdatePhaseBanner(CurrentPhase);
       }
@@ -106,17 +107,15 @@ void ATurnManager::AdvanceTurn() {
 void ATurnManager::SortControllersByInitiative() {
   Controllers.Sort(
       [](const ASkaldPlayerController &A, const ASkaldPlayerController &B) {
-        const ASkaldPlayerState *PSA =
-            A.GetPlayerState<ASkaldPlayerState>();
-        const ASkaldPlayerState *PSB =
-            B.GetPlayerState<ASkaldPlayerState>();
+        const ASkaldPlayerState *PSA = A.GetPlayerState<ASkaldPlayerState>();
+        const ASkaldPlayerState *PSB = B.GetPlayerState<ASkaldPlayerState>();
         const int32 RollA = PSA ? PSA->InitiativeRoll : 0;
         const int32 RollB = PSB ? PSB->InitiativeRoll : 0;
         return RollA > RollB;
       });
 }
 
-void ATurnManager::TriggerGridBattle(const FS_BattlePayload& Battle) {
+void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
   PendingBattle = Battle;
   // Load a battle map where the grid based combat takes place.
   UGameplayStatics::OpenLevel(this, FName("BattleMap"));

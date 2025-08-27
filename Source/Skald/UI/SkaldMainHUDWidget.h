@@ -2,8 +2,8 @@
 
 #include "Blueprint/UserWidget.h"
 #include "CoreMinimal.h"
-#include "SkaldTypes.h"
 #include "SkaldMainHUDWidget.generated.h"
+#include "SkaldTypes.h"
 
 class UButton;
 class UTextBlock;
@@ -128,6 +128,10 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
   void HideEndingTurn();
 
+  /** Show whose turn it is and toggle the End Turn button. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
+  void ShowTurnMessage(bool bIsMyTurn);
+
   /** Update and display the initiative announcement. */
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
   void UpdateInitiativeText(const FString &Message);
@@ -156,7 +160,7 @@ public:
   void CancelMoveSelection();
 
   UFUNCTION(BlueprintCallable, Category = "Skald|Selection")
-  void OnTerritoryClickedUI(ATerritory* Territory);
+  void OnTerritoryClickedUI(ATerritory *Territory);
 
   // BlueprintImplementableEvent hooks — BP subclass draws UI
   UFUNCTION(BlueprintImplementableEvent, Category = "Skald|HUD")
