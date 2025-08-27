@@ -309,17 +309,17 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
       continue;
     }
 
-    ASkaldPlayerState *Owner = nullptr;
+    ASkaldPlayerState *TerritoryOwner = nullptr;
     if (GS) {
       for (ASkaldPlayerState *PS : GS->Players) {
         if (PS && PS->GetPlayerId() == TerrData.OwnerPlayerID) {
-          Owner = PS;
+          TerritoryOwner = PS;
           break;
         }
       }
     }
 
-    Territory->OwningPlayer = Owner;
+    Territory->OwningPlayer = TerritoryOwner;
     Territory->ArmyStrength = TerrData.ArmyCount;
     Territory->bIsCapital = TerrData.IsCapital;
     Territory->ContinentID = TerrData.ContinentID;

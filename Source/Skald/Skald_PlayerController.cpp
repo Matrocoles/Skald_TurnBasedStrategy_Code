@@ -1,7 +1,7 @@
 #include "Skald_PlayerController.h"
 #include "Blueprint/UserWidget.h"
 #include "Engine/Engine.h"
-#include "HAL/NumericLimits.h"
+#include <limits>
 #include "Kismet/GameplayStatics.h"
 #include "Skald.h"
 #include "SkaldTypes.h"
@@ -265,7 +265,7 @@ void ASkaldPlayerController::MakeAIDecision() {
     if (Phase == ETurnPhase::Attack) {
       ATerritory *BestSource = nullptr;
       ATerritory *BestTarget = nullptr;
-      int32 WeakestStrength = TNumericLimits<int32>::Max();
+      int32 WeakestStrength = std::numeric_limits<int32>::max();
 
       for (ATerritory *Source : WorldMap->Territories) {
         if (!Source || Source->OwningPlayer != PS ||
@@ -306,7 +306,7 @@ void ASkaldPlayerController::MakeAIDecision() {
     if (Phase == ETurnPhase::Movement) {
       ATerritory *BestSource = nullptr;
       ATerritory *BestTarget = nullptr;
-      int32 WeakestStrength = TNumericLimits<int32>::Max();
+      int32 WeakestStrength = std::numeric_limits<int32>::max();
 
       for (ATerritory *Source : WorldMap->Territories) {
         if (!Source || Source->OwningPlayer != PS ||

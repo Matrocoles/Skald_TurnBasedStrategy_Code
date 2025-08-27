@@ -16,6 +16,9 @@ class SKALD_API USkaldGameInstance : public UGameInstance
     GENERATED_BODY()
 
 public:
+    /** Initialize the game instance. */
+    virtual void Init() override;
+
     /** Player chosen display name. */
     UPROPERTY(BlueprintReadWrite, Category="Player")
     FString DisplayName;

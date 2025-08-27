@@ -10,6 +10,11 @@
 #include "LobbyMenuWidget.h"
 #include "Engine/Engine.h"
 
+void UStartGameWidget::SetLobbyMenu(ULobbyMenuWidget* InMenu)
+{
+    OwningLobbyMenu = InMenu;
+}
+
 void UStartGameWidget::NativeConstruct()
 {
     Super::NativeConstruct();
