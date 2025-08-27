@@ -109,5 +109,8 @@ protected:
 
     UPROPERTY(BlueprintReadOnly, Category="Battle")
     int32 CurrentRound = 0;
+
+    UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Battle")
+    int32 MaxRounds = 100;
 };
 
