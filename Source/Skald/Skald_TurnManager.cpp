@@ -54,20 +54,23 @@ void ATurnManager::StartTurns() {
           CurrentController->GetPlayerState<ASkaldPlayerState>();
       const FString PlayerName = PS ? PS->DisplayName : TEXT("Unknown");
 
-      // Determine reinforcements based on owned territories.
+      // Determine reinforcements and resources based on owned territories.
       if (PS) {
         int32 Owned = 0;
+        int32 ResourceGain = 0;
         if (AWorldMap *WorldMap =
                 Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
                     GetWorld(), AWorldMap::StaticClass()))) {
           for (ATerritory *Terr : WorldMap->Territories) {
             if (Terr && Terr->OwningPlayer == PS) {
               ++Owned;
+              ResourceGain += Terr->Resources;
             }
           }
         }
         const int32 Reinforcements = FMath::CeilToInt(Owned / 3.0f);
         PS->ArmyPool = Reinforcements;
+        PS->Resources += ResourceGain;
         PS->ForceNetUpdate();
         BroadcastArmyPool(PS);
         BroadcastResources(PS);
@@ -127,19 +130,22 @@ void ATurnManager::AdvanceTurn() {
         CurrentController->GetPlayerState<ASkaldPlayerState>();
     const FString PlayerName = PS ? PS->DisplayName : TEXT("Unknown");
 
-    // Calculate reinforcements for the new active player.
+    // Calculate reinforcements and resources for the new active player.
     if (PS) {
       int32 Owned = 0;
+      int32 ResourceGain = 0;
       if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
               GetWorld(), AWorldMap::StaticClass()))) {
         for (ATerritory *Terr : WorldMap->Territories) {
           if (Terr && Terr->OwningPlayer == PS) {
             ++Owned;
+            ResourceGain += Terr->Resources;
           }
         }
       }
       const int32 Reinforcements = FMath::CeilToInt(Owned / 3.0f);
       PS->ArmyPool = Reinforcements;
+      PS->Resources += ResourceGain;
       PS->ForceNetUpdate();
       BroadcastArmyPool(PS);
       BroadcastResources(PS);
