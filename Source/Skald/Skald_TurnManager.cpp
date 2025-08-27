@@ -56,6 +56,7 @@ void ATurnManager::StartTurns() {
         PS->ArmyPool = Reinforcements;
         PS->ForceNetUpdate();
         BroadcastArmyPool(PS);
+        BroadcastResources(PS);
       }
 
       CurrentPhase = ETurnPhase::Reinforcement;
@@ -127,6 +128,7 @@ void ATurnManager::AdvanceTurn() {
       PS->ArmyPool = Reinforcements;
       PS->ForceNetUpdate();
       BroadcastArmyPool(PS);
+      BroadcastResources(PS);
     }
 
     CurrentPhase = ETurnPhase::Reinforcement;
@@ -279,6 +281,26 @@ void ATurnManager::BroadcastArmyPool(ASkaldPlayerState *ForPlayer) {
     if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
       if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
         HUD->UpdateDeployableUnits(ForPlayer->ArmyPool);
+      }
+    }
+  }
+
+  OnWorldStateChanged.Broadcast();
+}
+
+void ATurnManager::BroadcastResources(ASkaldPlayerState *ForPlayer) {
+  if (!ForPlayer) {
+    return;
+  }
+
+  if (ASkaldGameMode *GM = GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
+    GM->UpdatePlayerResources(ForPlayer);
+  }
+
+  for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr : Controllers) {
+    if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
+      if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
+        HUD->UpdateResources(ForPlayer->Resources);
       }
     }
   }

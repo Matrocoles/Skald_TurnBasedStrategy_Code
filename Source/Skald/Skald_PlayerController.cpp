@@ -83,6 +83,10 @@ void ASkaldPlayerController::BeginPlay() {
                                         ETurnPhase::Reinforcement, Players);
       }
 
+      if (ASkaldPlayerState *LocalPS = GetPlayerState<ASkaldPlayerState>()) {
+        MainHudWidget->UpdateResources(LocalPS->Resources);
+      }
+
       MainHudWidget->OnAttackRequested.AddDynamic(
           this, &ASkaldPlayerController::HandleAttackRequested);
       MainHudWidget->OnMoveRequested.AddDynamic(
@@ -91,6 +95,8 @@ void ASkaldPlayerController::BeginPlay() {
           this, &ASkaldPlayerController::HandleEndAttackRequested);
       MainHudWidget->OnEndMovementRequested.AddDynamic(
           this, &ASkaldPlayerController::HandleEndMovementRequested);
+      MainHudWidget->OnEngineeringRequested.AddDynamic(
+          this, &ASkaldPlayerController::HandleEngineeringRequested);
     }
   } else {
     UE_LOG(LogSkald, Warning,
@@ -202,10 +208,14 @@ void ASkaldPlayerController::MakeAIDecision() {
       ++TargetTerritory->ArmyStrength;
       TargetTerritory->RefreshAppearance();
       --PS->ArmyPool;
+      --PS->Resources;
       ++SpreadIndex;
     }
     PS->ForceNetUpdate();
     TurnManager->BroadcastArmyPool(PS);
+    if (TurnManager) {
+      TurnManager->BroadcastResources(PS);
+    }
 
     // Proceed to the attack phase and evaluate further actions.
     TurnManager->AdvancePhase();
@@ -511,6 +521,18 @@ void ASkaldPlayerController::HandleEndMovementRequested(bool bConfirmed) {
          bConfirmed ? TEXT("confirmed") : TEXT("cancelled"));
 }
 
+void ASkaldPlayerController::HandleEngineeringRequested(int32 CapitalID,
+                                                        uint8 UpgradeType) {
+  if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+    const int32 Cost = 10;
+    PS->Resources = FMath::Max(0, PS->Resources - Cost);
+    PS->ForceNetUpdate();
+    if (TurnManager) {
+      TurnManager->BroadcastResources(PS);
+    }
+  }
+}
+
 void ASkaldPlayerController::HandleTerritorySelected(ATerritory *Terr) {
   if (!Terr) {
     return;
@@ -532,11 +554,16 @@ void ASkaldPlayerController::HandlePlayersUpdated() {
       Data.PlayerName = PS->DisplayName;
       Data.IsAI = PS->bIsAI;
       Data.Faction = PS->Faction;
+      Data.Resources = PS->Resources;
       Data.IsEliminated = PS->IsEliminated;
       Players.Add(Data);
     }
   }
   MainHudWidget->RefreshPlayerList(Players);
+
+  if (ASkaldPlayerState *LocalPS = GetPlayerState<ASkaldPlayerState>()) {
+    MainHudWidget->UpdateResources(LocalPS->Resources);
+  }
 }
 
 void ASkaldPlayerController::HandleFactionsUpdated() {
@@ -570,6 +597,7 @@ void ASkaldPlayerController::HandleWorldStateChanged() {
         Data.PlayerName = PS->DisplayName;
         Data.IsAI = PS->bIsAI;
         Data.Faction = PS->Faction;
+        Data.Resources = PS->Resources;
         Data.IsEliminated = PS->IsEliminated;
         Players.Add(Data);
       }
@@ -580,6 +608,7 @@ void ASkaldPlayerController::HandleWorldStateChanged() {
   // Update deploy/phase banners.
   if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
     MainHudWidget->UpdateDeployableUnits(PS->ArmyPool);
+    MainHudWidget->UpdateResources(PS->Resources);
   }
   if (TurnManager) {
     MainHudWidget->UpdatePhaseBanner(TurnManager->GetCurrentPhase());

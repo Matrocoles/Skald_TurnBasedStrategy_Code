@@ -49,8 +49,19 @@ void UDeployWidget::HandleAccept() {
     Territory->ArmyStrength += Selected;
     Territory->RefreshAppearance();
     PlayerState->ArmyPool -= Selected;
+    PlayerState->Resources =
+        FMath::Max(0, PlayerState->Resources - Selected);
     PlayerState->ForceNetUpdate();
     OwningHUD->UpdateDeployableUnits(PlayerState->ArmyPool);
+    OwningHUD->UpdateResources(PlayerState->Resources);
+
+    if (APlayerController *PC = OwningHUD->GetOwningPlayer()) {
+      if (ASkaldPlayerController *SKPC = Cast<ASkaldPlayerController>(PC)) {
+        if (ATurnManager *TM = SKPC->GetTurnManager()) {
+          TM->BroadcastResources(PlayerState);
+        }
+      }
+    }
 
     if (PlayerState->ArmyPool <= 0 && OwningHUD->DeployButton) {
       OwningHUD->DeployButton->SetVisibility(ESlateVisibility::Collapsed);

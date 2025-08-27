@@ -217,6 +217,15 @@ void USkaldMainHUDWidget::UpdateDeployableUnits(int32 UnitsRemaining) {
   }
 }
 
+void USkaldMainHUDWidget::UpdateResources(int32 ResourceAmount) {
+  if (ResourcesText) {
+    const FString Text =
+        FString::Printf(TEXT("Resources: %d"), ResourceAmount);
+    ResourcesText->SetText(FText::FromString(Text));
+    ResourcesText->SetVisibility(ESlateVisibility::Visible);
+  }
+}
+
 void USkaldMainHUDWidget::BeginAttackSelection() {
   bSelectingForAttack = true;
   bSelectingForMove = false;

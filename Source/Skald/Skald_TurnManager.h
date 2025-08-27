@@ -46,6 +46,10 @@ public:
     UFUNCTION(BlueprintCallable, Category="Turn")
     void BroadcastArmyPool(class ASkaldPlayerState* ForPlayer);
 
+    /** Update all HUDs with the specified player's resources. */
+    UFUNCTION(BlueprintCallable, Category="Turn")
+    void BroadcastResources(class ASkaldPlayerState* ForPlayer);
+
     UFUNCTION(BlueprintCallable, Category="Turn")
     void SortControllersByInitiative();
 

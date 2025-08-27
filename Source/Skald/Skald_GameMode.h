@@ -96,6 +96,9 @@ private:
   /** Notify HUDs of the current player roster. */
   void RefreshHUDs();
 
+  /** Update cached player resource values. */
+  void UpdatePlayerResources(ASkaldPlayerState *Player);
+
   /** Attempt to initialise the world and start the game flow. */
   void TryInitializeWorldAndStart();
 };

@@ -27,6 +27,10 @@ public:
     UPROPERTY(BlueprintReadWrite, Replicated, Category="PlayerState")
     int32 InitiativeRoll;
 
+    /** Resource points available to the player. */
+    UPROPERTY(BlueprintReadWrite, Replicated, Category="PlayerState")
+    int32 Resources;
+
     /** Player chosen display name. */
     UPROPERTY(BlueprintReadWrite, Replicated, Category="PlayerState")
     FString DisplayName;
