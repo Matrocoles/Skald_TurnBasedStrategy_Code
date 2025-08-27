@@ -1,3 +1,4 @@
+#include "CoreMinimal.h"
 #include "Misc/AutomationTest.h"
 #include "Tests/AutomationEditorCommon.h"
 #include "Skald_TurnManager.h"

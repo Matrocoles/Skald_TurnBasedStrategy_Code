@@ -26,7 +26,7 @@ void AWorldMap::BeginPlay() {
 
     if (TerritoryClass && !TerritoryTable) {
       FActorSpawnParameters Params;
-      Params.StartOwner = this;
+      Params.Owner = this;
       ATerritory *Placeholder = GetWorld()->SpawnActor<ATerritory>(
           TerritoryClass, GetActorLocation(), FRotator::ZeroRotator, Params);
       if (Placeholder) {
@@ -49,7 +49,7 @@ void AWorldMap::BeginPlay() {
     const FVector SpawnLocation = GetActorLocation() + Data->Location;
 
     FActorSpawnParameters Params;
-    Params.StartOwner = this;
+    Params.Owner = this;
     ATerritory *Territory = GetWorld()->SpawnActor<ATerritory>(
         TerritoryClass, SpawnLocation, FRotator::ZeroRotator, Params);
     if (Territory) {
