@@ -2,6 +2,7 @@
 #include "Algo/RandomShuffle.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
+#include "SkaldSaveGame.h"
 #include "Skald_GameInstance.h"
 #include "Skald_GameState.h"
 #include "Skald_PlayerCharacter.h"
@@ -143,7 +144,8 @@ void ASkaldGameMode::PopulateAIPlayers() {
         if (Enum->HasMetaData(TEXT("Hidden"), i)) {
           continue;
         }
-        ESkaldFaction Fac = static_cast<ESkaldFaction>(Enum->GetValueByIndex(i));
+        ESkaldFaction Fac =
+            static_cast<ESkaldFaction>(Enum->GetValueByIndex(i));
         if (Fac != ESkaldFaction::None && !Taken.Contains(Fac)) {
           Available.Add(Fac);
         }
@@ -188,8 +190,7 @@ void ASkaldGameMode::RefreshHUDs() {
   for (FConstPlayerControllerIterator It =
            GetWorld()->GetPlayerControllerIterator();
        It; ++It) {
-    if (ASkaldPlayerController *RefreshPC =
-            Cast<ASkaldPlayerController>(*It)) {
+    if (ASkaldPlayerController *RefreshPC = Cast<ASkaldPlayerController>(*It)) {
       if (USkaldMainHUDWidget *HUD = RefreshPC->GetHUDWidget()) {
         HUD->RefreshPlayerList(AllPlayers);
       }
@@ -427,4 +428,58 @@ bool ASkaldGameMode::InitializeWorld() {
     }
   }
   return true;
+}
+
+void ASkaldGameMode::FillSaveGame(USkaldSaveGame *SaveGameObject) const {
+  if (!SaveGameObject) {
+    return;
+  }
+
+  // Store basic turn information.
+  SaveGameObject->TurnNumber = 0; // Turn tracking not yet implemented
+  if (const ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
+    SaveGameObject->CurrentPlayerIndex = GS->CurrentTurnIndex;
+  }
+
+  // Copy player data.
+  SaveGameObject->Players.Empty();
+  for (const FS_PlayerData &Data : PlayersData) {
+    FPlayerSaveStruct PlayerSave;
+    PlayerSave.PlayerID = Data.PlayerID;
+    PlayerSave.PlayerName = Data.PlayerName;
+    PlayerSave.IsAI = Data.IsAI;
+    PlayerSave.Faction = Data.Faction;
+    PlayerSave.CapitalTerritoryIDs = Data.CapitalTerritoryIDs;
+    PlayerSave.IsEliminated = Data.IsEliminated;
+    SaveGameObject->Players.Add(PlayerSave);
+  }
+
+  // Capture current territory state.
+  SaveGameObject->Territories.Empty();
+  if (WorldMap) {
+    for (ATerritory *Territory : WorldMap->Territories) {
+      if (!Territory) {
+        continue;
+      }
+
+      FS_Territory TerrData;
+      TerrData.TerritoryID = Territory->TerritoryID;
+      TerrData.TerritoryName = Territory->TerritoryName;
+      TerrData.OwnerPlayerID =
+          Territory->OwningPlayer ? Territory->OwningPlayer->GetPlayerId() : 0;
+      TerrData.IsCapital = Territory->bIsCapital;
+      TerrData.CapitalOwner = TerrData.OwnerPlayerID;
+      TerrData.ArmyCount = Territory->ArmyStrength;
+      TerrData.ContinentID = Territory->ContinentID;
+      for (ATerritory *Adj : Territory->AdjacentTerritories) {
+        if (Adj) {
+          TerrData.AdjacentIDs.Add(Adj->TerritoryID);
+        }
+      }
+      SaveGameObject->Territories.Add(TerrData);
+    }
+  }
+
+  // No sieges are currently tracked; ensure array is cleared.
+  SaveGameObject->Sieges.Empty();
 }

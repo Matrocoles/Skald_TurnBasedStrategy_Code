@@ -12,6 +12,7 @@ class ASkaldPlayerController;
 class ASkaldPlayerState;
 class AWorldMap;
 class APlayerController;
+class USkaldSaveGame;
 
 /**
  * GameMode responsible for managing player login and spawning the turn manager.
@@ -28,6 +29,10 @@ public:
 
   /** Advance army placement to the next controller. */
   void AdvanceArmyPlacement();
+
+  /** Populate a save game object with the current match state. */
+  UFUNCTION(BlueprintCallable, Category = "SaveGame")
+  void FillSaveGame(USkaldSaveGame *SaveGameObject) const;
 
 protected:
   /** Handles turn sequencing for the match. */
