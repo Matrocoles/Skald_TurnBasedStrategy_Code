@@ -72,6 +72,10 @@ public:
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="Turn")
     TArray<ASkaldPlayerController*> GetControllers() const;
 
+    /** Return the number of registered controllers. */
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="Turn")
+    int32 GetControllerCount() const { return Controllers.Num(); }
+
     /** Retrieve the current phase of play. */
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="Turn")
     ETurnPhase GetCurrentPhase() const { return CurrentPhase; }

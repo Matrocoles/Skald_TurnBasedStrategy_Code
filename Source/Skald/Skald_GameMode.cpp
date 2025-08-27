@@ -226,7 +226,9 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
   if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
     const bool bReadyToStart =
         GS->PlayerArray.Num() >= ExpectedPlayerCount;
-    if (bWorldInitialized && bReadyToStart && !bTurnsStarted && TurnManager) {
+    const bool bHaveControllers =
+        TurnManager && TurnManager->GetControllerCount() > 0;
+    if (bWorldInitialized && bReadyToStart && !bTurnsStarted && bHaveControllers) {
       bTurnsStarted = true;
       TurnManager->SortControllersByInitiative();
       TurnManager->StartTurns();
@@ -460,6 +462,15 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
 }
 
 bool ASkaldGameMode::InitializeWorld() {
+  if (!WorldMap) {
+    // Try to locate an existing world map actor in the level.
+    WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+        GetWorld(), AWorldMap::StaticClass()));
+    // If none exists, spawn a default instance so setup can continue.
+    if (!WorldMap) {
+      WorldMap = GetWorld()->SpawnActor<AWorldMap>();
+    }
+  }
   if (!WorldMap) {
     UE_LOG(LogSkald, Error,
            TEXT("InitializeWorld failed: WorldMap missing in %s"),
