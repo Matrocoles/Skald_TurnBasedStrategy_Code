@@ -181,6 +181,25 @@ void ASkaldGameMode::PopulateAIPlayers() {
     PlayersData[Index].IsAI = true;
     PlayersData[Index].Faction = AIState->Faction;
     PlayersData[Index].Resources = AIState->Resources;
+
+    // Spawn a controller and pawn for the AI player and register it with the
+    // turn system so it can participate normally in HUD updates and turn
+    // sequencing.
+    ASkaldPlayerController *AIController =
+        GetWorld()->SpawnActor<ASkaldPlayerController>(PlayerControllerClass);
+    if (AIController) {
+      AIController->PlayerState = AIState;
+      AIController->bIsAI = true;
+
+      if (APawn *AIPawn =
+              GetWorld()->SpawnActor<APawn>(DefaultPawnClass)) {
+        AIController->Possess(AIPawn);
+      }
+
+      if (TurnManager) {
+        TurnManager->RegisterController(AIController);
+      }
+    }
   }
 }
 
