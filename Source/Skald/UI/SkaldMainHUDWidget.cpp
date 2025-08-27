@@ -157,6 +157,9 @@ void USkaldMainHUDWidget::RebuildPlayerList(
   UEnum *FactionEnum = StaticEnum<ESkaldFaction>();
 
   for (const FS_PlayerData &Player : Players) {
+    if (Player.IsEliminated) {
+      continue;
+    }
     UTextBlock *Entry = NewObject<UTextBlock>(PlayerListBox);
     if (!Entry) {
       continue;

@@ -35,6 +35,13 @@ public:
     UPROPERTY(BlueprintReadWrite, Replicated, Category="PlayerState")
     ESkaldFaction Faction;
 
+    /** Whether this player has been eliminated from the match. */
+    UPROPERTY(BlueprintReadWrite, ReplicatedUsing = OnRep_IsEliminated, Category="PlayerState")
+    bool IsEliminated;
+
+    UFUNCTION()
+    void OnRep_IsEliminated();
+
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 };
 
