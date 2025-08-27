@@ -260,6 +260,10 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
       continue;
     }
 
+    if (TurnManager) {
+      TurnManager->BroadcastArmyPool(PS);
+    }
+
     // AI players automatically distribute their armies evenly.
     if (PS->bIsAI) {
       TArray<ATerritory *> OwnedTerritories;
@@ -278,14 +282,14 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
         ++SpreadIndex;
       }
       PS->ForceNetUpdate();
+      if (TurnManager) {
+        TurnManager->BroadcastArmyPool(PS);
+      }
       ++PlacementIndex;
       continue;
     }
 
-    // Human player: update HUD and wait for manual deployment.
-    if (USkaldMainHUDWidget *HUD = PC->GetHUDWidget()) {
-      HUD->UpdateDeployableUnits(PS->ArmyPool);
-    }
+    // Human player: wait for manual deployment with current pool visible.
     break;
   }
 }

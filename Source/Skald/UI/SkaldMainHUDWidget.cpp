@@ -428,14 +428,12 @@ void USkaldMainHUDWidget::SyncPhaseButtons(bool bIsMyTurn) {
 
   if (EndPhaseButton) {
     EndPhaseButton->SetVisibility(ESlateVisibility::Visible);
-    EndPhaseButton->SetIsEnabled(bIsMyTurn &&
-                                 CurrentPhase != ETurnPhase::EndTurn);
+    EndPhaseButton->SetIsEnabled(bIsMyTurn);
   }
 
   if (EndTurnButton) {
     EndTurnButton->SetVisibility(ESlateVisibility::Visible);
-    EndTurnButton->SetIsEnabled(bIsMyTurn &&
-                                CurrentPhase == ETurnPhase::EndTurn);
+    EndTurnButton->SetIsEnabled(bIsMyTurn);
   }
 }
 
