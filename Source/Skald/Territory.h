@@ -67,6 +67,10 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory", ReplicatedUsing = OnRep_ArmyStrength)
     int32 ArmyStrength = 0;
 
+    /** ID of siege equipment built in this territory, 0 if none. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory", Replicated)
+    int32 BuiltSiegeID = 0;
+
     /** Called when the territory is selected. */
     UPROPERTY(BlueprintAssignable, Category = "Territory")
     FTerritorySelectedSignature OnTerritorySelected;

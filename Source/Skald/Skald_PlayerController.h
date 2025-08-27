@@ -101,7 +101,8 @@ protected:
    *  Blueprint widgets invoke this when an attack is submitted.
    */
   UFUNCTION(BlueprintCallable, Category = "UI")
-  void HandleAttackRequested(int32 FromID, int32 ToID, int32 ArmySent);
+  void HandleAttackRequested(int32 FromID, int32 ToID, int32 ArmySent,
+                             bool bUseSiege);
 
   /** Handle HUD move submissions.
    *  Bound to USkaldMainHUDWidget::OnMoveRequested in the HUD.
@@ -142,7 +143,16 @@ protected:
 
   /** Server-side processing of an attack request. */
   UFUNCTION(Server, Reliable)
-  void ServerHandleAttack(int32 FromID, int32 ToID, int32 ArmySent);
+  void ServerHandleAttack(int32 FromID, int32 ToID, int32 ArmySent,
+                          bool bUseSiege);
+
+  /** Handle HUD siege build requests. */
+  UFUNCTION(BlueprintCallable, Category = "UI")
+  void HandleBuildSiegeRequested(int32 TerritoryID, E_SiegeWeapons SiegeType);
+
+  /** Server-side processing of a siege build request. */
+  UFUNCTION(Server, Reliable)
+  void ServerBuildSiege(int32 TerritoryID, E_SiegeWeapons SiegeType);
 
   /** Server-side processing of a move request. */
   UFUNCTION(Server, Reliable)
