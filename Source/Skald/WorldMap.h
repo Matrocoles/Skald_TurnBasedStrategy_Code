@@ -6,6 +6,11 @@
 
 class ATerritory;
 
+// Broadcast when a territory is selected on the world map so that interested
+// systems (e.g. player controllers) can react.
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FWorldMapTerritorySelected,
+                                            ATerritory *, Territory);
+
 /** Data describing how a territory should be spawned at runtime. */
 USTRUCT(BlueprintType)
 struct FTerritorySpawnData
@@ -68,6 +73,10 @@ public:
     /** Currently selected territory. */
     UPROPERTY(BlueprintReadOnly, Category = "WorldMap")
     ATerritory* SelectedTerritory;
+
+    /** Event fired whenever SelectTerritory chooses a new territory. */
+    UPROPERTY(BlueprintAssignable, Category = "WorldMap")
+    FWorldMapTerritorySelected OnTerritorySelected;
 
     /** Register a territory with the world map. */
     UFUNCTION(BlueprintCallable, Category = "WorldMap")

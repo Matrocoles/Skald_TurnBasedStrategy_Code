@@ -107,10 +107,6 @@ void ATerritory::Select(bool bSelectingForAttack) {
         FName("Color"), bSelectingForAttack ? White : Gold);
   }
   OnTerritorySelected.Broadcast(this);
-  if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(
-          GetWorld()->GetFirstPlayerController())) {
-    PC->HandleTerritorySelected(this);
-  }
 }
 
 void ATerritory::Deselect() {

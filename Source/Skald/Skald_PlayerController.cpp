@@ -64,6 +64,13 @@ void ASkaldPlayerController::BeginPlay() {
            TEXT("MainHudWidgetClass is null; HUD will not be displayed."));
   }
 
+  if (AWorldMap *WorldMap = Cast<AWorldMap>(
+          UGameplayStatics::GetActorOfClass(GetWorld(),
+                                            AWorldMap::StaticClass()))) {
+    WorldMap->OnTerritorySelected.AddDynamic(
+        this, &ASkaldPlayerController::HandleTerritorySelected);
+  }
+
   if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
     bIsAI = PS->bIsAI;
   }
