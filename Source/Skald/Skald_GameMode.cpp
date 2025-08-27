@@ -308,9 +308,9 @@ void ASkaldGameMode::InitializeWorld() {
     }
   }
 
-  GS->PlayerArray.Sort([](const APlayerState *A, const APlayerState *B) {
-    const ASkaldPlayerState *PSA = Cast<ASkaldPlayerState>(A);
-    const ASkaldPlayerState *PSB = Cast<ASkaldPlayerState>(B);
+  GS->PlayerArray.Sort([](const APlayerState &A, const APlayerState &B) {
+    const ASkaldPlayerState *PSA = Cast<const ASkaldPlayerState>(&A);
+    const ASkaldPlayerState *PSB = Cast<const ASkaldPlayerState>(&B);
     const int32 RollA = PSA ? PSA->InitiativeRoll : 0;
     const int32 RollB = PSB ? PSB->InitiativeRoll : 0;
     return RollA > RollB;
