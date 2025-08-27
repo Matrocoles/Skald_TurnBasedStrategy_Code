@@ -80,6 +80,11 @@ public:
   UFUNCTION(BlueprintCallable, Category = "WorldMap")
   void SelectTerritory(ATerritory *Territory);
 
+  /** Find a path across friendly territories from one territory to another. */
+  UFUNCTION(BlueprintCallable, Category = "WorldMap")
+  bool FindPath(ATerritory *From, ATerritory *To,
+                TArray<ATerritory *> &OutPath) const;
+
   /** Move units between territories. */
   UFUNCTION(BlueprintCallable, Category = "WorldMap")
   bool MoveBetween(ATerritory *From, ATerritory *To, int32 Troops);
