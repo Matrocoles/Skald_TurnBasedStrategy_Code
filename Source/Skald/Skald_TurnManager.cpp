@@ -234,18 +234,10 @@ void ATurnManager::ResolveGridBattleResult() {
 }
 
 void ATurnManager::BeginAttackPhase() {
-  // Enter the attack phase and notify all HUDs so they can swap controls.
+  // Enter the attack phase and notify all listeners so they can swap controls.
   CurrentPhase = ETurnPhase::Attack;
 
-  for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr : Controllers) {
-    if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
-      if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
-        HUD->UpdatePhaseBanner(ETurnPhase::Attack);
-      }
-    }
-  }
-
-  OnWorldStateChanged.Broadcast();
+  BroadcastCurrentPhase();
 }
 
 void ATurnManager::AdvancePhase() {
@@ -255,22 +247,20 @@ void ATurnManager::AdvancePhase() {
   }
 
   if (CurrentPhase == ETurnPhase::Attack) {
+    CurrentPhase = ETurnPhase::Engineering;
+  } else if (CurrentPhase == ETurnPhase::Engineering) {
+    CurrentPhase = ETurnPhase::Treasure;
+  } else if (CurrentPhase == ETurnPhase::Treasure) {
     CurrentPhase = ETurnPhase::Movement;
   } else if (CurrentPhase == ETurnPhase::Movement) {
     CurrentPhase = ETurnPhase::EndTurn;
+  } else if (CurrentPhase == ETurnPhase::EndTurn) {
+    CurrentPhase = ETurnPhase::Revolt;
   } else {
     return;
   }
 
-  for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr : Controllers) {
-    if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
-      if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
-        HUD->UpdatePhaseBanner(CurrentPhase);
-      }
-    }
-  }
-
-  OnWorldStateChanged.Broadcast();
+  BroadcastCurrentPhase();
 }
 
 void ATurnManager::BroadcastArmyPool(ASkaldPlayerState *ForPlayer) {
@@ -301,6 +291,38 @@ void ATurnManager::BroadcastResources(ASkaldPlayerState *ForPlayer) {
     if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
       if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
         HUD->UpdateResources(ForPlayer->Resources);
+      }
+    }
+  }
+
+  OnWorldStateChanged.Broadcast();
+}
+
+void ATurnManager::BroadcastCurrentPhase() {
+  for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr : Controllers) {
+    if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
+      if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
+        HUD->UpdatePhaseBanner(CurrentPhase);
+      }
+
+      switch (CurrentPhase) {
+      case ETurnPhase::Engineering:
+        Controller->HandleEngineeringPhase();
+        break;
+      case ETurnPhase::Treasure:
+        Controller->HandleTreasurePhase();
+        break;
+      case ETurnPhase::Movement:
+        Controller->HandleMovementPhase();
+        break;
+      case ETurnPhase::EndTurn:
+        Controller->HandleEndTurnPhase();
+        break;
+      case ETurnPhase::Revolt:
+        Controller->HandleRevoltPhase();
+        break;
+      default:
+        break;
       }
     }
   }
