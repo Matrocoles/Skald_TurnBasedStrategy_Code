@@ -1,4 +1,5 @@
 #include "LoadGameWidget.h"
+#include "Skald.h"
 #include "Components/Button.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/SaveGame.h"
@@ -76,7 +77,7 @@ void ULoadGameWidget::HandleLoadSlot(int32 SlotIndex)
     }
     else
     {
-        UE_LOG(LogTemp, Error, TEXT("Failed to load save slot %s"), SlotNames[SlotIndex]);
+        UE_LOG(LogSkald, Error, TEXT("Failed to load save slot %s"), SlotNames[SlotIndex]);
     }
 }
 

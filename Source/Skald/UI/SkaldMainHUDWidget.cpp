@@ -1,4 +1,5 @@
 #include "UI/SkaldMainHUDWidget.h"
+#include "Skald.h"
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
@@ -21,12 +22,12 @@ void USkaldMainHUDWidget::NativeConstruct() {
 
   GameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
   if (!GameMode) {
-    UE_LOG(LogTemp, Warning,
+    UE_LOG(LogSkald, Warning,
            TEXT("SkaldMainHUDWidget could not find GameMode."));
   }
   GameState = GetWorld()->GetGameState<ASkaldGameState>();
   if (!GameState) {
-    UE_LOG(LogTemp, Warning,
+    UE_LOG(LogSkald, Warning,
            TEXT("SkaldMainHUDWidget could not find GameState."));
   } else {
     GameState->OnPlayersUpdated.AddDynamic(
@@ -34,7 +35,7 @@ void USkaldMainHUDWidget::NativeConstruct() {
   }
   GameInstance = GetGameInstance<USkaldGameInstance>();
   if (!GameInstance) {
-    UE_LOG(LogTemp, Warning,
+    UE_LOG(LogSkald, Warning,
            TEXT("SkaldMainHUDWidget could not find GameInstance."));
   }
 
