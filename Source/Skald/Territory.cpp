@@ -1,6 +1,7 @@
 #include "Territory.h"
 #include "Components/PrimitiveComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/TextRenderComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
 #include "SkaldTypes.h"
@@ -38,6 +39,12 @@ ATerritory::ATerritory() {
   MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
   RootComponent = MeshComponent;
 
+  LabelComponent = CreateDefaultSubobject<UTextRenderComponent>(TEXT("Label"));
+  LabelComponent->SetupAttachment(RootComponent);
+  LabelComponent->SetHorizontalAlignment(EHTA_Center);
+  LabelComponent->SetRelativeLocation(FVector(0.f, 0.f, 100.f));
+  LabelComponent->SetText(FText::GetEmpty());
+
   OwningPlayer = nullptr;
   Resources = 0;
   TerritoryID = 0;
@@ -72,6 +79,7 @@ void ATerritory::BeginPlay() {
   }
 
   UpdateTerritoryColor();
+  UpdateLabel();
 
   // Territories are registered with the world map immediately after
   // spawning, so no self-registration is required here.
@@ -157,9 +165,14 @@ void ATerritory::HandleClicked(UPrimitiveComponent *TouchedComponent,
   }
 }
 
-void ATerritory::RefreshAppearance() { UpdateTerritoryColor(); }
+void ATerritory::RefreshAppearance() { UpdateTerritoryColor(); UpdateLabel(); }
 
-void ATerritory::OnRep_OwningPlayer() { UpdateTerritoryColor(); }
+void ATerritory::OnRep_OwningPlayer() {
+  UpdateTerritoryColor();
+  UpdateLabel();
+}
+
+void ATerritory::OnRep_ArmyStrength() { UpdateLabel(); }
 
 void ATerritory::UpdateTerritoryColor() {
   if (DynamicMaterial) {
@@ -170,4 +183,16 @@ void ATerritory::UpdateTerritoryColor() {
     DynamicMaterial->SetVectorParameterValue(FName("Color"), NewColor);
     DefaultColor = NewColor;
   }
+}
+
+void ATerritory::UpdateLabel() {
+  if (!LabelComponent) {
+    return;
+  }
+
+  const FString OwnerName = OwningPlayer ? OwningPlayer->DisplayName : TEXT("Neutral");
+  const FString Text = FString::Printf(TEXT("%s\nOwner: %s\nArmy: %d"),
+                                      *TerritoryName, *OwnerName,
+                                      ArmyStrength);
+  LabelComponent->SetText(FText::FromString(Text));
 }
