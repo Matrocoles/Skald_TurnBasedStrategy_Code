@@ -117,7 +117,7 @@ void ATerritory::GetLifetimeReplicatedProps(
   DOREPLIFETIME(ATerritory, ArmyStrength);
 }
 
-void ATerritory::Select(bool bSelectingForAttack) {
+void ATerritory::Select() {
   if (bIsSelected) {
     return;
   }
@@ -127,10 +127,10 @@ void ATerritory::Select(bool bSelectingForAttack) {
     MeshComponent->SetRenderCustomDepth(true);
   }
   if (DynamicMaterial) {
-    const FLinearColor Gold(1.0f, 0.84f, 0.0f, 1.0f);
-    const FLinearColor White(1.0f, 1.0f, 1.0f, 1.0f);
-    DynamicMaterial->SetVectorParameterValue(
-        FName("Color"), bSelectingForAttack ? White : Gold);
+    // Remember the existing color so it can be restored on deselect
+    DynamicMaterial->GetVectorParameterValue(FName("Color"), DefaultColor);
+    DynamicMaterial->SetVectorParameterValue(FName("Color"),
+                                             FLinearColor::White);
   }
   OnTerritorySelected.Broadcast(this);
 }
@@ -141,6 +141,7 @@ void ATerritory::Deselect() {
     MeshComponent->SetRenderCustomDepth(false);
   }
   if (DynamicMaterial) {
+    // Restore the color that was in use prior to selection
     DynamicMaterial->SetVectorParameterValue(FName("Color"), DefaultColor);
   }
 }
