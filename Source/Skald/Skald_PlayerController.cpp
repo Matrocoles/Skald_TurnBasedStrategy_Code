@@ -284,9 +284,8 @@ void ASkaldPlayerController::MakeAIDecision() {
       }
     }
 
-    if (BestSource && BestTarget) {
-      const int32 ArmySent = FMath::Clamp(BestSource->ArmyStrength - 1, 1,
-                                          BestSource->ArmyStrength - 1);
+    if (BestSource && BestTarget && BestSource->ArmyStrength > 1) {
+      const int32 ArmySent = BestSource->ArmyStrength - 1;
       HandleAttackRequested(BestSource->TerritoryID, BestTarget->TerritoryID,
                             ArmySent, false);
     }
