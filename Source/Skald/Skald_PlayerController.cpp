@@ -420,9 +420,19 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(
 
   Source->ArmyStrength -= ArmySent;
 
+  FRandomStream *CombatStream = nullptr;
+  if (CachedGameInstance) {
+    CachedGameInstance->SeedCombatRandomStream(FMath::Rand());
+    CombatStream = &CachedGameInstance->CombatRandomStream;
+  } else {
+    static FRandomStream FallbackStream;
+    FallbackStream.Initialize(FMath::Rand());
+    CombatStream = &FallbackStream;
+  }
+
   while (AttackingForces > 0 && DefendingForces > 0) {
-    const int32 AttackRoll = FMath::RandRange(1, 6);
-    const int32 DefendRoll = FMath::RandRange(1, 6);
+    const int32 AttackRoll = CombatStream->RandRange(1, 6);
+    const int32 DefendRoll = CombatStream->RandRange(1, 6);
     if (AttackRoll > DefendRoll) {
       --DefendingForces;
     } else {

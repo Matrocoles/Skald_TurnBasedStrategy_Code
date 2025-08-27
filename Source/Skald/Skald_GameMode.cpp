@@ -164,7 +164,9 @@ void ASkaldGameMode::PopulateAIPlayers() {
       }
     }
     if (Available.Num() > 0) {
-      AIState->Faction = Available[FMath::RandRange(0, Available.Num() - 1)];
+      FRandomStream RandStream;
+      RandStream.Initialize(FMath::Rand());
+      AIState->Faction = Available[RandStream.RandRange(0, Available.Num() - 1)];
       GI->TakenFactions.AddUnique(AIState->Faction);
     }
 
@@ -500,7 +502,13 @@ bool ASkaldGameMode::InitializeWorld() {
   // Roll initiative and sort players accordingly
   for (APlayerState *PSBase : GS->PlayerArray) {
     if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
-      PS->InitiativeRoll = FMath::RandRange(1, 6);
+      if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+        PS->InitiativeRoll = GI->CombatRandomStream.RandRange(1, 6);
+      } else {
+        static FRandomStream FallbackStream;
+        FallbackStream.Initialize(FMath::Rand());
+        PS->InitiativeRoll = FallbackStream.RandRange(1, 6);
+      }
     }
   }
 

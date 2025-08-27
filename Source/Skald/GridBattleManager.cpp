@@ -63,14 +63,14 @@ void UGridBattleManager::InitBattle(const TArray<FFighter>& Attackers, const TAr
     CurrentRound = 1;
 }
 
-int32 UGridBattleManager::RollInitiative()
+int32 UGridBattleManager::RollInitiative(FRandomStream& RandomStream)
 {
-    return FMath::RandRange(1, 6);
+    return RandomStream.RandRange(1, 6);
 }
 
-void UGridBattleManager::StartBattle()
+void UGridBattleManager::StartBattle(FRandomStream& RandomStream)
 {
-    bool bAttackerTurn = RollInitiative() >= RollInitiative();
+    bool bAttackerTurn = RollInitiative(RandomStream) >= RollInitiative(RandomStream);
 
     TArray<FIntPoint> PreviousAttackerPositions;
     PreviousAttackerPositions.Reserve(AttackerTeam.Num());
@@ -118,7 +118,7 @@ void UGridBattleManager::StartBattle()
             if (IsInRange(Fighter, *Target))
             {
                 int32 Damage = 0;
-                ResolveAttack(Fighter, *Target, Damage);
+                ResolveAttack(Fighter, *Target, Damage, RandomStream);
                 if (Damage > 0)
                 {
                     bDamageDealt = true;
@@ -209,7 +209,7 @@ void UGridBattleManager::StartBattle()
     OnBattleEnded.Broadcast(Winner, AttackerCasualties, DefenderCasualties);
 }
 
-bool UGridBattleManager::ResolveAttack(FFighter& Attacker, FFighter& Defender, int32& OutDamage)
+bool UGridBattleManager::ResolveAttack(FFighter& Attacker, FFighter& Defender, int32& OutDamage, FRandomStream& RandomStream)
 {
     OutDamage = 0;
     bool bDefeated = false;
@@ -218,16 +218,16 @@ bool UGridBattleManager::ResolveAttack(FFighter& Attacker, FFighter& Defender, i
 
     for (int32 i = 0; i < Attacker.Stats.AttackDice; ++i)
     {
-        int32 Roll = FMath::RandRange(1, 6);
+        int32 Roll = RandomStream.RandRange(1, 6);
         if (Roll == 6)
         {
-            int32 Damage = FMath::RandRange(1, Attacker.Stats.DamageDie) + 3;
+            int32 Damage = RandomStream.RandRange(1, Attacker.Stats.DamageDie) + 3;
             Defender.Stats.Health -= Damage;
             OutDamage += Damage;
         }
         else if (Roll >= RequiredRoll)
         {
-            int32 Damage = FMath::RandRange(1, Attacker.Stats.DamageDie);
+            int32 Damage = RandomStream.RandRange(1, Attacker.Stats.DamageDie);
             Defender.Stats.Health -= Damage;
             OutDamage += Damage;
         }

@@ -44,6 +44,14 @@ public:
     UPROPERTY(BlueprintReadWrite, Category="Battle")
     class UGridBattleManager* GridBattleManager = nullptr;
 
+    /** Random stream used for deterministic combat rolls. */
+    UPROPERTY()
+    FRandomStream CombatRandomStream;
+
+    /** Seed the combat random stream so all clients use the same sequence. */
+    UFUNCTION(BlueprintCallable, Category="Battle")
+    void SeedCombatRandomStream(int32 Seed);
+
     /** Save game loaded when transitioning from the main menu. */
     UPROPERTY(BlueprintReadWrite, Category="SaveGame")
     USkaldSaveGame* LoadedSaveGame = nullptr;

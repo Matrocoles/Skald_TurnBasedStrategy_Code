@@ -170,10 +170,13 @@ void ATurnManager::SortControllersByInitiative() {
 }
 
 void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
-  PendingBattle = Battle;
+  FS_BattlePayload SeededBattle = Battle;
+  SeededBattle.RandomSeed = FMath::Rand();
+  PendingBattle = SeededBattle;
 
   if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
-    GI->PendingBattle = Battle;
+    GI->SeedCombatRandomStream(SeededBattle.RandomSeed);
+    GI->PendingBattle = SeededBattle;
     if (!GI->GridBattleManager) {
       GI->GridBattleManager = NewObject<UGridBattleManager>(GI);
     }

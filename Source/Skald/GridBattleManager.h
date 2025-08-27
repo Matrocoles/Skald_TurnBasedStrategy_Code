@@ -75,15 +75,15 @@ public:
 
     /** Begin the battle and resolve rounds until a victor is found. */
     UFUNCTION(BlueprintCallable, Category="Battle")
-    void StartBattle();
+    void StartBattle(UPARAM(ref) FRandomStream& RandomStream);
 
     /** Roll a D6 to determine initiative. */
     UFUNCTION(BlueprintCallable, Category="Battle")
-    static int32 RollInitiative();
+    static int32 RollInitiative(UPARAM(ref) FRandomStream& RandomStream);
 
     /** Resolve an attack following strength/defence rules. Returns true if the defender is defeated. */
     UFUNCTION(BlueprintCallable, Category="Battle")
-    static bool ResolveAttack(FFighter& Attacker, FFighter& Defender, int32& OutDamage);
+    static bool ResolveAttack(FFighter& Attacker, FFighter& Defender, int32& OutDamage, UPARAM(ref) FRandomStream& RandomStream);
 
     /** Number of surviving attackers after the battle concludes. */
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
