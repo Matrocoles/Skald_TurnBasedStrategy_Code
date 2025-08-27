@@ -97,7 +97,6 @@ protected:
   USkaldGameInstance *CachedGameInstance;
 
 public:
-
   /** Handle HUD attack submissions.
    *  Bound to USkaldMainHUDWidget::OnAttackRequested in the HUD.
    *  Blueprint widgets invoke this when an attack is submitted.
@@ -193,10 +192,9 @@ public:
    *  turn events without keeping an external pointer that might be
    *  uninitialised.
    */
+protected:
   UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Turn",
             meta = (ExposeOnSpawn = true))
-
-protected:
   TObjectPtr<ATurnManager> TurnManager;
 
 private:
