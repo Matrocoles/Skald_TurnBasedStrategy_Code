@@ -68,6 +68,15 @@ private:
   /** Index of the controller currently placing armies. */
   int32 PlacementIndex = 0;
 
+  /** Register a newly connected player and update player data. */
+  void RegisterPlayer(ASkaldPlayerController *PC);
+
+  /** Populate remaining slots with AI players in singleplayer. */
+  void PopulateAIPlayers();
+
+  /** Notify HUDs of the current player roster. */
+  void RefreshHUDs();
+
   /** Attempt to initialise the world and start the game flow. */
   void TryInitializeWorldAndStart();
 };
