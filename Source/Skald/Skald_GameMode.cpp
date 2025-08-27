@@ -58,128 +58,140 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
   Super::PostLogin(NewPlayer);
 
   ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(NewPlayer);
-  if (PC) {
-    if (TurnManager) {
-      TurnManager->RegisterController(PC);
+  if (!PC) {
+    return;
+  }
+
+  RegisterPlayer(PC);
+  PopulateAIPlayers();
+  RefreshHUDs();
+
+  TryInitializeWorldAndStart();
+
+  if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
+    if (GS->PlayerArray.Num() >= ExpectedPlayerCount && !bTurnsStarted) {
+      bTurnsStarted = true;
+      GetWorldTimerManager().ClearTimer(StartGameTimerHandle);
+      if (TurnManager) {
+        TurnManager->SortControllersByInitiative();
+        TurnManager->StartTurns();
+        if (GEngine) {
+          GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Green,
+                                           TEXT("Game started"));
+        }
+      }
+    }
+  }
+}
+
+void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
+  if (TurnManager) {
+    TurnManager->RegisterController(PC);
+  }
+
+  if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
+    if (ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>()) {
+      GS->AddPlayerState(PS);
+
+      if (PlayersData.Num() < GS->PlayerArray.Num()) {
+        PlayersData.SetNum(GS->PlayerArray.Num());
+      }
+
+      if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+        PS->DisplayName = GI->DisplayName;
+        PS->Faction = GI->Faction;
+      }
+
+      const int32 Index = GS->PlayerArray.IndexOfByKey(PS);
+      if (PlayersData.IsValidIndex(Index)) {
+        PlayersData[Index].PlayerID = PS->GetPlayerId();
+        PlayersData[Index].PlayerName = PS->DisplayName;
+        PlayersData[Index].IsAI = PS->bIsAI;
+        PlayersData[Index].Faction = PS->Faction;
+      }
+    }
+  }
+}
+
+void ASkaldGameMode::PopulateAIPlayers() {
+  ASkaldGameState *GS = GetGameState<ASkaldGameState>();
+  USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+  if (!GS || !GI || GI->bIsMultiplayer) {
+    return;
+  }
+
+  while (GS->PlayerArray.Num() < ExpectedPlayerCount) {
+    ASkaldPlayerState *AIState =
+        GetWorld()->SpawnActor<ASkaldPlayerState>(PlayerStateClass);
+    if (!AIState) {
+      break;
+    }
+    AIState->bIsAI = true;
+    AIState->DisplayName =
+        FString::Printf(TEXT("AI_%d"), GS->PlayerArray.Num());
+
+    TArray<ESkaldFaction> Taken;
+    for (APlayerState *ExistingPS : GS->PlayerArray) {
+      if (ASkaldPlayerState *EPS = Cast<ASkaldPlayerState>(ExistingPS)) {
+        Taken.Add(EPS->Faction);
+      }
+    }
+    Taken.Append(GI->TakenFactions);
+    TArray<ESkaldFaction> Available;
+    if (UEnum *Enum = StaticEnum<ESkaldFaction>()) {
+      for (int32 i = 0; i < Enum->NumEnums(); ++i) {
+        if (Enum->HasMetaData(TEXT("Hidden"), i)) {
+          continue;
+        }
+        ESkaldFaction Fac = static_cast<ESkaldFaction>(Enum->GetValueByIndex(i));
+        if (Fac != ESkaldFaction::None && !Taken.Contains(Fac)) {
+          Available.Add(Fac);
+        }
+      }
+    }
+    if (Available.Num() > 0) {
+      AIState->Faction = Available[FMath::RandRange(0, Available.Num() - 1)];
+      GI->TakenFactions.AddUnique(AIState->Faction);
     }
 
-    if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
-      if (ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>()) {
-        GS->AddPlayerState(PS);
+    GS->AddPlayerState(AIState);
 
-        // Ensure PlayersData can hold at least as many entries as there
-        // are connected players. Never shrink to avoid index issues in
-        // existing blueprint logic.
-        if (PlayersData.Num() < GS->PlayerArray.Num()) {
-          PlayersData.SetNum(GS->PlayerArray.Num());
-        }
+    if (PlayersData.Num() < GS->PlayerArray.Num()) {
+      PlayersData.SetNum(GS->PlayerArray.Num());
+    }
+    const int32 Index = GS->PlayerArray.Num() - 1;
+    PlayersData[Index].PlayerID = AIState->GetPlayerId();
+    PlayersData[Index].PlayerName = AIState->DisplayName;
+    PlayersData[Index].IsAI = true;
+    PlayersData[Index].Faction = AIState->Faction;
+  }
+}
 
-        if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
-          PS->DisplayName = GI->DisplayName;
-          PS->Faction = GI->Faction;
-        }
+void ASkaldGameMode::RefreshHUDs() {
+  ASkaldGameState *GS = GetGameState<ASkaldGameState>();
+  if (!GS) {
+    return;
+  }
 
-        const int32 Index = GS->PlayerArray.IndexOfByKey(PS);
-        if (PlayersData.IsValidIndex(Index)) {
-          PlayersData[Index].PlayerID = PS->GetPlayerId();
-          PlayersData[Index].PlayerName = PS->DisplayName;
-          PlayersData[Index].IsAI = PS->bIsAI;
-          PlayersData[Index].Faction = PS->Faction;
-        }
-      }
+  TArray<FS_PlayerData> AllPlayers;
+  for (APlayerState *PSBase : GS->PlayerArray) {
+    if (ASkaldPlayerState *SPS = Cast<ASkaldPlayerState>(PSBase)) {
+      FS_PlayerData Data;
+      Data.PlayerID = SPS->GetPlayerId();
+      Data.PlayerName = SPS->DisplayName;
+      Data.IsAI = SPS->bIsAI;
+      Data.Faction = SPS->Faction;
+      AllPlayers.Add(Data);
+    }
+  }
 
-      // In singleplayer fill remaining slots with AI opponents
-      if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
-        if (!GI->bIsMultiplayer) {
-          // Populate AI players up to the expected count
-          while (GS->PlayerArray.Num() < ExpectedPlayerCount) {
-            ASkaldPlayerState *AIState =
-                GetWorld()->SpawnActor<ASkaldPlayerState>(PlayerStateClass);
-            if (!AIState) {
-              break;
-            }
-            AIState->bIsAI = true;
-            AIState->DisplayName =
-                FString::Printf(TEXT("AI_%d"), GS->PlayerArray.Num());
-
-            // Choose a faction not already taken
-            TArray<ESkaldFaction> Taken;
-            for (APlayerState *ExistingPS : GS->PlayerArray) {
-              if (ASkaldPlayerState *EPS =
-                      Cast<ASkaldPlayerState>(ExistingPS)) {
-                Taken.Add(EPS->Faction);
-              }
-            }
-            Taken.Append(GI->TakenFactions);
-            TArray<ESkaldFaction> Available;
-            if (UEnum *Enum = StaticEnum<ESkaldFaction>()) {
-              for (int32 i = 0; i < Enum->NumEnums(); ++i) {
-                if (Enum->HasMetaData(TEXT("Hidden"), i)) {
-                  continue;
-                }
-                ESkaldFaction Fac =
-                    static_cast<ESkaldFaction>(Enum->GetValueByIndex(i));
-                if (Fac != ESkaldFaction::None && !Taken.Contains(Fac)) {
-                  Available.Add(Fac);
-                }
-              }
-            }
-            if (Available.Num() > 0) {
-              AIState->Faction =
-                  Available[FMath::RandRange(0, Available.Num() - 1)];
-              GI->TakenFactions.AddUnique(AIState->Faction);
-            }
-
-            GS->AddPlayerState(AIState);
-
-            if (PlayersData.Num() < GS->PlayerArray.Num()) {
-              PlayersData.SetNum(GS->PlayerArray.Num());
-            }
-            const int32 Index = GS->PlayerArray.Num() - 1;
-            PlayersData[Index].PlayerID = AIState->GetPlayerId();
-            PlayersData[Index].PlayerName = AIState->DisplayName;
-            PlayersData[Index].IsAI = true;
-            PlayersData[Index].Faction = AIState->Faction;
-          }
-
-          // Refresh HUDs with the updated player list
-          TArray<FS_PlayerData> AllPlayers;
-          for (APlayerState *PSBase : GS->PlayerArray) {
-            if (ASkaldPlayerState *SPS = Cast<ASkaldPlayerState>(PSBase)) {
-              FS_PlayerData Data;
-              Data.PlayerID = SPS->GetPlayerId();
-              Data.PlayerName = SPS->DisplayName;
-              Data.IsAI = SPS->bIsAI;
-              Data.Faction = SPS->Faction;
-              AllPlayers.Add(Data);
-            }
-          }
-          for (FConstPlayerControllerIterator It =
-                   GetWorld()->GetPlayerControllerIterator();
-               It; ++It) {
-            if (ASkaldPlayerController *RefreshPC =
-                    Cast<ASkaldPlayerController>(*It)) {
-              if (USkaldMainHUDWidget *HUD = RefreshPC->GetHUDWidget()) {
-                HUD->RefreshPlayerList(AllPlayers);
-              }
-            }
-          }
-        }
-      }
-
-      TryInitializeWorldAndStart();
-
-      if (GS->PlayerArray.Num() >= ExpectedPlayerCount && !bTurnsStarted) {
-        bTurnsStarted = true;
-        GetWorldTimerManager().ClearTimer(StartGameTimerHandle);
-        if (TurnManager) {
-          TurnManager->SortControllersByInitiative();
-          TurnManager->StartTurns();
-          if (GEngine) {
-            GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Green,
-                                             TEXT("Game started"));
-          }
-        }
+  for (FConstPlayerControllerIterator It =
+           GetWorld()->GetPlayerControllerIterator();
+       It; ++It) {
+    if (ASkaldPlayerController *RefreshPC =
+            Cast<ASkaldPlayerController>(*It)) {
+      if (USkaldMainHUDWidget *HUD = RefreshPC->GetHUDWidget()) {
+        HUD->RefreshPlayerList(AllPlayers);
       }
     }
   }
