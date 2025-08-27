@@ -230,7 +230,6 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
       bTurnsStarted = true;
       TurnManager->SortControllersByInitiative();
       TurnManager->StartTurns();
-      TurnManager->BroadcastCurrentPhase();
 
       if (GEngine) {
         GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Green,
