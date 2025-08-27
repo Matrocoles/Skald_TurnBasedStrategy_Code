@@ -76,7 +76,7 @@ protected:
   /** Typed reference to the main HUD widget. */
   UPROPERTY(BlueprintReadOnly, Category = "UI",
             meta = (AllowPrivateAccess = "true"))
-  USkaldMainHUDWidget *MainHudWidget;
+  TObjectPtr<USkaldMainHUDWidget> MainHudWidget;
 
   /** Cached references to core game singletons for blueprint access */
   UPROPERTY(BlueprintReadOnly, Category = "Game",
