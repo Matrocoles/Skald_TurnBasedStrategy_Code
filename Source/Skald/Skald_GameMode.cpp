@@ -1,6 +1,7 @@
 #include "Skald_GameMode.h"
 #include "Algo/RandomShuffle.h"
 #include "Engine/World.h"
+#include "Kismet/GameplayStatics.h"
 #include "Skald_GameInstance.h"
 #include "Skald_GameState.h"
 #include "Skald_PlayerCharacter.h"
@@ -43,7 +44,11 @@ void ASkaldGameMode::BeginPlay() {
   }
 
   if (!WorldMap) {
-    WorldMap = GetWorld()->SpawnActor<AWorldMap>();
+    WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+        GetWorld(), AWorldMap::StaticClass()));
+    if (!WorldMap) {
+      WorldMap = GetWorld()->SpawnActor<AWorldMap>();
+    }
   }
 
   // Initialization of the world occurs after players join in PostLogin.

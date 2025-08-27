@@ -28,6 +28,10 @@ void USkaldMainHUDWidget::NativeConstruct() {
     EndTurnButton->OnClicked.AddDynamic(
         this, &USkaldMainHUDWidget::HandleEndTurnClicked);
   }
+  if (EndPhaseButton) {
+    EndPhaseButton->OnClicked.AddDynamic(
+        this, &USkaldMainHUDWidget::HandleEndPhaseClicked);
+  }
   if (DeployButton) {
     DeployButton->OnClicked.AddDynamic(
         this, &USkaldMainHUDWidget::HandleDeployClicked);
@@ -40,6 +44,14 @@ void USkaldMainHUDWidget::NativeConstruct() {
 
 void USkaldMainHUDWidget::HandleEndTurnClicked() {
   ShowEndingTurn();
+  if (APlayerController *PC = GetOwningPlayer()) {
+    if (ASkaldPlayerController *SPC = Cast<ASkaldPlayerController>(PC)) {
+      SPC->EndTurn();
+    }
+  }
+}
+
+void USkaldMainHUDWidget::HandleEndPhaseClicked() {
   if (CurrentPhase == ETurnPhase::Attack) {
     OnEndAttackRequested.Broadcast(true);
   } else if (CurrentPhase == ETurnPhase::Movement) {
@@ -48,7 +60,7 @@ void USkaldMainHUDWidget::HandleEndTurnClicked() {
 
   if (APlayerController *PC = GetOwningPlayer()) {
     if (ASkaldPlayerController *SPC = Cast<ASkaldPlayerController>(PC)) {
-      SPC->EndTurn();
+      SPC->EndPhase();
     }
   }
 }
@@ -60,6 +72,21 @@ void USkaldMainHUDWidget::UpdateTurnBanner(int32 InCurrentPlayerID,
 
   BP_SetTurnText(TurnNumber, CurrentPlayerID);
   BP_SetPhaseButtons(CurrentPhase, CurrentPlayerID == LocalPlayerID);
+
+  if (EndTurnButton) {
+    const bool bMyTurn = CurrentPlayerID == LocalPlayerID;
+    EndTurnButton->SetVisibility(bMyTurn &&
+                                        CurrentPhase == ETurnPhase::EndTurn
+                                    ? ESlateVisibility::Visible
+                                    : ESlateVisibility::Collapsed);
+  }
+  if (EndPhaseButton) {
+    const bool bMyTurn = CurrentPlayerID == LocalPlayerID;
+    EndPhaseButton->SetVisibility(bMyTurn &&
+                                         CurrentPhase != ETurnPhase::EndTurn
+                                     ? ESlateVisibility::Visible
+                                     : ESlateVisibility::Collapsed);
+  }
 }
 
 void USkaldMainHUDWidget::UpdatePhaseBanner(ETurnPhase InPhase) {
@@ -81,6 +108,20 @@ void USkaldMainHUDWidget::UpdatePhaseBanner(ETurnPhase InPhase) {
   }
   if (DeployableUnitsText && CurrentPhase != ETurnPhase::Reinforcement) {
     DeployableUnitsText->SetVisibility(ESlateVisibility::Collapsed);
+  }
+  if (EndTurnButton) {
+    const bool bMyTurn = CurrentPlayerID == LocalPlayerID;
+    EndTurnButton->SetVisibility(bMyTurn &&
+                                        CurrentPhase == ETurnPhase::EndTurn
+                                    ? ESlateVisibility::Visible
+                                    : ESlateVisibility::Collapsed);
+  }
+  if (EndPhaseButton) {
+    const bool bMyTurn = CurrentPlayerID == LocalPlayerID;
+    EndPhaseButton->SetVisibility(bMyTurn &&
+                                         CurrentPhase != ETurnPhase::EndTurn
+                                     ? ESlateVisibility::Visible
+                                     : ESlateVisibility::Collapsed);
   }
 }
 
@@ -108,6 +149,21 @@ void USkaldMainHUDWidget::RefreshFromState(
   BP_SetPhaseText(CurrentPhase);
   RebuildPlayerList(CachedPlayers);
   BP_SetPhaseButtons(CurrentPhase, CurrentPlayerID == LocalPlayerID);
+
+  if (EndTurnButton) {
+    const bool bMyTurn = CurrentPlayerID == LocalPlayerID;
+    EndTurnButton->SetVisibility(bMyTurn &&
+                                        CurrentPhase == ETurnPhase::EndTurn
+                                    ? ESlateVisibility::Visible
+                                    : ESlateVisibility::Collapsed);
+  }
+  if (EndPhaseButton) {
+    const bool bMyTurn = CurrentPlayerID == LocalPlayerID;
+    EndPhaseButton->SetVisibility(bMyTurn &&
+                                         CurrentPhase != ETurnPhase::EndTurn
+                                     ? ESlateVisibility::Visible
+                                     : ESlateVisibility::Collapsed);
+  }
 }
 
 void USkaldMainHUDWidget::ShowTurnAnnouncement(const FString &PlayerName) {
@@ -168,8 +224,16 @@ void USkaldMainHUDWidget::ShowTurnMessage(bool bIsMyTurn) {
     EndingTurnText->SetVisibility(ESlateVisibility::Visible);
   }
   if (EndTurnButton) {
-    EndTurnButton->SetVisibility(bIsMyTurn ? ESlateVisibility::Visible
-                                           : ESlateVisibility::Collapsed);
+    EndTurnButton->SetVisibility(bIsMyTurn &&
+                                        CurrentPhase == ETurnPhase::EndTurn
+                                    ? ESlateVisibility::Visible
+                                    : ESlateVisibility::Collapsed);
+  }
+  if (EndPhaseButton) {
+    EndPhaseButton->SetVisibility(bIsMyTurn &&
+                                         CurrentPhase != ETurnPhase::EndTurn
+                                     ? ESlateVisibility::Visible
+                                     : ESlateVisibility::Collapsed);
   }
 }
 
@@ -391,7 +455,7 @@ void USkaldMainHUDWidget::HandleDeployClicked() {
             if (ASkaldPlayerController *SKPC =
                     Cast<ASkaldPlayerController>(PC)) {
               if (ATurnManager *TM = SKPC->GetTurnManager()) {
-                TM->BeginAttackPhase();
+                TM->AdvancePhase();
               }
             }
           }

@@ -28,6 +28,9 @@ public:
   void EndTurn();
 
   UFUNCTION(BlueprintCallable, Category = "Turn")
+  void EndPhase();
+
+  UFUNCTION(BlueprintCallable, Category = "Turn")
   void MakeAIDecision();
 
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Turn")
