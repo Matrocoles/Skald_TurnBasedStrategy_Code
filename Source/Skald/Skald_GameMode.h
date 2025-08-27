@@ -48,6 +48,10 @@ public:
   UPROPERTY(BlueprintAssignable, Category = "GameMode")
   FSkaldGameOver OnGameOver;
 
+  /** Retrieve the active turn manager controlling turn order. */
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "GameMode")
+  ATurnManager *GetTurnManager() const { return TurnManager; }
+
 protected:
   /** Handles turn sequencing for the match. */
   UPROPERTY(BlueprintReadOnly, Category = "GameMode")

@@ -162,15 +162,49 @@ void ASkaldPlayerController::StartTurn() {
 void ASkaldPlayerController::EndTurn() {
   SetInputMode(FInputModeGameOnly());
 
-  if (TurnManager) {
-    TurnManager->AdvanceTurn();
+  if (!TurnManager) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("EndTurn called without a TurnManager. Attempting to reacquire."));
+
+    if (!CachedGameMode) {
+      CachedGameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
+    }
+
+    if (CachedGameMode) {
+      SetTurnManager(CachedGameMode->GetTurnManager());
+    }
+
+    if (!TurnManager) {
+      UE_LOG(LogSkald, Warning,
+             TEXT("TurnManager still missing; aborting EndTurn."));
+      return;
+    }
   }
+
+  TurnManager->AdvanceTurn();
 }
 
 void ASkaldPlayerController::EndPhase() {
-  if (TurnManager) {
-    TurnManager->AdvancePhase();
+  if (!TurnManager) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("EndPhase called without a TurnManager. Attempting to reacquire."));
+
+    if (!CachedGameMode) {
+      CachedGameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
+    }
+
+    if (CachedGameMode) {
+      SetTurnManager(CachedGameMode->GetTurnManager());
+    }
+
+    if (!TurnManager) {
+      UE_LOG(LogSkald, Warning,
+             TEXT("TurnManager still missing; aborting EndPhase."));
+      return;
+    }
   }
+
+  TurnManager->AdvancePhase();
 }
 
 void ASkaldPlayerController::MakeAIDecision() {
