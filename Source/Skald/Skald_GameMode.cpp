@@ -1,5 +1,5 @@
 #include "Skald_GameMode.h"
-#include "Algo/Shuffle.h"
+#include "Algo/RandomShuffle.h"
 #include "Engine/World.h"
 #include "Skald_GameInstance.h"
 #include "Skald_GameState.h"
@@ -299,7 +299,7 @@ void ASkaldGameMode::InitializeWorld() {
     return;
   }
   // Shuffle territories before assignment
-  Algo::Shuffle(WorldMap->Territories);
+  Algo::RandomShuffle(WorldMap->Territories);
 
   // Roll initiative and sort players accordingly
   for (APlayerState *PSBase : GS->PlayerArray) {
@@ -344,7 +344,7 @@ void ASkaldGameMode::InitializeWorld() {
         OwnedTerritories.Add(Territory);
       }
     }
-    Algo::Shuffle(OwnedTerritories);
+    Algo::RandomShuffle(OwnedTerritories);
 
     FS_PlayerData *PlayerData =
         PlayersData.FindByPredicate([PS](const FS_PlayerData &Data) {
