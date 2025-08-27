@@ -11,6 +11,7 @@ class UStaticMesh;
 class UStaticMeshComponent;
 class UPrimitiveComponent;
 class UMaterialInstanceDynamic;
+class UMaterialInterface;
 class UTextRenderComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FTerritorySelectedSignature, ATerritory*, Territory);
@@ -51,8 +52,16 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory", Replicated)
     bool bIsCapital = false;
 
+    /** Base mesh asset used for the territory. */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Territory")
+    UStaticMesh* TerritoryMeshAsset = nullptr;
+
+    /** Material applied to the territory mesh. */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Territory")
+    UMaterialInterface* TerritoryMaterial = nullptr;
+
     /** Mesh asset used to mark this territory as a capital. */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory")
+    UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Territory")
     UStaticMesh* CapitalMeshAsset = nullptr;
 
     /** Optional identifier describing which continent this territory belongs to. */

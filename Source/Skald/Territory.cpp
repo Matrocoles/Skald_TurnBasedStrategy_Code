@@ -3,7 +3,10 @@
 #include "Components/PrimitiveComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
+#include "Engine/StaticMesh.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
+#include "UObject/ConstructorHelpers.h"
 #include "Net/UnrealNetwork.h"
 #include "SkaldTypes.h"
 #include "Skald_PlayerController.h"
@@ -40,6 +43,33 @@ ATerritory::ATerritory() {
   MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
   RootComponent = MeshComponent;
 
+  static ConstructorHelpers::FObjectFinder<UStaticMesh> TerritoryMeshFinder(
+      TEXT("/All/Game/Blueprints/Meshes/Props/Plane.Plane"));
+  if (TerritoryMeshFinder.Succeeded()) {
+    TerritoryMeshAsset = TerritoryMeshFinder.Object;
+    MeshComponent->SetStaticMesh(TerritoryMeshAsset);
+  }
+
+  static ConstructorHelpers::FObjectFinder<UMaterialInterface>
+      TerritoryMaterialFinder(
+          TEXT("/All/Game/Blueprints/Meshes/Random_Materials/Skald_NeutralMapColor.Skald_NeutralMapColor"));
+  if (TerritoryMaterialFinder.Succeeded()) {
+    TerritoryMaterial = TerritoryMaterialFinder.Object;
+    MeshComponent->SetMaterial(0, TerritoryMaterial);
+  }
+
+  CapitalMesh =
+      CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CapitalMesh"));
+  CapitalMesh->SetupAttachment(RootComponent);
+  static ConstructorHelpers::FObjectFinder<UStaticMesh> CapitalMeshFinder(
+      TEXT("/All/Game/Blueprints/Meshes/Props/Cone.Cone"));
+  if (CapitalMeshFinder.Succeeded()) {
+    CapitalMeshAsset = CapitalMeshFinder.Object;
+    CapitalMesh->SetStaticMesh(CapitalMeshAsset);
+  }
+  CapitalMesh->SetVisibility(false);
+  CapitalMesh->SetHiddenInGame(true);
+
   LabelComponent = CreateDefaultSubobject<UTextRenderComponent>(TEXT("Label"));
   LabelComponent->SetupAttachment(RootComponent);
   LabelComponent->SetHorizontalAlignment(EHTA_Center);
@@ -58,20 +88,21 @@ ATerritory::ATerritory() {
 void ATerritory::BeginPlay() {
   Super::BeginPlay();
 
-  if (!CapitalMesh) {
-    CapitalMesh = NewObject<UStaticMeshComponent>(this, TEXT("CapitalMesh"));
-    if (CapitalMesh) {
-      CapitalMesh->SetupAttachment(RootComponent);
-      if (CapitalMeshAsset) {
-        CapitalMesh->SetStaticMesh(CapitalMeshAsset);
-      }
-      CapitalMesh->SetVisibility(false);
-      CapitalMesh->SetHiddenInGame(true);
-      CapitalMesh->RegisterComponent();
+  if (CapitalMesh) {
+    if (CapitalMeshAsset) {
+      CapitalMesh->SetStaticMesh(CapitalMeshAsset);
     }
+    CapitalMesh->SetVisibility(false);
+    CapitalMesh->SetHiddenInGame(true);
   }
 
   if (MeshComponent) {
+    if (TerritoryMeshAsset) {
+      MeshComponent->SetStaticMesh(TerritoryMeshAsset);
+    }
+    if (TerritoryMaterial) {
+      MeshComponent->SetMaterial(0, TerritoryMaterial);
+    }
     MeshComponent->OnBeginCursorOver.AddDynamic(this,
                                                 &ATerritory::HandleMouseEnter);
     MeshComponent->OnEndCursorOver.AddDynamic(this,
@@ -81,7 +112,8 @@ void ATerritory::BeginPlay() {
     if (MeshComponent->GetNumMaterials() > 0) {
       DynamicMaterial = MeshComponent->CreateAndSetMaterialInstanceDynamic(0);
       if (DynamicMaterial) {
-        DynamicMaterial->GetVectorParameterValue(FName("Color"), DefaultColor);
+        DynamicMaterial->GetVectorParameterValue(FName("Color"),
+                                                DefaultColor);
       }
     } else {
       UE_LOG(LogSkald, Warning, TEXT("Territory %s has no material at index 0"),
