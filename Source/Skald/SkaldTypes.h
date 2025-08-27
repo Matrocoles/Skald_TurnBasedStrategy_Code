@@ -123,6 +123,10 @@ struct SKALD_API FS_BattlePayload
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     int32 TurnNumber = 0;
+
+    /** Seed used for deterministic combat resolution. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    int32 RandomSeed = 0;
 };
 
 USTRUCT(BlueprintType)

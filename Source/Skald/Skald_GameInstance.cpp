@@ -1,4 +1,13 @@
 #include "Skald_GameInstance.h"
 
-// Currently no additional logic is required.
+void USkaldGameInstance::Init()
+{
+    Super::Init();
+    SeedCombatRandomStream(FMath::Rand());
+}
+
+void USkaldGameInstance::SeedCombatRandomStream(int32 Seed)
+{
+    CombatRandomStream.Initialize(Seed);
+}
 
