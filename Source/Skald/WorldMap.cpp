@@ -1,6 +1,7 @@
 #include "WorldMap.h"
 #include "Containers/Map.h"
 #include "Containers/Queue.h"
+#include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Skald_GameMode.h"
 #include "Territory.h"
@@ -14,6 +15,27 @@ void AWorldMap::BeginPlay() {
   Super::BeginPlay();
 
   if (!TerritoryClass || !TerritoryTable) {
+    UE_LOG(LogTemp, Error,
+           TEXT("WorldMap requires valid TerritoryClass and TerritoryTable."));
+
+    if (GEngine) {
+      GEngine->AddOnScreenDebugMessage(
+          -1, 5.f, FColor::Red,
+          TEXT("World map failed to initialize: missing assets."));
+    }
+
+    if (TerritoryClass && !TerritoryTable) {
+      FActorSpawnParameters Params;
+      Params.Owner = this;
+      ATerritory *Placeholder = GetWorld()->SpawnActor<ATerritory>(
+          TerritoryClass, GetActorLocation(), FRotator::ZeroRotator, Params);
+      if (Placeholder) {
+        Placeholder->TerritoryID = -1;
+        Placeholder->TerritoryName = TEXT("Placeholder Territory");
+        RegisterTerritory(Placeholder);
+      }
+    }
+
     return;
   }
 
