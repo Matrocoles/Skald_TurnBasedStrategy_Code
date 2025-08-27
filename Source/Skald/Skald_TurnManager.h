@@ -52,7 +52,7 @@ public:
 
     /** Access the controllers array in its current initiative order. */
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="Turn")
-    const TArray<ASkaldPlayerController*>& GetControllers() const { return Controllers; }
+    const TArray<TWeakObjectPtr<ASkaldPlayerController>>& GetControllers() const { return Controllers; }
 
     /** Retrieve the current phase of play. */
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="Turn")
@@ -60,7 +60,7 @@ public:
 
 protected:
     UPROPERTY(BlueprintReadOnly, Category="Turn")
-    TArray<ASkaldPlayerController*> Controllers;
+    TArray<TWeakObjectPtr<ASkaldPlayerController>> Controllers;
 
     UPROPERTY(BlueprintReadOnly, Category="Turn")
     int32 CurrentIndex;

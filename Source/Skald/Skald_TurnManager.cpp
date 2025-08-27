@@ -14,7 +14,7 @@ ATurnManager::ATurnManager() {
 void ATurnManager::BeginPlay() { Super::BeginPlay(); }
 
 void ATurnManager::RegisterController(ASkaldPlayerController *Controller) {
-  if (Controller) {
+  if (IsValid(Controller)) {
     Controllers.Add(Controller);
     Controller->SetTurnManager(this);
   }
@@ -24,17 +24,65 @@ void ATurnManager::StartTurns() {
   SortControllersByInitiative();
   CurrentIndex = 0;
   if (Controllers.IsValidIndex(CurrentIndex)) {
-    ASkaldPlayerController *CurrentController = Controllers[CurrentIndex];
+    if (ASkaldPlayerController *CurrentController = Controllers[CurrentIndex].Get()) {
+      ASkaldPlayerState *PS =
+          CurrentController->GetPlayerState<ASkaldPlayerState>();
+      const FString PlayerName = PS ? PS->DisplayName : TEXT("Unknown");
+
+      // Determine reinforcements based on owned territories.
+      if (PS) {
+        int32 Owned = 0;
+        if (AWorldMap *WorldMap =
+                Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+                    GetWorld(), AWorldMap::StaticClass()))) {
+          for (ATerritory *Terr : WorldMap->Territories) {
+            if (Terr && Terr->OwningPlayer == PS) {
+              ++Owned;
+            }
+          }
+        }
+        const int32 Reinforcements = FMath::CeilToInt(Owned / 3.0f);
+        PS->ArmyPool = Reinforcements;
+        PS->ForceNetUpdate();
+        BroadcastArmyPool(PS);
+      }
+
+      CurrentPhase = ETurnPhase::Reinforcement;
+      for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr : Controllers) {
+        if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
+          const bool bIsActive = Controller == CurrentController;
+          Controller->ShowTurnAnnouncement(PlayerName, bIsActive);
+          if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
+            HUD->UpdateTurnBanner(PS ? PS->GetPlayerId() : -1, 1);
+            HUD->UpdatePhaseBanner(CurrentPhase);
+          }
+        }
+      }
+
+      CurrentController->StartTurn();
+    }
+  }
+}
+
+void ATurnManager::AdvanceTurn() {
+  Controllers.RemoveAll([](const TWeakObjectPtr<ASkaldPlayerController> &Ptr) {
+    return !Ptr.IsValid();
+  });
+  if (Controllers.Num() == 0) {
+    return;
+  }
+
+  CurrentIndex = (CurrentIndex + 1) % Controllers.Num();
+  if (ASkaldPlayerController *CurrentController = Controllers[CurrentIndex].Get()) {
     ASkaldPlayerState *PS =
         CurrentController->GetPlayerState<ASkaldPlayerState>();
     const FString PlayerName = PS ? PS->DisplayName : TEXT("Unknown");
 
-    // Determine reinforcements based on owned territories.
+    // Calculate reinforcements for the new active player.
     if (PS) {
       int32 Owned = 0;
-      if (AWorldMap *WorldMap =
-              Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
-                  GetWorld(), AWorldMap::StaticClass()))) {
+      if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+              GetWorld(), AWorldMap::StaticClass()))) {
         for (ATerritory *Terr : WorldMap->Territories) {
           if (Terr && Terr->OwningPlayer == PS) {
             ++Owned;
@@ -48,8 +96,8 @@ void ATurnManager::StartTurns() {
     }
 
     CurrentPhase = ETurnPhase::Reinforcement;
-    for (ASkaldPlayerController *Controller : Controllers) {
-      if (Controller) {
+    for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr : Controllers) {
+      if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
         const bool bIsActive = Controller == CurrentController;
         Controller->ShowTurnAnnouncement(PlayerName, bIsActive);
         if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
@@ -63,58 +111,20 @@ void ATurnManager::StartTurns() {
   }
 }
 
-void ATurnManager::AdvanceTurn() {
-  if (Controllers.Num() == 0) {
-    return;
-  }
-
-  CurrentIndex = (CurrentIndex + 1) % Controllers.Num();
-  ASkaldPlayerController *CurrentController = Controllers[CurrentIndex];
-  ASkaldPlayerState *PS =
-      CurrentController->GetPlayerState<ASkaldPlayerState>();
-  const FString PlayerName = PS ? PS->DisplayName : TEXT("Unknown");
-
-  // Calculate reinforcements for the new active player.
-  if (PS) {
-    int32 Owned = 0;
-    if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
-            GetWorld(), AWorldMap::StaticClass()))) {
-      for (ATerritory *Terr : WorldMap->Territories) {
-        if (Terr && Terr->OwningPlayer == PS) {
-          ++Owned;
-        }
-      }
-    }
-    const int32 Reinforcements = FMath::CeilToInt(Owned / 3.0f);
-    PS->ArmyPool = Reinforcements;
-    PS->ForceNetUpdate();
-    BroadcastArmyPool(PS);
-  }
-
-  CurrentPhase = ETurnPhase::Reinforcement;
-  for (ASkaldPlayerController *Controller : Controllers) {
-    if (Controller) {
-      const bool bIsActive = Controller == CurrentController;
-      Controller->ShowTurnAnnouncement(PlayerName, bIsActive);
-      if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
-        HUD->UpdateTurnBanner(PS ? PS->GetPlayerId() : -1, 1);
-        HUD->UpdatePhaseBanner(CurrentPhase);
-      }
-    }
-  }
-
-  CurrentController->StartTurn();
-}
-
 void ATurnManager::SortControllersByInitiative() {
-  Controllers.Sort(
-      [](const ASkaldPlayerController &A, const ASkaldPlayerController &B) {
-        const ASkaldPlayerState *PSA = A.GetPlayerState<ASkaldPlayerState>();
-        const ASkaldPlayerState *PSB = B.GetPlayerState<ASkaldPlayerState>();
-        const int32 RollA = PSA ? PSA->InitiativeRoll : 0;
-        const int32 RollB = PSB ? PSB->InitiativeRoll : 0;
-        return RollA > RollB;
-      });
+  Controllers.RemoveAll([](const TWeakObjectPtr<ASkaldPlayerController> &Ptr) {
+    return !Ptr.IsValid();
+  });
+  Controllers.Sort([](const TWeakObjectPtr<ASkaldPlayerController> &A,
+                      const TWeakObjectPtr<ASkaldPlayerController> &B) {
+    const ASkaldPlayerState *PSA =
+        A.IsValid() ? A->GetPlayerState<ASkaldPlayerState>() : nullptr;
+    const ASkaldPlayerState *PSB =
+        B.IsValid() ? B->GetPlayerState<ASkaldPlayerState>() : nullptr;
+    const int32 RollA = PSA ? PSA->InitiativeRoll : 0;
+    const int32 RollB = PSB ? PSB->InitiativeRoll : 0;
+    return RollA > RollB;
+  });
 }
 
 void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
@@ -127,8 +137,8 @@ void ATurnManager::BeginAttackPhase() {
   // Enter the attack phase and notify all HUDs so they can swap controls.
   CurrentPhase = ETurnPhase::Attack;
 
-  for (ASkaldPlayerController *Controller : Controllers) {
-    if (Controller) {
+  for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr : Controllers) {
+    if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
       if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
         HUD->UpdatePhaseBanner(ETurnPhase::Attack);
       }
@@ -150,8 +160,8 @@ void ATurnManager::AdvancePhase() {
     return;
   }
 
-  for (ASkaldPlayerController *Controller : Controllers) {
-    if (Controller) {
+  for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr : Controllers) {
+    if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
       if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
         HUD->UpdatePhaseBanner(CurrentPhase);
       }
@@ -163,9 +173,11 @@ void ATurnManager::BroadcastArmyPool(ASkaldPlayerState *ForPlayer) {
   if (!ForPlayer) {
     return;
   }
-  for (ASkaldPlayerController *Controller : Controllers) {
-    if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
-      HUD->UpdateDeployableUnits(ForPlayer->ArmyPool);
+  for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr : Controllers) {
+    if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
+      if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
+        HUD->UpdateDeployableUnits(ForPlayer->ArmyPool);
+      }
     }
   }
 }
