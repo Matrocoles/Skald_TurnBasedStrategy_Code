@@ -219,8 +219,6 @@ void ASkaldPlayerController::MakeAIDecision() {
     return;
   }
 
-  const ETurnPhase Phase = TurnManager->GetCurrentPhase();
-
   // Cache the world map for subsequent phases.
   AWorldMap *WorldMap = Cast<AWorldMap>(
       UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
@@ -229,109 +227,115 @@ void ASkaldPlayerController::MakeAIDecision() {
     return;
   }
 
-  // Auto deploy troops during reinforcement and move to the next phase.
-  if (Phase == ETurnPhase::Reinforcement) {
-    TArray<ATerritory *> OwnedTerritories;
-    for (ATerritory *Territory : WorldMap->Territories) {
-      if (Territory && Territory->OwningPlayer == PS) {
-        OwnedTerritories.Add(Territory);
+  // Iterate through phases until the turn naturally ends.
+  ETurnPhase Phase = TurnManager->GetCurrentPhase();
+  while (true) {
+    if (Phase == ETurnPhase::Reinforcement) {
+      TArray<ATerritory *> OwnedTerritories;
+      for (ATerritory *Territory : WorldMap->Territories) {
+        if (Territory && Territory->OwningPlayer == PS) {
+          OwnedTerritories.Add(Territory);
+        }
       }
-    }
 
-    int32 SpreadIndex = 0;
-    while (PS->ArmyPool > 0 && OwnedTerritories.Num() > 0) {
-      ATerritory *TargetTerritory =
-          OwnedTerritories[SpreadIndex % OwnedTerritories.Num()];
-      ++TargetTerritory->ArmyStrength;
-      TargetTerritory->RefreshAppearance();
-      --PS->ArmyPool;
-      --PS->Resources;
-      ++SpreadIndex;
-    }
-    PS->ForceNetUpdate();
-    TurnManager->BroadcastArmyPool(PS);
-    if (TurnManager) {
+      int32 SpreadIndex = 0;
+      while (PS->ArmyPool > 0 && OwnedTerritories.Num() > 0) {
+        ATerritory *TargetTerritory =
+            OwnedTerritories[SpreadIndex % OwnedTerritories.Num()];
+        ++TargetTerritory->ArmyStrength;
+        TargetTerritory->RefreshAppearance();
+        --PS->ArmyPool;
+        --PS->Resources;
+        ++SpreadIndex;
+      }
+      PS->ForceNetUpdate();
+      TurnManager->BroadcastArmyPool(PS);
       TurnManager->BroadcastResources(PS);
+
+      TurnManager->AdvancePhase();
+      Phase = TurnManager->GetCurrentPhase();
+      continue;
     }
 
-    // Proceed to the attack phase and evaluate further actions.
-    TurnManager->AdvancePhase();
-    MakeAIDecision();
-    return;
-  }
+    if (Phase == ETurnPhase::Attack) {
+      ATerritory *BestSource = nullptr;
+      ATerritory *BestTarget = nullptr;
+      int32 WeakestStrength = TNumericLimits<int32>::Max();
 
-  // Choose an attack target if possible during the attack phase.
-  if (Phase == ETurnPhase::Attack) {
-    ATerritory *BestSource = nullptr;
-    ATerritory *BestTarget = nullptr;
-    int32 WeakestStrength = TNumericLimits<int32>::Max();
-
-    for (ATerritory *Source : WorldMap->Territories) {
-      if (!Source || Source->OwningPlayer != PS || Source->ArmyStrength <= 1) {
-        continue;
-      }
-
-      for (ATerritory *Neighbor : Source->AdjacentTerritories) {
-        if (!Neighbor || Neighbor->OwningPlayer == PS) {
+      for (ATerritory *Source : WorldMap->Territories) {
+        if (!Source || Source->OwningPlayer != PS || Source->ArmyStrength <= 1) {
           continue;
         }
 
-        if (Neighbor->ArmyStrength < WeakestStrength) {
-          BestSource = Source;
-          BestTarget = Neighbor;
-          WeakestStrength = Neighbor->ArmyStrength;
+        for (ATerritory *Neighbor : Source->AdjacentTerritories) {
+          if (!Neighbor || Neighbor->OwningPlayer == PS) {
+            continue;
+          }
+
+          if (Neighbor->ArmyStrength < WeakestStrength) {
+            BestSource = Source;
+            BestTarget = Neighbor;
+            WeakestStrength = Neighbor->ArmyStrength;
+          }
         }
       }
-    }
 
-    if (BestSource && BestTarget && BestSource->ArmyStrength > 1) {
-      const int32 ArmySent = BestSource->ArmyStrength - 1;
-      HandleAttackRequested(BestSource->TerritoryID, BestTarget->TerritoryID,
-                            ArmySent, false);
-    }
-
-    TurnManager->AdvancePhase();
-    MakeAIDecision();
-    return;
-  }
-
-  // Move units to reinforce weak friendly territories during the movement phase.
-  if (Phase == ETurnPhase::Movement) {
-    ATerritory *BestSource = nullptr;
-    ATerritory *BestTarget = nullptr;
-    int32 WeakestStrength = TNumericLimits<int32>::Max();
-
-    for (ATerritory *Source : WorldMap->Territories) {
-      if (!Source || Source->OwningPlayer != PS || Source->ArmyStrength <= 1) {
-        continue;
+      if (BestSource && BestTarget && BestSource->ArmyStrength > 1) {
+        const int32 ArmySent = BestSource->ArmyStrength - 1;
+        HandleAttackRequested(BestSource->TerritoryID,
+                              BestTarget->TerritoryID, ArmySent, false);
       }
 
-      for (ATerritory *Neighbor : Source->AdjacentTerritories) {
-        if (!Neighbor || Neighbor->OwningPlayer != PS) {
+      TurnManager->AdvancePhase();
+      Phase = TurnManager->GetCurrentPhase();
+      continue;
+    }
+
+    if (Phase == ETurnPhase::Engineering || Phase == ETurnPhase::Treasure) {
+      TurnManager->AdvancePhase();
+      Phase = TurnManager->GetCurrentPhase();
+      continue;
+    }
+
+    if (Phase == ETurnPhase::Movement) {
+      ATerritory *BestSource = nullptr;
+      ATerritory *BestTarget = nullptr;
+      int32 WeakestStrength = TNumericLimits<int32>::Max();
+
+      for (ATerritory *Source : WorldMap->Territories) {
+        if (!Source || Source->OwningPlayer != PS || Source->ArmyStrength <= 1) {
           continue;
         }
 
-        if (Neighbor->ArmyStrength < WeakestStrength) {
-          BestSource = Source;
-          BestTarget = Neighbor;
-          WeakestStrength = Neighbor->ArmyStrength;
+        for (ATerritory *Neighbor : Source->AdjacentTerritories) {
+          if (!Neighbor || Neighbor->OwningPlayer != PS) {
+            continue;
+          }
+
+          if (Neighbor->ArmyStrength < WeakestStrength) {
+            BestSource = Source;
+            BestTarget = Neighbor;
+            WeakestStrength = Neighbor->ArmyStrength;
+          }
         }
       }
+
+      if (BestSource && BestTarget) {
+        int32 TroopsToMove = BestSource->ArmyStrength / 2;
+        TroopsToMove =
+            FMath::Clamp(TroopsToMove, 1, BestSource->ArmyStrength - 1);
+        HandleMoveRequested(BestSource->TerritoryID, BestTarget->TerritoryID,
+                            TroopsToMove);
+      }
+
+      EndTurn();
+      return;
     }
 
-    if (BestSource && BestTarget) {
-      int32 TroopsToMove = BestSource->ArmyStrength / 2;
-      TroopsToMove = FMath::Clamp(TroopsToMove, 1, BestSource->ArmyStrength - 1);
-      HandleMoveRequested(BestSource->TerritoryID, BestTarget->TerritoryID,
-                          TroopsToMove);
-    }
-
+    // Any other phase ends the turn immediately.
     EndTurn();
     return;
   }
-
-  // Any other phase ends the turn immediately.
-  EndTurn();
 }
 
 bool ASkaldPlayerController::IsAIController() const { return bIsAI; }
