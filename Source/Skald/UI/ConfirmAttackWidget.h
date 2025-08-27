@@ -10,8 +10,8 @@ class USpinBox;
 /**
  * Simple confirmation widget with Approve/Cancel buttons for attack
  * selection.
- */
-UCLASS()
+*/
+UCLASS(BlueprintType, Blueprintable)
 class SKALD_API UConfirmAttackWidget : public UUserWidget {
   GENERATED_BODY()
 
