@@ -11,6 +11,7 @@
 #include "Territory.h"
 #include "UI/SkaldMainHUDWidget.h"
 #include "WorldMap.h"
+#include "HAL/NumericLimits.h"
 
 ASkaldPlayerController::ASkaldPlayerController() {
   bIsAI = false;
@@ -153,31 +154,114 @@ void ASkaldPlayerController::MakeAIDecision() {
   }
 
   const ETurnPhase Phase = TurnManager->GetCurrentPhase();
-  // Auto deploy troops during reinforcement.
-  if (Phase == ETurnPhase::Reinforcement) {
-    if (AWorldMap *WorldMap = Cast<AWorldMap>(
-            UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()))) {
-      TArray<ATerritory *> OwnedTerritories;
-      for (ATerritory *Territory : WorldMap->Territories) {
-        if (Territory && Territory->OwningPlayer == PS) {
-          OwnedTerritories.Add(Territory);
-        }
-      }
 
-      int32 SpreadIndex = 0;
-      while (PS->ArmyPool > 0 && OwnedTerritories.Num() > 0) {
-        ATerritory *TargetTerritory =
-            OwnedTerritories[SpreadIndex % OwnedTerritories.Num()];
-        ++TargetTerritory->ArmyStrength;
-        TargetTerritory->RefreshAppearance();
-        --PS->ArmyPool;
-        ++SpreadIndex;
-      }
-      PS->ForceNetUpdate();
-      TurnManager->BroadcastArmyPool(PS);
-    }
+  // Cache the world map for subsequent phases.
+  AWorldMap *WorldMap = Cast<AWorldMap>(
+      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
+  if (!WorldMap) {
+    EndTurn();
+    return;
   }
 
+  // Auto deploy troops during reinforcement and move to the next phase.
+  if (Phase == ETurnPhase::Reinforcement) {
+    TArray<ATerritory *> OwnedTerritories;
+    for (ATerritory *Territory : WorldMap->Territories) {
+      if (Territory && Territory->OwningPlayer == PS) {
+        OwnedTerritories.Add(Territory);
+      }
+    }
+
+    int32 SpreadIndex = 0;
+    while (PS->ArmyPool > 0 && OwnedTerritories.Num() > 0) {
+      ATerritory *TargetTerritory =
+          OwnedTerritories[SpreadIndex % OwnedTerritories.Num()];
+      ++TargetTerritory->ArmyStrength;
+      TargetTerritory->RefreshAppearance();
+      --PS->ArmyPool;
+      ++SpreadIndex;
+    }
+    PS->ForceNetUpdate();
+    TurnManager->BroadcastArmyPool(PS);
+
+    // Proceed to the attack phase and evaluate further actions.
+    TurnManager->AdvancePhase();
+    MakeAIDecision();
+    return;
+  }
+
+  // Choose an attack target if possible during the attack phase.
+  if (Phase == ETurnPhase::Attack) {
+    ATerritory *BestSource = nullptr;
+    ATerritory *BestTarget = nullptr;
+    int32 WeakestStrength = TNumericLimits<int32>::Max();
+
+    for (ATerritory *Source : WorldMap->Territories) {
+      if (!Source || Source->OwningPlayer != PS || Source->ArmyStrength <= 1) {
+        continue;
+      }
+
+      for (ATerritory *Neighbor : Source->AdjacentTerritories) {
+        if (!Neighbor || Neighbor->OwningPlayer == PS) {
+          continue;
+        }
+
+        if (Neighbor->ArmyStrength < WeakestStrength) {
+          BestSource = Source;
+          BestTarget = Neighbor;
+          WeakestStrength = Neighbor->ArmyStrength;
+        }
+      }
+    }
+
+    if (BestSource && BestTarget) {
+      const int32 ArmySent = FMath::Clamp(BestSource->ArmyStrength - 1, 1,
+                                          BestSource->ArmyStrength - 1);
+      HandleAttackRequested(BestSource->TerritoryID, BestTarget->TerritoryID,
+                            ArmySent);
+    }
+
+    TurnManager->AdvancePhase();
+    MakeAIDecision();
+    return;
+  }
+
+  // Move units to reinforce weak friendly territories during the movement phase.
+  if (Phase == ETurnPhase::Movement) {
+    ATerritory *BestSource = nullptr;
+    ATerritory *BestTarget = nullptr;
+    int32 WeakestStrength = TNumericLimits<int32>::Max();
+
+    for (ATerritory *Source : WorldMap->Territories) {
+      if (!Source || Source->OwningPlayer != PS || Source->ArmyStrength <= 1) {
+        continue;
+      }
+
+      for (ATerritory *Neighbor : Source->AdjacentTerritories) {
+        if (!Neighbor || Neighbor->OwningPlayer != PS) {
+          continue;
+        }
+
+        if (Neighbor->ArmyStrength < WeakestStrength) {
+          BestSource = Source;
+          BestTarget = Neighbor;
+          WeakestStrength = Neighbor->ArmyStrength;
+        }
+      }
+    }
+
+    if (BestSource && BestTarget) {
+      int32 TroopsToMove = BestSource->ArmyStrength / 2;
+      TroopsToMove = FMath::Clamp(TroopsToMove, 1, BestSource->ArmyStrength - 1);
+      HandleMoveRequested(BestSource->TerritoryID, BestTarget->TerritoryID,
+                          TroopsToMove);
+    }
+
+    EndTurn();
+    return;
+  }
+
+  // Any other phase ends the turn immediately.
   EndTurn();
 }
 
