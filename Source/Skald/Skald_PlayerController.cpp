@@ -1,18 +1,18 @@
 #include "Skald_PlayerController.h"
-#include "Skald.h"
 #include "Blueprint/UserWidget.h"
 #include "Engine/Engine.h"
+#include "HAL/NumericLimits.h"
 #include "Kismet/GameplayStatics.h"
+#include "Skald.h"
+#include "SkaldTypes.h"
 #include "Skald_GameInstance.h"
 #include "Skald_GameMode.h"
 #include "Skald_GameState.h"
 #include "Skald_PlayerState.h"
 #include "Skald_TurnManager.h"
 #include "Territory.h"
-#include "SkaldTypes.h"
 #include "UI/SkaldMainHUDWidget.h"
 #include "WorldMap.h"
-#include "HAL/NumericLimits.h"
 
 ASkaldPlayerController::ASkaldPlayerController() {
   bIsAI = false;
@@ -52,7 +52,7 @@ void ASkaldPlayerController::BeginPlay() {
 
     if (IsLocalController()) {
       ServerInitPlayerState(CachedGameInstance->DisplayName,
-                           CachedGameInstance->Faction);
+                            CachedGameInstance->Faction);
     }
   }
 
@@ -100,6 +100,8 @@ void ASkaldPlayerController::BeginPlay() {
           this, &ASkaldPlayerController::HandleEngineeringRequested);
       MainHudWidget->OnBuildSiegeRequested.AddDynamic(
           this, &ASkaldPlayerController::HandleBuildSiegeRequested);
+      MainHudWidget->OnDigTreasureRequested.AddDynamic(
+          this, &ASkaldPlayerController::HandleDigTreasureRequested);
     }
   } else {
     UE_LOG(LogSkald, Warning,
@@ -163,8 +165,9 @@ void ASkaldPlayerController::EndTurn() {
   SetInputMode(FInputModeGameOnly());
 
   if (!TurnManager) {
-    UE_LOG(LogSkald, Warning,
-           TEXT("EndTurn called without a TurnManager. Attempting to reacquire."));
+    UE_LOG(
+        LogSkald, Warning,
+        TEXT("EndTurn called without a TurnManager. Attempting to reacquire."));
 
     if (!CachedGameMode) {
       CachedGameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
@@ -186,8 +189,10 @@ void ASkaldPlayerController::EndTurn() {
 
 void ASkaldPlayerController::EndPhase() {
   if (!TurnManager) {
-    UE_LOG(LogSkald, Warning,
-           TEXT("EndPhase called without a TurnManager. Attempting to reacquire."));
+    UE_LOG(
+        LogSkald, Warning,
+        TEXT(
+            "EndPhase called without a TurnManager. Attempting to reacquire."));
 
     if (!CachedGameMode) {
       CachedGameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
@@ -263,7 +268,8 @@ void ASkaldPlayerController::MakeAIDecision() {
       int32 WeakestStrength = TNumericLimits<int32>::Max();
 
       for (ATerritory *Source : WorldMap->Territories) {
-        if (!Source || Source->OwningPlayer != PS || Source->ArmyStrength <= 1) {
+        if (!Source || Source->OwningPlayer != PS ||
+            Source->ArmyStrength <= 1) {
           continue;
         }
 
@@ -282,8 +288,8 @@ void ASkaldPlayerController::MakeAIDecision() {
 
       if (BestSource && BestTarget && BestSource->ArmyStrength > 1) {
         const int32 ArmySent = BestSource->ArmyStrength - 1;
-        HandleAttackRequested(BestSource->TerritoryID,
-                              BestTarget->TerritoryID, ArmySent, false);
+        HandleAttackRequested(BestSource->TerritoryID, BestTarget->TerritoryID,
+                              ArmySent, false);
       }
 
       TurnManager->AdvancePhase();
@@ -303,7 +309,8 @@ void ASkaldPlayerController::MakeAIDecision() {
       int32 WeakestStrength = TNumericLimits<int32>::Max();
 
       for (ATerritory *Source : WorldMap->Territories) {
-        if (!Source || Source->OwningPlayer != PS || Source->ArmyStrength <= 1) {
+        if (!Source || Source->OwningPlayer != PS ||
+            Source->ArmyStrength <= 1) {
           continue;
         }
 
@@ -344,7 +351,7 @@ void ASkaldPlayerController::HandleAttackRequested(int32 FromID, int32 ToID,
                                                    int32 ArmySent,
                                                    bool bUseSiege) {
   UE_LOG(LogSkald, Log, TEXT("HUD attack from %d to %d with %d"), FromID, ToID,
-        ArmySent);
+         ArmySent);
 
   AWorldMap *WorldMap = Cast<AWorldMap>(
       UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
@@ -370,7 +377,8 @@ void ASkaldPlayerController::HandleAttackRequested(int32 FromID, int32 ToID,
     return;
   }
 
-  if (!SkaldHelpers::MeetsCapitalAttackRequirement(Target->bIsCapital, ArmySent)) {
+  if (!SkaldHelpers::MeetsCapitalAttackRequirement(Target->bIsCapital,
+                                                   ArmySent)) {
     NotifyActionError(TEXT("Insufficient forces to attack capital"));
     return;
   }
@@ -378,8 +386,10 @@ void ASkaldPlayerController::HandleAttackRequested(int32 FromID, int32 ToID,
   ServerHandleAttack(FromID, ToID, ArmySent, bUseSiege);
 }
 
-void ASkaldPlayerController::ServerHandleAttack_Implementation(
-    int32 FromID, int32 ToID, int32 ArmySent, bool bUseSiege) {
+void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
+                                                               int32 ToID,
+                                                               int32 ArmySent,
+                                                               bool bUseSiege) {
   AWorldMap *WorldMap = Cast<AWorldMap>(
       UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
   if (!WorldMap) {
@@ -397,7 +407,8 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(
     return;
   }
 
-  if (!SkaldHelpers::MeetsCapitalAttackRequirement(Target->bIsCapital, ArmySent)) {
+  if (!SkaldHelpers::MeetsCapitalAttackRequirement(Target->bIsCapital,
+                                                   ArmySent)) {
     return;
   }
 
@@ -541,13 +552,13 @@ void ASkaldPlayerController::ServerHandleMove_Implementation(int32 FromID,
       if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
         if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
           FString SourceOwner = Source->OwningPlayer
-                                   ? Source->OwningPlayer->DisplayName
-                                   : TEXT("Neutral");
+                                    ? Source->OwningPlayer->DisplayName
+                                    : TEXT("Neutral");
           HUD->UpdateTerritoryInfo(Source->TerritoryName, SourceOwner,
                                    Source->ArmyStrength);
           FString TargetOwner = Target->OwningPlayer
-                                   ? Target->OwningPlayer->DisplayName
-                                   : TEXT("Neutral");
+                                    ? Target->OwningPlayer->DisplayName
+                                    : TEXT("Neutral");
           HUD->UpdateTerritoryInfo(Target->TerritoryName, TargetOwner,
                                    Target->ArmyStrength);
         }
@@ -576,9 +587,8 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
     return;
   }
 
-  FString OwnerName = Terr->OwningPlayer
-                           ? Terr->OwningPlayer->DisplayName
-                           : TEXT("Neutral");
+  FString OwnerName =
+      Terr->OwningPlayer ? Terr->OwningPlayer->DisplayName : TEXT("Neutral");
 
   Terr->ForceNetUpdate();
 
@@ -622,24 +632,77 @@ void ASkaldPlayerController::HandleBuildSiegeRequested(
   ServerBuildSiege(TerritoryID, SiegeType);
 }
 
+void ASkaldPlayerController::HandleDigTreasureRequested(int32 TerritoryID) {
+  ServerDigTreasure(TerritoryID);
+}
+
+void ASkaldPlayerController::ServerDigTreasure_Implementation(
+    int32 TerritoryID) {
+  AWorldMap *WorldMap = Cast<AWorldMap>(
+      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
+  if (!WorldMap) {
+    return;
+  }
+
+  ATerritory *Terr = WorldMap->GetTerritoryById(TerritoryID);
+  if (!Terr) {
+    return;
+  }
+
+  if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+    if (Terr->OwningPlayer == PS && Terr->HasTreasure) {
+      Terr->HasTreasure = false;
+      Terr->RefreshAppearance();
+      PS->Resources += 5;
+      PS->ForceNetUpdate();
+      if (TurnManager) {
+        TurnManager->BroadcastResources(PS);
+      }
+    }
+  }
+}
+
 void ASkaldPlayerController::HandleEngineeringPhase() {
   UE_LOG(LogSkald, Log, TEXT("Engineering phase started"));
+  if (MainHudWidget) {
+    MainHudWidget->CancelAttackSelection();
+    MainHudWidget->CancelMoveSelection();
+    MainHudWidget->UpdateInitiativeText(TEXT("Engineering Phase"));
+  }
 }
 
 void ASkaldPlayerController::HandleTreasurePhase() {
   UE_LOG(LogSkald, Log, TEXT("Treasure phase started"));
+  if (MainHudWidget) {
+    MainHudWidget->CancelAttackSelection();
+    MainHudWidget->CancelMoveSelection();
+    MainHudWidget->UpdateInitiativeText(TEXT("Treasure Phase"));
+  }
 }
 
 void ASkaldPlayerController::HandleMovementPhase() {
   UE_LOG(LogSkald, Log, TEXT("Movement phase started"));
+  if (MainHudWidget) {
+    MainHudWidget->CancelAttackSelection();
+    MainHudWidget->BeginMoveSelection();
+    MainHudWidget->UpdateInitiativeText(TEXT("Movement Phase"));
+  }
 }
 
 void ASkaldPlayerController::HandleEndTurnPhase() {
   UE_LOG(LogSkald, Log, TEXT("EndTurn phase started"));
+  if (MainHudWidget) {
+    MainHudWidget->ShowEndingTurn();
+    MainHudWidget->UpdateInitiativeText(TEXT("End Turn Phase"));
+  }
 }
 
 void ASkaldPlayerController::HandleRevoltPhase() {
   UE_LOG(LogSkald, Log, TEXT("Revolt phase started"));
+  if (MainHudWidget) {
+    MainHudWidget->HideEndingTurn();
+    MainHudWidget->UpdateInitiativeText(TEXT("Revolt Phase"));
+  }
 }
 
 void ASkaldPlayerController::HandleTerritorySelected(ATerritory *Terr) {
@@ -716,9 +779,8 @@ void ASkaldPlayerController::HandleWorldStateChanged() {
   if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
           GetWorld(), AWorldMap::StaticClass()))) {
     if (ATerritory *Terr = WorldMap->SelectedTerritory) {
-      FString OwnerName = Terr->OwningPlayer
-                               ? Terr->OwningPlayer->DisplayName
-                               : TEXT("Neutral");
+      FString OwnerName = Terr->OwningPlayer ? Terr->OwningPlayer->DisplayName
+                                             : TEXT("Neutral");
       MainHudWidget->UpdateTerritoryInfo(Terr->TerritoryName, OwnerName,
                                          Terr->ArmyStrength);
     }
