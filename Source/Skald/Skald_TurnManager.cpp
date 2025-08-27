@@ -7,6 +7,7 @@
 #include "Territory.h"
 #include "UI/SkaldMainHUDWidget.h"
 #include "WorldMap.h"
+#include "Skald_GameMode.h"
 
 ATurnManager::ATurnManager() {
   PrimaryActorTick.bCanEverTick = false;
@@ -70,6 +71,10 @@ void ATurnManager::StartTurns() {
       }
 
       CurrentController->StartTurn();
+      if (ASkaldGameMode *GM =
+              GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
+        GM->CheckVictoryConditions();
+      }
     }
   }
 }
@@ -118,6 +123,10 @@ void ATurnManager::AdvanceTurn() {
     }
 
     CurrentController->StartTurn();
+    if (ASkaldGameMode *GM =
+            GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
+      GM->CheckVictoryConditions();
+    }
   }
 }
 
@@ -192,6 +201,11 @@ void ATurnManager::ResolveGridBattleResult() {
 
   GI->PendingBattle = FS_BattlePayload();
   GI->GridBattleManager = nullptr;
+
+  if (ASkaldGameMode *GM =
+          GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
+    GM->CheckVictoryConditions();
+  }
 }
 
 void ATurnManager::BeginAttackPhase() {

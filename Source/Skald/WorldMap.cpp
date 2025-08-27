@@ -1,6 +1,7 @@
 #include "WorldMap.h"
 #include "Engine/World.h"
 #include "Territory.h"
+#include "Skald_GameMode.h"
 
 AWorldMap::AWorldMap() {
   PrimaryActorTick.bCanEverTick = false;
@@ -106,6 +107,10 @@ bool AWorldMap::MoveBetween(ATerritory *From, ATerritory *To, int32 Troops) {
 
   From->ForceNetUpdate();
   To->ForceNetUpdate();
+
+  if (ASkaldGameMode *GM = GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
+    GM->CheckVictoryConditions();
+  }
 
   return true;
 }
