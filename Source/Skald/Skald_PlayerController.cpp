@@ -69,7 +69,8 @@ void ASkaldPlayerController::BeginPlay() {
           }
         }
 
-        const ASkaldPlayerState *CurrentPS = CachedGameState->GetCurrentPlayer();
+        const ASkaldPlayerState *CurrentPS =
+            CachedGameState->GetCurrentPlayer();
         const int32 CurrentID = CurrentPS ? CurrentPS->GetPlayerId() : -1;
         MainHudWidget->RefreshFromState(CurrentID, /*TurnNumber*/ 1,
                                         ETurnPhase::Reinforcement, Players);
@@ -89,9 +90,8 @@ void ASkaldPlayerController::BeginPlay() {
            TEXT("MainHudWidgetClass is null; HUD will not be displayed."));
   }
 
-  if (AWorldMap *WorldMap = Cast<AWorldMap>(
-          UGameplayStatics::GetActorOfClass(GetWorld(),
-                                            AWorldMap::StaticClass()))) {
+  if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+          GetWorld(), AWorldMap::StaticClass()))) {
     WorldMap->OnTerritorySelected.AddDynamic(
         this, &ASkaldPlayerController::HandleTerritorySelected);
   }
@@ -150,32 +150,6 @@ void ASkaldPlayerController::HandleAttackRequested(int32 FromID, int32 ToID,
                                                    int32 ArmySent) {
   UE_LOG(LogTemp, Log, TEXT("HUD attack from %d to %d with %d"), FromID, ToID,
          ArmySent);
-
-  FS_BattlePayload Battle;
-  if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
-    Battle.AttackerPlayerID = PS->GetPlayerId();
-  }
-  if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
-          GetWorld(), AWorldMap::StaticClass()))) {
-    if (ATerritory *Source = WorldMap->GetTerritoryById(FromID)) {
-      if (Source->OwningPlayer) {
-        Battle.AttackerPlayerID = Source->OwningPlayer->GetPlayerId();
-      }
-    }
-    if (ATerritory *Target = WorldMap->GetTerritoryById(ToID)) {
-      if (Target->OwningPlayer) {
-        Battle.DefenderPlayerID = Target->OwningPlayer->GetPlayerId();
-      }
-      Battle.IsCapitalAttack = Target->bIsCapital;
-    }
-  }
-  Battle.FromTerritoryID = FromID;
-  Battle.TargetTerritoryID = ToID;
-  Battle.ArmyCountSent = ArmySent;
-
-  if (TurnManager) {
-    TurnManager->TriggerGridBattle(Battle);
-  }
 }
 
 void ASkaldPlayerController::HandleMoveRequested(int32 FromID, int32 ToID,
