@@ -417,18 +417,9 @@ void ASkaldPlayerController::ServerHandleMove_Implementation(int32 FromID,
     return;
   }
 
-  if (!WorldMap->MoveBetween(Source, Target)) {
+  if (!WorldMap->MoveBetween(Source, Target, Troops)) {
     return;
   }
-
-  Source->ArmyStrength -= Troops;
-  Target->ArmyStrength += Troops;
-
-  Source->RefreshAppearance();
-  Target->RefreshAppearance();
-
-  Source->ForceNetUpdate();
-  Target->ForceNetUpdate();
 
   if (TurnManager) {
     for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr :

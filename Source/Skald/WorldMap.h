@@ -82,7 +82,7 @@ public:
 
   /** Move units between territories. */
   UFUNCTION(BlueprintCallable, Category = "WorldMap")
-  bool MoveBetween(ATerritory *From, ATerritory *To);
+  bool MoveBetween(ATerritory *From, ATerritory *To, int32 Troops);
 
   /** Actor class used when spawning territory instances. */
   UPROPERTY(EditAnywhere, Category = "WorldMap")

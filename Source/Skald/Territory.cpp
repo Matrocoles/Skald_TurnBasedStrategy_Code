@@ -151,16 +151,17 @@ bool ATerritory::IsAdjacentTo(const ATerritory *Other) const {
   return AdjacentTerritories.Contains(Other);
 }
 
-bool ATerritory::MoveTo(ATerritory *TargetTerritory) {
-  if (!TargetTerritory || !IsAdjacentTo(TargetTerritory)) {
+bool ATerritory::MoveTo(ATerritory *TargetTerritory, int32 Troops) {
+  if (!TargetTerritory || Troops <= 0 || Troops >= ArmyStrength) {
     return false;
   }
 
-  // Movement logic would be handled here. For now we simply select the target.
-  // Movement logic would be handled here. For now we simply deselect this
-  // territory and select the target.
+  ArmyStrength -= Troops;
+  TargetTerritory->ArmyStrength += Troops;
+
   Deselect();
   TargetTerritory->Select();
+
   return true;
 }
 

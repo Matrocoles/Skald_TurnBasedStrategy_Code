@@ -85,7 +85,7 @@ public:
 
     /** Attempt to move units to the target territory. */
     UFUNCTION(BlueprintCallable, Category = "Territory")
-    bool MoveTo(ATerritory* TargetTerritory);
+    bool MoveTo(ATerritory* TargetTerritory, int32 Troops);
 
     /** React to mouse entering the territory. */
     UFUNCTION()
