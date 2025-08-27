@@ -191,6 +191,16 @@ void ATurnManager::SortControllersByInitiative() {
   });
 }
 
+TArray<ASkaldPlayerController*> ATurnManager::GetControllers() const {
+  TArray<ASkaldPlayerController*> Result;
+  for (const TWeakObjectPtr<ASkaldPlayerController>& Ptr : Controllers) {
+    if (Ptr.IsValid()) {
+      Result.Add(Ptr.Get());
+    }
+  }
+  return Result;
+}
+
 void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
   FS_BattlePayload SeededBattle = Battle;
   SeededBattle.RandomSeed = FMath::Rand();
