@@ -26,7 +26,7 @@ void AWorldMap::BeginPlay() {
 
     if (TerritoryClass && !TerritoryTable) {
       FActorSpawnParameters Params;
-      Params.Owner = this;
+      Params.StartOwner = this;
       ATerritory *Placeholder = GetWorld()->SpawnActor<ATerritory>(
           TerritoryClass, GetActorLocation(), FRotator::ZeroRotator, Params);
       if (Placeholder) {
@@ -49,7 +49,7 @@ void AWorldMap::BeginPlay() {
     const FVector SpawnLocation = GetActorLocation() + Data->Location;
 
     FActorSpawnParameters Params;
-    Params.Owner = this;
+    Params.StartOwner = this;
     ATerritory *Territory = GetWorld()->SpawnActor<ATerritory>(
         TerritoryClass, SpawnLocation, FRotator::ZeroRotator, Params);
     if (Territory) {
@@ -127,7 +127,7 @@ bool AWorldMap::FindPath(ATerritory *From, ATerritory *To,
     return true;
   }
 
-  ASkaldPlayerState *Owner = From->OwningPlayer;
+  ASkaldPlayerState *StartOwner = From->OwningPlayer;
   TQueue<ATerritory *> Frontier;
   TMap<ATerritory *, ATerritory *> CameFrom;
 
@@ -142,7 +142,7 @@ bool AWorldMap::FindPath(ATerritory *From, ATerritory *To,
     }
 
     for (ATerritory *Neighbor : Current->AdjacentTerritories) {
-      if (!Neighbor || Neighbor->OwningPlayer != Owner ||
+      if (!Neighbor || Neighbor->OwningPlayer != StartOwner ||
           CameFrom.Contains(Neighbor)) {
         continue;
       }
