@@ -106,6 +106,10 @@ void USkaldMainHUDWidget::UpdatePhaseBanner(ETurnPhase InPhase) {
   CurrentPhase = InPhase;
 
   BP_SetPhaseText(CurrentPhase);
+  if (!FindFunction(TEXT("BP_SetPhaseButtons"))) {
+    UE_LOG(LogSkald, Warning, TEXT("SyncPhaseButtons not bound for HUD %s"),
+           *GetName());
+  }
   SyncPhaseButtons(CurrentPlayerID == LocalPlayerID);
 
   if (DeployableUnitsText && CurrentPhase != ETurnPhase::Reinforcement) {

@@ -79,21 +79,6 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
   RefreshHUDs();
 
   TryInitializeWorldAndStart();
-
-  if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
-    if (GS->PlayerArray.Num() >= ExpectedPlayerCount && !bTurnsStarted) {
-      bTurnsStarted = true;
-      GetWorldTimerManager().ClearTimer(StartGameTimerHandle);
-      if (TurnManager) {
-        TurnManager->SortControllersByInitiative();
-        TurnManager->StartTurns();
-        if (GEngine) {
-          GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Green,
-                                           TEXT("Game started"));
-        }
-      }
-    }
-  }
 }
 
 void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
@@ -229,26 +214,27 @@ void ASkaldGameMode::UpdatePlayerResources(ASkaldPlayerState *Player) {
 }
 
 void ASkaldGameMode::TryInitializeWorldAndStart() {
-  if (bWorldInitialized) {
-    return;
-  }
+  const bool bWasInitialized = bWorldInitialized;
 
-  if (InitializeWorld()) {
+  if (!bWorldInitialized && InitializeWorld()) {
     bWorldInitialized = true;
     BeginArmyPlacementPhase();
-    GetWorldTimerManager().SetTimer(
-        StartGameTimerHandle, FTimerDelegate::CreateLambda([this]() {
-          if (!bTurnsStarted && TurnManager) {
-            bTurnsStarted = true;
-            TurnManager->SortControllersByInitiative();
-            TurnManager->StartTurns();
-            if (GEngine) {
-              GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Green,
-                                               TEXT("Game started"));
-            }
-          }
-        }),
-        StartGameTimeout, false);
+  }
+
+  if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
+    const bool bReadyToStart =
+        GS->PlayerArray.Num() >= ExpectedPlayerCount;
+    if (bWorldInitialized && bReadyToStart && !bTurnsStarted && TurnManager) {
+      bTurnsStarted = true;
+      TurnManager->SortControllersByInitiative();
+      TurnManager->StartTurns();
+      TurnManager->BroadcastCurrentPhase();
+
+      if (GEngine) {
+        GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Green,
+                                         TEXT("Game started"));
+      }
+    }
   }
 }
 
