@@ -54,6 +54,10 @@ public:
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="Turn")
     const TArray<ASkaldPlayerController*>& GetControllers() const { return Controllers; }
 
+    /** Retrieve the current phase of play. */
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="Turn")
+    ETurnPhase GetCurrentPhase() const { return CurrentPhase; }
+
 protected:
     UPROPERTY(BlueprintReadOnly, Category="Turn")
     TArray<ASkaldPlayerController*> Controllers;
