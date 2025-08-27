@@ -221,6 +221,9 @@ struct SKALD_API FS_Territory
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     int32 ContinentID = 0;
 
+    UPROPERTY(BlueprintReadWrite, EditAnywhere, SaveGame)
+    FVector Location = FVector::ZeroVector;
+
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     bool HasTreasure = false;
 
