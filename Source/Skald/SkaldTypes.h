@@ -12,6 +12,16 @@ namespace SkaldConstants
     static constexpr int32 CapitalAttackArmyRequirement = 10;
 }
 
+// Utility helpers for gameplay checks
+namespace SkaldHelpers
+{
+    // Returns true if the given attack meets the capital requirement.
+    inline bool MeetsCapitalAttackRequirement(bool bTargetIsCapital, int32 ArmySent)
+    {
+        return !bTargetIsCapital || ArmySent >= SkaldConstants::CapitalAttackArmyRequirement;
+    }
+}
+
 UENUM(BlueprintType)
 enum class ETurnPhase : uint8
 {

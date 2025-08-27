@@ -13,6 +13,7 @@
 #include "Skald_PlayerState.h"
 #include "Skald_TurnManager.h"
 #include "Territory.h"
+#include "SkaldTypes.h"
 #include "UI/ConfirmAttackWidget.h"
 #include "UI/DeployWidget.h"
 #include "WorldMap.h"
@@ -467,12 +468,30 @@ void USkaldMainHUDWidget::HandleAttackApproved() {
   const int32 SourceID = SelectedSourceID;
   const int32 TargetID = SelectedTargetID;
   int32 ArmyCount = ActiveConfirmWidget->ArmyCount;
+  bool bTargetIsCapital = false;
 
   if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
           GetWorld(), AWorldMap::StaticClass()))) {
     if (ATerritory *Source = WorldMap->GetTerritoryById(SourceID)) {
       ArmyCount = FMath::Clamp(ArmyCount, 1, Source->ArmyStrength);
     }
+    if (ATerritory *Target = WorldMap->GetTerritoryById(TargetID)) {
+      bTargetIsCapital = Target->bIsCapital;
+    }
+  }
+
+  if (!SkaldHelpers::MeetsCapitalAttackRequirement(bTargetIsCapital, ArmyCount)) {
+    const FString Error = FString::Printf(
+        TEXT("Must send at least %d units to attack a capital."),
+        SkaldConstants::CapitalAttackArmyRequirement);
+    if (SelectionPrompt) {
+      SelectionPrompt->SetText(FText::FromString(Error));
+      SelectionPrompt->SetVisibility(ESlateVisibility::Visible);
+    }
+    if (GEngine) {
+      GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Red, Error);
+    }
+    return;
   }
 
   SubmitAttack(SourceID, TargetID, ArmyCount, bUseSiegeForNextAttack);

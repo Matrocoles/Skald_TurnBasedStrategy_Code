@@ -9,6 +9,7 @@
 #include "Skald_PlayerState.h"
 #include "Skald_TurnManager.h"
 #include "Territory.h"
+#include "SkaldTypes.h"
 #include "UI/SkaldMainHUDWidget.h"
 #include "WorldMap.h"
 #include "HAL/NumericLimits.h"
@@ -328,6 +329,10 @@ void ASkaldPlayerController::HandleAttackRequested(int32 FromID, int32 ToID,
     return;
   }
 
+  if (!SkaldHelpers::MeetsCapitalAttackRequirement(Target->bIsCapital, ArmySent)) {
+    return;
+  }
+
   ServerHandleAttack(FromID, ToID, ArmySent, bUseSiege);
 }
 
@@ -346,6 +351,10 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(
   }
 
   if (ArmySent <= 0 || ArmySent >= Source->ArmyStrength) {
+    return;
+  }
+
+  if (!SkaldHelpers::MeetsCapitalAttackRequirement(Target->bIsCapital, ArmySent)) {
     return;
   }
 
