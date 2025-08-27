@@ -252,8 +252,8 @@ void USkaldMainHUDWidget::BeginAttackSelection() {
 }
 
 void USkaldMainHUDWidget::SubmitAttack(int32 FromID, int32 ToID,
-                                       int32 ArmySent) {
-  OnAttackRequested.Broadcast(FromID, ToID, ArmySent);
+                                       int32 ArmySent, bool bUseSiege) {
+  OnAttackRequested.Broadcast(FromID, ToID, ArmySent, bUseSiege);
   CancelAttackSelection();
 }
 
@@ -392,6 +392,15 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
   }
 }
 
+void USkaldMainHUDWidget::BuildSiege(int32 TerritoryID,
+                                     E_SiegeWeapons SiegeType) {
+  OnBuildSiegeRequested.Broadcast(TerritoryID, SiegeType);
+}
+
+void USkaldMainHUDWidget::SetUseSiegeForNextAttack(bool bEnable) {
+  bUseSiegeForNextAttack = bEnable;
+}
+
 void USkaldMainHUDWidget::HandlePlayersUpdated() {
   if (!GameState) {
     return;
@@ -466,7 +475,10 @@ void USkaldMainHUDWidget::HandleAttackApproved() {
     }
   }
 
-  SubmitAttack(SourceID, TargetID, ArmyCount);
+  SubmitAttack(SourceID, TargetID, ArmyCount, bUseSiegeForNextAttack);
+
+  const bool bUseSiege = bUseSiegeForNextAttack;
+  bUseSiegeForNextAttack = false;
 
   // Trigger the battle immediately
   if (APlayerController *PC = GetOwningPlayer()) {
@@ -482,6 +494,10 @@ void USkaldMainHUDWidget::HandleAttackApproved() {
           if (ATerritory *Source = WorldMap->GetTerritoryById(SourceID)) {
             if (Source->OwningPlayer) {
               Battle.AttackerPlayerID = Source->OwningPlayer->GetPlayerId();
+            }
+            if (bUseSiege && Source->BuiltSiegeID > 0) {
+              Battle.AssignedSiegeIDs.Add(Source->BuiltSiegeID);
+              Source->BuiltSiegeID = 0;
             }
           }
           if (ATerritory *Target = WorldMap->GetTerritoryById(TargetID)) {

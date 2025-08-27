@@ -116,6 +116,7 @@ void ATerritory::GetLifetimeReplicatedProps(
   DOREPLIFETIME(ATerritory, ContinentID);
   DOREPLIFETIME(ATerritory, AdjacentTerritories);
   DOREPLIFETIME(ATerritory, ArmyStrength);
+  DOREPLIFETIME(ATerritory, BuiltSiegeID);
 }
 
 void ATerritory::Select() {

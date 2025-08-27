@@ -62,6 +62,13 @@ protected:
   UPROPERTY(BlueprintReadOnly, Category = "Players")
   TArray<FS_PlayerData> PlayersData;
 
+  /** All siege equipment constructed on the map. */
+  UPROPERTY(BlueprintReadOnly, Category = "Siege")
+  TArray<FS_Siege> SiegePool;
+
+  /** Next unique identifier for siege equipment. */
+  int32 NextSiegeID = 1;
+
   /**
    * Setup initial territories, armies, and initiative.
    * Returns true if the world was successfully initialised with at least one
@@ -73,6 +80,14 @@ protected:
   /** Allow players to position initial armies based on initiative. */
   UFUNCTION(BlueprintCallable, Category = "GameMode")
   void BeginArmyPlacementPhase();
+
+  /** Build siege equipment during the engineering phase. */
+  UFUNCTION(BlueprintCallable, Category = "Siege")
+  int32 BuildSiegeAtTerritory(int32 TerritoryID, E_SiegeWeapons Type);
+
+  /** Consume a built siege from a territory for an attack. */
+  UFUNCTION(BlueprintCallable, Category = "Siege")
+  int32 ConsumeSiege(int32 TerritoryID);
 
 private:
   /** Timer that triggers auto-start of the turn sequence. */

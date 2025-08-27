@@ -97,6 +97,8 @@ void ASkaldPlayerController::BeginPlay() {
           this, &ASkaldPlayerController::HandleEndMovementRequested);
       MainHudWidget->OnEngineeringRequested.AddDynamic(
           this, &ASkaldPlayerController::HandleEngineeringRequested);
+      MainHudWidget->OnBuildSiegeRequested.AddDynamic(
+          this, &ASkaldPlayerController::HandleBuildSiegeRequested);
     }
   } else {
     UE_LOG(LogSkald, Warning,
@@ -251,7 +253,7 @@ void ASkaldPlayerController::MakeAIDecision() {
       const int32 ArmySent = FMath::Clamp(BestSource->ArmyStrength - 1, 1,
                                           BestSource->ArmyStrength - 1);
       HandleAttackRequested(BestSource->TerritoryID, BestTarget->TerritoryID,
-                            ArmySent);
+                            ArmySent, false);
     }
 
     TurnManager->AdvancePhase();
@@ -301,7 +303,8 @@ void ASkaldPlayerController::MakeAIDecision() {
 bool ASkaldPlayerController::IsAIController() const { return bIsAI; }
 
 void ASkaldPlayerController::HandleAttackRequested(int32 FromID, int32 ToID,
-                                                   int32 ArmySent) {
+                                                   int32 ArmySent,
+                                                   bool bUseSiege) {
   UE_LOG(LogSkald, Log, TEXT("HUD attack from %d to %d with %d"), FromID, ToID,
         ArmySent);
 
@@ -325,12 +328,11 @@ void ASkaldPlayerController::HandleAttackRequested(int32 FromID, int32 ToID,
     return;
   }
 
-  ServerHandleAttack(FromID, ToID, ArmySent);
+  ServerHandleAttack(FromID, ToID, ArmySent, bUseSiege);
 }
 
-void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
-                                                               int32 ToID,
-                                                               int32 ArmySent) {
+void ASkaldPlayerController::ServerHandleAttack_Implementation(
+    int32 FromID, int32 ToID, int32 ArmySent, bool bUseSiege) {
   AWorldMap *WorldMap = Cast<AWorldMap>(
       UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
   if (!WorldMap) {
@@ -358,12 +360,21 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
     Battle.TargetTerritoryID = ToID;
     Battle.ArmyCountSent = ArmySent;
     Battle.IsCapitalAttack = Target->bIsCapital;
+    if (bUseSiege && CachedGameMode) {
+      const int32 SiegeID = CachedGameMode->ConsumeSiege(FromID);
+      if (SiegeID > 0) {
+        Battle.AssignedSiegeIDs.Add(SiegeID);
+      }
+    }
     TurnManager->TriggerGridBattle(Battle);
     return;
   }
 
   int32 AttackingForces = ArmySent;
   int32 DefendingForces = Target->ArmyStrength;
+  if (bUseSiege && CachedGameMode) {
+    CachedGameMode->ConsumeSiege(FromID);
+  }
 
   Source->ArmyStrength -= ArmySent;
 
@@ -479,6 +490,13 @@ void ASkaldPlayerController::ServerHandleMove_Implementation(int32 FromID,
   }
 }
 
+void ASkaldPlayerController::ServerBuildSiege_Implementation(
+    int32 TerritoryID, E_SiegeWeapons SiegeType) {
+  if (CachedGameMode) {
+    CachedGameMode->BuildSiegeAtTerritory(TerritoryID, SiegeType);
+  }
+}
+
 void ASkaldPlayerController::ServerSelectTerritory_Implementation(
     int32 TerritoryID) {
   AWorldMap *WorldMap = Cast<AWorldMap>(
@@ -531,6 +549,11 @@ void ASkaldPlayerController::HandleEngineeringRequested(int32 CapitalID,
       TurnManager->BroadcastResources(PS);
     }
   }
+}
+
+void ASkaldPlayerController::HandleBuildSiegeRequested(
+    int32 TerritoryID, E_SiegeWeapons SiegeType) {
+  ServerBuildSiege(TerritoryID, SiegeType);
 }
 
 void ASkaldPlayerController::HandleTerritorySelected(ATerritory *Terr) {

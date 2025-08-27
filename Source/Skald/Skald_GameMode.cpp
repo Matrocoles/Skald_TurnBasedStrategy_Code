@@ -37,6 +37,7 @@ ASkaldGameMode::ASkaldGameMode() {
   // Preallocate slots so blueprint scripts can safely write
   // player data to indices without hitting "invalid index" warnings.
   PlayersData.SetNum(ExpectedPlayerCount);
+  NextSiegeID = 1;
 }
 
 void ASkaldGameMode::BeginPlay() {
@@ -294,6 +295,12 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
     }
   }
 
+  SiegePool = LoadedGame->Sieges;
+  NextSiegeID = 1;
+  for (const FS_Siege &S : SiegePool) {
+    NextSiegeID = FMath::Max(NextSiegeID, S.SiegeID + 1);
+  }
+
   for (const FS_Territory &TerrData : LoadedGame->Territories) {
     ATerritory *Territory = WorldMap->GetTerritoryById(TerrData.TerritoryID);
     if (!Territory) {
@@ -314,6 +321,7 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
     Territory->ArmyStrength = TerrData.ArmyCount;
     Territory->bIsCapital = TerrData.IsCapital;
     Territory->ContinentID = TerrData.ContinentID;
+    Territory->BuiltSiegeID = TerrData.BuiltSiegeID;
     Territory->RefreshAppearance();
     Territory->ForceNetUpdate();
   }
@@ -368,6 +376,43 @@ void ASkaldGameMode::BeginArmyPlacementPhase() {
 
   PlacementIndex = 0;
   AdvanceArmyPlacement();
+}
+
+int32 ASkaldGameMode::BuildSiegeAtTerritory(int32 TerritoryID,
+                                            E_SiegeWeapons Type) {
+  if (!WorldMap) {
+    return 0;
+  }
+  ATerritory *Terr = WorldMap->GetTerritoryById(TerritoryID);
+  if (!Terr || Terr->BuiltSiegeID != 0) {
+    return 0;
+  }
+  FS_Siege NewSiege;
+  NewSiege.SiegeID = NextSiegeID++;
+  NewSiege.Type = Type;
+  NewSiege.BuiltAtTerritoryID = TerritoryID;
+  SiegePool.Add(NewSiege);
+  Terr->BuiltSiegeID = NewSiege.SiegeID;
+  Terr->ForceNetUpdate();
+  return NewSiege.SiegeID;
+}
+
+int32 ASkaldGameMode::ConsumeSiege(int32 TerritoryID) {
+  if (!WorldMap) {
+    return 0;
+  }
+  ATerritory *Terr = WorldMap->GetTerritoryById(TerritoryID);
+  if (!Terr || Terr->BuiltSiegeID == 0) {
+    return 0;
+  }
+  const int32 SiegeID = Terr->BuiltSiegeID;
+  Terr->BuiltSiegeID = 0;
+  if (FS_Siege *Siege = SiegePool.FindByPredicate(
+          [SiegeID](const FS_Siege &S) { return S.SiegeID == SiegeID; })) {
+    Siege->AssignedToUnitID = TerritoryID;
+  }
+  Terr->ForceNetUpdate();
+  return SiegeID;
 }
 
 void ASkaldGameMode::AdvanceArmyPlacement() {
@@ -613,12 +658,13 @@ void ASkaldGameMode::FillSaveGame(USkaldSaveGame *SaveGameObject) const {
           TerrData.AdjacentIDs.Add(Adj->TerritoryID);
         }
       }
+      TerrData.BuiltSiegeID = Territory->BuiltSiegeID;
       SaveGameObject->Territories.Add(TerrData);
     }
   }
 
-  // No sieges are currently tracked; ensure array is cleared.
-  SaveGameObject->Sieges.Empty();
+  // Store current siege equipment state.
+  SaveGameObject->Sieges = SiegePool;
 }
 
 void ASkaldGameMode::CheckVictoryConditions() {

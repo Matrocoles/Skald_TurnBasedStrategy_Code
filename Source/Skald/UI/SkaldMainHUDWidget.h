@@ -17,9 +17,12 @@ class ASkaldGameState;
 class USkaldGameInstance;
 
 // Delegates broadcasting user UI actions to game logic
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FSkaldAttackRequested, int32,
-                                               FromID, int32, ToID, int32,
-                                               ArmySent);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FSkaldAttackRequested, int32,
+                                              FromID, int32, ToID, int32,
+                                              ArmySent, bool, bUseSiege);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FSkaldBuildSiegeRequested, int32,
+                                             TerritoryID, E_SiegeWeapons,
+                                             SiegeType);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSkaldEndAttackRequested, bool,
                                             bConfirmed);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FSkaldEngineeringRequested, int32,
@@ -75,6 +78,9 @@ public:
   UPROPERTY(BlueprintReadWrite, Category = "Skald|Selection")
   bool bSelectingForMove = false;
 
+  UPROPERTY(BlueprintReadWrite, Category = "Skald|Siege")
+  bool bUseSiegeForNextAttack = false;
+
   // Cached list of players for UI list building
   UPROPERTY(BlueprintReadWrite, Category = "Skald|Data")
   TArray<FS_PlayerData> CachedPlayers;
@@ -98,6 +104,9 @@ public:
 
   UPROPERTY(BlueprintAssignable, Category = "Skald|Events")
   FSkaldEngineeringRequested OnEngineeringRequested;
+
+  UPROPERTY(BlueprintAssignable, Category = "Skald|Events")
+  FSkaldBuildSiegeRequested OnBuildSiegeRequested;
 
   UPROPERTY(BlueprintAssignable, Category = "Skald|Events")
   FSkaldDigTreasureRequested OnDigTreasureRequested;
@@ -163,7 +172,8 @@ public:
   void BeginAttackSelection();
 
   UFUNCTION(BlueprintCallable, Category = "Skald|Selection")
-  void SubmitAttack(int32 FromID, int32 ToID, int32 ArmySent);
+  void SubmitAttack(int32 FromID, int32 ToID, int32 ArmySent,
+                    bool bUseSiege);
 
   UFUNCTION(BlueprintCallable, Category = "Skald|Selection")
   void CancelAttackSelection();
@@ -179,6 +189,12 @@ public:
 
   UFUNCTION(BlueprintCallable, Category = "Skald|Selection")
   void OnTerritoryClickedUI(ATerritory *Territory);
+
+  UFUNCTION(BlueprintCallable, Category = "Skald|Siege")
+  void BuildSiege(int32 TerritoryID, E_SiegeWeapons SiegeType);
+
+  UFUNCTION(BlueprintCallable, Category = "Skald|Siege")
+  void SetUseSiegeForNextAttack(bool bEnable);
 
   // BlueprintImplementableEvent hooks — BP subclass draws UI
   UFUNCTION(BlueprintImplementableEvent, Category = "Skald|HUD")
