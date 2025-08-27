@@ -9,9 +9,11 @@
 #include "WorldMap.h"
 #include "Skald_GameMode.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 
 ATurnManager::ATurnManager() {
   PrimaryActorTick.bCanEverTick = false;
+  bReplicates = true;
   CurrentIndex = 0;
 }
 
@@ -236,17 +238,31 @@ void ATurnManager::ResolveGridBattleResult() {
     return;
   }
 
+  const int32 AttackerID =
+      Source->OwningPlayer ? Source->OwningPlayer->GetPlayerId() : -1;
+  const int32 DefenderID =
+      Target->OwningPlayer ? Target->OwningPlayer->GetPlayerId() : -1;
+  const int32 InitialSourceArmy = Source->ArmyStrength;
+  const int32 InitialTargetArmy = Target->ArmyStrength;
+
   const int32 AttackerSurvivors = GI->GridBattleManager->GetAttackerSurvivors();
   const int32 DefenderSurvivors = GI->GridBattleManager->GetDefenderSurvivors();
 
   Source->ArmyStrength -= Battle.ArmyCountSent;
 
+  int32 WinningPlayerID = DefenderID;
+  int32 NewOwnerPlayerID = DefenderID;
   if (AttackerSurvivors > 0 && DefenderSurvivors <= 0) {
     Target->OwningPlayer = Source->OwningPlayer;
     Target->ArmyStrength = AttackerSurvivors;
+    WinningPlayerID = AttackerID;
+    NewOwnerPlayerID = AttackerID;
   } else {
     Target->ArmyStrength = DefenderSurvivors;
   }
+
+  const int32 AttackerCasualties = Battle.ArmyCountSent - AttackerSurvivors;
+  const int32 DefenderCasualties = InitialTargetArmy - DefenderSurvivors;
 
   Source->RefreshAppearance();
   Target->RefreshAppearance();
@@ -260,6 +276,53 @@ void ATurnManager::ResolveGridBattleResult() {
   if (ASkaldGameMode *GM =
           GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
     GM->CheckVictoryConditions();
+  }
+
+  ClientBattleResolved(WinningPlayerID, AttackerCasualties,
+                       DefenderCasualties, Source->TerritoryID,
+                       Target->TerritoryID, NewOwnerPlayerID,
+                       Source->ArmyStrength, Target->ArmyStrength);
+}
+
+void ATurnManager::ClientBattleResolved_Implementation(
+    int32 WinningPlayerID, int32 AttackerCasualties, int32 DefenderCasualties,
+    int32 FromTerritoryID, int32 TargetTerritoryID, int32 NewOwnerPlayerID,
+    int32 SourceArmy, int32 TargetArmy) {
+  if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+          GetWorld(), AWorldMap::StaticClass()))) {
+    ATerritory *Source = WorldMap->GetTerritoryById(FromTerritoryID);
+    ATerritory *Target = WorldMap->GetTerritoryById(TargetTerritoryID);
+    if (Source) {
+      Source->ArmyStrength = SourceArmy;
+      Source->RefreshAppearance();
+      Source->ForceNetUpdate();
+    }
+    if (Target) {
+      ASkaldPlayerState *NewOwner = nullptr;
+      for (TActorIterator<ASkaldPlayerState> It(GetWorld()); It; ++It) {
+        if (It->GetPlayerId() == NewOwnerPlayerID) {
+          NewOwner = *It;
+          break;
+        }
+      }
+      Target->OwningPlayer = NewOwner;
+      Target->ArmyStrength = TargetArmy;
+      Target->RefreshAppearance();
+      Target->ForceNetUpdate();
+    }
+  }
+
+  for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator();
+       It; ++It) {
+    if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(It->Get())) {
+      if (USkaldMainHUDWidget *HUD = PC->GetHUDWidget()) {
+        const FString Msg = FString::Printf(
+            TEXT("Player %d won: A-%d D-%d casualties"), WinningPlayerID,
+            AttackerCasualties, DefenderCasualties);
+        HUD->UpdateInitiativeText(Msg);
+      }
+      PC->HandleWorldStateChanged();
+    }
   }
 
   OnWorldStateChanged.Broadcast();
