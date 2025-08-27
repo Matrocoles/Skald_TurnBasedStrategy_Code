@@ -79,7 +79,10 @@ void ULoadGameWidget::HandleLoadSlot(int32 SlotIndex)
         }
 
         // After loading, transition to the main gameplay map
-        UGameplayStatics::OpenLevel(this, FName("Skald_OverTop"));
+        if (UWorld* WorldToTravel = GetWorld())
+        {
+            WorldToTravel->ServerTravel(TEXT("Skald_OverTop"));
+        }
     }
     else
     {

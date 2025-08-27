@@ -732,6 +732,8 @@ void ASkaldGameMode::CheckVictoryConditions() {
 
   if (RemainingPlayers == 1 && WinningPlayer) {
     OnGameOver.Broadcast(WinningPlayer);
-    UGameplayStatics::OpenLevel(this, FName("EndScreen"));
+    if (UWorld* WorldToTravel = GetWorld()) {
+      WorldToTravel->ServerTravel(TEXT("EndScreen"));
+    }
   }
 }

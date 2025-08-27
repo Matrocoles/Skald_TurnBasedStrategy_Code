@@ -8,6 +8,7 @@
 #include "UI/SkaldMainHUDWidget.h"
 #include "WorldMap.h"
 #include "Skald_GameMode.h"
+#include "Engine/World.h"
 
 ATurnManager::ATurnManager() {
   PrimaryActorTick.bCanEverTick = false;
@@ -20,6 +21,19 @@ void ATurnManager::BeginPlay() {
   if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
     if (GI->GridBattleManager) {
       ResolveGridBattleResult();
+    }
+
+    if (GI->bResumeTurns) {
+      CurrentIndex = GI->SavedTurnIndex;
+      CurrentPhase = GI->SavedTurnPhase;
+      GI->bResumeTurns = false;
+
+      if (Controllers.IsValidIndex(CurrentIndex)) {
+        if (ASkaldPlayerController *Controller = Controllers[CurrentIndex].Get()) {
+          Controller->StartTurn();
+          BroadcastCurrentPhase();
+        }
+      }
     }
   }
 }
@@ -182,8 +196,17 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
     }
   }
 
+  // Save the current turn state so it can be restored after travelling.
+  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+    GI->SavedTurnIndex = CurrentIndex;
+    GI->SavedTurnPhase = CurrentPhase;
+    GI->bResumeTurns = true;
+  }
+
   // Load a battle map where the grid based combat takes place.
-  UGameplayStatics::OpenLevel(this, FName("BattleMap"));
+  if (UWorld *World = GetWorld()) {
+    World->ServerTravel(TEXT("BattleMap"));
+  }
 }
 
 void ATurnManager::ResolveGridBattleResult() {
