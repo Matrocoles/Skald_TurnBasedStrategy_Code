@@ -403,27 +403,27 @@ void USkaldMainHUDWidget::SyncPhaseButtons(bool bIsMyTurn) {
   BP_SetPhaseButtons(CurrentPhase, bIsMyTurn);
 
   if (AttackButton) {
-    const ESlateVisibility Visibility =
+    const ESlateVisibility DesiredVisibility =
         (bIsMyTurn && CurrentPhase == ETurnPhase::Attack)
             ? ESlateVisibility::Visible
             : ESlateVisibility::Collapsed;
-    AttackButton->SetVisibility(Visibility);
+    AttackButton->SetVisibility(DesiredVisibility);
   }
 
   if (MoveButton) {
-    const ESlateVisibility Visibility =
+    const ESlateVisibility DesiredVisibility =
         (bIsMyTurn && CurrentPhase == ETurnPhase::Movement)
             ? ESlateVisibility::Visible
             : ESlateVisibility::Collapsed;
-    MoveButton->SetVisibility(Visibility);
+    MoveButton->SetVisibility(DesiredVisibility);
   }
 
   if (DeployButton) {
-    const ESlateVisibility Visibility =
+    const ESlateVisibility DesiredVisibility =
         (bIsMyTurn && CurrentPhase == ETurnPhase::Reinforcement)
             ? ESlateVisibility::Visible
             : ESlateVisibility::Collapsed;
-    DeployButton->SetVisibility(Visibility);
+    DeployButton->SetVisibility(DesiredVisibility);
   }
 
   if (EndPhaseButton) {
