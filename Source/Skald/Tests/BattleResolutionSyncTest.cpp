@@ -5,23 +5,7 @@
 #include "Skald_PlayerState.h"
 #include "Territory.h"
 #include "WorldMap.h"
-
-// Helper object to bind to the turn manager's dynamic multicast delegate
-// which cannot directly accept lambda functions.
-UCLASS()
-class UWorldStateChangedListener : public UObject
-{
-  GENERATED_BODY()
-
-public:
-  bool bBroadcasted = false;
-
-  UFUNCTION()
-  void HandleBroadcast()
-  {
-    bBroadcasted = true;
-  }
-};
+#include "BattleResolutionSyncTest.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldBattleResolutionSyncTest, "Skald.Multiplayer.BattleResolutionSync", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FSkaldBattleResolutionSyncTest::RunTest(const FString& Parameters) {
