@@ -1,25 +1,16 @@
 #include "Misc/AutomationTest.h"
 #include "Tests/AutomationEditorCommon.h"
-#include "Skald_PlayerController.h"
-#include "UI/SkaldMainHUDWidget.h"
-#include "PlayerControllerValidationTest.generated.h"
+#include "PlayerControllerValidationTest.h"
 
-UCLASS()
-class UTestHUDWidget : public USkaldMainHUDWidget {
-  GENERATED_BODY()
-public:
-  FString LastError;
-  virtual void ShowErrorMessage(const FString &Message) override {
+void UTestHUDWidget::ShowErrorMessage(const FString& Message)
+{
     LastError = Message;
-  }
-};
+}
 
-UCLASS()
-class ATestPlayerController : public ASkaldPlayerController {
-  GENERATED_BODY()
-public:
-  void SetHUD(USkaldMainHUDWidget *InHUD) { MainHudWidget = InHUD; }
-};
+void ATestPlayerController::SetHUD(USkaldMainHUDWidget* InHUD)
+{
+    MainHudWidget = InHUD;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldPlayerControllerValidationFeedbackTest,
                                  "Skald.PlayerController.ValidationFeedback",

@@ -5,6 +5,23 @@
 #include "Territory.h"
 #include "WorldMap.h"
 
+// Helper object to bind to the turn manager's dynamic multicast delegate
+// which cannot directly accept lambda functions.
+UCLASS()
+class UWorldStateChangedListener : public UObject
+{
+  GENERATED_BODY()
+
+public:
+  bool bBroadcasted = false;
+
+  UFUNCTION()
+  void HandleBroadcast()
+  {
+    bBroadcasted = true;
+  }
+};
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldBattleResolutionSyncTest, "Skald.Multiplayer.BattleResolutionSync", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FSkaldBattleResolutionSyncTest::RunTest(const FString& Parameters) {
   UWorld* World = FAutomationEditorCommonUtils::CreateNewMap();
@@ -44,12 +61,14 @@ bool FSkaldBattleResolutionSyncTest::RunTest(const FString& Parameters) {
   WM->Territories.Add(Source);
   WM->Territories.Add(Target);
 
-  bool bBroadcasted = false;
-  TM->OnWorldStateChanged.AddLambda([&bBroadcasted]() { bBroadcasted = true; });
+  // Use an object instance to capture the broadcast because AddLambda is not
+  // supported on dynamic multicast delegates.
+  UWorldStateChangedListener* Listener = NewObject<UWorldStateChangedListener>();
+  TM->OnWorldStateChanged.AddDynamic(Listener, &UWorldStateChangedListener::HandleBroadcast);
 
   TM->ClientBattleResolved(1, 3, 5, 1, 2, 1, 5, 2);
 
-  TestTrue(TEXT("Broadcast fired"), bBroadcasted);
+  TestTrue(TEXT("Broadcast fired"), Listener->bBroadcasted);
   TestEqual(TEXT("Source army"), Source->ArmyStrength, 5);
   TestEqual(TEXT("Target army"), Target->ArmyStrength, 2);
   TestTrue(TEXT("Target owner"), Target->OwningPlayer == PS1);
