@@ -1,8 +1,8 @@
 #pragma once
 
 #include "Blueprint/UserWidget.h"
-#include "ConfirmAttackWidget.generated.h"
 #include "CoreMinimal.h"
+#include "ConfirmAttackWidget.generated.h"
 
 class UButton;
 class USpinBox;
