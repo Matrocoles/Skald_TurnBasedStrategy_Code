@@ -324,6 +324,7 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
     Territory->bIsCapital = TerrData.IsCapital;
     Territory->ContinentID = TerrData.ContinentID;
     Territory->BuiltSiegeID = TerrData.BuiltSiegeID;
+    Territory->SetActorLocation(TerrData.Location);
     Territory->RefreshAppearance();
     Territory->ForceNetUpdate();
   }
@@ -677,6 +678,7 @@ void ASkaldGameMode::FillSaveGame(USkaldSaveGame *SaveGameObject) const {
           TerrData.AdjacentIDs.Add(Adj->TerritoryID);
         }
       }
+      TerrData.Location = Territory->GetActorLocation();
       TerrData.BuiltSiegeID = Territory->BuiltSiegeID;
       SaveGameObject->Territories.Add(TerrData);
     }
