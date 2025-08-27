@@ -227,6 +227,13 @@ void USkaldMainHUDWidget::UpdateResources(int32 ResourceAmount) {
   }
 }
 
+void USkaldMainHUDWidget::ShowErrorMessage(const FString &Message) {
+  if (GEngine) {
+    GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Red, Message);
+  }
+  BP_ShowErrorMessage(Message);
+}
+
 void USkaldMainHUDWidget::BeginAttackSelection() {
   bSelectingForAttack = true;
   bSelectingForMove = false;

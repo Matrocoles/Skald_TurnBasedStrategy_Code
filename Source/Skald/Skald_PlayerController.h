@@ -189,4 +189,5 @@ protected:
 
 private:
   void BuildPlayerDataArray(TArray<FS_PlayerData> &OutPlayers) const;
+  void NotifyActionError(const FString &Message);
 };

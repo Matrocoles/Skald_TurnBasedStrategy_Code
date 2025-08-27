@@ -167,6 +167,14 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
   void UpdateResources(int32 ResourceAmount);
 
+  /** Display an error message to the player. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
+  virtual void ShowErrorMessage(const FString &Message);
+
+  /** Blueprint hook to draw the error message. */
+  UFUNCTION(BlueprintImplementableEvent, Category = "Skald|HUD")
+  void BP_ShowErrorMessage(const FString &Message);
+
   // BlueprintCallable functions — selection UX helpers
   UFUNCTION(BlueprintCallable, Category = "Skald|Selection")
   void BeginAttackSelection();
