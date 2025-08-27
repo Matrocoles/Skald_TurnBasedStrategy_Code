@@ -51,7 +51,7 @@ void ASkaldGameMode::BeginPlay() {
     }
   }
 
-  // Initialization of the world occurs after players join in PostLogin.
+  TryInitializeWorldAndStart();
 }
 
 void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
@@ -167,25 +167,7 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
         }
       }
 
-      if (!bWorldInitialized) {
-        if (InitializeWorld()) {
-          bWorldInitialized = true;
-          BeginArmyPlacementPhase();
-          GetWorldTimerManager().SetTimer(
-              StartGameTimerHandle, FTimerDelegate::CreateLambda([this]() {
-                if (!bTurnsStarted && TurnManager) {
-                  bTurnsStarted = true;
-                  TurnManager->SortControllersByInitiative();
-                  TurnManager->StartTurns();
-                  if (GEngine) {
-                    GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Green,
-                                                     TEXT("Game started"));
-                  }
-                }
-              }),
-              StartGameTimeout, false);
-        }
-      }
+      TryInitializeWorldAndStart();
 
       if (GS->PlayerArray.Num() >= ExpectedPlayerCount && !bTurnsStarted) {
         bTurnsStarted = true;
@@ -200,6 +182,30 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
         }
       }
     }
+  }
+}
+
+void ASkaldGameMode::TryInitializeWorldAndStart() {
+  if (bWorldInitialized) {
+    return;
+  }
+
+  if (InitializeWorld()) {
+    bWorldInitialized = true;
+    BeginArmyPlacementPhase();
+    GetWorldTimerManager().SetTimer(
+        StartGameTimerHandle, FTimerDelegate::CreateLambda([this]() {
+          if (!bTurnsStarted && TurnManager) {
+            bTurnsStarted = true;
+            TurnManager->SortControllersByInitiative();
+            TurnManager->StartTurns();
+            if (GEngine) {
+              GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Green,
+                                               TEXT("Game started"));
+            }
+          }
+        }),
+        StartGameTimeout, false);
   }
 }
 

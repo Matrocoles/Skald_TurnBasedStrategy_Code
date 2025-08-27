@@ -67,4 +67,7 @@ private:
 
   /** Index of the controller currently placing armies. */
   int32 PlacementIndex = 0;
+
+  /** Attempt to initialise the world and start the game flow. */
+  void TryInitializeWorldAndStart();
 };

@@ -10,6 +10,7 @@ class ATerritory;
 class UStaticMeshComponent;
 class UPrimitiveComponent;
 class UMaterialInstanceDynamic;
+class UTextRenderComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FTerritorySelectedSignature, ATerritory*, Territory);
 
@@ -58,7 +59,7 @@ public:
     TArray<ATerritory*> AdjacentTerritories;
 
     /** Number of armies stationed in this territory. */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory", Replicated)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory", ReplicatedUsing = OnRep_ArmyStrength)
     int32 ArmyStrength = 0;
 
     /** Called when the territory is selected. */
@@ -100,10 +101,17 @@ public:
     UFUNCTION()
     void OnRep_OwningPlayer();
 
+    UFUNCTION()
+    void OnRep_ArmyStrength();
+
 protected:
     /** Visual representation of the territory. */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Territory")
     UStaticMeshComponent* MeshComponent = nullptr;
+
+    /** Text label showing name, owner and army count. */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Territory")
+    UTextRenderComponent* LabelComponent = nullptr;
 
     /** Dynamic material used for highlighting. */
     UPROPERTY()
@@ -116,4 +124,5 @@ protected:
     bool bIsSelected = false;
 
     void UpdateTerritoryColor();
+    void UpdateLabel();
 };
