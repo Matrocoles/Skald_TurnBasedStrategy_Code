@@ -80,10 +80,32 @@ void AWorldMap::SelectTerritory(ATerritory *Territory) {
   OnTerritorySelected.Broadcast(Territory);
 }
 
-bool AWorldMap::MoveBetween(ATerritory *From, ATerritory *To) {
+bool AWorldMap::MoveBetween(ATerritory *From, ATerritory *To, int32 Troops) {
   if (!From || !To) {
     return false;
   }
 
-  return From->MoveTo(To);
+  if (From->OwningPlayer != To->OwningPlayer) {
+    return false;
+  }
+
+  if (!From->IsAdjacentTo(To)) {
+    return false;
+  }
+
+  if (Troops <= 0 || Troops >= From->ArmyStrength) {
+    return false;
+  }
+
+  if (!From->MoveTo(To, Troops)) {
+    return false;
+  }
+
+  From->RefreshAppearance();
+  To->RefreshAppearance();
+
+  From->ForceNetUpdate();
+  To->ForceNetUpdate();
+
+  return true;
 }
