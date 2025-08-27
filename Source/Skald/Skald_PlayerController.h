@@ -127,6 +127,10 @@ protected:
   UFUNCTION()
   void HandleFactionsUpdated();
 
+  /** Server-side processing of an attack request. */
+  UFUNCTION(Server, Reliable)
+  void ServerHandleAttack(int32 FromID, int32 ToID, int32 ArmySent);
+
   /** Reference to the game's turn manager.
    *  Exposed to Blueprints so BP_Skald_PlayerController can bind to
    *  turn events without keeping an external pointer that might be
