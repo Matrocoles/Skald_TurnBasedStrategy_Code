@@ -578,3 +578,48 @@ void ASkaldGameMode::FillSaveGame(USkaldSaveGame *SaveGameObject) const {
   // No sieges are currently tracked; ensure array is cleared.
   SaveGameObject->Sieges.Empty();
 }
+
+void ASkaldGameMode::CheckVictoryConditions() {
+  if (!WorldMap) {
+    return;
+  }
+
+  ASkaldGameState *GS = GetGameState<ASkaldGameState>();
+  if (!GS) {
+    return;
+  }
+
+  int32 RemainingPlayers = 0;
+  ASkaldPlayerState *WinningPlayer = nullptr;
+
+  for (APlayerState *PSBase : GS->PlayerArray) {
+    ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase);
+    if (!PS) {
+      continue;
+    }
+
+    bool bHasTerritory = false;
+    for (ATerritory *Territory : WorldMap->Territories) {
+      if (Territory && Territory->OwningPlayer == PS) {
+        bHasTerritory = true;
+        break;
+      }
+    }
+
+    FS_PlayerData *Data = PlayersData.FindByPredicate(
+        [PS](const FS_PlayerData &D) { return D.PlayerID == PS->GetPlayerId(); });
+    if (Data) {
+      Data->IsEliminated = !bHasTerritory;
+    }
+
+    if (bHasTerritory) {
+      ++RemainingPlayers;
+      WinningPlayer = PS;
+    }
+  }
+
+  if (RemainingPlayers == 1 && WinningPlayer) {
+    OnGameOver.Broadcast(WinningPlayer);
+    UGameplayStatics::OpenLevel(this, FName("EndScreen"));
+  }
+}

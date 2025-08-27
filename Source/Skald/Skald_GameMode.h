@@ -14,6 +14,9 @@ class AWorldMap;
 class APlayerController;
 class USkaldSaveGame;
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSkaldGameOver, ASkaldPlayerState *,
+                                            Winner);
+
 /**
  * GameMode responsible for managing player login and spawning the turn manager.
  */
@@ -36,6 +39,14 @@ public:
 
   /** Restore match state from a previously loaded save game. */
   void ApplyLoadedGame(USkaldSaveGame *LoadedGame);
+
+  /** Check if only one player remains and handle victory. */
+  UFUNCTION(BlueprintCallable, Category = "GameMode")
+  void CheckVictoryConditions();
+
+  /** Event fired when a winner has been determined. */
+  UPROPERTY(BlueprintAssignable, Category = "GameMode")
+  FSkaldGameOver OnGameOver;
 
 protected:
   /** Handles turn sequencing for the match. */
