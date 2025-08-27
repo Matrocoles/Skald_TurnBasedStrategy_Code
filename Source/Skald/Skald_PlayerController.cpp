@@ -661,7 +661,17 @@ void ASkaldPlayerController::HandlePlayersUpdated() {
 }
 
 void ASkaldPlayerController::HandleFactionsUpdated() {
-  UE_LOG(LogSkald, Log, TEXT("GameInstance factions updated."));
+  if (!MainHudWidget || !CachedGameState) {
+    return;
+  }
+
+  TArray<FS_PlayerData> Players;
+  BuildPlayerDataArray(Players);
+  MainHudWidget->RefreshPlayerList(Players);
+
+  if (ASkaldPlayerState *LocalPS = GetPlayerState<ASkaldPlayerState>()) {
+    MainHudWidget->UpdateResources(LocalPS->Resources);
+  }
 }
 
 void ASkaldPlayerController::HandleWorldStateChanged() {
