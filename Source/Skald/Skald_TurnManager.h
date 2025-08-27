@@ -8,6 +8,9 @@
 class ASkaldPlayerController;
 class ASkaldPlayerState;
 
+// Broadcast whenever the overall world state changes so HUDs can refresh.
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSkaldWorldStateChanged);
+
 /**
  * Handles turn sequencing for all registered player controllers.
  */
@@ -61,6 +64,10 @@ public:
     /** Retrieve the current phase of play. */
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="Turn")
     ETurnPhase GetCurrentPhase() const { return CurrentPhase; }
+
+    /** Event fired when the world state has changed. */
+    UPROPERTY(BlueprintAssignable, Category="Turn")
+    FSkaldWorldStateChanged OnWorldStateChanged;
 
 protected:
     UPROPERTY(BlueprintReadOnly, Category="Turn")
