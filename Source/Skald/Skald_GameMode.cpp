@@ -230,19 +230,19 @@ void ASkaldGameMode::BeginArmyPlacementPhase() {
   TurnManager->SortControllersByInitiative();
 
   // Calculate army pools for each player based on owned territories.
-  for (ASkaldPlayerController *PC : TurnManager->GetControllers()) {
-    if (!PC) {
-      continue;
-    }
-    if (ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>()) {
-      int32 Owned = 0;
-      for (ATerritory *Territory : WorldMap->Territories) {
-        if (Territory && Territory->OwningPlayer == PS) {
-          ++Owned;
+  for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr :
+       TurnManager->GetControllers()) {
+    if (ASkaldPlayerController *PC = ControllerPtr.Get()) {
+      if (ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>()) {
+        int32 Owned = 0;
+        for (ATerritory *Territory : WorldMap->Territories) {
+          if (Territory && Territory->OwningPlayer == PS) {
+            ++Owned;
+          }
         }
+        PS->ArmyPool = FMath::CeilToInt(Owned / 3.0f);
+        PS->ForceNetUpdate();
       }
-      PS->ArmyPool = FMath::CeilToInt(Owned / 3.0f);
-      PS->ForceNetUpdate();
     }
   }
 
@@ -255,13 +255,14 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
     return;
   }
 
-  const TArray<ASkaldPlayerController *> &Controllers =
+  const TArray<TWeakObjectPtr<ASkaldPlayerController>> &Controllers =
       TurnManager->GetControllers();
   const int32 NumControllers = Controllers.Num();
 
   while (PlacementIndex < NumControllers) {
-    ASkaldPlayerController *PC = Controllers[PlacementIndex];
-    ASkaldPlayerState *PS = PC ? PC->GetPlayerState<ASkaldPlayerState>() : nullptr;
+    ASkaldPlayerController *PC = Controllers[PlacementIndex].Get();
+    ASkaldPlayerState *PS =
+        PC ? PC->GetPlayerState<ASkaldPlayerState>() : nullptr;
     if (!PC || !PS) {
       ++PlacementIndex;
       continue;
