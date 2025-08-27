@@ -72,6 +72,11 @@ protected:
 
     void ValidateSelections();
 
+    void RefreshFactionOptions();
+
+    UFUNCTION()
+    void HandleFactionsUpdated();
+
 private:
     /** Reference back to the owning lobby menu so it can be restored. */
     UPROPERTY()
