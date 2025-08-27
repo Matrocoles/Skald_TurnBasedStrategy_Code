@@ -32,6 +32,11 @@ public class Skald : ModuleRules
                         ModuleDirectory
                 });
 
+                if (Target.bBuildEditor)
+                {
+                        PrivateDependencyModuleNames.Add("UnrealEd");
+                }
+
                 // To include OnlineSubsystemSteam, add it to the plugins section in your uproject file with the Enabled attribute set to true
         }
 }

@@ -1,6 +1,7 @@
+#include "PlayerControllerValidationTest.h"
+
 #include "Misc/AutomationTest.h"
 #include "Tests/AutomationEditorCommon.h"
-#include "PlayerControllerValidationTest.h"
 
 void UTestHUDWidget::ShowErrorMessage(const FString& Message)
 {

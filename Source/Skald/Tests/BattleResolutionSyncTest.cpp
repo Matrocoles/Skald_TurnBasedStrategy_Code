@@ -1,11 +1,11 @@
-#include "CoreMinimal.h"
+#include "BattleResolutionSyncTest.h"
+
 #include "Misc/AutomationTest.h"
 #include "Tests/AutomationEditorCommon.h"
 #include "Skald_TurnManager.h"
 #include "Skald_PlayerState.h"
 #include "Territory.h"
 #include "WorldMap.h"
-#include "BattleResolutionSyncTest.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldBattleResolutionSyncTest, "Skald.Multiplayer.BattleResolutionSync", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FSkaldBattleResolutionSyncTest::RunTest(const FString& Parameters) {
