@@ -6,6 +6,7 @@
 #include "Skald_GameInstance.generated.h"
 
 class UGridBattleManager;
+class USkaldSaveGame;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSkaldFactionsUpdated);
 /** Game instance storing player selections from the lobby. */
@@ -42,5 +43,9 @@ public:
     /** Runtime manager used to execute grid based battles. */
     UPROPERTY(BlueprintReadWrite, Category="Battle")
     class UGridBattleManager* GridBattleManager = nullptr;
+
+    /** Save game loaded when transitioning from the main menu. */
+    UPROPERTY(BlueprintReadWrite, Category="SaveGame")
+    USkaldSaveGame* LoadedSaveGame = nullptr;
 };
 

@@ -13,6 +13,7 @@
 #include "TimerManager.h"
 #include "UI/SkaldMainHUDWidget.h"
 #include "WorldMap.h"
+#include "Camera/CameraComponent.h"
 
 namespace {
 constexpr int32 ExpectedPlayerCount = 4;
@@ -49,6 +50,14 @@ void ASkaldGameMode::BeginPlay() {
         GetWorld(), AWorldMap::StaticClass()));
     if (!WorldMap) {
       WorldMap = GetWorld()->SpawnActor<AWorldMap>();
+    }
+  }
+
+  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+    if (GI->LoadedSaveGame) {
+      ApplyLoadedGame(GI->LoadedSaveGame);
+      GI->LoadedSaveGame = nullptr;
+      return;
     }
   }
 
@@ -219,6 +228,92 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
           }
         }),
         StartGameTimeout, false);
+  }
+}
+
+void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
+  if (!LoadedGame || !WorldMap) {
+    return;
+  }
+
+  bWorldInitialized = true;
+  bTurnsStarted = true;
+
+  ASkaldGameState *GS = GetGameState<ASkaldGameState>();
+  if (GS) {
+    GS->Players.Empty();
+    GS->PlayerArray.Empty();
+    GS->CurrentTurnIndex = LoadedGame->CurrentPlayerIndex;
+  }
+
+  PlayersData.Empty();
+  for (const FPlayerSaveStruct &PlayerSave : LoadedGame->Players) {
+    ASkaldPlayerState *PS = GetWorld()->SpawnActor<ASkaldPlayerState>();
+    if (!PS) {
+      continue;
+    }
+    PS->SetPlayerId(PlayerSave.PlayerID);
+    PS->DisplayName = PlayerSave.PlayerName;
+    PS->bIsAI = PlayerSave.IsAI;
+    PS->Faction = PlayerSave.Faction;
+    if (GS) {
+      GS->AddPlayerState(PS);
+    }
+
+    FS_PlayerData Data;
+    Data.PlayerID = PlayerSave.PlayerID;
+    Data.PlayerName = PlayerSave.PlayerName;
+    Data.IsAI = PlayerSave.IsAI;
+    Data.Faction = PlayerSave.Faction;
+    Data.CapitalTerritoryIDs = PlayerSave.CapitalTerritoryIDs;
+    Data.IsEliminated = PlayerSave.IsEliminated;
+    PlayersData.Add(Data);
+  }
+
+  for (const FS_Territory &TerrData : LoadedGame->Territories) {
+    ATerritory *Territory = WorldMap->GetTerritoryById(TerrData.TerritoryID);
+    if (!Territory) {
+      continue;
+    }
+
+    ASkaldPlayerState *Owner = nullptr;
+    if (GS) {
+      for (ASkaldPlayerState *PS : GS->Players) {
+        if (PS && PS->GetPlayerId() == TerrData.OwnerPlayerID) {
+          Owner = PS;
+          break;
+        }
+      }
+    }
+
+    Territory->OwningPlayer = Owner;
+    Territory->ArmyStrength = TerrData.ArmyCount;
+    Territory->bIsCapital = TerrData.IsCapital;
+    Territory->ContinentID = TerrData.ContinentID;
+    Territory->RefreshAppearance();
+    Territory->ForceNetUpdate();
+  }
+
+  if (APlayerController *PC = UGameplayStatics::GetPlayerController(this, 0)) {
+    if (APawn *Pawn = PC->GetPawn()) {
+      FVector Loc = Pawn->GetActorLocation();
+      Loc.X = LoadedGame->SavedViewOffset.X;
+      Loc.Y = LoadedGame->SavedViewOffset.Y;
+      Pawn->SetActorLocation(Loc);
+
+      if (UCameraComponent *Camera = Pawn->FindComponentByClass<UCameraComponent>()) {
+        Camera->SetFieldOfView(LoadedGame->SavedZoomAmount);
+      }
+    }
+  }
+
+  RefreshHUDs();
+
+  if (TurnManager) {
+    TurnManager->SortControllersByInitiative();
+    for (int32 i = 0; i < LoadedGame->CurrentPlayerIndex; ++i) {
+      TurnManager->AdvanceTurn();
+    }
   }
 }
 

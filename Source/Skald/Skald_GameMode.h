@@ -34,6 +34,9 @@ public:
   UFUNCTION(BlueprintCallable, Category = "SaveGame")
   void FillSaveGame(USkaldSaveGame *SaveGameObject) const;
 
+  /** Restore match state from a previously loaded save game. */
+  void ApplyLoadedGame(USkaldSaveGame *LoadedGame);
+
 protected:
   /** Handles turn sequencing for the match. */
   UPROPERTY(BlueprintReadOnly, Category = "GameMode")
