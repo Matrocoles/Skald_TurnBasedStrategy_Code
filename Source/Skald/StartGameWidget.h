@@ -45,7 +45,7 @@ public:
     UButton* MainMenuButton;
 
     /** Record the lobby menu that spawned this widget so we can unhide it later. */
-    void SetLobbyMenu(ULobbyMenuWidget* InMenu) { OwningLobbyMenu = InMenu; }
+    void SetLobbyMenu(ULobbyMenuWidget* InMenu);
 
 protected:
     virtual void NativeConstruct() override;
