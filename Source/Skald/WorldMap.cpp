@@ -1,6 +1,8 @@
 #include "WorldMap.h"
 #include "Containers/Map.h"
 #include "Containers/Queue.h"
+#include "Containers/Set.h"
+#include <float.h>
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Skald_GameMode.h"
@@ -67,27 +69,114 @@ void AWorldMap::BeginPlay() {
     }
   }
 
-  // Establish adjacency based on the data table definitions.
-  for (const FTerritorySpawnData *Data : Rows) {
-    if (!Data) {
+  // Build adjacency by distance.
+  for (int32 i = 0; i < Territories.Num(); ++i) {
+    ATerritory *A = Territories[i];
+    if (!A) {
       continue;
     }
-    ATerritory *Territory = GetTerritoryById(Data->TerritoryID);
-    if (!Territory) {
-      continue;
-    }
-    for (int32 NeighborID : Data->AdjacentTerritoryIDs) {
-      ATerritory *Neighbor = GetTerritoryById(NeighborID);
-      if (!Neighbor) {
+    for (int32 j = i + 1; j < Territories.Num(); ++j) {
+      ATerritory *B = Territories[j];
+      if (!B) {
         continue;
       }
-      if (!Territory->AdjacentTerritories.Contains(Neighbor)) {
-        Territory->AdjacentTerritories.Add(Neighbor);
-      }
-      if (!Neighbor->AdjacentTerritories.Contains(Territory)) {
-        Neighbor->AdjacentTerritories.Add(Territory);
+      const float Dist =
+          FVector::Dist(A->GetActorLocation(), B->GetActorLocation());
+      if (Dist <= AdjacencyDistance) {
+        if (!A->AdjacentTerritories.Contains(B)) {
+          A->AdjacentTerritories.Add(B);
+        }
+        if (!B->AdjacentTerritories.Contains(A)) {
+          B->AdjacentTerritories.Add(A);
+        }
       }
     }
+  }
+
+  // Ensure every territory has at least one neighbor.
+  for (ATerritory *Territory : Territories) {
+    if (!Territory || Territory->AdjacentTerritories.Num() > 0) {
+      continue;
+    }
+    float BestDist = FLT_MAX;
+    ATerritory *Closest = nullptr;
+    const FVector Loc = Territory->GetActorLocation();
+    for (ATerritory *Other : Territories) {
+      if (!Other || Other == Territory) {
+        continue;
+      }
+      const float Dist = FVector::Dist(Loc, Other->GetActorLocation());
+      if (Dist < BestDist) {
+        BestDist = Dist;
+        Closest = Other;
+      }
+    }
+    if (Closest) {
+      Territory->AdjacentTerritories.Add(Closest);
+      if (!Closest->AdjacentTerritories.Contains(Territory)) {
+        Closest->AdjacentTerritories.Add(Territory);
+      }
+    }
+  }
+
+  // Connect separate graph components by linking closest territories.
+  auto GatherComponents = [&]() {
+    TArray<TArray<ATerritory *>> Components;
+    TSet<ATerritory *> Visited;
+    for (ATerritory *Terr : Territories) {
+      if (!Terr || Visited.Contains(Terr)) {
+        continue;
+      }
+      TArray<ATerritory *> Component;
+      TQueue<ATerritory *> Queue;
+      Queue.Enqueue(Terr);
+      Visited.Add(Terr);
+      while (!Queue.IsEmpty()) {
+        ATerritory *Current = nullptr;
+        Queue.Dequeue(Current);
+        Component.Add(Current);
+        for (ATerritory *Neighbor : Current->AdjacentTerritories) {
+          if (Neighbor && !Visited.Contains(Neighbor)) {
+            Visited.Add(Neighbor);
+            Queue.Enqueue(Neighbor);
+          }
+        }
+      }
+      Components.Add(Component);
+    }
+    return Components;
+  };
+
+  TArray<TArray<ATerritory *>> Components = GatherComponents();
+  while (Components.Num() > 1) {
+    float BestDist = FLT_MAX;
+    ATerritory *A = nullptr;
+    ATerritory *B = nullptr;
+    for (int32 i = 0; i < Components.Num(); ++i) {
+      for (int32 j = i + 1; j < Components.Num(); ++j) {
+        for (ATerritory *T1 : Components[i]) {
+          for (ATerritory *T2 : Components[j]) {
+            const float Dist = FVector::Dist(
+                T1->GetActorLocation(), T2->GetActorLocation());
+            if (Dist < BestDist) {
+              BestDist = Dist;
+              A = T1;
+              B = T2;
+            }
+          }
+        }
+      }
+    }
+    if (!A || !B) {
+      break;
+    }
+    if (!A->AdjacentTerritories.Contains(B)) {
+      A->AdjacentTerritories.Add(B);
+    }
+    if (!B->AdjacentTerritories.Contains(A)) {
+      B->AdjacentTerritories.Add(A);
+    }
+    Components = GatherComponents();
   }
 }
 
