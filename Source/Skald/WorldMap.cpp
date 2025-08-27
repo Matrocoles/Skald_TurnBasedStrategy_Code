@@ -1,9 +1,9 @@
 #include "WorldMap.h"
-#include "Engine/World.h"
-#include "Territory.h"
-#include "Skald_GameMode.h"
-#include "Containers/Queue.h"
 #include "Containers/Map.h"
+#include "Containers/Queue.h"
+#include "Engine/World.h"
+#include "Skald_GameMode.h"
+#include "Territory.h"
 
 AWorldMap::AWorldMap() {
   PrimaryActorTick.bCanEverTick = false;
@@ -39,15 +39,25 @@ void AWorldMap::BeginPlay() {
     }
   }
 
-  // Establish adjacency based on territory positions so that neighboring
-  // territories share borders.
-  for (int32 i = 0; i < Territories.Num(); ++i) {
-    for (int32 j = i + 1; j < Territories.Num(); ++j) {
-      if (FVector::Dist2D(Territories[i]->GetActorLocation(),
-                          Territories[j]->GetActorLocation()) <=
-          AdjacencyDistance) {
-        Territories[i]->AdjacentTerritories.Add(Territories[j].Get());
-        Territories[j]->AdjacentTerritories.Add(Territories[i].Get());
+  // Establish adjacency based on the data table definitions.
+  for (const FTerritorySpawnData *Data : Rows) {
+    if (!Data) {
+      continue;
+    }
+    ATerritory *Territory = GetTerritoryById(Data->TerritoryID);
+    if (!Territory) {
+      continue;
+    }
+    for (int32 NeighborID : Data->AdjacentTerritoryIDs) {
+      ATerritory *Neighbor = GetTerritoryById(NeighborID);
+      if (!Neighbor) {
+        continue;
+      }
+      if (!Territory->AdjacentTerritories.Contains(Neighbor)) {
+        Territory->AdjacentTerritories.Add(Neighbor);
+      }
+      if (!Neighbor->AdjacentTerritories.Contains(Territory)) {
+        Neighbor->AdjacentTerritories.Add(Territory);
       }
     }
   }

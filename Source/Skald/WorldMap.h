@@ -19,13 +19,15 @@ struct FTerritorySpawnData : public FTableRowBase {
 
   FTerritorySpawnData()
       : TerritoryID(0), TerritoryName(TEXT("")), bIsCapital(false),
-        ContinentID(0), Location(FVector::ZeroVector) {}
+        ContinentID(0), Location(FVector::ZeroVector), AdjacentTerritoryIDs() {}
 
   FTerritorySpawnData(int32 InID, const FString &InName, bool bCapital = false,
                       int32 InContinent = 0,
-                      FVector InLocation = FVector::ZeroVector)
+                      FVector InLocation = FVector::ZeroVector,
+                      const TArray<int32> &InAdjacents = {})
       : TerritoryID(InID), TerritoryName(InName), bIsCapital(bCapital),
-        ContinentID(InContinent), Location(InLocation) {}
+        ContinentID(InContinent), Location(InLocation),
+        AdjacentTerritoryIDs(InAdjacents) {}
 
   UPROPERTY(EditAnywhere, BlueprintReadOnly)
   int32 TerritoryID;
@@ -42,6 +44,10 @@ struct FTerritorySpawnData : public FTableRowBase {
   /** Location for spawning this territory relative to the world map actor. */
   UPROPERTY(EditAnywhere, BlueprintReadOnly)
   FVector Location;
+
+  /** IDs of territories adjacent to this one. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly)
+  TArray<int32> AdjacentTerritoryIDs;
 };
 
 /**
