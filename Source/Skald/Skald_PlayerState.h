@@ -16,7 +16,7 @@ class SKALD_API ASkaldPlayerState : public APlayerState
 public:
     ASkaldPlayerState();
 
-    UPROPERTY(BlueprintReadWrite, Category="PlayerState")
+    UPROPERTY(BlueprintReadWrite, Replicated, Category="PlayerState")
     bool bIsAI;
 
     /** Army units available for placement. */
@@ -24,7 +24,7 @@ public:
     int32 ArmyPool;
 
     /** Initiative roll determining turn order. */
-    UPROPERTY(BlueprintReadWrite, Category="PlayerState")
+    UPROPERTY(BlueprintReadWrite, Replicated, Category="PlayerState")
     int32 InitiativeRoll;
 
     /** Player chosen display name. */
