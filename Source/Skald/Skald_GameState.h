@@ -20,7 +20,7 @@ public:
     ASkaldGameState();
 
     /** List of players participating in the match. */
-    UPROPERTY(BlueprintReadOnly, Category="GameState")
+    UPROPERTY(BlueprintReadOnly, Replicated, Category="GameState")
     TArray<ASkaldPlayerState*> Players;
 
     /** Broadcast whenever the player list changes. */
@@ -28,8 +28,10 @@ public:
     FSkaldPlayersUpdated OnPlayersUpdated;
 
     /** Index of the player whose turn is active. */
-    UPROPERTY(BlueprintReadOnly, Category="GameState")
+    UPROPERTY(BlueprintReadOnly, Replicated, Category="GameState")
     int32 CurrentTurnIndex;
+
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
     virtual void AddPlayerState(APlayerState* PlayerState) override;
 
