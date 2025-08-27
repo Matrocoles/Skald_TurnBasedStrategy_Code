@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Engine/DataTable.h"
 #include "GameFramework/Actor.h"
 #include "WorldMap.generated.h"
 
@@ -13,7 +14,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FWorldMapTerritorySelected,
 
 /** Data describing how a territory should be spawned at runtime. */
 USTRUCT(BlueprintType)
-struct FTerritorySpawnData {
+struct FTerritorySpawnData : public FTableRowBase {
   GENERATED_BODY();
 
   FTerritorySpawnData()
@@ -87,6 +88,10 @@ public:
   UPROPERTY(EditAnywhere, Category = "WorldMap")
   TSubclassOf<ATerritory> TerritoryClass;
 
+  /** Data table defining territories to spawn. */
+  UPROPERTY(EditAnywhere, Category = "WorldMap")
+  UDataTable *TerritoryTable;
+
   /** Minimum XY (in local space) for random spawn positions. */
   UPROPERTY(EditAnywhere, Category = "WorldMap")
   FVector2D SpawnAreaMin = FVector2D(-500.f, -500.f);
@@ -100,6 +105,4 @@ public:
   float AdjacencyDistance = 210.f;
 
 protected:
-  /** Predefined territory table used for spawning at begin play. */
-  static const TArray<FTerritorySpawnData> DefaultTerritories;
 };
