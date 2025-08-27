@@ -26,6 +26,9 @@ public:
   virtual void BeginPlay() override;
   virtual void PostLogin(APlayerController *NewPlayer) override;
 
+  /** Advance army placement to the next controller. */
+  void AdvanceArmyPlacement();
+
 protected:
   /** Handles turn sequencing for the match. */
   UPROPERTY(BlueprintReadOnly, Category = "GameMode")
@@ -47,9 +50,6 @@ protected:
   /** Allow players to position initial armies based on initiative. */
   UFUNCTION(BlueprintCallable, Category = "GameMode")
   void BeginArmyPlacementPhase();
-
-  /** Advance army placement to the next controller. */
-  void AdvanceArmyPlacement();
 
 private:
   /** Timer that triggers auto-start of the turn sequence. */

@@ -3,16 +3,15 @@
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/Widget.h"
+#include "Engine/Engine.h"
 #include "Kismet/GameplayStatics.h"
+#include "Skald_GameMode.h"
+#include "Skald_PlayerController.h"
+#include "Skald_PlayerState.h"
+#include "Skald_TurnManager.h"
 #include "Territory.h"
 #include "UI/ConfirmAttackWidget.h"
 #include "WorldMap.h"
-#include "Territory.h"
-#include "Skald_PlayerState.h"
-#include "Skald_GameMode.h"
-#include "Skald_PlayerController.h"
-#include "Skald_TurnManager.h"
-#include "Engine/Engine.h"
 
 void USkaldMainHUDWidget::NativeConstruct() {
   Super::NativeConstruct();
@@ -68,10 +67,11 @@ void USkaldMainHUDWidget::UpdatePhaseBanner(ETurnPhase InPhase) {
     AttackButton->SetIsEnabled(CurrentPhase == ETurnPhase::Attack);
   }
   if (DeployButton) {
-    const ESlateVisibility Visibility =
-        CurrentPhase == ETurnPhase::Reinforcement ? DeployButton->GetVisibility()
-                                                  : ESlateVisibility::Collapsed;
-    DeployButton->SetVisibility(Visibility);
+    const ESlateVisibility ButtonVisibility =
+        CurrentPhase == ETurnPhase::Reinforcement
+            ? DeployButton->GetVisibility()
+            : ESlateVisibility::Collapsed;
+    DeployButton->SetVisibility(ButtonVisibility);
   }
   if (DeployableUnitsText && CurrentPhase != ETurnPhase::Reinforcement) {
     DeployableUnitsText->SetVisibility(ESlateVisibility::Collapsed);
@@ -107,8 +107,7 @@ void USkaldMainHUDWidget::RefreshFromState(
 void USkaldMainHUDWidget::ShowTurnAnnouncement(const FString &PlayerName) {
   BP_ShowTurnAnnouncement(PlayerName);
   if (GEngine) {
-    const FString Message =
-        FString::Printf(TEXT("%s's Turn"), *PlayerName);
+    const FString Message = FString::Printf(TEXT("%s's Turn"), *PlayerName);
     GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Yellow, Message);
   }
 }
@@ -165,7 +164,8 @@ void USkaldMainHUDWidget::UpdateInitiativeText(const FString &Message) {
 
 void USkaldMainHUDWidget::UpdateDeployableUnits(int32 UnitsRemaining) {
   if (DeployableUnitsText) {
-    const FString Text = FString::Printf(TEXT("Deployable: %d"), UnitsRemaining);
+    const FString Text =
+        FString::Printf(TEXT("Deployable: %d"), UnitsRemaining);
     DeployableUnitsText->SetText(FText::FromString(Text));
     DeployableUnitsText->SetVisibility(ESlateVisibility::Visible);
   }
@@ -177,7 +177,8 @@ void USkaldMainHUDWidget::BeginAttackSelection() {
   SelectedSourceID = -1;
   SelectedTargetID = -1;
   if (SelectionPrompt) {
-    SelectionPrompt->SetText(FText::FromString(TEXT("Choose owned territory.")));
+    SelectionPrompt->SetText(
+        FText::FromString(TEXT("Choose owned territory.")));
     SelectionPrompt->SetVisibility(ESlateVisibility::Visible);
   }
 }
@@ -189,9 +190,8 @@ void USkaldMainHUDWidget::SubmitAttack(int32 FromID, int32 ToID,
 }
 
 void USkaldMainHUDWidget::CancelAttackSelection() {
-  if (AWorldMap *WorldMap =
-          Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
-              GetWorld(), AWorldMap::StaticClass()))) {
+  if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+          GetWorld(), AWorldMap::StaticClass()))) {
     if (SelectedSourceID != -1) {
       if (ATerritory *Source = WorldMap->GetTerritoryById(SelectedSourceID)) {
         Source->Deselect();
@@ -241,13 +241,13 @@ void USkaldMainHUDWidget::CancelMoveSelection() {
   SelectedTargetID = -1;
 }
 
-void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory* Territory) {
+void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
   if (!Territory) {
     return;
   }
 
-  ASkaldPlayerState* LocalPS = nullptr;
-  if (APlayerController* PC = GetOwningPlayer()) {
+  ASkaldPlayerState *LocalPS = nullptr;
+  if (APlayerController *PC = GetOwningPlayer()) {
     LocalPS = PC->GetPlayerState<ASkaldPlayerState>();
   }
 
@@ -261,7 +261,8 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory* Territory) {
         if (AWorldMap *WorldMap =
                 Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
                     GetWorld(), AWorldMap::StaticClass()))) {
-          if (ATerritory *Source = WorldMap->GetTerritoryById(SelectedSourceID)) {
+          if (ATerritory *Source =
+                  WorldMap->GetTerritoryById(SelectedSourceID)) {
             for (ATerritory *Terr : WorldMap->Territories) {
               if (Terr && Source->IsAdjacentTo(Terr) &&
                   Terr->OwningPlayer != Source->OwningPlayer) {
@@ -343,9 +344,8 @@ void USkaldMainHUDWidget::HandleDeployClicked() {
     return;
   }
 
-  if (AWorldMap *WorldMap =
-          Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
-              GetWorld(), AWorldMap::StaticClass()))) {
+  if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+          GetWorld(), AWorldMap::StaticClass()))) {
     if (ATerritory *Terr = WorldMap->GetTerritoryById(SelectedSourceID)) {
       if (Terr->OwningPlayer == PS) {
         ++Terr->ArmyStrength;
@@ -353,8 +353,7 @@ void USkaldMainHUDWidget::HandleDeployClicked() {
         --PS->ArmyPool;
         PS->ForceNetUpdate();
 
-        if (ASkaldPlayerController *SKPC =
-                Cast<ASkaldPlayerController>(PC)) {
+        if (ASkaldPlayerController *SKPC = Cast<ASkaldPlayerController>(PC)) {
           if (ATurnManager *TM = SKPC->GetTurnManager()) {
             TM->BroadcastArmyPool(PS);
           }
