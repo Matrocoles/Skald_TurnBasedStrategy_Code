@@ -50,6 +50,10 @@ public:
     UFUNCTION(BlueprintCallable, Category="Battle")
     void TriggerGridBattle(const FS_BattlePayload& Battle);
 
+    /** Apply the outcome of a completed grid battle to the world map. */
+    UFUNCTION(BlueprintCallable, Category="Battle")
+    void ResolveGridBattleResult();
+
     /** Access the controllers array in its current initiative order. */
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="Turn")
     const TArray<TWeakObjectPtr<ASkaldPlayerController>>& GetControllers() const { return Controllers; }

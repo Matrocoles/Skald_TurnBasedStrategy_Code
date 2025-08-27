@@ -74,6 +74,14 @@ public:
     UFUNCTION(BlueprintCallable, Category="Battle")
     static bool ResolveAttack(FFighter& Attacker, FFighter& Defender, int32& OutDamage);
 
+    /** Number of surviving attackers after the battle concludes. */
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
+    int32 GetAttackerSurvivors() const;
+
+    /** Number of surviving defenders after the battle concludes. */
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
+    int32 GetDefenderSurvivors() const;
+
     /** Size of the square grid used in battle. */
     static const int32 GridSize = 48;
 
