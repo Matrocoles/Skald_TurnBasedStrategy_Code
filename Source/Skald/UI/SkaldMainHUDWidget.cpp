@@ -45,6 +45,12 @@ void USkaldMainHUDWidget::HandleEndTurnClicked() {
   } else if (CurrentPhase == ETurnPhase::Movement) {
     OnEndMovementRequested.Broadcast(true);
   }
+
+  if (APlayerController *PC = GetOwningPlayer()) {
+    if (ASkaldPlayerController *SPC = Cast<ASkaldPlayerController>(PC)) {
+      SPC->EndTurn();
+    }
+  }
 }
 
 void USkaldMainHUDWidget::UpdateTurnBanner(int32 InCurrentPlayerID,
@@ -152,6 +158,18 @@ void USkaldMainHUDWidget::ShowEndingTurn() {
 void USkaldMainHUDWidget::HideEndingTurn() {
   if (EndingTurnText) {
     EndingTurnText->SetVisibility(ESlateVisibility::Collapsed);
+  }
+}
+
+void USkaldMainHUDWidget::ShowTurnMessage(bool bIsMyTurn) {
+  if (EndingTurnText) {
+    EndingTurnText->SetText(
+        FText::FromString(bIsMyTurn ? TEXT("Your turn") : TEXT("Enemy turn")));
+    EndingTurnText->SetVisibility(ESlateVisibility::Visible);
+  }
+  if (EndTurnButton) {
+    EndTurnButton->SetVisibility(bIsMyTurn ? ESlateVisibility::Visible
+                                           : ESlateVisibility::Collapsed);
   }
 }
 

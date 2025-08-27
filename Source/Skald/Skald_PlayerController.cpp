@@ -1,13 +1,13 @@
 #include "Skald_PlayerController.h"
 #include "Blueprint/UserWidget.h"
+#include "Engine/Engine.h"
+#include "Kismet/GameplayStatics.h"
 #include "Skald_GameState.h"
 #include "Skald_PlayerState.h"
 #include "Skald_TurnManager.h"
 #include "Territory.h"
 #include "UI/SkaldMainHUDWidget.h"
 #include "WorldMap.h"
-#include "Kismet/GameplayStatics.h"
-#include "Engine/Engine.h"
 
 ASkaldPlayerController::ASkaldPlayerController() {
   bIsAI = false;
@@ -73,9 +73,11 @@ void ASkaldPlayerController::SetTurnManager(ATurnManager *Manager) {
   TurnManager = Manager;
 }
 
-void ASkaldPlayerController::ShowTurnAnnouncement(const FString& PlayerName) {
+void ASkaldPlayerController::ShowTurnAnnouncement(const FString &PlayerName,
+                                                  bool bIsMyTurn) {
   if (MainHudWidget) {
     MainHudWidget->ShowTurnAnnouncement(PlayerName);
+    MainHudWidget->ShowTurnMessage(bIsMyTurn);
   } else if (GEngine) {
     const FString Message = FString::Printf(TEXT("%s's Turn"), *PlayerName);
     GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Yellow, Message);
@@ -83,9 +85,6 @@ void ASkaldPlayerController::ShowTurnAnnouncement(const FString& PlayerName) {
 }
 
 void ASkaldPlayerController::StartTurn() {
-  if (MainHudWidget) {
-    MainHudWidget->HideEndingTurn();
-  }
   if (bIsAI) {
     MakeAIDecision();
     EndTurn();
@@ -118,9 +117,8 @@ void ASkaldPlayerController::HandleAttackRequested(int32 FromID, int32 ToID,
   if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
     Battle.AttackerPlayerID = PS->GetPlayerId();
   }
-  if (AWorldMap *WorldMap =
-          Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
-              GetWorld(), AWorldMap::StaticClass()))) {
+  if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+          GetWorld(), AWorldMap::StaticClass()))) {
     if (ATerritory *Source = WorldMap->GetTerritoryById(FromID)) {
       if (Source->OwningPlayer) {
         Battle.AttackerPlayerID = Source->OwningPlayer->GetPlayerId();
