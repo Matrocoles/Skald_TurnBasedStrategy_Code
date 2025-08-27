@@ -1,7 +1,9 @@
 #include "Skald_GameMode.h"
 #include "Algo/RandomShuffle.h"
+#include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
+#include "Skald.h"
 #include "SkaldSaveGame.h"
 #include "Skald_GameInstance.h"
 #include "Skald_GameState.h"
@@ -460,11 +462,35 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
 
 bool ASkaldGameMode::InitializeWorld() {
   if (!WorldMap) {
+    UE_LOG(LogSkald, Error,
+           TEXT("InitializeWorld failed: WorldMap missing in %s"),
+           *GetName());
+    if (GEngine) {
+      GEngine->AddOnScreenDebugMessage(
+          -1, 5.f, FColor::Red,
+          FString::Printf(TEXT("InitializeWorld: WorldMap missing in %s"),
+                          *GetName()));
+    }
     return false;
   }
 
   ASkaldGameState *GS = GetGameState<ASkaldGameState>();
-  if (!GS || GS->PlayerArray.Num() == 0) {
+  if (!GS) {
+    UE_LOG(LogSkald, Error, TEXT("InitializeWorld failed: GameState missing"));
+    if (GEngine) {
+      GEngine->AddOnScreenDebugMessage(
+          -1, 5.f, FColor::Red,
+          TEXT("InitializeWorld: GameState missing"));
+    }
+    return false;
+  }
+  if (GS->PlayerArray.Num() == 0) {
+    UE_LOG(LogSkald, Error, TEXT("InitializeWorld failed: no players"));
+    if (GEngine) {
+      GEngine->AddOnScreenDebugMessage(
+          -1, 5.f, FColor::Red,
+          TEXT("InitializeWorld: no players"));
+    }
     return false;
   }
 
@@ -477,6 +503,18 @@ bool ASkaldGameMode::InitializeWorld() {
         WorldMap->RegisterTerritory(Territory);
       }
     }
+  }
+  if (WorldMap->Territories.Num() == 0) {
+    UE_LOG(LogSkald, Error,
+           TEXT("InitializeWorld failed: WorldMap %s has no territories"),
+           *WorldMap->GetName());
+    if (GEngine) {
+      GEngine->AddOnScreenDebugMessage(
+          -1, 5.f, FColor::Red,
+          FString::Printf(TEXT("InitializeWorld: %s has no territories"),
+                          *WorldMap->GetName()));
+    }
+    return false;
   }
   // Shuffle territories before assignment
   Algo::RandomShuffle(WorldMap->Territories);
@@ -596,6 +634,15 @@ bool ASkaldGameMode::InitializeWorld() {
       if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(*It)) {
         if (USkaldMainHUDWidget *HUD = PC->GetHUDWidget()) {
           HUD->UpdateInitiativeText(Message);
+        } else {
+          UE_LOG(LogSkald, Warning,
+                 TEXT("InitializeWorld: Controller %s missing HUD widget"),
+                 *PC->GetName());
+          if (GEngine) {
+            GEngine->AddOnScreenDebugMessage(
+                -1, 5.f, FColor::Yellow,
+                FString::Printf(TEXT("No HUD for %s"), *PC->GetName()));
+          }
         }
       }
     }
