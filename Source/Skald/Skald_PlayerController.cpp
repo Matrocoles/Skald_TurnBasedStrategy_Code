@@ -354,6 +354,9 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
   Source->RefreshAppearance();
   Target->RefreshAppearance();
 
+  Source->ForceNetUpdate();
+  Target->ForceNetUpdate();
+
   if (TurnManager) {
     for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr :
          TurnManager->GetControllers()) {
@@ -442,6 +445,38 @@ void ASkaldPlayerController::ServerHandleMove_Implementation(int32 FromID,
   }
 }
 
+void ASkaldPlayerController::ServerSelectTerritory_Implementation(
+    int32 TerritoryID) {
+  AWorldMap *WorldMap = Cast<AWorldMap>(
+      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
+  if (!WorldMap) {
+    return;
+  }
+
+  ATerritory *Terr = WorldMap->GetTerritoryById(TerritoryID);
+  if (!Terr) {
+    return;
+  }
+
+  FString OwnerName = Terr->OwningPlayer
+                           ? Terr->OwningPlayer->DisplayName
+                           : TEXT("Neutral");
+
+  Terr->ForceNetUpdate();
+
+  if (TurnManager) {
+    for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr :
+         TurnManager->GetControllers()) {
+      if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
+        if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
+          HUD->UpdateTerritoryInfo(Terr->TerritoryName, OwnerName,
+                                   Terr->ArmyStrength);
+        }
+      }
+    }
+  }
+}
+
 void ASkaldPlayerController::HandleEndAttackRequested(bool bConfirmed) {
   UE_LOG(LogSkald, Log, TEXT("HUD end attack %s"),
          bConfirmed ? TEXT("confirmed") : TEXT("cancelled"));
@@ -453,17 +488,11 @@ void ASkaldPlayerController::HandleEndMovementRequested(bool bConfirmed) {
 }
 
 void ASkaldPlayerController::HandleTerritorySelected(ATerritory *Terr) {
-  if (!MainHudWidget || !Terr) {
+  if (!Terr) {
     return;
   }
 
-  FString OwnerName = TEXT("Neutral");
-  if (Terr->OwningPlayer) {
-    OwnerName = Terr->OwningPlayer->DisplayName;
-  }
-
-  MainHudWidget->UpdateTerritoryInfo(Terr->TerritoryName, OwnerName,
-                                     Terr->ArmyStrength);
+  ServerSelectTerritory(Terr->TerritoryID);
 }
 
 void ASkaldPlayerController::HandlePlayersUpdated() {
