@@ -334,7 +334,9 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
       Pawn->SetActorLocation(Loc);
 
       if (UCameraComponent *Camera = Pawn->FindComponentByClass<UCameraComponent>()) {
-        Camera->SetFieldOfView(LoadedGame->SavedZoomAmount);
+        if (LoadedGame->SavedZoomAmount > 0.f) {
+          Camera->SetFieldOfView(LoadedGame->SavedZoomAmount);
+        }
       }
     }
   }
@@ -620,6 +622,20 @@ void ASkaldGameMode::FillSaveGame(USkaldSaveGame *SaveGameObject) const {
   SaveGameObject->TurnNumber = 0; // Turn tracking not yet implemented
   if (const ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
     SaveGameObject->CurrentPlayerIndex = GS->CurrentTurnIndex;
+  }
+
+  // Preserve current camera position and zoom so the view can be restored
+  // when the game is loaded again.
+  if (APlayerController *PC = UGameplayStatics::GetPlayerController(this, 0)) {
+    if (APawn *Pawn = PC->GetPawn()) {
+      const FVector Loc = Pawn->GetActorLocation();
+      SaveGameObject->SavedViewOffset = FVector2D(Loc.X, Loc.Y);
+
+      if (UCameraComponent *Camera =
+              Pawn->FindComponentByClass<UCameraComponent>()) {
+        SaveGameObject->SavedZoomAmount = Camera->FieldOfView;
+      }
+    }
   }
 
   // Copy player data.
