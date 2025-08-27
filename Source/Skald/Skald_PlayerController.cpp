@@ -2,6 +2,8 @@
 #include "Blueprint/UserWidget.h"
 #include "Engine/Engine.h"
 #include "Kismet/GameplayStatics.h"
+#include "Skald_GameInstance.h"
+#include "Skald_GameMode.h"
 #include "Skald_GameState.h"
 #include "Skald_PlayerState.h"
 #include "Skald_TurnManager.h"
@@ -23,6 +25,10 @@ ASkaldPlayerController::ASkaldPlayerController() {
 void ASkaldPlayerController::BeginPlay() {
   Super::BeginPlay();
 
+  CachedGameState = GetWorld()->GetGameState<ASkaldGameState>();
+  CachedGameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
+  CachedGameInstance = GetGameInstance<USkaldGameInstance>();
+
   // Create and show the HUD widget if a class has been assigned (expected via
   // blueprint).
   if (MainHudWidgetClass) {
@@ -31,9 +37,9 @@ void ASkaldPlayerController::BeginPlay() {
       HUDRef = MainHudWidget;
       MainHudWidget->AddToViewport();
 
-      if (ASkaldGameState *GS = GetWorld()->GetGameState<ASkaldGameState>()) {
+      if (CachedGameState) {
         TArray<FS_PlayerData> Players;
-        for (APlayerState *PSBase : GS->PlayerArray) {
+        for (APlayerState *PSBase : CachedGameState->PlayerArray) {
           if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
             FS_PlayerData Data;
             Data.PlayerID = PS->GetPlayerId();
@@ -44,7 +50,7 @@ void ASkaldPlayerController::BeginPlay() {
           }
         }
 
-        const ASkaldPlayerState *CurrentPS = GS->GetCurrentPlayer();
+        const ASkaldPlayerState *CurrentPS = CachedGameState->GetCurrentPlayer();
         const int32 CurrentID = CurrentPS ? CurrentPS->GetPlayerId() : -1;
         MainHudWidget->RefreshFromState(CurrentID, /*TurnNumber*/ 1,
                                         ETurnPhase::Reinforcement, Players);

@@ -6,6 +6,8 @@
 #include "Engine/Engine.h"
 #include "Kismet/GameplayStatics.h"
 #include "Skald_GameMode.h"
+#include "Skald_GameState.h"
+#include "Skald_GameInstance.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
 #include "Skald_TurnManager.h"
@@ -15,6 +17,10 @@
 
 void USkaldMainHUDWidget::NativeConstruct() {
   Super::NativeConstruct();
+
+  GameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
+  GameState = GetWorld()->GetGameState<ASkaldGameState>();
+  GameInstance = GetGameInstance<USkaldGameInstance>();
 
   if (AttackButton) {
     AttackButton->OnClicked.AddDynamic(
