@@ -5,6 +5,7 @@
 #include "SkaldTypes.h"
 #include "Skald_GameInstance.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSkaldFactionsUpdated);
 /** Game instance storing player selections from the lobby. */
 UCLASS()
 class SKALD_API USkaldGameInstance : public UGameInstance
@@ -27,5 +28,9 @@ public:
     /** Factions that have already been selected by players or AI. */
     UPROPERTY(BlueprintReadWrite, Category="Player")
     TArray<ESkaldFaction> TakenFactions;
+
+    /** Event fired when the taken faction list changes. */
+    UPROPERTY(BlueprintAssignable, Category="Player|Events")
+    FSkaldFactionsUpdated OnFactionsUpdated;
 };
 

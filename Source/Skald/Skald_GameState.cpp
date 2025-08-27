@@ -13,6 +13,7 @@ void ASkaldGameState::AddPlayerState(APlayerState* PlayerState)
     if (ASkaldPlayerState* SkaldPlayer = Cast<ASkaldPlayerState>(PlayerState))
     {
         Players.Add(SkaldPlayer);
+        OnPlayersUpdated.Broadcast();
     }
 }
 

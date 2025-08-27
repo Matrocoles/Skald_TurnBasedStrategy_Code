@@ -19,8 +19,23 @@ void USkaldMainHUDWidget::NativeConstruct() {
   Super::NativeConstruct();
 
   GameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
+  if (!GameMode) {
+    UE_LOG(LogTemp, Warning,
+           TEXT("SkaldMainHUDWidget could not find GameMode."));
+  }
   GameState = GetWorld()->GetGameState<ASkaldGameState>();
+  if (!GameState) {
+    UE_LOG(LogTemp, Warning,
+           TEXT("SkaldMainHUDWidget could not find GameState."));
+  } else {
+    GameState->OnPlayersUpdated.AddDynamic(this,
+                                          &USkaldMainHUDWidget::HandlePlayersUpdated);
+  }
   GameInstance = GetGameInstance<USkaldGameInstance>();
+  if (!GameInstance) {
+    UE_LOG(LogTemp, Warning,
+           TEXT("SkaldMainHUDWidget could not find GameInstance."));
+  }
 
   if (AttackButton) {
     AttackButton->OnClicked.AddDynamic(
@@ -409,6 +424,26 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
       DeployButton->SetVisibility(ESlateVisibility::Visible);
     }
   }
+}
+
+void USkaldMainHUDWidget::HandlePlayersUpdated() {
+  if (!GameState) {
+    return;
+  }
+
+  TArray<FS_PlayerData> Players;
+  for (APlayerState *PSBase : GameState->PlayerArray) {
+    if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
+      FS_PlayerData Data;
+      Data.PlayerID = PS->GetPlayerId();
+      Data.PlayerName = PS->DisplayName;
+      Data.IsAI = PS->bIsAI;
+      Data.Faction = PS->Faction;
+      Players.Add(Data);
+    }
+  }
+
+  RefreshPlayerList(Players);
 }
 
 void USkaldMainHUDWidget::SyncPhaseButtons(bool bIsMyTurn) {

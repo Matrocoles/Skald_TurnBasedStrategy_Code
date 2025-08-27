@@ -272,4 +272,8 @@ protected:
   TArray<ATerritory *> HighlightedTerritories;
 
   virtual void NativeConstruct() override;
+
+  /** Refresh player list when the game state notifies us of a change. */
+  UFUNCTION()
+  void HandlePlayersUpdated();
 };
