@@ -4,17 +4,6 @@
 #include "Skald_PlayerState.h"
 #include "Territory.h"
 #include "WorldMap.h"
-#include "BattleResolutionSyncTest.generated.h"
-
-
-UCLASS()
-class UWorldStateListener : public UObject {
-  GENERATED_BODY()
-public:
-  bool bBroadcasted = false;
-  UFUNCTION()
-  void OnBroadcast() { bBroadcasted = true; }
-};
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldBattleResolutionSyncTest, "Skald.Multiplayer.BattleResolutionSync", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FSkaldBattleResolutionSyncTest::RunTest(const FString& Parameters) {
@@ -55,12 +44,12 @@ bool FSkaldBattleResolutionSyncTest::RunTest(const FString& Parameters) {
   WM->Territories.Add(Source);
   WM->Territories.Add(Target);
 
-  UWorldStateListener* Listener = NewObject<UWorldStateListener>();
-  TM->OnWorldStateChanged.AddDynamic(Listener, &UWorldStateListener::OnBroadcast);
+  bool bBroadcasted = false;
+  TM->OnWorldStateChanged.AddLambda([&bBroadcasted]() { bBroadcasted = true; });
 
   TM->ClientBattleResolved(1, 3, 5, 1, 2, 1, 5, 2);
 
-  TestTrue(TEXT("Broadcast fired"), Listener->bBroadcasted);
+  TestTrue(TEXT("Broadcast fired"), bBroadcasted);
   TestEqual(TEXT("Source army"), Source->ArmyStrength, 5);
   TestEqual(TEXT("Target army"), Target->ArmyStrength, 2);
   TestTrue(TEXT("Target owner"), Target->OwningPlayer == PS1);
