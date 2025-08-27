@@ -61,6 +61,13 @@ public:
     UFUNCTION(BlueprintCallable, Category="Battle")
     void ResolveGridBattleResult();
 
+    /** Multicast the results of a resolved battle to all clients. */
+    UFUNCTION(NetMulticast, Reliable)
+    void ClientBattleResolved(int32 WinningPlayerID, int32 AttackerCasualties,
+                              int32 DefenderCasualties, int32 FromTerritoryID,
+                              int32 TargetTerritoryID, int32 NewOwnerPlayerID,
+                              int32 SourceArmy, int32 TargetArmy);
+
     /** Access the controllers array in its current initiative order. */
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="Turn")
     const TArray<TWeakObjectPtr<ASkaldPlayerController>>& GetControllers() const { return Controllers; }
