@@ -121,6 +121,8 @@ void AWorldMap::SelectTerritory(ATerritory *Territory) {
   }
 
   SelectedTerritory = Territory;
+
+  OnTerritorySelected.Broadcast(Territory);
 }
 
 bool AWorldMap::MoveBetween(ATerritory *From, ATerritory *To) {
