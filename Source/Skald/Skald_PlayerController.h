@@ -129,6 +129,10 @@ protected:
   UFUNCTION(BlueprintCallable, Category = "UI")
   void HandleEngineeringRequested(int32 CapitalID, uint8 UpgradeType);
 
+  /** Handle HUD treasure digging requests. */
+  UFUNCTION(BlueprintCallable, Category = "UI")
+  void HandleDigTreasureRequested(int32 TerritoryID);
+
   /** React to player list changes in the game state. */
   UFUNCTION()
   void HandlePlayersUpdated();
@@ -153,6 +157,10 @@ protected:
   /** Server-side processing of a siege build request. */
   UFUNCTION(Server, Reliable)
   void ServerBuildSiege(int32 TerritoryID, E_SiegeWeapons SiegeType);
+
+  /** Server-side processing of a treasure dig request. */
+  UFUNCTION(Server, Reliable)
+  void ServerDigTreasure(int32 TerritoryID);
 
   /** Server-side processing of a move request. */
   UFUNCTION(Server, Reliable)

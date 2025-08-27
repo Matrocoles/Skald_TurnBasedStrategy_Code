@@ -1,11 +1,12 @@
 #include "UI/SkaldMainHUDWidget.h"
-#include "Skald.h"
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/Widget.h"
 #include "Engine/Engine.h"
 #include "Kismet/GameplayStatics.h"
+#include "Skald.h"
+#include "SkaldTypes.h"
 #include "Skald_GameInstance.h"
 #include "Skald_GameMode.h"
 #include "Skald_GameState.h"
@@ -13,7 +14,6 @@
 #include "Skald_PlayerState.h"
 #include "Skald_TurnManager.h"
 #include "Territory.h"
-#include "SkaldTypes.h"
 #include "UI/ConfirmAttackWidget.h"
 #include "UI/DeployWidget.h"
 #include "WorldMap.h"
@@ -220,8 +220,7 @@ void USkaldMainHUDWidget::UpdateDeployableUnits(int32 UnitsRemaining) {
 
 void USkaldMainHUDWidget::UpdateResources(int32 ResourceAmount) {
   if (ResourcesText) {
-    const FString Text =
-        FString::Printf(TEXT("Resources: %d"), ResourceAmount);
+    const FString Text = FString::Printf(TEXT("Resources: %d"), ResourceAmount);
     ResourcesText->SetText(FText::FromString(Text));
     ResourcesText->SetVisibility(ESlateVisibility::Visible);
   }
@@ -259,8 +258,8 @@ void USkaldMainHUDWidget::BeginAttackSelection() {
   }
 }
 
-void USkaldMainHUDWidget::SubmitAttack(int32 FromID, int32 ToID,
-                                       int32 ArmySent, bool bUseSiege) {
+void USkaldMainHUDWidget::SubmitAttack(int32 FromID, int32 ToID, int32 ArmySent,
+                                       bool bUseSiege) {
   OnAttackRequested.Broadcast(FromID, ToID, ArmySent, bUseSiege);
   CancelAttackSelection();
 }
@@ -397,6 +396,12 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
     if (DeployButton) {
       DeployButton->SetVisibility(ESlateVisibility::Visible);
     }
+  } else if (CurrentPhase == ETurnPhase::Engineering && bOwnedByLocal &&
+             Territory->bIsCapital) {
+    OnEngineeringRequested.Broadcast(Territory->TerritoryID, 0);
+  } else if (CurrentPhase == ETurnPhase::Treasure && bOwnedByLocal &&
+             Territory->HasTreasure) {
+    OnDigTreasureRequested.Broadcast(Territory->TerritoryID);
   }
 }
 
@@ -487,7 +492,8 @@ void USkaldMainHUDWidget::HandleAttackApproved() {
     }
   }
 
-  if (!SkaldHelpers::MeetsCapitalAttackRequirement(bTargetIsCapital, ArmyCount)) {
+  if (!SkaldHelpers::MeetsCapitalAttackRequirement(bTargetIsCapital,
+                                                   ArmyCount)) {
     const FString Error = FString::Printf(
         TEXT("Must send at least %d units to attack a capital."),
         SkaldConstants::CapitalAttackArmyRequirement);
