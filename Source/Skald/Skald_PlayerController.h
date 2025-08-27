@@ -186,4 +186,7 @@ protected:
   UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Turn",
             meta = (ExposeOnSpawn = true))
   TObjectPtr<ATurnManager> TurnManager;
+
+private:
+  void BuildPlayerDataArray(TArray<FS_PlayerData> &OutPlayers) const;
 };

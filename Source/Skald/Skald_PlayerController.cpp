@@ -626,12 +626,13 @@ void ASkaldPlayerController::HandleTerritorySelected(ATerritory *Terr) {
   ServerSelectTerritory(Terr->TerritoryID);
 }
 
-void ASkaldPlayerController::HandlePlayersUpdated() {
-  if (!MainHudWidget || !CachedGameState) {
+void ASkaldPlayerController::BuildPlayerDataArray(
+    TArray<FS_PlayerData> &OutPlayers) const {
+  OutPlayers.Reset();
+  if (!CachedGameState) {
     return;
   }
 
-  TArray<FS_PlayerData> Players;
   for (APlayerState *PSBase : CachedGameState->PlayerArray) {
     if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
       FS_PlayerData Data;
@@ -641,9 +642,17 @@ void ASkaldPlayerController::HandlePlayersUpdated() {
       Data.Faction = PS->Faction;
       Data.Resources = PS->Resources;
       Data.IsEliminated = PS->IsEliminated;
-      Players.Add(Data);
+      OutPlayers.Add(Data);
     }
   }
+}
+
+void ASkaldPlayerController::HandlePlayersUpdated() {
+  if (!MainHudWidget || !CachedGameState) {
+    return;
+  }
+  TArray<FS_PlayerData> Players;
+  BuildPlayerDataArray(Players);
   MainHudWidget->RefreshPlayerList(Players);
 
   if (ASkaldPlayerState *LocalPS = GetPlayerState<ASkaldPlayerState>()) {
@@ -675,18 +684,7 @@ void ASkaldPlayerController::HandleWorldStateChanged() {
   // Refresh player list from the game state.
   if (CachedGameState) {
     TArray<FS_PlayerData> Players;
-    for (APlayerState *PSBase : CachedGameState->PlayerArray) {
-      if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
-        FS_PlayerData Data;
-        Data.PlayerID = PS->GetPlayerId();
-        Data.PlayerName = PS->DisplayName;
-        Data.IsAI = PS->bIsAI;
-        Data.Faction = PS->Faction;
-        Data.Resources = PS->Resources;
-        Data.IsEliminated = PS->IsEliminated;
-        Players.Add(Data);
-      }
-    }
+    BuildPlayerDataArray(Players);
     MainHudWidget->RefreshPlayerList(Players);
   }
 
