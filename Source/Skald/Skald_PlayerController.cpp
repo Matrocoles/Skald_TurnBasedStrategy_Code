@@ -1,4 +1,5 @@
 #include "Skald_PlayerController.h"
+#include "Skald.h"
 #include "Blueprint/UserWidget.h"
 #include "Engine/Engine.h"
 #include "Kismet/GameplayStatics.h"
@@ -26,7 +27,7 @@ void ASkaldPlayerController::BeginPlay() {
   Super::BeginPlay();
   CachedGameState = GetWorld()->GetGameState<ASkaldGameState>();
   if (!CachedGameState) {
-    UE_LOG(LogTemp, Error,
+    UE_LOG(LogSkald, Error,
            TEXT("ASkaldPlayerController could not find ASkaldGameState."));
   } else {
     CachedGameState->OnPlayersUpdated.AddDynamic(
@@ -35,13 +36,13 @@ void ASkaldPlayerController::BeginPlay() {
 
   CachedGameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
   if (!CachedGameMode) {
-    UE_LOG(LogTemp, Error,
+    UE_LOG(LogSkald, Error,
            TEXT("ASkaldPlayerController could not find ASkaldGameMode."));
   }
 
   CachedGameInstance = GetGameInstance<USkaldGameInstance>();
   if (!CachedGameInstance) {
-    UE_LOG(LogTemp, Error,
+    UE_LOG(LogSkald, Error,
            TEXT("ASkaldPlayerController could not find USkaldGameInstance."));
   } else {
     CachedGameInstance->OnFactionsUpdated.AddDynamic(
@@ -86,7 +87,7 @@ void ASkaldPlayerController::BeginPlay() {
           this, &ASkaldPlayerController::HandleEndMovementRequested);
     }
   } else {
-    UE_LOG(LogTemp, Warning,
+    UE_LOG(LogSkald, Warning,
            TEXT("MainHudWidgetClass is null; HUD will not be displayed."));
   }
 
@@ -184,23 +185,23 @@ bool ASkaldPlayerController::IsAIController() const { return bIsAI; }
 
 void ASkaldPlayerController::HandleAttackRequested(int32 FromID, int32 ToID,
                                                    int32 ArmySent) {
-  UE_LOG(LogTemp, Log, TEXT("HUD attack from %d to %d with %d"), FromID, ToID,
-         ArmySent);
+  UE_LOG(LogSkald, Log, TEXT("HUD attack from %d to %d with %d"), FromID, ToID,
+        ArmySent);
 }
 
 void ASkaldPlayerController::HandleMoveRequested(int32 FromID, int32 ToID,
                                                  int32 Troops) {
-  UE_LOG(LogTemp, Log, TEXT("HUD move from %d to %d with %d"), FromID, ToID,
+  UE_LOG(LogSkald, Log, TEXT("HUD move from %d to %d with %d"), FromID, ToID,
          Troops);
 }
 
 void ASkaldPlayerController::HandleEndAttackRequested(bool bConfirmed) {
-  UE_LOG(LogTemp, Log, TEXT("HUD end attack %s"),
+  UE_LOG(LogSkald, Log, TEXT("HUD end attack %s"),
          bConfirmed ? TEXT("confirmed") : TEXT("cancelled"));
 }
 
 void ASkaldPlayerController::HandleEndMovementRequested(bool bConfirmed) {
-  UE_LOG(LogTemp, Log, TEXT("HUD end move %s"),
+  UE_LOG(LogSkald, Log, TEXT("HUD end move %s"),
          bConfirmed ? TEXT("confirmed") : TEXT("cancelled"));
 }
 
@@ -238,5 +239,5 @@ void ASkaldPlayerController::HandlePlayersUpdated() {
 }
 
 void ASkaldPlayerController::HandleFactionsUpdated() {
-  UE_LOG(LogTemp, Log, TEXT("GameInstance factions updated."));
+  UE_LOG(LogSkald, Log, TEXT("GameInstance factions updated."));
 }

@@ -1,4 +1,5 @@
 #include "SaveGameWidget.h"
+#include "Skald.h"
 #include "Components/Button.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/SaveGame.h"
@@ -93,7 +94,7 @@ void USaveGameWidget::HandleSaveSlot(int32 SlotIndex)
     }
     else
     {
-        UE_LOG(LogTemp, Error, TEXT("Failed to save slot %s"), SlotNames[SlotIndex]);
+        UE_LOG(LogSkald, Error, TEXT("Failed to save slot %s"), SlotNames[SlotIndex]);
     }
 }
 

@@ -1,4 +1,5 @@
 #include "Territory.h"
+#include "Skald.h"
 #include "Components/PrimitiveComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
@@ -83,7 +84,7 @@ void ATerritory::BeginPlay() {
         DynamicMaterial->GetVectorParameterValue(FName("Color"), DefaultColor);
       }
     } else {
-      UE_LOG(LogTemp, Warning, TEXT("Territory %s has no material at index 0"),
+      UE_LOG(LogSkald, Warning, TEXT("Territory %s has no material at index 0"),
              *GetName());
     }
 

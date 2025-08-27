@@ -3,4 +3,6 @@
 #include "Skald.h"
 #include "Modules/ModuleManager.h"
 
+DEFINE_LOG_CATEGORY(LogSkald);
+
 IMPLEMENT_PRIMARY_GAME_MODULE( FDefaultGameModuleImpl, Skald, "Skald" );

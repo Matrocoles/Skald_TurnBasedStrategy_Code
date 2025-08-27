@@ -2,6 +2,7 @@
 
 
 #include "Skald_PlayerCharacter.h"
+#include "Skald.h"
 #include "WorldMap.h"
 #include "Territory.h"
 #include "Camera/CameraComponent.h"
@@ -103,7 +104,7 @@ void ASkald_PlayerCharacter::AbilityOne()
 {
         if (CurrentSelection)
         {
-                UE_LOG(LogTemp, Log, TEXT("%s used Ability One on %s"), *GetName(), *CurrentSelection->GetName());
+                UE_LOG(LogSkald, Log, TEXT("%s used Ability One on %s"), *GetName(), *CurrentSelection->GetName());
         }
 }
 
@@ -111,12 +112,12 @@ void ASkald_PlayerCharacter::AbilityTwo()
 {
         if (CurrentSelection)
         {
-                UE_LOG(LogTemp, Log, TEXT("%s used Ability Two"), *GetName());
+                UE_LOG(LogSkald, Log, TEXT("%s used Ability Two"), *GetName());
         }
 }
 
 void ASkald_PlayerCharacter::AbilityThree()
 {
-        UE_LOG(LogTemp, Log, TEXT("%s used Ability Three"), *GetName());
+        UE_LOG(LogSkald, Log, TEXT("%s used Ability Three"), *GetName());
 }
 
