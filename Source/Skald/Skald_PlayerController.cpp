@@ -48,6 +48,11 @@ void ASkaldPlayerController::BeginPlay() {
   } else {
     CachedGameInstance->OnFactionsUpdated.AddDynamic(
         this, &ASkaldPlayerController::HandleFactionsUpdated);
+
+    if (IsLocalController()) {
+      ServerInitPlayerState(CachedGameInstance->DisplayName,
+                           CachedGameInstance->Faction);
+    }
   }
 
   // Create and show the HUD widget if a class has been assigned (expected via
@@ -100,6 +105,14 @@ void ASkaldPlayerController::BeginPlay() {
 
   if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
     bIsAI = PS->bIsAI;
+  }
+}
+
+void ASkaldPlayerController::ServerInitPlayerState_Implementation(
+    const FString &Name, ESkaldFaction Faction) {
+  if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+    PS->DisplayName = Name;
+    PS->Faction = Faction;
   }
 }
 
