@@ -157,6 +157,11 @@ bool ATerritory::MoveTo(ATerritory *TargetTerritory, int32 Troops) {
     return false;
   }
 
+  if (!IsAdjacentTo(TargetTerritory) ||
+      TargetTerritory->OwningPlayer != OwningPlayer) {
+    return false;
+  }
+
   ArmyStrength -= Troops;
   TargetTerritory->ArmyStrength += Troops;
 
