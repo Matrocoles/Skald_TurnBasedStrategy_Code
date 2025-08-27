@@ -349,24 +349,29 @@ void ASkaldPlayerController::HandleAttackRequested(int32 FromID, int32 ToID,
   AWorldMap *WorldMap = Cast<AWorldMap>(
       UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
   if (!WorldMap) {
+    NotifyActionError(TEXT("World map not found"));
     return;
   }
 
   ATerritory *Source = WorldMap->GetTerritoryById(FromID);
   ATerritory *Target = WorldMap->GetTerritoryById(ToID);
   if (!Source || !Target) {
+    NotifyActionError(TEXT("Invalid territory selection"));
     return;
   }
 
   if (!Source->IsAdjacentTo(Target)) {
+    NotifyActionError(TEXT("Cannot attack non-adjacent territory"));
     return;
   }
 
   if (ArmySent <= 0 || ArmySent >= Source->ArmyStrength) {
+    NotifyActionError(TEXT("Invalid army count for attack"));
     return;
   }
 
   if (!SkaldHelpers::MeetsCapitalAttackRequirement(Target->bIsCapital, ArmySent)) {
+    NotifyActionError(TEXT("Insufficient forces to attack capital"));
     return;
   }
 
@@ -378,6 +383,7 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(
   AWorldMap *WorldMap = Cast<AWorldMap>(
       UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
   if (!WorldMap) {
+    NotifyActionError(TEXT("World map not found"));
     return;
   }
 
@@ -481,21 +487,25 @@ void ASkaldPlayerController::HandleMoveRequested(int32 FromID, int32 ToID,
   AWorldMap *WorldMap = Cast<AWorldMap>(
       UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
   if (!WorldMap) {
+    NotifyActionError(TEXT("World map not found"));
     return;
   }
 
   ATerritory *Source = WorldMap->GetTerritoryById(FromID);
   ATerritory *Target = WorldMap->GetTerritoryById(ToID);
   if (!Source || !Target) {
+    NotifyActionError(TEXT("Invalid territory selection"));
     return;
   }
 
   TArray<ATerritory *> Path;
   if (!WorldMap->FindPath(Source, Target, Path)) {
+    NotifyActionError(TEXT("No valid path for movement"));
     return;
   }
 
   if (Troops <= 0 || Troops >= Source->ArmyStrength) {
+    NotifyActionError(TEXT("Invalid troop count for movement"));
     return;
   }
 
@@ -638,6 +648,15 @@ void ASkaldPlayerController::HandleTerritorySelected(ATerritory *Terr) {
   }
 
   ServerSelectTerritory(Terr->TerritoryID);
+}
+
+void ASkaldPlayerController::NotifyActionError(const FString &Message) {
+  UE_LOG(LogSkald, Warning, TEXT("%s"), *Message);
+  if (MainHudWidget) {
+    MainHudWidget->ShowErrorMessage(Message);
+  } else if (GEngine) {
+    GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Red, Message);
+  }
 }
 
 void ASkaldPlayerController::BuildPlayerDataArray(
