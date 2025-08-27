@@ -7,6 +7,7 @@
 
 class ASkaldPlayerState;
 class ATerritory;
+class UStaticMesh;
 class UStaticMeshComponent;
 class UPrimitiveComponent;
 class UMaterialInstanceDynamic;
@@ -49,6 +50,10 @@ public:
     /** Whether this territory is a capital. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory", Replicated)
     bool bIsCapital = false;
+
+    /** Mesh asset used to mark this territory as a capital. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory")
+    UStaticMesh* CapitalMeshAsset = nullptr;
 
     /** Optional identifier describing which continent this territory belongs to. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory", Replicated)
@@ -108,6 +113,10 @@ protected:
     /** Visual representation of the territory. */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Territory")
     UStaticMeshComponent* MeshComponent = nullptr;
+
+    /** Mesh indicating this territory is a capital. */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Territory")
+    UStaticMeshComponent* CapitalMesh = nullptr;
 
     /** Text label showing name, owner and army count. */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Territory")

@@ -57,6 +57,19 @@ ATerritory::ATerritory() {
 void ATerritory::BeginPlay() {
   Super::BeginPlay();
 
+  if (!CapitalMesh) {
+    CapitalMesh = NewObject<UStaticMeshComponent>(this, TEXT("CapitalMesh"));
+    if (CapitalMesh) {
+      CapitalMesh->SetupAttachment(RootComponent);
+      if (CapitalMeshAsset) {
+        CapitalMesh->SetStaticMesh(CapitalMeshAsset);
+      }
+      CapitalMesh->SetVisibility(false);
+      CapitalMesh->SetHiddenInGame(true);
+      CapitalMesh->RegisterComponent();
+    }
+  }
+
   if (MeshComponent) {
     MeshComponent->OnBeginCursorOver.AddDynamic(this,
                                                 &ATerritory::HandleMouseEnter);
@@ -80,6 +93,11 @@ void ATerritory::BeginPlay() {
 
   UpdateTerritoryColor();
   UpdateLabel();
+
+  if (CapitalMesh) {
+    CapitalMesh->SetVisibility(bIsCapital);
+    CapitalMesh->SetHiddenInGame(!bIsCapital);
+  }
 
   // Territories are registered with the world map immediately after
   // spawning, so no self-registration is required here.
@@ -170,6 +188,11 @@ void ATerritory::RefreshAppearance() { UpdateTerritoryColor(); UpdateLabel(); }
 void ATerritory::OnRep_OwningPlayer() {
   UpdateTerritoryColor();
   UpdateLabel();
+
+  if (CapitalMesh) {
+    CapitalMesh->SetVisibility(bIsCapital);
+    CapitalMesh->SetHiddenInGame(!bIsCapital);
+  }
 }
 
 void ATerritory::OnRep_ArmyStrength() { UpdateLabel(); }
