@@ -84,7 +84,7 @@ protected:
   /** Allow players to position initial armies based on initiative. */
   UFUNCTION(BlueprintCallable, Category = "GameMode")
   void BeginArmyPlacementPhase();
-
+public:
   /** Build siege equipment during the engineering phase. */
   UFUNCTION(BlueprintCallable, Category = "Siege")
   int32 BuildSiegeAtTerritory(int32 TerritoryID, E_SiegeWeapons Type);
@@ -93,6 +93,8 @@ protected:
   UFUNCTION(BlueprintCallable, Category = "Siege")
   int32 ConsumeSiege(int32 TerritoryID);
 
+  /** Update cached player resource values. */
+  void UpdatePlayerResources(ASkaldPlayerState *Player);
 private:
   /** Timer that triggers auto-start of the turn sequence. */
   FTimerHandle StartGameTimerHandle;
@@ -115,8 +117,6 @@ private:
   /** Notify HUDs of the current player roster. */
   void RefreshHUDs();
 
-  /** Update cached player resource values. */
-  void UpdatePlayerResources(ASkaldPlayerState *Player);
 
   /** Attempt to initialise the world and start the game flow. */
   void TryInitializeWorldAndStart();

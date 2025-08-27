@@ -70,6 +70,10 @@ public:
     /** ID of siege equipment built in this territory, 0 if none. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory", Replicated)
     int32 BuiltSiegeID = 0;
+    /** Whether this territory contains treasure. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory", Replicated)
+    bool HasTreasure = false;
+
 
     /** Called when the territory is selected. */
     UPROPERTY(BlueprintAssignable, Category = "Territory")

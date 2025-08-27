@@ -2,6 +2,7 @@
 #include "Tests/AutomationEditorCommon.h"
 #include "Skald_PlayerController.h"
 #include "UI/SkaldMainHUDWidget.h"
+#include "PlayerControllerValidationTest.generated.h"
 
 UCLASS()
 class UTestHUDWidget : public USkaldMainHUDWidget {
