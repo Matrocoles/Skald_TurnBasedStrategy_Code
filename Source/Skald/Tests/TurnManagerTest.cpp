@@ -76,10 +76,10 @@ bool FSkaldTurnManagerInitiativeTest::RunTest(const FString& Parameters) {
   TM->RegisterController(PC2);
   TM->SortControllersByInitiative();
 
-  const TArray<TWeakObjectPtr<ASkaldPlayerController>>& Controllers = TM->GetControllers();
+  const TArray<ASkaldPlayerController*> Controllers = TM->GetControllers();
   TestEqual(TEXT("Controller count"), Controllers.Num(), 2);
-  TestTrue(TEXT("Highest initiative first"), Controllers[0].Get() == PC2);
-  TestTrue(TEXT("Lowest initiative second"), Controllers[1].Get() == PC1);
+  TestTrue(TEXT("Highest initiative first"), Controllers[0] == PC2);
+  TestTrue(TEXT("Lowest initiative second"), Controllers[1] == PC1);
 
   return true;
 }

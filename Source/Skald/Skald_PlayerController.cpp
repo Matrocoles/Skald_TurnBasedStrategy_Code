@@ -475,16 +475,13 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
   Target->ForceNetUpdate();
 
   if (TurnManager) {
-    for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr :
-         TurnManager->GetControllers()) {
-      if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
-        if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
-          FString OwnerName = Target->OwningPlayer
-                                  ? Target->OwningPlayer->DisplayName
-                                  : TEXT("Neutral");
-          HUD->UpdateTerritoryInfo(Target->TerritoryName, OwnerName,
-                                   Target->ArmyStrength);
-        }
+    for (ASkaldPlayerController* Controller : TurnManager->GetControllers()) {
+      if (USkaldMainHUDWidget* HUD = Controller ? Controller->GetHUDWidget() : nullptr) {
+        FString OwnerName = Target->OwningPlayer
+                                ? Target->OwningPlayer->DisplayName
+                                : TEXT("Neutral");
+        HUD->UpdateTerritoryInfo(Target->TerritoryName, OwnerName,
+                                 Target->ArmyStrength);
       }
     }
   }
@@ -547,21 +544,18 @@ void ASkaldPlayerController::ServerHandleMove_Implementation(int32 FromID,
   }
 
   if (TurnManager) {
-    for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr :
-         TurnManager->GetControllers()) {
-      if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
-        if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
-          FString SourceOwner = Source->OwningPlayer
-                                    ? Source->OwningPlayer->DisplayName
-                                    : TEXT("Neutral");
-          HUD->UpdateTerritoryInfo(Source->TerritoryName, SourceOwner,
-                                   Source->ArmyStrength);
-          FString TargetOwner = Target->OwningPlayer
-                                    ? Target->OwningPlayer->DisplayName
-                                    : TEXT("Neutral");
-          HUD->UpdateTerritoryInfo(Target->TerritoryName, TargetOwner,
-                                   Target->ArmyStrength);
-        }
+    for (ASkaldPlayerController* Controller : TurnManager->GetControllers()) {
+      if (USkaldMainHUDWidget* HUD = Controller ? Controller->GetHUDWidget() : nullptr) {
+        FString SourceOwner = Source->OwningPlayer
+                                  ? Source->OwningPlayer->DisplayName
+                                  : TEXT("Neutral");
+        HUD->UpdateTerritoryInfo(Source->TerritoryName, SourceOwner,
+                                 Source->ArmyStrength);
+        FString TargetOwner = Target->OwningPlayer
+                                  ? Target->OwningPlayer->DisplayName
+                                  : TEXT("Neutral");
+        HUD->UpdateTerritoryInfo(Target->TerritoryName, TargetOwner,
+                                 Target->ArmyStrength);
       }
     }
   }
@@ -593,13 +587,10 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
   Terr->ForceNetUpdate();
 
   if (TurnManager) {
-    for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr :
-         TurnManager->GetControllers()) {
-      if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
-        if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
-          HUD->UpdateTerritoryInfo(Terr->TerritoryName, OwnerName,
-                                   Terr->ArmyStrength);
-        }
+    for (ASkaldPlayerController* Controller : TurnManager->GetControllers()) {
+      if (USkaldMainHUDWidget* HUD = Controller ? Controller->GetHUDWidget() : nullptr) {
+        HUD->UpdateTerritoryInfo(Terr->TerritoryName, OwnerName,
+                                 Terr->ArmyStrength);
       }
     }
   }

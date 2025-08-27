@@ -70,7 +70,7 @@ public:
 
     /** Access the controllers array in its current initiative order. */
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="Turn")
-    const TArray<TWeakObjectPtr<ASkaldPlayerController>>& GetControllers() const { return Controllers; }
+    TArray<ASkaldPlayerController*> GetControllers() const;
 
     /** Retrieve the current phase of play. */
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="Turn")
@@ -81,7 +81,7 @@ public:
     FSkaldWorldStateChanged OnWorldStateChanged;
 
 protected:
-    UPROPERTY(BlueprintReadOnly, Category="Turn")
+    UPROPERTY()
     TArray<TWeakObjectPtr<ASkaldPlayerController>> Controllers;
 
     UPROPERTY(BlueprintReadOnly, Category="Turn")
