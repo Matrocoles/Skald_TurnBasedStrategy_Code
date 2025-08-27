@@ -1,5 +1,6 @@
 #include "SaveGameWidget.h"
 #include "Components/Button.h"
+#include "Components/TextBlock.h"
 #include "Kismet/GameplayStatics.h"
 #include "LobbyMenuWidget.h"
 #include "Skald.h"
@@ -14,13 +15,19 @@ void USaveGameWidget::NativeConstruct() {
     Slot0Button->OnClicked.AddDynamic(this, &USaveGameWidget::OnSaveSlot0);
   }
 
+  UpdateSlotDisplay(0, Slot0Button, Slot0Text);
+
   if (Slot1Button) {
     Slot1Button->OnClicked.AddDynamic(this, &USaveGameWidget::OnSaveSlot1);
   }
 
+  UpdateSlotDisplay(1, Slot1Button, Slot1Text);
+
   if (Slot2Button) {
     Slot2Button->OnClicked.AddDynamic(this, &USaveGameWidget::OnSaveSlot2);
   }
+
+  UpdateSlotDisplay(2, Slot2Button, Slot2Text);
 
   if (MainMenuButton) {
     MainMenuButton->OnClicked.AddDynamic(this, &USaveGameWidget::OnMainMenu);
@@ -77,5 +84,28 @@ void USaveGameWidget::HandleSaveSlot(int32 SlotIndex) {
   } else {
     UE_LOG(LogSkald, Error, TEXT("Failed to save slot %s"),
            SlotNames[SlotIndex]);
+  }
+}
+
+void USaveGameWidget::UpdateSlotDisplay(int32 SlotIndex, UButton *SlotButton,
+                                        UTextBlock *SlotText) {
+  const FString SlotName = SlotNames[SlotIndex];
+  const bool bExists = UGameplayStatics::DoesSaveGameExist(SlotName, 0);
+
+  if (SlotButton) {
+    SlotButton->SetIsEnabled(bExists);
+  }
+
+  if (SlotText) {
+    if (bExists) {
+      if (USkaldSaveGame *Save = Cast<USkaldSaveGame>(
+              UGameplayStatics::LoadGameFromSlot(SlotName, 0))) {
+        const FString DateString = Save->SaveDate.ToString();
+        SlotText->SetText(FText::FromString(
+            FString::Printf(TEXT("%s - %s"), *Save->SaveName, *DateString)));
+      }
+    } else {
+      SlotText->SetText(FText::FromString(SlotName));
+    }
   }
 }
