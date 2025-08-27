@@ -39,14 +39,18 @@ void AWorldMap::BeginPlay() {
     return;
   }
 
-  // Spawn territories defined in the data table.
+  // Spawn territories defined in the data table at random locations.
   TArray<FTerritorySpawnData *> Rows;
   TerritoryTable->GetAllRows(TEXT("TerritoryTable"), Rows);
   for (const FTerritorySpawnData *Data : Rows) {
     if (!Data) {
       continue;
     }
-    const FVector SpawnLocation = GetActorLocation() + Data->Location;
+
+    const float RandX = FMath::FRandRange(SpawnAreaMin.X, SpawnAreaMax.X);
+    const float RandY = FMath::FRandRange(SpawnAreaMin.Y, SpawnAreaMax.Y);
+    const FVector SpawnLocation =
+        GetActorLocation() + FVector(RandX, RandY, 0.f);
 
     FActorSpawnParameters Params;
     Params.Owner = this;
@@ -58,6 +62,8 @@ void AWorldMap::BeginPlay() {
       Territory->bIsCapital = Data->bIsCapital;
       Territory->ContinentID = Data->ContinentID;
       RegisterTerritory(Territory);
+
+      SpawnedLocations.Add(Data->TerritoryID, SpawnLocation);
     }
   }
 

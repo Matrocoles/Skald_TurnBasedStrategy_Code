@@ -115,5 +115,9 @@ public:
   UPROPERTY(EditAnywhere, Category = "WorldMap")
   float AdjacencyDistance = 210.f;
 
+  /** Randomly generated spawn locations keyed by territory ID. */
+  UPROPERTY(BlueprintReadOnly, Category = "WorldMap")
+  TMap<int32, FVector> SpawnedLocations;
+
 protected:
 };
