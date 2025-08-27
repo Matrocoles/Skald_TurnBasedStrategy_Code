@@ -299,7 +299,15 @@ void UStartGameWidget::StartGame(bool bMultiplayer)
             {
                 Options = TEXT("listen");
             }
-            UGameplayStatics::OpenLevel(this, LevelName, true, Options);
+            if (UWorld* WorldToTravel = GetWorld())
+            {
+                FString URL = LevelName.ToString();
+                if (!Options.IsEmpty())
+                {
+                    URL += TEXT("?") + Options;
+                }
+                WorldToTravel->ServerTravel(URL);
+            }
         }
     }
 }

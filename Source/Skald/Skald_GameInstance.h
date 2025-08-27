@@ -48,6 +48,18 @@ public:
     UPROPERTY()
     FRandomStream CombatRandomStream;
 
+    /** Index of the current player turn when travelling between maps. */
+    UPROPERTY(BlueprintReadWrite, Category="Turn")
+    int32 SavedTurnIndex = 0;
+
+    /** Phase of the turn cycle that was active before travelling. */
+    UPROPERTY(BlueprintReadWrite, Category="Turn")
+    ETurnPhase SavedTurnPhase = ETurnPhase::Reinforcement;
+
+    /** Flag indicating whether the turn manager should resume after travel. */
+    UPROPERTY(BlueprintReadWrite, Category="Turn")
+    bool bResumeTurns = false;
+
     /** Seed the combat random stream so all clients use the same sequence. */
     UFUNCTION(BlueprintCallable, Category="Battle")
     void SeedCombatRandomStream(int32 Seed);
