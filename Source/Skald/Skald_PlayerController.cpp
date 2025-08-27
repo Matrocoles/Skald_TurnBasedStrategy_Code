@@ -508,6 +508,7 @@ void ASkaldPlayerController::HandlePlayersUpdated() {
       Data.PlayerName = PS->DisplayName;
       Data.IsAI = PS->bIsAI;
       Data.Faction = PS->Faction;
+      Data.IsEliminated = PS->IsEliminated;
       Players.Add(Data);
     }
   }

@@ -1,5 +1,6 @@
 #include "Skald_PlayerState.h"
 #include "Net/UnrealNetwork.h"
+#include "Skald_GameState.h"
 
 ASkaldPlayerState::ASkaldPlayerState()
     : bIsAI(false)
@@ -7,6 +8,7 @@ ASkaldPlayerState::ASkaldPlayerState()
     , InitiativeRoll(0)
     , DisplayName(TEXT("Player"))
     , Faction(ESkaldFaction::None)
+    , IsEliminated(false)
 {
 }
 
@@ -20,5 +22,14 @@ void ASkaldPlayerState::GetLifetimeReplicatedProps(
     DOREPLIFETIME(ASkaldPlayerState, ArmyPool);
     DOREPLIFETIME(ASkaldPlayerState, bIsAI);
     DOREPLIFETIME(ASkaldPlayerState, InitiativeRoll);
+    DOREPLIFETIME(ASkaldPlayerState, IsEliminated);
+}
+
+void ASkaldPlayerState::OnRep_IsEliminated()
+{
+    if (ASkaldGameState* GS = GetWorld() ? GetWorld()->GetGameState<ASkaldGameState>() : nullptr)
+    {
+        GS->OnPlayersUpdated.Broadcast();
+    }
 }
 

@@ -80,12 +80,29 @@ void ATurnManager::StartTurns() {
 }
 
 void ATurnManager::AdvanceTurn() {
+  ASkaldPlayerController *PreviousController =
+      Controllers.IsValidIndex(CurrentIndex) ? Controllers[CurrentIndex].Get() : nullptr;
+
   Controllers.RemoveAll([](const TWeakObjectPtr<ASkaldPlayerController> &Ptr) {
-    return !Ptr.IsValid();
+    if (!Ptr.IsValid()) {
+      return true;
+    }
+    if (ASkaldPlayerController *PC = Ptr.Get()) {
+      if (ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>()) {
+        return PS->IsEliminated;
+      }
+    }
+    return false;
   });
   if (Controllers.Num() == 0) {
     return;
   }
+
+  int32 FoundIndex = Controllers.IndexOfByPredicate(
+      [PreviousController](const TWeakObjectPtr<ASkaldPlayerController> &Ptr) {
+        return Ptr.Get() == PreviousController;
+      });
+  CurrentIndex = (FoundIndex != INDEX_NONE) ? FoundIndex : Controllers.Num() - 1;
 
   CurrentIndex = (CurrentIndex + 1) % Controllers.Num();
   if (ASkaldPlayerController *CurrentController = Controllers[CurrentIndex].Get()) {
