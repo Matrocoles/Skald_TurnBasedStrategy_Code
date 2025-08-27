@@ -12,8 +12,8 @@ class USkaldMainHUDWidget;
 /**
  * Simple widget allowing the player to choose how many units to deploy to a
  * territory.
- */
-UCLASS()
+*/
+UCLASS(BlueprintType, Blueprintable)
 class SKALD_API UDeployWidget : public UUserWidget {
   GENERATED_BODY()
 
