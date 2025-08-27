@@ -119,6 +119,14 @@ protected:
   UFUNCTION(BlueprintCallable, Category = "UI")
   void HandleEndMovementRequested(bool bConfirmed);
 
+  /** React to player list changes in the game state. */
+  UFUNCTION()
+  void HandlePlayersUpdated();
+
+  /** React to faction selections in the game instance. */
+  UFUNCTION()
+  void HandleFactionsUpdated();
+
   /** Reference to the game's turn manager.
    *  Exposed to Blueprints so BP_Skald_PlayerController can bind to
    *  turn events without keeping an external pointer that might be

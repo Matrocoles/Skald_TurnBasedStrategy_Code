@@ -24,10 +24,29 @@ ASkaldPlayerController::ASkaldPlayerController() {
 
 void ASkaldPlayerController::BeginPlay() {
   Super::BeginPlay();
-
   CachedGameState = GetWorld()->GetGameState<ASkaldGameState>();
+  if (!CachedGameState) {
+    UE_LOG(LogTemp, Error,
+           TEXT("ASkaldPlayerController could not find ASkaldGameState."));
+  } else {
+    CachedGameState->OnPlayersUpdated.AddDynamic(
+        this, &ASkaldPlayerController::HandlePlayersUpdated);
+  }
+
   CachedGameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
+  if (!CachedGameMode) {
+    UE_LOG(LogTemp, Error,
+           TEXT("ASkaldPlayerController could not find ASkaldGameMode."));
+  }
+
   CachedGameInstance = GetGameInstance<USkaldGameInstance>();
+  if (!CachedGameInstance) {
+    UE_LOG(LogTemp, Error,
+           TEXT("ASkaldPlayerController could not find USkaldGameInstance."));
+  } else {
+    CachedGameInstance->OnFactionsUpdated.AddDynamic(
+        this, &ASkaldPlayerController::HandleFactionsUpdated);
+  }
 
   // Create and show the HUD widget if a class has been assigned (expected via
   // blueprint).
@@ -187,4 +206,27 @@ void ASkaldPlayerController::HandleTerritorySelected(ATerritory *Terr) {
 
   MainHudWidget->UpdateTerritoryInfo(Terr->TerritoryName, OwnerName,
                                      Terr->ArmyStrength);
+}
+
+void ASkaldPlayerController::HandlePlayersUpdated() {
+  if (!MainHudWidget || !CachedGameState) {
+    return;
+  }
+
+  TArray<FS_PlayerData> Players;
+  for (APlayerState *PSBase : CachedGameState->PlayerArray) {
+    if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
+      FS_PlayerData Data;
+      Data.PlayerID = PS->GetPlayerId();
+      Data.PlayerName = PS->DisplayName;
+      Data.IsAI = PS->bIsAI;
+      Data.Faction = PS->Faction;
+      Players.Add(Data);
+    }
+  }
+  MainHudWidget->RefreshPlayerList(Players);
+}
+
+void ASkaldPlayerController::HandleFactionsUpdated() {
+  UE_LOG(LogTemp, Log, TEXT("GameInstance factions updated."));
 }

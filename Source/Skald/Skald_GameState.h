@@ -6,6 +6,8 @@
 
 class ASkaldPlayerState;
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSkaldPlayersUpdated);
+
 /**
  * Stores information about players and the current turn.
  */
@@ -20,6 +22,10 @@ public:
     /** List of players participating in the match. */
     UPROPERTY(BlueprintReadOnly, Category="GameState")
     TArray<ASkaldPlayerState*> Players;
+
+    /** Broadcast whenever the player list changes. */
+    UPROPERTY(BlueprintAssignable, Category="GameState|Events")
+    FSkaldPlayersUpdated OnPlayersUpdated;
 
     /** Index of the player whose turn is active. */
     UPROPERTY(BlueprintReadOnly, Category="GameState")

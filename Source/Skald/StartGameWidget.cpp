@@ -153,6 +153,7 @@ void UStartGameWidget::OnLockIn()
             GI->DisplayName = Name;
             GI->Faction = Faction;
             GI->TakenFactions.AddUnique(Faction);
+            GI->OnFactionsUpdated.Broadcast();
         }
     }
 
