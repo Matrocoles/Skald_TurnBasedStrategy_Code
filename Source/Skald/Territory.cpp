@@ -8,6 +8,7 @@
 #include "SkaldTypes.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
+#include "UObject/ConstructorHelpers.h"
 
 namespace {
 FLinearColor GetFactionColor(ESkaldFaction Faction) {
@@ -39,6 +40,20 @@ ATerritory::ATerritory() {
   bReplicates = true;
   MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
   RootComponent = MeshComponent;
+
+  // Provide basic visuals so the world map can function even if assets
+  // are missing in the editor. This avoids runtime errors about missing
+  // meshes or materials when spawning territories.
+  static ConstructorHelpers::FObjectFinder<UStaticMesh> DefaultMesh(
+      TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+  if (DefaultMesh.Succeeded()) {
+    MeshComponent->SetStaticMesh(DefaultMesh.Object);
+  }
+  static ConstructorHelpers::FObjectFinder<UMaterialInterface> DefaultMat(
+      TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+  if (DefaultMat.Succeeded()) {
+    MeshComponent->SetMaterial(0, DefaultMat.Object);
+  }
 
   LabelComponent = CreateDefaultSubobject<UTextRenderComponent>(TEXT("Label"));
   LabelComponent->SetupAttachment(RootComponent);
