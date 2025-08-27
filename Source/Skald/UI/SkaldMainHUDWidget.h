@@ -154,6 +154,10 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
   void UpdateDeployableUnits(int32 UnitsRemaining);
 
+  /** Update the resource display. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
+  void UpdateResources(int32 ResourceAmount);
+
   // BlueprintCallable functions — selection UX helpers
   UFUNCTION(BlueprintCallable, Category = "Skald|Selection")
   void BeginAttackSelection();
@@ -248,6 +252,10 @@ public:
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
             meta = (BindWidget))
   UTextBlock *DeployableUnitsText;
+
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
+            meta = (BindWidget))
+  UTextBlock *ResourcesText;
 
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Widgets")
   TSubclassOf<UConfirmAttackWidget> ConfirmAttackWidgetClass;

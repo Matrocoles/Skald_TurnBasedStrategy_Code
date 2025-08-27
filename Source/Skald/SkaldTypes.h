@@ -148,6 +148,9 @@ struct SKALD_API FS_PlayerData
     ESkaldFaction Faction = ESkaldFaction::Human;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    int32 Resources = 0;
+
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
     TArray<int32> CapitalTerritoryIDs;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
@@ -248,6 +251,9 @@ struct SKALD_API FPlayerSaveStruct
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     ESkaldFaction Faction = ESkaldFaction::Human;
+
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    int32 Resources = 0;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     TArray<int32> CapitalTerritoryIDs;

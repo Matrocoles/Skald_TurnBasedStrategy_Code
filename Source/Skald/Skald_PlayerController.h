@@ -124,6 +124,10 @@ protected:
   UFUNCTION(BlueprintCallable, Category = "UI")
   void HandleEndMovementRequested(bool bConfirmed);
 
+  /** Handle HUD engineering action requests. */
+  UFUNCTION(BlueprintCallable, Category = "UI")
+  void HandleEngineeringRequested(int32 CapitalID, uint8 UpgradeType);
+
   /** React to player list changes in the game state. */
   UFUNCTION()
   void HandlePlayersUpdated();

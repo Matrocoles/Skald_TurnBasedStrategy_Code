@@ -6,6 +6,7 @@ ASkaldPlayerState::ASkaldPlayerState()
     : bIsAI(false)
     , ArmyPool(0)
     , InitiativeRoll(0)
+    , Resources(0)
     , DisplayName(TEXT("Player"))
     , Faction(ESkaldFaction::None)
     , IsEliminated(false)
@@ -22,6 +23,7 @@ void ASkaldPlayerState::GetLifetimeReplicatedProps(
     DOREPLIFETIME(ASkaldPlayerState, ArmyPool);
     DOREPLIFETIME(ASkaldPlayerState, bIsAI);
     DOREPLIFETIME(ASkaldPlayerState, InitiativeRoll);
+    DOREPLIFETIME(ASkaldPlayerState, Resources);
     DOREPLIFETIME(ASkaldPlayerState, IsEliminated);
 }
 
