@@ -8,6 +8,9 @@ class ATurnManager;
 class UUserWidget;
 class USkaldMainHUDWidget;
 class ATerritory;
+class ASkaldGameMode;
+class ASkaldGameState;
+class USkaldGameInstance;
 
 /**
  * Player controller capable of participating in turn based gameplay.
@@ -74,6 +77,19 @@ protected:
   UPROPERTY(BlueprintReadOnly, Category = "UI",
             meta = (AllowPrivateAccess = "true"))
   USkaldMainHUDWidget *MainHudWidget;
+
+  /** Cached references to core game singletons for blueprint access */
+  UPROPERTY(BlueprintReadOnly, Category = "Game",
+            meta = (AllowPrivateAccess = "true"))
+  ASkaldGameMode *CachedGameMode;
+
+  UPROPERTY(BlueprintReadOnly, Category = "Game",
+            meta = (AllowPrivateAccess = "true"))
+  ASkaldGameState *CachedGameState;
+
+  UPROPERTY(BlueprintReadOnly, Category = "Game",
+            meta = (AllowPrivateAccess = "true"))
+  USkaldGameInstance *CachedGameInstance;
 
   /** Handle HUD attack submissions.
    *  Bound to USkaldMainHUDWidget::OnAttackRequested in the HUD.

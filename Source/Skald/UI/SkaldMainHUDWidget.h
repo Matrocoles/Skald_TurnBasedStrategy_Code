@@ -11,6 +11,9 @@ class UVerticalBox;
 class ATerritory;
 class UConfirmAttackWidget;
 class UWidget;
+class ASkaldGameMode;
+class ASkaldGameState;
+class USkaldGameInstance;
 
 // Delegates broadcasting user UI actions to game logic
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FSkaldAttackRequested, int32,
@@ -74,6 +77,16 @@ public:
   // Cached list of players for UI list building
   UPROPERTY(BlueprintReadWrite, Category = "Skald|Data")
   TArray<FS_PlayerData> CachedPlayers;
+
+  // References to core game objects for blueprint access
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|State")
+  ASkaldGameMode* GameMode = nullptr;
+
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|State")
+  ASkaldGameState* GameState = nullptr;
+
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|State")
+  USkaldGameInstance* GameInstance = nullptr;
 
   // Delegates (BlueprintAssignable) — UI → game actions
   UPROPERTY(BlueprintAssignable, Category = "Skald|Events")
@@ -187,52 +200,52 @@ public:
 public:
   // Bound widget references - optional so subclasses can customise layouts
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
-            meta = (BindWidgetOptional))
+            meta = (BindWidget))
   UTextBlock *TurnText;
 
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
-            meta = (BindWidgetOptional))
+            meta = (BindWidget))
   UTextBlock *PhaseText;
 
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
-            meta = (BindWidgetOptional))
+            meta = (BindWidget))
   UTextBlock *SelectionPrompt;
 
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
-            meta = (BindWidgetOptional))
+            meta = (BindWidget))
   UButton *AttackButton;
 
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
-            meta = (BindWidgetOptional))
+            meta = (BindWidget))
   UButton *MoveButton;
 
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
-            meta = (BindWidgetOptional))
+            meta = (BindWidget))
   UButton *EndTurnButton;
 
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
-            meta = (BindWidgetOptional))
+            meta = (BindWidget))
   UButton *EndPhaseButton;
 
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
-            meta = (BindWidgetOptional))
+            meta = (BindWidget))
   UButton *DeployButton;
 
   // Container where RebuildPlayerList will spawn entries
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
-            meta = (BindWidgetOptional))
+            meta = (BindWidget))
   UVerticalBox *PlayerListBox;
 
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
-            meta = (BindWidgetOptional))
+            meta = (BindWidget))
   UTextBlock *EndingTurnText;
 
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
-            meta = (BindWidgetOptional))
+            meta = (BindWidget))
   UTextBlock *InitiativeText;
 
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
-            meta = (BindWidgetOptional))
+            meta = (BindWidget))
   UTextBlock *DeployableUnitsText;
 
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Widgets")

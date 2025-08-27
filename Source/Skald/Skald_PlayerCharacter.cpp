@@ -10,6 +10,9 @@
 #include "Engine/World.h"
 #include "Components/InputComponent.h"
 #include "GameFramework/PlayerController.h"
+#include "Skald_GameMode.h"
+#include "Skald_GameState.h"
+#include "Skald_GameInstance.h"
 
 // Sets default values
 ASkald_PlayerCharacter::ASkald_PlayerCharacter()
@@ -27,6 +30,10 @@ void ASkald_PlayerCharacter::BeginPlay()
 
         // Cache reference to the world map if one exists in the level
         WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
+
+        CachedGameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
+        CachedGameState = GetWorld()->GetGameState<ASkaldGameState>();
+        CachedGameInstance = GetGameInstance<USkaldGameInstance>();
 }
 
 // Called every frame

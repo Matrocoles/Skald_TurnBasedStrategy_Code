@@ -7,6 +7,9 @@
 
 class AWorldMap;
 class ATerritory;
+class ASkaldGameMode;
+class ASkaldGameState;
+class USkaldGameInstance;
 
 #include "Skald_PlayerCharacter.generated.h"
 
@@ -30,6 +33,16 @@ protected:
         /** Currently selected territory, if any */
         UPROPERTY(BlueprintReadOnly, Category="Selection")
         ATerritory* CurrentSelection;
+
+        /** Cached references to global game objects for blueprint use */
+        UPROPERTY(BlueprintReadOnly, Category="Game")
+        ASkaldGameMode* CachedGameMode;
+
+        UPROPERTY(BlueprintReadOnly, Category="Game")
+        ASkaldGameState* CachedGameState;
+
+        UPROPERTY(BlueprintReadOnly, Category="Game")
+        USkaldGameInstance* CachedGameInstance;
 
 public:
         /** Called every frame */
