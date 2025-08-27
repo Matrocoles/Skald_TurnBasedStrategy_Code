@@ -72,8 +72,24 @@ void UGridBattleManager::StartBattle()
 {
     bool bAttackerTurn = RollInitiative() >= RollInitiative();
 
-    while (GetAttackerSurvivors() > 0 && GetDefenderSurvivors() > 0)
+    TArray<FIntPoint> PreviousAttackerPositions;
+    PreviousAttackerPositions.Reserve(AttackerTeam.Num());
+    for (const FFighter& Fighter : AttackerTeam)
     {
+        PreviousAttackerPositions.Add(Fighter.Position);
+    }
+    TArray<FIntPoint> PreviousDefenderPositions;
+    PreviousDefenderPositions.Reserve(DefenderTeam.Num());
+    for (const FFighter& Fighter : DefenderTeam)
+    {
+        PreviousDefenderPositions.Add(Fighter.Position);
+    }
+
+    int32 StalemateTurns = 0;
+
+    while (GetAttackerSurvivors() > 0 && GetDefenderSurvivors() > 0 && CurrentRound <= MaxRounds)
+    {
+        bool bDamageDealt = false;
         TArray<FFighter>& ActingTeam = bAttackerTurn ? AttackerTeam : DefenderTeam;
         TArray<FFighter>& TargetTeam = bAttackerTurn ? DefenderTeam : AttackerTeam;
 
@@ -103,12 +119,60 @@ void UGridBattleManager::StartBattle()
             {
                 int32 Damage = 0;
                 ResolveAttack(Fighter, *Target, Damage);
+                if (Damage > 0)
+                {
+                    bDamageDealt = true;
+                }
             }
 
             if (GetAttackerSurvivors() <= 0 || GetDefenderSurvivors() <= 0)
             {
                 break;
             }
+        }
+
+        bool bPositionsChanged = false;
+        for (int32 Index = 0; Index < AttackerTeam.Num(); ++Index)
+        {
+            if (AttackerTeam[Index].Position != PreviousAttackerPositions[Index])
+            {
+                bPositionsChanged = true;
+                break;
+            }
+        }
+        if (!bPositionsChanged)
+        {
+            for (int32 Index = 0; Index < DefenderTeam.Num(); ++Index)
+            {
+                if (DefenderTeam[Index].Position != PreviousDefenderPositions[Index])
+                {
+                    bPositionsChanged = true;
+                    break;
+                }
+            }
+        }
+
+        if (!bDamageDealt && !bPositionsChanged)
+        {
+            ++StalemateTurns;
+        }
+        else
+        {
+            StalemateTurns = 0;
+        }
+
+        for (int32 Index = 0; Index < AttackerTeam.Num(); ++Index)
+        {
+            PreviousAttackerPositions[Index] = AttackerTeam[Index].Position;
+        }
+        for (int32 Index = 0; Index < DefenderTeam.Num(); ++Index)
+        {
+            PreviousDefenderPositions[Index] = DefenderTeam[Index].Position;
+        }
+
+        if (StalemateTurns >= 2)
+        {
+            break;
         }
 
         bAttackerTurn = !bAttackerTurn;
