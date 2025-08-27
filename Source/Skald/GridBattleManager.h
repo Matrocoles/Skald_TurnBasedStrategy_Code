@@ -47,7 +47,14 @@ struct FFighter
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Fighter")
     ESkaldFaction Faction = ESkaldFaction::None;
+
+    /** Current grid position of the fighter. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Fighter")
+    FIntPoint Position = FIntPoint::ZeroValue;
 };
+
+/** Event fired when a grid battle concludes. */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnBattleEnded, ESkaldFaction, WinningFaction, int32, AttackerCasualties, int32, DefenderCasualties);
 
 /**
  * Manages a simple grid based battle between two teams of fighters.
@@ -66,6 +73,10 @@ public:
     UFUNCTION(BlueprintCallable, Category="Battle")
     void InitBattle(const TArray<FFighter>& Attackers, const TArray<FFighter>& Defenders);
 
+    /** Begin the battle and resolve rounds until a victor is found. */
+    UFUNCTION(BlueprintCallable, Category="Battle")
+    void StartBattle();
+
     /** Roll a D6 to determine initiative. */
     UFUNCTION(BlueprintCallable, Category="Battle")
     static int32 RollInitiative();
@@ -81,6 +92,10 @@ public:
     /** Number of surviving defenders after the battle concludes. */
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
     int32 GetDefenderSurvivors() const;
+
+    /** Event fired when the battle ends reporting winner and casualties. */
+    UPROPERTY(BlueprintAssignable, Category="Battle|Events")
+    FOnBattleEnded OnBattleEnded;
 
     /** Size of the square grid used in battle. */
     static const int32 GridSize = 48;
