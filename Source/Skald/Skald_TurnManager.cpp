@@ -1,7 +1,9 @@
 #include "Skald_TurnManager.h"
 #include "Kismet/GameplayStatics.h"
+#include "Skald_GameInstance.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
+#include "GridBattleManager.h"
 #include "Territory.h"
 #include "UI/SkaldMainHUDWidget.h"
 #include "WorldMap.h"
@@ -11,7 +13,15 @@ ATurnManager::ATurnManager() {
   CurrentIndex = 0;
 }
 
-void ATurnManager::BeginPlay() { Super::BeginPlay(); }
+void ATurnManager::BeginPlay() {
+  Super::BeginPlay();
+
+  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+    if (GI->GridBattleManager) {
+      ResolveGridBattleResult();
+    }
+  }
+}
 
 void ATurnManager::RegisterController(ASkaldPlayerController *Controller) {
   if (IsValid(Controller)) {
@@ -129,8 +139,59 @@ void ATurnManager::SortControllersByInitiative() {
 
 void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
   PendingBattle = Battle;
+
+  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+    GI->PendingBattle = Battle;
+    if (!GI->GridBattleManager) {
+      GI->GridBattleManager = NewObject<UGridBattleManager>(GI);
+    }
+  }
+
   // Load a battle map where the grid based combat takes place.
   UGameplayStatics::OpenLevel(this, FName("BattleMap"));
+}
+
+void ATurnManager::ResolveGridBattleResult() {
+  USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+  if (!GI || !GI->GridBattleManager) {
+    return;
+  }
+
+  const FS_BattlePayload Battle = GI->PendingBattle;
+  PendingBattle = Battle;
+
+  AWorldMap *WorldMap = Cast<AWorldMap>(
+      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
+  if (!WorldMap) {
+    return;
+  }
+
+  ATerritory *Source = WorldMap->GetTerritoryById(Battle.FromTerritoryID);
+  ATerritory *Target = WorldMap->GetTerritoryById(Battle.TargetTerritoryID);
+  if (!Source || !Target) {
+    return;
+  }
+
+  const int32 AttackerSurvivors = GI->GridBattleManager->GetAttackerSurvivors();
+  const int32 DefenderSurvivors = GI->GridBattleManager->GetDefenderSurvivors();
+
+  Source->ArmyStrength -= Battle.ArmyCountSent;
+
+  if (AttackerSurvivors > 0 && DefenderSurvivors <= 0) {
+    Target->OwningPlayer = Source->OwningPlayer;
+    Target->ArmyStrength = AttackerSurvivors;
+  } else {
+    Target->ArmyStrength = DefenderSurvivors;
+  }
+
+  Source->RefreshAppearance();
+  Target->RefreshAppearance();
+
+  Source->ForceNetUpdate();
+  Target->ForceNetUpdate();
+
+  GI->PendingBattle = FS_BattlePayload();
+  GI->GridBattleManager = nullptr;
 }
 
 void ATurnManager::BeginAttackPhase() {

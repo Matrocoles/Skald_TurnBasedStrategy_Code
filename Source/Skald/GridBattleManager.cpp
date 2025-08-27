@@ -44,3 +44,29 @@ bool UGridBattleManager::ResolveAttack(FFighter& Attacker, FFighter& Defender, i
     return bDefeated;
 }
 
+int32 UGridBattleManager::GetAttackerSurvivors() const
+{
+    int32 Count = 0;
+    for (const FFighter& Fighter : AttackerTeam)
+    {
+        if (Fighter.Stats.Health > 0)
+        {
+            ++Count;
+        }
+    }
+    return Count;
+}
+
+int32 UGridBattleManager::GetDefenderSurvivors() const
+{
+    int32 Count = 0;
+    for (const FFighter& Fighter : DefenderTeam)
+    {
+        if (Fighter.Stats.Health > 0)
+        {
+            ++Count;
+        }
+    }
+    return Count;
+}
+

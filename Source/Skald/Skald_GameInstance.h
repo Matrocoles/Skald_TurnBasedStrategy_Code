@@ -5,6 +5,8 @@
 #include "SkaldTypes.h"
 #include "Skald_GameInstance.generated.h"
 
+class UGridBattleManager;
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSkaldFactionsUpdated);
 /** Game instance storing player selections from the lobby. */
 UCLASS()
@@ -32,5 +34,13 @@ public:
     /** Event fired when the taken faction list changes. */
     UPROPERTY(BlueprintAssignable, Category="Player|Events")
     FSkaldFactionsUpdated OnFactionsUpdated;
+
+    /** Payload describing the battle to resolve when returning from the battle map. */
+    UPROPERTY(BlueprintReadWrite, Category="Battle")
+    FS_BattlePayload PendingBattle;
+
+    /** Runtime manager used to execute grid based battles. */
+    UPROPERTY(BlueprintReadWrite, Category="Battle")
+    class UGridBattleManager* GridBattleManager = nullptr;
 };
 
