@@ -8,6 +8,7 @@
 #include "Skald_PlayerState.h"
 #include "GameFramework/PlayerController.h"
 #include "LobbyMenuWidget.h"
+#include "Engine/Engine.h"
 
 void UStartGameWidget::NativeConstruct()
 {
@@ -21,31 +22,13 @@ void UStartGameWidget::NativeConstruct()
 
     if (FactionComboBox)
     {
-        FactionComboBox->ClearOptions();
-        if (UEnum* Enum = StaticEnum<ESkaldFaction>())
-        {
-            for (int32 i = 0; i < Enum->NumEnums(); ++i)
-            {
-                if (!Enum->HasMetaData(TEXT("Hidden"), i))
-                {
-                    const FString Option = Enum->GetNameStringByIndex(i);
-                    if (Option != TEXT("None"))
-                    {
-                        FactionComboBox->AddOption(Option);
-                    }
-                }
-            }
-            if (USkaldGameInstance* GI = GetWorld()->GetGameInstance<USkaldGameInstance>())
-            {
-                for (ESkaldFaction Taken : GI->TakenFactions)
-                {
-                    const FString Option = Enum->GetNameStringByValue(static_cast<int64>(Taken));
-                    FactionComboBox->RemoveOption(Option);
-                }
-            }
-            FactionComboBox->SetSelectedIndex(INDEX_NONE);
-        }
+        RefreshFactionOptions();
         FactionComboBox->OnSelectionChanged.AddDynamic(this, &UStartGameWidget::OnFactionChanged);
+    }
+
+    if (USkaldGameInstance* GI = GetWorld()->GetGameInstance<USkaldGameInstance>())
+    {
+        GI->OnFactionsUpdated.AddDynamic(this, &UStartGameWidget::HandleFactionsUpdated);
     }
 
     if (LockInButton)
@@ -107,10 +90,96 @@ void UStartGameWidget::OnFactionChanged(FString /*SelectedItem*/, ESelectInfo::T
 
 void UStartGameWidget::ValidateSelections()
 {
+    bool bFactionAvailable = true;
+
+    if (FactionComboBox && FactionComboBox->GetSelectedIndex() != INDEX_NONE)
+    {
+        const FString Selected = FactionComboBox->GetSelectedOption();
+        if (UEnum* Enum = StaticEnum<ESkaldFaction>())
+        {
+            const int32 Value = Enum->GetValueByNameString(Selected);
+            if (Value != INDEX_NONE)
+            {
+                if (USkaldGameInstance* GI = GetWorld()->GetGameInstance<USkaldGameInstance>())
+                {
+                    const ESkaldFaction Faction = static_cast<ESkaldFaction>(Value);
+                    if (GI->TakenFactions.Contains(Faction))
+                    {
+                        bFactionAvailable = false;
+                        if (GEngine)
+                        {
+                            GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Yellow, TEXT("Selected faction already taken"));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    else
+    {
+        bFactionAvailable = false;
+    }
+
     if (LockInButton)
     {
-        LockInButton->SetIsEnabled(true);
+        LockInButton->SetIsEnabled(bFactionAvailable);
     }
+}
+
+void UStartGameWidget::RefreshFactionOptions()
+{
+    if (!FactionComboBox)
+    {
+        return;
+    }
+
+    const FString PreviouslySelected = FactionComboBox->GetSelectedOption();
+    FactionComboBox->ClearOptions();
+
+    if (UEnum* Enum = StaticEnum<ESkaldFaction>())
+    {
+        for (int32 i = 0; i < Enum->NumEnums(); ++i)
+        {
+            if (!Enum->HasMetaData(TEXT("Hidden"), i))
+            {
+                const FString Option = Enum->GetNameStringByIndex(i);
+                if (Option != TEXT("None"))
+                {
+                    FactionComboBox->AddOption(Option);
+                }
+            }
+        }
+
+        if (USkaldGameInstance* GI = GetWorld()->GetGameInstance<USkaldGameInstance>())
+        {
+            for (ESkaldFaction Taken : GI->TakenFactions)
+            {
+                const FString Option = Enum->GetNameStringByValue(static_cast<int64>(Taken));
+                FactionComboBox->RemoveOption(Option);
+            }
+        }
+    }
+
+    const int32 Index = FactionComboBox->FindOptionIndex(PreviouslySelected);
+    if (Index != INDEX_NONE)
+    {
+        FactionComboBox->SetSelectedIndex(Index);
+    }
+    else
+    {
+        if (!PreviouslySelected.IsEmpty() && GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Red, TEXT("Selected faction is no longer available"));
+        }
+        FactionComboBox->SetSelectedIndex(INDEX_NONE);
+    }
+
+    ValidateSelections();
+}
+
+void UStartGameWidget::HandleFactionsUpdated()
+{
+    RefreshFactionOptions();
 }
 
 void UStartGameWidget::OnLockIn()
@@ -150,6 +219,20 @@ void UStartGameWidget::OnLockIn()
     {
         if (USkaldGameInstance* GI = World->GetGameInstance<USkaldGameInstance>())
         {
+            if (GI->TakenFactions.Contains(Faction))
+            {
+                if (LockInButton)
+                {
+                    LockInButton->SetIsEnabled(false);
+                }
+                if (GEngine)
+                {
+                    GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Red, TEXT("Selected faction is no longer available"));
+                }
+                RefreshFactionOptions();
+                return;
+            }
+
             GI->DisplayName = Name;
             GI->Faction = Faction;
             GI->TakenFactions.AddUnique(Faction);
