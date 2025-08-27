@@ -218,6 +218,19 @@ void USkaldMainHUDWidget::BeginAttackSelection() {
   bSelectingForMove = false;
   SelectedSourceID = -1;
   SelectedTargetID = -1;
+
+  for (ATerritory *Terr : HighlightedTerritories) {
+    if (Terr) {
+      Terr->Deselect();
+    }
+  }
+  HighlightedTerritories.Empty();
+
+  if (ActiveConfirmWidget) {
+    ActiveConfirmWidget->RemoveFromParent();
+    ActiveConfirmWidget = nullptr;
+  }
+
   if (SelectionPrompt) {
     SelectionPrompt->SetText(
         FText::FromString(TEXT("Choose owned territory.")));
@@ -297,28 +310,27 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
 
   if (bSelectingForAttack) {
     if (SelectedSourceID == -1) {
-      if (bOwnedByLocal) {
+      if (bOwnedByLocal && Territory->ArmyStrength > 0) {
         SelectedSourceID = Territory->TerritoryID;
         Territory->Select();
-
-        if (AWorldMap *WorldMap =
-                Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
-                    GetWorld(), AWorldMap::StaticClass()))) {
-          if (ATerritory *Source =
-                  WorldMap->GetTerritoryById(SelectedSourceID)) {
-            for (ATerritory *Terr : WorldMap->Territories) {
-              if (Terr && Source->IsAdjacentTo(Terr) &&
-                  Terr->OwningPlayer != Source->OwningPlayer) {
-                Terr->Select();
-                HighlightedTerritories.Add(Terr);
-              }
-            }
+        if (SelectionPrompt) {
+          SelectionPrompt->SetText(
+              FText::FromString(TEXT("Choose enemy territory.")));
+        }
+        HighlightedTerritories.Empty();
+        for (ATerritory *Adj : Territory->AdjacentTerritories) {
+          if (Adj && Adj->OwningPlayer != Territory->OwningPlayer) {
+            Adj->Select();
+            HighlightedTerritories.Add(Adj);
           }
         }
       }
-    } else if (SelectedTargetID == -1) {
-      SelectedTargetID = Territory->TerritoryID;
+      return;
+    }
 
+    // Source selected: only allow choosing highlighted enemy territories
+    if (HighlightedTerritories.Contains(Territory)) {
+      SelectedTargetID = Territory->TerritoryID;
       if (SelectionPrompt) {
         SelectionPrompt->SetVisibility(ESlateVisibility::Collapsed);
       }
@@ -326,6 +338,16 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
         ActiveConfirmWidget = CreateWidget<UConfirmAttackWidget>(
             GetWorld(), ConfirmAttackWidgetClass);
         if (ActiveConfirmWidget) {
+          int32 MaxUnits = 1;
+          if (AWorldMap *WorldMap =
+                  Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+                      GetWorld(), AWorldMap::StaticClass()))) {
+            if (ATerritory *Source =
+                    WorldMap->GetTerritoryById(SelectedSourceID)) {
+              MaxUnits = Source->ArmyStrength;
+            }
+          }
+          ActiveConfirmWidget->Setup(MaxUnits);
           ActiveConfirmWidget->AddToViewport();
           if (ActiveConfirmWidget->ApproveButton) {
             ActiveConfirmWidget->ApproveButton->OnClicked.AddDynamic(
@@ -337,17 +359,8 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
           }
         }
       }
-      if (bOwnedByLocal && Territory->ArmyStrength > 0) {
-        SelectedSourceID = Territory->TerritoryID;
-        Territory->Select();
-        if (SelectionPrompt) {
-          SelectionPrompt->SetText(
-              FText::FromString(TEXT("Choose enemy territory.")));
-        }
-      }
-    } else if (SelectedTargetID == -1) {
-      SelectedTargetID = Territory->TerritoryID;
     }
+    return;
   } else if (bSelectingForMove) {
     if (SelectedSourceID == -1) {
       if (bOwnedByLocal) {
@@ -427,9 +440,50 @@ void USkaldMainHUDWidget::SyncPhaseButtons(bool bIsMyTurn) {
 }
 
 void USkaldMainHUDWidget::HandleAttackApproved() {
-  const int32 ArmyCount =
-      ActiveConfirmWidget ? ActiveConfirmWidget->ArmyCount : 0;
-  SubmitAttack(SelectedSourceID, SelectedTargetID, ArmyCount);
+  if (!ActiveConfirmWidget) {
+    return;
+  }
+
+  const int32 SourceID = SelectedSourceID;
+  const int32 TargetID = SelectedTargetID;
+  int32 ArmyCount = ActiveConfirmWidget->ArmyCount;
+
+  if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+          GetWorld(), AWorldMap::StaticClass()))) {
+    if (ATerritory *Source = WorldMap->GetTerritoryById(SourceID)) {
+      ArmyCount = FMath::Clamp(ArmyCount, 1, Source->ArmyStrength);
+    }
+  }
+
+  SubmitAttack(SourceID, TargetID, ArmyCount);
+
+  // Trigger the battle immediately
+  if (APlayerController *PC = GetOwningPlayer()) {
+    if (ASkaldPlayerController *SPC = Cast<ASkaldPlayerController>(PC)) {
+      if (ATurnManager *TM = SPC->GetTurnManager()) {
+        FS_BattlePayload Battle;
+        Battle.FromTerritoryID = SourceID;
+        Battle.TargetTerritoryID = TargetID;
+        Battle.ArmyCountSent = ArmyCount;
+        if (AWorldMap *WorldMap =
+                Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+                    GetWorld(), AWorldMap::StaticClass()))) {
+          if (ATerritory *Source = WorldMap->GetTerritoryById(SourceID)) {
+            if (Source->OwningPlayer) {
+              Battle.AttackerPlayerID = Source->OwningPlayer->GetPlayerId();
+            }
+          }
+          if (ATerritory *Target = WorldMap->GetTerritoryById(TargetID)) {
+            if (Target->OwningPlayer) {
+              Battle.DefenderPlayerID = Target->OwningPlayer->GetPlayerId();
+            }
+            Battle.IsCapitalAttack = Target->bIsCapital;
+          }
+        }
+        TM->TriggerGridBattle(Battle);
+      }
+    }
+  }
 }
 
 void USkaldMainHUDWidget::HandleDeployClicked() {
@@ -439,7 +493,8 @@ void USkaldMainHUDWidget::HandleDeployClicked() {
   }
 
   ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>();
-  if (!PS || PS->ArmyPool <= 0 || SelectedSourceID == -1 || !DeployWidgetClass) {
+  if (!PS || PS->ArmyPool <= 0 || SelectedSourceID == -1 ||
+      !DeployWidgetClass) {
     return;
   }
 
@@ -453,7 +508,8 @@ void USkaldMainHUDWidget::HandleDeployClicked() {
     return;
   }
 
-  ActiveDeployWidget = CreateWidget<UDeployWidget>(GetWorld(), DeployWidgetClass);
+  ActiveDeployWidget =
+      CreateWidget<UDeployWidget>(GetWorld(), DeployWidgetClass);
   if (ActiveDeployWidget) {
     ActiveDeployWidget->Setup(Territory, PS, this, PS->ArmyPool);
     ActiveDeployWidget->AddToViewport();
