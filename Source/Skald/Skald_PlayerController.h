@@ -162,6 +162,22 @@ protected:
   UFUNCTION(Server, Reliable)
   void ServerSelectTerritory(int32 TerritoryID);
 
+  /** Phase change handlers. */
+  UFUNCTION(BlueprintCallable, Category = "Turn")
+  void HandleEngineeringPhase();
+
+  UFUNCTION(BlueprintCallable, Category = "Turn")
+  void HandleTreasurePhase();
+
+  UFUNCTION(BlueprintCallable, Category = "Turn")
+  void HandleMovementPhase();
+
+  UFUNCTION(BlueprintCallable, Category = "Turn")
+  void HandleEndTurnPhase();
+
+  UFUNCTION(BlueprintCallable, Category = "Turn")
+  void HandleRevoltPhase();
+
   /** Reference to the game's turn manager.
    *  Exposed to Blueprints so BP_Skald_PlayerController can bind to
    *  turn events without keeping an external pointer that might be

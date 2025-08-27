@@ -85,5 +85,8 @@ protected:
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Turn")
     FS_BattlePayload PendingBattle;
+
+    /** Notify controllers and HUDs of a phase change. */
+    void BroadcastCurrentPhase();
 };
 

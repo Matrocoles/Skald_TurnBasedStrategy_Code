@@ -556,6 +556,26 @@ void ASkaldPlayerController::HandleBuildSiegeRequested(
   ServerBuildSiege(TerritoryID, SiegeType);
 }
 
+void ASkaldPlayerController::HandleEngineeringPhase() {
+  UE_LOG(LogSkald, Log, TEXT("Engineering phase started"));
+}
+
+void ASkaldPlayerController::HandleTreasurePhase() {
+  UE_LOG(LogSkald, Log, TEXT("Treasure phase started"));
+}
+
+void ASkaldPlayerController::HandleMovementPhase() {
+  UE_LOG(LogSkald, Log, TEXT("Movement phase started"));
+}
+
+void ASkaldPlayerController::HandleEndTurnPhase() {
+  UE_LOG(LogSkald, Log, TEXT("EndTurn phase started"));
+}
+
+void ASkaldPlayerController::HandleRevoltPhase() {
+  UE_LOG(LogSkald, Log, TEXT("Revolt phase started"));
+}
+
 void ASkaldPlayerController::HandleTerritorySelected(ATerritory *Terr) {
   if (!Terr) {
     return;
