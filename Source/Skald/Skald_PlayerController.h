@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
+#include "SkaldTypes.h"
 #include "Skald_PlayerController.generated.h"
 
 class ATurnManager;
@@ -56,6 +57,10 @@ public:
   /** Retrieve the turn manager controlling this player. */
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Turn")
   ATurnManager *GetTurnManager() const { return TurnManager; }
+
+  /** Send the local player's initial data to the server for replication. */
+  UFUNCTION(Server, Reliable)
+  void ServerInitPlayerState(const FString &Name, ESkaldFaction Faction);
 
 protected:
   /** Whether this controller is controlled by AI. */
