@@ -163,22 +163,23 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
       }
 
       if (!bWorldInitialized) {
-        InitializeWorld();
-        BeginArmyPlacementPhase();
-        bWorldInitialized = true;
-        GetWorldTimerManager().SetTimer(
-            StartGameTimerHandle, FTimerDelegate::CreateLambda([this]() {
-              if (!bTurnsStarted && TurnManager) {
-                bTurnsStarted = true;
-                TurnManager->SortControllersByInitiative();
-                TurnManager->StartTurns();
-                if (GEngine) {
-                  GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Green,
-                                                   TEXT("Game started"));
+        if (InitializeWorld()) {
+          bWorldInitialized = true;
+          BeginArmyPlacementPhase();
+          GetWorldTimerManager().SetTimer(
+              StartGameTimerHandle, FTimerDelegate::CreateLambda([this]() {
+                if (!bTurnsStarted && TurnManager) {
+                  bTurnsStarted = true;
+                  TurnManager->SortControllersByInitiative();
+                  TurnManager->StartTurns();
+                  if (GEngine) {
+                    GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Green,
+                                                     TEXT("Game started"));
+                  }
                 }
-              }
-            }),
-            StartGameTimeout, false);
+              }),
+              StartGameTimeout, false);
+        }
       }
 
       if (GS->PlayerArray.Num() >= ExpectedPlayerCount && !bTurnsStarted) {
@@ -278,9 +279,14 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
   }
 }
 
-void ASkaldGameMode::InitializeWorld() {
+bool ASkaldGameMode::InitializeWorld() {
   if (!WorldMap) {
-    return;
+    return false;
+  }
+
+  ASkaldGameState *GS = GetGameState<ASkaldGameState>();
+  if (!GS || GS->PlayerArray.Num() == 0) {
+    return false;
   }
 
   // If the world map has not spawned territories yet, create basic ones.
@@ -292,11 +298,6 @@ void ASkaldGameMode::InitializeWorld() {
         WorldMap->RegisterTerritory(Territory);
       }
     }
-  }
-
-  ASkaldGameState *GS = GetGameState<ASkaldGameState>();
-  if (!GS) {
-    return;
   }
   // Shuffle territories before assignment
   Algo::RandomShuffle(WorldMap->Territories);
@@ -397,4 +398,5 @@ void ASkaldGameMode::InitializeWorld() {
       }
     }
   }
+  return true;
 }

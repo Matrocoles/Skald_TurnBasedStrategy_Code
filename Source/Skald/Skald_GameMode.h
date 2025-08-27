@@ -43,9 +43,13 @@ protected:
   UPROPERTY(BlueprintReadOnly, Category = "Players")
   TArray<FS_PlayerData> PlayersData;
 
-  /** Setup initial territories, armies, and initiative. */
+  /**
+   * Setup initial territories, armies, and initiative.
+   * Returns true if the world was successfully initialised with at least one
+   * player present.
+   */
   UFUNCTION(BlueprintCallable, Category = "GameMode")
-  void InitializeWorld();
+  bool InitializeWorld();
 
   /** Allow players to position initial armies based on initiative. */
   UFUNCTION(BlueprintCallable, Category = "GameMode")
