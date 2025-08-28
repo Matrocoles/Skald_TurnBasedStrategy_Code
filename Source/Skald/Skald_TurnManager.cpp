@@ -49,6 +49,12 @@ void ATurnManager::RegisterController(ASkaldPlayerController *Controller) {
   }
 }
 
+void ATurnManager::StartArmyPlacementPhase() {
+  CurrentPhase = ETurnPhase::ArmyPlacement;
+  CurrentIndex = 0;
+  BroadcastCurrentPhase();
+}
+
 void ATurnManager::StartTurns() {
   SortControllersByInitiative();
   CurrentIndex = 0;

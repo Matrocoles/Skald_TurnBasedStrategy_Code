@@ -288,6 +288,7 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
   }
 
   if (bWorldInitialized && bReadyToStart && !bTurnsStarted && TurnManager &&
+      TurnManager->GetCurrentPhase() != ETurnPhase::ArmyPlacement &&
       TurnManager->GetControllerCount() > 0) {
     bTurnsStarted = true;
     TurnManager->SortControllersByInitiative();
@@ -408,10 +409,12 @@ void ASkaldGameMode::BeginArmyPlacementPhase() {
     return;
   }
 
-  // Ensure controllers are sorted before placement begins.
+  // Ensure controllers are sorted before placement begins and set phase.
   TurnManager->SortControllersByInitiative();
+  TurnManager->StartArmyPlacementPhase();
 
-  // Calculate army pools for each player based on owned territories.
+  // Calculate army pools for each player based on owned territories and
+  // update HUDs.
   for (ASkaldPlayerController *PC : TurnManager->GetControllers()) {
     if (ASkaldPlayerState *PS =
             PC ? PC->GetPlayerState<ASkaldPlayerState>() : nullptr) {
@@ -421,12 +424,13 @@ void ASkaldGameMode::BeginArmyPlacementPhase() {
           ++Owned;
         }
       }
-      PS->ArmyPool = FMath::CeilToInt(Owned / 3.0f);
+      PS->ArmyPool = FMath::CeilToInt(Owned / 3.f);
       PS->ForceNetUpdate();
+      TurnManager->BroadcastArmyPool(PS);
     }
   }
 
-  PlacementIndex = 0;
+  PlacementIndex = -1;
   AdvanceArmyPlacement();
 }
 
@@ -476,6 +480,8 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
       TurnManager->GetControllers();
   const int32 NumControllers = Controllers.Num();
 
+  ++PlacementIndex;
+
   while (PlacementIndex < NumControllers) {
     ASkaldPlayerController *PC = Controllers[PlacementIndex];
     ASkaldPlayerState *PS =
@@ -490,8 +496,16 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
       continue;
     }
 
-    if (TurnManager) {
-      TurnManager->BroadcastArmyPool(PS);
+    TurnManager->BroadcastArmyPool(PS);
+
+    // Announce whose placement turn it is.
+    const FString PlayerName = PS->DisplayName;
+    for (ASkaldPlayerController *Controller : Controllers) {
+      const bool bIsActive = Controller == PC;
+      Controller->ShowTurnAnnouncement(PlayerName, bIsActive);
+      if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
+        HUD->UpdateTurnBanner(PS->GetPlayerId(), 1);
+      }
     }
 
     // AI players automatically distribute their armies evenly.
@@ -512,16 +526,18 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
         ++SpreadIndex;
       }
       PS->ForceNetUpdate();
-      if (TurnManager) {
-        TurnManager->BroadcastArmyPool(PS);
-      }
+      TurnManager->BroadcastArmyPool(PS);
       ++PlacementIndex;
       continue;
     }
 
     // Human player: wait for manual deployment with current pool visible.
-    break;
+    return;
   }
+
+  // All players have finished placing armies; start the main turn loop.
+  bTurnsStarted = true;
+  TurnManager->StartTurns();
 }
 
 bool ASkaldGameMode::InitializeWorld() {

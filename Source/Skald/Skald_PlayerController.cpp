@@ -225,6 +225,24 @@ void ASkaldPlayerController::EndPhase() {
     }
   }
 
+  ETurnPhase Phase = TurnManager->GetCurrentPhase();
+  if (Phase == ETurnPhase::ArmyPlacement) {
+    if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+      PS->ArmyPool = 0;
+      PS->ForceNetUpdate();
+      TurnManager->BroadcastArmyPool(PS);
+    }
+
+    if (!CachedGameMode) {
+      CachedGameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
+    }
+
+    if (CachedGameMode) {
+      CachedGameMode->AdvanceArmyPlacement();
+    }
+    return;
+  }
+
   TurnManager->AdvancePhase();
 }
 

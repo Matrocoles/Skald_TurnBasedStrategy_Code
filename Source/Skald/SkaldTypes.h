@@ -25,6 +25,7 @@ namespace SkaldHelpers
 UENUM(BlueprintType)
 enum class ETurnPhase : uint8
 {
+    ArmyPlacement UMETA(DisplayName = "Army Placement"),
     Reinforcement UMETA(DisplayName = "Reinforcement"),
     Attack        UMETA(DisplayName = "Attack"),
     Engineering   UMETA(DisplayName = "Engineering"),

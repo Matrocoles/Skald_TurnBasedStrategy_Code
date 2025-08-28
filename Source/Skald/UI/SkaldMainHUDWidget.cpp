@@ -84,6 +84,11 @@ void USkaldMainHUDWidget::HandleEndPhaseClicked() {
     OnEndAttackRequested.Broadcast(true);
   } else if (CurrentPhase == ETurnPhase::Movement) {
     OnEndMovementRequested.Broadcast(true);
+  } else if (CurrentPhase == ETurnPhase::ArmyPlacement) {
+    if (GameMode) {
+      GameMode->AdvanceArmyPlacement();
+    }
+    return;
   }
 
   if (APlayerController *PC = GetOwningPlayer()) {
@@ -112,7 +117,8 @@ void USkaldMainHUDWidget::UpdatePhaseBanner(ETurnPhase InPhase) {
   }
   SyncPhaseButtons(CurrentPlayerID == LocalPlayerID);
 
-  if (DeployableUnitsText && CurrentPhase != ETurnPhase::Reinforcement) {
+  if (DeployableUnitsText && CurrentPhase != ETurnPhase::Reinforcement &&
+      CurrentPhase != ETurnPhase::ArmyPlacement) {
     DeployableUnitsText->SetVisibility(ESlateVisibility::Collapsed);
   }
 }
@@ -395,7 +401,9 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
         SelectedTargetID = Territory->TerritoryID;
       }
     }
-  } else if (CurrentPhase == ETurnPhase::Reinforcement && bOwnedByLocal) {
+  } else if ((CurrentPhase == ETurnPhase::Reinforcement ||
+              CurrentPhase == ETurnPhase::ArmyPlacement) &&
+             bOwnedByLocal) {
     SelectedSourceID = Territory->TerritoryID;
     if (DeployButton) {
       DeployButton->SetVisibility(ESlateVisibility::Visible);
@@ -459,7 +467,8 @@ void USkaldMainHUDWidget::SyncPhaseButtons(bool bIsMyTurn) {
 
   if (DeployButton) {
     const ESlateVisibility DesiredVisibility =
-        (bIsMyTurn && CurrentPhase == ETurnPhase::Reinforcement)
+        (bIsMyTurn && (CurrentPhase == ETurnPhase::Reinforcement ||
+                        CurrentPhase == ETurnPhase::ArmyPlacement))
             ? ESlateVisibility::Visible
             : ESlateVisibility::Collapsed;
     DeployButton->SetVisibility(DesiredVisibility);
