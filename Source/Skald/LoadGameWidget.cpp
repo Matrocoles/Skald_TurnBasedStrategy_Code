@@ -4,6 +4,9 @@
 #include "GameFramework/SaveGame.h"
 #include "LobbyMenuWidget.h"
 #include "SlotNameConstants.h"
+#include "SkaldSaveGame.h"
+#include "SkaldSaveGameLibrary.h"
+#include "Skald_GameInstance.h"
 
 void ULoadGameWidget::NativeConstruct()
 {
@@ -59,10 +62,18 @@ void ULoadGameWidget::OnMainMenu()
 
 void ULoadGameWidget::HandleLoadSlot(int32 SlotIndex)
 {
-    USaveGame* LoadedGame = UGameplayStatics::LoadGameFromSlot(SlotNames[SlotIndex], 0);
+    USkaldSaveGame* LoadedGame = USkaldSaveGameLibrary::LoadSkaldGame(SlotNames[SlotIndex], 0);
     if (LoadedGame)
     {
-        // After loading, transition to the main gameplay map
+        if (USkaldGameInstance* GI = GetWorld()->GetGameInstance<USkaldGameInstance>())
+        {
+            if (LoadedGame->Players.Num() > 0)
+            {
+                GI->DisplayName = LoadedGame->Players[0].PlayerName;
+                GI->Faction = LoadedGame->Players[0].Faction;
+            }
+        }
+
         UGameplayStatics::OpenLevel(this, FName("Skald_OverTop"));
     }
     else
