@@ -59,6 +59,10 @@ public:
         UFUNCTION(BlueprintCallable, Category="Input")
         void MoveRight(float Value);
 
+       /** Handle up/down movement input */
+       UFUNCTION(BlueprintCallable, Category="Input")
+       void MoveUp(float Value);
+
         /** Handle yaw input */
         UFUNCTION(BlueprintCallable, Category="Input")
         void Turn(float Value);

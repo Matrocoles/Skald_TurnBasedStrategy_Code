@@ -66,6 +66,7 @@ void ASkald_PlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerIn
 
         PlayerInputComponent->BindAxis("MoveForward", this, &ASkald_PlayerCharacter::MoveForward);
         PlayerInputComponent->BindAxis("MoveRight", this, &ASkald_PlayerCharacter::MoveRight);
+       PlayerInputComponent->BindAxis("MoveUp", this, &ASkald_PlayerCharacter::MoveUp);
         PlayerInputComponent->BindAxis("Turn", this, &ASkald_PlayerCharacter::Turn);
         PlayerInputComponent->BindAxis("LookUp", this, &ASkald_PlayerCharacter::LookUp);
 
@@ -89,6 +90,14 @@ void ASkald_PlayerCharacter::MoveRight(float Value)
         {
                 AddMovementInput(GetActorRightVector(), Value);
         }
+}
+
+void ASkald_PlayerCharacter::MoveUp(float Value)
+{
+       if (Value != 0.0f)
+       {
+               AddMovementInput(GetActorUpVector(), Value);
+       }
 }
 
 void ASkald_PlayerCharacter::Turn(float Value)

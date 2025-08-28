@@ -22,8 +22,8 @@ from Blueprints and level actors. To hook everything up:
    `Select()` function on territories under the mouse cursor when the
    `Select` action is triggered.
 
-4. **Input** – Add axis mappings for `MoveForward` and `MoveRight` and action
-   mappings for `Select`, `Ability1`, `Ability2`, and `Ability3` in the
+4. **Input** – Add axis mappings for `MoveForward`, `MoveRight`, and `MoveUp` and
+   action mappings for `Select`, `Ability1`, `Ability2`, and `Ability3` in the
    project settings. Also enable *Click Events* and *Mouse Over Events* on the
    player controller so territory meshes can generate the appropriate input
    callbacks.
