@@ -87,6 +87,7 @@ protected:
   /** Allow players to position initial armies based on initiative. */
   UFUNCTION(BlueprintCallable, Category = "GameMode")
   void BeginArmyPlacementPhase();
+
 public:
   /** Build siege equipment during the engineering phase. */
   UFUNCTION(BlueprintCallable, Category = "Siege")
@@ -98,6 +99,7 @@ public:
 
   /** Update cached player resource values. */
   void UpdatePlayerResources(ASkaldPlayerState *Player);
+
 private:
   /** Timer that triggers auto-start of the turn sequence. */
   FTimerHandle StartGameTimerHandle;
@@ -107,6 +109,9 @@ private:
 
   /** Whether the world has been initialized and territories assigned. */
   bool bWorldInitialized;
+
+  /** Controllers waiting for world initialization before registration. */
+  TArray<ASkaldPlayerController *> PendingControllers;
 
   /** Index of the controller currently placing armies. */
   int32 PlacementIndex = 0;
@@ -119,7 +124,6 @@ private:
 
   /** Notify HUDs of the current player roster. */
   void RefreshHUDs();
-
 
   /** Attempt to initialise the world and start the game flow. */
   void TryInitializeWorldAndStart();
