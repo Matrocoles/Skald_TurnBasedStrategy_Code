@@ -50,6 +50,26 @@ void UStartGameWidget::NativeConstruct()
     }
 }
 
+void UStartGameWidget::NativeDestruct()
+{
+    if (SingleplayerButton)
+    {
+        SingleplayerButton->OnClicked.RemoveDynamic(this, &UStartGameWidget::OnSingleplayer);
+    }
+
+    if (MultiplayerButton)
+    {
+        MultiplayerButton->OnClicked.RemoveDynamic(this, &UStartGameWidget::OnMultiplayer);
+    }
+
+    if (MainMenuButton)
+    {
+        MainMenuButton->OnClicked.RemoveDynamic(this, &UStartGameWidget::OnMainMenu);
+    }
+
+    Super::NativeDestruct();
+}
+
 void UStartGameWidget::OnSingleplayer()
 {
     StartGame(false);
