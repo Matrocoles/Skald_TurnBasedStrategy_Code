@@ -13,6 +13,7 @@ class ATerritory;
 class ASkaldGameMode;
 class ASkaldGameState;
 class USkaldGameInstance;
+class AWorldMap;
 
 /**
  * Player controller capable of participating in turn based gameplay.
@@ -100,6 +101,10 @@ protected:
   UPROPERTY(BlueprintReadOnly, Category = "Game",
             meta = (AllowPrivateAccess = "true"))
   USkaldGameInstance *CachedGameInstance;
+
+  UPROPERTY(BlueprintReadOnly, Category = "Game",
+            meta = (AllowPrivateAccess = "true"))
+  AWorldMap *CachedWorldMap;
 
 public:
   /** Handle HUD attack submissions.
