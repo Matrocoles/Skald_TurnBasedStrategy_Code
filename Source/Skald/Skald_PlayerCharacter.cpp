@@ -94,10 +94,12 @@ void ASkald_PlayerCharacter::MoveRight(float Value)
 
 void ASkald_PlayerCharacter::MoveUp(float Value)
 {
-       if (Value != 0.0f)
-       {
-               AddMovementInput(GetActorUpVector(), Value);
-       }
+        if (Value != 0.0f)
+        {
+                // Move strictly along world Z to ensure SpaceBar and LeftControl
+                // translate vertically regardless of character rotation
+                AddMovementInput(FVector::UpVector, Value);
+        }
 }
 
 void ASkald_PlayerCharacter::Turn(float Value)
