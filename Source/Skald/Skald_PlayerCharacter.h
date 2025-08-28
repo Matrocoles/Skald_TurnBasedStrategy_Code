@@ -8,6 +8,8 @@ class ATerritory;
 class ASkaldGameMode;
 class ASkaldGameState;
 class USkaldGameInstance;
+class UCameraComponent;
+class USpringArmComponent;
 
 #include "Skald_PlayerCharacter.generated.h"
 
@@ -57,6 +59,14 @@ public:
         UFUNCTION(BlueprintCallable, Category="Input")
         void MoveRight(float Value);
 
+        /** Handle yaw input */
+        UFUNCTION(BlueprintCallable, Category="Input")
+        void Turn(float Value);
+
+        /** Handle pitch input */
+        UFUNCTION(BlueprintCallable, Category="Input")
+        void LookUp(float Value);
+
         /** Handle selection action */
         UFUNCTION(BlueprintCallable, Category="Input")
         void Select();
@@ -70,4 +80,13 @@ public:
 
         UFUNCTION(BlueprintCallable, Category="Abilities")
         void AbilityThree();
+
+protected:
+        /** Camera boom positioning the camera behind the character */
+        UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Camera", meta=(AllowPrivateAccess="true"))
+        USpringArmComponent* CameraBoom;
+
+        /** Follow camera */
+        UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Camera", meta=(AllowPrivateAccess="true"))
+        UCameraComponent* FollowCamera;
 };

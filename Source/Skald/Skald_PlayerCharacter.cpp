@@ -9,14 +9,27 @@
 #include "Skald_GameMode.h"
 #include "Skald_GameState.h"
 #include "Skald_GameInstance.h"
+#include "Camera/CameraComponent.h"
+#include "GameFramework/SpringArmComponent.h"
 
 // Sets default values
 ASkald_PlayerCharacter::ASkald_PlayerCharacter()
 {
         PrimaryActorTick.bCanEverTick = true;
 
+        bUseControllerRotationYaw = true;
+        bUseControllerRotationPitch = true;
+
         WorldMap = nullptr;
         CurrentSelection = nullptr;
+
+        CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
+        CameraBoom->SetupAttachment(RootComponent);
+        CameraBoom->bUsePawnControlRotation = true;
+
+        FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
+        FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
+        FollowCamera->bUsePawnControlRotation = false;
 }
 
 // Called when the game starts or when spawned
@@ -53,6 +66,8 @@ void ASkald_PlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerIn
 
         PlayerInputComponent->BindAxis("MoveForward", this, &ASkald_PlayerCharacter::MoveForward);
         PlayerInputComponent->BindAxis("MoveRight", this, &ASkald_PlayerCharacter::MoveRight);
+        PlayerInputComponent->BindAxis("Turn", this, &ASkald_PlayerCharacter::Turn);
+        PlayerInputComponent->BindAxis("LookUp", this, &ASkald_PlayerCharacter::LookUp);
 
         PlayerInputComponent->BindAction("Select", IE_Pressed, this, &ASkald_PlayerCharacter::Select);
         PlayerInputComponent->BindAction("Ability1", IE_Pressed, this, &ASkald_PlayerCharacter::AbilityOne);
@@ -73,6 +88,22 @@ void ASkald_PlayerCharacter::MoveRight(float Value)
         if (Value != 0.0f)
         {
                 AddMovementInput(GetActorRightVector(), Value);
+        }
+}
+
+void ASkald_PlayerCharacter::Turn(float Value)
+{
+        if (Value != 0.0f)
+        {
+                AddControllerYawInput(Value);
+        }
+}
+
+void ASkald_PlayerCharacter::LookUp(float Value)
+{
+        if (Value != 0.0f)
+        {
+                AddControllerPitchInput(Value);
         }
 }
 
