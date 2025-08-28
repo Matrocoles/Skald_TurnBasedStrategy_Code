@@ -413,6 +413,21 @@ void ASkaldGameMode::BeginArmyPlacementPhase() {
   TurnManager->SortControllersByInitiative();
   TurnManager->StartArmyPlacementPhase();
 
+  const TArray<ASkaldPlayerController *> Controllers =
+      TurnManager->GetControllers();
+  ASkaldPlayerController *ActiveController =
+      Controllers.Num() > 0 ? Controllers[0] : nullptr;
+  const FString PhaseString =
+      UEnum::GetValueAsString(TurnManager->GetCurrentPhase());
+  UE_LOG(LogSkald, Log, TEXT("BeginArmyPlacementPhase: Controller=%s Phase=%s"),
+         *GetNameSafe(ActiveController), *PhaseString);
+  if (GEngine) {
+    GEngine->AddOnScreenDebugMessage(
+        -1, 5.f, FColor::Green,
+        FString::Printf(TEXT("Begin Army Placement: %s - %s"),
+                        *GetNameSafe(ActiveController), *PhaseString));
+  }
+
   // Calculate army pools for each player based on owned territories and
   // update HUDs.
   for (ASkaldPlayerController *PC : TurnManager->GetControllers()) {
@@ -494,6 +509,17 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
     if (PS->ArmyPool <= 0) {
       ++PlacementIndex;
       continue;
+    }
+
+    const FString PhaseString =
+        UEnum::GetValueAsString(TurnManager->GetCurrentPhase());
+    UE_LOG(LogSkald, Log, TEXT("AdvanceArmyPlacement: Controller=%s Phase=%s"),
+           *GetNameSafe(PC), *PhaseString);
+    if (GEngine) {
+      GEngine->AddOnScreenDebugMessage(
+          -1, 5.f, FColor::Green,
+          FString::Printf(TEXT("Army Placement: %s - %s"),
+                          *GetNameSafe(PC), *PhaseString));
     }
 
     TurnManager->BroadcastArmyPool(PS);
