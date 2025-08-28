@@ -2,6 +2,7 @@
 
 #include "Components/Button.h"
 #include "GameFramework/PlayerController.h"
+#include "Kismet/GameplayStatics.h"
 #include "LobbyMenuWidget.h"
 #include "Skald_GameInstance.h"
 #include "Skald_PlayerController.h"
@@ -62,19 +63,9 @@ void UStartGameWidget::TravelToGameplayMap(APlayerController *PC,
   }
 
   const FName LevelName(TEXT("/Game/Blueprints/Maps/OverviewMap"));
-  FString URL = LevelName.ToString();
-
-  if (UWorld *WorldToTravel = PC->GetWorld()) {
-    if (PC->HasAuthority()) {
-      if (bMultiplayer) {
-        URL += TEXT("?listen");
-      }
-      WorldToTravel->ServerTravel(URL);
-    } else if (PC->IsLocalController()) {
-      PC->ClientTravel(URL, ETravelType::TRAVEL_Absolute);
-    } else {
-      UE_LOG(LogTemp, Error,
-             TEXT("TravelToGameplayMap: invalid context for travel"));
-    }
+  FString Options;
+  if (bMultiplayer) {
+    Options = TEXT("listen");
   }
+  UGameplayStatics::OpenLevel(PC, LevelName, true, Options);
 }
