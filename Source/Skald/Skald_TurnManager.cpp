@@ -17,10 +17,14 @@ ATurnManager::ATurnManager() {
   PrimaryActorTick.bCanEverTick = false;
   bReplicates = true;
   CurrentIndex = 0;
+  CachedWorldMap = nullptr;
 }
 
 void ATurnManager::BeginPlay() {
   Super::BeginPlay();
+
+  CachedWorldMap = Cast<AWorldMap>(
+      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
 
   if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
     if (GI->GridBattleManager) {
@@ -90,21 +94,19 @@ void ATurnManager::StartTurns() {
   if (PS) {
     int32 Owned = 0;
     int32 ResourceGain = 0;
-    if (AWorldMap *WorldMap =
-            Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
-                GetWorld(), AWorldMap::StaticClass()))) {
-      if (WorldMap->Territories.Num() == 0) {
+    if (CachedWorldMap) {
+      if (CachedWorldMap->Territories.Num() == 0) {
         UE_LOG(LogSkald, Error,
                TEXT("StartTurns: WorldMap %s has no territories"),
-               *WorldMap->GetName());
+               *CachedWorldMap->GetName());
         if (GEngine) {
           GEngine->AddOnScreenDebugMessage(
               -1, 5.f, FColor::Red,
               FString::Printf(TEXT("StartTurns: %s has no territories"),
-                              *WorldMap->GetName()));
+                              *CachedWorldMap->GetName()));
         }
       } else {
-        for (ATerritory *Terr : WorldMap->Territories) {
+        for (ATerritory *Terr : CachedWorldMap->Territories) {
           if (Terr && Terr->OwningPlayer == PS) {
             ++Owned;
             ResourceGain += Terr->Resources;
@@ -196,9 +198,8 @@ void ATurnManager::AdvanceTurn() {
     if (PS) {
       int32 Owned = 0;
       int32 ResourceGain = 0;
-      if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
-              GetWorld(), AWorldMap::StaticClass()))) {
-        for (ATerritory *Terr : WorldMap->Territories) {
+      if (CachedWorldMap) {
+        for (ATerritory *Terr : CachedWorldMap->Territories) {
           if (Terr && Terr->OwningPlayer == PS) {
             ++Owned;
             ResourceGain += Terr->Resources;
@@ -296,14 +297,12 @@ void ATurnManager::ResolveGridBattleResult() {
   const FS_BattlePayload Battle = GI->PendingBattle;
   PendingBattle = Battle;
 
-  AWorldMap *WorldMap = Cast<AWorldMap>(
-      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
-  if (!WorldMap) {
+  if (!CachedWorldMap) {
     return;
   }
 
-  ATerritory *Source = WorldMap->GetTerritoryById(Battle.FromTerritoryID);
-  ATerritory *Target = WorldMap->GetTerritoryById(Battle.TargetTerritoryID);
+  ATerritory *Source = CachedWorldMap->GetTerritoryById(Battle.FromTerritoryID);
+  ATerritory *Target = CachedWorldMap->GetTerritoryById(Battle.TargetTerritoryID);
   if (!Source || !Target) {
     return;
   }
@@ -358,10 +357,9 @@ void ATurnManager::ClientBattleResolved_Implementation(
     int32 WinningPlayerID, int32 AttackerCasualties, int32 DefenderCasualties,
     int32 FromTerritoryID, int32 TargetTerritoryID, int32 NewOwnerPlayerID,
     int32 SourceArmy, int32 TargetArmy) {
-  if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
-          GetWorld(), AWorldMap::StaticClass()))) {
-    ATerritory *Source = WorldMap->GetTerritoryById(FromTerritoryID);
-    ATerritory *Target = WorldMap->GetTerritoryById(TargetTerritoryID);
+  if (CachedWorldMap) {
+    ATerritory *Source = CachedWorldMap->GetTerritoryById(FromTerritoryID);
+    ATerritory *Target = CachedWorldMap->GetTerritoryById(TargetTerritoryID);
     if (Source) {
       Source->ArmyStrength = SourceArmy;
       Source->RefreshAppearance();
