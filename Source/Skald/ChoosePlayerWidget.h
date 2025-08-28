@@ -8,6 +8,10 @@
 class UEditableTextBox;
 class UComboBoxString;
 class UButton;
+namespace ESelectInfo
+{
+    enum Type;
+}
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FPlayerLockedIn);
 
@@ -41,5 +45,18 @@ public:
     /** Delegate fired when the player locks in their selection. */
     UPROPERTY(BlueprintAssignable, Category="Skald|Widgets|Events")
     FPlayerLockedIn OnPlayerLockedIn;
+
+protected:
+    /** Text box change handler. */
+    UFUNCTION()
+    void HandleDisplayNameChanged(const FText& Text);
+
+    /** Faction combo selection handler. */
+    UFUNCTION()
+    void HandleFactionSelected(FString SelectedItem, ESelectInfo::Type SelectionType);
+
+    /** Enable lock in button when prerequisites are met. */
+    UFUNCTION()
+    void UpdateLockInEnabled();
 };
 
