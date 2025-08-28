@@ -13,6 +13,7 @@
 AWorldMap::AWorldMap() {
   PrimaryActorTick.bCanEverTick = false;
   SelectedTerritory = nullptr;
+  TerritoryClass = ATerritory::StaticClass();
 }
 
 void AWorldMap::BeginPlay() {
