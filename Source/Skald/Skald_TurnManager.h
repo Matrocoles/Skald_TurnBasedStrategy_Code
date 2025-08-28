@@ -7,6 +7,7 @@
 
 class ASkaldPlayerController;
 class ASkaldPlayerState;
+class AWorldMap;
 
 // Broadcast whenever the overall world state changes so HUDs can refresh.
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSkaldWorldStateChanged);
@@ -100,6 +101,9 @@ protected:
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Turn")
     FS_BattlePayload PendingBattle;
+
+    UPROPERTY()
+    AWorldMap* CachedWorldMap;
 
     /** Notify controllers and HUDs of a phase change. */
     void BroadcastCurrentPhase();
