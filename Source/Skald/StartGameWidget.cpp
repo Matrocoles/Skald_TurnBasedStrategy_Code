@@ -2,9 +2,9 @@
 
 #include "Components/Button.h"
 #include "GameFramework/PlayerController.h"
-#include "Skald_PlayerController.h"
 #include "LobbyMenuWidget.h"
 #include "Skald_GameInstance.h"
+#include "Skald_PlayerController.h"
 
 void UStartGameWidget::SetLobbyMenu(ULobbyMenuWidget *InMenu) {
   OwningLobbyMenu = InMenu;
@@ -43,7 +43,6 @@ void UStartGameWidget::OnMainMenu() {
   }
 }
 
-
 void UStartGameWidget::StartGame(bool bMultiplayer) {
   if (UWorld *World = GetWorld()) {
     if (USkaldGameInstance *GI = World->GetGameInstance<USkaldGameInstance>()) {
@@ -66,7 +65,7 @@ void UStartGameWidget::TravelToGameplayMap(APlayerController *PC,
   FString URL = LevelName.ToString();
 
   if (UWorld *WorldToTravel = PC->GetWorld()) {
-    if (WorldToTravel->IsServer()) {
+    if (PC->HasAuthority()) {
       if (bMultiplayer) {
         URL += TEXT("?listen");
       }
