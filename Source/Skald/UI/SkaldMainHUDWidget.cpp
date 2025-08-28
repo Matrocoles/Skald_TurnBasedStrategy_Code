@@ -70,6 +70,40 @@ void USkaldMainHUDWidget::NativeConstruct() {
   RebuildPlayerList(CachedPlayers);
 }
 
+void USkaldMainHUDWidget::NativeDestruct() {
+  if (GameState) {
+    GameState->OnPlayersUpdated.RemoveDynamic(
+        this, &USkaldMainHUDWidget::HandlePlayersUpdated);
+  }
+
+  if (AttackButton) {
+    AttackButton->OnClicked.RemoveDynamic(
+        this, &USkaldMainHUDWidget::BeginAttackSelection);
+  }
+
+  if (MoveButton) {
+    MoveButton->OnClicked.RemoveDynamic(
+        this, &USkaldMainHUDWidget::BeginMoveSelection);
+  }
+
+  if (EndTurnButton) {
+    EndTurnButton->OnClicked.RemoveDynamic(
+        this, &USkaldMainHUDWidget::HandleEndTurnClicked);
+  }
+
+  if (EndPhaseButton) {
+    EndPhaseButton->OnClicked.RemoveDynamic(
+        this, &USkaldMainHUDWidget::HandleEndPhaseClicked);
+  }
+
+  if (DeployButton) {
+    DeployButton->OnClicked.RemoveDynamic(
+        this, &USkaldMainHUDWidget::HandleDeployClicked);
+  }
+
+  Super::NativeDestruct();
+}
+
 void USkaldMainHUDWidget::HandleEndTurnClicked() {
   ShowEndingTurn();
   if (APlayerController *PC = GetOwningPlayer()) {
