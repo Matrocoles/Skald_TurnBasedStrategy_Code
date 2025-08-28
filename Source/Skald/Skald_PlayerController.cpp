@@ -1,7 +1,7 @@
 #include "Skald_PlayerController.h"
 #include "Blueprint/UserWidget.h"
+#include "ChoosePlayerWidget.h"
 #include "Engine/Engine.h"
-#include <limits>
 #include "Kismet/GameplayStatics.h"
 #include "Skald.h"
 #include "SkaldTypes.h"
@@ -12,9 +12,11 @@
 #include "Skald_TurnManager.h"
 #include "Territory.h"
 #include "UI/SkaldMainHUDWidget.h"
-#include "ChoosePlayerWidget.h"
-#include "WorldMap.h"
 #include "UObject/ConstructorHelpers.h"
+#include "WorldMap.h"
+#include <limits>
+
+constexpr int32 MaxAIIterations = 100;
 
 ASkaldPlayerController::ASkaldPlayerController() {
   bIsAI = false;
@@ -116,7 +118,8 @@ void ASkaldPlayerController::BeginPlay() {
   if (!ChoosePlayerWidget) {
     if (UClass *ChooseWidgetClass = LoadClass<UChoosePlayerWidget>(
             nullptr,
-            TEXT("/Game/Blueprints/UI/Skald_ChoosePlayerWidget.Skald_ChoosePlayerWidget_C"))) {
+            TEXT("/Game/Blueprints/UI/"
+                 "Skald_ChoosePlayerWidget.Skald_ChoosePlayerWidget_C"))) {
       ChoosePlayerWidget =
           CreateWidget<UChoosePlayerWidget>(this, ChooseWidgetClass);
       if (ChoosePlayerWidget) {
@@ -276,7 +279,14 @@ void ASkaldPlayerController::MakeAIDecision() {
 
   // Iterate through phases until the turn naturally ends.
   ETurnPhase Phase = TurnManager->GetCurrentPhase();
+  int32 IterationCount = 0;
   while (true) {
+    if (++IterationCount > MaxAIIterations) {
+      UE_LOG(LogSkald, Warning,
+             TEXT("MakeAIDecision exceeded %d iterations; ending turn."),
+             MaxAIIterations);
+      break;
+    }
     if (Phase == ETurnPhase::Reinforcement) {
       TArray<ATerritory *> OwnedTerritories;
       for (ATerritory *Territory : WorldMap->Territories) {
@@ -385,13 +395,15 @@ void ASkaldPlayerController::MakeAIDecision() {
     EndTurn();
     return;
   }
+
+  EndTurn();
 }
 
 bool ASkaldPlayerController::IsAIController() const { return bIsAI; }
 
 bool ASkaldPlayerController::ValidateAttack(int32 FromID, int32 ToID,
-                                           int32 ArmySent, bool bUseSiege,
-                                           FString *OutError) {
+                                            int32 ArmySent, bool bUseSiege,
+                                            FString *OutError) {
   AWorldMap *WorldMap = Cast<AWorldMap>(
       UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
   if (!WorldMap) {
@@ -530,8 +542,9 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
   Target->ForceNetUpdate();
 
   if (TurnManager) {
-    for (ASkaldPlayerController* Controller : TurnManager->GetControllers()) {
-      if (USkaldMainHUDWidget* HUD = Controller ? Controller->GetHUDWidget() : nullptr) {
+    for (ASkaldPlayerController *Controller : TurnManager->GetControllers()) {
+      if (USkaldMainHUDWidget *HUD =
+              Controller ? Controller->GetHUDWidget() : nullptr) {
         FString OwnerName = Target->OwningPlayer
                                 ? Target->OwningPlayer->PlayerDisplayName
                                 : TEXT("Neutral");
@@ -599,8 +612,9 @@ void ASkaldPlayerController::ServerHandleMove_Implementation(int32 FromID,
   }
 
   if (TurnManager) {
-    for (ASkaldPlayerController* Controller : TurnManager->GetControllers()) {
-      if (USkaldMainHUDWidget* HUD = Controller ? Controller->GetHUDWidget() : nullptr) {
+    for (ASkaldPlayerController *Controller : TurnManager->GetControllers()) {
+      if (USkaldMainHUDWidget *HUD =
+              Controller ? Controller->GetHUDWidget() : nullptr) {
         FString SourceOwner = Source->OwningPlayer
                                   ? Source->OwningPlayer->PlayerDisplayName
                                   : TEXT("Neutral");
@@ -636,14 +650,15 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
     return;
   }
 
-  FString OwnerName =
-      Terr->OwningPlayer ? Terr->OwningPlayer->PlayerDisplayName : TEXT("Neutral");
+  FString OwnerName = Terr->OwningPlayer ? Terr->OwningPlayer->PlayerDisplayName
+                                         : TEXT("Neutral");
 
   Terr->ForceNetUpdate();
 
   if (TurnManager) {
-    for (ASkaldPlayerController* Controller : TurnManager->GetControllers()) {
-      if (USkaldMainHUDWidget* HUD = Controller ? Controller->GetHUDWidget() : nullptr) {
+    for (ASkaldPlayerController *Controller : TurnManager->GetControllers()) {
+      if (USkaldMainHUDWidget *HUD =
+              Controller ? Controller->GetHUDWidget() : nullptr) {
         HUD->UpdateTerritoryInfo(Terr->TerritoryName, OwnerName,
                                  Terr->ArmyStrength);
       }
@@ -826,9 +841,9 @@ void ASkaldPlayerController::HandleWorldStateChanged() {
   if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
           GetWorld(), AWorldMap::StaticClass()))) {
     if (ATerritory *Terr = WorldMap->SelectedTerritory) {
-      FString OwnerName =
-          Terr->OwningPlayer ? Terr->OwningPlayer->PlayerDisplayName
-                             : TEXT("Neutral");
+      FString OwnerName = Terr->OwningPlayer
+                              ? Terr->OwningPlayer->PlayerDisplayName
+                              : TEXT("Neutral");
       MainHudWidget->UpdateTerritoryInfo(Terr->TerritoryName, OwnerName,
                                          Terr->ArmyStrength);
     }
