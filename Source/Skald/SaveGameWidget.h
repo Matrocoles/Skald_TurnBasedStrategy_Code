@@ -27,7 +27,8 @@ public:
     UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta=(BindWidgetOptional))
     UButton* MainMenuButton;
 
-    void SetLobbyMenu(ULobbyMenuWidget* InMenu) { LobbyMenu = InMenu; }
+    UFUNCTION(BlueprintCallable, Category="Skald|Widgets")
+    void SetLobbyMenu(ULobbyMenuWidget* InMenu);
 
 protected:
     virtual void NativeConstruct() override;
@@ -42,7 +43,7 @@ protected:
     UFUNCTION(BlueprintCallable)
     void OnSaveSlot2();
 
-    UFUNCTION()
+    UFUNCTION(BlueprintCallable, Category="Skald|Widgets")
     void OnMainMenu();
 
 private:

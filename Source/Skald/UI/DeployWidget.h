@@ -21,6 +21,7 @@ public:
   virtual void NativeConstruct() override;
 
   /** Configure the widget for the given territory and player state. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Deploy")
   void Setup(ATerritory *InTerritory, ASkaldPlayerState *InPlayerState,
              USkaldMainHUDWidget *InHUD, int32 MaxAmount);
 
@@ -34,10 +35,10 @@ public:
   UButton *DeclineButton;
 
 private:
-  UFUNCTION()
+  UFUNCTION(BlueprintCallable, Category = "Skald|Deploy")
   void HandleAccept();
 
-  UFUNCTION()
+  UFUNCTION(BlueprintCallable, Category = "Skald|Deploy")
   void HandleDecline();
 
   UPROPERTY()

@@ -4,6 +4,11 @@
 #include "Engine/Engine.h"
 #include "LobbyMenuWidget.h"
 
+void USettingsWidget::SetLobbyMenu(ULobbyMenuWidget* InMenu)
+{
+    LobbyMenu = InMenu;
+}
+
 void USettingsWidget::NativeConstruct()
 {
     Super::NativeConstruct();

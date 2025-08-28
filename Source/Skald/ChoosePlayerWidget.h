@@ -48,15 +48,15 @@ public:
 
 protected:
     /** Text box change handler. */
-    UFUNCTION()
+    UFUNCTION(BlueprintCallable, Category="Skald|Widgets")
     void HandleDisplayNameChanged(const FText& Text);
 
     /** Faction combo selection handler. */
-    UFUNCTION()
+    UFUNCTION(BlueprintCallable, Category="Skald|Widgets")
     void HandleFactionSelected(FString SelectedItem, ESelectInfo::Type SelectionType);
 
     /** Enable lock in button when prerequisites are met. */
-    UFUNCTION()
+    UFUNCTION(BlueprintCallable, Category="Skald|Widgets")
     void UpdateLockInEnabled();
 };
 
