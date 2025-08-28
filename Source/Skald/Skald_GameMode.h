@@ -67,7 +67,7 @@ protected:
   /** Data describing each player in the match. Pre-sized so blueprints can
    * safely write to indices without hitting invalid array warnings. */
   UPROPERTY(BlueprintReadOnly, Category = "Players")
-  TArray<FS_PlayerData> PlayersData;
+  TArray<FS_PlayerData> PlayerDataArray;
 
   /** All siege equipment constructed on the map. */
   UPROPERTY(BlueprintReadOnly, Category = "Siege")

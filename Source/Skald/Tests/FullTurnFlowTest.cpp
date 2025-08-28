@@ -68,7 +68,7 @@ bool FSkaldFullTurnFlowTest::RunTest(const FString &Parameters) {
   T1->TerritoryID = 1;
   T1->bIsCapital = true;
   T1->OwningPlayer = PS;
-  T1->HasTreasure = true;
+  T1->bHasTreasure = true;
   T1->ArmyStrength = 5;
   T2->TerritoryID = 2;
   T2->OwningPlayer = PS;
@@ -95,7 +95,7 @@ bool FSkaldFullTurnFlowTest::RunTest(const FString &Parameters) {
             ETurnPhase::Treasure);
   HUD->OnTerritoryClickedUI(T1);
   TestEqual(TEXT("Resources after treasure"), PS->Resources, 15);
-  TestFalse(TEXT("Treasure cleared"), T1->HasTreasure);
+  TestFalse(TEXT("Treasure cleared"), T1->bHasTreasure);
 
   PC->EndPhase(); // to movement
   TestEqual(TEXT("Movement phase"), TM->GetCurrentPhase(),

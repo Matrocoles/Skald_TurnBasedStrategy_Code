@@ -33,7 +33,7 @@ public:
 
     /** Player chosen display name. */
     UPROPERTY(BlueprintReadWrite, Replicated, Category="PlayerState")
-    FString DisplayName;
+    FString PlayerDisplayName;
 
     /** Selected faction for this player. */
     UPROPERTY(BlueprintReadWrite, Replicated, Category="PlayerState")
