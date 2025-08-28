@@ -252,21 +252,20 @@ void UStartGameWidget::TravelToGameplayMap(APlayerController *PC,
     return;
   }
 
-  PC->SetInputMode(FInputModeGameOnly());
-  PC->bShowMouseCursor = false;
-  PC->bEnableClickEvents = false;
-  PC->bEnableMouseOverEvents = false;
-
   const FName LevelName(TEXT("/Game/Blueprints/Maps/OverviewMap"));
-  FString Options;
-  if (bMultiplayer) {
-    Options = TEXT("listen");
-  }
+  FString URL = LevelName.ToString();
+
   if (UWorld *WorldToTravel = PC->GetWorld()) {
-    FString URL = LevelName.ToString();
-    if (!Options.IsEmpty()) {
-      URL += TEXT("?") + Options;
+    if (WorldToTravel->IsServer()) {
+      if (bMultiplayer) {
+        URL += TEXT("?listen");
+      }
+      WorldToTravel->ServerTravel(URL);
+    } else if (PC->IsLocalController()) {
+      PC->ClientTravel(URL, ETravelType::TRAVEL_Absolute);
+    } else {
+      UE_LOG(LogTemp, Error,
+             TEXT("TravelToGameplayMap: invalid context for travel"));
     }
-    WorldToTravel->ServerTravel(URL);
   }
 }
