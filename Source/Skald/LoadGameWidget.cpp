@@ -8,6 +8,11 @@
 #include "SkaldSaveGame.h"
 #include "Skald_GameInstance.h"
 
+void ULoadGameWidget::SetLobbyMenu(ULobbyMenuWidget* InMenu)
+{
+    LobbyMenu = InMenu;
+}
+
 void ULoadGameWidget::NativeConstruct()
 {
     Super::NativeConstruct();

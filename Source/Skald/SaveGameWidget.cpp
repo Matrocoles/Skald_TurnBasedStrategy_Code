@@ -7,6 +7,11 @@
 #include "Skald_GameMode.h"
 #include "SlotNameConstants.h"
 
+void USaveGameWidget::SetLobbyMenu(ULobbyMenuWidget* InMenu)
+{
+  LobbyMenu = InMenu;
+}
+
 void USaveGameWidget::NativeConstruct() {
   Super::NativeConstruct();
 

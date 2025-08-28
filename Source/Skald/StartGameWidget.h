@@ -31,23 +31,24 @@ public:
             meta = (BindWidgetOptional))
   UButton *MainMenuButton;
 
-  /** Record the lobby menu that spawned this widget so we can unhide it later.
-   */
+  /** Record the lobby menu that spawned this widget so we can unhide it later. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Widgets")
   void SetLobbyMenu(ULobbyMenuWidget *InMenu);
 
   /** Shared helper to move the player controller to the gameplay map. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Widgets")
   static void TravelToGameplayMap(APlayerController *PC, bool bMultiplayer);
 
 protected:
   virtual void NativeConstruct() override;
 
-  UFUNCTION()
+  UFUNCTION(BlueprintCallable, Category = "Skald|Widgets")
   void OnSingleplayer();
 
-  UFUNCTION()
+  UFUNCTION(BlueprintCallable, Category = "Skald|Widgets")
   void OnMultiplayer();
 
-  UFUNCTION()
+  UFUNCTION(BlueprintCallable, Category = "Skald|Widgets")
   void OnMainMenu();
 
   void StartGame(bool bMultiplayer);
