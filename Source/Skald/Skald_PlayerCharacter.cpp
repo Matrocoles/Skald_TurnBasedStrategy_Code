@@ -78,7 +78,7 @@ void ASkald_PlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerIn
 
 void ASkald_PlayerCharacter::MoveForward(float Value)
 {
-        if (Value != 0.0f)
+        if (!FMath::IsNearlyZero(Value))
         {
                 AddMovementInput(GetActorForwardVector(), Value);
         }
@@ -86,7 +86,7 @@ void ASkald_PlayerCharacter::MoveForward(float Value)
 
 void ASkald_PlayerCharacter::MoveRight(float Value)
 {
-        if (Value != 0.0f)
+        if (!FMath::IsNearlyZero(Value))
         {
                 AddMovementInput(GetActorRightVector(), Value);
         }
@@ -94,7 +94,7 @@ void ASkald_PlayerCharacter::MoveRight(float Value)
 
 void ASkald_PlayerCharacter::MoveUp(float Value)
 {
-        if (Value != 0.0f)
+        if (!FMath::IsNearlyZero(Value))
         {
                 // Move strictly along world Z to ensure SpaceBar and LeftControl
                 // translate vertically regardless of character rotation
@@ -104,7 +104,7 @@ void ASkald_PlayerCharacter::MoveUp(float Value)
 
 void ASkald_PlayerCharacter::Turn(float Value)
 {
-        if (Value != 0.0f)
+        if (!FMath::IsNearlyZero(Value))
         {
                 AddControllerYawInput(Value);
         }
@@ -112,7 +112,7 @@ void ASkald_PlayerCharacter::Turn(float Value)
 
 void ASkald_PlayerCharacter::LookUp(float Value)
 {
-        if (Value != 0.0f)
+        if (!FMath::IsNearlyZero(Value))
         {
                 AddControllerPitchInput(Value);
         }
