@@ -181,6 +181,11 @@ bool ATerritory::MoveTo(ATerritory *TargetTerritory, int32 Troops) {
   ArmyStrength -= Troops;
   TargetTerritory->ArmyStrength += Troops;
 
+  RefreshAppearance();
+  ForceNetUpdate();
+  TargetTerritory->RefreshAppearance();
+  TargetTerritory->ForceNetUpdate();
+
   Deselect();
   TargetTerritory->Select();
 
