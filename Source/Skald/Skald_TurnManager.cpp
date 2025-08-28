@@ -464,6 +464,14 @@ void ATurnManager::BroadcastResources(ASkaldPlayerState *ForPlayer) {
 }
 
 void ATurnManager::BroadcastCurrentPhase() {
+  const FString PhaseString = UEnum::GetValueAsString(CurrentPhase);
+  UE_LOG(LogSkald, Log, TEXT("BroadcastCurrentPhase: %s"), *PhaseString);
+  if (GEngine) {
+    GEngine->AddOnScreenDebugMessage(
+        -1, 5.f, FColor::Green,
+        FString::Printf(TEXT("Current Phase: %s"), *PhaseString));
+  }
+
   for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr : Controllers) {
     if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
       if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
