@@ -5,6 +5,7 @@
 #include "Components/EditableTextBox.h"
 #include "Engine/Engine.h"
 #include "GameFramework/PlayerController.h"
+#include "Skald_PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "LobbyMenuWidget.h"
 #include "Skald_GameInstance.h"
@@ -204,11 +205,13 @@ void UStartGameWidget::OnLockIn() {
     }
   }
 
-  if (APlayerController *PC = GetOwningPlayer()) {
+  if (ASkaldPlayerController *PC =
+          Cast<ASkaldPlayerController>(GetOwningPlayer())) {
     if (ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>()) {
       PS->DisplayName = Name;
       PS->Faction = Faction;
     }
+    PC->ServerInitPlayerState(Name, Faction);
   }
 
   if (DisplayNameBox) {

@@ -49,11 +49,6 @@ void ASkaldPlayerController::BeginPlay() {
   } else {
     CachedGameInstance->OnFactionsUpdated.AddDynamic(
         this, &ASkaldPlayerController::HandleFactionsUpdated);
-
-    if (IsLocalController()) {
-      ServerInitPlayerState(CachedGameInstance->DisplayName,
-                            CachedGameInstance->Faction);
-    }
   }
 
   // Create and show the HUD widget if a class has been assigned (expected via
