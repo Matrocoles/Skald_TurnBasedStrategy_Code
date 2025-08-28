@@ -69,10 +69,9 @@ protected:
   bool bIsAI;
 
   /** Widget class to instantiate for the player's HUD.
-   *  Expected to be assigned in the Blueprint subclass to avoid
-   *  hard loading during CDO construction. */
+   *  Settable via Blueprint or loaded in the constructor. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
-  TSubclassOf<USkaldMainHUDWidget> MainHudWidgetClass;
+  TSubclassOf<UUserWidget> HUDWidgetClass;
 
   /** Reference to the HUD widget instance. */
   UPROPERTY(BlueprintReadOnly, Category = "UI",
