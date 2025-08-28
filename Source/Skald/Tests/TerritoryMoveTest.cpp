@@ -2,6 +2,7 @@
 #include "Tests/AutomationEditorCommon.h"
 #include "Territory.h"
 #include "Skald_PlayerState.h"
+#include "Components/TextRenderComponent.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldTerritoryMoveValidTest, "Skald.Territory.Move.Valid", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldTerritoryMoveInvalidTest, "Skald.Territory.Move.Invalid", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -33,10 +34,20 @@ bool FSkaldTerritoryMoveValidTest::RunTest(const FString& Parameters)
     A->ArmyStrength = 10;
     B->ArmyStrength = 0;
 
+    float APrevNet = A->NetUpdateTime;
+    float BPrevNet = B->NetUpdateTime;
+
     bool bMoved = A->MoveTo(B, 5);
     TestTrue(TEXT("Move succeeds"), bMoved);
     TestEqual(TEXT("Origin army reduced"), A->ArmyStrength, 5);
     TestEqual(TEXT("Target army increased"), B->ArmyStrength, 5);
+
+    UTextRenderComponent* ALabel = A->FindComponentByClass<UTextRenderComponent>();
+    UTextRenderComponent* BLabel = B->FindComponentByClass<UTextRenderComponent>();
+    TestTrue(TEXT("Source label updated"), ALabel && ALabel->GetText().ToString().Contains("Army: 5"));
+    TestTrue(TEXT("Target label updated"), BLabel && BLabel->GetText().ToString().Contains("Army: 5"));
+    TestTrue(TEXT("Source net update forced"), A->NetUpdateTime < APrevNet);
+    TestTrue(TEXT("Target net update forced"), B->NetUpdateTime < BPrevNet);
 
     return true;
 }
@@ -70,19 +81,37 @@ bool FSkaldTerritoryMoveInvalidTest::RunTest(const FString& Parameters)
     B->AdjacentTerritories = {};
     A->ArmyStrength = 10;
     B->ArmyStrength = 0;
+    UTextRenderComponent* ALabel = A->FindComponentByClass<UTextRenderComponent>();
+    UTextRenderComponent* BLabel = B->FindComponentByClass<UTextRenderComponent>();
+    const FString ALabelBefore = ALabel ? ALabel->GetText().ToString() : FString();
+    const FString BLabelBefore = BLabel ? BLabel->GetText().ToString() : FString();
+    float APrevNet = A->NetUpdateTime;
+    float BPrevNet = B->NetUpdateTime;
     bool bMoved = A->MoveTo(B, 5);
     TestFalse(TEXT("Non-adjacent move fails"), bMoved);
     TestEqual(TEXT("Origin army unchanged"), A->ArmyStrength, 10);
     TestEqual(TEXT("Target army unchanged"), B->ArmyStrength, 0);
+    TestEqual(TEXT("Source label unchanged"), ALabel ? ALabel->GetText().ToString() : FString(), ALabelBefore);
+    TestEqual(TEXT("Target label unchanged"), BLabel ? BLabel->GetText().ToString() : FString(), BLabelBefore);
+    TestEqual(TEXT("Source net update unchanged"), A->NetUpdateTime, APrevNet);
+    TestEqual(TEXT("Target net update unchanged"), B->NetUpdateTime, BPrevNet);
 
     // Adjacent but different owner should fail
     A->AdjacentTerritories = {B};
     B->AdjacentTerritories = {A};
     B->OwningPlayer = Player2;
+    const FString ALabelBefore2 = ALabel ? ALabel->GetText().ToString() : FString();
+    const FString BLabelBefore2 = BLabel ? BLabel->GetText().ToString() : FString();
+    APrevNet = A->NetUpdateTime;
+    BPrevNet = B->NetUpdateTime;
     bMoved = A->MoveTo(B, 5);
     TestFalse(TEXT("Move to enemy territory fails"), bMoved);
     TestEqual(TEXT("Origin army unchanged"), A->ArmyStrength, 10);
     TestEqual(TEXT("Target army unchanged"), B->ArmyStrength, 0);
+    TestEqual(TEXT("Source label unchanged"), ALabel ? ALabel->GetText().ToString() : FString(), ALabelBefore2);
+    TestEqual(TEXT("Target label unchanged"), BLabel ? BLabel->GetText().ToString() : FString(), BLabelBefore2);
+    TestEqual(TEXT("Source net update unchanged"), A->NetUpdateTime, APrevNet);
+    TestEqual(TEXT("Target net update unchanged"), B->NetUpdateTime, BPrevNet);
 
     return true;
 }
