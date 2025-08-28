@@ -36,6 +36,31 @@ void ULoadGameWidget::NativeConstruct()
     }
 }
 
+void ULoadGameWidget::NativeDestruct()
+{
+    if (Slot0Button)
+    {
+        Slot0Button->OnClicked.RemoveDynamic(this, &ULoadGameWidget::OnLoadSlot0);
+    }
+
+    if (Slot1Button)
+    {
+        Slot1Button->OnClicked.RemoveDynamic(this, &ULoadGameWidget::OnLoadSlot1);
+    }
+
+    if (Slot2Button)
+    {
+        Slot2Button->OnClicked.RemoveDynamic(this, &ULoadGameWidget::OnLoadSlot2);
+    }
+
+    if (MainMenuButton)
+    {
+        MainMenuButton->OnClicked.RemoveDynamic(this, &ULoadGameWidget::OnMainMenu);
+    }
+
+    Super::NativeDestruct();
+}
+
 void ULoadGameWidget::OnLoadSlot0()
 {
     HandleLoadSlot(0);
