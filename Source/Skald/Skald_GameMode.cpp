@@ -1,5 +1,6 @@
 #include "Skald_GameMode.h"
 #include "Algo/RandomShuffle.h"
+#include "Camera/CameraComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
@@ -15,7 +16,6 @@
 #include "TimerManager.h"
 #include "UI/SkaldMainHUDWidget.h"
 #include "WorldMap.h"
-#include "Camera/CameraComponent.h"
 
 namespace {
 constexpr int32 ExpectedPlayerCount = 4;
@@ -52,9 +52,6 @@ void ASkaldGameMode::BeginPlay() {
   if (!WorldMap) {
     WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
         GetWorld(), AWorldMap::StaticClass()));
-    if (!WorldMap) {
-      WorldMap = GetWorld()->SpawnActor<AWorldMap>();
-    }
   }
 
   for (FConstPlayerControllerIterator It =
@@ -95,9 +92,11 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
 }
 
 void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
-  if (TurnManager) {
-    TurnManager->RegisterController(PC);
+  if (!PC) {
+    return;
   }
+
+  PendingControllers.AddUnique(PC);
 
   if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
     if (ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>()) {
@@ -166,7 +165,8 @@ void ASkaldGameMode::PopulateAIPlayers() {
     if (Available.Num() > 0) {
       FRandomStream RandStream;
       RandStream.Initialize(FMath::Rand());
-      AIState->Faction = Available[RandStream.RandRange(0, Available.Num() - 1)];
+      AIState->Faction =
+          Available[RandStream.RandRange(0, Available.Num() - 1)];
       GI->TakenFactions.AddUnique(AIState->Faction);
     }
 
@@ -263,17 +263,32 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     }
   }
 
-  const bool bReadyToStart =
-      GS->PlayerArray.Num() >= ExpectedPlayerCount;
-  const bool bHaveControllers =
-      TurnManager && TurnManager->GetControllerCount() > 0;
+  const bool bReadyToStart = GS->PlayerArray.Num() >= ExpectedPlayerCount;
 
   if (!bWorldInitialized && bReadyToStart && InitializeWorld()) {
     bWorldInitialized = true;
+
+    for (ASkaldPlayerController *PC : PendingControllers) {
+      if (TurnManager) {
+        TurnManager->RegisterController(PC);
+      }
+    }
+    PendingControllers.Empty();
+
     BeginArmyPlacementPhase();
   }
 
-  if (bWorldInitialized && bReadyToStart && !bTurnsStarted && bHaveControllers) {
+  if (bWorldInitialized && PendingControllers.Num() > 0) {
+    for (ASkaldPlayerController *PC : PendingControllers) {
+      if (TurnManager) {
+        TurnManager->RegisterController(PC);
+      }
+    }
+    PendingControllers.Empty();
+  }
+
+  if (bWorldInitialized && bReadyToStart && !bTurnsStarted && TurnManager &&
+      TurnManager->GetControllerCount() > 0) {
     bTurnsStarted = true;
     TurnManager->SortControllersByInitiative();
     TurnManager->StartTurns();
@@ -369,7 +384,8 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
       Loc.Y = LoadedGame->SavedViewOffset.Y;
       Pawn->SetActorLocation(Loc);
 
-      if (UCameraComponent *Camera = Pawn->FindComponentByClass<UCameraComponent>()) {
+      if (UCameraComponent *Camera =
+              Pawn->FindComponentByClass<UCameraComponent>()) {
         if (LoadedGame->SavedZoomAmount > 0.f) {
           Camera->SetFieldOfView(LoadedGame->SavedZoomAmount);
         }
@@ -396,10 +412,11 @@ void ASkaldGameMode::BeginArmyPlacementPhase() {
   TurnManager->SortControllersByInitiative();
 
   // Calculate army pools for each player based on owned territories.
-  for (ASkaldPlayerController* PC : TurnManager->GetControllers()) {
-    if (ASkaldPlayerState* PS = PC ? PC->GetPlayerState<ASkaldPlayerState>() : nullptr) {
+  for (ASkaldPlayerController *PC : TurnManager->GetControllers()) {
+    if (ASkaldPlayerState *PS =
+            PC ? PC->GetPlayerState<ASkaldPlayerState>() : nullptr) {
       int32 Owned = 0;
-      for (ATerritory* Territory : WorldMap->Territories) {
+      for (ATerritory *Territory : WorldMap->Territories) {
         if (Territory && Territory->OwningPlayer == PS) {
           ++Owned;
         }
@@ -455,12 +472,14 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
     return;
   }
 
-  const TArray<ASkaldPlayerController*> Controllers = TurnManager->GetControllers();
+  const TArray<ASkaldPlayerController *> Controllers =
+      TurnManager->GetControllers();
   const int32 NumControllers = Controllers.Num();
 
   while (PlacementIndex < NumControllers) {
-    ASkaldPlayerController* PC = Controllers[PlacementIndex];
-    ASkaldPlayerState* PS = PC ? PC->GetPlayerState<ASkaldPlayerState>() : nullptr;
+    ASkaldPlayerController *PC = Controllers[PlacementIndex];
+    ASkaldPlayerState *PS =
+        PC ? PC->GetPlayerState<ASkaldPlayerState>() : nullptr;
     if (!PC || !PS) {
       ++PlacementIndex;
       continue;
@@ -517,8 +536,7 @@ bool ASkaldGameMode::InitializeWorld() {
   }
   if (!WorldMap) {
     UE_LOG(LogSkald, Error,
-           TEXT("InitializeWorld failed: WorldMap missing in %s"),
-           *GetName());
+           TEXT("InitializeWorld failed: WorldMap missing in %s"), *GetName());
     if (GEngine) {
       GEngine->AddOnScreenDebugMessage(
           -1, 5.f, FColor::Red,
@@ -533,17 +551,15 @@ bool ASkaldGameMode::InitializeWorld() {
     UE_LOG(LogSkald, Error, TEXT("InitializeWorld failed: GameState missing"));
     if (GEngine) {
       GEngine->AddOnScreenDebugMessage(
-          -1, 5.f, FColor::Red,
-          TEXT("InitializeWorld: GameState missing"));
+          -1, 5.f, FColor::Red, TEXT("InitializeWorld: GameState missing"));
     }
     return false;
   }
   if (GS->PlayerArray.Num() == 0) {
     UE_LOG(LogSkald, Error, TEXT("InitializeWorld failed: no players"));
     if (GEngine) {
-      GEngine->AddOnScreenDebugMessage(
-          -1, 5.f, FColor::Red,
-          TEXT("InitializeWorld: no players"));
+      GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red,
+                                       TEXT("InitializeWorld: no players"));
     }
     return false;
   }
@@ -802,8 +818,10 @@ void ASkaldGameMode::CheckVictoryConditions() {
       }
     }
 
-    FS_PlayerData *Data = PlayersData.FindByPredicate(
-        [PS](const FS_PlayerData &D) { return D.PlayerID == PS->GetPlayerId(); });
+    FS_PlayerData *Data =
+        PlayersData.FindByPredicate([PS](const FS_PlayerData &D) {
+          return D.PlayerID == PS->GetPlayerId();
+        });
     if (Data) {
       Data->IsEliminated = !bHasTerritory;
     }
@@ -816,7 +834,7 @@ void ASkaldGameMode::CheckVictoryConditions() {
 
   if (RemainingPlayers == 1 && WinningPlayer) {
     OnGameOver.Broadcast(WinningPlayer);
-    if (UWorld* WorldToTravel = GetWorld()) {
+    if (UWorld *WorldToTravel = GetWorld()) {
       WorldToTravel->ServerTravel(TEXT("EndScreen"));
     }
   }
