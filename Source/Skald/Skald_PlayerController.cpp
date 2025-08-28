@@ -135,6 +135,11 @@ void ASkaldPlayerController::ServerInitPlayerState_Implementation(
   if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
     PS->DisplayName = Name;
     PS->Faction = Faction;
+    PS->bHasLockedIn = true;
+
+    if (ASkaldGameMode *GM = GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
+      GM->HandlePlayerLockedIn(PS);
+    }
   }
 }
 

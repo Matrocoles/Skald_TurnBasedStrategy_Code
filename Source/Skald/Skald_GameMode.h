@@ -52,6 +52,9 @@ public:
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "GameMode")
   ATurnManager *GetTurnManager() const { return TurnManager; }
 
+  /** Handle a player confirming their name and faction selection. */
+  void HandlePlayerLockedIn(ASkaldPlayerState *PS);
+
 protected:
   /** Handles turn sequencing for the match. */
   UPROPERTY(BlueprintReadOnly, Category = "GameMode")
