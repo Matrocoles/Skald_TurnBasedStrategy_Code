@@ -14,6 +14,7 @@
 #include "UI/SkaldMainHUDWidget.h"
 #include "ChoosePlayerWidget.h"
 #include "WorldMap.h"
+#include "UObject/ConstructorHelpers.h"
 
 ASkaldPlayerController::ASkaldPlayerController() {
   bIsAI = false;
@@ -24,6 +25,13 @@ ASkaldPlayerController::ASkaldPlayerController() {
   bShowMouseCursor = true;
   bEnableClickEvents = true;
   bEnableMouseOverEvents = true;
+
+  // Load a default HUD widget blueprint if available.
+  static ConstructorHelpers::FClassFinder<UUserWidget> HUDWidgetFinder(
+      TEXT("/Game/C++_BPs/Skald_MainHUDBP"));
+  if (HUDWidgetFinder.Succeeded()) {
+    HUDWidgetClass = HUDWidgetFinder.Class;
+  }
 }
 
 void ASkaldPlayerController::BeginPlay() {
@@ -53,9 +61,9 @@ void ASkaldPlayerController::BeginPlay() {
   }
 
   // Create and show the HUD widget if a class has been assigned (expected via
-  // blueprint).
-  if (MainHudWidgetClass) {
-    MainHudWidget = CreateWidget<USkaldMainHUDWidget>(this, MainHudWidgetClass);
+  // blueprint or constructor).
+  if (HUDWidgetClass) {
+    MainHudWidget = CreateWidget<USkaldMainHUDWidget>(this, HUDWidgetClass);
     if (MainHudWidget) {
       HUDRef = MainHudWidget;
       MainHudWidget->AddToViewport();
@@ -102,7 +110,7 @@ void ASkaldPlayerController::BeginPlay() {
     }
   } else {
     UE_LOG(LogSkald, Warning,
-           TEXT("MainHudWidgetClass is null; HUD will not be displayed."));
+           TEXT("HUDWidgetClass is null; HUD will not be displayed."));
   }
 
   if (!ChoosePlayerWidget) {
