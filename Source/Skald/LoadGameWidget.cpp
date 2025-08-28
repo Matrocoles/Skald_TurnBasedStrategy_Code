@@ -79,10 +79,8 @@ void ULoadGameWidget::HandleLoadSlot(int32 SlotIndex)
         }
 
         // After loading, transition to the main gameplay map
-        if (UWorld* WorldToTravel = GetWorld())
-        {
-            WorldToTravel->ServerTravel(TEXT("Skald_OverTop"));
-        }
+        const FName LevelName(TEXT("/Game/Blueprints/Maps/Skald_OverTop"));
+        UGameplayStatics::OpenLevel(this, LevelName);
     }
     else
     {
