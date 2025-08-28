@@ -1,13 +1,9 @@
 #pragma once
 
 #include "Blueprint/UserWidget.h"
-#include "Components/ComboBoxString.h"
 #include "CoreMinimal.h"
-#include "SkaldTypes.h"
 #include "StartGameWidget.generated.h"
 
-class UEditableTextBox;
-class UComboBoxString;
 class ULobbyMenuWidget;
 class UButton;
 class APlayerController;
@@ -20,21 +16,6 @@ class SKALD_API UStartGameWidget : public UUserWidget {
   GENERATED_BODY()
 
 public:
-  /** Entry box for the player's display name. */
-  UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
-            meta = (BindWidgetOptional))
-  UEditableTextBox *DisplayNameBox;
-
-  /** Combo box to choose a faction. */
-  UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
-            meta = (BindWidgetOptional))
-  UComboBoxString *FactionComboBox;
-
-  /** Button to confirm the player's selections before starting. */
-  UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
-            meta = (BindWidgetOptional))
-  UButton *LockInButton;
-
   /** Button to start singleplayer. */
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
             meta = (BindWidgetOptional))
@@ -69,23 +50,7 @@ protected:
   UFUNCTION()
   void OnMainMenu();
 
-  UFUNCTION()
-  void OnLockIn();
-
-  UFUNCTION()
-  void OnDisplayNameChanged(const FText &Text);
-
-  UFUNCTION()
-  void OnFactionChanged(FString SelectedItem, ESelectInfo::Type SelectionType);
-
   void StartGame(bool bMultiplayer);
-
-  void ValidateSelections();
-
-  void RefreshFactionOptions();
-
-  UFUNCTION()
-  void HandleFactionsUpdated();
 
 private:
   /** Reference back to the owning lobby menu so it can be restored. */
