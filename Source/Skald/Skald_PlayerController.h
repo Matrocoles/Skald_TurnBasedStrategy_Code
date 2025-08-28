@@ -208,5 +208,10 @@ protected:
 
 private:
   void BuildPlayerDataArray(TArray<FS_PlayerData> &OutPlayers) const;
+
+  bool ValidateAttack(int32 FromID, int32 ToID, int32 ArmySent, bool bUseSiege,
+                      FString *OutError);
+
+  UFUNCTION(Client, Reliable)
   void NotifyActionError(const FString &Message);
 };

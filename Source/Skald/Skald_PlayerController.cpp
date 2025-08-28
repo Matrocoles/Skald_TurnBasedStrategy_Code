@@ -389,39 +389,60 @@ void ASkaldPlayerController::MakeAIDecision() {
 
 bool ASkaldPlayerController::IsAIController() const { return bIsAI; }
 
-void ASkaldPlayerController::HandleAttackRequested(int32 FromID, int32 ToID,
-                                                   int32 ArmySent,
-                                                   bool bUseSiege) {
-  UE_LOG(LogSkald, Log, TEXT("HUD attack from %d to %d with %d"), FromID, ToID,
-         ArmySent);
-
+bool ASkaldPlayerController::ValidateAttack(int32 FromID, int32 ToID,
+                                           int32 ArmySent, bool bUseSiege,
+                                           FString *OutError) {
   AWorldMap *WorldMap = Cast<AWorldMap>(
       UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
   if (!WorldMap) {
-    NotifyActionError(TEXT("World map not found"));
-    return;
+    if (OutError) {
+      *OutError = TEXT("World map not found");
+    }
+    return false;
   }
 
   ATerritory *Source = WorldMap->GetTerritoryById(FromID);
   ATerritory *Target = WorldMap->GetTerritoryById(ToID);
   if (!Source || !Target) {
-    NotifyActionError(TEXT("Invalid territory selection"));
-    return;
+    if (OutError) {
+      *OutError = TEXT("Invalid territory selection");
+    }
+    return false;
   }
 
   if (!Source->IsAdjacentTo(Target)) {
-    NotifyActionError(TEXT("Cannot attack non-adjacent territory"));
-    return;
+    if (OutError) {
+      *OutError = TEXT("Cannot attack non-adjacent territory");
+    }
+    return false;
   }
 
   if (ArmySent <= 0 || ArmySent >= Source->ArmyStrength) {
-    NotifyActionError(TEXT("Invalid army count for attack"));
-    return;
+    if (OutError) {
+      *OutError = TEXT("Invalid army count for attack");
+    }
+    return false;
   }
 
   if (!SkaldHelpers::MeetsCapitalAttackRequirement(Target->bIsCapital,
                                                    ArmySent)) {
-    NotifyActionError(TEXT("Insufficient forces to attack capital"));
+    if (OutError) {
+      *OutError = TEXT("Insufficient forces to attack capital");
+    }
+    return false;
+  }
+
+  return true;
+}
+
+void ASkaldPlayerController::HandleAttackRequested(int32 FromID, int32 ToID,
+                                                   int32 ArmySent,
+                                                   bool bUseSiege) {
+  UE_LOG(LogSkald, Log, TEXT("HUD attack from %d to %d with %d"), FromID, ToID,
+         ArmySent);
+  FString Error;
+  if (!ValidateAttack(FromID, ToID, ArmySent, bUseSiege, &Error)) {
+    NotifyActionError(Error);
     return;
   }
 
@@ -432,25 +453,17 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
                                                                int32 ToID,
                                                                int32 ArmySent,
                                                                bool bUseSiege) {
+  FString Error;
+  if (!ValidateAttack(FromID, ToID, ArmySent, bUseSiege, &Error)) {
+    NotifyActionError(Error);
+    return;
+  }
+
   AWorldMap *WorldMap = Cast<AWorldMap>(
       UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
-  if (!WorldMap) {
-    NotifyActionError(TEXT("World map not found"));
-    return;
-  }
-
-  ATerritory *Source = WorldMap->GetTerritoryById(FromID);
-  ATerritory *Target = WorldMap->GetTerritoryById(ToID);
-  if (!Source || !Target || !Source->IsAdjacentTo(Target)) {
-    return;
-  }
-
-  if (ArmySent <= 0 || ArmySent >= Source->ArmyStrength) {
-    return;
-  }
-
-  if (!SkaldHelpers::MeetsCapitalAttackRequirement(Target->bIsCapital,
-                                                   ArmySent)) {
+  ATerritory *Source = WorldMap ? WorldMap->GetTerritoryById(FromID) : nullptr;
+  ATerritory *Target = WorldMap ? WorldMap->GetTerritoryById(ToID) : nullptr;
+  if (!Source || !Target) {
     return;
   }
 
@@ -746,7 +759,8 @@ void ASkaldPlayerController::HandleTerritorySelected(ATerritory *Terr) {
   ServerSelectTerritory(Terr->TerritoryID);
 }
 
-void ASkaldPlayerController::NotifyActionError(const FString &Message) {
+void ASkaldPlayerController::NotifyActionError_Implementation(
+    const FString &Message) {
   UE_LOG(LogSkald, Warning, TEXT("%s"), *Message);
   if (MainHudWidget) {
     MainHudWidget->ShowErrorMessage(Message);
