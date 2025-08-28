@@ -27,6 +27,10 @@ public:
     UFUNCTION(BlueprintCallable, Category="Turn")
     void RegisterController(ASkaldPlayerController* Controller);
 
+    /** Begin the pre-game army placement phase. */
+    UFUNCTION(BlueprintCallable, Category="Turn")
+    void StartArmyPlacementPhase();
+
     UFUNCTION(BlueprintCallable, Category="Turn")
     void StartTurns();
 
