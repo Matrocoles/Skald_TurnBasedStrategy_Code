@@ -41,7 +41,7 @@ void UChoosePlayerWidget::NativeConstruct()
                 FactionComboBox->AddOption(Name);
             }
         }
-
+        FactionComboBox->ClearSelection();
         FactionComboBox->OnSelectionChanged.AddDynamic(this, &UChoosePlayerWidget::HandleFactionSelected);
     }
 
