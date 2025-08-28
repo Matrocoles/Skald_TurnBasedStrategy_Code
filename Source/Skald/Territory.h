@@ -48,7 +48,7 @@ public:
     FString TerritoryName;
 
     /** Whether this territory is a capital. */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory", Replicated)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory", ReplicatedUsing = OnRep_IsCapital)
     bool bIsCapital = false;
 
     /** Mesh asset used to mark this territory as a capital. */
@@ -116,6 +116,9 @@ public:
 
     UFUNCTION()
     void OnRep_ArmyStrength();
+
+    UFUNCTION()
+    void OnRep_IsCapital();
 
 protected:
     /** Visual representation of the territory. */

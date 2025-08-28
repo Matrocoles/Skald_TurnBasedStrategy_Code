@@ -208,9 +208,7 @@ void ATerritory::HandleClicked(UPrimitiveComponent *TouchedComponent,
   }
 }
 
-void ATerritory::RefreshAppearance() { UpdateTerritoryColor(); UpdateLabel(); }
-
-void ATerritory::OnRep_OwningPlayer() {
+void ATerritory::RefreshAppearance() {
   UpdateTerritoryColor();
   UpdateLabel();
 
@@ -219,6 +217,10 @@ void ATerritory::OnRep_OwningPlayer() {
     CapitalMesh->SetHiddenInGame(!bIsCapital);
   }
 }
+
+void ATerritory::OnRep_OwningPlayer() { RefreshAppearance(); }
+
+void ATerritory::OnRep_IsCapital() { RefreshAppearance(); }
 
 void ATerritory::OnRep_ArmyStrength() { UpdateLabel(); }
 
