@@ -57,6 +57,14 @@ void ASkaldGameMode::BeginPlay() {
     }
   }
 
+  for (FConstPlayerControllerIterator It =
+           GetWorld()->GetPlayerControllerIterator();
+       It; ++It) {
+    if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(*It)) {
+      RegisterPlayer(PC);
+    }
+  }
+
   if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
     if (GI->LoadedSaveGame) {
       ApplyLoadedGame(GI->LoadedSaveGame);
@@ -64,6 +72,9 @@ void ASkaldGameMode::BeginPlay() {
       return;
     }
   }
+
+  PopulateAIPlayers();
+  RefreshHUDs();
 
   TryInitializeWorldAndStart();
 }
@@ -90,7 +101,9 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
 
   if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
     if (ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>()) {
-      GS->AddPlayerState(PS);
+      if (!GS->PlayerArray.Contains(PS)) {
+        GS->AddPlayerState(PS);
+      }
 
       if (PlayersData.Num() < GS->PlayerArray.Num()) {
         PlayersData.SetNum(GS->PlayerArray.Num());

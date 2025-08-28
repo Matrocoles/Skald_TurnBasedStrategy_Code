@@ -43,7 +43,7 @@ void ATurnManager::BeginPlay() {
 }
 
 void ATurnManager::RegisterController(ASkaldPlayerController *Controller) {
-  if (IsValid(Controller)) {
+  if (IsValid(Controller) && !Controllers.Contains(Controller)) {
     Controllers.Add(Controller);
     Controller->SetTurnManager(this);
   }
