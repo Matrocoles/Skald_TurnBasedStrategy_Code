@@ -127,9 +127,10 @@ void ASkaldPlayerController::BeginPlay() {
     }
   }
 
-  if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
-          GetWorld(), AWorldMap::StaticClass()))) {
-    WorldMap->OnTerritorySelected.AddDynamic(
+  CachedWorldMap = Cast<AWorldMap>(
+      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
+  if (CachedWorldMap) {
+    CachedWorldMap->OnTerritorySelected.AddDynamic(
         this, &ASkaldPlayerController::HandleTerritorySelected);
   }
 
@@ -266,9 +267,8 @@ void ASkaldPlayerController::MakeAIDecision() {
     return;
   }
 
-  // Cache the world map for subsequent phases.
-  AWorldMap *WorldMap = Cast<AWorldMap>(
-      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
+  // Use the cached world map for subsequent phases.
+  AWorldMap *WorldMap = CachedWorldMap;
   if (!WorldMap) {
     EndTurn();
     return;
@@ -395,8 +395,7 @@ void ASkaldPlayerController::HandleAttackRequested(int32 FromID, int32 ToID,
   UE_LOG(LogSkald, Log, TEXT("HUD attack from %d to %d with %d"), FromID, ToID,
          ArmySent);
 
-  AWorldMap *WorldMap = Cast<AWorldMap>(
-      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
+  AWorldMap *WorldMap = CachedWorldMap;
   if (!WorldMap) {
     NotifyActionError(TEXT("World map not found"));
     return;
@@ -432,8 +431,7 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
                                                                int32 ToID,
                                                                int32 ArmySent,
                                                                bool bUseSiege) {
-  AWorldMap *WorldMap = Cast<AWorldMap>(
-      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
+  AWorldMap *WorldMap = CachedWorldMap;
   if (!WorldMap) {
     NotifyActionError(TEXT("World map not found"));
     return;
@@ -534,8 +532,7 @@ void ASkaldPlayerController::HandleMoveRequested(int32 FromID, int32 ToID,
   UE_LOG(LogSkald, Log, TEXT("HUD move from %d to %d with %d"), FromID, ToID,
          Troops);
 
-  AWorldMap *WorldMap = Cast<AWorldMap>(
-      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
+  AWorldMap *WorldMap = CachedWorldMap;
   if (!WorldMap) {
     NotifyActionError(TEXT("World map not found"));
     return;
@@ -565,8 +562,7 @@ void ASkaldPlayerController::HandleMoveRequested(int32 FromID, int32 ToID,
 void ASkaldPlayerController::ServerHandleMove_Implementation(int32 FromID,
                                                              int32 ToID,
                                                              int32 Troops) {
-  AWorldMap *WorldMap = Cast<AWorldMap>(
-      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
+  AWorldMap *WorldMap = CachedWorldMap;
   if (!WorldMap) {
     return;
   }
@@ -612,8 +608,7 @@ void ASkaldPlayerController::ServerBuildSiege_Implementation(
 
 void ASkaldPlayerController::ServerSelectTerritory_Implementation(
     int32 TerritoryID) {
-  AWorldMap *WorldMap = Cast<AWorldMap>(
-      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
+  AWorldMap *WorldMap = CachedWorldMap;
   if (!WorldMap) {
     return;
   }
@@ -671,8 +666,7 @@ void ASkaldPlayerController::HandleDigTreasureRequested(int32 TerritoryID) {
 
 void ASkaldPlayerController::ServerDigTreasure_Implementation(
     int32 TerritoryID) {
-  AWorldMap *WorldMap = Cast<AWorldMap>(
-      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
+  AWorldMap *WorldMap = CachedWorldMap;
   if (!WorldMap) {
     return;
   }
@@ -809,9 +803,8 @@ void ASkaldPlayerController::HandleWorldStateChanged() {
   }
 
   // Update territory info for the currently selected territory if available.
-  if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
-          GetWorld(), AWorldMap::StaticClass()))) {
-    if (ATerritory *Terr = WorldMap->SelectedTerritory) {
+  if (CachedWorldMap) {
+    if (ATerritory *Terr = CachedWorldMap->SelectedTerritory) {
       FString OwnerName =
           Terr->OwningPlayer ? Terr->OwningPlayer->PlayerDisplayName
                              : TEXT("Neutral");
