@@ -8,6 +8,7 @@
 class ATurnManager;
 class UUserWidget;
 class USkaldMainHUDWidget;
+class UChoosePlayerWidget;
 class ATerritory;
 class ASkaldGameMode;
 class ASkaldGameState;
@@ -83,6 +84,11 @@ protected:
             meta = (AllowPrivateAccess = "true"))
   TObjectPtr<USkaldMainHUDWidget> MainHudWidget;
 
+  /** Player selection widget instance. */
+  UPROPERTY(BlueprintReadOnly, Category = "UI",
+            meta = (AllowPrivateAccess = "true"))
+  TObjectPtr<UChoosePlayerWidget> ChoosePlayerWidget;
+
   /** Cached references to core game singletons for blueprint access */
   UPROPERTY(BlueprintReadOnly, Category = "Game",
             meta = (AllowPrivateAccess = "true"))
@@ -145,6 +151,10 @@ public:
   /** React to world state changes broadcast by the turn manager. */
   UFUNCTION()
   void HandleWorldStateChanged();
+
+  /** React to the player finishing their pre-game selection. */
+  UFUNCTION()
+  void HandlePlayerLockedIn();
 
   /** Server-side processing of an attack request. */
   UFUNCTION(Server, Reliable)
