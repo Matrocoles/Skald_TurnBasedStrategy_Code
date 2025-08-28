@@ -184,6 +184,24 @@ void ASkaldGameMode::PopulateAIPlayers() {
   }
 }
 
+void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
+  if (!PS) {
+    return;
+  }
+
+  FS_PlayerData *PlayerData =
+      PlayersData.FindByPredicate([PS](const FS_PlayerData &Data) {
+        return Data.PlayerID == PS->GetPlayerId();
+      });
+  if (PlayerData) {
+    PlayerData->PlayerName = PS->DisplayName;
+    PlayerData->Faction = PS->Faction;
+  }
+
+  RefreshHUDs();
+  TryInitializeWorldAndStart();
+}
+
 void ASkaldGameMode::RefreshHUDs() {
   ASkaldGameState *GS = GetGameState<ASkaldGameState>();
   if (!GS) {
