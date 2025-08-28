@@ -39,9 +39,16 @@ public:
     UPROPERTY(BlueprintReadWrite, Replicated, Category="PlayerState")
     ESkaldFaction Faction;
 
+    /** Whether the player has locked in their actions for the current turn. */
+    UPROPERTY(BlueprintReadWrite, ReplicatedUsing = OnRep_HasLockedIn, Category="PlayerState")
+    bool bHasLockedIn;
+
     /** Whether this player has been eliminated from the match. */
     UPROPERTY(BlueprintReadWrite, ReplicatedUsing = OnRep_IsEliminated, Category="PlayerState")
     bool IsEliminated;
+
+    UFUNCTION()
+    void OnRep_HasLockedIn();
 
     UFUNCTION()
     void OnRep_IsEliminated();
