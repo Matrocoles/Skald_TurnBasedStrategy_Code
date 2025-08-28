@@ -102,12 +102,15 @@ void ASkaldGameMode::InitializeWorld() {
     return;
   }
 
-  // Spawn 43 territories with unique identifiers
-  for (int32 Id = 0; Id < 43; ++Id) {
-    ATerritory *Territory = GetWorld()->SpawnActor<ATerritory>();
-    if (Territory) {
-      Territory->TerritoryID = Id;
-      WorldMap->RegisterTerritory(Territory);
+  // If the world map failed to spawn its default territories, create them
+  // here as a fallback. Normally AWorldMap::BeginPlay() handles this.
+  if (WorldMap->Territories.Num() == 0) {
+    for (int32 Id = 0; Id < 43; ++Id) {
+      ATerritory *Territory = GetWorld()->SpawnActor<ATerritory>();
+      if (Territory) {
+        Territory->TerritoryID = Id;
+        WorldMap->RegisterTerritory(Territory);
+      }
     }
   }
 
