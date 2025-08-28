@@ -19,6 +19,7 @@ public:
   virtual void NativeConstruct() override;
 
   /** Configure selector for maximum army size available. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Attack")
   void Setup(int32 MaxUnits);
 
   /** Spin box allowing the player to choose army size. */
@@ -36,6 +37,6 @@ public:
   int32 ArmyCount = 1;
 
 private:
-  UFUNCTION()
+  UFUNCTION(BlueprintCallable, Category = "Skald|Attack")
   void HandleValueChanged(float NewValue);
 };
