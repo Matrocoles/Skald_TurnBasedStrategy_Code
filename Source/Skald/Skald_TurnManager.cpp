@@ -84,7 +84,7 @@ void ATurnManager::StartTurns() {
   ASkaldPlayerState *PS = CurrentController
                               ? CurrentController->GetPlayerState<ASkaldPlayerState>()
                               : nullptr;
-  const FString PlayerName = PS ? PS->DisplayName : TEXT("Unknown");
+  const FString PlayerName = PS ? PS->PlayerDisplayName : TEXT("Unknown");
 
   // Determine reinforcements and resources based on owned territories.
   if (PS) {
@@ -190,7 +190,7 @@ void ATurnManager::AdvanceTurn() {
   if (ASkaldPlayerController *CurrentController = Controllers[CurrentIndex].Get()) {
     ASkaldPlayerState *PS =
         CurrentController->GetPlayerState<ASkaldPlayerState>();
-    const FString PlayerName = PS ? PS->DisplayName : TEXT("Unknown");
+    const FString PlayerName = PS ? PS->PlayerDisplayName : TEXT("Unknown");
 
     // Calculate reinforcements and resources for the new active player.
     if (PS) {

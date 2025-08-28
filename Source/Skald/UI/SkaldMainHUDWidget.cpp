@@ -412,7 +412,7 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
              Territory->bIsCapital) {
     OnEngineeringRequested.Broadcast(Territory->TerritoryID, 0);
   } else if (CurrentPhase == ETurnPhase::Treasure && bOwnedByLocal &&
-             Territory->HasTreasure) {
+             Territory->bHasTreasure) {
     OnDigTreasureRequested.Broadcast(Territory->TerritoryID);
   }
 }
@@ -436,7 +436,7 @@ void USkaldMainHUDWidget::HandlePlayersUpdated() {
     if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
       FS_PlayerData Data;
       Data.PlayerID = PS->GetPlayerId();
-      Data.PlayerName = PS->DisplayName;
+      Data.PlayerName = PS->PlayerDisplayName;
       Data.IsAI = PS->bIsAI;
       Data.Faction = PS->Faction;
       Players.Add(Data);

@@ -75,7 +75,7 @@ void ASkaldPlayerController::BeginPlay() {
           if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
             FS_PlayerData Data;
             Data.PlayerID = PS->GetPlayerId();
-            Data.PlayerName = PS->DisplayName;
+            Data.PlayerName = PS->PlayerDisplayName;
             Data.IsAI = PS->bIsAI;
             Data.Faction = PS->Faction;
             Players.Add(Data);
@@ -141,7 +141,7 @@ void ASkaldPlayerController::BeginPlay() {
 void ASkaldPlayerController::ServerInitPlayerState_Implementation(
     const FString &Name, ESkaldFaction Faction) {
   if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
-    PS->DisplayName = Name;
+    PS->PlayerDisplayName = Name;
     PS->Faction = Faction;
     PS->bHasLockedIn = true;
 
@@ -520,7 +520,7 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
     for (ASkaldPlayerController* Controller : TurnManager->GetControllers()) {
       if (USkaldMainHUDWidget* HUD = Controller ? Controller->GetHUDWidget() : nullptr) {
         FString OwnerName = Target->OwningPlayer
-                                ? Target->OwningPlayer->DisplayName
+                                ? Target->OwningPlayer->PlayerDisplayName
                                 : TEXT("Neutral");
         HUD->UpdateTerritoryInfo(Target->TerritoryName, OwnerName,
                                  Target->ArmyStrength);
@@ -589,12 +589,12 @@ void ASkaldPlayerController::ServerHandleMove_Implementation(int32 FromID,
     for (ASkaldPlayerController* Controller : TurnManager->GetControllers()) {
       if (USkaldMainHUDWidget* HUD = Controller ? Controller->GetHUDWidget() : nullptr) {
         FString SourceOwner = Source->OwningPlayer
-                                  ? Source->OwningPlayer->DisplayName
+                                  ? Source->OwningPlayer->PlayerDisplayName
                                   : TEXT("Neutral");
         HUD->UpdateTerritoryInfo(Source->TerritoryName, SourceOwner,
                                  Source->ArmyStrength);
         FString TargetOwner = Target->OwningPlayer
-                                  ? Target->OwningPlayer->DisplayName
+                                  ? Target->OwningPlayer->PlayerDisplayName
                                   : TEXT("Neutral");
         HUD->UpdateTerritoryInfo(Target->TerritoryName, TargetOwner,
                                  Target->ArmyStrength);
@@ -624,7 +624,7 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
   }
 
   FString OwnerName =
-      Terr->OwningPlayer ? Terr->OwningPlayer->DisplayName : TEXT("Neutral");
+      Terr->OwningPlayer ? Terr->OwningPlayer->PlayerDisplayName : TEXT("Neutral");
 
   Terr->ForceNetUpdate();
 
@@ -683,8 +683,8 @@ void ASkaldPlayerController::ServerDigTreasure_Implementation(
   }
 
   if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
-    if (Terr->OwningPlayer == PS && Terr->HasTreasure) {
-      Terr->HasTreasure = false;
+    if (Terr->OwningPlayer == PS && Terr->bHasTreasure) {
+      Terr->bHasTreasure = false;
       Terr->RefreshAppearance();
       PS->Resources += 5;
       PS->ForceNetUpdate();
@@ -766,7 +766,7 @@ void ASkaldPlayerController::BuildPlayerDataArray(
     if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
       FS_PlayerData Data;
       Data.PlayerID = PS->GetPlayerId();
-      Data.PlayerName = PS->DisplayName;
+      Data.PlayerName = PS->PlayerDisplayName;
       Data.IsAI = PS->bIsAI;
       Data.Faction = PS->Faction;
       Data.Resources = PS->Resources;
@@ -812,8 +812,9 @@ void ASkaldPlayerController::HandleWorldStateChanged() {
   if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
           GetWorld(), AWorldMap::StaticClass()))) {
     if (ATerritory *Terr = WorldMap->SelectedTerritory) {
-      FString OwnerName = Terr->OwningPlayer ? Terr->OwningPlayer->DisplayName
-                                             : TEXT("Neutral");
+      FString OwnerName =
+          Terr->OwningPlayer ? Terr->OwningPlayer->PlayerDisplayName
+                             : TEXT("Neutral");
       MainHudWidget->UpdateTerritoryInfo(Terr->TerritoryName, OwnerName,
                                          Terr->ArmyStrength);
     }

@@ -38,7 +38,7 @@ ASkaldGameMode::ASkaldGameMode() {
 
   // Preallocate slots so blueprint scripts can safely write
   // player data to indices without hitting "invalid index" warnings.
-  PlayersData.SetNum(ExpectedPlayerCount);
+  PlayerDataArray.SetNum(ExpectedPlayerCount);
   NextSiegeID = 1;
 }
 
@@ -104,22 +104,22 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
         GS->AddPlayerState(PS);
       }
 
-      if (PlayersData.Num() < GS->PlayerArray.Num()) {
-        PlayersData.SetNum(GS->PlayerArray.Num());
+      if (PlayerDataArray.Num() < GS->PlayerArray.Num()) {
+        PlayerDataArray.SetNum(GS->PlayerArray.Num());
       }
 
       if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
-        PS->DisplayName = GI->DisplayName;
+        PS->PlayerDisplayName = GI->DisplayName;
         PS->Faction = GI->Faction;
       }
 
       const int32 Index = GS->PlayerArray.IndexOfByKey(PS);
-      if (PlayersData.IsValidIndex(Index)) {
-        PlayersData[Index].PlayerID = PS->GetPlayerId();
-        PlayersData[Index].PlayerName = PS->DisplayName;
-        PlayersData[Index].IsAI = PS->bIsAI;
-        PlayersData[Index].Faction = PS->Faction;
-        PlayersData[Index].Resources = PS->Resources;
+      if (PlayerDataArray.IsValidIndex(Index)) {
+        PlayerDataArray[Index].PlayerID = PS->GetPlayerId();
+        PlayerDataArray[Index].PlayerName = PS->PlayerDisplayName;
+        PlayerDataArray[Index].IsAI = PS->bIsAI;
+        PlayerDataArray[Index].Faction = PS->Faction;
+        PlayerDataArray[Index].Resources = PS->Resources;
       }
     }
   }
@@ -139,7 +139,7 @@ void ASkaldGameMode::PopulateAIPlayers() {
       break;
     }
     AIState->bIsAI = true;
-    AIState->DisplayName =
+    AIState->PlayerDisplayName =
         FString::Printf(TEXT("AI_%d"), GS->PlayerArray.Num());
 
     TArray<ESkaldFaction> Taken;
@@ -175,15 +175,15 @@ void ASkaldGameMode::PopulateAIPlayers() {
 
     GS->AddPlayerState(AIState);
 
-    if (PlayersData.Num() < GS->PlayerArray.Num()) {
-      PlayersData.SetNum(GS->PlayerArray.Num());
+    if (PlayerDataArray.Num() < GS->PlayerArray.Num()) {
+      PlayerDataArray.SetNum(GS->PlayerArray.Num());
     }
     const int32 Index = GS->PlayerArray.Num() - 1;
-    PlayersData[Index].PlayerID = AIState->GetPlayerId();
-    PlayersData[Index].PlayerName = AIState->DisplayName;
-    PlayersData[Index].IsAI = true;
-    PlayersData[Index].Faction = AIState->Faction;
-    PlayersData[Index].Resources = AIState->Resources;
+    PlayerDataArray[Index].PlayerID = AIState->GetPlayerId();
+    PlayerDataArray[Index].PlayerName = AIState->PlayerDisplayName;
+    PlayerDataArray[Index].IsAI = true;
+    PlayerDataArray[Index].Faction = AIState->Faction;
+    PlayerDataArray[Index].Resources = AIState->Resources;
 
     // Refresh player data and attempt to initialize the world as soon as all
     // AI players are created.
@@ -197,11 +197,11 @@ void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
   }
 
   FS_PlayerData *PlayerData =
-      PlayersData.FindByPredicate([PS](const FS_PlayerData &Data) {
+      PlayerDataArray.FindByPredicate([PS](const FS_PlayerData &Data) {
         return Data.PlayerID == PS->GetPlayerId();
       });
   if (PlayerData) {
-    PlayerData->PlayerName = PS->DisplayName;
+    PlayerData->PlayerName = PS->PlayerDisplayName;
     PlayerData->Faction = PS->Faction;
   }
 
@@ -220,7 +220,7 @@ void ASkaldGameMode::RefreshHUDs() {
     if (ASkaldPlayerState *SPS = Cast<ASkaldPlayerState>(PSBase)) {
       FS_PlayerData Data;
       Data.PlayerID = SPS->GetPlayerId();
-      Data.PlayerName = SPS->DisplayName;
+      Data.PlayerName = SPS->PlayerDisplayName;
       Data.IsAI = SPS->bIsAI;
       Data.Faction = SPS->Faction;
       Data.Resources = SPS->Resources;
@@ -245,7 +245,7 @@ void ASkaldGameMode::UpdatePlayerResources(ASkaldPlayerState *Player) {
   }
 
   FS_PlayerData *PlayerData =
-      PlayersData.FindByPredicate([Player](const FS_PlayerData &Data) {
+      PlayerDataArray.FindByPredicate([Player](const FS_PlayerData &Data) {
         return Data.PlayerID == Player->GetPlayerId();
       });
   if (PlayerData) {
@@ -323,14 +323,14 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
     GS->CurrentTurnIndex = LoadedGame->CurrentPlayerIndex;
   }
 
-  PlayersData.Empty();
+  PlayerDataArray.Empty();
   for (const FPlayerSaveStruct &PlayerSave : LoadedGame->Players) {
     ASkaldPlayerState *PS = GetWorld()->SpawnActor<ASkaldPlayerState>();
     if (!PS) {
       continue;
     }
     PS->SetPlayerId(PlayerSave.PlayerID);
-    PS->DisplayName = PlayerSave.PlayerName;
+    PS->PlayerDisplayName = PlayerSave.PlayerName;
     PS->bIsAI = PlayerSave.IsAI;
     PS->Faction = PlayerSave.Faction;
     PS->Resources = PlayerSave.Resources;
@@ -346,7 +346,7 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
     Data.Resources = PlayerSave.Resources;
     Data.CapitalTerritoryIDs = PlayerSave.CapitalTerritoryIDs;
     Data.IsEliminated = PlayerSave.IsEliminated;
-    PlayersData.Add(Data);
+    PlayerDataArray.Add(Data);
 
     if (TurnManager) {
       TurnManager->BroadcastResources(PS);
@@ -532,7 +532,7 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
     TurnManager->BroadcastArmyPool(PS);
 
     // Announce whose placement turn it is.
-    const FString PlayerName = PS->DisplayName;
+    const FString PlayerName = PS->PlayerDisplayName;
     for (ASkaldPlayerController *Controller : Controllers) {
       const bool bIsActive = Controller == PC;
       Controller->ShowTurnAnnouncement(PlayerName, bIsActive);
@@ -685,7 +685,7 @@ bool ASkaldGameMode::InitializeWorld() {
     if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
       PS->Resources = StartingResources;
       FS_PlayerData *PlayerData =
-          PlayersData.FindByPredicate([PS](const FS_PlayerData &Data) {
+          PlayerDataArray.FindByPredicate([PS](const FS_PlayerData &Data) {
             return Data.PlayerID == PS->GetPlayerId();
           });
       if (PlayerData) {
@@ -728,9 +728,9 @@ bool ASkaldGameMode::InitializeWorld() {
     Algo::RandomShuffle(OwnedTerritories);
 
     FS_PlayerData *PlayerData =
-        PlayersData.FindByPredicate([PS](const FS_PlayerData &Data) {
-          return Data.PlayerID == PS->GetPlayerId();
-        });
+        PlayerDataArray.FindByPredicate([PS](const FS_PlayerData &Data) {
+            return Data.PlayerID == PS->GetPlayerId();
+          });
     if (PlayerData) {
       PlayerData->CapitalTerritoryIDs.Reset();
     }
@@ -767,7 +767,7 @@ bool ASkaldGameMode::InitializeWorld() {
   if (HighestPS) {
     const FString Message =
         FString::Printf(TEXT("%s wins initiative with a roll of %d"),
-                        *HighestPS->DisplayName, HighestRoll);
+                        *HighestPS->PlayerDisplayName, HighestRoll);
     for (FConstPlayerControllerIterator It =
              GetWorld()->GetPlayerControllerIterator();
          It; ++It) {
@@ -817,7 +817,7 @@ void ASkaldGameMode::FillSaveGame(USkaldSaveGame *SaveGameObject) const {
 
   // Copy player data.
   SaveGameObject->Players.Empty();
-  for (const FS_PlayerData &Data : PlayersData) {
+  for (const FS_PlayerData &Data : PlayerDataArray) {
     FPlayerSaveStruct PlayerSave;
     PlayerSave.PlayerID = Data.PlayerID;
     PlayerSave.PlayerName = Data.PlayerName;
@@ -889,9 +889,9 @@ void ASkaldGameMode::CheckVictoryConditions() {
     }
 
     FS_PlayerData *Data =
-        PlayersData.FindByPredicate([PS](const FS_PlayerData &D) {
-          return D.PlayerID == PS->GetPlayerId();
-        });
+        PlayerDataArray.FindByPredicate([PS](const FS_PlayerData &D) {
+            return D.PlayerID == PS->GetPlayerId();
+          });
     if (Data) {
       Data->IsEliminated = !bHasTerritory;
     }

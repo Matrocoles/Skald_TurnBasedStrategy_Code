@@ -72,7 +72,7 @@ public:
     int32 BuiltSiegeID = 0;
     /** Whether this territory contains treasure. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory", Replicated)
-    bool HasTreasure = false;
+    bool bHasTreasure = false;
 
 
     /** Called when the territory is selected. */

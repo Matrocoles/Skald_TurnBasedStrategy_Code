@@ -132,7 +132,7 @@ void ATerritory::GetLifetimeReplicatedProps(
   DOREPLIFETIME(ATerritory, AdjacentTerritories);
   DOREPLIFETIME(ATerritory, ArmyStrength);
   DOREPLIFETIME(ATerritory, BuiltSiegeID);
-  DOREPLIFETIME(ATerritory, HasTreasure);
+  DOREPLIFETIME(ATerritory, bHasTreasure);
 }
 
 void ATerritory::Select() {
@@ -240,7 +240,8 @@ void ATerritory::UpdateLabel() {
     return;
   }
 
-  const FString OwnerName = OwningPlayer ? OwningPlayer->DisplayName : TEXT("Neutral");
+  const FString OwnerName =
+      OwningPlayer ? OwningPlayer->PlayerDisplayName : TEXT("Neutral");
   const FString Text = FString::Printf(TEXT("%s\nOwner: %s\nArmy: %d"),
                                       *TerritoryName, *OwnerName,
                                       ArmyStrength);
