@@ -247,27 +247,40 @@ void ASkaldGameMode::UpdatePlayerResources(ASkaldPlayerState *Player) {
 }
 
 void ASkaldGameMode::TryInitializeWorldAndStart() {
-  const bool bWasInitialized = bWorldInitialized;
+  ASkaldGameState *GS = GetGameState<ASkaldGameState>();
+  if (!GS) {
+    return;
+  }
 
-  if (!bWorldInitialized && InitializeWorld()) {
+  // Ensure all expected players have locked in before starting the game.
+  for (APlayerState *PSBase : GS->PlayerArray) {
+    if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
+      if (!PS->bHasLockedIn) {
+        return;
+      }
+    } else {
+      return;
+    }
+  }
+
+  const bool bReadyToStart =
+      GS->PlayerArray.Num() >= ExpectedPlayerCount;
+  const bool bHaveControllers =
+      TurnManager && TurnManager->GetControllerCount() > 0;
+
+  if (!bWorldInitialized && bReadyToStart && InitializeWorld()) {
     bWorldInitialized = true;
     BeginArmyPlacementPhase();
   }
 
-  if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
-    const bool bReadyToStart =
-        GS->PlayerArray.Num() >= ExpectedPlayerCount;
-    const bool bHaveControllers =
-        TurnManager && TurnManager->GetControllerCount() > 0;
-    if (bWorldInitialized && bReadyToStart && !bTurnsStarted && bHaveControllers) {
-      bTurnsStarted = true;
-      TurnManager->SortControllersByInitiative();
-      TurnManager->StartTurns();
+  if (bWorldInitialized && bReadyToStart && !bTurnsStarted && bHaveControllers) {
+    bTurnsStarted = true;
+    TurnManager->SortControllersByInitiative();
+    TurnManager->StartTurns();
 
-      if (GEngine) {
-        GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Green,
-                                         TEXT("Game started"));
-      }
+    if (GEngine) {
+      GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Green,
+                                       TEXT("Game started"));
     }
   }
 }
