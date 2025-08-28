@@ -12,6 +12,7 @@
 #include "Skald_TurnManager.h"
 #include "Territory.h"
 #include "UI/SkaldMainHUDWidget.h"
+#include "ChoosePlayerWidget.h"
 #include "WorldMap.h"
 
 ASkaldPlayerController::ASkaldPlayerController() {
@@ -58,6 +59,7 @@ void ASkaldPlayerController::BeginPlay() {
     if (MainHudWidget) {
       HUDRef = MainHudWidget;
       MainHudWidget->AddToViewport();
+      MainHudWidget->SetVisibility(ESlateVisibility::Hidden);
 
       if (CachedGameState) {
         TArray<FS_PlayerData> Players;
@@ -101,6 +103,20 @@ void ASkaldPlayerController::BeginPlay() {
   } else {
     UE_LOG(LogSkald, Warning,
            TEXT("MainHudWidgetClass is null; HUD will not be displayed."));
+  }
+
+  if (!ChoosePlayerWidget) {
+    if (UClass *ChooseWidgetClass = LoadClass<UChoosePlayerWidget>(
+            nullptr,
+            TEXT("/Game/Blueprints/UI/Skald_ChoosePlayerWidget.Skald_ChoosePlayerWidget_C"))) {
+      ChoosePlayerWidget =
+          CreateWidget<UChoosePlayerWidget>(this, ChooseWidgetClass);
+      if (ChoosePlayerWidget) {
+        ChoosePlayerWidget->OnPlayerLockedIn.AddDynamic(
+            this, &ASkaldPlayerController::HandlePlayerLockedIn);
+        ChoosePlayerWidget->AddToViewport();
+      }
+    }
   }
 
   if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
@@ -786,5 +802,16 @@ void ASkaldPlayerController::HandleWorldStateChanged() {
   }
   if (TurnManager) {
     MainHudWidget->UpdatePhaseBanner(TurnManager->GetCurrentPhase());
+  }
+}
+
+void ASkaldPlayerController::HandlePlayerLockedIn() {
+  if (ChoosePlayerWidget) {
+    ChoosePlayerWidget->OnPlayerLockedIn.RemoveDynamic(
+        this, &ASkaldPlayerController::HandlePlayerLockedIn);
+    ChoosePlayerWidget->RemoveFromParent();
+  }
+  if (MainHudWidget) {
+    MainHudWidget->SetVisibility(ESlateVisibility::Visible);
   }
 }
