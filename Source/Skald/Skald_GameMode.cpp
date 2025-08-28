@@ -170,6 +170,9 @@ void ASkaldGameMode::PopulateAIPlayers() {
       GI->TakenFactions.AddUnique(AIState->Faction);
     }
 
+    // Mark AI players as locked in so the game can start without further input.
+    AIState->bHasLockedIn = true;
+
     GS->AddPlayerState(AIState);
 
     if (PlayersData.Num() < GS->PlayerArray.Num()) {
@@ -181,6 +184,10 @@ void ASkaldGameMode::PopulateAIPlayers() {
     PlayersData[Index].IsAI = true;
     PlayersData[Index].Faction = AIState->Faction;
     PlayersData[Index].Resources = AIState->Resources;
+
+    // Refresh player data and attempt to initialize the world as soon as all
+    // AI players are created.
+    HandlePlayerLockedIn(AIState);
   }
 }
 
@@ -518,8 +525,8 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
     if (GEngine) {
       GEngine->AddOnScreenDebugMessage(
           -1, 5.f, FColor::Green,
-          FString::Printf(TEXT("Army Placement: %s - %s"),
-                          *GetNameSafe(PC), *PhaseString));
+          FString::Printf(TEXT("Army Placement: %s - %s"), *GetNameSafe(PC),
+                          *PhaseString));
     }
 
     TurnManager->BroadcastArmyPool(PS);
