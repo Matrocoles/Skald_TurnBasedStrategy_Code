@@ -606,8 +606,29 @@ bool ASkaldGameMode::InitializeWorld() {
     return false;
   }
 
-  // If the world map has not spawned territories yet, create basic ones.
-  if (WorldMap->Territories.Num() == 0) {
+  // If the world map has not spawned territories yet or only contains a
+  // placeholder, create basic ones.
+  if (WorldMap->Territories.Num() == 0 ||
+      (WorldMap->Territories.Num() > 0 && WorldMap->Territories[0] &&
+       WorldMap->Territories[0]->TerritoryID == -1)) {
+    ATerritory *Placeholder = nullptr;
+    if (WorldMap->Territories.Num() > 0) {
+      Placeholder = WorldMap->Territories[0];
+      WorldMap->Territories.Empty();
+    } else {
+      TArray<AActor *> Found;
+      UGameplayStatics::GetAllActorsOfClass(GetWorld(), ATerritory::StaticClass(), Found);
+      for (AActor *Actor : Found) {
+        ATerritory *Terr = Cast<ATerritory>(Actor);
+        if (Terr && Terr->TerritoryID == -1) {
+          Placeholder = Terr;
+          break;
+        }
+      }
+    }
+    if (Placeholder) {
+      Placeholder->Destroy();
+    }
     for (int32 Id = 0; Id < 43; ++Id) {
       ATerritory *Territory = GetWorld()->SpawnActor<ATerritory>();
       if (Territory) {

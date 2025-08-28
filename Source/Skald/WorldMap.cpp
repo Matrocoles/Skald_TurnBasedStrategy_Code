@@ -48,7 +48,6 @@ void AWorldMap::BeginPlay() {
     if (Placeholder) {
       Placeholder->TerritoryID = -1;
       Placeholder->TerritoryName = TEXT("Placeholder Territory");
-      RegisterTerritory(Placeholder);
     }
 
     return;
