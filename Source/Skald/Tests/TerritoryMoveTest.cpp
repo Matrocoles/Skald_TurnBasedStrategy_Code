@@ -2,6 +2,7 @@
 #include "Tests/AutomationEditorCommon.h"
 #include "Territory.h"
 #include "Skald_PlayerState.h"
+#include "Engine\World.h"
 #include "Components/TextRenderComponent.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldTerritoryMoveValidTest, "Skald.Territory.Move.Valid", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

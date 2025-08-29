@@ -5,6 +5,7 @@
 #include "Skald_PlayerState.h"
 #include "Territory.h"
 #include "WorldMap.h"
+#include "Engine\World.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldReinforcementResourceTest, "Skald.TurnManager.ResourceAccumulation", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FSkaldReinforcementResourceTest::RunTest(const FString& Parameters) {

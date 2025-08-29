@@ -6,6 +6,7 @@
 #include "Skald_PlayerState.h"
 #include "Territory.h"
 #include "WorldMap.h"
+#include "Engine\World.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldBattleResolutionSyncTest, "Skald.Multiplayer.BattleResolutionSync", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FSkaldBattleResolutionSyncTest::RunTest(const FString& Parameters) {

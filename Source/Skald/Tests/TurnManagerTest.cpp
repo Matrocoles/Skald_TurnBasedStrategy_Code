@@ -3,6 +3,7 @@
 #include "Skald_TurnManager.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
+#include "Engine\World.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldTurnManagerPhaseTest, "Skald.TurnManager.PhaseTransitions", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FSkaldTurnManagerPhaseTest::RunTest(const FString& Parameters) {

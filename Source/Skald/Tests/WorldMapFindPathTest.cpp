@@ -3,6 +3,7 @@
 #include "WorldMap.h"
 #include "Territory.h"
 #include "Skald_PlayerState.h"
+#include "Engine\World.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWorldMapFindPathValidTest, "Skald.WorldMap.FindPath.Valid", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FWorldMapFindPathValidTest::RunTest(const FString& Parameters) {

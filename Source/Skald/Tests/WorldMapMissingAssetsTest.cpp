@@ -1,6 +1,7 @@
 #include "Misc/AutomationTest.h"
 #include "WorldMap.h"
 #include "Tests/AutomationEditorCommon.h"
+#include "Engine\World.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWorldMapMissingAssetsTest, "Skald.WorldMap.MissingAssetsLogged", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
