@@ -43,6 +43,10 @@ bool FSkaldTerritoryMoveValidTest::RunTest(const FString& Parameters)
     UTextRenderComponent* BLabel = B->FindComponentByClass<UTextRenderComponent>();
     TestTrue(TEXT("Source label updated"), ALabel && ALabel->Text.ToString().Contains("Army: 5"));
     TestTrue(TEXT("Target label updated"), BLabel && BLabel->Text.ToString().Contains("Army: 5"));
+    TestTrue(TEXT("Source label updated"),
+             ALabel && ALabel->Text.ToString().Contains("Army: 5"));
+    TestTrue(TEXT("Target label updated"),
+             BLabel && BLabel->Text.ToString().Contains("Army: 5"));
 
     return true;
 }
@@ -86,6 +90,10 @@ bool FSkaldTerritoryMoveInvalidTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Target army unchanged"), B->ArmyStrength, 0);
     TestEqual(TEXT("Source label unchanged"), ALabel ? ALabel->Text.ToString() : FString(), ALabelBefore);
     TestEqual(TEXT("Target label unchanged"), BLabel ? BLabel->Text.ToString() : FString(), BLabelBefore);
+    TestEqual(TEXT("Source label unchanged"),
+             ALabel ? ALabel->Text.ToString() : FString(), ALabelBefore);
+    TestEqual(TEXT("Target label unchanged"),
+             BLabel ? BLabel->Text.ToString() : FString(), BLabelBefore);
 
     // Adjacent but different owner should fail
     A->AdjacentTerritories = {B};
@@ -99,6 +107,10 @@ bool FSkaldTerritoryMoveInvalidTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Target army unchanged"), B->ArmyStrength, 0);
     TestEqual(TEXT("Source label unchanged"), ALabel ? ALabel->Text.ToString() : FString(), ALabelBefore2);
     TestEqual(TEXT("Target label unchanged"), BLabel ? BLabel->Text.ToString() : FString(), BLabelBefore2);
+    TestEqual(TEXT("Source label unchanged"),
+             ALabel ? ALabel->Text.ToString() : FString(), ALabelBefore2);
+    TestEqual(TEXT("Target label unchanged"),
+             BLabel ? BLabel->Text.ToString() : FString(), BLabelBefore2);
 
     return true;
 }

@@ -1,14 +1,14 @@
 #include "WorldMap.h"
+#include "Components/StaticMeshComponent.h"
 #include "Containers/Map.h"
 #include "Containers/Queue.h"
-#include "Containers/Set.h"
-#include <float.h>
-#include "Components/StaticMeshComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Skald.h"
 #include "Skald_GameMode.h"
 #include "Territory.h"
+#include <float.h>
+#include "Templates/Function.h"
 
 AWorldMap::AWorldMap() {
   PrimaryActorTick.bCanEverTick = false;
@@ -60,16 +60,16 @@ void AWorldMap::BeginPlay() {
           : nullptr;
   if (!MeshComp || !MeshComp->GetStaticMesh() ||
       MeshComp->GetNumMaterials() == 0) {
-    const FString MissingAsset =
-        (!MeshComp || !MeshComp->GetStaticMesh()) ? TEXT("mesh") : TEXT("material");
-    UE_LOG(LogSkald, Error,
-           TEXT("WorldMap %s TerritoryClass %s missing %s"), *GetName(),
-           *TerritoryClass->GetName(), *MissingAsset);
+    const FString MissingAsset = (!MeshComp || !MeshComp->GetStaticMesh())
+                                     ? TEXT("mesh")
+                                     : TEXT("material");
+    UE_LOG(LogSkald, Error, TEXT("WorldMap %s TerritoryClass %s missing %s"),
+           *GetName(), *TerritoryClass->GetName(), *MissingAsset);
     if (GEngine) {
       GEngine->AddOnScreenDebugMessage(
           -1, 5.f, FColor::Red,
-          FString::Printf(TEXT("%s missing %s"),
-                          *TerritoryClass->GetName(), *MissingAsset));
+          FString::Printf(TEXT("%s missing %s"), *TerritoryClass->GetName(),
+                          *MissingAsset));
     }
     return;
   }
@@ -152,51 +152,75 @@ void AWorldMap::BeginPlay() {
     }
   }
 
-  // Connect separate graph components by linking closest territories.
-  auto GatherComponents = [&]() {
-    TArray<TArray<ATerritory *>> Components;
-    TSet<ATerritory *> Visited;
-    for (ATerritory *Terr : Territories) {
-      if (!Terr || Visited.Contains(Terr)) {
-        continue;
-      }
-      TArray<ATerritory *> Component;
-      TQueue<ATerritory *> Queue;
-      Queue.Enqueue(Terr);
-      Visited.Add(Terr);
-      while (!Queue.IsEmpty()) {
-        ATerritory *Current = nullptr;
-        Queue.Dequeue(Current);
-        Component.Add(Current);
-        for (ATerritory *Neighbor : Current->AdjacentTerritories) {
-          if (Neighbor && !Visited.Contains(Neighbor)) {
-            Visited.Add(Neighbor);
-            Queue.Enqueue(Neighbor);
-          }
-        }
-      }
-      Components.Add(Component);
+  // Connect separate graph components by linking closest territories using a
+  // union-find structure to avoid repeatedly gathering components.
+  TMap<ATerritory *, ATerritory *> Parent;
+  Parent.Reserve(Territories.Num());
+  for (ATerritory *Terr : Territories) {
+    if (Terr) {
+      Parent.Add(Terr, Terr);
     }
-    return Components;
+  }
+
+  // Find with path compression.
+  TFunction<ATerritory *(ATerritory *)> FindRoot =
+      [&](ATerritory *Territory) -> ATerritory * {
+    ATerritory **Ptr = Parent.Find(Territory);
+    if (!Ptr) {
+      return nullptr;
+    }
+    ATerritory *Root = *Ptr;
+    if (Root != Territory) {
+      Root = FindRoot(Root);
+      Parent[Territory] = Root;
+    }
+    return Root;
   };
 
-  TArray<TArray<ATerritory *>> Components = GatherComponents();
-  while (Components.Num() > 1) {
+  // Union two sets; return true if merged.
+  auto Union = [&](ATerritory *A, ATerritory *B) {
+    ATerritory *RootA = FindRoot(A);
+    ATerritory *RootB = FindRoot(B);
+    if (!RootA || !RootB || RootA == RootB) {
+      return false;
+    }
+    Parent[RootB] = RootA;
+    return true;
+  };
+
+  int32 ComponentCount = Parent.Num();
+  // Merge sets based on existing adjacency.
+  for (ATerritory *Terr : Territories) {
+    if (!Terr) {
+      continue;
+    }
+    for (ATerritory *Neighbor : Terr->AdjacentTerritories) {
+      if (Neighbor && Union(Terr, Neighbor)) {
+        --ComponentCount;
+      }
+    }
+  }
+
+  while (ComponentCount > 1) {
     float BestDist = FLT_MAX;
     ATerritory *A = nullptr;
     ATerritory *B = nullptr;
-    for (int32 i = 0; i < Components.Num(); ++i) {
-      for (int32 j = i + 1; j < Components.Num(); ++j) {
-        for (ATerritory *T1 : Components[i]) {
-          for (ATerritory *T2 : Components[j]) {
-            const float Dist = FVector::Dist(
-                T1->GetActorLocation(), T2->GetActorLocation());
-            if (Dist < BestDist) {
-              BestDist = Dist;
-              A = T1;
-              B = T2;
-            }
-          }
+    for (int32 i = 0; i < Territories.Num(); ++i) {
+      ATerritory *T1 = Territories[i];
+      if (!T1) {
+        continue;
+      }
+      for (int32 j = i + 1; j < Territories.Num(); ++j) {
+        ATerritory *T2 = Territories[j];
+        if (!T2 || FindRoot(T1) == FindRoot(T2)) {
+          continue;
+        }
+        const float Dist =
+            FVector::Dist(T1->GetActorLocation(), T2->GetActorLocation());
+        if (Dist < BestDist) {
+          BestDist = Dist;
+          A = T1;
+          B = T2;
         }
       }
     }
@@ -209,7 +233,9 @@ void AWorldMap::BeginPlay() {
     if (!B->AdjacentTerritories.Contains(A)) {
       B->AdjacentTerritories.Add(A);
     }
-    Components = GatherComponents();
+    if (Union(A, B)) {
+      --ComponentCount;
+    }
   }
 }
 

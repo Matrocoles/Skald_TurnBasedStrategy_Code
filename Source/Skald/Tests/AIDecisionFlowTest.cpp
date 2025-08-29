@@ -75,6 +75,7 @@ bool FSkaldAIDecisionFlowTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Resources spent"), PS1->Resources, 0);
     TestEqual(TEXT("Attack captured territory"), TB->OwningPlayer, PS1);
     TestTrue(TEXT("Movement reinforced"), TA->ArmyStrength > 1);
+    TestEqual(TEXT("Turn advanced"), TM->GetCurrentPhase(), ETurnPhase::Reinforcement);
 
     return true;
 }
