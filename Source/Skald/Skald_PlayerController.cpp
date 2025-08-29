@@ -280,13 +280,9 @@ void ASkaldPlayerController::MakeAIDecision() {
   // Iterate through phases until the turn naturally ends.
   ETurnPhase Phase = TurnManager->GetCurrentPhase();
   int32 IterationCount = 0;
-  while (true) {
-    if (++IterationCount > MaxAIIterations) {
-      UE_LOG(LogSkald, Warning,
-             TEXT("MakeAIDecision exceeded %d iterations; ending turn."),
-             MaxAIIterations);
-      break;
-    }
+  while (Phase != ETurnPhase::EndTurn && IterationCount++ < MaxAIIterations) {
+    const ETurnPhase PrevPhase = Phase;
+
     if (Phase == ETurnPhase::Reinforcement) {
       TArray<ATerritory *> OwnedTerritories;
       for (ATerritory *Territory : WorldMap->Territories) {
@@ -310,11 +306,7 @@ void ASkaldPlayerController::MakeAIDecision() {
       TurnManager->BroadcastResources(PS);
 
       TurnManager->AdvancePhase();
-      Phase = TurnManager->GetCurrentPhase();
-      continue;
-    }
-
-    if (Phase == ETurnPhase::Attack) {
+    } else if (Phase == ETurnPhase::Attack) {
       ATerritory *BestSource = nullptr;
       ATerritory *BestTarget = nullptr;
       int32 WeakestStrength = std::numeric_limits<int32>::max();
@@ -345,17 +337,10 @@ void ASkaldPlayerController::MakeAIDecision() {
       }
 
       TurnManager->AdvancePhase();
-      Phase = TurnManager->GetCurrentPhase();
-      continue;
-    }
-
-    if (Phase == ETurnPhase::Engineering || Phase == ETurnPhase::Treasure) {
+    } else if (Phase == ETurnPhase::Engineering ||
+               Phase == ETurnPhase::Treasure) {
       TurnManager->AdvancePhase();
-      Phase = TurnManager->GetCurrentPhase();
-      continue;
-    }
-
-    if (Phase == ETurnPhase::Movement) {
+    } else if (Phase == ETurnPhase::Movement) {
       ATerritory *BestSource = nullptr;
       ATerritory *BestTarget = nullptr;
       int32 WeakestStrength = std::numeric_limits<int32>::max();
@@ -387,13 +372,30 @@ void ASkaldPlayerController::MakeAIDecision() {
                             TroopsToMove);
       }
 
-      EndTurn();
-      return;
+      TurnManager->AdvancePhase();
+    } else {
+      // Any other phase ends the turn immediately.
+      UE_LOG(LogSkald, Warning,
+             TEXT("MakeAIDecision encountered unexpected phase %s"),
+             *UEnum::GetValueAsString(Phase));
+      break;
     }
 
-    // Any other phase ends the turn immediately.
-    EndTurn();
-    return;
+    Phase = TurnManager->GetCurrentPhase();
+    if (Phase == PrevPhase) {
+      UE_LOG(LogSkald, Warning,
+             TEXT("MakeAIDecision phase %s did not advance; breaking"),
+             *UEnum::GetValueAsString(Phase));
+      break;
+    }
+  }
+
+  if (IterationCount >= MaxAIIterations) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("MakeAIDecision hit iteration limit (%d)"), MaxAIIterations);
+  } else {
+    UE_LOG(LogSkald, Log, TEXT("MakeAIDecision completed in %d iterations"),
+           IterationCount);
   }
 
   EndTurn();
