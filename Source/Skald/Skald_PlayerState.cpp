@@ -1,6 +1,7 @@
 #include "Skald_PlayerState.h"
 #include "Net/UnrealNetwork.h"
 #include "Skald_GameState.h"
+#include "Engine/World.h"
 
 ASkaldPlayerState::ASkaldPlayerState()
     : bIsAI(false)
@@ -31,17 +32,23 @@ void ASkaldPlayerState::GetLifetimeReplicatedProps(
 
 void ASkaldPlayerState::OnRep_HasLockedIn()
 {
-    if (ASkaldGameState* GS = GetWorld() ? GetWorld()->GetGameState<ASkaldGameState>() : nullptr)
+    if (UWorld* World = GetWorld())
     {
-        GS->OnPlayersUpdated.Broadcast();
+        if (ASkaldGameState* GS = World->GetGameState<ASkaldGameState>())
+        {
+            GS->OnPlayersUpdated.Broadcast();
+        }
     }
 }
 
 void ASkaldPlayerState::OnRep_IsEliminated()
 {
-    if (ASkaldGameState* GS = GetWorld() ? GetWorld()->GetGameState<ASkaldGameState>() : nullptr)
+    if (UWorld* World = GetWorld())
     {
-        GS->OnPlayersUpdated.Broadcast();
+        if (ASkaldGameState* GS = World->GetGameState<ASkaldGameState>())
+        {
+            GS->OnPlayersUpdated.Broadcast();
+        }
     }
 }
 
