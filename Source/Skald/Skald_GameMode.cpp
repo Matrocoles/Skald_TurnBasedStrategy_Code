@@ -132,7 +132,15 @@ void ASkaldGameMode::PopulateAIPlayers() {
     return;
   }
 
-  while (GS->PlayerArray.Num() < ExpectedPlayerCount) {
+  // Guard against the unlikely scenario where player states fail to be
+  // registered correctly and the loop below never makes progress. Without a
+  // hard iteration cap the game can lock up while endlessly spawning AI
+  // controllers during project startup.
+  const int32 MaxSpawnAttempts = ExpectedPlayerCount * 2;
+  int32 SpawnAttempts = 0;
+
+  while (GS->PlayerArray.Num() < ExpectedPlayerCount &&
+         SpawnAttempts++ < MaxSpawnAttempts) {
     ASkaldPlayerState *AIState =
         GetWorld()->SpawnActor<ASkaldPlayerState>(PlayerStateClass);
     if (!AIState) {
@@ -188,6 +196,12 @@ void ASkaldGameMode::PopulateAIPlayers() {
     // Refresh player data and attempt to initialize the world as soon as all
     // AI players are created.
     HandlePlayerLockedIn(AIState);
+  }
+
+  if (GS->PlayerArray.Num() < ExpectedPlayerCount) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("PopulateAIPlayers spawned only %d/%d players after %d attempts"),
+           GS->PlayerArray.Num(), ExpectedPlayerCount, SpawnAttempts);
   }
 }
 
