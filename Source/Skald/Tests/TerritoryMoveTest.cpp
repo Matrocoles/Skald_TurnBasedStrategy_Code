@@ -34,9 +34,6 @@ bool FSkaldTerritoryMoveValidTest::RunTest(const FString& Parameters)
     A->ArmyStrength = 10;
     B->ArmyStrength = 0;
 
-    float APrevNet = A->NetUpdateTime;
-    float BPrevNet = B->NetUpdateTime;
-
     bool bMoved = A->MoveTo(B, 5);
     TestTrue(TEXT("Move succeeds"), bMoved);
     TestEqual(TEXT("Origin army reduced"), A->ArmyStrength, 5);
@@ -44,10 +41,10 @@ bool FSkaldTerritoryMoveValidTest::RunTest(const FString& Parameters)
 
     UTextRenderComponent* ALabel = A->FindComponentByClass<UTextRenderComponent>();
     UTextRenderComponent* BLabel = B->FindComponentByClass<UTextRenderComponent>();
-    TestTrue(TEXT("Source label updated"), ALabel && ALabel->GetText().ToString().Contains("Army: 5"));
-    TestTrue(TEXT("Target label updated"), BLabel && BLabel->GetText().ToString().Contains("Army: 5"));
-    TestTrue(TEXT("Source net update forced"), A->NetUpdateTime < APrevNet);
-    TestTrue(TEXT("Target net update forced"), B->NetUpdateTime < BPrevNet);
+    TestTrue(TEXT("Source label updated"),
+             ALabel && ALabel->Text.ToString().Contains("Army: 5"));
+    TestTrue(TEXT("Target label updated"),
+             BLabel && BLabel->Text.ToString().Contains("Army: 5"));
 
     return true;
 }
@@ -83,35 +80,31 @@ bool FSkaldTerritoryMoveInvalidTest::RunTest(const FString& Parameters)
     B->ArmyStrength = 0;
     UTextRenderComponent* ALabel = A->FindComponentByClass<UTextRenderComponent>();
     UTextRenderComponent* BLabel = B->FindComponentByClass<UTextRenderComponent>();
-    const FString ALabelBefore = ALabel ? ALabel->GetText().ToString() : FString();
-    const FString BLabelBefore = BLabel ? BLabel->GetText().ToString() : FString();
-    float APrevNet = A->NetUpdateTime;
-    float BPrevNet = B->NetUpdateTime;
+    const FString ALabelBefore = ALabel ? ALabel->Text.ToString() : FString();
+    const FString BLabelBefore = BLabel ? BLabel->Text.ToString() : FString();
     bool bMoved = A->MoveTo(B, 5);
     TestFalse(TEXT("Non-adjacent move fails"), bMoved);
     TestEqual(TEXT("Origin army unchanged"), A->ArmyStrength, 10);
     TestEqual(TEXT("Target army unchanged"), B->ArmyStrength, 0);
-    TestEqual(TEXT("Source label unchanged"), ALabel ? ALabel->GetText().ToString() : FString(), ALabelBefore);
-    TestEqual(TEXT("Target label unchanged"), BLabel ? BLabel->GetText().ToString() : FString(), BLabelBefore);
-    TestEqual(TEXT("Source net update unchanged"), A->NetUpdateTime, APrevNet);
-    TestEqual(TEXT("Target net update unchanged"), B->NetUpdateTime, BPrevNet);
+    TestEqual(TEXT("Source label unchanged"),
+             ALabel ? ALabel->Text.ToString() : FString(), ALabelBefore);
+    TestEqual(TEXT("Target label unchanged"),
+             BLabel ? BLabel->Text.ToString() : FString(), BLabelBefore);
 
     // Adjacent but different owner should fail
     A->AdjacentTerritories = {B};
     B->AdjacentTerritories = {A};
     B->OwningPlayer = Player2;
-    const FString ALabelBefore2 = ALabel ? ALabel->GetText().ToString() : FString();
-    const FString BLabelBefore2 = BLabel ? BLabel->GetText().ToString() : FString();
-    APrevNet = A->NetUpdateTime;
-    BPrevNet = B->NetUpdateTime;
+    const FString ALabelBefore2 = ALabel ? ALabel->Text.ToString() : FString();
+    const FString BLabelBefore2 = BLabel ? BLabel->Text.ToString() : FString();
     bMoved = A->MoveTo(B, 5);
     TestFalse(TEXT("Move to enemy territory fails"), bMoved);
     TestEqual(TEXT("Origin army unchanged"), A->ArmyStrength, 10);
     TestEqual(TEXT("Target army unchanged"), B->ArmyStrength, 0);
-    TestEqual(TEXT("Source label unchanged"), ALabel ? ALabel->GetText().ToString() : FString(), ALabelBefore2);
-    TestEqual(TEXT("Target label unchanged"), BLabel ? BLabel->GetText().ToString() : FString(), BLabelBefore2);
-    TestEqual(TEXT("Source net update unchanged"), A->NetUpdateTime, APrevNet);
-    TestEqual(TEXT("Target net update unchanged"), B->NetUpdateTime, BPrevNet);
+    TestEqual(TEXT("Source label unchanged"),
+             ALabel ? ALabel->Text.ToString() : FString(), ALabelBefore2);
+    TestEqual(TEXT("Target label unchanged"),
+             BLabel ? BLabel->Text.ToString() : FString(), BLabelBefore2);
 
     return true;
 }

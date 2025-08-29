@@ -8,6 +8,7 @@
 #include "Skald_GameMode.h"
 #include "Territory.h"
 #include <float.h>
+#include "Templates/Function.h"
 
 AWorldMap::AWorldMap() {
   PrimaryActorTick.bCanEverTick = false;
@@ -162,14 +163,15 @@ void AWorldMap::BeginPlay() {
   }
 
   // Find with path compression.
-  auto Find = [&](ATerritory *Territory) -> ATerritory * {
+  TFunction<ATerritory *(ATerritory *)> FindRoot =
+      [&](ATerritory *Territory) -> ATerritory * {
     ATerritory **Ptr = Parent.Find(Territory);
     if (!Ptr) {
       return nullptr;
     }
     ATerritory *Root = *Ptr;
     if (Root != Territory) {
-      Root = Find(Root);
+      Root = FindRoot(Root);
       Parent[Territory] = Root;
     }
     return Root;
@@ -177,8 +179,8 @@ void AWorldMap::BeginPlay() {
 
   // Union two sets; return true if merged.
   auto Union = [&](ATerritory *A, ATerritory *B) {
-    ATerritory *RootA = Find(A);
-    ATerritory *RootB = Find(B);
+    ATerritory *RootA = FindRoot(A);
+    ATerritory *RootB = FindRoot(B);
     if (!RootA || !RootB || RootA == RootB) {
       return false;
     }
@@ -210,7 +212,7 @@ void AWorldMap::BeginPlay() {
       }
       for (int32 j = i + 1; j < Territories.Num(); ++j) {
         ATerritory *T2 = Territories[j];
-        if (!T2 || Find(T1) == Find(T2)) {
+        if (!T2 || FindRoot(T1) == FindRoot(T2)) {
           continue;
         }
         const float Dist =
