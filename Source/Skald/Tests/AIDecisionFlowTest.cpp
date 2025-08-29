@@ -1,5 +1,6 @@
 #include "Misc/AutomationTest.h"
 #include "Tests/AutomationEditorCommon.h"
+#include "Engine/World.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
 #include "Skald_TurnManager.h"
