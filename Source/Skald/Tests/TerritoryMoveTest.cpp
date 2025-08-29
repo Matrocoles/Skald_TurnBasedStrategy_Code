@@ -41,6 +41,8 @@ bool FSkaldTerritoryMoveValidTest::RunTest(const FString& Parameters)
 
     UTextRenderComponent* ALabel = A->FindComponentByClass<UTextRenderComponent>();
     UTextRenderComponent* BLabel = B->FindComponentByClass<UTextRenderComponent>();
+    TestTrue(TEXT("Source label updated"), ALabel && ALabel->Text.ToString().Contains("Army: 5"));
+    TestTrue(TEXT("Target label updated"), BLabel && BLabel->Text.ToString().Contains("Army: 5"));
     TestTrue(TEXT("Source label updated"),
              ALabel && ALabel->Text.ToString().Contains("Army: 5"));
     TestTrue(TEXT("Target label updated"),
@@ -86,6 +88,8 @@ bool FSkaldTerritoryMoveInvalidTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Non-adjacent move fails"), bMoved);
     TestEqual(TEXT("Origin army unchanged"), A->ArmyStrength, 10);
     TestEqual(TEXT("Target army unchanged"), B->ArmyStrength, 0);
+    TestEqual(TEXT("Source label unchanged"), ALabel ? ALabel->Text.ToString() : FString(), ALabelBefore);
+    TestEqual(TEXT("Target label unchanged"), BLabel ? BLabel->Text.ToString() : FString(), BLabelBefore);
     TestEqual(TEXT("Source label unchanged"),
              ALabel ? ALabel->Text.ToString() : FString(), ALabelBefore);
     TestEqual(TEXT("Target label unchanged"),
@@ -101,6 +105,8 @@ bool FSkaldTerritoryMoveInvalidTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Move to enemy territory fails"), bMoved);
     TestEqual(TEXT("Origin army unchanged"), A->ArmyStrength, 10);
     TestEqual(TEXT("Target army unchanged"), B->ArmyStrength, 0);
+    TestEqual(TEXT("Source label unchanged"), ALabel ? ALabel->Text.ToString() : FString(), ALabelBefore2);
+    TestEqual(TEXT("Target label unchanged"), BLabel ? BLabel->Text.ToString() : FString(), BLabelBefore2);
     TestEqual(TEXT("Source label unchanged"),
              ALabel ? ALabel->Text.ToString() : FString(), ALabelBefore2);
     TestEqual(TEXT("Target label unchanged"),
