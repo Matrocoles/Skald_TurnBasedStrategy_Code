@@ -1,5 +1,6 @@
 #include "Skald_PlayerState.h"
 #include "Net/UnrealNetwork.h"
+#include "Engine/World.h"
 #include "Skald_GameState.h"
 
 ASkaldPlayerState::ASkaldPlayerState()
