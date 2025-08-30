@@ -44,15 +44,15 @@ ATerritory::ATerritory() {
   // Provide basic visuals so the world map can function even if assets
   // are missing in the editor. This avoids runtime errors about missing
   // meshes or materials when spawning territories.
-  static ConstructorHelpers::FObjectFinder<UStaticMesh> DefaultMesh(
-      TEXT("/Engine/BasicShapes/Sphere.Sphere"));
-  if (DefaultMesh.Succeeded()) {
-    MeshComponent->SetStaticMesh(DefaultMesh.Object);
+  static UStaticMesh *DefaultMesh = LoadObject<UStaticMesh>(
+      nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+  if (DefaultMesh) {
+    MeshComponent->SetStaticMesh(DefaultMesh);
   }
-  static ConstructorHelpers::FObjectFinder<UMaterialInterface> DefaultMat(
-      TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
-  if (DefaultMat.Succeeded()) {
-    MeshComponent->SetMaterial(0, DefaultMat.Object);
+  static UMaterialInterface *DefaultMat = LoadObject<UMaterialInterface>(
+      nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+  if (DefaultMat) {
+    MeshComponent->SetMaterial(0, DefaultMat);
   }
 
   LabelComponent = CreateDefaultSubobject<UTextRenderComponent>(TEXT("Label"));
