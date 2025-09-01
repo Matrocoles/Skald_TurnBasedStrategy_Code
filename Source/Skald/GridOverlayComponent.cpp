@@ -1,5 +1,7 @@
 #include "GridOverlayComponent.h"
+#include "Containers/Queue.h"
 #include "DrawDebugHelpers.h"
+#include "FighterPawn.h"
 
 UGridOverlayComponent::UGridOverlayComponent() {
   PrimaryComponentTick.bCanEverTick = false;
@@ -55,13 +57,105 @@ void UGridOverlayComponent::SetOccupied(const FIntPoint &GridCoord,
 }
 
 void UGridOverlayComponent::HighlightCell(const FIntPoint &GridCoord,
-                                          const FColor &Color,
-                                          float Duration) const {
+                                          const FColor &Color, float Duration,
+                                          bool bPersistent) const {
   if (!IsValidGrid(GridCoord) || !GetWorld()) {
     return;
   }
 
   FVector Center = GridToWorld(GridCoord);
   FVector Extent(CellSize * 0.5f, CellSize * 0.5f, 10.f);
-  DrawDebugSolidBox(GetWorld(), Center, Extent, Color, false, Duration);
+  DrawDebugSolidBox(GetWorld(), Center, Extent, Color, bPersistent, Duration);
+}
+
+void UGridOverlayComponent::ClearHighlights() const {
+  if (GetWorld()) {
+    FlushPersistentDebugLines(GetWorld());
+  }
+}
+
+void UGridOverlayComponent::HighlightMovement(AFighterPawn *Fighter) {
+  if (!Fighter) {
+    return;
+  }
+
+  ClearHighlights();
+
+  FIntPoint Origin = WorldToGrid(Fighter->GetActorLocation());
+  const int32 Range = Fighter->Stats.Movement;
+
+  TSet<FIntPoint> Visited;
+  TQueue<TPair<FIntPoint, int32>> Frontier;
+  Visited.Add(Origin);
+  Frontier.Enqueue(TPair<FIntPoint, int32>(Origin, 0));
+
+  while (!Frontier.IsEmpty()) {
+    TPair<FIntPoint, int32> Node;
+    Frontier.Dequeue(Node);
+    const FIntPoint Cell = Node.Key;
+    const int32 Distance = Node.Value;
+
+    if (Distance > 0) {
+      HighlightCell(Cell, FColor::Green, 0.f, true);
+    }
+
+    if (Distance >= Range) {
+      continue;
+    }
+
+    static const FIntPoint Directions[4] = {FIntPoint(1, 0), FIntPoint(-1, 0),
+                                            FIntPoint(0, 1), FIntPoint(0, -1)};
+
+    for (const FIntPoint &Dir : Directions) {
+      const FIntPoint Next = Cell + Dir;
+      if (!IsValidGrid(Next) || IsOccupied(Next) || Visited.Contains(Next)) {
+        continue;
+      }
+      Visited.Add(Next);
+      Frontier.Enqueue(TPair<FIntPoint, int32>(Next, Distance + 1));
+    }
+  }
+}
+
+void UGridOverlayComponent::HighlightAttack(AFighterPawn *Fighter) {
+  if (!Fighter) {
+    return;
+  }
+
+  ClearHighlights();
+
+  FIntPoint Origin = WorldToGrid(Fighter->GetActorLocation());
+  const int32 Range = Fighter->Stats.AttackRange;
+
+  TSet<FIntPoint> Visited;
+  TQueue<TPair<FIntPoint, int32>> Frontier;
+  Visited.Add(Origin);
+  Frontier.Enqueue(TPair<FIntPoint, int32>(Origin, 0));
+
+  while (!Frontier.IsEmpty()) {
+    TPair<FIntPoint, int32> Node;
+    Frontier.Dequeue(Node);
+    const FIntPoint Cell = Node.Key;
+    const int32 Distance = Node.Value;
+
+    if (Distance > 0) {
+      HighlightCell(Cell, FColor::Red, 0.f, true);
+    }
+
+    if (Distance >= Range) {
+      continue;
+    }
+
+    static const FIntPoint Directions[4] = {FIntPoint(1, 0), FIntPoint(-1, 0),
+                                            FIntPoint(0, 1), FIntPoint(0, -1)};
+
+    for (const FIntPoint &Dir : Directions) {
+      const FIntPoint Next = Cell + Dir;
+      if (!IsValidGrid(Next) || Visited.Contains(Next)) {
+        continue;
+      }
+      Visited.Add(Next);
+      Frontier.Enqueue(TPair<FIntPoint, int32>(Next, Distance + 1));
+    }
+  }
 }
