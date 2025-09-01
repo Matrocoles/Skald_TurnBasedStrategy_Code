@@ -2,6 +2,8 @@
 
 #include "CoreMinimal.h"
 #include "UObject/NoExportTypes.h"
+#include "Engine/DataTable.h"
+#include "GameFramework/Actor.h"
 #include "SkaldTypes.h"
 #include "GridBattleManager.generated.h"
 
@@ -43,6 +45,27 @@ struct FFighterStats
     /** Cost to include this fighter in an army. */
     UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Stats")
     int32 ArmyCost = 1;
+};
+
+/** Definition of a fighter type used by data tables. */
+USTRUCT(BlueprintType)
+struct FFighterDefinition : public FTableRowBase
+{
+    GENERATED_BODY();
+
+    FFighterDefinition()
+        : Id(NAME_None), MeshClass(nullptr), Stats()
+    {
+    }
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Fighter")
+    FName Id;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Fighter")
+    TSubclassOf<AActor> MeshClass;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Fighter")
+    FFighterStats Stats;
 };
 
 USTRUCT(BlueprintType)
@@ -104,6 +127,10 @@ public:
     /** Event fired when the battle ends reporting winner and casualties. */
     UPROPERTY(BlueprintAssignable, Category="Battle|Events")
     FOnBattleEnded OnBattleEnded;
+
+    /** Table containing fighter definitions. */
+    UPROPERTY(BlueprintReadOnly, Category="Battle")
+    UDataTable* FighterDefinitions;
 
     /** Size of the square grid used in battle. */
     static const int32 GridSize = 48;
