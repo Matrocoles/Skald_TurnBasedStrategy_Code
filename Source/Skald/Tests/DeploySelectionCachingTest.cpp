@@ -8,6 +8,18 @@
 #include "UI/SkaldMainHUDWidget.h"
 #include "UI/DeployWidget.h"
 
+// Test-only subclass to expose protected functionality from USkaldMainHUDWidget
+UCLASS()
+class UTestSkaldMainHUDWidget : public USkaldMainHUDWidget
+{
+    GENERATED_BODY()
+
+public:
+    using USkaldMainHUDWidget::HandleDeployClicked;
+
+    UDeployWidget* GetActiveDeployWidget() const { return ActiveDeployWidget; }
+};
+
 // Verify that territory selection for deployment persists even if the
 // local player state is not yet assigned when the territory is clicked.
 
@@ -44,7 +56,7 @@ bool FSkaldDeploySelectionCachingTest::RunTest(const FString& Parameters)
     PC->SetTurnManager(TM);
     TM->RegisterController(PC);
 
-    USkaldMainHUDWidget* HUD = NewObject<USkaldMainHUDWidget>(PC);
+    UTestSkaldMainHUDWidget* HUD = NewObject<UTestSkaldMainHUDWidget>(PC);
     HUD->SetOwningPlayer(PC);
     HUD->DeployWidgetClass = UDeployWidget::StaticClass();
 
@@ -63,7 +75,7 @@ bool FSkaldDeploySelectionCachingTest::RunTest(const FString& Parameters)
     PS->DeployableUnits = 1;
 
     HUD->HandleDeployClicked();
-    TestNotNull(TEXT("Deploy widget created"), HUD->ActiveDeployWidget);
+    TestNotNull(TEXT("Deploy widget created"), HUD->GetActiveDeployWidget());
 
     return true;
 }
