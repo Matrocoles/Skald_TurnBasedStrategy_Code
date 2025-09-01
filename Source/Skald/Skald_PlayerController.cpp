@@ -12,6 +12,7 @@
 #include "Skald_TurnManager.h"
 #include "Territory.h"
 #include "UI/SkaldMainHUDWidget.h"
+#include "UI/DeployWidget.h"
 #include "WorldMap.h"
 #include <limits>
 
@@ -63,6 +64,15 @@ void ASkaldPlayerController::BeginPlay() {
   if (HUDWidgetClass) {
     MainHudWidget = CreateWidget<USkaldMainHUDWidget>(this, HUDWidgetClass);
     if (MainHudWidget) {
+      // Ensure DeployWidgetClass is set so the Deploy UI can be spawned.
+      if (!MainHudWidget->DeployWidgetClass) {
+        if (UClass *DeployClass = LoadClass<UDeployWidget>(
+                nullptr,
+                TEXT("/Game/Blueprints/UI/Skald_DeployWidget.Skald_DeployWidget_C"))) {
+          MainHudWidget->DeployWidgetClass = DeployClass;
+        }
+      }
+
       HUDRef = MainHudWidget;
       MainHudWidget->AddToViewport();
       MainHudWidget->SetVisibility(ESlateVisibility::Hidden);
@@ -774,6 +784,10 @@ void ASkaldPlayerController::HandleTerritorySelected(ATerritory *Terr) {
   }
 
   ServerSelectTerritory(Terr->TerritoryID);
+
+  if (MainHudWidget) {
+    MainHudWidget->OnTerritoryClickedUI(Terr);
+  }
 }
 
 void ASkaldPlayerController::NotifyActionError_Implementation(
