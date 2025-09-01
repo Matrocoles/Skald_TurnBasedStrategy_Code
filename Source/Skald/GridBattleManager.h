@@ -57,7 +57,10 @@ struct FFighterDefinition : public FTableRowBase
     GENERATED_BODY();
 
     FFighterDefinition()
-        : Id(NAME_None), MeshClass(nullptr), Stats()
+        : Id(NAME_None)
+        , MeshClass(nullptr)
+        , Faction(ESkaldFaction::None)
+        , Stats()
     {
     }
 
@@ -66,6 +69,9 @@ struct FFighterDefinition : public FTableRowBase
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Fighter")
     TSubclassOf<AActor> MeshClass;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Fighter")
+    ESkaldFaction Faction = ESkaldFaction::None;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Fighter")
     FFighterStats Stats;
