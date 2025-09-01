@@ -164,6 +164,10 @@ public:
       UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
       AFighterPawn* GetActiveFighter() const;
 
+    /** Get fighter definitions for the specified faction. */
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
+    TArray<FFighterDefinition> GetFightersForFaction(ESkaldFaction Faction) const;
+
     /** Event fired when the battle ends reporting winner and casualties. */
     UPROPERTY(BlueprintAssignable, Category="Battle|Events")
     FOnBattleEnded OnBattleEnded;

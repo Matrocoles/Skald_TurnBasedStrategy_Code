@@ -292,6 +292,26 @@ AFighterPawn* UGridBattleManager::GetActiveFighter() const
     return ActiveFighter;
 }
 
+TArray<FFighterDefinition> UGridBattleManager::GetFightersForFaction(ESkaldFaction Faction) const
+{
+    TArray<FFighterDefinition> Fighters;
+    if (!FighterDefinitions)
+    {
+        return Fighters;
+    }
+
+    for (const TPair<FName, uint8*>& Pair : FighterDefinitions->GetRowMap())
+    {
+        const FFighterDefinition* Definition = reinterpret_cast<const FFighterDefinition*>(Pair.Value);
+        if (Definition && Definition->Faction == Faction)
+        {
+            Fighters.Add(*Definition);
+        }
+    }
+
+    return Fighters;
+}
+
 void UGridBattleManager::RollInitiative()
 {
     struct FInitiativeEntry
