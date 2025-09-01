@@ -1,5 +1,5 @@
 {
-  "Blueprint": "WidgetBlueprint'/Game/C++_BPs/Skald_MainHUDBP'",
+  "Blueprint": "WidgetBlueprint'/Game/C++_BPs/Skald_MainHUDBP.Skald_MainHUDBP'",
   "ParentClass": "/Script/Skald.SkaldMainHUDWidget",
   "Purpose": "Main HUD widget used during gameplay",
   "Widgets": {
