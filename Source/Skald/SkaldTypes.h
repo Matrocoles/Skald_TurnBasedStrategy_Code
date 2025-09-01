@@ -48,6 +48,9 @@ enum class ESkaldFaction : uint8
     Undead     UMETA(DisplayName = "Undead Faction"),
     Gnoll      UMETA(DisplayName = "Gnoll Faction"),
     Empire     UMETA(DisplayName = "Empire"),
+    Inflicted  UMETA(DisplayName = "The Inflicted"),
+    FrogFolk   UMETA(DisplayName = "FrogFolk"),
+    Ravpack    UMETA(DisplayName = "Ravpack"),
 };
 
 UENUM(BlueprintType)
