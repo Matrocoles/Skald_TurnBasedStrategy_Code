@@ -10,7 +10,9 @@
   },
   "Events": {
     "BP_RebuildPlayerList": {
-      "Parameters": "Array of FS_PlayerData",
+      "Parameters": {
+        "Players": "Array of FS_PlayerData"
+      },
       "Steps": [
         "Clear children of PlayerListBox",
         "For each player in Players:",
