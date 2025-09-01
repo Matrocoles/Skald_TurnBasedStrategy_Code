@@ -1,14 +1,16 @@
 #include "Territory.h"
-#include "Skald.h"
 #include "Components/PrimitiveComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
+#include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
+#include "Skald.h"
 #include "SkaldTypes.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
 #include "UObject/ConstructorHelpers.h"
+#include "WorldMap.h"
 
 namespace {
 FLinearColor GetFactionColor(ESkaldFaction Faction) {
@@ -50,7 +52,8 @@ ATerritory::ATerritory() {
     MeshComponent->SetStaticMesh(DefaultMesh);
   }
   static UMaterialInterface *DefaultMat = LoadObject<UMaterialInterface>(
-      nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+      nullptr,
+      TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
   if (DefaultMat) {
     MeshComponent->SetMaterial(0, DefaultMat);
   }
@@ -115,8 +118,15 @@ void ATerritory::BeginPlay() {
     CapitalMesh->SetHiddenInGame(!bIsCapital);
   }
 
-  // Territories are registered with the world map immediately after
-  // spawning, so no self-registration is required here.
+  // Ensure this territory is registered with the world map. When territories
+  // are placed manually in a level they may not have been added during map
+  // initialization, so register here if needed.
+  if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+          GetWorld(), AWorldMap::StaticClass()))) {
+    if (!WorldMap->Territories.Contains(this)) {
+      WorldMap->RegisterTerritory(this);
+    }
+  }
 }
 
 void ATerritory::GetLifetimeReplicatedProps(
@@ -247,8 +257,8 @@ void ATerritory::UpdateLabel() {
 
   const FString OwnerName =
       OwningPlayer ? OwningPlayer->PlayerDisplayName : TEXT("Neutral");
-  const FString Text = FString::Printf(TEXT("%s\nOwner: %s\nArmy: %d"),
-                                      *TerritoryName, *OwnerName,
-                                      ArmyStrength);
+  const FString Text =
+      FString::Printf(TEXT("%s\nOwner: %s\nArmy: %d"), *TerritoryName,
+                      *OwnerName, ArmyStrength);
   LabelComponent->SetText(FText::FromString(Text));
 }
