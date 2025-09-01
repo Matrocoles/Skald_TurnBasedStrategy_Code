@@ -163,7 +163,7 @@ public:
 
   /** Update the remaining deployable unit count display. */
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
-  void UpdateDeployableUnits(int32 UnitsRemaining);
+  virtual void UpdateDeployableUnits(int32 UnitsRemaining);
 
   /** Update the resource display. */
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
