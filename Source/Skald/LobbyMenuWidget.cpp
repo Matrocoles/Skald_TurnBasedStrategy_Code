@@ -51,14 +51,21 @@ void ULobbyMenuWidget::OnLoadGame()
 {
     if (UWorld* World = GetWorld())
     {
-        if (LoadGameWidgetClass)
+        if (!LoadGameWidgetClass)
         {
-            if (ULoadGameWidget* Widget = CreateWidget<ULoadGameWidget>(World, LoadGameWidgetClass))
+            LoadGameWidgetClass = LoadClass<ULoadGameWidget>(nullptr, TEXT("/Game/Blueprints/UI/Skald_LoadGameWidget.Skald_LoadGameWidget_C"));
+            if (!LoadGameWidgetClass)
             {
-                Widget->SetLobbyMenu(this);
-                Widget->AddToViewport();
-                SetVisibility(ESlateVisibility::Hidden);
+                UE_LOG(LogTemp, Error, TEXT("Failed to load default LoadGameWidget class."));
+                return;
             }
+        }
+
+        if (ULoadGameWidget* Widget = CreateWidget<ULoadGameWidget>(World, LoadGameWidgetClass))
+        {
+            Widget->SetLobbyMenu(this);
+            Widget->AddToViewport();
+            SetVisibility(ESlateVisibility::Hidden);
         }
     }
 }
@@ -67,14 +74,21 @@ void ULobbyMenuWidget::OnSettings()
 {
     if (UWorld* World = GetWorld())
     {
-        if (SettingsWidgetClass)
+        if (!SettingsWidgetClass)
         {
-            if (USettingsWidget* Widget = CreateWidget<USettingsWidget>(World, SettingsWidgetClass))
+            SettingsWidgetClass = LoadClass<USettingsWidget>(nullptr, TEXT("/Game/Blueprints/UI/Skald_SettingsWidget.Skald_SettingsWidget_C"));
+            if (!SettingsWidgetClass)
             {
-                Widget->SetLobbyMenu(this);
-                Widget->AddToViewport();
-                SetVisibility(ESlateVisibility::Hidden);
+                UE_LOG(LogTemp, Error, TEXT("Failed to load default SettingsWidget class."));
+                return;
             }
+        }
+
+        if (USettingsWidget* Widget = CreateWidget<USettingsWidget>(World, SettingsWidgetClass))
+        {
+            Widget->SetLobbyMenu(this);
+            Widget->AddToViewport();
+            SetVisibility(ESlateVisibility::Hidden);
         }
     }
 }
