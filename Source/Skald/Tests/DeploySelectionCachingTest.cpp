@@ -1,3 +1,5 @@
+#include "DeploySelectionCachingTest.h"
+
 #include "Misc/AutomationTest.h"
 #include "Tests/AutomationEditorCommon.h"
 #include "Skald_PlayerController.h"
@@ -5,20 +7,7 @@
 #include "Skald_TurnManager.h"
 #include "WorldMap.h"
 #include "Territory.h"
-#include "UI/SkaldMainHUDWidget.h"
 #include "UI/DeployWidget.h"
-
-// Test-only subclass to expose protected functionality from USkaldMainHUDWidget
-UCLASS()
-class UTestSkaldMainHUDWidget : public USkaldMainHUDWidget
-{
-    GENERATED_BODY()
-
-public:
-    using USkaldMainHUDWidget::HandleDeployClicked;
-
-    UDeployWidget* GetActiveDeployWidget() const { return ActiveDeployWidget; }
-};
 
 // Verify that territory selection for deployment persists even if the
 // local player state is not yet assigned when the territory is clicked.
