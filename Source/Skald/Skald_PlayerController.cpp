@@ -11,8 +11,8 @@
 #include "Skald_PlayerState.h"
 #include "Skald_TurnManager.h"
 #include "Territory.h"
-#include "UI/SkaldMainHUDWidget.h"
 #include "UI/DeployWidget.h"
+#include "UI/SkaldMainHUDWidget.h"
 #include "WorldMap.h"
 #include <limits>
 
@@ -67,8 +67,8 @@ void ASkaldPlayerController::BeginPlay() {
       // Ensure DeployWidgetClass is set so the Deploy UI can be spawned.
       if (!MainHudWidget->DeployWidgetClass) {
         if (UClass *DeployClass = LoadClass<UDeployWidget>(
-                nullptr,
-                TEXT("/Game/Blueprints/UI/Skald_DeployWidget.Skald_DeployWidget_C"))) {
+                nullptr, TEXT("/Game/Blueprints/UI/"
+                              "Skald_DeployWidget.Skald_DeployWidget_C"))) {
           MainHudWidget->DeployWidgetClass = DeployClass;
         }
       }
@@ -97,9 +97,8 @@ void ASkaldPlayerController::BeginPlay() {
                                         ETurnPhase::Reinforcement, Players);
       }
 
-      if (ASkaldPlayerState *LocalPS = GetPlayerState<ASkaldPlayerState>()) {
-        MainHudWidget->UpdateResources(LocalPS->Resources);
-      }
+      // Ensure local player details are registered with the HUD once available.
+      OnRep_PlayerState();
 
       MainHudWidget->OnAttackRequested.AddDynamic(
           this, &ASkaldPlayerController::HandleAttackRequested);
@@ -132,7 +131,8 @@ void ASkaldPlayerController::BeginPlay() {
         ChoosePlayerWidget->OnPlayerLockedIn.AddDynamic(
             this, &ASkaldPlayerController::HandlePlayerLockedIn);
         ChoosePlayerWidget->AddToViewport();
-        // While the player is choosing their faction, restrict controls to the UI
+        // While the player is choosing their faction, restrict controls to the
+        // UI
         SetInputMode(FInputModeUIOnly());
         SetIgnoreMoveInput(true);
         SetIgnoreLookInput(true);
@@ -148,6 +148,21 @@ void ASkaldPlayerController::BeginPlay() {
 
   if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
     bIsAI = PS->bIsAI;
+  }
+}
+
+void ASkaldPlayerController::OnRep_PlayerState() {
+  Super::OnRep_PlayerState();
+
+  if (!MainHudWidget) {
+    return;
+  }
+
+  if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+    MainHudWidget->LocalPlayerID = PS->GetPlayerId();
+    MainHudWidget->UpdateResources(PS->Resources);
+    MainHudWidget->SyncPhaseButtons(MainHudWidget->CurrentPlayerID ==
+                                    MainHudWidget->LocalPlayerID);
   }
 }
 
@@ -401,8 +416,8 @@ void ASkaldPlayerController::MakeAIDecision() {
   }
 
   if (IterationCount >= MaxAIIterations) {
-    UE_LOG(LogSkald, Warning,
-           TEXT("MakeAIDecision hit iteration limit (%d)"), MaxAIIterations);
+    UE_LOG(LogSkald, Warning, TEXT("MakeAIDecision hit iteration limit (%d)"),
+           MaxAIIterations);
   } else {
     UE_LOG(LogSkald, Log, TEXT("MakeAIDecision completed in %d iterations"),
            IterationCount);

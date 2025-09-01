@@ -26,6 +26,8 @@ public:
 
   virtual void BeginPlay() override;
 
+  virtual void OnRep_PlayerState() override;
+
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void StartTurn();
 
