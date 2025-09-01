@@ -397,7 +397,9 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
     LocalPS = PC->GetPlayerState<ASkaldPlayerState>();
   }
 
-  const bool bOwnedByLocal = LocalPS && Territory->OwningPlayer == LocalPS;
+  const bool bOwnedByLocal = LocalPS && Territory->OwningPlayer &&
+                             Territory->OwningPlayer->GetPlayerId() ==
+                                 LocalPS->GetPlayerId();
 
   if (bSelectingForAttack) {
     if (SelectedSourceID == -1) {
@@ -679,7 +681,8 @@ void USkaldMainHUDWidget::HandleDeployClicked() {
     Territory = WorldMap->GetTerritoryById(SelectedSourceID);
   }
 
-  if (!Territory || Territory->OwningPlayer != PS) {
+  if (!Territory || !Territory->OwningPlayer ||
+      Territory->OwningPlayer->GetPlayerId() != PS->GetPlayerId()) {
     UE_LOG(LogSkald, Warning,
            TEXT("HandleDeployClicked failed: invalid territory %d"),
            SelectedSourceID);
