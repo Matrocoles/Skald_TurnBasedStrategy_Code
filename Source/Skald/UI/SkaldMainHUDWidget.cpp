@@ -26,6 +26,11 @@ USkaldMainHUDWidget::USkaldMainHUDWidget(const FObjectInitializer& ObjectInitial
   if (DeployBP.Succeeded()) {
     DeployWidgetClass = DeployBP.Class;
   }
+  static ConstructorHelpers::FClassFinder<UConfirmAttackWidget> ConfirmBP(
+      TEXT("/Game/Blueprints/UI/Skald_ConfirmAttackWidget"));
+  if (ConfirmBP.Succeeded()) {
+    ConfirmAttackWidgetClass = ConfirmBP.Class;
+  }
 }
 
 void USkaldMainHUDWidget::NativeConstruct() {
@@ -563,6 +568,10 @@ void USkaldMainHUDWidget::HandleAttackApproved() {
     }
     return;
   }
+
+  // Remove the confirmation widget now that the attack is approved
+  ActiveConfirmWidget->RemoveFromParent();
+  ActiveConfirmWidget = nullptr;
 
   SubmitAttack(SourceID, TargetID, ArmyCount, bUseSiegeForNextAttack);
 
