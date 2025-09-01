@@ -60,6 +60,10 @@ class SKALD_API UFighterSelectionWidget : public UUserWidget {
 public:
   virtual void NativeConstruct() override;
 
+  /** Faction of the player owning this selection widget. */
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Fighter")
+  ESkaldFaction PlayerFaction = ESkaldFaction::None;
+
   /** Fighters that can be chosen. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Fighter")
   TArray<FFighterDefinition> AvailableFighters;
