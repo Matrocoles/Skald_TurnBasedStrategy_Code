@@ -19,9 +19,9 @@ public:
     UPROPERTY(BlueprintReadWrite, Replicated, Category="PlayerState")
     bool bIsAI;
 
-    /** Army units available for placement. */
+    /** Deployable units available for placement. */
     UPROPERTY(BlueprintReadWrite, Replicated, Category="PlayerState")
-    int32 ArmyPool;
+    int32 DeployableUnits;
 
     /** Initiative roll determining turn order. */
     UPROPERTY(BlueprintReadWrite, Replicated, Category="PlayerState")

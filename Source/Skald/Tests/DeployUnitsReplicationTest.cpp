@@ -52,7 +52,7 @@ bool FSkaldDeployReplicationTest::RunTest(const FString& Parameters)
     Terr->OwningPlayer = PS1;
     Terr->ArmyStrength = 5;
     WM->Territories = {Terr};
-    PS1->ArmyPool = 10;
+    PS1->DeployableUnits = 10;
 
     UDeployTestHUDWidget* HUD1 = NewObject<UDeployTestHUDWidget>(PC1);
     UDeployTestHUDWidget* HUD2 = NewObject<UDeployTestHUDWidget>(PC2);
@@ -62,7 +62,7 @@ bool FSkaldDeployReplicationTest::RunTest(const FString& Parameters)
     PC1->ServerDeployUnits(Terr->TerritoryID, 3);
 
     TestEqual(TEXT("Territory army updated"), Terr->ArmyStrength, 8);
-    TestEqual(TEXT("Player army pool updated"), PS1->ArmyPool, 7);
+    TestEqual(TEXT("Player deployable units updated"), PS1->DeployableUnits, 7);
     TestEqual(TEXT("HUD1 updated"), HUD1->LastUnits, 7);
     TestEqual(TEXT("HUD2 updated"), HUD2->LastUnits, 7);
 

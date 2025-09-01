@@ -256,9 +256,9 @@ void ASkaldPlayerController::EndPhase() {
   ETurnPhase Phase = TurnManager->GetCurrentPhase();
   if (Phase == ETurnPhase::ArmyPlacement) {
     if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
-      PS->ArmyPool = 0;
+      PS->DeployableUnits = 0;
       PS->ForceNetUpdate();
-      TurnManager->BroadcastArmyPool(PS);
+      TurnManager->BroadcastDeployableUnits(PS);
     }
 
     if (!CachedGameMode) {
@@ -309,17 +309,17 @@ void ASkaldPlayerController::MakeAIDecision() {
       }
 
       int32 SpreadIndex = 0;
-      while (PS->ArmyPool > 0 && OwnedTerritories.Num() > 0) {
+      while (PS->DeployableUnits > 0 && OwnedTerritories.Num() > 0) {
         ATerritory *TargetTerritory =
             OwnedTerritories[SpreadIndex % OwnedTerritories.Num()];
         ++TargetTerritory->ArmyStrength;
         TargetTerritory->RefreshAppearance();
-        --PS->ArmyPool;
+        --PS->DeployableUnits;
         --PS->Resources;
         ++SpreadIndex;
       }
       PS->ForceNetUpdate();
-      TurnManager->BroadcastArmyPool(PS);
+      TurnManager->BroadcastDeployableUnits(PS);
       TurnManager->BroadcastResources(PS);
 
       TurnManager->AdvancePhase();
@@ -674,7 +674,7 @@ void ASkaldPlayerController::ServerDeployUnits_Implementation(int32 TerritoryID,
     return;
   }
 
-  if (!WorldMap->IsOwnedBy(Terr, PS) || PS->ArmyPool < Amount) {
+  if (!WorldMap->IsOwnedBy(Terr, PS) || PS->DeployableUnits < Amount) {
     return;
   }
 
@@ -682,11 +682,11 @@ void ASkaldPlayerController::ServerDeployUnits_Implementation(int32 TerritoryID,
   Terr->RefreshAppearance();
   Terr->ForceNetUpdate();
 
-  PS->ArmyPool -= Amount;
+  PS->DeployableUnits -= Amount;
   PS->ForceNetUpdate();
 
   if (TurnManager) {
-    TurnManager->BroadcastArmyPool(PS);
+    TurnManager->BroadcastDeployableUnits(PS);
   }
 }
 
@@ -907,7 +907,7 @@ void ASkaldPlayerController::HandleWorldStateChanged() {
 
   // Update deploy/phase banners.
   if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
-    MainHudWidget->UpdateDeployableUnits(PS->ArmyPool);
+    MainHudWidget->UpdateDeployableUnits(PS->DeployableUnits);
     MainHudWidget->UpdateResources(PS->Resources);
   }
   if (TurnManager) {

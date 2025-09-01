@@ -449,7 +449,7 @@ void ASkaldGameMode::BeginArmyPlacementPhase() {
                         *GetNameSafe(ActiveController), *PhaseString));
   }
 
-  // Calculate army pools for each player based on owned territories and
+  // Calculate deployable units for each player based on owned territories and
   // update HUDs.
   for (ASkaldPlayerController *PC : TurnManager->GetControllers()) {
     if (ASkaldPlayerState *PS =
@@ -460,9 +460,9 @@ void ASkaldGameMode::BeginArmyPlacementPhase() {
           ++Owned;
         }
       }
-      PS->ArmyPool = FMath::CeilToInt(Owned / 3.f);
+      PS->DeployableUnits = FMath::CeilToInt(Owned / 3.f);
       PS->ForceNetUpdate();
-      TurnManager->BroadcastArmyPool(PS);
+      TurnManager->BroadcastDeployableUnits(PS);
     }
   }
 
@@ -527,7 +527,7 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
       continue;
     }
 
-    if (PS->ArmyPool <= 0) {
+    if (PS->DeployableUnits <= 0) {
       ++PlacementIndex;
       continue;
     }
@@ -543,7 +543,7 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
                           *PhaseString));
     }
 
-    TurnManager->BroadcastArmyPool(PS);
+    TurnManager->BroadcastDeployableUnits(PS);
 
     // Announce whose placement turn it is.
     const FString PlayerName = PS->PlayerDisplayName;
@@ -564,16 +564,16 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
         }
       }
       int32 SpreadIndex = 0;
-      while (PS->ArmyPool > 0 && OwnedTerritories.Num() > 0) {
+      while (PS->DeployableUnits > 0 && OwnedTerritories.Num() > 0) {
         ATerritory *TargetTerritory =
             OwnedTerritories[SpreadIndex % OwnedTerritories.Num()];
         ++TargetTerritory->ArmyStrength;
         TargetTerritory->RefreshAppearance();
-        --PS->ArmyPool;
+        --PS->DeployableUnits;
         ++SpreadIndex;
       }
       PS->ForceNetUpdate();
-      TurnManager->BroadcastArmyPool(PS);
+      TurnManager->BroadcastDeployableUnits(PS);
       ++PlacementIndex;
       continue;
     }
