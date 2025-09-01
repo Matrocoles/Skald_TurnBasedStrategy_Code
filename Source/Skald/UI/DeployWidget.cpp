@@ -46,24 +46,17 @@ void UDeployWidget::HandleAccept() {
                                              PlayerState->ArmyPool)
                               : 0;
   if (Selected > 0) {
-    Territory->ArmyStrength += Selected;
-    Territory->RefreshAppearance();
-    PlayerState->ArmyPool -= Selected;
-    PlayerState->Resources =
-        FMath::Max(0, PlayerState->Resources - Selected);
-    PlayerState->ForceNetUpdate();
-    OwningHUD->UpdateDeployableUnits(PlayerState->ArmyPool);
-    OwningHUD->UpdateResources(PlayerState->Resources);
-
     if (APlayerController *PC = OwningHUD->GetOwningPlayer()) {
       if (ASkaldPlayerController *SKPC = Cast<ASkaldPlayerController>(PC)) {
+        SKPC->ServerDeployUnits(Territory->TerritoryID, Selected);
         if (ATurnManager *TM = SKPC->GetTurnManager()) {
-          TM->BroadcastResources(PlayerState);
+          TM->BroadcastArmyPool(PlayerState);
         }
       }
     }
 
-    if (PlayerState->ArmyPool <= 0 && OwningHUD->DeployButton) {
+    const int32 Remaining = PlayerState->ArmyPool - Selected;
+    if (Remaining <= 0 && OwningHUD->DeployButton) {
       OwningHUD->DeployButton->SetVisibility(ESlateVisibility::Collapsed);
       bool bHandled = false;
       if (ASkaldGameMode *GM =
