@@ -7,6 +7,7 @@
 #include "GameFramework/PlayerController.h"
 #include "SkaldSaveGame.h"
 #include "Skald_GameInstance.h"
+#include "Blueprint/WidgetBlueprintLibrary.h"
 
 void ULoadGameWidget::SetLobbyMenu(ULobbyMenuWidget* InMenu)
 {
@@ -59,6 +60,18 @@ void ULoadGameWidget::OnLoadSlot2()
 void ULoadGameWidget::OnMainMenu()
 {
     RemoveFromParent();
+
+    // Ensure no other widgets linger on the viewport and steal input
+    TArray<UUserWidget*> Widgets;
+    UWidgetBlueprintLibrary::GetAllWidgetsOfClass(this, Widgets, UUserWidget::StaticClass(), /*TopLevelOnly*/ true);
+    for (UUserWidget* Widget : Widgets)
+    {
+        if (Widget && Widget != LobbyMenu.Get())
+        {
+            Widget->RemoveFromParent();
+        }
+    }
+
     if (LobbyMenu.IsValid())
     {
         // Re-enable the lobby once the load-game widget closes
