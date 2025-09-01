@@ -33,6 +33,12 @@ FLinearColor GetFactionColor(ESkaldFaction Faction) {
     return FLinearColor(1.0f, 0.55f, 0.0f, 1.f); // Orange
   case ESkaldFaction::Empire:
     return FLinearColor(0.5f, 0.0f, 0.5f, 1.f); // Purple
+  case ESkaldFaction::Inflicted:
+    return FLinearColor(0.99f, 0.14f, 0.14f, 1.f); // Scarlet
+  case ESkaldFaction::FrogFolk:
+    return FLinearColor(1.f, 0.31f, 0.55f, 1.f); // Rose
+  case ESkaldFaction::Ravpack:
+    return FLinearColor(0.54f, 0.f, 0.54f, 1.f); // Violet
   default:
     return FLinearColor::White;
   }
