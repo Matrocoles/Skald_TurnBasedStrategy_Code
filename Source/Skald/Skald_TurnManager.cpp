@@ -312,8 +312,10 @@ void ATurnManager::ResolveGridBattleResult() {
   const int32 InitialSourceArmy = Source->ArmyUnits;
   const int32 InitialTargetArmy = Target->ArmyUnits;
 
-  const int32 AttackerSurvivors = GI->GridBattleManager->GetAttackerSurvivors();
-  const int32 DefenderSurvivors = GI->GridBattleManager->GetDefenderSurvivors();
+  const int32 AttackerSurvivors =
+      GI->GridBattleManager->GetAttackerSurvivorCost();
+  const int32 DefenderSurvivors =
+      GI->GridBattleManager->GetDefenderSurvivorCost();
 
   Source->ArmyUnits -= Battle.ArmyCountSent;
 
@@ -328,14 +330,31 @@ void ATurnManager::ResolveGridBattleResult() {
     Target->ArmyUnits = DefenderSurvivors;
   }
 
-  const int32 AttackerCasualties = Battle.ArmyCountSent - AttackerSurvivors;
-  const int32 DefenderCasualties = InitialTargetArmy - DefenderSurvivors;
+  const int32 AttackerCasualties =
+      Battle.ArmyCountSent - AttackerSurvivors;
+  const int32 DefenderCasualties =
+      InitialTargetArmy - DefenderSurvivors;
 
   Source->RefreshAppearance();
   Target->RefreshAppearance();
 
   GI->PendingBattle = FS_BattlePayload();
   GI->GridBattleManager = nullptr;
+  PendingBattle = FS_BattlePayload();
+
+  // Resume the saved turn sequence now that the battle has been resolved.
+  if (GI->bResumeTurns) {
+    CurrentIndex = GI->SavedTurnIndex;
+    CurrentPhase = GI->SavedTurnPhase;
+    GI->bResumeTurns = false;
+
+    if (Controllers.IsValidIndex(CurrentIndex)) {
+      if (ASkaldPlayerController *Controller = Controllers[CurrentIndex].Get()) {
+        Controller->StartTurn();
+        BroadcastCurrentPhase();
+      }
+    }
+  }
 
   if (ASkaldGameMode *GM =
           GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
