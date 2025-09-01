@@ -83,36 +83,40 @@ void ASkaldGameMode::BeginPlay() {
       UGameplayStatics::GetCurrentLevelName(this, true);
   if (CurrentLevel.Equals(TEXT("BattleMap"), ESearchCase::IgnoreCase)) {
     if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
-      if (GI->GridBattleManager && GI->GridBattleManager->FighterDefinitions) {
-        TArray<FFighterDefinition *> Definitions;
-        GI->GridBattleManager->FighterDefinitions->GetAllRows(
-            TEXT("AIFill"), Definitions);
+      if (GI->GridBattleManager) {
         ASkaldGameState *GS = GetGameState<ASkaldGameState>();
-        if (GS && Definitions.Num() > 0) {
+        if (GS) {
           for (APlayerState *BasePS : GS->PlayerArray) {
             ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(BasePS);
             if (!PS || !PS->bIsAI) {
               continue;
             }
 
-            int32 RemainingCost =
+            TArray<FFighterDefinition> Definitions =
+                GI->GridBattleManager->GetFightersForFaction(PS->Faction);
+            if (Definitions.Num() <= 0) {
+              PS->bHasLockedIn = true;
+              continue;
+            }
+
+            const int32 MaxCost =
                 GI->PendingBattle.ArmyCountSent > 0
                     ? GI->PendingBattle.ArmyCountSent
                     : DefaultAIMaxCost;
+            int32 CurrentCost = 0;
 
-            TArray<FFighterDefinition *> ShuffledDefs = Definitions;
-            Algo::RandomShuffle(ShuffledDefs);
+            Algo::RandomShuffle(Definitions);
 
             TArray<FFighter> Fighters;
-            for (FFighterDefinition *Def : ShuffledDefs) {
-              if (!Def || Def->Stats.ArmyCost > RemainingCost) {
+            for (const FFighterDefinition &Def : Definitions) {
+              if (CurrentCost + Def.Stats.ArmyCost > MaxCost) {
                 continue;
               }
               FFighter Fighter;
-              Fighter.Stats = Def->Stats;
+              Fighter.Stats = Def.Stats;
               Fighter.Faction = PS->Faction;
               Fighters.Add(Fighter);
-              RemainingCost -= Def->Stats.ArmyCost;
+              CurrentCost += Def.Stats.ArmyCost;
             }
 
             if (Fighters.Num() > 0) {
