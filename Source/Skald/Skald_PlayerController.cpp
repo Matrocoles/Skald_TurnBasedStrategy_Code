@@ -30,7 +30,7 @@ ASkaldPlayerController::ASkaldPlayerController() {
 
   // Load a default HUD widget blueprint if available.
   static ConstructorHelpers::FClassFinder<UUserWidget> HUDWidgetFinder(
-      TEXT("/Game/C++_BPs/Skald_MainHUDBP"));
+      TEXT("/Game/C++_BPs/Skald_MainHUDBP.Skald_MainHUDBP_C"));
   if (HUDWidgetFinder.Succeeded()) {
     HUDWidgetClass = HUDWidgetFinder.Class;
   }
