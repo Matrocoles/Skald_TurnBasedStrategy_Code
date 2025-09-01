@@ -6,6 +6,7 @@
 #include "WorldMap.generated.h"
 
 class ATerritory;
+class ASkaldPlayerState;
 
 // Broadcast when a territory is selected on the world map so that interested
 // systems (e.g. player controllers) can react.
@@ -86,6 +87,10 @@ public:
   UFUNCTION(BlueprintCallable, Category = "WorldMap")
   void SelectTerritory(ATerritory *Territory);
 
+  /** Multicast selection so all clients highlight the same territory. */
+  UFUNCTION(NetMulticast, Reliable)
+  void MulticastSelectTerritory(ATerritory *Territory);
+
   /** Find a path across friendly territories from one territory to another. */
   UFUNCTION(BlueprintCallable, Category = "WorldMap")
   bool FindPath(ATerritory *From, ATerritory *To,
@@ -111,13 +116,23 @@ public:
   UPROPERTY(EditAnywhere, Category = "WorldMap")
   FVector2D SpawnAreaMax = FVector2D(500.f, 500.f);
 
-  /** Maximum distance to consider two territories adjacent. */
-  UPROPERTY(EditAnywhere, Category = "WorldMap")
-  float AdjacencyDistance = 210.f;
+  /** Maximum distance (in Unreal units) to consider two territories adjacent.
+   */
+  UPROPERTY(EditAnywhere, Config, Category = "WorldMap")
+  float AdjacencyDistance = 5000.f;
 
   /** Randomly generated spawn locations keyed by territory ID. */
   UPROPERTY(BlueprintReadOnly, Category = "WorldMap")
   TMap<int32, FVector> SpawnedLocations;
+
+  /** Check whether two territories are adjacent, falling back to distance. */
+  UFUNCTION(BlueprintCallable, Category = "WorldMap")
+  bool AreTerritoriesAdjacent(const ATerritory *A, const ATerritory *B) const;
+
+  /** Determine if a territory is owned by a given player state. */
+  UFUNCTION(BlueprintCallable, Category = "WorldMap")
+  bool IsOwnedBy(const ATerritory *Territory,
+                 const ASkaldPlayerState *Player) const;
 
 protected:
 };
