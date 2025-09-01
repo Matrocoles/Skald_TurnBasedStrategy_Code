@@ -287,6 +287,11 @@ int32 UGridBattleManager::GetDefenderSurvivorCost() const
     return Cost;
 }
 
+AFighterPawn* UGridBattleManager::GetActiveFighter() const
+{
+    return ActiveFighter;
+}
+
 void UGridBattleManager::RollInitiative()
 {
     struct FInitiativeEntry
