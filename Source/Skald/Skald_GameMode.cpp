@@ -471,7 +471,7 @@ void ASkaldGameMode::BeginArmyPlacementPhase() {
 }
 
 int32 ASkaldGameMode::BuildSiegeAtTerritory(int32 TerritoryID,
-                                            E_SiegeWeapons Type) {
+                                            ESiegeWeapon Type) {
   if (!WorldMap) {
     return 0;
   }

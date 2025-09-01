@@ -91,7 +91,7 @@ protected:
 public:
   /** Build siege equipment during the engineering phase. */
   UFUNCTION(BlueprintCallable, Category = "Siege")
-  int32 BuildSiegeAtTerritory(int32 TerritoryID, E_SiegeWeapons Type);
+  int32 BuildSiegeAtTerritory(int32 TerritoryID, ESiegeWeapon Type);
 
   /** Consume a built siege from a territory for an attack. */
   UFUNCTION(BlueprintCallable, Category = "Siege")

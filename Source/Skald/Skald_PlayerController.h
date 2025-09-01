@@ -75,6 +75,10 @@ protected:
   UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
   TSubclassOf<UUserWidget> HUDWidgetClass;
 
+  /** Widget class used for the player faction selection screen. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
+  TSubclassOf<UChoosePlayerWidget> ChoosePlayerWidgetClass;
+
   /** Reference to the HUD widget instance. */
   UPROPERTY(BlueprintReadOnly, Category = "UI",
             meta = (AllowPrivateAccess = "true"))
@@ -164,11 +168,11 @@ public:
 
   /** Handle HUD siege build requests. */
   UFUNCTION(BlueprintCallable, Category = "UI")
-  void HandleBuildSiegeRequested(int32 TerritoryID, E_SiegeWeapons SiegeType);
+  void HandleBuildSiegeRequested(int32 TerritoryID, ESiegeWeapon SiegeType);
 
   /** Server-side processing of a siege build request. */
   UFUNCTION(Server, Reliable)
-  void ServerBuildSiege(int32 TerritoryID, E_SiegeWeapons SiegeType);
+  void ServerBuildSiege(int32 TerritoryID, ESiegeWeapon SiegeType);
 
   /** Server-side processing of a treasure dig request. */
   UFUNCTION(Server, Reliable)

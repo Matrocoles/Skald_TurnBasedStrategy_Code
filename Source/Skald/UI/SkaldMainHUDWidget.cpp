@@ -17,6 +17,16 @@
 #include "UI/ConfirmAttackWidget.h"
 #include "UI/DeployWidget.h"
 #include "WorldMap.h"
+#include "UObject/ConstructorHelpers.h"
+
+USkaldMainHUDWidget::USkaldMainHUDWidget(const FObjectInitializer& ObjectInitializer)
+    : Super(ObjectInitializer) {
+  static ConstructorHelpers::FClassFinder<UDeployWidget> DeployBP(
+      TEXT("/Game/Blueprints/UI/Skald_DeployWidget"));
+  if (DeployBP.Succeeded()) {
+    DeployWidgetClass = DeployBP.Class;
+  }
+}
 
 void USkaldMainHUDWidget::NativeConstruct() {
   Super::NativeConstruct();
@@ -452,7 +462,7 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
 }
 
 void USkaldMainHUDWidget::BuildSiege(int32 TerritoryID,
-                                     E_SiegeWeapons SiegeType) {
+                                     ESiegeWeapon SiegeType) {
   OnBuildSiegeRequested.Broadcast(TerritoryID, SiegeType);
 }
 

@@ -5,6 +5,17 @@
 #include "Components/Button.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "UObject/ConstructorHelpers.h"
+
+ULobbyMenuWidget::ULobbyMenuWidget(const FObjectInitializer& ObjectInitializer)
+    : Super(ObjectInitializer) {
+    static ConstructorHelpers::FClassFinder<UStartGameWidget> StartBP(TEXT("/Game/Blueprints/UI/Skald_StartGameWidget"));
+    if (StartBP.Succeeded()) { StartGameWidgetClass = StartBP.Class; }
+    static ConstructorHelpers::FClassFinder<ULoadGameWidget> LoadBP(TEXT("/Game/Blueprints/UI/Skald_LoadGameWidget"));
+    if (LoadBP.Succeeded()) { LoadGameWidgetClass = LoadBP.Class; }
+    static ConstructorHelpers::FClassFinder<USettingsWidget> SettingsBP(TEXT("/Game/Blueprints/UI/Skald_SettingsWidget"));
+    if (SettingsBP.Succeeded()) { SettingsWidgetClass = SettingsBP.Class; }
+}
 
 void ULobbyMenuWidget::NativeConstruct()
 {
@@ -35,7 +46,7 @@ void ULobbyMenuWidget::OnStartGame()
 {
     if (UWorld* World = GetWorld())
     {
-        if (UClass* StartGameWidgetClass = LoadClass<UStartGameWidget>(nullptr, TEXT("/Game/Blueprints/UI/Skald_StartGameWidget.Skald_StartGameWidget_C")))
+        if (StartGameWidgetClass)
         {
             if (UStartGameWidget* Widget = CreateWidget<UStartGameWidget>(World, StartGameWidgetClass))
             {
@@ -53,12 +64,8 @@ void ULobbyMenuWidget::OnLoadGame()
     {
         if (!LoadGameWidgetClass)
         {
-            LoadGameWidgetClass = LoadClass<ULoadGameWidget>(nullptr, TEXT("/Game/Blueprints/UI/Skald_LoadGameWidget.Skald_LoadGameWidget_C"));
-            if (!LoadGameWidgetClass)
-            {
-                UE_LOG(LogTemp, Error, TEXT("Failed to load default LoadGameWidget class."));
-                return;
-            }
+            UE_LOG(LogTemp, Error, TEXT("LoadGameWidgetClass is not set."));
+            return;
         }
 
         if (ULoadGameWidget* Widget = CreateWidget<ULoadGameWidget>(World, LoadGameWidgetClass))
@@ -76,12 +83,8 @@ void ULobbyMenuWidget::OnSettings()
     {
         if (!SettingsWidgetClass)
         {
-            SettingsWidgetClass = LoadClass<USettingsWidget>(nullptr, TEXT("/Game/Blueprints/UI/Skald_SettingsWidget.Skald_SettingsWidget_C"));
-            if (!SettingsWidgetClass)
-            {
-                UE_LOG(LogTemp, Error, TEXT("Failed to load default SettingsWidget class."));
-                return;
-            }
+            UE_LOG(LogTemp, Error, TEXT("SettingsWidgetClass is not set."));
+            return;
         }
 
         if (USettingsWidget* Widget = CreateWidget<USettingsWidget>(World, SettingsWidgetClass))

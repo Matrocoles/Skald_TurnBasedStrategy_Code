@@ -1,0 +1,182 @@
+[
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/Skald_GameInstance.cpp",
+    "file": "Source/Skald/Skald_GameInstance.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/WorldMap.cpp",
+    "file": "Source/Skald/WorldMap.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/SaveGameWidget.cpp",
+    "file": "Source/Skald/SaveGameWidget.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/SkaldSaveGame.cpp",
+    "file": "Source/Skald/SkaldSaveGame.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/LoadGameWidget.cpp",
+    "file": "Source/Skald/LoadGameWidget.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/ChoosePlayerWidget.cpp",
+    "file": "Source/Skald/ChoosePlayerWidget.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/GridBattleManager.cpp",
+    "file": "Source/Skald/GridBattleManager.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/StartGameWidget.cpp",
+    "file": "Source/Skald/StartGameWidget.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/Skald.cpp",
+    "file": "Source/Skald/Skald.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/Skald_PlayerState.cpp",
+    "file": "Source/Skald/Skald_PlayerState.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/Skald_TurnManager.cpp",
+    "file": "Source/Skald/Skald_TurnManager.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/SkaldSaveGameLibrary.cpp",
+    "file": "Source/Skald/SkaldSaveGameLibrary.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/SettingsWidget.cpp",
+    "file": "Source/Skald/SettingsWidget.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/Territory.cpp",
+    "file": "Source/Skald/Territory.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/Skald_PlayerCharacter.cpp",
+    "file": "Source/Skald/Skald_PlayerCharacter.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/LobbyGameMode.cpp",
+    "file": "Source/Skald/LobbyGameMode.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/Skald_GameMode.cpp",
+    "file": "Source/Skald/Skald_GameMode.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/LobbyMenuWidget.cpp",
+    "file": "Source/Skald/LobbyMenuWidget.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/Skald_PlayerController.cpp",
+    "file": "Source/Skald/Skald_PlayerController.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/Skald_GameState.cpp",
+    "file": "Source/Skald/Skald_GameState.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/Tests/ResolveAttackClampTest.cpp",
+    "file": "Source/Skald/Tests/ResolveAttackClampTest.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/Tests/TerritoryMoveTest.cpp",
+    "file": "Source/Skald/Tests/TerritoryMoveTest.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/Tests/PlayerControllerValidationTest.cpp",
+    "file": "Source/Skald/Tests/PlayerControllerValidationTest.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/Tests/FullTurnFlowTest.cpp",
+    "file": "Source/Skald/Tests/FullTurnFlowTest.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/Tests/BattleResolutionSyncTest.cpp",
+    "file": "Source/Skald/Tests/BattleResolutionSyncTest.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/Tests/TurnManagerTest.cpp",
+    "file": "Source/Skald/Tests/TurnManagerTest.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/Tests/ReinforcementResourceTest.cpp",
+    "file": "Source/Skald/Tests/ReinforcementResourceTest.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/Tests/PlayerControllerLockInMovementTest.cpp",
+    "file": "Source/Skald/Tests/PlayerControllerLockInMovementTest.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/Tests/WorldMapFindPathTest.cpp",
+    "file": "Source/Skald/Tests/WorldMapFindPathTest.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/Tests/SkaldMainHUDWidgetTest.cpp",
+    "file": "Source/Skald/Tests/SkaldMainHUDWidgetTest.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/Tests/AIDecisionFlowTest.cpp",
+    "file": "Source/Skald/Tests/AIDecisionFlowTest.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/Tests/CapitalAttackRequirementTest.cpp",
+    "file": "Source/Skald/Tests/CapitalAttackRequirementTest.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/Tests/WorldMapMissingAssetsTest.cpp",
+    "file": "Source/Skald/Tests/WorldMapMissingAssetsTest.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/UI/DeployWidget.cpp",
+    "file": "Source/Skald/UI/DeployWidget.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/UI/ConfirmAttackWidget.cpp",
+    "file": "Source/Skald/UI/ConfirmAttackWidget.cpp"
+  },
+  {
+    "directory": "/workspace/Skald_TurnBasedStrategy_Code",
+    "command": "clang++ -std=c++17 -I../Engine/Source -ISource -c Source/Skald/UI/SkaldMainHUDWidget.cpp",
+    "file": "Source/Skald/UI/SkaldMainHUDWidget.cpp"
+  }
+]
