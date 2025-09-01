@@ -79,7 +79,15 @@ void UDeployWidget::HandleAccept() {
   }
 
   RemoveFromParent();
+  if (OwningHUD.IsValid()) {
+    OwningHUD->ClearDeployWidget();
+  }
 }
 
-void UDeployWidget::HandleDecline() { RemoveFromParent(); }
+void UDeployWidget::HandleDecline() {
+  RemoveFromParent();
+  if (OwningHUD.IsValid()) {
+    OwningHUD->ClearDeployWidget();
+  }
+}
 
