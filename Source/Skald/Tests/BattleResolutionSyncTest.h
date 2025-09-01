@@ -7,7 +7,7 @@
  * Helper object to listen for world state change broadcasts.
  */
 UCLASS()
-class UWorldStateChangedListener : public UObject
+class SKALD_API UWorldStateChangedListener : public UObject
 {
     GENERATED_BODY()
 
