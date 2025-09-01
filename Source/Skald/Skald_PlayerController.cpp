@@ -12,7 +12,6 @@
 #include "Skald_TurnManager.h"
 #include "Territory.h"
 #include "UI/SkaldMainHUDWidget.h"
-#include "UObject/ConstructorHelpers.h"
 #include "WorldMap.h"
 #include <limits>
 
@@ -28,12 +27,9 @@ ASkaldPlayerController::ASkaldPlayerController() {
   bEnableClickEvents = true;
   bEnableMouseOverEvents = true;
 
-  // Load a default HUD widget blueprint if available.
-  static ConstructorHelpers::FClassFinder<UUserWidget> HUDWidgetFinder(
-      TEXT("/Game/C++_BPs/Skald_MainHUDBP"));
-  if (HUDWidgetFinder.Succeeded()) {
-    HUDWidgetClass = HUDWidgetFinder.Class;
-  }
+  // Default to the native HUD widget class. This avoids loading a
+  // blueprint-derived widget that may not exist or may be corrupt.
+  HUDWidgetClass = USkaldMainHUDWidget::StaticClass();
 }
 
 void ASkaldPlayerController::BeginPlay() {
