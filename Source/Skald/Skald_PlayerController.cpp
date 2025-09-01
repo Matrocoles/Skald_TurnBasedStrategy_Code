@@ -814,6 +814,11 @@ void ASkaldPlayerController::HandleTerritorySelected(ATerritory *Terr) {
   ServerSelectTerritory(Terr->TerritoryID);
 
   if (MainHudWidget) {
+    FString OwnerName = Terr->OwningPlayer
+                            ? Terr->OwningPlayer->PlayerDisplayName
+                            : TEXT("Neutral");
+    MainHudWidget->UpdateTerritoryInfo(Terr->TerritoryName, OwnerName,
+                                       Terr->ArmyStrength);
     MainHudWidget->OnTerritoryClickedUI(Terr);
   }
 }
