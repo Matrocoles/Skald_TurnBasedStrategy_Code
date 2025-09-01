@@ -6,12 +6,14 @@
 #include "Engine/World.h"
 #include "Skald.h"
 #include "Skald_GameMode.h"
+#include "Skald_PlayerState.h"
+#include "Templates/Function.h"
 #include "Territory.h"
 #include <cfloat>
-#include "Templates/Function.h"
 
 AWorldMap::AWorldMap() {
   PrimaryActorTick.bCanEverTick = false;
+  bReplicates = true;
   SelectedTerritory = nullptr;
   TerritoryClass = ATerritory::StaticClass();
 }
@@ -266,6 +268,10 @@ void AWorldMap::SelectTerritory(ATerritory *Territory) {
 
   SelectedTerritory = Territory;
 
+  if (Territory) {
+    Territory->Select();
+  }
+
   OnTerritorySelected.Broadcast(Territory);
 }
 
@@ -296,7 +302,7 @@ bool AWorldMap::FindPath(ATerritory *From, ATerritory *To,
     }
 
     for (ATerritory *Neighbor : Current->AdjacentTerritories) {
-      if (!Neighbor || Neighbor->OwningPlayer != StartOwner ||
+      if (!Neighbor || !IsOwnedBy(Neighbor, StartOwner) ||
           CameFrom.Contains(Neighbor)) {
         continue;
       }
@@ -323,7 +329,7 @@ bool AWorldMap::MoveBetween(ATerritory *From, ATerritory *To, int32 Troops) {
     return false;
   }
 
-  if (From->OwningPlayer != To->OwningPlayer) {
+  if (!IsOwnedBy(To, From->OwningPlayer)) {
     return false;
   }
 
@@ -353,4 +359,29 @@ bool AWorldMap::MoveBetween(ATerritory *From, ATerritory *To, int32 Troops) {
   }
 
   return true;
+}
+
+bool AWorldMap::AreTerritoriesAdjacent(const ATerritory *A,
+                                       const ATerritory *B) const {
+  if (!A || !B) {
+    return false;
+  }
+  if (A->IsAdjacentTo(B) || B->IsAdjacentTo(A)) {
+    return true;
+  }
+  const float Dist =
+      FVector::Dist(A->GetActorLocation(), B->GetActorLocation());
+  return Dist <= AdjacencyDistance;
+}
+
+bool AWorldMap::IsOwnedBy(const ATerritory *Territory,
+                          const ASkaldPlayerState *Player) const {
+  if (!Territory || !Player || !Territory->OwningPlayer) {
+    return false;
+  }
+  return Territory->OwningPlayer->GetPlayerId() == Player->GetPlayerId();
+}
+
+void AWorldMap::MulticastSelectTerritory_Implementation(ATerritory *Territory) {
+  SelectTerritory(Territory);
 }

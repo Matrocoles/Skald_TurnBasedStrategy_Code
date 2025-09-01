@@ -13,8 +13,8 @@
 #include "Territory.h"
 #include "UI/DeployWidget.h"
 #include "UI/SkaldMainHUDWidget.h"
-#include "WorldMap.h"
 #include "UObject/ConstructorHelpers.h"
+#include "WorldMap.h"
 #include <limits>
 
 constexpr int32 MaxAIIterations = 100;
@@ -441,7 +441,7 @@ bool ASkaldPlayerController::ValidateAttack(int32 FromID, int32 ToID,
     return false;
   }
 
-  if (!Source->IsAdjacentTo(Target)) {
+  if (!WorldMap->AreTerritoriesAdjacent(Source, Target)) {
     if (OutError) {
       *OutError = TEXT("Cannot attack non-adjacent territory");
     }
@@ -674,7 +674,7 @@ void ASkaldPlayerController::ServerDeployUnits_Implementation(int32 TerritoryID,
     return;
   }
 
-  if (Terr->OwningPlayer != PS || PS->ArmyPool < Amount) {
+  if (!WorldMap->IsOwnedBy(Terr, PS) || PS->ArmyPool < Amount) {
     return;
   }
 
@@ -699,24 +699,11 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
   }
 
   ATerritory *Terr = WorldMap->GetTerritoryById(TerritoryID);
-  if (!Terr) {
+  if (!Terr || WorldMap->SelectedTerritory == Terr) {
     return;
   }
 
-  FString OwnerName = Terr->OwningPlayer ? Terr->OwningPlayer->PlayerDisplayName
-                                         : TEXT("Neutral");
-
-  Terr->ForceNetUpdate();
-
-  if (TurnManager) {
-    for (ASkaldPlayerController *Controller : TurnManager->GetControllers()) {
-      if (USkaldMainHUDWidget *HUD =
-              Controller ? Controller->GetHUDWidget() : nullptr) {
-        HUD->UpdateTerritoryInfo(Terr->TerritoryName, OwnerName,
-                                 Terr->ArmyStrength);
-      }
-    }
-  }
+  WorldMap->MulticastSelectTerritory(Terr);
 }
 
 void ASkaldPlayerController::HandleEndAttackRequested(bool bConfirmed) {
@@ -741,8 +728,8 @@ void ASkaldPlayerController::HandleEngineeringRequested(int32 CapitalID,
   }
 }
 
-void ASkaldPlayerController::HandleBuildSiegeRequested(
-    int32 TerritoryID, ESiegeWeapon SiegeType) {
+void ASkaldPlayerController::HandleBuildSiegeRequested(int32 TerritoryID,
+                                                       ESiegeWeapon SiegeType) {
   ServerBuildSiege(TerritoryID, SiegeType);
 }
 
