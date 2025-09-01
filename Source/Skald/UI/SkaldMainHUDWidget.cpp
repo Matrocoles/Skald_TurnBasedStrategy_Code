@@ -403,7 +403,7 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
 
   if (bSelectingForAttack) {
     if (SelectedSourceID == -1) {
-      if (bOwnedByLocal && Territory->ArmyStrength > 1) {
+      if (bOwnedByLocal && Territory->ArmyUnits > 1) {
         SelectedSourceID = Territory->TerritoryID;
         Territory->Select();
         if (SelectionPrompt) {
@@ -441,7 +441,7 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
                       GetWorld(), AWorldMap::StaticClass()))) {
             if (ATerritory *Source =
                     WorldMap->GetTerritoryById(SelectedSourceID)) {
-              MaxUnits = Source->ArmyStrength - 1;
+              MaxUnits = Source->ArmyUnits - 1;
             }
           }
           ActiveConfirmWidget->Setup(MaxUnits);
@@ -578,7 +578,7 @@ void USkaldMainHUDWidget::HandleAttackApproved() {
   if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
           GetWorld(), AWorldMap::StaticClass()))) {
     if (ATerritory *Source = WorldMap->GetTerritoryById(SourceID)) {
-      ArmyCount = FMath::Clamp(ArmyCount, 1, Source->ArmyStrength);
+      ArmyCount = FMath::Clamp(ArmyCount, 1, Source->ArmyUnits);
     }
     if (ATerritory *Target = WorldMap->GetTerritoryById(TargetID)) {
       bTargetIsCapital = Target->bIsCapital;

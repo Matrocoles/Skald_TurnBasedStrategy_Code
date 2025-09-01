@@ -37,11 +37,11 @@ bool FSkaldBattleResolutionSyncTest::RunTest(const FString& Parameters) {
   PS2->SetPlayerId(2);
 
   Source->TerritoryID = 1;
-  Source->ArmyStrength = 10;
+  Source->ArmyUnits = 10;
   Source->OwningPlayer = PS1;
 
   Target->TerritoryID = 2;
-  Target->ArmyStrength = 5;
+  Target->ArmyUnits = 5;
   Target->OwningPlayer = PS2;
 
   WM->Territories.Add(Source);
@@ -55,8 +55,8 @@ bool FSkaldBattleResolutionSyncTest::RunTest(const FString& Parameters) {
   TM->ClientBattleResolved(1, 3, 5, 1, 2, 1, 5, 2);
 
   TestTrue(TEXT("Broadcast fired"), Listener->bBroadcasted);
-  TestEqual(TEXT("Source army"), Source->ArmyStrength, 5);
-  TestEqual(TEXT("Target army"), Target->ArmyStrength, 2);
+  TestEqual(TEXT("Source army"), Source->ArmyUnits, 5);
+  TestEqual(TEXT("Target army"), Target->ArmyUnits, 2);
   TestTrue(TEXT("Target owner"), Target->OwningPlayer == PS1);
 
   return true;

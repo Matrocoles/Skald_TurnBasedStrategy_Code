@@ -81,7 +81,7 @@ struct SKALD_API FS_ArmyUnit
     int32 OwnerPlayerID = 0;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
-    int32 ArmyCount = 0;
+    int32 ArmyUnits = 0;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     bool HasTreasure = false;
@@ -214,7 +214,7 @@ struct SKALD_API FS_Territory
     int32 CapitalOwner = 0;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
-    int32 ArmyCount = 0;
+    int32 ArmyUnits = 0;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     TArray<int32> AdjacentIDs;

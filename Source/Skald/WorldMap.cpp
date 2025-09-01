@@ -333,7 +333,7 @@ bool AWorldMap::MoveBetween(ATerritory *From, ATerritory *To, int32 Troops) {
     return false;
   }
 
-  if (Troops <= 0 || Troops >= From->ArmyStrength) {
+  if (Troops <= 0 || Troops >= From->ArmyUnits) {
     return false;
   }
 

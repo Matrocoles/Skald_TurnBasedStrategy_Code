@@ -312,7 +312,7 @@ void ASkaldPlayerController::MakeAIDecision() {
       while (PS->DeployableUnits > 0 && OwnedTerritories.Num() > 0) {
         ATerritory *TargetTerritory =
             OwnedTerritories[SpreadIndex % OwnedTerritories.Num()];
-        ++TargetTerritory->ArmyStrength;
+        ++TargetTerritory->ArmyUnits;
         TargetTerritory->RefreshAppearance();
         --PS->DeployableUnits;
         --PS->Resources;
@@ -330,7 +330,7 @@ void ASkaldPlayerController::MakeAIDecision() {
 
       for (ATerritory *Source : WorldMap->Territories) {
         if (!Source || Source->OwningPlayer != PS ||
-            Source->ArmyStrength <= 1) {
+            Source->ArmyUnits <= 1) {
           continue;
         }
 
@@ -339,16 +339,16 @@ void ASkaldPlayerController::MakeAIDecision() {
             continue;
           }
 
-          if (Neighbor->ArmyStrength < WeakestStrength) {
+          if (Neighbor->ArmyUnits < WeakestStrength) {
             BestSource = Source;
             BestTarget = Neighbor;
-            WeakestStrength = Neighbor->ArmyStrength;
+            WeakestStrength = Neighbor->ArmyUnits;
           }
         }
       }
 
-      if (BestSource && BestTarget && BestSource->ArmyStrength > 1) {
-        const int32 ArmySent = BestSource->ArmyStrength - 1;
+      if (BestSource && BestTarget && BestSource->ArmyUnits > 1) {
+        const int32 ArmySent = BestSource->ArmyUnits - 1;
         HandleAttackRequested(BestSource->TerritoryID, BestTarget->TerritoryID,
                               ArmySent, false);
       }
@@ -364,7 +364,7 @@ void ASkaldPlayerController::MakeAIDecision() {
 
       for (ATerritory *Source : WorldMap->Territories) {
         if (!Source || Source->OwningPlayer != PS ||
-            Source->ArmyStrength <= 1) {
+            Source->ArmyUnits <= 1) {
           continue;
         }
 
@@ -373,18 +373,18 @@ void ASkaldPlayerController::MakeAIDecision() {
             continue;
           }
 
-          if (Neighbor->ArmyStrength < WeakestStrength) {
+          if (Neighbor->ArmyUnits < WeakestStrength) {
             BestSource = Source;
             BestTarget = Neighbor;
-            WeakestStrength = Neighbor->ArmyStrength;
+            WeakestStrength = Neighbor->ArmyUnits;
           }
         }
       }
 
       if (BestSource && BestTarget) {
-        int32 TroopsToMove = BestSource->ArmyStrength / 2;
+        int32 TroopsToMove = BestSource->ArmyUnits / 2;
         TroopsToMove =
-            FMath::Clamp(TroopsToMove, 1, BestSource->ArmyStrength - 1);
+            FMath::Clamp(TroopsToMove, 1, BestSource->ArmyUnits - 1);
         HandleMoveRequested(BestSource->TerritoryID, BestTarget->TerritoryID,
                             TroopsToMove);
       }
@@ -448,7 +448,7 @@ bool ASkaldPlayerController::ValidateAttack(int32 FromID, int32 ToID,
     return false;
   }
 
-  if (ArmySent <= 0 || ArmySent >= Source->ArmyStrength) {
+  if (ArmySent <= 0 || ArmySent >= Source->ArmyUnits) {
     if (OutError) {
       *OutError = TEXT("Invalid army count for attack");
     }
@@ -520,12 +520,12 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
   }
 
   int32 AttackingForces = ArmySent;
-  int32 DefendingForces = Target->ArmyStrength;
+  int32 DefendingForces = Target->ArmyUnits;
   if (bUseSiege && CachedGameMode) {
     CachedGameMode->ConsumeSiege(FromID);
   }
 
-  Source->ArmyStrength -= ArmySent;
+  Source->ArmyUnits -= ArmySent;
 
   FRandomStream *CombatStream = nullptr;
   if (CachedGameInstance) {
@@ -549,9 +549,9 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
 
   if (DefendingForces <= 0) {
     Target->OwningPlayer = AttackerPS;
-    Target->ArmyStrength = AttackingForces;
+    Target->ArmyUnits = AttackingForces;
   } else {
-    Target->ArmyStrength = DefendingForces;
+    Target->ArmyUnits = DefendingForces;
   }
 
   Source->RefreshAppearance();
@@ -568,7 +568,7 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
                                 ? Target->OwningPlayer->PlayerDisplayName
                                 : TEXT("Neutral");
         HUD->UpdateTerritoryInfo(Target->TerritoryName, OwnerName,
-                                 Target->ArmyStrength);
+                                 Target->ArmyUnits);
       }
     }
   }
@@ -599,7 +599,7 @@ void ASkaldPlayerController::HandleMoveRequested(int32 FromID, int32 ToID,
     return;
   }
 
-  if (Troops <= 0 || Troops >= Source->ArmyStrength) {
+  if (Troops <= 0 || Troops >= Source->ArmyUnits) {
     NotifyActionError(TEXT("Invalid troop count for movement"));
     return;
   }
@@ -622,7 +622,7 @@ void ASkaldPlayerController::ServerHandleMove_Implementation(int32 FromID,
     return;
   }
 
-  if (Troops <= 0 || Troops >= Source->ArmyStrength) {
+  if (Troops <= 0 || Troops >= Source->ArmyUnits) {
     return;
   }
 
@@ -638,12 +638,12 @@ void ASkaldPlayerController::ServerHandleMove_Implementation(int32 FromID,
                                   ? Source->OwningPlayer->PlayerDisplayName
                                   : TEXT("Neutral");
         HUD->UpdateTerritoryInfo(Source->TerritoryName, SourceOwner,
-                                 Source->ArmyStrength);
+                                 Source->ArmyUnits);
         FString TargetOwner = Target->OwningPlayer
                                   ? Target->OwningPlayer->PlayerDisplayName
                                   : TEXT("Neutral");
         HUD->UpdateTerritoryInfo(Target->TerritoryName, TargetOwner,
-                                 Target->ArmyStrength);
+                                 Target->ArmyUnits);
       }
     }
   }
@@ -678,7 +678,7 @@ void ASkaldPlayerController::ServerDeployUnits_Implementation(int32 TerritoryID,
     return;
   }
 
-  Terr->ArmyStrength += Amount;
+  Terr->ArmyUnits += Amount;
   Terr->RefreshAppearance();
   Terr->ForceNetUpdate();
 
@@ -818,7 +818,7 @@ void ASkaldPlayerController::HandleTerritorySelected(ATerritory *Terr) {
                             ? Terr->OwningPlayer->PlayerDisplayName
                             : TEXT("Neutral");
     MainHudWidget->UpdateTerritoryInfo(Terr->TerritoryName, OwnerName,
-                                       Terr->ArmyStrength);
+                                       Terr->ArmyUnits);
     MainHudWidget->OnTerritoryClickedUI(Terr);
   }
 }
@@ -894,7 +894,7 @@ void ASkaldPlayerController::HandleWorldStateChanged() {
                               ? Terr->OwningPlayer->PlayerDisplayName
                               : TEXT("Neutral");
       MainHudWidget->UpdateTerritoryInfo(Terr->TerritoryName, OwnerName,
-                                         Terr->ArmyStrength);
+                                         Terr->ArmyUnits);
     }
   }
 

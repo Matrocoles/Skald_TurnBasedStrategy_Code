@@ -390,7 +390,7 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
     }
 
     Territory->OwningPlayer = TerritoryOwner;
-    Territory->ArmyStrength = TerrData.ArmyCount;
+    Territory->ArmyUnits = TerrData.ArmyUnits;
     Territory->bIsCapital = TerrData.IsCapital;
     Territory->ContinentID = TerrData.ContinentID;
     Territory->BuiltSiegeID = TerrData.BuiltSiegeID;
@@ -567,7 +567,7 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
       while (PS->DeployableUnits > 0 && OwnedTerritories.Num() > 0) {
         ATerritory *TargetTerritory =
             OwnedTerritories[SpreadIndex % OwnedTerritories.Num()];
-        ++TargetTerritory->ArmyStrength;
+        ++TargetTerritory->ArmyUnits;
         TargetTerritory->RefreshAppearance();
         --PS->DeployableUnits;
         ++SpreadIndex;
@@ -720,7 +720,7 @@ bool ASkaldGameMode::InitializeWorld() {
           Cast<ASkaldPlayerState>(GS->PlayerArray[Index % PlayerCount]);
       Territory->OwningPlayer = TerritoryOwner;
       Territory->bIsCapital = false;
-      Territory->ArmyStrength = 1;
+      Territory->ArmyUnits = 1;
       Territory->RefreshAppearance();
       Territory->ForceNetUpdate();
       ++Index;
@@ -859,7 +859,7 @@ void ASkaldGameMode::FillSaveGame(USkaldSaveGame *SaveGameObject) const {
           Territory->OwningPlayer ? Territory->OwningPlayer->GetPlayerId() : 0;
       TerrData.IsCapital = Territory->bIsCapital;
       TerrData.CapitalOwner = TerrData.OwnerPlayerID;
-      TerrData.ArmyCount = Territory->ArmyStrength;
+      TerrData.ArmyUnits = Territory->ArmyUnits;
       TerrData.ContinentID = Territory->ContinentID;
       for (ATerritory *Adj : Territory->AdjacentTerritories) {
         if (Adj) {
