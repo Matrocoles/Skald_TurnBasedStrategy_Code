@@ -147,6 +147,15 @@ void ASkaldPlayerController::BeginPlay() {
             CreateWidget<UFighterSelectionWidget>(
                 this, UFighterSelectionWidget::StaticClass())) {
       GFighterSelectionWidget = Selection;
+      if (CachedGameInstance && CachedGameInstance->GridBattleManager) {
+        if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+          const ESkaldFaction PlayerFaction = PS->Faction;
+          Selection->PlayerFaction = PlayerFaction;
+          Selection->AvailableFighters =
+              CachedGameInstance->GridBattleManager->GetFightersForFaction(
+                  PlayerFaction);
+        }
+      }
       Selection->OnLockedIn.AddDynamic(
           this, &ASkaldPlayerController::HandlePlayerLockedIn);
       Selection->AddToViewport();
