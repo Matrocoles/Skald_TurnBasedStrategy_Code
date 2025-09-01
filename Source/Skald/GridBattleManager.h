@@ -35,6 +35,14 @@ struct FFighterStats
     /** Sides of the damage dice rolled on a successful hit. */
     UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Stats")
     int32 DamageDie = 6;
+
+    /** Damage dealt on a successful hit. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Stats")
+    int32 AttackDamage = 1;
+
+    /** Cost to include this fighter in an army. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Stats")
+    int32 ArmyCost = 1;
 };
 
 USTRUCT(BlueprintType)

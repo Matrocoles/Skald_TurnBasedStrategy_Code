@@ -221,14 +221,14 @@ bool UGridBattleManager::ResolveAttack(FFighter& Attacker, FFighter& Defender, i
         int32 Roll = RandomStream.RandRange(1, 6);
         if (Roll == 6)
         {
-            int32 Damage = RandomStream.RandRange(1, Attacker.Stats.DamageDie) + 3;
+            int32 Damage = Attacker.Stats.AttackDamage + 3;
             Defender.Stats.Health -= Damage;
             Defender.Stats.Health = FMath::Max(Defender.Stats.Health, 0);
             OutDamage += Damage;
         }
         else if (Roll >= RequiredRoll)
         {
-            int32 Damage = RandomStream.RandRange(1, Attacker.Stats.DamageDie);
+            int32 Damage = Attacker.Stats.AttackDamage;
             Defender.Stats.Health -= Damage;
             Defender.Stats.Health = FMath::Max(Defender.Stats.Health, 0);
             OutDamage += Damage;
