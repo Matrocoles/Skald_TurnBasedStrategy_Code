@@ -2,6 +2,7 @@
 #include "Blueprint/UserWidget.h"
 #include "ChoosePlayerWidget.h"
 #include "Engine/Engine.h"
+#include "GridBattleManager.h"
 #include "Kismet/GameplayStatics.h"
 #include "Skald.h"
 #include "SkaldTypes.h"
@@ -12,12 +13,17 @@
 #include "Skald_TurnManager.h"
 #include "Territory.h"
 #include "UI/DeployWidget.h"
+#include "UI/FighterSelectionWidget.h"
 #include "UI/SkaldMainHUDWidget.h"
 #include "UObject/ConstructorHelpers.h"
 #include "WorldMap.h"
 #include <limits>
 
 constexpr int32 MaxAIIterations = 100;
+
+namespace {
+TWeakObjectPtr<UFighterSelectionWidget> GFighterSelectionWidget;
+}
 
 ASkaldPlayerController::ASkaldPlayerController() {
   bIsAI = false;
@@ -129,6 +135,19 @@ void ASkaldPlayerController::BeginPlay() {
       SetInputMode(FInputModeUIOnly());
       SetIgnoreMoveInput(true);
       SetIgnoreLookInput(true);
+    }
+  }
+
+  const FString CurrentMap = UGameplayStatics::GetCurrentLevelName(this, true);
+  if (CurrentMap.Equals(TEXT("BattleMap"), ESearchCase::IgnoreCase)) {
+    if (UFighterSelectionWidget *Selection =
+            CreateWidget<UFighterSelectionWidget>(
+                this, UFighterSelectionWidget::StaticClass())) {
+      GFighterSelectionWidget = Selection;
+      Selection->OnLockedIn.AddDynamic(
+          this, &ASkaldPlayerController::HandlePlayerLockedIn);
+      Selection->AddToViewport();
+      SetIgnoreMoveInput(true);
     }
   }
 
@@ -327,8 +346,7 @@ void ASkaldPlayerController::MakeAIDecision() {
       int32 WeakestStrength = std::numeric_limits<int32>::max();
 
       for (ATerritory *Source : WorldMap->Territories) {
-        if (!Source || Source->OwningPlayer != PS ||
-            Source->ArmyUnits <= 1) {
+        if (!Source || Source->OwningPlayer != PS || Source->ArmyUnits <= 1) {
           continue;
         }
 
@@ -361,8 +379,7 @@ void ASkaldPlayerController::MakeAIDecision() {
       int32 WeakestStrength = std::numeric_limits<int32>::max();
 
       for (ATerritory *Source : WorldMap->Territories) {
-        if (!Source || Source->OwningPlayer != PS ||
-            Source->ArmyUnits <= 1) {
+        if (!Source || Source->OwningPlayer != PS || Source->ArmyUnits <= 1) {
           continue;
         }
 
@@ -381,8 +398,7 @@ void ASkaldPlayerController::MakeAIDecision() {
 
       if (BestSource && BestTarget) {
         int32 TroopsToMove = BestSource->ArmyUnits / 2;
-        TroopsToMove =
-            FMath::Clamp(TroopsToMove, 1, BestSource->ArmyUnits - 1);
+        TroopsToMove = FMath::Clamp(TroopsToMove, 1, BestSource->ArmyUnits - 1);
         HandleMoveRequested(BestSource->TerritoryID, BestTarget->TerritoryID,
                             TroopsToMove);
       }
@@ -655,7 +671,8 @@ void ASkaldPlayerController::ServerDeployUnits_Implementation(int32 TerritoryID,
                                                               int32 Amount) {
   if (Amount <= 0) {
     UE_LOG(LogSkald, Warning,
-           TEXT("ServerDeployUnits called with non-positive amount: %d"), Amount);
+           TEXT("ServerDeployUnits called with non-positive amount: %d"),
+           Amount);
     NotifyActionError(TEXT("Invalid deploy amount"));
     return;
   }
@@ -932,6 +949,29 @@ void ASkaldPlayerController::HandlePlayerLockedIn() {
         this, &ASkaldPlayerController::HandlePlayerLockedIn);
     ChoosePlayerWidget->RemoveFromParent();
   }
+  if (GFighterSelectionWidget.IsValid()) {
+    UFighterSelectionWidget *Selection = GFighterSelectionWidget.Get();
+    Selection->OnLockedIn.RemoveDynamic(
+        this, &ASkaldPlayerController::HandlePlayerLockedIn);
+    Selection->RemoveFromParent();
+
+    if (CachedGameInstance && CachedGameInstance->GridBattleManager) {
+      TArray<FFighter> Fighters;
+      if (Selection) {
+        for (const FFighterDefinition &Def : Selection->ChosenFighters) {
+          FFighter Fighter;
+          Fighter.Stats = Def.Stats;
+          if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+            Fighter.Faction = PS->Faction;
+          }
+          Fighters.Add(Fighter);
+        }
+      }
+      CachedGameInstance->GridBattleManager->InitBattle(Fighters, Fighters);
+    }
+    GFighterSelectionWidget = nullptr;
+  }
+
   // Restore game controls now that the player has locked in
   SetInputMode(FInputModeGameAndUI());
   SetIgnoreMoveInput(false);
