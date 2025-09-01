@@ -15,6 +15,7 @@
 #include "UI/DeployWidget.h"
 #include "UI/FighterSelectionWidget.h"
 #include "UI/SkaldMainHUDWidget.h"
+#include "UI/BattleHUDWidget.h"
 #include "UObject/ConstructorHelpers.h"
 #include "WorldMap.h"
 #include <limits>
@@ -30,6 +31,7 @@ ASkaldPlayerController::ASkaldPlayerController() {
   TurnManager = nullptr;
   HUDRef = nullptr;
   MainHudWidget = nullptr;
+  BattleHudWidget = nullptr;
 
   bShowMouseCursor = true;
   bEnableClickEvents = true;
@@ -38,6 +40,7 @@ ASkaldPlayerController::ASkaldPlayerController() {
   // Default to the native HUD widget class. This avoids loading a
   // blueprint-derived widget that may not exist or may be corrupt.
   HUDWidgetClass = USkaldMainHUDWidget::StaticClass();
+  BattleHUDWidgetClass = UBattleHUDWidget::StaticClass();
 
   static ConstructorHelpers::FClassFinder<UChoosePlayerWidget> ChooseBP(
       TEXT("/Game/Blueprints/UI/Skald_ChoosePlayerWidget"));
@@ -968,6 +971,16 @@ void ASkaldPlayerController::HandlePlayerLockedIn() {
         }
       }
       CachedGameInstance->GridBattleManager->InitBattle(Fighters, Fighters);
+
+      if (BattleHUDWidgetClass) {
+        BattleHudWidget =
+            CreateWidget<UBattleHUDWidget>(this, BattleHUDWidgetClass);
+        if (BattleHudWidget) {
+          BattleHudWidget->AddToViewport();
+          BattleHudWidget->BindToFighter(
+              CachedGameInstance->GridBattleManager->ActiveFighter);
+        }
+      }
     }
     GFighterSelectionWidget = nullptr;
   }
@@ -978,6 +991,6 @@ void ASkaldPlayerController::HandlePlayerLockedIn() {
   SetIgnoreLookInput(false);
 
   if (MainHudWidget) {
-    MainHudWidget->SetVisibility(ESlateVisibility::Visible);
+    MainHudWidget->SetVisibility(ESlateVisibility::Collapsed);
   }
 }
