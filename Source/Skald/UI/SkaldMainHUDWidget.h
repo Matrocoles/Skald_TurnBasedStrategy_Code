@@ -51,6 +51,8 @@ UCLASS(Blueprintable, BlueprintType)
 class SKALD_API USkaldMainHUDWidget : public UUserWidget {
   GENERATED_BODY()
 
+  friend class UDeployWidget;
+
 public:
   USkaldMainHUDWidget(const FObjectInitializer& ObjectInitializer);
 
