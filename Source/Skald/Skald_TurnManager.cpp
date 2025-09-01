@@ -432,8 +432,11 @@ void ATurnManager::BroadcastArmyPool(ASkaldPlayerState *ForPlayer) {
   }
   for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr : Controllers) {
     if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
-      if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
-        HUD->UpdateDeployableUnits(ForPlayer->ArmyPool);
+      ASkaldPlayerState *PS = Controller->GetPlayerState<ASkaldPlayerState>();
+      if (PS == ForPlayer) {
+        if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
+          HUD->UpdateDeployableUnits(ForPlayer->ArmyPool);
+        }
       }
     }
   }
