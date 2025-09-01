@@ -103,6 +103,9 @@ class SKALD_API UGridBattleManager : public UObject
     GENERATED_BODY()
 
 public:
+    /** Load fighter definitions and set default state. */
+    UGridBattleManager();
+
     /** Initialise a battle with attackers and defenders. */
     UFUNCTION(BlueprintCallable, Category="Battle")
     void InitBattle(const TArray<FFighter>& Attackers, const TArray<FFighter>& Defenders);
