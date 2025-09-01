@@ -396,7 +396,6 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
     Territory->BuiltSiegeID = TerrData.BuiltSiegeID;
     Territory->SetActorLocation(TerrData.Location);
     Territory->RefreshAppearance();
-    Territory->ForceNetUpdate();
   }
 
   if (APlayerController *PC = UGameplayStatics::GetPlayerController(this, 0)) {
@@ -461,7 +460,6 @@ void ASkaldGameMode::BeginArmyPlacementPhase() {
         }
       }
       PS->DeployableUnits = FMath::CeilToInt(Owned / 3.f);
-      PS->ForceNetUpdate();
       TurnManager->BroadcastDeployableUnits(PS);
     }
   }
@@ -485,7 +483,6 @@ int32 ASkaldGameMode::BuildSiegeAtTerritory(int32 TerritoryID,
   NewSiege.BuiltAtTerritoryID = TerritoryID;
   SiegePool.Add(NewSiege);
   Terr->BuiltSiegeID = NewSiege.SiegeID;
-  Terr->ForceNetUpdate();
   return NewSiege.SiegeID;
 }
 
@@ -503,7 +500,6 @@ int32 ASkaldGameMode::ConsumeSiege(int32 TerritoryID) {
           [SiegeID](const FS_Siege &S) { return S.SiegeID == SiegeID; })) {
     Siege->AssignedToUnitID = TerritoryID;
   }
-  Terr->ForceNetUpdate();
   return SiegeID;
 }
 
@@ -572,7 +568,6 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
         --PS->DeployableUnits;
         ++SpreadIndex;
       }
-      PS->ForceNetUpdate();
       TurnManager->BroadcastDeployableUnits(PS);
       ++PlacementIndex;
       continue;
@@ -722,7 +717,6 @@ bool ASkaldGameMode::InitializeWorld() {
       Territory->bIsCapital = false;
       Territory->ArmyUnits = 1;
       Territory->RefreshAppearance();
-      Territory->ForceNetUpdate();
       ++Index;
     }
   }

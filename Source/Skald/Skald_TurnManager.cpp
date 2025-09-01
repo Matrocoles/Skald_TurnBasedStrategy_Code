@@ -124,7 +124,6 @@ void ATurnManager::StartTurns() {
     const int32 Reinforcements = FMath::CeilToInt(Owned / 3.0f);
     PS->DeployableUnits += Reinforcements;
     PS->Resources += ResourceGain;
-    PS->ForceNetUpdate();
     BroadcastDeployableUnits(PS);
     BroadcastResources(PS);
   }
@@ -209,7 +208,6 @@ void ATurnManager::AdvanceTurn() {
       const int32 Reinforcements = FMath::CeilToInt(Owned / 3.0f);
       PS->DeployableUnits += Reinforcements;
       PS->Resources += ResourceGain;
-      PS->ForceNetUpdate();
       BroadcastDeployableUnits(PS);
       BroadcastResources(PS);
     }
@@ -336,9 +334,6 @@ void ATurnManager::ResolveGridBattleResult() {
   Source->RefreshAppearance();
   Target->RefreshAppearance();
 
-  Source->ForceNetUpdate();
-  Target->ForceNetUpdate();
-
   GI->PendingBattle = FS_BattlePayload();
   GI->GridBattleManager = nullptr;
 
@@ -363,7 +358,6 @@ void ATurnManager::ClientBattleResolved_Implementation(
     if (Source) {
       Source->ArmyUnits = SourceArmy;
       Source->RefreshAppearance();
-      Source->ForceNetUpdate();
     }
     if (Target) {
       ASkaldPlayerState *NewOwner = nullptr;
@@ -376,7 +370,6 @@ void ATurnManager::ClientBattleResolved_Implementation(
       Target->OwningPlayer = NewOwner;
       Target->ArmyUnits = TargetArmy;
       Target->RefreshAppearance();
-      Target->ForceNetUpdate();
     }
   }
 

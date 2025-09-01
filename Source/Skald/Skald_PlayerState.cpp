@@ -2,7 +2,8 @@
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
 #include "Skald_GameState.h"
-#include "Engine/World.h"
+#include "Skald_PlayerController.h"
+#include "UI/SkaldMainHUDWidget.h"
 
 ASkaldPlayerState::ASkaldPlayerState()
     : bIsAI(false)
@@ -29,6 +30,20 @@ void ASkaldPlayerState::GetLifetimeReplicatedProps(
     DOREPLIFETIME(ASkaldPlayerState, Resources);
     DOREPLIFETIME(ASkaldPlayerState, bHasLockedIn);
     DOREPLIFETIME(ASkaldPlayerState, IsEliminated);
+}
+
+void ASkaldPlayerState::OnRep_DeployableUnits()
+{
+    if (APlayerController* PC = GetOwner<APlayerController>())
+    {
+        if (ASkaldPlayerController* SkaldPC = Cast<ASkaldPlayerController>(PC))
+        {
+            if (USkaldMainHUDWidget* HUD = SkaldPC->GetHUDWidget())
+            {
+                HUD->UpdateDeployableUnits(DeployableUnits);
+            }
+        }
+    }
 }
 
 void ASkaldPlayerState::OnRep_HasLockedIn()
