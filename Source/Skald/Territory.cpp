@@ -121,8 +121,9 @@ void ATerritory::BeginPlay() {
   // Ensure this territory is registered with the world map. When territories
   // are placed manually in a level they may not have been added during map
   // initialization, so register here if needed.
-  if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
-          GetWorld(), AWorldMap::StaticClass()))) {
+  if (AWorldMap *WorldMap =
+          Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+              this, AWorldMap::StaticClass()))) {
     if (!WorldMap->Territories.Contains(this)) {
       WorldMap->RegisterTerritory(this);
     }
