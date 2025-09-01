@@ -5,9 +5,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldCapitalAttackRequirementTest, "Skald.Atta
 
 bool FSkaldCapitalAttackRequirementTest::RunTest(const FString& Parameters)
 {
-    using namespace SkaldConstants;
     TestTrue(TEXT("Non-capital attack bypasses requirement"), SkaldHelpers::MeetsCapitalAttackRequirement(false, 1));
-    TestFalse(TEXT("Capital attack below requirement is invalid"), SkaldHelpers::MeetsCapitalAttackRequirement(true, CapitalAttackArmyRequirement - 1));
-    TestTrue(TEXT("Capital attack meeting requirement is valid"), SkaldHelpers::MeetsCapitalAttackRequirement(true, CapitalAttackArmyRequirement));
+    TestFalse(TEXT("Capital attack below requirement is invalid"), SkaldHelpers::MeetsCapitalAttackRequirement(true, SkaldConstants::CapitalAttackArmyRequirement - 1));
+    TestTrue(TEXT("Capital attack meeting requirement is valid"), SkaldHelpers::MeetsCapitalAttackRequirement(true, SkaldConstants::CapitalAttackArmyRequirement));
     return true;
 }

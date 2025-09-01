@@ -7,7 +7,7 @@
 #include "Skald.h"
 #include "Skald_GameMode.h"
 #include "Territory.h"
-#include <float.h>
+#include <cfloat>
 #include "Templates/Function.h"
 
 AWorldMap::AWorldMap() {

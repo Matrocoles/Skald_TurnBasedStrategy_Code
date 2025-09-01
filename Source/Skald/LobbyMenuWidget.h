@@ -8,6 +8,7 @@ class UButton;
 class UVerticalBox;
 class ULoadGameWidget;
 class USettingsWidget;
+class UStartGameWidget;
 
 /**
  * Main menu widget shown on the lobby map.
@@ -18,6 +19,8 @@ class SKALD_API ULobbyMenuWidget : public UUserWidget
     GENERATED_BODY()
 
 public:
+    ULobbyMenuWidget(const FObjectInitializer& ObjectInitializer);
+
     UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta=(BindWidgetOptional))
     UVerticalBox* Root;
 
@@ -38,6 +41,9 @@ public:
 
     UPROPERTY(EditAnywhere, Category="Lobby")
     TSubclassOf<USettingsWidget> SettingsWidgetClass;
+
+    UPROPERTY(EditAnywhere, Category="Lobby")
+    TSubclassOf<UStartGameWidget> StartGameWidgetClass;
 
 protected:
     virtual void NativeConstruct() override;

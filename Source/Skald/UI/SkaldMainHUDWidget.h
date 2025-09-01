@@ -21,7 +21,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FSkaldAttackRequested, int32,
                                               FromID, int32, ToID, int32,
                                               ArmySent, bool, bUseSiege);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FSkaldBuildSiegeRequested, int32,
-                                             TerritoryID, E_SiegeWeapons,
+                                             TerritoryID, ESiegeWeapon,
                                              SiegeType);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSkaldEndAttackRequested, bool,
                                             bConfirmed);
@@ -52,6 +52,8 @@ class SKALD_API USkaldMainHUDWidget : public UUserWidget {
   GENERATED_BODY()
 
 public:
+  USkaldMainHUDWidget(const FObjectInitializer& ObjectInitializer);
+
   // Identity / state (read by BP)
   UPROPERTY(BlueprintReadWrite, Category = "Skald|State")
   int32 LocalPlayerID = -1;
@@ -199,7 +201,7 @@ public:
   void OnTerritoryClickedUI(ATerritory *Territory);
 
   UFUNCTION(BlueprintCallable, Category = "Skald|Siege")
-  void BuildSiege(int32 TerritoryID, E_SiegeWeapons SiegeType);
+  void BuildSiege(int32 TerritoryID, ESiegeWeapon SiegeType);
 
   UFUNCTION(BlueprintCallable, Category = "Skald|Siege")
   void SetUseSiegeForNextAttack(bool bEnable);

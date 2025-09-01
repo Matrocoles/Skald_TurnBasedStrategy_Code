@@ -14,6 +14,7 @@
 #include "UI/DeployWidget.h"
 #include "UI/SkaldMainHUDWidget.h"
 #include "WorldMap.h"
+#include "UObject/ConstructorHelpers.h"
 #include <limits>
 
 constexpr int32 MaxAIIterations = 100;
@@ -31,6 +32,12 @@ ASkaldPlayerController::ASkaldPlayerController() {
   // Default to the native HUD widget class. This avoids loading a
   // blueprint-derived widget that may not exist or may be corrupt.
   HUDWidgetClass = USkaldMainHUDWidget::StaticClass();
+
+  static ConstructorHelpers::FClassFinder<UChoosePlayerWidget> ChooseBP(
+      TEXT("/Game/Blueprints/UI/Skald_ChoosePlayerWidget"));
+  if (ChooseBP.Succeeded()) {
+    ChoosePlayerWidgetClass = ChooseBP.Class;
+  }
 }
 
 void ASkaldPlayerController::BeginPlay() {
@@ -64,15 +71,6 @@ void ASkaldPlayerController::BeginPlay() {
   if (HUDWidgetClass) {
     MainHudWidget = CreateWidget<USkaldMainHUDWidget>(this, HUDWidgetClass);
     if (MainHudWidget) {
-      // Ensure DeployWidgetClass is set so the Deploy UI can be spawned.
-      if (!MainHudWidget->DeployWidgetClass) {
-        if (UClass *DeployClass = LoadClass<UDeployWidget>(
-                nullptr, TEXT("/Game/Blueprints/UI/"
-                              "Skald_DeployWidget.Skald_DeployWidget_C"))) {
-          MainHudWidget->DeployWidgetClass = DeployClass;
-        }
-      }
-
       HUDRef = MainHudWidget;
       MainHudWidget->AddToViewport();
       MainHudWidget->SetVisibility(ESlateVisibility::Hidden);
@@ -120,23 +118,17 @@ void ASkaldPlayerController::BeginPlay() {
            TEXT("HUDWidgetClass is null; HUD will not be displayed."));
   }
 
-  if (!ChoosePlayerWidget) {
-    if (UClass *ChooseWidgetClass = LoadClass<UChoosePlayerWidget>(
-            nullptr,
-            TEXT("/Game/Blueprints/UI/"
-                 "Skald_ChoosePlayerWidget.Skald_ChoosePlayerWidget_C"))) {
-      ChoosePlayerWidget =
-          CreateWidget<UChoosePlayerWidget>(this, ChooseWidgetClass);
-      if (ChoosePlayerWidget) {
-        ChoosePlayerWidget->OnPlayerLockedIn.AddDynamic(
-            this, &ASkaldPlayerController::HandlePlayerLockedIn);
-        ChoosePlayerWidget->AddToViewport();
-        // While the player is choosing their faction, restrict controls to the
-        // UI
-        SetInputMode(FInputModeUIOnly());
-        SetIgnoreMoveInput(true);
-        SetIgnoreLookInput(true);
-      }
+  if (!ChoosePlayerWidget && ChoosePlayerWidgetClass) {
+    ChoosePlayerWidget =
+        CreateWidget<UChoosePlayerWidget>(this, ChoosePlayerWidgetClass);
+    if (ChoosePlayerWidget) {
+      ChoosePlayerWidget->OnPlayerLockedIn.AddDynamic(
+          this, &ASkaldPlayerController::HandlePlayerLockedIn);
+      ChoosePlayerWidget->AddToViewport();
+      // While the player is choosing their faction, restrict controls to the UI
+      SetInputMode(FInputModeUIOnly());
+      SetIgnoreMoveInput(true);
+      SetIgnoreLookInput(true);
     }
   }
 
@@ -658,7 +650,7 @@ void ASkaldPlayerController::ServerHandleMove_Implementation(int32 FromID,
 }
 
 void ASkaldPlayerController::ServerBuildSiege_Implementation(
-    int32 TerritoryID, E_SiegeWeapons SiegeType) {
+    int32 TerritoryID, ESiegeWeapon SiegeType) {
   if (CachedGameMode) {
     CachedGameMode->BuildSiegeAtTerritory(TerritoryID, SiegeType);
   }
@@ -716,7 +708,7 @@ void ASkaldPlayerController::HandleEngineeringRequested(int32 CapitalID,
 }
 
 void ASkaldPlayerController::HandleBuildSiegeRequested(
-    int32 TerritoryID, E_SiegeWeapons SiegeType) {
+    int32 TerritoryID, ESiegeWeapon SiegeType) {
   ServerBuildSiege(TerritoryID, SiegeType);
 }
 

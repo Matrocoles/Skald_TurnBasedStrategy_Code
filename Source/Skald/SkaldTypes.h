@@ -51,7 +51,7 @@ enum class ESkaldFaction : uint8
 };
 
 UENUM(BlueprintType)
-enum class E_SiegeWeapons : uint8   // (Consider E prefix instead of Enum_ for UE style)
+enum class ESiegeWeapon : uint8
 {
     BatteringRam UMETA(DisplayName = "BatteringRam"),
     Trebuchet    UMETA(DisplayName = "Trebuchet"),
@@ -181,7 +181,7 @@ struct SKALD_API FS_Siege
     int32 SiegeID = 0;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
-    E_SiegeWeapons Type = E_SiegeWeapons::BatteringRam;
+    ESiegeWeapon Type = ESiegeWeapon::BatteringRam;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     int32 BuiltAtTerritoryID = 0;
