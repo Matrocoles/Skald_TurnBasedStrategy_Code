@@ -659,22 +659,42 @@ void ASkaldPlayerController::ServerBuildSiege_Implementation(
 void ASkaldPlayerController::ServerDeployUnits_Implementation(int32 TerritoryID,
                                                               int32 Amount) {
   if (Amount <= 0) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("ServerDeployUnits called with non-positive amount: %d"), Amount);
+    NotifyActionError(TEXT("Invalid deploy amount"));
     return;
   }
 
   AWorldMap *WorldMap = Cast<AWorldMap>(
       UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
   if (!WorldMap) {
+    UE_LOG(LogSkald, Warning, TEXT("ServerDeployUnits: World map not found"));
+    NotifyActionError(TEXT("World map not found"));
     return;
   }
 
   ATerritory *Terr = WorldMap->GetTerritoryById(TerritoryID);
   ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
   if (!Terr || !PS) {
+    UE_LOG(LogSkald, Warning, TEXT("ServerDeployUnits: Invalid territory %d"),
+           TerritoryID);
+    NotifyActionError(TEXT("Invalid territory selection"));
     return;
   }
 
-  if (!WorldMap->IsOwnedBy(Terr, PS) || PS->DeployableUnits < Amount) {
+  if (!WorldMap->IsOwnedBy(Terr, PS)) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("ServerDeployUnits: Player %d does not own territory %d"),
+           PS->GetPlayerId(), TerritoryID);
+    NotifyActionError(TEXT("You do not own this territory"));
+    return;
+  }
+
+  if (PS->DeployableUnits < Amount) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("ServerDeployUnits: Insufficient units. Have %d need %d"),
+           PS->DeployableUnits, Amount);
+    NotifyActionError(TEXT("Not enough deployable units"));
     return;
   }
 
