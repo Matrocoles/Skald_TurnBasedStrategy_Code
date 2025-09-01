@@ -109,7 +109,10 @@ void USettingsWidget::OnApply()
 
 void USettingsWidget::OnMainMenu()
 {
+    // Hide the settings widget before showing the main menu again
+    SetVisibility(ESlateVisibility::Hidden);
     RemoveFromParent();
+
     if (LobbyMenu.IsValid())
     {
         LobbyMenu->SetVisibility(ESlateVisibility::Visible);
