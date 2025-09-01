@@ -9,6 +9,7 @@ class ATurnManager;
 class UUserWidget;
 class USkaldMainHUDWidget;
 class UChoosePlayerWidget;
+class UBattleHUDWidget;
 class ATerritory;
 class ASkaldGameMode;
 class ASkaldGameState;
@@ -75,6 +76,10 @@ protected:
   UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
   TSubclassOf<UUserWidget> HUDWidgetClass;
 
+  /** Widget class used for in-battle HUD. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
+  TSubclassOf<UBattleHUDWidget> BattleHUDWidgetClass;
+
   /** Widget class used for the player faction selection screen. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
   TSubclassOf<UChoosePlayerWidget> ChoosePlayerWidgetClass;
@@ -88,6 +93,11 @@ protected:
   UPROPERTY(BlueprintReadOnly, Category = "UI",
             meta = (AllowPrivateAccess = "true"))
   TObjectPtr<USkaldMainHUDWidget> MainHudWidget;
+
+  /** Typed reference to the battle HUD widget. */
+  UPROPERTY(BlueprintReadOnly, Category = "UI",
+            meta = (AllowPrivateAccess = "true"))
+  TObjectPtr<UBattleHUDWidget> BattleHudWidget;
 
   /** Player selection widget instance. */
   UPROPERTY(BlueprintReadOnly, Category = "UI",
