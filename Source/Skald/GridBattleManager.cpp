@@ -71,14 +71,14 @@ void UGridBattleManager::InitBattle(const TArray<FFighter>& Attackers, const TAr
     CurrentRound = 1;
 }
 
-int32 UGridBattleManager::RollInitiative(FRandomStream& RandomStream)
+int32 UGridBattleManager::RollInitiativeDie(FRandomStream& RandomStream)
 {
     return RandomStream.RandRange(1, 6);
 }
 
 void UGridBattleManager::StartBattle(FRandomStream& RandomStream)
 {
-    bool bAttackerTurn = RollInitiative(RandomStream) >= RollInitiative(RandomStream);
+    bool bAttackerTurn = RollInitiativeDie(RandomStream) >= RollInitiativeDie(RandomStream);
 
     TArray<FIntPoint> PreviousAttackerPositions;
     PreviousAttackerPositions.Reserve(AttackerTeam.Num());
