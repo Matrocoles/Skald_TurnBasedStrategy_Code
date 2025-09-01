@@ -5,7 +5,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldResolveAttackClampTest, "Skald.GridBattle
 bool FSkaldResolveAttackClampTest::RunTest(const FString& Parameters) {
   FFighter Attacker;
   Attacker.Stats.AttackDice = 1;
-  Attacker.Stats.DamageDie = 6;
+  Attacker.Stats.AttackDamage = 6;
 
   FFighter Defender;
   Defender.Stats.Health = 5;
