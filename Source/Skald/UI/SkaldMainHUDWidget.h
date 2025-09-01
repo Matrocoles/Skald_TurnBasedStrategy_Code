@@ -303,6 +303,8 @@ protected:
   UFUNCTION()
   void HandleAttackApproved();
 
+  void ClearDeployWidget();
+
   UPROPERTY()
   UConfirmAttackWidget *ActiveConfirmWidget = nullptr;
 

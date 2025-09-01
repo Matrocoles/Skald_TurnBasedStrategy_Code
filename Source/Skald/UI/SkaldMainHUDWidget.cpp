@@ -25,11 +25,17 @@ USkaldMainHUDWidget::USkaldMainHUDWidget(const FObjectInitializer& ObjectInitial
       TEXT("/Game/Blueprints/UI/Skald_DeployWidget"));
   if (DeployBP.Succeeded()) {
     DeployWidgetClass = DeployBP.Class;
+  } else {
+    UE_LOG(LogSkald, Error,
+           TEXT("SkaldMainHUDWidget: failed to find deploy widget class"));
   }
   static ConstructorHelpers::FClassFinder<UConfirmAttackWidget> ConfirmBP(
       TEXT("/Game/Blueprints/UI/Skald_ConfirmAttackWidget"));
   if (ConfirmBP.Succeeded()) {
     ConfirmAttackWidgetClass = ConfirmBP.Class;
+  } else {
+    UE_LOG(LogSkald, Error,
+           TEXT("SkaldMainHUDWidget: failed to find confirm attack widget class"));
   }
 }
 
@@ -160,6 +166,12 @@ void USkaldMainHUDWidget::UpdatePhaseBanner(ETurnPhase InPhase) {
   CurrentPhase = InPhase;
 
   BP_SetPhaseText(CurrentPhase);
+  if (CurrentPhase != ETurnPhase::Attack) {
+    CancelAttackSelection();
+  }
+  if (CurrentPhase != ETurnPhase::Reinforcement && CurrentPhase != ETurnPhase::ArmyPlacement) {
+    ClearDeployWidget();
+  }
   if (!FindFunction(TEXT("BP_SetPhaseButtons"))) {
     UE_LOG(LogSkald, Warning, TEXT("SyncPhaseButtons not bound for HUD %s"),
            *GetName());
@@ -408,7 +420,9 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
     }
 
     // Source selected: only allow choosing highlighted enemy territories
-    if (HighlightedTerritories.Contains(Territory)) {
+    const bool bIsHighlighted = HighlightedTerritories.ContainsByPredicate(
+        [Territory](ATerritory* T) { return T && T->TerritoryID == Territory->TerritoryID; });
+    if (bIsHighlighted) {
       SelectedTargetID = Territory->TerritoryID;
       if (SelectionPrompt) {
         SelectionPrompt->SetVisibility(ESlateVisibility::Collapsed);
@@ -436,8 +450,21 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
             ActiveConfirmWidget->CancelButton->OnClicked.AddDynamic(
                 this, &USkaldMainHUDWidget::CancelAttackSelection);
           }
+        } else {
+          UE_LOG(LogSkald, Warning,
+                 TEXT("OnTerritoryClickedUI: failed to create confirm widget"));
+          ShowErrorMessage(TEXT("Could not open confirm attack UI"));
         }
+      } else {
+        UE_LOG(LogSkald, Warning,
+               TEXT("OnTerritoryClickedUI: ConfirmAttackWidgetClass null"));
+        ShowErrorMessage(TEXT("Confirm attack widget missing"));
       }
+    } else {
+      UE_LOG(LogSkald, Warning,
+             TEXT("OnTerritoryClickedUI: territory %d not highlighted for attack"),
+             Territory->TerritoryID);
+      ShowErrorMessage(TEXT("Target not attackable"));
     }
     return;
   } else if (bSelectingForMove) {
@@ -614,12 +641,35 @@ void USkaldMainHUDWidget::HandleAttackApproved() {
 void USkaldMainHUDWidget::HandleDeployClicked() {
   APlayerController *PC = GetOwningPlayer();
   if (!PC) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("HandleDeployClicked failed: no owning PlayerController"));
+    ShowErrorMessage(TEXT("No player controller"));
     return;
   }
 
   ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>();
-  if (!PS || PS->ArmyPool <= 0 || SelectedSourceID == -1 ||
-      !DeployWidgetClass) {
+  if (!PS) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("HandleDeployClicked failed: missing PlayerState"));
+    ShowErrorMessage(TEXT("Missing player state"));
+    return;
+  }
+  if (PS->ArmyPool <= 0) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("HandleDeployClicked failed: ArmyPool empty"));
+    ShowErrorMessage(TEXT("No troops to deploy"));
+    return;
+  }
+  if (SelectedSourceID == -1) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("HandleDeployClicked failed: no territory selected"));
+    ShowErrorMessage(TEXT("No territory selected"));
+    return;
+  }
+  if (!DeployWidgetClass) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("HandleDeployClicked failed: DeployWidgetClass null"));
+    ShowErrorMessage(TEXT("Deploy widget unavailable"));
     return;
   }
 
@@ -630,6 +680,10 @@ void USkaldMainHUDWidget::HandleDeployClicked() {
   }
 
   if (!Territory || Territory->OwningPlayer != PS) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("HandleDeployClicked failed: invalid territory %d"),
+           SelectedSourceID);
+    ShowErrorMessage(TEXT("Invalid territory selected"));
     return;
   }
 
@@ -638,5 +692,17 @@ void USkaldMainHUDWidget::HandleDeployClicked() {
   if (ActiveDeployWidget) {
     ActiveDeployWidget->Setup(Territory, PS, this, PS->ArmyPool);
     ActiveDeployWidget->AddToViewport();
+  } else {
+    UE_LOG(LogSkald, Warning,
+           TEXT("HandleDeployClicked failed: could not create widget"));
+    ShowErrorMessage(TEXT("Could not open deploy UI"));
   }
 }
+
+void USkaldMainHUDWidget::ClearDeployWidget() {
+  if (ActiveDeployWidget) {
+    ActiveDeployWidget->RemoveFromParent();
+    ActiveDeployWidget = nullptr;
+  }
+}
+
