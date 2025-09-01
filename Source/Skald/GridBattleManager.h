@@ -113,7 +113,7 @@ public:
 
     /** Roll a D6 to determine initiative. */
     UFUNCTION(BlueprintCallable, Category="Battle")
-    static int32 RollInitiative(UPARAM(ref) FRandomStream& RandomStream);
+    static int32 RollInitiativeDie(UPARAM(ref) FRandomStream& RandomStream);
 
     /** Resolve an attack following strength/defence rules. Returns true if the defender is defeated. */
     UFUNCTION(BlueprintCallable, Category="Battle")
