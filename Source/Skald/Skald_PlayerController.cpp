@@ -122,6 +122,10 @@ void ASkaldPlayerController::BeginPlay() {
         ChoosePlayerWidget->OnPlayerLockedIn.AddDynamic(
             this, &ASkaldPlayerController::HandlePlayerLockedIn);
         ChoosePlayerWidget->AddToViewport();
+        // While the player is choosing their faction, restrict controls to the UI
+        SetInputMode(FInputModeUIOnly());
+        SetIgnoreMoveInput(true);
+        SetIgnoreLookInput(true);
       }
     }
   }
@@ -870,6 +874,11 @@ void ASkaldPlayerController::HandlePlayerLockedIn() {
         this, &ASkaldPlayerController::HandlePlayerLockedIn);
     ChoosePlayerWidget->RemoveFromParent();
   }
+  // Restore game controls now that the player has locked in
+  SetInputMode(FInputModeGameAndUI());
+  SetIgnoreMoveInput(false);
+  SetIgnoreLookInput(false);
+
   if (MainHudWidget) {
     MainHudWidget->SetVisibility(ESlateVisibility::Visible);
   }
