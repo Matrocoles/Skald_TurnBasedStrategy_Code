@@ -403,7 +403,7 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
 
   if (bSelectingForAttack) {
     if (SelectedSourceID == -1) {
-      if (bOwnedByLocal && Territory->ArmyStrength > 0) {
+      if (bOwnedByLocal && Territory->ArmyStrength > 1) {
         SelectedSourceID = Territory->TerritoryID;
         Territory->Select();
         if (SelectionPrompt) {
@@ -417,6 +417,8 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
             HighlightedTerritories.Add(Adj);
           }
         }
+      } else if (bOwnedByLocal) {
+        ShowErrorMessage(TEXT("Need more than one unit to attack"));
       }
       return;
     }
@@ -439,7 +441,7 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
                       GetWorld(), AWorldMap::StaticClass()))) {
             if (ATerritory *Source =
                     WorldMap->GetTerritoryById(SelectedSourceID)) {
-              MaxUnits = Source->ArmyStrength;
+              MaxUnits = Source->ArmyStrength - 1;
             }
           }
           ActiveConfirmWidget->Setup(MaxUnits);
