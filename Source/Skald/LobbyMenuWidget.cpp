@@ -70,8 +70,11 @@ void ULobbyMenuWidget::OnLoadGame()
 
         if (ULoadGameWidget* Widget = CreateWidget<ULoadGameWidget>(World, LoadGameWidgetClass))
         {
+            // Pass a reference to the lobby so it can be restored later
             Widget->SetLobbyMenu(this);
             Widget->AddToViewport();
+
+            // Hide the lobby while the load-game menu is active
             SetVisibility(ESlateVisibility::Hidden);
         }
     }

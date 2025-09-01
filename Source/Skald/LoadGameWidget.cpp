@@ -61,6 +61,7 @@ void ULoadGameWidget::OnMainMenu()
     RemoveFromParent();
     if (LobbyMenu.IsValid())
     {
+        // Re-enable the lobby once the load-game widget closes
         LobbyMenu->SetVisibility(ESlateVisibility::Visible);
     }
 }

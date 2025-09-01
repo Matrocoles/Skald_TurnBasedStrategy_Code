@@ -50,6 +50,7 @@ private:
     void HandleLoadSlot(int32 SlotIndex);
 
     UPROPERTY()
+    /** Weak reference back to the lobby so it can be re-enabled when closing. */
     TWeakObjectPtr<ULobbyMenuWidget> LobbyMenu;
 };
 
