@@ -7,8 +7,8 @@
 #include "WorldMap.h"
 #include "DeployUnitsReplicationTest.h"
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldArmyPoolCalculationTest, "Skald.TurnManager.ArmyPoolCalculation", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
-bool FSkaldArmyPoolCalculationTest::RunTest(const FString& Parameters) {
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldDeployableUnitsCalculationTest, "Skald.TurnManager.DeployableUnitsCalculation", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSkaldDeployableUnitsCalculationTest::RunTest(const FString& Parameters) {
   UWorld* World = FAutomationEditorCommonUtils::CreateNewMap();
   TestNotNull(TEXT("World created"), World);
   if (!World) {
@@ -46,7 +46,7 @@ bool FSkaldArmyPoolCalculationTest::RunTest(const FString& Parameters) {
   Map->Territories = Terrs;
 
   TM->StartTurns();
-  TestEqual(TEXT("Army pool after start"), PS->ArmyPool, 2);
+  TestEqual(TEXT("Deployable units after start"), PS->DeployableUnits, 2);
   TestEqual(TEXT("HUD after start"), HUD->LastUnits, 2);
 
   // add two more territories and advance turn to recalc
@@ -62,7 +62,7 @@ bool FSkaldArmyPoolCalculationTest::RunTest(const FString& Parameters) {
   Map->Territories = Terrs;
 
   TM->AdvanceTurn();
-  TestEqual(TEXT("Army pool after advance"), PS->ArmyPool, 3);
+  TestEqual(TEXT("Deployable units after advance"), PS->DeployableUnits, 3);
   TestEqual(TEXT("HUD after advance"), HUD->LastUnits, 3);
 
   return true;

@@ -5,7 +5,7 @@
 #include "UI/SkaldMainHUDWidget.h"
 #include "DeployUnitsReplicationTest.generated.h"
 
-/** HUD widget capturing the last army pool value for tests. */
+/** HUD widget capturing the last deployable units value for tests. */
 UCLASS()
 class UDeployTestHUDWidget : public USkaldMainHUDWidget {
     GENERATED_BODY()

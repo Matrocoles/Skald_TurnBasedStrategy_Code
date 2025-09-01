@@ -43,19 +43,19 @@ void UDeployWidget::HandleAccept() {
 
   const int32 Selected = AmountSelector
                               ? FMath::Clamp(FMath::RoundToInt(AmountSelector->GetValue()), 0,
-                                             PlayerState->ArmyPool)
+                                             PlayerState->DeployableUnits)
                               : 0;
   if (Selected > 0) {
     if (APlayerController *PC = OwningHUD->GetOwningPlayer()) {
       if (ASkaldPlayerController *SKPC = Cast<ASkaldPlayerController>(PC)) {
         SKPC->ServerDeployUnits(Territory->TerritoryID, Selected);
         if (ATurnManager *TM = SKPC->GetTurnManager()) {
-          TM->BroadcastArmyPool(PlayerState);
+          TM->BroadcastDeployableUnits(PlayerState);
         }
       }
     }
 
-    const int32 Remaining = PlayerState->ArmyPool - Selected;
+    const int32 Remaining = PlayerState->DeployableUnits - Selected;
     if (Remaining <= 0 && OwningHUD->DeployButton) {
       OwningHUD->DeployButton->SetVisibility(ESlateVisibility::Collapsed);
       bool bHandled = false;

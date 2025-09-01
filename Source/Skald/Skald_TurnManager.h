@@ -47,9 +47,9 @@ public:
     UFUNCTION(BlueprintCallable, Category="Turn")
     void AdvancePhase();
 
-    /** Update all players' HUDs with the specified player's army pool. */
+    /** Update all players' HUDs with the specified player's deployable units. */
     UFUNCTION(BlueprintCallable, Category="Turn")
-    void BroadcastArmyPool(class ASkaldPlayerState* ForPlayer);
+    void BroadcastDeployableUnits(class ASkaldPlayerState* ForPlayer);
 
     /** Update all HUDs with the specified player's resources. */
     UFUNCTION(BlueprintCallable, Category="Turn")

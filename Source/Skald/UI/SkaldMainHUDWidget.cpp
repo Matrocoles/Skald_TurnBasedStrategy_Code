@@ -658,9 +658,9 @@ void USkaldMainHUDWidget::HandleDeployClicked() {
     ShowErrorMessage(TEXT("Missing player state"));
     return;
   }
-  if (PS->ArmyPool <= 0) {
+  if (PS->DeployableUnits <= 0) {
     UE_LOG(LogSkald, Warning,
-           TEXT("HandleDeployClicked failed: ArmyPool empty"));
+           TEXT("HandleDeployClicked failed: no deployable units"));
     ShowErrorMessage(TEXT("No troops to deploy"));
     return;
   }
@@ -695,7 +695,7 @@ void USkaldMainHUDWidget::HandleDeployClicked() {
   ActiveDeployWidget =
       CreateWidget<UDeployWidget>(GetWorld(), DeployWidgetClass);
   if (ActiveDeployWidget) {
-    ActiveDeployWidget->Setup(Territory, PS, this, PS->ArmyPool);
+    ActiveDeployWidget->Setup(Territory, PS, this, PS->DeployableUnits);
     ActiveDeployWidget->AddToViewport();
   } else {
     UE_LOG(LogSkald, Warning,

@@ -37,7 +37,7 @@ bool FSkaldAIDecisionFlowTest::RunTest(const FString& Parameters)
 
     PC1->PlayerState = PS1;
     PS1->bIsAI = true;
-    PS1->ArmyPool = 4;
+    PS1->DeployableUnits = 4;
     PS1->Resources = 4;
     PC1->SetTurnManager(TM);
 
@@ -72,7 +72,7 @@ bool FSkaldAIDecisionFlowTest::RunTest(const FString& Parameters)
     FMath::RandInit(1);
     PC1->MakeAIDecision();
 
-    TestEqual(TEXT("Army pool spent"), PS1->ArmyPool, 0);
+    TestEqual(TEXT("Deployable units spent"), PS1->DeployableUnits, 0);
     TestEqual(TEXT("Resources spent"), PS1->Resources, 0);
     TestEqual(TEXT("Attack captured territory"), TB->OwningPlayer, PS1);
     TestTrue(TEXT("Movement reinforced"), TA->ArmyStrength > 1);

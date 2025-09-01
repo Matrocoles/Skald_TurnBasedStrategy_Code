@@ -122,10 +122,10 @@ void ATurnManager::StartTurns() {
       }
     }
     const int32 Reinforcements = FMath::CeilToInt(Owned / 3.0f);
-    PS->ArmyPool = Reinforcements;
+    PS->DeployableUnits = Reinforcements;
     PS->Resources += ResourceGain;
     PS->ForceNetUpdate();
-    BroadcastArmyPool(PS);
+    BroadcastDeployableUnits(PS);
     BroadcastResources(PS);
   }
 
@@ -207,10 +207,10 @@ void ATurnManager::AdvanceTurn() {
         }
       }
       const int32 Reinforcements = FMath::CeilToInt(Owned / 3.0f);
-      PS->ArmyPool = Reinforcements;
+      PS->DeployableUnits = Reinforcements;
       PS->Resources += ResourceGain;
       PS->ForceNetUpdate();
-      BroadcastArmyPool(PS);
+      BroadcastDeployableUnits(PS);
       BroadcastResources(PS);
     }
 
@@ -426,7 +426,7 @@ void ATurnManager::AdvancePhase() {
   BroadcastCurrentPhase();
 }
 
-void ATurnManager::BroadcastArmyPool(ASkaldPlayerState *ForPlayer) {
+void ATurnManager::BroadcastDeployableUnits(ASkaldPlayerState *ForPlayer) {
   if (!ForPlayer) {
     return;
   }
@@ -435,7 +435,7 @@ void ATurnManager::BroadcastArmyPool(ASkaldPlayerState *ForPlayer) {
       ASkaldPlayerState *PS = Controller->GetPlayerState<ASkaldPlayerState>();
       if (PS == ForPlayer) {
         if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
-          HUD->UpdateDeployableUnits(ForPlayer->ArmyPool);
+          HUD->UpdateDeployableUnits(ForPlayer->DeployableUnits);
         }
       }
     }

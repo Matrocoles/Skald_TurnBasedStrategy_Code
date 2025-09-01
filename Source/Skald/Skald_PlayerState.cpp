@@ -6,7 +6,7 @@
 
 ASkaldPlayerState::ASkaldPlayerState()
     : bIsAI(false)
-    , ArmyPool(0)
+    , DeployableUnits(0)
     , InitiativeRoll(0)
     , Resources(0)
     , PlayerDisplayName(TEXT("Player"))
@@ -23,7 +23,7 @@ void ASkaldPlayerState::GetLifetimeReplicatedProps(
 
     DOREPLIFETIME(ASkaldPlayerState, PlayerDisplayName);
     DOREPLIFETIME(ASkaldPlayerState, Faction);
-    DOREPLIFETIME(ASkaldPlayerState, ArmyPool);
+    DOREPLIFETIME(ASkaldPlayerState, DeployableUnits);
     DOREPLIFETIME(ASkaldPlayerState, bIsAI);
     DOREPLIFETIME(ASkaldPlayerState, InitiativeRoll);
     DOREPLIFETIME(ASkaldPlayerState, Resources);
