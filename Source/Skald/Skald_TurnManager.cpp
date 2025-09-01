@@ -122,7 +122,7 @@ void ATurnManager::StartTurns() {
       }
     }
     const int32 Reinforcements = FMath::CeilToInt(Owned / 3.0f);
-    PS->DeployableUnits = Reinforcements;
+    PS->DeployableUnits += Reinforcements;
     PS->Resources += ResourceGain;
     PS->ForceNetUpdate();
     BroadcastDeployableUnits(PS);
@@ -207,7 +207,7 @@ void ATurnManager::AdvanceTurn() {
         }
       }
       const int32 Reinforcements = FMath::CeilToInt(Owned / 3.0f);
-      PS->DeployableUnits = Reinforcements;
+      PS->DeployableUnits += Reinforcements;
       PS->Resources += ResourceGain;
       PS->ForceNetUpdate();
       BroadcastDeployableUnits(PS);

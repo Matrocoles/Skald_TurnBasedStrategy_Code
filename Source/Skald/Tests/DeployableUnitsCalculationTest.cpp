@@ -62,8 +62,8 @@ bool FSkaldDeployableUnitsCalculationTest::RunTest(const FString& Parameters) {
   Map->Territories = Terrs;
 
   TM->AdvanceTurn();
-  TestEqual(TEXT("Deployable units after advance"), PS->DeployableUnits, 3);
-  TestEqual(TEXT("HUD after advance"), HUD->LastUnits, 3);
+  TestEqual(TEXT("Deployable units after advance"), PS->DeployableUnits, 5);
+  TestEqual(TEXT("HUD after advance"), HUD->LastUnits, 5);
 
   return true;
 }
