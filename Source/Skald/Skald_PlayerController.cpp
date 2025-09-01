@@ -656,6 +656,40 @@ void ASkaldPlayerController::ServerBuildSiege_Implementation(
   }
 }
 
+void ASkaldPlayerController::ServerDeployUnits_Implementation(int32 TerritoryID,
+                                                              int32 Amount) {
+  if (Amount <= 0) {
+    return;
+  }
+
+  AWorldMap *WorldMap = Cast<AWorldMap>(
+      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
+  if (!WorldMap) {
+    return;
+  }
+
+  ATerritory *Terr = WorldMap->GetTerritoryById(TerritoryID);
+  ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
+  if (!Terr || !PS) {
+    return;
+  }
+
+  if (Terr->OwningPlayer != PS || PS->ArmyPool < Amount) {
+    return;
+  }
+
+  Terr->ArmyStrength += Amount;
+  Terr->RefreshAppearance();
+  Terr->ForceNetUpdate();
+
+  PS->ArmyPool -= Amount;
+  PS->ForceNetUpdate();
+
+  if (TurnManager) {
+    TurnManager->BroadcastArmyPool(PS);
+  }
+}
+
 void ASkaldPlayerController::ServerSelectTerritory_Implementation(
     int32 TerritoryID) {
   AWorldMap *WorldMap = Cast<AWorldMap>(

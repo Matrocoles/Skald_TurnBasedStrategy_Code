@@ -182,6 +182,10 @@ public:
   UFUNCTION(Server, Reliable)
   void ServerHandleMove(int32 FromID, int32 ToID, int32 Troops);
 
+  /** Server-side processing of a unit deployment. */
+  UFUNCTION(Server, Reliable)
+  void ServerDeployUnits(int32 TerritoryID, int32 Amount);
+
   /** Server-side processing of a territory selection. */
   UFUNCTION(Server, Reliable)
   void ServerSelectTerritory(int32 TerritoryID);
