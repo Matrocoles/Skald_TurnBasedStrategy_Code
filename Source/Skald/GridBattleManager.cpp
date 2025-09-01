@@ -1,4 +1,6 @@
 #include "GridBattleManager.h"
+#include "Engine/DataTable.h"
+#include "UObject/ConstructorHelpers.h"
 
 namespace
 {
@@ -54,6 +56,11 @@ namespace
     {
         return Distance(Attacker.Position, Defender.Position) <= Attacker.Stats.AttackRange;
     }
+}
+
+UGridBattleManager::UGridBattleManager()
+{
+    FighterDefinitions = LoadObject<UDataTable>(nullptr, TEXT("/Game/DataTables/FighterTable.FighterTable"));
 }
 
 void UGridBattleManager::InitBattle(const TArray<FFighter>& Attackers, const TArray<FFighter>& Defenders)
