@@ -5,6 +5,9 @@
 #include "Engine/DataTable.h"
 #include "GameFramework/Actor.h"
 #include "SkaldTypes.h"
+
+class AFighterPawn;
+
 #include "GridBattleManager.generated.h"
 
 /** Statistics for a fighter in grid battle mode. */
@@ -116,6 +119,22 @@ public:
     UFUNCTION(BlueprintCallable, Category="Battle")
     static bool ResolveAttack(FFighter& Attacker, FFighter& Defender, int32& OutDamage, UPARAM(ref) FRandomStream& RandomStream);
 
+    /** Roll initiative for all fighters participating in the battle. */
+    UFUNCTION(BlueprintCallable, Category="Battle")
+    void RollInitiative();
+
+    /** Randomly place all fighters at the start of a round. */
+    UFUNCTION(BlueprintCallable, Category="Battle")
+    void StartRound(UPARAM(ref) FRandomStream& RandomStream);
+
+    /** Advance to the next fighter in the initiative order. */
+    UFUNCTION(BlueprintCallable, Category="Battle")
+    void AdvanceTurn();
+
+    /** Conclude the battle and broadcast the results. */
+    UFUNCTION(BlueprintCallable, Category="Battle")
+    void EndBattle();
+
     /** Number of surviving attackers after the battle concludes. */
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
     int32 GetAttackerSurvivors() const;
@@ -147,5 +166,24 @@ protected:
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Battle")
     int32 MaxRounds = 100;
+
+    /** Ordered list of fighters based on their initiative rolls. */
+    UPROPERTY(BlueprintReadOnly, Category="Battle")
+    TArray<AFighterPawn*> InitiativeOrder;
+
+    /** Fighter currently taking its turn. */
+    UPROPERTY(BlueprintReadOnly, Category="Battle")
+    AFighterPawn* ActiveFighter = nullptr;
+
+    /** Index of the fighter whose turn is active. */
+    UPROPERTY(BlueprintReadOnly, Category="Battle")
+    int32 CurrentTurn = 0;
+
+    /** Cached surviving counts for each side. */
+    UPROPERTY(BlueprintReadOnly, Category="Battle")
+    int32 AttackerSurvivorCount = 0;
+
+    UPROPERTY(BlueprintReadOnly, Category="Battle")
+    int32 DefenderSurvivorCount = 0;
 };
 

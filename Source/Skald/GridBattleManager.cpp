@@ -1,6 +1,7 @@
 #include "GridBattleManager.h"
 #include "Engine/DataTable.h"
 #include "UObject/ConstructorHelpers.h"
+#include "FighterPawn.h"
 
 namespace
 {
@@ -252,27 +253,149 @@ bool UGridBattleManager::ResolveAttack(FFighter& Attacker, FFighter& Defender, i
 
 int32 UGridBattleManager::GetAttackerSurvivors() const
 {
-    int32 Count = 0;
-    for (const FFighter& Fighter : AttackerTeam)
-    {
-        if (Fighter.Stats.Health > 0)
-        {
-            ++Count;
-        }
-    }
-    return Count;
+    return AttackerSurvivorCount;
 }
 
 int32 UGridBattleManager::GetDefenderSurvivors() const
 {
-    int32 Count = 0;
-    for (const FFighter& Fighter : DefenderTeam)
+    return DefenderSurvivorCount;
+}
+
+void UGridBattleManager::RollInitiative()
+{
+    struct FInitiativeEntry
     {
-        if (Fighter.Stats.Health > 0)
+        AFighterPawn* Fighter;
+        int32 Roll;
+    };
+
+    TArray<FInitiativeEntry> Rolls;
+    Rolls.Reserve(InitiativeOrder.Num());
+    for (AFighterPawn* Fighter : InitiativeOrder)
+    {
+        if (!Fighter)
         {
-            ++Count;
+            continue;
+        }
+        FInitiativeEntry Entry{Fighter, FMath::RandRange(1, 20)};
+        Rolls.Add(Entry);
+    }
+
+    Rolls.Sort([](const FInitiativeEntry& A, const FInitiativeEntry& B)
+    {
+        return A.Roll > B.Roll;
+    });
+
+    InitiativeOrder.Empty(Rolls.Num());
+    for (const FInitiativeEntry& Entry : Rolls)
+    {
+        InitiativeOrder.Add(Entry.Fighter);
+    }
+
+    CurrentTurn = 0;
+    ActiveFighter = InitiativeOrder.Num() > 0 ? InitiativeOrder[0] : nullptr;
+    if (ActiveFighter)
+    {
+        ActiveFighter->BeginActivation();
+    }
+}
+
+void UGridBattleManager::StartRound(FRandomStream& RandomStream)
+{
+    const int32 EdgeRange = 3;
+    const int32 Half = InitiativeOrder.Num() / 2;
+    for (int32 Index = 0; Index < InitiativeOrder.Num(); ++Index)
+    {
+        AFighterPawn* Fighter = InitiativeOrder[Index];
+        if (!Fighter)
+        {
+            continue;
+        }
+
+        Fighter->BeginActivation();
+
+        FIntPoint Cell;
+        Cell.Y = RandomStream.RandRange(0, GridSize - 1);
+        if (Index < Half)
+        {
+            Cell.X = RandomStream.RandRange(0, EdgeRange - 1);
+        }
+        else
+        {
+            Cell.X = RandomStream.RandRange(GridSize - EdgeRange, GridSize - 1);
+        }
+
+        Fighter->MoveToCell(Cell);
+        Fighter->ActionsRemaining = 0;
+    }
+
+    CurrentTurn = 0;
+    ActiveFighter = InitiativeOrder.Num() > 0 ? InitiativeOrder[0] : nullptr;
+    if (ActiveFighter)
+    {
+        ActiveFighter->BeginActivation();
+    }
+}
+
+void UGridBattleManager::AdvanceTurn()
+{
+    if (ActiveFighter && ActiveFighter->IsAlive() && ActiveFighter->ActionsRemaining > 0)
+    {
+        return;
+    }
+
+    InitiativeOrder.RemoveAll([](AFighterPawn* Fighter)
+    {
+        return !Fighter || !Fighter->IsAlive();
+    });
+
+    if (InitiativeOrder.Num() == 0)
+    {
+        ActiveFighter = nullptr;
+        return;
+    }
+
+    CurrentTurn = (CurrentTurn + 1) % InitiativeOrder.Num();
+    ActiveFighter = InitiativeOrder[CurrentTurn];
+    if (ActiveFighter)
+    {
+        ActiveFighter->BeginActivation();
+    }
+}
+
+void UGridBattleManager::EndBattle()
+{
+    const int32 Half = InitiativeOrder.Num() / 2;
+    AttackerSurvivorCount = 0;
+    DefenderSurvivorCount = 0;
+    for (int32 Index = 0; Index < InitiativeOrder.Num(); ++Index)
+    {
+        AFighterPawn* Fighter = InitiativeOrder[Index];
+        if (Fighter && Fighter->IsAlive())
+        {
+            if (Index < Half)
+            {
+                ++AttackerSurvivorCount;
+            }
+            else
+            {
+                ++DefenderSurvivorCount;
+            }
         }
     }
-    return Count;
+
+    ESkaldFaction Winner = ESkaldFaction::None;
+    if (AttackerSurvivorCount > 0 && DefenderSurvivorCount <= 0)
+    {
+        Winner = AttackerTeam.Num() > 0 ? AttackerTeam[0].Faction : ESkaldFaction::None;
+    }
+    else if (DefenderSurvivorCount > 0 && AttackerSurvivorCount <= 0)
+    {
+        Winner = DefenderTeam.Num() > 0 ? DefenderTeam[0].Faction : ESkaldFaction::None;
+    }
+
+    const int32 AttackerCasualties = AttackerTeam.Num() - AttackerSurvivorCount;
+    const int32 DefenderCasualties = DefenderTeam.Num() - DefenderSurvivorCount;
+    OnBattleEnded.Broadcast(Winner, AttackerCasualties, DefenderCasualties);
 }
 
