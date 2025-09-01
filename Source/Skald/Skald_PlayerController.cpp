@@ -977,8 +977,8 @@ void ASkaldPlayerController::HandlePlayerLockedIn() {
             CreateWidget<UBattleHUDWidget>(this, BattleHUDWidgetClass);
         if (BattleHudWidget) {
           BattleHudWidget->AddToViewport();
-          BattleHudWidget->BindToFighter(
-              CachedGameInstance->GridBattleManager->ActiveFighter);
+            BattleHudWidget->BindToFighter(
+                CachedGameInstance->GridBattleManager->GetActiveFighter());
         }
       }
     }
