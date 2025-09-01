@@ -4,6 +4,8 @@
 #include "CoreMinimal.h"
 #include "GridOverlayComponent.generated.h"
 
+class AFighterPawn;
+
 /**
  * Component that tracks grid cell occupancy and provides world/grid conversion.
  * Designed to be attached to the battle map floor actor.
@@ -36,7 +38,19 @@ public:
   /** Draw a debug highlight box for a grid cell. */
   UFUNCTION(BlueprintCallable, Category = "Grid")
   void HighlightCell(const FIntPoint &GridCoord, const FColor &Color,
-                     float Duration = 0.f) const;
+                     float Duration = 0.f, bool bPersistent = false) const;
+
+  /** Highlight all reachable movement cells for the fighter. */
+  UFUNCTION(BlueprintCallable, Category = "Grid")
+  void HighlightMovement(AFighterPawn *Fighter);
+
+  /** Highlight attack range for the fighter. */
+  UFUNCTION(BlueprintCallable, Category = "Grid")
+  void HighlightAttack(AFighterPawn *Fighter);
+
+  /** Remove any persistent highlights. */
+  UFUNCTION(BlueprintCallable, Category = "Grid")
+  void ClearHighlights() const;
 
 protected:
   /** Width of the grid in cells. */
