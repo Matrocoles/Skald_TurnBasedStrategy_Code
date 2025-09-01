@@ -20,7 +20,7 @@ public:
     bool bIsAI;
 
     /** Deployable units available for placement. */
-    UPROPERTY(BlueprintReadWrite, Replicated, Category="PlayerState")
+    UPROPERTY(BlueprintReadWrite, ReplicatedUsing = OnRep_DeployableUnits, Category="PlayerState")
     int32 DeployableUnits;
 
     /** Initiative roll determining turn order. */
@@ -46,6 +46,9 @@ public:
     /** Whether this player has been eliminated from the match. */
     UPROPERTY(BlueprintReadWrite, ReplicatedUsing = OnRep_IsEliminated, Category="PlayerState")
     bool IsEliminated;
+
+    UFUNCTION()
+    void OnRep_DeployableUnits();
 
     UFUNCTION()
     void OnRep_HasLockedIn();

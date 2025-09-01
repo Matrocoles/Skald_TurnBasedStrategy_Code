@@ -350,8 +350,6 @@ bool AWorldMap::MoveBetween(ATerritory *From, ATerritory *To, int32 Troops) {
     }
     Curr->RefreshAppearance();
     Next->RefreshAppearance();
-    Curr->ForceNetUpdate();
-    Next->ForceNetUpdate();
   }
 
   if (ASkaldGameMode *GM = GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {

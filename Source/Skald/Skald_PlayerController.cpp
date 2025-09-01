@@ -257,7 +257,6 @@ void ASkaldPlayerController::EndPhase() {
   if (Phase == ETurnPhase::ArmyPlacement) {
     if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
       PS->DeployableUnits = 0;
-      PS->ForceNetUpdate();
       TurnManager->BroadcastDeployableUnits(PS);
     }
 
@@ -318,7 +317,6 @@ void ASkaldPlayerController::MakeAIDecision() {
         --PS->Resources;
         ++SpreadIndex;
       }
-      PS->ForceNetUpdate();
       TurnManager->BroadcastDeployableUnits(PS);
       TurnManager->BroadcastResources(PS);
 
@@ -557,9 +555,6 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
   Source->RefreshAppearance();
   Target->RefreshAppearance();
 
-  Source->ForceNetUpdate();
-  Target->ForceNetUpdate();
-
   if (TurnManager) {
     for (ASkaldPlayerController *Controller : TurnManager->GetControllers()) {
       if (USkaldMainHUDWidget *HUD =
@@ -700,10 +695,8 @@ void ASkaldPlayerController::ServerDeployUnits_Implementation(int32 TerritoryID,
 
   Terr->ArmyUnits += Amount;
   Terr->RefreshAppearance();
-  Terr->ForceNetUpdate();
 
   PS->DeployableUnits -= Amount;
-  PS->ForceNetUpdate();
 
   if (TurnManager) {
     TurnManager->BroadcastDeployableUnits(PS);
@@ -741,7 +734,6 @@ void ASkaldPlayerController::HandleEngineeringRequested(int32 CapitalID,
   if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
     const int32 Cost = 10;
     PS->Resources = FMath::Max(0, PS->Resources - Cost);
-    PS->ForceNetUpdate();
     if (TurnManager) {
       TurnManager->BroadcastResources(PS);
     }
@@ -775,7 +767,6 @@ void ASkaldPlayerController::ServerDigTreasure_Implementation(
       Terr->bHasTreasure = false;
       Terr->RefreshAppearance();
       PS->Resources += 5;
-      PS->ForceNetUpdate();
       if (TurnManager) {
         TurnManager->BroadcastResources(PS);
       }
