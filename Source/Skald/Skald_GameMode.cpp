@@ -722,6 +722,7 @@ bool ASkaldGameMode::InitializeWorld() {
       Territory->bIsCapital = false;
       Territory->ArmyStrength = 1;
       Territory->RefreshAppearance();
+      Territory->ForceNetUpdate();
       ++Index;
     }
   }
