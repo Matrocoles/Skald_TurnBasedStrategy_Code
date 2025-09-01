@@ -1,8 +1,8 @@
 #pragma once
 
 #include "Blueprint/UserWidget.h"
-#include "FighterSelectionWidget.generated.h"
 #include "GridBattleManager.h"
+#include "FighterSelectionWidget.generated.h"
 
 class UButton;
 class UScrollBox;
