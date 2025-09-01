@@ -481,11 +481,10 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
         SelectedTargetID = Territory->TerritoryID;
       }
     }
-  } else if ((CurrentPhase == ETurnPhase::Reinforcement ||
-              CurrentPhase == ETurnPhase::ArmyPlacement) &&
-             bOwnedByLocal) {
+  } else if (CurrentPhase == ETurnPhase::Reinforcement ||
+             CurrentPhase == ETurnPhase::ArmyPlacement) {
     SelectedSourceID = Territory->TerritoryID;
-    if (DeployButton) {
+    if (bOwnedByLocal && DeployButton) {
       DeployButton->SetVisibility(ESlateVisibility::Visible);
     }
   } else if (CurrentPhase == ETurnPhase::Engineering && bOwnedByLocal &&
