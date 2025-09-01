@@ -143,6 +143,14 @@ public:
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
     int32 GetDefenderSurvivors() const;
 
+    /** Total army cost of surviving attackers. */
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
+    int32 GetAttackerSurvivorCost() const;
+
+    /** Total army cost of surviving defenders. */
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
+    int32 GetDefenderSurvivorCost() const;
+
     /** Event fired when the battle ends reporting winner and casualties. */
     UPROPERTY(BlueprintAssignable, Category="Battle|Events")
     FOnBattleEnded OnBattleEnded;

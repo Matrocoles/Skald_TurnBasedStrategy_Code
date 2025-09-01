@@ -261,6 +261,32 @@ int32 UGridBattleManager::GetDefenderSurvivors() const
     return DefenderSurvivorCount;
 }
 
+int32 UGridBattleManager::GetAttackerSurvivorCost() const
+{
+    int32 Cost = 0;
+    for (const FFighter& Fighter : AttackerTeam)
+    {
+        if (Fighter.Stats.Health > 0)
+        {
+            Cost += Fighter.Stats.ArmyCost;
+        }
+    }
+    return Cost;
+}
+
+int32 UGridBattleManager::GetDefenderSurvivorCost() const
+{
+    int32 Cost = 0;
+    for (const FFighter& Fighter : DefenderTeam)
+    {
+        if (Fighter.Stats.Health > 0)
+        {
+            Cost += Fighter.Stats.ArmyCost;
+        }
+    }
+    return Cost;
+}
+
 void UGridBattleManager::RollInitiative()
 {
     struct FInitiativeEntry
