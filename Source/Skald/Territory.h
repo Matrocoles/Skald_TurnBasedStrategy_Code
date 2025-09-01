@@ -63,9 +63,9 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory", Replicated)
     TArray<ATerritory*> AdjacentTerritories;
 
-    /** Number of armies stationed in this territory. */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory", ReplicatedUsing = OnRep_ArmyStrength)
-    int32 ArmyStrength = 0;
+    /** Number of units stationed in this territory. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory", ReplicatedUsing = OnRep_ArmyUnits)
+    int32 ArmyUnits = 0;
 
     /** ID of siege equipment built in this territory, 0 if none. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory", Replicated)
@@ -115,7 +115,7 @@ public:
     void OnRep_OwningPlayer();
 
     UFUNCTION()
-    void OnRep_ArmyStrength();
+    void OnRep_ArmyUnits();
 
     UFUNCTION()
     void OnRep_IsCapital();

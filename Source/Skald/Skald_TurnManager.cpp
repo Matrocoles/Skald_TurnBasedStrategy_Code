@@ -311,23 +311,23 @@ void ATurnManager::ResolveGridBattleResult() {
       Source->OwningPlayer ? Source->OwningPlayer->GetPlayerId() : -1;
   const int32 DefenderID =
       Target->OwningPlayer ? Target->OwningPlayer->GetPlayerId() : -1;
-  const int32 InitialSourceArmy = Source->ArmyStrength;
-  const int32 InitialTargetArmy = Target->ArmyStrength;
+  const int32 InitialSourceArmy = Source->ArmyUnits;
+  const int32 InitialTargetArmy = Target->ArmyUnits;
 
   const int32 AttackerSurvivors = GI->GridBattleManager->GetAttackerSurvivors();
   const int32 DefenderSurvivors = GI->GridBattleManager->GetDefenderSurvivors();
 
-  Source->ArmyStrength -= Battle.ArmyCountSent;
+  Source->ArmyUnits -= Battle.ArmyCountSent;
 
   int32 WinningPlayerID = DefenderID;
   int32 NewOwnerPlayerID = DefenderID;
   if (AttackerSurvivors > 0 && DefenderSurvivors <= 0) {
     Target->OwningPlayer = Source->OwningPlayer;
-    Target->ArmyStrength = AttackerSurvivors;
+    Target->ArmyUnits = AttackerSurvivors;
     WinningPlayerID = AttackerID;
     NewOwnerPlayerID = AttackerID;
   } else {
-    Target->ArmyStrength = DefenderSurvivors;
+    Target->ArmyUnits = DefenderSurvivors;
   }
 
   const int32 AttackerCasualties = Battle.ArmyCountSent - AttackerSurvivors;
@@ -350,7 +350,7 @@ void ATurnManager::ResolveGridBattleResult() {
   ClientBattleResolved(WinningPlayerID, AttackerCasualties,
                        DefenderCasualties, Source->TerritoryID,
                        Target->TerritoryID, NewOwnerPlayerID,
-                       Source->ArmyStrength, Target->ArmyStrength);
+                       Source->ArmyUnits, Target->ArmyUnits);
 }
 
 void ATurnManager::ClientBattleResolved_Implementation(
@@ -361,7 +361,7 @@ void ATurnManager::ClientBattleResolved_Implementation(
     ATerritory *Source = CachedWorldMap->GetTerritoryById(FromTerritoryID);
     ATerritory *Target = CachedWorldMap->GetTerritoryById(TargetTerritoryID);
     if (Source) {
-      Source->ArmyStrength = SourceArmy;
+      Source->ArmyUnits = SourceArmy;
       Source->RefreshAppearance();
       Source->ForceNetUpdate();
     }
@@ -374,7 +374,7 @@ void ATurnManager::ClientBattleResolved_Implementation(
         }
       }
       Target->OwningPlayer = NewOwner;
-      Target->ArmyStrength = TargetArmy;
+      Target->ArmyUnits = TargetArmy;
       Target->RefreshAppearance();
       Target->ForceNetUpdate();
     }

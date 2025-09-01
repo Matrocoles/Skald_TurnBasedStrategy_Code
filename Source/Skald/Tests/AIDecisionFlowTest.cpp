@@ -59,9 +59,9 @@ bool FSkaldAIDecisionFlowTest::RunTest(const FString& Parameters)
         return false;
     }
 
-    TA->TerritoryID = 1; TA->OwningPlayer = PS1; TA->ArmyStrength = 10;
-    TB->TerritoryID = 2; TB->OwningPlayer = PS2; TB->ArmyStrength = 1;
-    TC->TerritoryID = 3; TC->OwningPlayer = PS1; TC->ArmyStrength = 1;
+    TA->TerritoryID = 1; TA->OwningPlayer = PS1; TA->ArmyUnits = 10;
+    TB->TerritoryID = 2; TB->OwningPlayer = PS2; TB->ArmyUnits = 1;
+    TC->TerritoryID = 3; TC->OwningPlayer = PS1; TC->ArmyUnits = 1;
 
     TA->AdjacentTerritories = {TB, TC};
     TB->AdjacentTerritories = {TA};
@@ -75,7 +75,7 @@ bool FSkaldAIDecisionFlowTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Deployable units spent"), PS1->DeployableUnits, 0);
     TestEqual(TEXT("Resources spent"), PS1->Resources, 0);
     TestEqual(TEXT("Attack captured territory"), TB->OwningPlayer, PS1);
-    TestTrue(TEXT("Movement reinforced"), TA->ArmyStrength > 1);
+    TestTrue(TEXT("Movement reinforced"), TA->ArmyUnits > 1);
     TestEqual(TEXT("Turn advanced"), TM->GetCurrentPhase(), ETurnPhase::Reinforcement);
 
     return true;

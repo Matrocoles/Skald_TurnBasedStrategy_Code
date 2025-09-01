@@ -70,7 +70,7 @@ ATerritory::ATerritory() {
   TerritoryName = TEXT("");
   bIsCapital = false;
   ContinentID = 0;
-  ArmyStrength = 0;
+  ArmyUnits = 0;
 }
 
 void ATerritory::BeginPlay() {
@@ -140,7 +140,7 @@ void ATerritory::GetLifetimeReplicatedProps(
   DOREPLIFETIME(ATerritory, bIsCapital);
   DOREPLIFETIME(ATerritory, ContinentID);
   DOREPLIFETIME(ATerritory, AdjacentTerritories);
-  DOREPLIFETIME(ATerritory, ArmyStrength);
+  DOREPLIFETIME(ATerritory, ArmyUnits);
   DOREPLIFETIME(ATerritory, BuiltSiegeID);
   DOREPLIFETIME(ATerritory, bHasTreasure);
 }
@@ -179,7 +179,7 @@ bool ATerritory::IsAdjacentTo(const ATerritory *Other) const {
 }
 
 bool ATerritory::MoveTo(ATerritory *TargetTerritory, int32 Troops) {
-  if (!TargetTerritory || Troops <= 0 || Troops >= ArmyStrength) {
+  if (!TargetTerritory || Troops <= 0 || Troops >= ArmyUnits) {
     return false;
   }
 
@@ -188,8 +188,8 @@ bool ATerritory::MoveTo(ATerritory *TargetTerritory, int32 Troops) {
     return false;
   }
 
-  ArmyStrength -= Troops;
-  TargetTerritory->ArmyStrength += Troops;
+  ArmyUnits -= Troops;
+  TargetTerritory->ArmyUnits += Troops;
 
   RefreshAppearance();
   ForceNetUpdate();
@@ -237,7 +237,7 @@ void ATerritory::OnRep_OwningPlayer() { RefreshAppearance(); }
 
 void ATerritory::OnRep_IsCapital() { RefreshAppearance(); }
 
-void ATerritory::OnRep_ArmyStrength() { UpdateLabel(); }
+void ATerritory::OnRep_ArmyUnits() { UpdateLabel(); }
 
 void ATerritory::UpdateTerritoryColor() {
   if (DynamicMaterial) {
@@ -258,7 +258,7 @@ void ATerritory::UpdateLabel() {
   const FString OwnerName =
       OwningPlayer ? OwningPlayer->PlayerDisplayName : TEXT("Neutral");
   const FString Text =
-      FString::Printf(TEXT("%s\nOwner: %s\nArmy: %d"), *TerritoryName,
-                      *OwnerName, ArmyStrength);
+      FString::Printf(TEXT("%s\nOwner: %s\nUnits: %d"), *TerritoryName,
+                      *OwnerName, ArmyUnits);
   LabelComponent->SetText(FText::FromString(Text));
 }

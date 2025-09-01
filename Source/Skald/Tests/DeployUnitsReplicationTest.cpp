@@ -50,7 +50,7 @@ bool FSkaldDeployReplicationTest::RunTest(const FString& Parameters)
 
     Terr->TerritoryID = 1;
     Terr->OwningPlayer = PS1;
-    Terr->ArmyStrength = 5;
+    Terr->ArmyUnits = 5;
     WM->Territories = {Terr};
     PS1->DeployableUnits = 10;
 
@@ -61,7 +61,7 @@ bool FSkaldDeployReplicationTest::RunTest(const FString& Parameters)
 
     PC1->ServerDeployUnits(Terr->TerritoryID, 3);
 
-    TestEqual(TEXT("Territory army updated"), Terr->ArmyStrength, 8);
+    TestEqual(TEXT("Territory army updated"), Terr->ArmyUnits, 8);
     TestEqual(TEXT("Player deployable units updated"), PS1->DeployableUnits, 7);
     TestEqual(TEXT("HUD1 updated"), HUD1->LastUnits, 7);
     TestEqual(TEXT("HUD2 updated"), HUD2->LastUnits, 7);

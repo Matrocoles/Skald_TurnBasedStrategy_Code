@@ -69,10 +69,10 @@ bool FSkaldFullTurnFlowTest::RunTest(const FString &Parameters) {
   T1->bIsCapital = true;
   T1->OwningPlayer = PS;
   T1->bHasTreasure = true;
-  T1->ArmyStrength = 5;
+  T1->ArmyUnits = 5;
   T2->TerritoryID = 2;
   T2->OwningPlayer = PS;
-  T2->ArmyStrength = 0;
+  T2->ArmyUnits = 0;
   T1->AdjacentTerritories = {T2};
   T2->AdjacentTerritories = {T1};
   Map->Territories = {T1, T2};
@@ -103,8 +103,8 @@ bool FSkaldFullTurnFlowTest::RunTest(const FString &Parameters) {
   HUD->OnTerritoryClickedUI(T1);
   HUD->OnTerritoryClickedUI(T2);
   HUD->SubmitMove(T1->TerritoryID, T2->TerritoryID, 2);
-  TestEqual(TEXT("Source after move"), T1->ArmyStrength, 3);
-  TestEqual(TEXT("Target after move"), T2->ArmyStrength, 2);
+  TestEqual(TEXT("Source after move"), T1->ArmyUnits, 3);
+  TestEqual(TEXT("Target after move"), T2->ArmyUnits, 2);
 
   PC->EndPhase(); // to end turn
   TestEqual(TEXT("EndTurn phase"), TM->GetCurrentPhase(), ETurnPhase::EndTurn);
