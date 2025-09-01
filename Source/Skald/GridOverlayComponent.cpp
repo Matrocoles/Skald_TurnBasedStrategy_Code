@@ -81,13 +81,13 @@ void UGridOverlayComponent::HighlightMovement(AFighterPawn *Fighter) {
 
   ClearHighlights();
 
-  FIntPoint Origin = WorldToGrid(Fighter->GetActorLocation());
+  FIntPoint StartCell = WorldToGrid(Fighter->GetActorLocation());
   const int32 Range = Fighter->Stats.Movement;
 
   TSet<FIntPoint> Visited;
   TQueue<TPair<FIntPoint, int32>> Frontier;
-  Visited.Add(Origin);
-  Frontier.Enqueue(TPair<FIntPoint, int32>(Origin, 0));
+  Visited.Add(StartCell);
+  Frontier.Enqueue(TPair<FIntPoint, int32>(StartCell, 0));
 
   while (!Frontier.IsEmpty()) {
     TPair<FIntPoint, int32> Node;
@@ -124,13 +124,13 @@ void UGridOverlayComponent::HighlightAttack(AFighterPawn *Fighter) {
 
   ClearHighlights();
 
-  FIntPoint Origin = WorldToGrid(Fighter->GetActorLocation());
+  FIntPoint StartCell = WorldToGrid(Fighter->GetActorLocation());
   const int32 Range = Fighter->Stats.AttackRange;
 
   TSet<FIntPoint> Visited;
   TQueue<TPair<FIntPoint, int32>> Frontier;
-  Visited.Add(Origin);
-  Frontier.Enqueue(TPair<FIntPoint, int32>(Origin, 0));
+  Visited.Add(StartCell);
+  Frontier.Enqueue(TPair<FIntPoint, int32>(StartCell, 0));
 
   while (!Frontier.IsEmpty()) {
     TPair<FIntPoint, int32> Node;
