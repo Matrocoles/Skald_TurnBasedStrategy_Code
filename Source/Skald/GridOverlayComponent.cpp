@@ -16,6 +16,7 @@ void UGridOverlayComponent::BeginPlay() {
   Width = 50;
   Height = 50;
   Cells.Init(false, Width * Height);
+  ObscuredCells.Init(false, Width * Height);
 
   if (AActor *Owner = GetOwner()) {
     Origin = Owner->GetActorLocation();
@@ -74,6 +75,20 @@ bool UGridOverlayComponent::IsOccupied(const FIntPoint &GridCoord) const {
   return Cells[Index(GridCoord)];
 }
 
+bool UGridOverlayComponent::IsObscured(const FIntPoint &GridCoord) const {
+  if (!IsValidGrid(GridCoord)) {
+    return false;
+  }
+  return ObscuredCells[Index(GridCoord)];
+}
+
+float UGridOverlayComponent::GetCellHeight(const FIntPoint &GridCoord) const {
+  if (!IsValidGrid(GridCoord)) {
+    return Origin.Z;
+  }
+  return CellHeights[Index(GridCoord)];
+}
+
 void UGridOverlayComponent::SetOccupied(const FIntPoint &GridCoord,
                                         bool bOccupied) {
   if (!IsValidGrid(GridCoord)) {
@@ -107,9 +122,25 @@ void UGridOverlayComponent::RegisterObstacle(UGridObstacleComponent *Obstacle) {
   }
   Obstacles.Add(Obstacle);
   if (AActor *Owner = Obstacle->GetOwner()) {
-    FIntPoint Cell = WorldToGrid(Owner->GetActorLocation());
-    if (Obstacle->bBlocksMovement) {
-      SetOccupied(Cell, true);
+    const FBox Bounds = Owner->GetComponentsBoundingBox(true);
+    const FIntPoint Min = WorldToGrid(Bounds.Min);
+    const FIntPoint Max = WorldToGrid(Bounds.Max);
+    for (int32 Y = Min.Y; Y <= Max.Y; ++Y) {
+      for (int32 X = Min.X; X <= Max.X; ++X) {
+        const FIntPoint Cell(X, Y);
+        if (!IsValidGrid(Cell)) {
+          continue;
+        }
+        const int32 Idx = Index(Cell);
+        if (Obstacle->bBlocksMovement && !Obstacle->bClimbable) {
+          Cells[Idx] = true;
+        }
+        ObscuredCells[Idx] = true;
+        if (Obstacle->bClimbable) {
+          CellHeights[Idx] = Bounds.Max.Z;
+          ObscuredCells[Idx] = false;
+        }
+      }
     }
   }
 }
