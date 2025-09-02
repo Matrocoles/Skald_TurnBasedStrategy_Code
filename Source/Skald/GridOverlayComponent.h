@@ -5,6 +5,7 @@
 #include "GridOverlayComponent.generated.h"
 
 class AFighterPawn;
+class UGridObstacleComponent;
 
 /**
  * Component that tracks grid cell occupancy and provides world/grid conversion.
@@ -50,7 +51,11 @@ public:
 
   /** Remove any persistent highlights. */
   UFUNCTION(BlueprintCallable, Category = "Grid")
-  void ClearHighlights() const;
+    void ClearHighlights() const;
+
+    /** Register an obstacle component so it can affect grid behaviour. */
+    UFUNCTION(BlueprintCallable, Category = "Grid")
+    void RegisterObstacle(UGridObstacleComponent *Obstacle);
 
 protected:
   /** Width of the grid in cells. */
@@ -77,5 +82,9 @@ protected:
   int32 Index(const FIntPoint &GridCoord) const;
 
   /** Check whether grid coordinate is inside bounds. */
-  bool IsValidGrid(const FIntPoint &GridCoord) const;
+    bool IsValidGrid(const FIntPoint &GridCoord) const;
+
+    /** Obstacles currently registered with this grid. */
+    UPROPERTY()
+    TArray<UGridObstacleComponent *> Obstacles;
 };

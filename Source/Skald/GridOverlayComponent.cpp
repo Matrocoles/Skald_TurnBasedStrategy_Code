@@ -2,6 +2,7 @@
 #include "Containers/Queue.h"
 #include "DrawDebugHelpers.h"
 #include "FighterPawn.h"
+#include "GridObstacleComponent.h"
 #include "Engine/World.h"
 #include "Engine/EngineTypes.h"
 
@@ -97,6 +98,19 @@ void UGridOverlayComponent::HighlightCell(const FIntPoint &GridCoord,
 void UGridOverlayComponent::ClearHighlights() const {
   if (GetWorld()) {
     FlushPersistentDebugLines(GetWorld());
+  }
+}
+
+void UGridOverlayComponent::RegisterObstacle(UGridObstacleComponent *Obstacle) {
+  if (!Obstacle) {
+    return;
+  }
+  Obstacles.Add(Obstacle);
+  if (AActor *Owner = Obstacle->GetOwner()) {
+    FIntPoint Cell = WorldToGrid(Owner->GetActorLocation());
+    if (Obstacle->bBlocksMovement) {
+      SetOccupied(Cell, true);
+    }
   }
 }
 
