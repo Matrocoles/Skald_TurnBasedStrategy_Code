@@ -2,6 +2,8 @@
 #include "Containers/Queue.h"
 #include "DrawDebugHelpers.h"
 #include "FighterPawn.h"
+#include "Engine/World.h"
+#include "Engine/EngineTypes.h"
 
 UGridOverlayComponent::UGridOverlayComponent() {
   PrimaryComponentTick.bCanEverTick = false;
@@ -17,6 +19,25 @@ void UGridOverlayComponent::BeginPlay() {
   if (AActor *Owner = GetOwner()) {
     Origin = Owner->GetActorLocation();
   }
+
+  CellHeights.Init(Origin.Z, Width * Height);
+
+  if (UWorld *World = GetWorld()) {
+    for (int32 Y = 0; Y < Height; ++Y) {
+      for (int32 X = 0; X < Width; ++X) {
+        const int32 Idx = Index(FIntPoint(X, Y));
+        FVector Start =
+            Origin + FVector((X + 0.5f) * CellSize, (Y + 0.5f) * CellSize, 10000.f);
+        FVector End = Start - FVector(0.f, 0.f, 20000.f);
+        FHitResult Hit;
+        if (World->LineTraceSingleByChannel(Hit, Start, End, ECC_WorldStatic)) {
+          CellHeights[Idx] = Hit.Location.Z;
+        } else {
+          CellHeights[Idx] = Start.Z;
+        }
+      }
+    }
+  }
 }
 
 FIntPoint
@@ -28,8 +49,12 @@ UGridOverlayComponent::WorldToGrid(const FVector &WorldLocation) const {
 }
 
 FVector UGridOverlayComponent::GridToWorld(const FIntPoint &GridCoord) const {
-  return Origin + FVector((GridCoord.X + 0.5f) * CellSize,
-                          (GridCoord.Y + 0.5f) * CellSize, 0.f);
+  FVector World = Origin + FVector((GridCoord.X + 0.5f) * CellSize,
+                                   (GridCoord.Y + 0.5f) * CellSize, 0.f);
+  if (IsValidGrid(GridCoord) && CellHeights.IsValidIndex(Index(GridCoord))) {
+    World.Z = CellHeights[Index(GridCoord)];
+  }
+  return World;
 }
 
 bool UGridOverlayComponent::IsValidGrid(const FIntPoint &GridCoord) const {
@@ -65,6 +90,7 @@ void UGridOverlayComponent::HighlightCell(const FIntPoint &GridCoord,
 
   FVector Center = GridToWorld(GridCoord);
   FVector Extent(CellSize * 0.5f, CellSize * 0.5f, 10.f);
+  Center.Z += Extent.Z; // raise the box above the ground
   DrawDebugSolidBox(GetWorld(), Center, Extent, Color, bPersistent, Duration);
 }
 
