@@ -69,6 +69,10 @@ protected:
   UPROPERTY()
   TArray<bool> Cells;
 
+  /** Cached world-space Z for each grid cell. */
+  UPROPERTY()
+  TArray<float> CellHeights;
+
   /** Get linear array index for a grid coordinate. */
   int32 Index(const FIntPoint &GridCoord) const;
 

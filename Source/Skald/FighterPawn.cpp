@@ -6,10 +6,6 @@
 #include "Skald_GameInstance.h"
 #include "Blueprint/UserWidget.h"
 
-namespace {
-/** Size of a grid cell in world units. */
-constexpr float CellSize = 100.f;
-} // namespace
 
 AFighterPawn::AFighterPawn() {
   PrimaryActorTick.bCanEverTick = false;
@@ -48,19 +44,21 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
   }
 
   CurrentCell = TargetCell;
-  FVector NewLocation(TargetCell.X * CellSize, TargetCell.Y * CellSize,
-                      GetActorLocation().Z);
-  SetActorLocation(NewLocation);
-  ActionsRemaining -= Distance;
-
+  FVector NewLocation = GetActorLocation();
+  UGridOverlayComponent *Grid = nullptr;
   if (UWorld *World = GetWorld()) {
     for (TActorIterator<AActor> It(World); It; ++It) {
-      if (UGridOverlayComponent *Grid =
-              It->FindComponentByClass<UGridOverlayComponent>()) {
-        Grid->ClearHighlights();
+      if ((Grid = It->FindComponentByClass<UGridOverlayComponent>())) {
+        NewLocation = Grid->GridToWorld(TargetCell);
         break;
       }
     }
+  }
+  SetActorLocation(NewLocation);
+  ActionsRemaining -= Distance;
+
+  if (Grid) {
+    Grid->ClearHighlights();
   }
 
   if (Stats.Health != OldHealth) {
