@@ -63,7 +63,7 @@ public:
     void TriggerGridBattle(const FS_BattlePayload& Battle);
 
     /** Apply the outcome of a completed grid battle to the world map. */
-    UFUNCTION(BlueprintCallable, Category="Battle")
+    UFUNCTION(Server, Reliable, BlueprintCallable, Category="Battle")
     void ResolveGridBattleResult();
 
     /** Multicast the results of a resolved battle to all clients. */

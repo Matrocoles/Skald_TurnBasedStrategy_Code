@@ -286,7 +286,7 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
   }
 }
 
-void ATurnManager::ResolveGridBattleResult() {
+void ATurnManager::ResolveGridBattleResult_Implementation() {
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
   if (!GI || !GI->GridBattleManager) {
     return;

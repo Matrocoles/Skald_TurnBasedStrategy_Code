@@ -1084,9 +1084,18 @@ void ASkaldPlayerController::HandleGridClick() {
 void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,
                                                int32 AttackerCasualties,
                                                int32 DefenderCasualties) {
+  if (BattleHudWidget) {
+    BattleHudWidget->RemoveFromParent();
+    BattleHudWidget = nullptr;
+  }
+
   if (VictoryWidgetClass) {
     if (UUserWidget *Widget = CreateWidget<UUserWidget>(this, VictoryWidgetClass)) {
       Widget->AddToViewport();
     }
+  }
+
+  if (TurnManager) {
+    TurnManager->ResolveGridBattleResult();
   }
 }
