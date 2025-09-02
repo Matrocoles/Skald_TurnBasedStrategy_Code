@@ -33,7 +33,7 @@ void UGridOverlayComponent::BeginPlay() {
         if (World->LineTraceSingleByChannel(Hit, Start, End, ECC_WorldStatic)) {
           CellHeights[Idx] = Hit.Location.Z;
         } else {
-          CellHeights[Idx] = Start.Z;
+          CellHeights[Idx] = Origin.Z;
         }
       }
     }
