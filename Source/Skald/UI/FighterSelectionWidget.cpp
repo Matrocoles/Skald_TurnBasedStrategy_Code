@@ -2,6 +2,7 @@
 
 #include "Components/Button.h"
 #include "Components/ScrollBox.h"
+#include "Components/TextBlock.h"
 
 void UFighterEntryWidget::NativeConstruct() {
   Super::NativeConstruct();
@@ -15,6 +16,33 @@ void UFighterEntryWidget::Init(const FFighterDefinition &InFighter,
                                UFighterSelectionWidget *InOwner) {
   Fighter = InFighter;
   Owner = InOwner;
+  if (NameText) {
+    NameText->SetText(FText::FromName(Fighter.Id));
+  }
+  if (StrengthText) {
+    StrengthText->SetText(FText::AsNumber(Fighter.Stats.Strength));
+  }
+  if (DefenceText) {
+    DefenceText->SetText(FText::AsNumber(Fighter.Stats.Defence));
+  }
+  if (HealthText) {
+    HealthText->SetText(FText::AsNumber(Fighter.Stats.Health));
+  }
+  if (AttackRangeText) {
+    AttackRangeText->SetText(FText::AsNumber(Fighter.Stats.AttackRange));
+  }
+  if (AttackDamageText) {
+    AttackDamageText->SetText(FText::AsNumber(Fighter.Stats.AttackDamage));
+  }
+  if (AttackDiceText) {
+    AttackDiceText->SetText(FText::AsNumber(Fighter.Stats.AttackDice));
+  }
+  if (MovementText) {
+    MovementText->SetText(FText::AsNumber(Fighter.Stats.Movement));
+  }
+  if (CostText) {
+    CostText->SetText(FText::AsNumber(Fighter.Stats.ArmyCost));
+  }
 }
 
 void UFighterEntryWidget::HandleClicked() {
@@ -25,6 +53,10 @@ void UFighterEntryWidget::HandleClicked() {
 
 void UFighterSelectionWidget::NativeConstruct() {
   Super::NativeConstruct();
+  if (LockInButton) {
+    LockInButton->OnClicked.AddDynamic(this, &UFighterSelectionWidget::LockIn);
+  }
+  UpdateCostDisplay();
   PopulateFighterList();
 }
 
@@ -54,7 +86,16 @@ bool UFighterSelectionWidget::ChooseFighter(const FFighterDefinition &Fighter) {
   ChosenFighters.Add(Fighter);
   CurrentCost += Fighter.Stats.ArmyCost;
   OnFighterChosen.Broadcast(Fighter);
+  UpdateCostDisplay();
   return true;
 }
 
 void UFighterSelectionWidget::LockIn() { OnLockedIn.Broadcast(); }
+
+void UFighterSelectionWidget::UpdateCostDisplay() {
+  if (CostDisplayText) {
+    CostDisplayText->SetText(FText::Format(FText::FromString("{0} / {1}"),
+                                          FText::AsNumber(CurrentCost),
+                                          FText::AsNumber(MaxCost)));
+  }
+}
