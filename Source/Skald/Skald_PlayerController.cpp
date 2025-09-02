@@ -967,19 +967,24 @@ void ASkaldPlayerController::HandlePlayerLockedIn() {
         this, &ASkaldPlayerController::HandlePlayerLockedIn);
     Selection->RemoveFromParent();
 
-    if (CachedGameInstance && CachedGameInstance->GridBattleManager) {
-      TArray<FFighter> Fighters;
-      if (Selection) {
-        for (const FFighterDefinition &Def : Selection->ChosenFighters) {
-          FFighter Fighter;
-          Fighter.Stats = Def.Stats;
-          if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
-            Fighter.Faction = PS->Faction;
+      if (CachedGameInstance && CachedGameInstance->GridBattleManager) {
+        TArray<FFighter> Fighters;
+        if (Selection) {
+          for (const FFighterDefinition &Def : Selection->ChosenFighters) {
+            FFighter Fighter;
+            Fighter.Stats = Def.Stats;
+            if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+              Fighter.Faction = PS->Faction;
+            }
+            Fighters.Add(Fighter);
           }
-          Fighters.Add(Fighter);
         }
-      }
       CachedGameInstance->GridBattleManager->InitBattle(Fighters, Fighters);
+      CachedGameInstance->GridBattleManager->RollInitiative();
+      CachedGameInstance->GridBattleManager->OnBattleEnded.AddDynamic(
+          this, &ASkaldPlayerController::HandleBattleEnded);
+      CachedGameInstance->GridBattleManager->StartRound(
+          CachedGameInstance->CombatRandomStream);
 
       if (BattleHUDWidgetClass) {
         BattleHudWidget =
@@ -1001,5 +1006,15 @@ void ASkaldPlayerController::HandlePlayerLockedIn() {
 
   if (MainHudWidget) {
     MainHudWidget->SetVisibility(ESlateVisibility::Collapsed);
+  }
+}
+
+void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,
+                                               int32 AttackerCasualties,
+                                               int32 DefenderCasualties) {
+  if (VictoryWidgetClass) {
+    if (UUserWidget *Widget = CreateWidget<UUserWidget>(this, VictoryWidgetClass)) {
+      Widget->AddToViewport();
+    }
   }
 }

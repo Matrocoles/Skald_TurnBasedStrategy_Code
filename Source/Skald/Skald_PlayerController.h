@@ -84,6 +84,10 @@ protected:
   UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
   TSubclassOf<UChoosePlayerWidget> ChoosePlayerWidgetClass;
 
+  /** Widget class used for displaying battle victory. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
+  TSubclassOf<UUserWidget> VictoryWidgetClass;
+
   /** Reference to the HUD widget instance. */
   UPROPERTY(BlueprintReadOnly, Category = "UI",
             meta = (AllowPrivateAccess = "true"))
@@ -170,6 +174,12 @@ public:
   /** React to the player finishing their pre-game selection. */
   UFUNCTION()
   void HandlePlayerLockedIn();
+
+  /** React to the end of a battle. */
+  UFUNCTION()
+  void HandleBattleEnded(ESkaldFaction WinningFaction,
+                         int32 AttackerCasualties,
+                         int32 DefenderCasualties);
 
   /** Server-side processing of an attack request. */
   UFUNCTION(Server, Reliable)
