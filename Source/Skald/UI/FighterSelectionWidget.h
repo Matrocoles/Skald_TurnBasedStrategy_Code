@@ -6,6 +6,7 @@
 
 class UButton;
 class UScrollBox;
+class UTextBlock;
 class UFighterSelectionWidget; // forward declare for entry widget
 
 /**
@@ -27,6 +28,42 @@ public:
   /** Button bound from the blueprint used to choose this fighter. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
   UButton *SelectButton;
+
+  /** Name text bound from the blueprint. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+  UTextBlock *NameText;
+
+  /** Strength display text. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+  UTextBlock *StrengthText;
+
+  /** Defence display text. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+  UTextBlock *DefenceText;
+
+  /** Health display text. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+  UTextBlock *HealthText;
+
+  /** Attack range display text. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+  UTextBlock *AttackRangeText;
+
+  /** Attack damage display text. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+  UTextBlock *AttackDamageText;
+
+  /** Attack dice display text. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+  UTextBlock *AttackDiceText;
+
+  /** Movement display text. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+  UTextBlock *MovementText;
+
+  /** Army cost display text. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+  UTextBlock *CostText;
 
   /** Fighter definition represented by this entry. */
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Fighter")
@@ -84,6 +121,14 @@ public:
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
   UScrollBox *FighterList;
 
+  /** Button that finalises the fighter selection. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+  UButton *LockInButton;
+
+  /** Text displaying the current/maximum cost. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+  UTextBlock *CostDisplayText;
+
   /** Blueprint class used for each fighter entry. */
   UPROPERTY(EditAnywhere, Category = "Skald|Fighter")
   TSubclassOf<UFighterEntryWidget> FighterEntryClass;
@@ -112,4 +157,8 @@ protected:
   /** Check whether a fighter can be afforded with remaining cost. */
   UFUNCTION(BlueprintCallable, Category = "Skald|Fighter")
   bool CanAfford(const FFighterDefinition &Fighter) const;
+
+  /** Update cost display text from current/max cost. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Fighter")
+  void UpdateCostDisplay();
 };

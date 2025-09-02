@@ -52,6 +52,22 @@ public:
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
   UTextBlock *MoveText;
 
+  /** Text displaying strength value. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+  UTextBlock *StrengthText;
+
+  /** Text displaying defence value. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+  UTextBlock *DefenceText;
+
+  /** Text displaying attack range. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+  UTextBlock *AttackRangeText;
+
+  /** Text displaying number of attack dice. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+  UTextBlock *AttackDiceText;
+
 private:
   /** Callback when MoveButton is pressed. */
   UFUNCTION()

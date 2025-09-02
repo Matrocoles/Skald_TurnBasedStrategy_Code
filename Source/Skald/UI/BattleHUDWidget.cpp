@@ -71,6 +71,18 @@ void UBattleHUDWidget::UpdateStatPanel() {
   if (MoveText) {
     MoveText->SetText(FText::AsNumber(BoundFighter->Stats.Movement));
   }
+  if (StrengthText) {
+    StrengthText->SetText(FText::AsNumber(BoundFighter->Stats.Strength));
+  }
+  if (DefenceText) {
+    DefenceText->SetText(FText::AsNumber(BoundFighter->Stats.Defence));
+  }
+  if (AttackRangeText) {
+    AttackRangeText->SetText(FText::AsNumber(BoundFighter->Stats.AttackRange));
+  }
+  if (AttackDiceText) {
+    AttackDiceText->SetText(FText::AsNumber(BoundFighter->Stats.AttackDice));
+  }
 }
 
 UGridOverlayComponent *UBattleHUDWidget::FindGridOverlay() const {
