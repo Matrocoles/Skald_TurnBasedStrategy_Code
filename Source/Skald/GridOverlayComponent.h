@@ -32,6 +32,14 @@ public:
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Grid")
   bool IsOccupied(const FIntPoint &GridCoord) const;
 
+  /** Query whether a grid cell is obscured. */
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Grid")
+  bool IsObscured(const FIntPoint &GridCoord) const;
+
+  /** Get the cached height for a grid cell. */
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Grid")
+  float GetCellHeight(const FIntPoint &GridCoord) const;
+
   /** Mark a grid cell as occupied or free. */
   UFUNCTION(BlueprintCallable, Category = "Grid")
   void SetOccupied(const FIntPoint &GridCoord, bool bOccupied);
@@ -73,6 +81,10 @@ protected:
   /** Occupancy array; true if the cell is occupied. */
   UPROPERTY()
   TArray<bool> Cells;
+
+  /** Obscured array; true if the cell is blocked by an obstacle. */
+  UPROPERTY()
+  TArray<bool> ObscuredCells;
 
   /** Cached world-space Z for each grid cell. */
   UPROPERTY()
