@@ -1,8 +1,10 @@
 #include "FighterPawn.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/TextBlock.h"
 #include "EngineUtils.h"
 #include "GridOverlayComponent.h"
 #include "Skald_GameInstance.h"
+#include "Blueprint/UserWidget.h"
 
 namespace {
 /** Size of a grid cell in world units. */
@@ -16,13 +18,29 @@ AFighterPawn::AFighterPawn() {
       CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DisplayMesh"));
   RootComponent = DisplayMesh;
 
+  HealthWidget =
+      CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthWidget"));
+  HealthWidget->SetupAttachment(DisplayMesh);
+
   ActionsRemaining = 0;
   CurrentCell = FIntPoint::ZeroValue;
+}
+
+void AFighterPawn::BeginPlay() {
+  Super::BeginPlay();
+
+  if (HealthWidget && HealthWidgetTemplate) {
+    HealthWidget->SetWidgetClass(HealthWidgetTemplate);
+  }
+
+  OnHealthChanged.AddDynamic(this, &AFighterPawn::UpdateHealthDisplay);
+  OnHealthChanged.Broadcast(Stats.Health);
 }
 
 void AFighterPawn::BeginActivation() { ActionsRemaining = Stats.Movement; }
 
 void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
+  int32 OldHealth = Stats.Health;
   int32 Distance = FMath::Abs(TargetCell.X - CurrentCell.X) +
                    FMath::Abs(TargetCell.Y - CurrentCell.Y);
   if (Distance > ActionsRemaining) {
@@ -43,6 +61,10 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
         break;
       }
     }
+  }
+
+  if (Stats.Health != OldHealth) {
+    OnHealthChanged.Broadcast(Stats.Health);
   }
 }
 
@@ -74,6 +96,20 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
     if (Roll >= RequiredRoll) {
       Target->Stats.Health =
           FMath::Max(0, Target->Stats.Health - Stats.AttackDamage);
+
+      if (DamageFloatWidgetTemplate && Target) {
+        if (UWorld *World = GetWorld()) {
+          if (UUserWidget *DamageWidget =
+                  CreateWidget<UUserWidget>(World, DamageFloatWidgetTemplate)) {
+            if (UTextBlock *Text =
+                    Cast<UTextBlock>(DamageWidget->GetWidgetFromName(
+                        TEXT("DamageText")))) {
+              Text->SetText(FText::AsNumber(Stats.AttackDamage));
+            }
+            DamageWidget->AddToViewport();
+          }
+        }
+      }
     }
   }
 
@@ -95,3 +131,15 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
 }
 
 bool AFighterPawn::IsAlive() const { return Stats.Health > 0; }
+
+void AFighterPawn::UpdateHealthDisplay(int32 NewHealth) {
+  if (!HealthWidget) {
+    return;
+  }
+  if (UUserWidget *Widget = HealthWidget->GetUserWidgetObject()) {
+    if (UTextBlock *Text =
+            Cast<UTextBlock>(Widget->GetWidgetFromName(TEXT("HealthText")))) {
+      Text->SetText(FText::AsNumber(NewHealth));
+    }
+  }
+}
