@@ -3,6 +3,7 @@
 #include "ChoosePlayerWidget.h"
 #include "Engine/Engine.h"
 #include "GridBattleManager.h"
+#include "GridOverlayComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Skald.h"
 #include "SkaldTypes.h"
@@ -18,6 +19,9 @@
 #include "UI/BattleHUDWidget.h"
 #include "UObject/ConstructorHelpers.h"
 #include "WorldMap.h"
+#include "FighterPawn.h"
+#include "InputCoreTypes.h"
+#include "EngineUtils.h"
 #include <limits>
 
 constexpr int32 MaxAIIterations = 100;
@@ -32,6 +36,7 @@ ASkaldPlayerController::ASkaldPlayerController() {
   HUDRef = nullptr;
   MainHudWidget = nullptr;
   BattleHudWidget = nullptr;
+  CurrentCommandMode = EBattleCommandMode::None;
 
   bShowMouseCursor = true;
   bEnableClickEvents = true;
@@ -991,8 +996,12 @@ void ASkaldPlayerController::HandlePlayerLockedIn() {
             CreateWidget<UBattleHUDWidget>(this, BattleHUDWidgetClass);
         if (BattleHudWidget) {
           BattleHudWidget->AddToViewport();
-            BattleHudWidget->BindToFighter(
-                CachedGameInstance->GridBattleManager->GetActiveFighter());
+          BattleHudWidget->OnMovePressed.AddDynamic(
+              this, &ASkaldPlayerController::BeginMoveMode);
+          BattleHudWidget->OnAttackPressed.AddDynamic(
+              this, &ASkaldPlayerController::BeginAttackMode);
+          BattleHudWidget->BindToFighter(
+              CachedGameInstance->GridBattleManager->GetActiveFighter());
         }
       }
     }
@@ -1007,6 +1016,69 @@ void ASkaldPlayerController::HandlePlayerLockedIn() {
   if (MainHudWidget) {
     MainHudWidget->SetVisibility(ESlateVisibility::Collapsed);
   }
+}
+
+void ASkaldPlayerController::SetupInputComponent() {
+  Super::SetupInputComponent();
+
+  if (InputComponent) {
+    InputComponent->BindKey(EKeys::LeftMouseButton, IE_Pressed, this,
+                            &ASkaldPlayerController::HandleGridClick);
+  }
+}
+
+void ASkaldPlayerController::BeginMoveMode() {
+  CurrentCommandMode = EBattleCommandMode::Move;
+}
+
+void ASkaldPlayerController::BeginAttackMode() {
+  CurrentCommandMode = EBattleCommandMode::Attack;
+}
+
+void ASkaldPlayerController::HandleGridClick() {
+  if (!CachedGameInstance || !CachedGameInstance->GridBattleManager) {
+    return;
+  }
+
+  UGridBattleManager *GridBattleManager = CachedGameInstance->GridBattleManager;
+  AFighterPawn *ActiveFighter = GridBattleManager->GetActiveFighter();
+  if (!ActiveFighter) {
+    return;
+  }
+
+  FHitResult Hit;
+  GetHitResultUnderCursor(ECC_Visibility, false, Hit);
+
+  UGridOverlayComponent *GridOverlay = nullptr;
+  if (UWorld *World = GetWorld()) {
+    for (TActorIterator<AActor> It(World); It; ++It) {
+      if (UGridOverlayComponent *Comp =
+              It->FindComponentByClass<UGridOverlayComponent>()) {
+        GridOverlay = Comp;
+        break;
+      }
+    }
+  }
+
+  if (CurrentCommandMode == EBattleCommandMode::Move && GridOverlay) {
+    const FIntPoint Cell = GridOverlay->WorldToGrid(Hit.Location);
+    ActiveFighter->MoveToCell(Cell);
+  } else if (CurrentCommandMode == EBattleCommandMode::Attack) {
+    if (AFighterPawn *Target = Cast<AFighterPawn>(Hit.GetActor())) {
+      ActiveFighter->PerformAttack(Target);
+    }
+  }
+
+  GridBattleManager->AdvanceTurn();
+  if (BattleHudWidget) {
+    BattleHudWidget->BindToFighter(
+        GridBattleManager->GetActiveFighter());
+  }
+
+  if (GridOverlay) {
+    GridOverlay->ClearHighlights();
+  }
+  CurrentCommandMode = EBattleCommandMode::None;
 }
 
 void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,

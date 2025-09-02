@@ -15,6 +15,14 @@ class ASkaldGameMode;
 class ASkaldGameState;
 class USkaldGameInstance;
 
+/** Command issued by the player during a battle. */
+UENUM()
+enum class EBattleCommandMode : uint8 {
+  None,
+  Move,
+  Attack
+};
+
 /**
  * Player controller capable of participating in turn based gameplay.
  */
@@ -120,6 +128,23 @@ protected:
   UPROPERTY(BlueprintReadOnly, Category = "Game",
             meta = (AllowPrivateAccess = "true"))
   USkaldGameInstance *CachedGameInstance;
+
+  /** Current command selection when issuing grid battle orders. */
+  EBattleCommandMode CurrentCommandMode;
+
+  virtual void SetupInputComponent() override;
+
+  /** Begin selecting a move destination. */
+  UFUNCTION()
+  void BeginMoveMode();
+
+  /** Begin selecting an attack target. */
+  UFUNCTION()
+  void BeginAttackMode();
+
+  /** Handle the player clicking on the grid. */
+  UFUNCTION()
+  void HandleGridClick();
 
 public:
   /** Handle HUD attack submissions.
