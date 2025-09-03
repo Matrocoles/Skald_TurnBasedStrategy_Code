@@ -65,6 +65,10 @@ public:
   UPROPERTY(BlueprintAssignable, Category = "Fighter|Events")
   FOnHealthChanged OnHealthChanged;
 
+protected:
+  /** Clear grid occupancy when the fighter is destroyed. */
+  virtual void Destroyed() override;
+
 private:
   /** Update the health widget with a new value. */
   UFUNCTION()

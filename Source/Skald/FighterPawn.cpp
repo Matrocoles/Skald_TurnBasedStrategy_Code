@@ -198,3 +198,11 @@ void AFighterPawn::UpdateHealthDisplay(int32 NewHealth) {
     }
   }
 }
+
+void AFighterPawn::Destroyed() {
+  if (UGridOverlayComponent *Grid = GetGrid()) {
+    Grid->SetOccupied(CurrentCell, false);
+  }
+  CurrentCell = FIntPoint::ZeroValue;
+  Super::Destroyed();
+}
