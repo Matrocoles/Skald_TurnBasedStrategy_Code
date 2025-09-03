@@ -89,6 +89,7 @@ void UGridBattleManager::InitBattle(const TArray<FFighter>& Attackers, const TAr
 
     AttackerSurvivorCount = 0;
     DefenderSurvivorCount = 0;
+    bTeamsAssigned = false;
 }
 
 int32 UGridBattleManager::RollInitiativeDie(FRandomStream& RandomStream)
@@ -414,10 +415,22 @@ void UGridBattleManager::RollInitiative()
 void UGridBattleManager::StartRound(FRandomStream& RandomStream)
 {
     const int32 EdgeRange = 3;
-    const int32 Half = InitiativeOrder.Num() / 2;
-    for (int32 Index = 0; Index < InitiativeOrder.Num(); ++Index)
+    if (!bTeamsAssigned)
     {
-        AFighterPawn* Fighter = InitiativeOrder[Index];
+        const int32 Half = InitiativeOrder.Num() / 2;
+        for (int32 Index = 0; Index < InitiativeOrder.Num(); ++Index)
+        {
+            AFighterPawn* Fighter = InitiativeOrder[Index];
+            if (Fighter)
+            {
+                Fighter->bIsAttacker = Index < Half;
+            }
+        }
+        bTeamsAssigned = true;
+    }
+
+    for (AFighterPawn* Fighter : InitiativeOrder)
+    {
         if (!Fighter)
         {
             continue;
@@ -427,7 +440,7 @@ void UGridBattleManager::StartRound(FRandomStream& RandomStream)
 
         FIntPoint Cell;
         Cell.Y = RandomStream.RandRange(0, GridSize - 1);
-        if (Index < Half)
+        if (Fighter->bIsAttacker)
         {
             Cell.X = RandomStream.RandRange(0, EdgeRange - 1);
         }
@@ -476,15 +489,13 @@ void UGridBattleManager::AdvanceTurn()
 
 void UGridBattleManager::EndBattle()
 {
-    const int32 Half = InitiativeOrder.Num() / 2;
     AttackerSurvivorCount = 0;
     DefenderSurvivorCount = 0;
-    for (int32 Index = 0; Index < InitiativeOrder.Num(); ++Index)
+    for (AFighterPawn* Fighter : InitiativeOrder)
     {
-        AFighterPawn* Fighter = InitiativeOrder[Index];
         if (Fighter && Fighter->IsAlive())
         {
-            if (Index < Half)
+            if (Fighter->bIsAttacker)
             {
                 AttackerSurvivorCount += Fighter->Stats.ArmyCost;
             }
