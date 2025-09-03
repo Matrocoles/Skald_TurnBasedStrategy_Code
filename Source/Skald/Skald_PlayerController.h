@@ -49,6 +49,9 @@ public:
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Turn")
   bool IsAIController() const;
 
+  UFUNCTION(BlueprintCallable, Category = "Turn")
+  void SetIsAIController(bool bInIsAI);
+
   /** Set the turn manager responsible for sequencing play. */
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void SetTurnManager(ATurnManager *Manager);

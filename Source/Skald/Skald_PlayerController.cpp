@@ -452,6 +452,10 @@ void ASkaldPlayerController::MakeAIDecision() {
 
 bool ASkaldPlayerController::IsAIController() const { return bIsAI; }
 
+void ASkaldPlayerController::SetIsAIController(bool bInIsAI) {
+  bIsAI = bInIsAI;
+}
+
 bool ASkaldPlayerController::ValidateAttack(int32 FromID, int32 ToID,
                                             int32 ArmySent, bool bUseSiege,
                                             FString *OutError) {
