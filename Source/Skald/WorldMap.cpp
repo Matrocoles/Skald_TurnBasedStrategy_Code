@@ -10,6 +10,7 @@
 #include "Skald_PlayerState.h"
 #include "Templates/Function.h"
 #include "Territory.h"
+#include "UObject/ConstructorHelpers.h"
 #include <cfloat>
 
 AWorldMap::AWorldMap() {
@@ -17,6 +18,12 @@ AWorldMap::AWorldMap() {
   bReplicates = true;
   SelectedTerritory = nullptr;
   TerritoryClass = ATerritory::StaticClass();
+
+  static ConstructorHelpers::FObjectFinder<UDataTable> TerritoryTableFinder(
+      TEXT("/Game/DataTables/TerritoriesDataTable.TerritoriesDataTable"));
+  if (TerritoryTableFinder.Succeeded()) {
+    TerritoryTable = TerritoryTableFinder.Object;
+  }
 }
 
 void AWorldMap::BeginPlay() {
