@@ -69,25 +69,26 @@ void UGridBattleManager::InitBattle(const TArray<FFighter>& Attackers, const TAr
     AttackerTeam = Attackers;
     DefenderTeam = Defenders;
     CurrentRound = 1;
-
-    AttackerSurvivorCount = 0;
+    AttackerInitialArmyCost = 0;
     for (const FFighter& Fighter : AttackerTeam)
     {
         if (Fighter.Stats.Health > 0)
         {
-            AttackerSurvivorCount += Fighter.Stats.ArmyCost;
-            ++AttackerSurvivorCount;
+            AttackerInitialArmyCost += Fighter.Stats.ArmyCost;
         }
     }
-    DefenderSurvivorCount = 0;
+
+    DefenderInitialArmyCost = 0;
     for (const FFighter& Fighter : DefenderTeam)
     {
         if (Fighter.Stats.Health > 0)
         {
-            DefenderSurvivorCount += Fighter.Stats.ArmyCost;
-            ++DefenderSurvivorCount;
+            DefenderInitialArmyCost += Fighter.Stats.ArmyCost;
         }
     }
+
+    AttackerSurvivorCount = 0;
+    DefenderSurvivorCount = 0;
 }
 
 int32 UGridBattleManager::RollInitiativeDie(FRandomStream& RandomStream)
@@ -504,23 +505,8 @@ void UGridBattleManager::EndBattle()
         Winner = DefenderTeam.Num() > 0 ? DefenderTeam[0].Faction : ESkaldFaction::None;
     }
 
-    int32 AttackerCasualties = 0;
-    int32 DefenderCasualties = 0;
-    for (int32 Index = 0; Index < InitiativeOrder.Num(); ++Index)
-    {
-        AFighterPawn* Fighter = InitiativeOrder[Index];
-        if (Fighter && !Fighter->IsAlive())
-        {
-            if (Index < Half)
-            {
-                AttackerCasualties += Fighter->Stats.ArmyCost;
-            }
-            else
-            {
-                DefenderCasualties += Fighter->Stats.ArmyCost;
-            }
-        }
-    }
+    int32 AttackerCasualties = AttackerInitialArmyCost - AttackerSurvivorCount;
+    int32 DefenderCasualties = DefenderInitialArmyCost - DefenderSurvivorCount;
 
     OnBattleEnded.Broadcast(Winner, AttackerCasualties, DefenderCasualties);
 }
