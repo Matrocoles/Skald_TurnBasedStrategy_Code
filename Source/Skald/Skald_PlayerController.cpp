@@ -140,7 +140,7 @@ void ASkaldPlayerController::BeginPlay() {
           CreateWidget<UChoosePlayerWidget>(this, ChoosePlayerWidgetClass);
       if (ChoosePlayerWidget) {
         ChoosePlayerWidget->OnPlayerLockedIn.AddDynamic(
-            this, &ASkaldPlayerController::HandlePlayerLockedIn);
+            this, &ASkaldPlayerController::HandleFactionLockedIn);
         ChoosePlayerWidget->AddToViewport();
         // While the player is choosing their faction, restrict controls to the
         // UI
@@ -258,7 +258,7 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
               PlayerFaction);
     }
     Selection->OnLockedIn.AddDynamic(
-        this, &ASkaldPlayerController::HandlePlayerLockedIn);
+        this, &ASkaldPlayerController::HandleFighterSelectionLockedIn);
     Selection->AddToViewport();
     SetIgnoreMoveInput(true);
   }
@@ -999,29 +999,51 @@ void ASkaldPlayerController::HandleWorldStateChanged() {
   }
 }
 
-void ASkaldPlayerController::HandlePlayerLockedIn() {
+void ASkaldPlayerController::HandleFactionLockedIn() {
   if (ChoosePlayerWidget) {
     ChoosePlayerWidget->OnPlayerLockedIn.RemoveDynamic(
-        this, &ASkaldPlayerController::HandlePlayerLockedIn);
+        this, &ASkaldPlayerController::HandleFactionLockedIn);
     ChoosePlayerWidget->RemoveFromParent();
+    ChoosePlayerWidget = nullptr;
   }
+
+  if (MainHudWidget) {
+    MainHudWidget->SetVisibility(ESlateVisibility::Visible);
+    if (CachedGameState) {
+      TArray<FS_PlayerData> Players;
+      BuildPlayerDataArray(Players);
+      MainHudWidget->RefreshPlayerList(Players);
+    }
+    if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+      MainHudWidget->UpdateDeployableUnits(PS->DeployableUnits);
+      MainHudWidget->UpdateResources(PS->Resources);
+    }
+    if (TurnManager) {
+      MainHudWidget->UpdatePhaseBanner(TurnManager->GetCurrentPhase());
+    }
+  }
+
+  SetInputMode(FInputModeGameAndUI());
+  SetIgnoreMoveInput(false);
+  SetIgnoreLookInput(false);
+}
+
+void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
   if (FighterSelectionWidget) {
     UFighterSelectionWidget *Selection = FighterSelectionWidget;
     Selection->OnLockedIn.RemoveDynamic(
-        this, &ASkaldPlayerController::HandlePlayerLockedIn);
+        this, &ASkaldPlayerController::HandleFighterSelectionLockedIn);
     Selection->RemoveFromParent();
 
     if (CachedGameInstance && CachedGameInstance->GridBattleManager) {
       TArray<FFighter> Fighters;
-      if (Selection) {
-        for (const FFighterDefinition &Def : Selection->ChosenFighters) {
-          FFighter Fighter;
-          Fighter.Stats = Def.Stats;
-          if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
-            Fighter.Faction = PS->Faction;
-          }
-          Fighters.Add(Fighter);
+      for (const FFighterDefinition &Def : Selection->ChosenFighters) {
+        FFighter Fighter;
+        Fighter.Stats = Def.Stats;
+        if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+          Fighter.Faction = PS->Faction;
         }
+        Fighters.Add(Fighter);
       }
       CachedGameInstance->GridBattleManager->InitBattle(Fighters, Fighters);
       CachedGameInstance->GridBattleManager->RollInitiative();
@@ -1046,27 +1068,10 @@ void ASkaldPlayerController::HandlePlayerLockedIn() {
     }
     FighterSelectionWidget = nullptr;
     if (MainHudWidget) {
-      // Transitioning to battle HUD; collapse the main HUD.
       MainHudWidget->SetVisibility(ESlateVisibility::Collapsed);
-    }
-  } else if (MainHudWidget) {
-    // Normal map flow: ensure the main HUD is visible and up to date.
-    MainHudWidget->SetVisibility(ESlateVisibility::Visible);
-    if (CachedGameState) {
-      TArray<FS_PlayerData> Players;
-      BuildPlayerDataArray(Players);
-      MainHudWidget->RefreshPlayerList(Players);
-    }
-    if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
-      MainHudWidget->UpdateDeployableUnits(PS->DeployableUnits);
-      MainHudWidget->UpdateResources(PS->Resources);
-    }
-    if (TurnManager) {
-      MainHudWidget->UpdatePhaseBanner(TurnManager->GetCurrentPhase());
     }
   }
 
-  // Restore game controls now that the player has locked in
   SetInputMode(FInputModeGameAndUI());
   SetIgnoreMoveInput(false);
   SetIgnoreLookInput(false);

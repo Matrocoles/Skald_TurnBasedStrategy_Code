@@ -91,6 +91,10 @@ public:
   UFUNCTION(NetMulticast, Reliable)
   void MulticastSelectTerritory(ATerritory *Territory);
 
+  /** Generate territories from the assigned data table. */
+  UFUNCTION(BlueprintCallable, Category = "WorldMap")
+  bool GenerateTerritoriesFromTable();
+
   /** Find a path across friendly territories from one territory to another. */
   UFUNCTION(BlueprintCallable, Category = "WorldMap")
   bool FindPath(ATerritory *From, ATerritory *To,

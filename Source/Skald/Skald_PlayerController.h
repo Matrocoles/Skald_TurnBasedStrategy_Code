@@ -203,7 +203,9 @@ public:
 
   /** React to the player finishing their pre-game selection. */
   UFUNCTION()
-  void HandlePlayerLockedIn();
+  void HandleFactionLockedIn();
+
+  void HandleFighterSelectionLockedIn();
 
   /** React to the end of a battle. */
   UFUNCTION()

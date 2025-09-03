@@ -10,25 +10,20 @@
 #include "Skald_PlayerState.h"
 #include "Templates/Function.h"
 #include "Territory.h"
-#include "UObject/ConstructorHelpers.h"
 #include <cfloat>
 
+// Constructor sets default properties but leaves TerritoryTable unassigned so
+// designers must configure it manually.
 AWorldMap::AWorldMap() {
   PrimaryActorTick.bCanEverTick = false;
   bReplicates = true;
   SelectedTerritory = nullptr;
   TerritoryClass = ATerritory::StaticClass();
-
-  static ConstructorHelpers::FObjectFinder<UDataTable> TerritoryTableFinder(
-      TEXT("/Game/DataTables/TerritoriesDataTable.TerritoriesDataTable"));
-  if (TerritoryTableFinder.Succeeded()) {
-    TerritoryTable = TerritoryTableFinder.Object;
-  }
 }
 
-void AWorldMap::BeginPlay() {
-  Super::BeginPlay();
+void AWorldMap::BeginPlay() { Super::BeginPlay(); }
 
+bool AWorldMap::GenerateTerritoriesFromTable() {
   if (!TerritoryClass) {
     UE_LOG(LogSkald, Error, TEXT("WorldMap %s missing TerritoryClass"),
            *GetName());
@@ -38,7 +33,7 @@ void AWorldMap::BeginPlay() {
           FString::Printf(TEXT("WorldMap %s has no TerritoryClass"),
                           *GetName()));
     }
-    return;
+    return false;
   }
 
   if (!TerritoryTable) {
@@ -52,19 +47,10 @@ void AWorldMap::BeginPlay() {
                    " Expected /Game/DataTables/TerritoriesDataTable"),
               *GetName()));
     }
-
-    FActorSpawnParameters Params;
-    Params.Owner = this;
-    ATerritory *Placeholder = GetWorld()->SpawnActor<ATerritory>(
-        TerritoryClass, GetActorLocation(), FRotator::ZeroRotator, Params);
-    if (Placeholder) {
-      Placeholder->TerritoryID = -1;
-      Placeholder->TerritoryName = TEXT("Placeholder Territory");
-      RegisterTerritory(Placeholder);
-    }
-
-    return;
+    return false;
   }
+
+  Territories.Empty();
 
   ATerritory *DefaultTerritory = TerritoryClass->GetDefaultObject<ATerritory>();
   UStaticMeshComponent *MeshComp =
@@ -84,7 +70,7 @@ void AWorldMap::BeginPlay() {
           FString::Printf(TEXT("%s missing %s"), *TerritoryClass->GetName(),
                           *MissingAsset));
     }
-    return;
+    return false;
   }
 
   // Spawn territories defined in the data table at random locations.
@@ -250,6 +236,8 @@ void AWorldMap::BeginPlay() {
       --ComponentCount;
     }
   }
+
+  return Territories.Num() > 0;
 }
 
 void AWorldMap::RegisterTerritory(ATerritory *Territory) {
