@@ -101,7 +101,7 @@ public:
   bool MoveBetween(ATerritory *From, ATerritory *To, int32 Troops);
 
   /** Actor class used when spawning territory instances. */
-  UPROPERTY(EditAnywhere, Category = "WorldMap")
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WorldMap")
   TSubclassOf<ATerritory> TerritoryClass;
 
   /** Data table defining territories to spawn. */

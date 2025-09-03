@@ -67,7 +67,7 @@ struct FFighterDefinition : public FTableRowBase
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Fighter")
     FName Id;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Fighter")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Fighter")
     TSubclassOf<AActor> MeshClass;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Fighter")
