@@ -218,7 +218,7 @@ void ASkaldGameMode::PopulateAIPlayers() {
 
     AIState->bIsAI = true;
 
-    FTransform SpawnTransform;
+    FTransform SpawnTransform = FTransform::Identity;
     ASkaldPlayerController *AIController =
         GetWorld()->SpawnActorDeferred<ASkaldPlayerController>(
             PlayerControllerClass, SpawnTransform, nullptr, nullptr,
