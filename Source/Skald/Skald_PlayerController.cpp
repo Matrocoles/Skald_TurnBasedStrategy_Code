@@ -144,6 +144,10 @@ void ASkaldPlayerController::BeginPlay() {
   }
 
   const FString CurrentMap = UGameplayStatics::GetCurrentLevelName(this, true);
+  bool bIsBattleMap = CurrentMap.Equals(TEXT("BattleMap"),
+                                        ESearchCase::IgnoreCase);
+  if (ATurnManager *TM = Cast<ATurnManager>(UGameplayStatics::GetActorOfClass(
+          GetWorld(), ATurnManager::StaticClass()))) {
   bool bIsBattleMap = false;
   if (CachedGameMode && CachedGameMode->GetTurnManager()) {
     ATurnManager *TM = CachedGameMode->GetTurnManager();

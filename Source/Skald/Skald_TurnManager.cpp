@@ -13,12 +13,19 @@
 #include "Skald_GameMode.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "Net/UnrealNetwork.h"
 
 ATurnManager::ATurnManager() {
   PrimaryActorTick.bCanEverTick = false;
   bReplicates = true;
   CurrentIndex = 0;
   CachedWorldMap = nullptr;
+}
+
+void ATurnManager::GetLifetimeReplicatedProps(
+    TArray<FLifetimeProperty>& OutLifetimeProps) const {
+  Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+  DOREPLIFETIME(ATurnManager, BattleMaps);
 }
 
 void ATurnManager::BeginPlay() {

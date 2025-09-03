@@ -26,6 +26,9 @@ public:
 
     virtual void BeginPlay() override;
 
+    virtual void GetLifetimeReplicatedProps(
+        TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
     UFUNCTION(BlueprintCallable, Category="Turn")
     void RegisterController(ASkaldPlayerController* Controller);
 
@@ -91,6 +94,7 @@ public:
     FSkaldWorldStateChanged OnWorldStateChanged;
 
     /** Maps that can be used for grid based battles. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category="Battle")
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Battle")
     TArray<TSoftObjectPtr<UWorld>> BattleMaps;
 

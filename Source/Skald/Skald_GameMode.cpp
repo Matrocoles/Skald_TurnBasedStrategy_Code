@@ -81,6 +81,8 @@ void ASkaldGameMode::BeginPlay() {
   // Auto-select fighters for AI players on the battle map
   const FString CurrentLevel =
       UGameplayStatics::GetCurrentLevelName(this, true);
+  bool bIsBattleMap = CurrentLevel.Equals(TEXT("BattleMap"),
+                                         ESearchCase::IgnoreCase);
   bool bIsBattleMap = false;
   if (TurnManager) {
     for (const TSoftObjectPtr<UWorld> &Map : TurnManager->BattleMaps) {
