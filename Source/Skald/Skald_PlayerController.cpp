@@ -21,6 +21,7 @@
 #include "WorldMap.h"
 #include "FighterPawn.h"
 #include "InputCoreTypes.h"
+#include "Components/InputComponent.h"
 #include "EngineUtils.h"
 #include <limits>
 
