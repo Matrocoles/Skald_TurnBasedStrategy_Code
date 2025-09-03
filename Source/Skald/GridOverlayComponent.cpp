@@ -1,10 +1,10 @@
 #include "GridOverlayComponent.h"
 #include "Containers/Queue.h"
 #include "DrawDebugHelpers.h"
+#include "Engine/EngineTypes.h"
+#include "Engine/World.h"
 #include "FighterPawn.h"
 #include "GridObstacleComponent.h"
-#include "Engine/World.h"
-#include "Engine/EngineTypes.h"
 
 UGridOverlayComponent::UGridOverlayComponent() {
   PrimaryComponentTick.bCanEverTick = false;
@@ -28,8 +28,8 @@ void UGridOverlayComponent::BeginPlay() {
     for (int32 Y = 0; Y < Height; ++Y) {
       for (int32 X = 0; X < Width; ++X) {
         const int32 Idx = Index(FIntPoint(X, Y));
-        FVector Start =
-            Origin + FVector((X + 0.5f) * CellSize, (Y + 0.5f) * CellSize, 10000.f);
+        FVector Start = Origin + FVector((X + 0.5f) * CellSize,
+                                         (Y + 0.5f) * CellSize, 10000.f);
         FVector End = Start - FVector(0.f, 0.f, 20000.f);
         FHitResult Hit;
         if (World->LineTraceSingleByChannel(Hit, Start, End, ECC_WorldStatic)) {
@@ -53,9 +53,7 @@ UGridOverlayComponent::WorldToGrid(const FVector &WorldLocation) const {
 FVector UGridOverlayComponent::GridToWorld(const FIntPoint &GridCoord) const {
   FVector World = Origin + FVector((GridCoord.X + 0.5f) * CellSize,
                                    (GridCoord.Y + 0.5f) * CellSize, 0.f);
-  if (IsValidGrid(GridCoord) && CellHeights.IsValidIndex(Index(GridCoord))) {
-    World.Z = CellHeights[Index(GridCoord)];
-  }
+  World.Z = GetCellHeight(GridCoord);
   return World;
 }
 
@@ -179,7 +177,8 @@ void UGridOverlayComponent::HighlightMovement(AFighterPawn *Fighter) {
 
     for (const FIntPoint &Dir : Directions) {
       const FIntPoint Next = Cell + Dir;
-      if (!IsValidGrid(Next) || IsOccupied(Next) || Visited.Contains(Next)) {
+      if (!IsValidGrid(Next) || IsOccupied(Next) || IsObscured(Next) ||
+          Visited.Contains(Next)) {
         continue;
       }
       Visited.Add(Next);
@@ -198,35 +197,50 @@ void UGridOverlayComponent::HighlightAttack(AFighterPawn *Fighter) {
   FIntPoint StartCell = WorldToGrid(Fighter->GetActorLocation());
   const int32 Range = Fighter->Stats.AttackRange;
 
-  TSet<FIntPoint> Visited;
-  TQueue<TPair<FIntPoint, int32>> Frontier;
-  Visited.Add(StartCell);
-  Frontier.Enqueue(TPair<FIntPoint, int32>(StartCell, 0));
-
-  while (!Frontier.IsEmpty()) {
-    TPair<FIntPoint, int32> Node;
-    Frontier.Dequeue(Node);
-    const FIntPoint Cell = Node.Key;
-    const int32 Distance = Node.Value;
-
-    if (Distance > 0) {
-      HighlightCell(Cell, FColor::Red, 0.f, true);
-    }
-
-    if (Distance >= Range) {
-      continue;
-    }
-
-    static const FIntPoint Directions[4] = {FIntPoint(1, 0), FIntPoint(-1, 0),
-                                            FIntPoint(0, 1), FIntPoint(0, -1)};
-
-    for (const FIntPoint &Dir : Directions) {
-      const FIntPoint Next = Cell + Dir;
-      if (!IsValidGrid(Next) || Visited.Contains(Next)) {
+  for (int32 Dy = -Range; Dy <= Range; ++Dy) {
+    for (int32 Dx = -Range; Dx <= Range; ++Dx) {
+      if (FMath::Abs(Dx) + FMath::Abs(Dy) > Range) {
         continue;
       }
-      Visited.Add(Next);
-      Frontier.Enqueue(TPair<FIntPoint, int32>(Next, Distance + 1));
+      const FIntPoint Target = StartCell + FIntPoint(Dx, Dy);
+      if (!IsValidGrid(Target) || Target == StartCell) {
+        continue;
+      }
+
+      int32 x0 = StartCell.X;
+      int32 y0 = StartCell.Y;
+      int32 x1 = Target.X;
+      int32 y1 = Target.Y;
+      int32 dx = FMath::Abs(x1 - x0);
+      int32 sx = x0 < x1 ? 1 : -1;
+      int32 dy = -FMath::Abs(y1 - y0);
+      int32 sy = y0 < y1 ? 1 : -1;
+      int32 err = dx + dy;
+      FIntPoint Current(x0, y0);
+      bool bBlocked = false;
+
+      while (true) {
+        if (Current != StartCell && IsObscured(Current)) {
+          bBlocked = true;
+          break;
+        }
+        if (Current.X == x1 && Current.Y == y1) {
+          break;
+        }
+        int32 e2 = 2 * err;
+        if (e2 >= dy) {
+          err += dy;
+          Current.X += sx;
+        }
+        if (e2 <= dx) {
+          err += dx;
+          Current.Y += sy;
+        }
+      }
+
+      if (!bBlocked) {
+        HighlightCell(Target, FColor::Red, 0.f, true);
+      }
     }
   }
 }
