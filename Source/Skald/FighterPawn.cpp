@@ -45,7 +45,8 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
   UGridOverlayComponent *Grid = nullptr;
   if (UWorld *World = GetWorld()) {
     for (TActorIterator<AActor> It(World); It; ++It) {
-      if ((Grid = It->FindComponentByClass<UGridOverlayComponent>())) {
+      Grid = It->FindComponentByClass<UGridOverlayComponent>();
+      if (Grid != nullptr) {
         break;
       }
     }
@@ -86,7 +87,8 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
   UGridOverlayComponent *Grid = nullptr;
   if (UWorld *World = GetWorld()) {
     for (TActorIterator<AActor> It(World); It; ++It) {
-      if ((Grid = It->FindComponentByClass<UGridOverlayComponent>())) {
+      Grid = It->FindComponentByClass<UGridOverlayComponent>();
+      if (Grid != nullptr) {
         break;
       }
     }
