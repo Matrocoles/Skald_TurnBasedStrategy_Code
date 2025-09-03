@@ -27,6 +27,7 @@
 #include <limits>
 
 constexpr int32 MaxAIIterations = 100;
+constexpr int32 MaxWorldMapSearchAttempts = 5;
 
 ASkaldPlayerController::ASkaldPlayerController() {
   bIsAI = false;
@@ -44,6 +45,8 @@ ASkaldPlayerController::ASkaldPlayerController() {
   // blueprint-derived widget that may not exist or may be corrupt.
   HUDWidgetClass = USkaldMainHUDWidget::StaticClass();
   BattleHUDWidgetClass = UBattleHUDWidget::StaticClass();
+
+  WorldMapSearchAttempts = 0;
 
   static ConstructorHelpers::FClassFinder<UChoosePlayerWidget> ChooseBP(
       TEXT("/Game/Blueprints/UI/Skald_ChoosePlayerWidget"));
@@ -160,9 +163,23 @@ void ASkaldPlayerController::BeginPlay() {
 void ASkaldPlayerController::TryBindWorldMap() {
   if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
           GetWorld(), AWorldMap::StaticClass()))) {
-    WorldMap->OnTerritorySelected.AddDynamic(
-        this, &ASkaldPlayerController::HandleTerritorySelected);
+    if (!WorldMap->OnTerritorySelected.IsAlreadyBound(
+            this, &ASkaldPlayerController::HandleTerritorySelected)) {
+      WorldMap->OnTerritorySelected.AddDynamic(
+          this, &ASkaldPlayerController::HandleTerritorySelected);
+      ensureMsgf(
+          WorldMap->OnTerritorySelected.IsAlreadyBound(
+              this, &ASkaldPlayerController::HandleTerritorySelected),
+          TEXT("Failed to bind HandleTerritorySelected to WorldMap."));
+    }
+    WorldMapSearchAttempts = 0;
   } else {
+    ++WorldMapSearchAttempts;
+    if (WorldMapSearchAttempts >= MaxWorldMapSearchAttempts) {
+      UE_LOG(LogSkald, Warning,
+             TEXT("ASkaldPlayerController could not find AWorldMap after %d attempts."),
+             WorldMapSearchAttempts);
+    }
     GetWorldTimerManager().SetTimer(
         WorldMapSearchHandle, this,
         &ASkaldPlayerController::TryBindWorldMap, 0.5f, false);
@@ -1037,8 +1054,11 @@ void ASkaldPlayerController::HandleFactionLockedIn() {
   }
 
   SetInputMode(FInputModeGameAndUI());
+  bShowMouseCursor = true;
+  bEnableClickEvents = true;
   SetIgnoreMoveInput(false);
   SetIgnoreLookInput(false);
+  TryBindWorldMap();
 }
 
 void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
