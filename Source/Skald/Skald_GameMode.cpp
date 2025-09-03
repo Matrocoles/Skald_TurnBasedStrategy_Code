@@ -1,8 +1,10 @@
 #include "Skald_GameMode.h"
 #include "Algo/RandomShuffle.h"
 #include "Camera/CameraComponent.h"
+#include "Engine/DataTable.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "GridBattleManager.h"
 #include "Kismet/GameplayStatics.h"
 #include "Skald.h"
 #include "SkaldSaveGame.h"
@@ -16,8 +18,6 @@
 #include "TimerManager.h"
 #include "UI/SkaldMainHUDWidget.h"
 #include "WorldMap.h"
-#include "GridBattleManager.h"
-#include "Engine/DataTable.h"
 
 namespace {
 constexpr int32 ExpectedPlayerCount = 4;
@@ -99,10 +99,9 @@ void ASkaldGameMode::BeginPlay() {
               continue;
             }
 
-            const int32 MaxCost =
-                GI->PendingBattle.ArmyCountSent > 0
-                    ? GI->PendingBattle.ArmyCountSent
-                    : DefaultAIMaxCost;
+            const int32 MaxCost = GI->PendingBattle.ArmyCountSent > 0
+                                      ? GI->PendingBattle.ArmyCountSent
+                                      : DefaultAIMaxCost;
             int32 CurrentCost = 0;
 
             Algo::RandomShuffle(Definitions);
@@ -256,9 +255,10 @@ void ASkaldGameMode::PopulateAIPlayers() {
   }
 
   if (GS->PlayerArray.Num() < ExpectedPlayerCount) {
-    UE_LOG(LogSkald, Warning,
-           TEXT("PopulateAIPlayers spawned only %d/%d players after %d attempts"),
-           GS->PlayerArray.Num(), ExpectedPlayerCount, SpawnAttempts);
+    UE_LOG(
+        LogSkald, Warning,
+        TEXT("PopulateAIPlayers spawned only %d/%d players after %d attempts"),
+        GS->PlayerArray.Num(), ExpectedPlayerCount, SpawnAttempts);
   }
 }
 
@@ -274,6 +274,12 @@ void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
   if (PlayerData) {
     PlayerData->PlayerName = PS->PlayerDisplayName;
     PlayerData->Faction = PS->Faction;
+  }
+
+  // If a human player has locked in and there are still open slots,
+  // populate them with AI players so the match can start.
+  if (!PS->bIsAI) {
+    PopulateAIPlayers();
   }
 
   RefreshHUDs();
@@ -690,7 +696,8 @@ bool ASkaldGameMode::InitializeWorld() {
       WorldMap->Territories.Empty();
     } else {
       TArray<AActor *> Found;
-      UGameplayStatics::GetAllActorsOfClass(GetWorld(), ATerritory::StaticClass(), Found);
+      UGameplayStatics::GetAllActorsOfClass(GetWorld(),
+                                            ATerritory::StaticClass(), Found);
       for (AActor *Actor : Found) {
         ATerritory *Terr = Cast<ATerritory>(Actor);
         if (Terr && Terr->TerritoryID == -1) {
@@ -795,8 +802,8 @@ bool ASkaldGameMode::InitializeWorld() {
 
     FS_PlayerData *PlayerData =
         PlayerDataArray.FindByPredicate([PS](const FS_PlayerData &Data) {
-            return Data.PlayerID == PS->GetPlayerId();
-          });
+          return Data.PlayerID == PS->GetPlayerId();
+        });
     if (PlayerData) {
       PlayerData->CapitalTerritoryIDs.Reset();
     }
@@ -956,8 +963,8 @@ void ASkaldGameMode::CheckVictoryConditions() {
 
     FS_PlayerData *Data =
         PlayerDataArray.FindByPredicate([PS](const FS_PlayerData &D) {
-            return D.PlayerID == PS->GetPlayerId();
-          });
+          return D.PlayerID == PS->GetPlayerId();
+        });
     if (Data) {
       Data->IsEliminated = !bHasTerritory;
     }
