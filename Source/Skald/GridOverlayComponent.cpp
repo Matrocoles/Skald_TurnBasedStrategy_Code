@@ -130,13 +130,17 @@ void UGridOverlayComponent::RegisterObstacle(UGridObstacleComponent *Obstacle) {
           continue;
         }
         const int32 Idx = Index(Cell);
-        if (Obstacle->bBlocksMovement && !Obstacle->bClimbable) {
-          Cells[Idx] = true;
-        }
-        ObscuredCells[Idx] = true;
         if (Obstacle->bClimbable) {
           CellHeights[Idx] = Bounds.Max.Z;
+          Cells[Idx] = false;
           ObscuredCells[Idx] = false;
+        } else {
+          if (Obstacle->bBlocksMovement) {
+            Cells[Idx] = true;
+          }
+          if (Obstacle->bBlocksLineOfSight) {
+            ObscuredCells[Idx] = true;
+          }
         }
       }
     }
