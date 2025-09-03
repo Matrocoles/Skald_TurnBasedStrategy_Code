@@ -269,9 +269,7 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
   if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
     GI->SeedCombatRandomStream(SeededBattle.RandomSeed);
     GI->PendingBattle = SeededBattle;
-    if (!GI->GridBattleManager) {
-      GI->GridBattleManager = NewObject<UGridBattleManager>(GI);
-    }
+    GI->GetGridBattleManager();
   }
 
   // Save the current turn state so it can be restored after travelling.

@@ -47,6 +47,10 @@ public:
     UPROPERTY(BlueprintReadWrite, Category="Battle")
     class UGridBattleManager* GridBattleManager = nullptr;
 
+    /** Accessor that lazily creates the grid battle manager when first requested. */
+    UFUNCTION(BlueprintCallable, Category="Battle")
+    UGridBattleManager* GetGridBattleManager();
+
     /** Random stream used for deterministic combat rolls. */
     UPROPERTY()
     FRandomStream CombatRandomStream;
