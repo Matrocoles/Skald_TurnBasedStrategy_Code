@@ -151,6 +151,14 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
     return;
   }
 
+  if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
+    if (GS->PlayerArray.Num() >= ExpectedPlayerCount) {
+      PC->ClientMessage(TEXT("Game is full."));
+      PC->Destroy();
+      return;
+    }
+  }
+
   RegisterPlayer(PC);
   PopulateAIPlayers();
   RefreshHUDs();
@@ -810,7 +818,8 @@ bool ASkaldGameMode::InitializeWorld() {
     }
   }
 
-  // Ensure the expected number of players are present before assigning territories
+  // Ensure the expected number of players are present before assigning
+  // territories
   const int32 PlayerCount = GS->PlayerArray.Num();
   if (PlayerCount != ExpectedPlayerCount) {
     UE_LOG(LogSkald, Warning,
