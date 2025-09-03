@@ -1033,16 +1033,31 @@ void ASkaldPlayerController::HandlePlayerLockedIn() {
       }
     }
     FighterSelectionWidget = nullptr;
+    if (MainHudWidget) {
+      // Transitioning to battle HUD; collapse the main HUD.
+      MainHudWidget->SetVisibility(ESlateVisibility::Collapsed);
+    }
+  } else if (MainHudWidget) {
+    // Normal map flow: ensure the main HUD is visible and up to date.
+    MainHudWidget->SetVisibility(ESlateVisibility::Visible);
+    if (CachedGameState) {
+      TArray<FS_PlayerData> Players;
+      BuildPlayerDataArray(Players);
+      MainHudWidget->RefreshPlayerList(Players);
+    }
+    if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+      MainHudWidget->UpdateDeployableUnits(PS->DeployableUnits);
+      MainHudWidget->UpdateResources(PS->Resources);
+    }
+    if (TurnManager) {
+      MainHudWidget->UpdatePhaseBanner(TurnManager->GetCurrentPhase());
+    }
   }
 
   // Restore game controls now that the player has locked in
   SetInputMode(FInputModeGameAndUI());
   SetIgnoreMoveInput(false);
   SetIgnoreLookInput(false);
-
-  if (MainHudWidget) {
-    MainHudWidget->SetVisibility(ESlateVisibility::Collapsed);
-  }
 }
 
 void ASkaldPlayerController::SetupInputComponent() {
