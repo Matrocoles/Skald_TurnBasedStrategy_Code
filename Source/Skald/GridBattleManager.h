@@ -146,11 +146,11 @@ public:
 
     /** Number of surviving attackers after the battle concludes. */
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
-    int32 GetAttackerSurvivors() const;
+    int32 GetAttackerSurvivors();
 
     /** Number of surviving defenders after the battle concludes. */
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
-    int32 GetDefenderSurvivors() const;
+    int32 GetDefenderSurvivors();
 
     /** Total army cost of surviving attackers. */
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
