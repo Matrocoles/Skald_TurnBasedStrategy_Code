@@ -95,6 +95,7 @@ public:
 
     /** Maps that can be used for grid based battles. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category="Battle")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Battle")
     TArray<TSoftObjectPtr<UWorld>> BattleMaps;
 
 protected:

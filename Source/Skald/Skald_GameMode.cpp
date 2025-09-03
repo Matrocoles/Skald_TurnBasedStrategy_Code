@@ -83,6 +83,7 @@ void ASkaldGameMode::BeginPlay() {
       UGameplayStatics::GetCurrentLevelName(this, true);
   bool bIsBattleMap = CurrentLevel.Equals(TEXT("BattleMap"),
                                          ESearchCase::IgnoreCase);
+  bool bIsBattleMap = false;
   if (TurnManager) {
     for (const TSoftObjectPtr<UWorld> &Map : TurnManager->BattleMaps) {
       if (CurrentLevel.Equals(Map.ToSoftObjectPath().GetAssetName(),

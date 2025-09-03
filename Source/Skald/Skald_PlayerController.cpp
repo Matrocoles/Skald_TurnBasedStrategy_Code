@@ -148,6 +148,9 @@ void ASkaldPlayerController::BeginPlay() {
                                         ESearchCase::IgnoreCase);
   if (ATurnManager *TM = Cast<ATurnManager>(UGameplayStatics::GetActorOfClass(
           GetWorld(), ATurnManager::StaticClass()))) {
+  bool bIsBattleMap = false;
+  if (CachedGameMode && CachedGameMode->GetTurnManager()) {
+    ATurnManager *TM = CachedGameMode->GetTurnManager();
     for (const TSoftObjectPtr<UWorld> &Map : TM->BattleMaps) {
       if (CurrentMap.Equals(Map.ToSoftObjectPath().GetAssetName(),
                            ESearchCase::IgnoreCase)) {
