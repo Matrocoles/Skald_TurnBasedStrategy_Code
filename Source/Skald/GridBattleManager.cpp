@@ -102,26 +102,26 @@ void UGridBattleManager::StartBattle(FRandomStream& RandomStream)
     bool bAttackerTurn = RollInitiativeDie(RandomStream) >= RollInitiativeDie(RandomStream);
 
     int32 AttackerSurvivors = 0;
+    int32 AttackerSurvivorCost = 0;
     for (const FFighter& Fighter : AttackerTeam)
     {
         if (Fighter.Stats.Health > 0)
         {
             ++AttackerSurvivors;
+            AttackerSurvivorCost += Fighter.Stats.ArmyCost;
         }
     }
+
     int32 DefenderSurvivors = 0;
+    int32 DefenderSurvivorCost = 0;
     for (const FFighter& Fighter : DefenderTeam)
     {
         if (Fighter.Stats.Health > 0)
         {
             ++DefenderSurvivors;
+            DefenderSurvivorCost += Fighter.Stats.ArmyCost;
         }
     }
-
-    int32 AttackerSurvivorCost = AttackerSurvivorCount;
-    int32 DefenderSurvivorCost = DefenderSurvivorCount;
-    int32 AttackerSurvivors = AttackerSurvivorCount;
-    int32 DefenderSurvivors = DefenderSurvivorCount;
 
     TArray<FIntPoint> PreviousAttackerPositions;
     PreviousAttackerPositions.Reserve(AttackerTeam.Num());
@@ -245,8 +245,6 @@ void UGridBattleManager::StartBattle(FRandomStream& RandomStream)
 
     AttackerSurvivorCount = AttackerSurvivorCost;
     DefenderSurvivorCount = DefenderSurvivorCost;
-    AttackerSurvivorCount = AttackerSurvivors;
-    DefenderSurvivorCount = DefenderSurvivors;
 
     ESkaldFaction Winner = ESkaldFaction::None;
     if (AttackerSurvivors > 0 && DefenderSurvivors <= 0)
