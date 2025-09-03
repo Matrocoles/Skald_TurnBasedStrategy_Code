@@ -1,11 +1,10 @@
 #include "FighterPawn.h"
+#include "Blueprint/UserWidget.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextBlock.h"
 #include "EngineUtils.h"
 #include "GridOverlayComponent.h"
 #include "Skald_GameInstance.h"
-#include "Blueprint/UserWidget.h"
-
 
 AFighterPawn::AFighterPawn() {
   PrimaryActorTick.bCanEverTick = false;
@@ -14,8 +13,7 @@ AFighterPawn::AFighterPawn() {
       CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DisplayMesh"));
   RootComponent = DisplayMesh;
 
-  HealthWidget =
-      CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthWidget"));
+  HealthWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthWidget"));
   HealthWidget->SetupAttachment(DisplayMesh);
 
   ActionsRemaining = 0;
@@ -31,28 +29,41 @@ void AFighterPawn::BeginPlay() {
 
   OnHealthChanged.AddDynamic(this, &AFighterPawn::UpdateHealthDisplay);
   OnHealthChanged.Broadcast(Stats.Health);
+
+  if (UGridOverlayComponent *Grid = GetGrid()) {
+    Grid->SetOccupied(CurrentCell, true);
+  }
 }
 
 void AFighterPawn::BeginActivation() { ActionsRemaining = Stats.Movement; }
 
+UGridOverlayComponent *AFighterPawn::GetGrid() {
+  if (!CachedGrid) {
+    if (UWorld *World = GetWorld()) {
+      for (TActorIterator<AActor> It(World); It; ++It) {
+        CachedGrid = It->FindComponentByClass<UGridOverlayComponent>();
+        if (CachedGrid) {
+          break;
+        }
+      }
+    }
+  }
+  return CachedGrid;
+}
+
 void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
-  int32 OldHealth = Stats.Health;
   int32 Distance = FMath::Abs(TargetCell.X - CurrentCell.X) +
                    FMath::Abs(TargetCell.Y - CurrentCell.Y);
   if (Distance > ActionsRemaining) {
     return;
   }
-  UGridOverlayComponent *Grid = nullptr;
-  if (UWorld *World = GetWorld()) {
-    for (TActorIterator<AActor> It(World); It; ++It) {
-      Grid = It->FindComponentByClass<UGridOverlayComponent>();
-      if (Grid != nullptr) {
-        break;
-      }
-    }
-  }
+  UGridOverlayComponent *Grid = GetGrid();
   if (Grid && Grid->IsObscured(TargetCell)) {
     return;
+  }
+
+  if (Grid) {
+    Grid->SetOccupied(CurrentCell, false);
   }
 
   CurrentCell = TargetCell;
@@ -65,11 +76,8 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
   ActionsRemaining -= Distance;
 
   if (Grid) {
+    Grid->SetOccupied(TargetCell, true);
     Grid->ClearHighlights();
-  }
-
-  if (Stats.Health != OldHealth) {
-    OnHealthChanged.Broadcast(Stats.Health);
   }
 }
 
@@ -154,9 +162,8 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
         if (UWorld *World = GetWorld()) {
           if (UUserWidget *DamageWidget =
                   CreateWidget<UUserWidget>(World, DamageFloatWidgetTemplate)) {
-            if (UTextBlock *Text =
-                    Cast<UTextBlock>(DamageWidget->GetWidgetFromName(
-                        TEXT("DamageText")))) {
+            if (UTextBlock *Text = Cast<UTextBlock>(
+                    DamageWidget->GetWidgetFromName(TEXT("DamageText")))) {
               Text->SetText(FText::AsNumber(Stats.AttackDamage));
             }
             DamageWidget->AddToViewport();

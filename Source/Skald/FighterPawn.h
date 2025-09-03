@@ -1,75 +1,81 @@
 #pragma once
 
+#include "Blueprint/UserWidget.h"
+#include "Components/WidgetComponent.h"
 #include "CoreMinimal.h"
+#include "FighterPawn.generated.h"
 #include "GameFramework/Pawn.h"
 #include "GridBattleManager.h"
-#include "Components/WidgetComponent.h"
-#include "Blueprint/UserWidget.h"
-#include "FighterPawn.generated.h"
+
+class UGridOverlayComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHealthChanged, int32, NewHealth);
 
 /** Pawn representing a fighter in grid battles. */
 UCLASS()
-class SKALD_API AFighterPawn : public APawn
-{
-    GENERATED_BODY()
+class SKALD_API AFighterPawn : public APawn {
+  GENERATED_BODY()
 
 public:
-    AFighterPawn();
+  AFighterPawn();
 
-    virtual void BeginPlay() override;
+  virtual void BeginPlay() override;
 
-    /** Prepare the fighter for its activation. */
-    UFUNCTION(BlueprintCallable, Category="Fighter")
-    void BeginActivation();
+  /** Prepare the fighter for its activation. */
+  UFUNCTION(BlueprintCallable, Category = "Fighter")
+  void BeginActivation();
 
-    /** Move to the specified grid cell if actions remain. */
-    UFUNCTION(BlueprintCallable, Category="Fighter")
-    void MoveToCell(FIntPoint TargetCell);
+  /** Move to the specified grid cell if actions remain. */
+  UFUNCTION(BlueprintCallable, Category = "Fighter")
+  void MoveToCell(FIntPoint TargetCell);
 
-    /** Perform an attack against another fighter. */
-    UFUNCTION(BlueprintCallable, Category="Fighter")
-    void PerformAttack(AFighterPawn* Target);
+  /** Perform an attack against another fighter. */
+  UFUNCTION(BlueprintCallable, Category = "Fighter")
+  void PerformAttack(AFighterPawn *Target);
 
-    /** Check whether this fighter is still alive. */
-    UFUNCTION(BlueprintCallable, BlueprintPure, Category="Fighter")
-    bool IsAlive() const;
+  /** Check whether this fighter is still alive. */
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Fighter")
+  bool IsAlive() const;
 
-    /** Statistics describing this fighter. */
-    UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Fighter")
-    FFighterStats Stats;
+  /** Statistics describing this fighter. */
+  UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Fighter")
+  FFighterStats Stats;
 
-    /** Actions remaining for the current activation. */
-    UPROPERTY(BlueprintReadOnly, Category="Fighter")
-    int32 ActionsRemaining;
+  /** Actions remaining for the current activation. */
+  UPROPERTY(BlueprintReadOnly, Category = "Fighter")
+  int32 ActionsRemaining;
 
-    /** Mesh used to display the fighter. */
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-    UStaticMeshComponent* DisplayMesh;
+  /** Mesh used to display the fighter. */
+  UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+  UStaticMeshComponent *DisplayMesh;
 
-    /** Widget displaying the current health. */
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Fighter|UI")
-    UWidgetComponent* HealthWidget;
+  /** Widget displaying the current health. */
+  UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|UI")
+  UWidgetComponent *HealthWidget;
 
-    /** Widget class used for the health display. */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Fighter|UI")
-    TSubclassOf<UUserWidget> HealthWidgetTemplate;
+  /** Widget class used for the health display. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Fighter|UI")
+  TSubclassOf<UUserWidget> HealthWidgetTemplate;
 
-    /** Widget class used for optional damage float indicators. */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Fighter|UI")
-    TSubclassOf<UUserWidget> DamageFloatWidgetTemplate;
+  /** Widget class used for optional damage float indicators. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Fighter|UI")
+  TSubclassOf<UUserWidget> DamageFloatWidgetTemplate;
 
-    /** Event broadcast when health changes. */
-    UPROPERTY(BlueprintAssignable, Category="Fighter|Events")
-    FOnHealthChanged OnHealthChanged;
+  /** Event broadcast when health changes. */
+  UPROPERTY(BlueprintAssignable, Category = "Fighter|Events")
+  FOnHealthChanged OnHealthChanged;
 
 private:
-    /** Update the health widget with a new value. */
-    UFUNCTION()
-    void UpdateHealthDisplay(int32 NewHealth);
+  /** Update the health widget with a new value. */
+  UFUNCTION()
+  void UpdateHealthDisplay(int32 NewHealth);
 
-    /** Current cell occupied by the fighter. */
-    FIntPoint CurrentCell;
+  /** Get the grid overlay component, caching the result. */
+  UGridOverlayComponent *GetGrid();
+
+  /** Current cell occupied by the fighter. */
+  FIntPoint CurrentCell;
+
+  /** Cached grid overlay component. */
+  UGridOverlayComponent *CachedGrid = nullptr;
 };
-
