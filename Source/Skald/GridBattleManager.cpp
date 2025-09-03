@@ -69,6 +69,23 @@ void UGridBattleManager::InitBattle(const TArray<FFighter>& Attackers, const TAr
     AttackerTeam = Attackers;
     DefenderTeam = Defenders;
     CurrentRound = 1;
+
+    AttackerSurvivorCount = 0;
+    for (const FFighter& Fighter : AttackerTeam)
+    {
+        if (Fighter.Stats.Health > 0)
+        {
+            ++AttackerSurvivorCount;
+        }
+    }
+    DefenderSurvivorCount = 0;
+    for (const FFighter& Fighter : DefenderTeam)
+    {
+        if (Fighter.Stats.Health > 0)
+        {
+            ++DefenderSurvivorCount;
+        }
+    }
 }
 
 int32 UGridBattleManager::RollInitiativeDie(FRandomStream& RandomStream)
@@ -79,6 +96,9 @@ int32 UGridBattleManager::RollInitiativeDie(FRandomStream& RandomStream)
 void UGridBattleManager::StartBattle(FRandomStream& RandomStream)
 {
     bool bAttackerTurn = RollInitiativeDie(RandomStream) >= RollInitiativeDie(RandomStream);
+
+    int32 AttackerSurvivors = AttackerSurvivorCount;
+    int32 DefenderSurvivors = DefenderSurvivorCount;
 
     TArray<FIntPoint> PreviousAttackerPositions;
     PreviousAttackerPositions.Reserve(AttackerTeam.Num());
@@ -95,7 +115,7 @@ void UGridBattleManager::StartBattle(FRandomStream& RandomStream)
 
     int32 StalemateTurns = 0;
 
-    while (GetAttackerSurvivors() > 0 && GetDefenderSurvivors() > 0 && CurrentRound <= MaxRounds)
+    while (AttackerSurvivors > 0 && DefenderSurvivors > 0 && CurrentRound <= MaxRounds)
     {
         bool bDamageDealt = false;
         TArray<FFighter>& ActingTeam = bAttackerTurn ? AttackerTeam : DefenderTeam;
@@ -126,14 +146,25 @@ void UGridBattleManager::StartBattle(FRandomStream& RandomStream)
             if (IsInRange(Fighter, *Target))
             {
                 int32 Damage = 0;
-                ResolveAttack(Fighter, *Target, Damage, RandomStream);
+                bool bDefeated = ResolveAttack(Fighter, *Target, Damage, RandomStream);
                 if (Damage > 0)
                 {
                     bDamageDealt = true;
                 }
+                if (bDefeated)
+                {
+                    if (bAttackerTurn)
+                    {
+                        --DefenderSurvivors;
+                    }
+                    else
+                    {
+                        --AttackerSurvivors;
+                    }
+                }
             }
 
-            if (GetAttackerSurvivors() <= 0 || GetDefenderSurvivors() <= 0)
+            if (AttackerSurvivors <= 0 || DefenderSurvivors <= 0)
             {
                 break;
             }
@@ -187,12 +218,15 @@ void UGridBattleManager::StartBattle(FRandomStream& RandomStream)
         ++CurrentRound;
     }
 
+    AttackerSurvivorCount = AttackerSurvivors;
+    DefenderSurvivorCount = DefenderSurvivors;
+
     ESkaldFaction Winner = ESkaldFaction::None;
-    if (GetAttackerSurvivors() > 0 && GetDefenderSurvivors() <= 0)
+    if (AttackerSurvivors > 0 && DefenderSurvivors <= 0)
     {
         Winner = AttackerTeam.Num() > 0 ? AttackerTeam[0].Faction : ESkaldFaction::None;
     }
-    else if (GetDefenderSurvivors() > 0 && GetAttackerSurvivors() <= 0)
+    else if (DefenderSurvivors > 0 && AttackerSurvivors <= 0)
     {
         Winner = DefenderTeam.Num() > 0 ? DefenderTeam[0].Faction : ESkaldFaction::None;
     }
