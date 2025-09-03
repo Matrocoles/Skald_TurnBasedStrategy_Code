@@ -261,6 +261,12 @@ void ASkaldGameMode::PopulateAIPlayers() {
       AIState->Faction =
           Available[RandStream.RandRange(0, Available.Num() - 1)];
       GI->TakenFactions.AddUnique(AIState->Faction);
+    } else {
+      UE_LOG(LogSkald, Error,
+             TEXT("PopulateAIPlayers: no available factions for AI"));
+      AIController->Destroy();
+      AIState->Destroy();
+      break;
     }
 
     AIState->bHasLockedIn = true;
@@ -674,21 +680,18 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
 
 bool ASkaldGameMode::InitializeWorld() {
   if (!WorldMap) {
-    // Try to locate an existing world map actor in the level.
+    // Look for an existing world map actor placed in the level.
     WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
         GetWorld(), AWorldMap::StaticClass()));
-    // If none exists, spawn a default instance so setup can continue.
-    if (!WorldMap) {
-      WorldMap = GetWorld()->SpawnActor<AWorldMap>();
-    }
   }
   if (!WorldMap) {
     UE_LOG(LogSkald, Error,
-           TEXT("InitializeWorld failed: WorldMap missing in %s"), *GetName());
+           TEXT("InitializeWorld failed: WorldMap missing in %s. Place a WorldMap actor in the level."),
+           *GetName());
     if (GEngine) {
       GEngine->AddOnScreenDebugMessage(
           -1, 5.f, FColor::Red,
-          FString::Printf(TEXT("InitializeWorld: WorldMap missing in %s"),
+          FString::Printf(TEXT("InitializeWorld: WorldMap missing in %s. Place a WorldMap actor in the level."),
                           *GetName()));
     }
     return false;
@@ -712,36 +715,18 @@ bool ASkaldGameMode::InitializeWorld() {
     return false;
   }
 
-  // If the world map has not spawned territories yet or only contains a
-  // placeholder, create basic ones.
-  if (WorldMap->Territories.Num() == 0 ||
-      (WorldMap->Territories.Num() > 0 && WorldMap->Territories[0] &&
-       WorldMap->Territories[0]->TerritoryID == -1)) {
-    ATerritory *Placeholder = nullptr;
-    if (WorldMap->Territories.Num() > 0) {
-      Placeholder = WorldMap->Territories[0];
-      WorldMap->Territories.Empty();
-    } else {
-      TArray<AActor *> Found;
-      UGameplayStatics::GetAllActorsOfClass(GetWorld(),
-                                            ATerritory::StaticClass(), Found);
-      for (AActor *Actor : Found) {
-        ATerritory *Terr = Cast<ATerritory>(Actor);
-        if (Terr && Terr->TerritoryID == -1) {
-          Placeholder = Terr;
-          break;
-        }
+  if (WorldMap->Territories.Num() == 0) {
+    if (!WorldMap->GenerateTerritoriesFromTable()) {
+      UE_LOG(LogSkald, Error,
+             TEXT("InitializeWorld failed: WorldMap %s could not generate territories"),
+             *WorldMap->GetName());
+      if (GEngine) {
+        GEngine->AddOnScreenDebugMessage(
+            -1, 5.f, FColor::Red,
+            FString::Printf(TEXT("InitializeWorld: %s could not generate territories"),
+                            *WorldMap->GetName()));
       }
-    }
-    if (Placeholder) {
-      Placeholder->Destroy();
-    }
-    for (int32 Id = 0; Id < 43; ++Id) {
-      ATerritory *Territory = GetWorld()->SpawnActor<ATerritory>();
-      if (Territory) {
-        Territory->TerritoryID = Id;
-        WorldMap->RegisterTerritory(Territory);
-      }
+      return false;
     }
   }
   if (WorldMap->Territories.Num() == 0) {
