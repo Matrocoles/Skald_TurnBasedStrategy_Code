@@ -330,8 +330,14 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
   const int32 InitialTargetArmy = Target->ArmyUnits;
 
   const int32 AttackerSurvivors =
-      GI->GridBattleManager->GetAttackerSurvivorCost();
+      GI->GridBattleManager->GetAttackerSurvivors();
   const int32 DefenderSurvivors =
+      GI->GridBattleManager->GetDefenderSurvivors();
+
+  // Army-cost totals for potential downstream use
+  const int32 AttackerSurvivorCost =
+      GI->GridBattleManager->GetAttackerSurvivorCost();
+  const int32 DefenderSurvivorCost =
       GI->GridBattleManager->GetDefenderSurvivorCost();
 
   Source->ArmyUnits -= Battle.ArmyCountSent;
@@ -348,7 +354,7 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
   }
 
   const int32 AttackerCasualties =
-      Battle.ArmyCountSent - AttackerSurvivors;
+      InitialSourceArmy - (Source->ArmyUnits + AttackerSurvivors);
   const int32 DefenderCasualties =
       InitialTargetArmy - DefenderSurvivors;
 
