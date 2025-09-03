@@ -76,74 +76,81 @@ void ASkaldPlayerController::BeginPlay() {
     CachedGameInstance->OnFactionsUpdated.AddDynamic(
         this, &ASkaldPlayerController::HandleFactionsUpdated);
   }
+  if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+    bIsAI = PS->bIsAI;
+  }
 
-  // Create and show the HUD widget if a class has been assigned (expected via
-  // blueprint or constructor).
-  if (HUDWidgetClass) {
-    MainHudWidget = CreateWidget<USkaldMainHUDWidget>(this, HUDWidgetClass);
-    if (MainHudWidget) {
-      HUDRef = MainHudWidget;
-      MainHudWidget->AddToViewport();
-      MainHudWidget->SetVisibility(ESlateVisibility::Hidden);
+  if (IsLocalPlayerController() && !IsAIController()) {
+    // Create and show the HUD widget if a class has been assigned (expected via
+    // blueprint or constructor).
+    if (HUDWidgetClass) {
+      MainHudWidget = CreateWidget<USkaldMainHUDWidget>(this, HUDWidgetClass);
+      if (MainHudWidget) {
+        HUDRef = MainHudWidget;
+        MainHudWidget->AddToViewport();
+        MainHudWidget->SetVisibility(ESlateVisibility::Hidden);
 
-      if (CachedGameState) {
-        TArray<FS_PlayerData> Players;
-        for (APlayerState *PSBase : CachedGameState->PlayerArray) {
-          if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
-            FS_PlayerData Data;
-            Data.PlayerID = PS->GetPlayerId();
-            Data.PlayerName = PS->PlayerDisplayName;
-            Data.IsAI = PS->bIsAI;
-            Data.Faction = PS->Faction;
-            Players.Add(Data);
+        if (CachedGameState) {
+          TArray<FS_PlayerData> Players;
+          for (APlayerState *PSBase : CachedGameState->PlayerArray) {
+            if (ASkaldPlayerState *LPS = Cast<ASkaldPlayerState>(PSBase)) {
+              FS_PlayerData Data;
+              Data.PlayerID = LPS->GetPlayerId();
+              Data.PlayerName = LPS->PlayerDisplayName;
+              Data.IsAI = LPS->bIsAI;
+              Data.Faction = LPS->Faction;
+              Players.Add(Data);
+            }
           }
+
+          const ASkaldPlayerState *CurrentPS =
+              CachedGameState->GetCurrentPlayer();
+          const int32 CurrentID = CurrentPS ? CurrentPS->GetPlayerId() : -1;
+          MainHudWidget->RefreshFromState(CurrentID, /*TurnNumber*/ 1,
+                                          ETurnPhase::Reinforcement, Players);
         }
 
-        const ASkaldPlayerState *CurrentPS =
-            CachedGameState->GetCurrentPlayer();
-        const int32 CurrentID = CurrentPS ? CurrentPS->GetPlayerId() : -1;
-        MainHudWidget->RefreshFromState(CurrentID, /*TurnNumber*/ 1,
-                                        ETurnPhase::Reinforcement, Players);
+        // Ensure local player details are registered with the HUD once
+        // available.
+        OnRep_PlayerState();
+
+        MainHudWidget->OnAttackRequested.AddDynamic(
+            this, &ASkaldPlayerController::HandleAttackRequested);
+        MainHudWidget->OnMoveRequested.AddDynamic(
+            this, &ASkaldPlayerController::HandleMoveRequested);
+        MainHudWidget->OnEndAttackRequested.AddDynamic(
+            this, &ASkaldPlayerController::HandleEndAttackRequested);
+        MainHudWidget->OnEndMovementRequested.AddDynamic(
+            this, &ASkaldPlayerController::HandleEndMovementRequested);
+        MainHudWidget->OnEngineeringRequested.AddDynamic(
+            this, &ASkaldPlayerController::HandleEngineeringRequested);
+        MainHudWidget->OnBuildSiegeRequested.AddDynamic(
+            this, &ASkaldPlayerController::HandleBuildSiegeRequested);
+        MainHudWidget->OnDigTreasureRequested.AddDynamic(
+            this, &ASkaldPlayerController::HandleDigTreasureRequested);
       }
-
-      // Ensure local player details are registered with the HUD once available.
-      OnRep_PlayerState();
-
-      MainHudWidget->OnAttackRequested.AddDynamic(
-          this, &ASkaldPlayerController::HandleAttackRequested);
-      MainHudWidget->OnMoveRequested.AddDynamic(
-          this, &ASkaldPlayerController::HandleMoveRequested);
-      MainHudWidget->OnEndAttackRequested.AddDynamic(
-          this, &ASkaldPlayerController::HandleEndAttackRequested);
-      MainHudWidget->OnEndMovementRequested.AddDynamic(
-          this, &ASkaldPlayerController::HandleEndMovementRequested);
-      MainHudWidget->OnEngineeringRequested.AddDynamic(
-          this, &ASkaldPlayerController::HandleEngineeringRequested);
-      MainHudWidget->OnBuildSiegeRequested.AddDynamic(
-          this, &ASkaldPlayerController::HandleBuildSiegeRequested);
-      MainHudWidget->OnDigTreasureRequested.AddDynamic(
-          this, &ASkaldPlayerController::HandleDigTreasureRequested);
+    } else {
+      UE_LOG(LogSkald, Warning,
+             TEXT("HUDWidgetClass is null; HUD will not be displayed."));
     }
-  } else {
-    UE_LOG(LogSkald, Warning,
-           TEXT("HUDWidgetClass is null; HUD will not be displayed."));
-  }
 
-  if (!ChoosePlayerWidget && ChoosePlayerWidgetClass) {
-    ChoosePlayerWidget =
-        CreateWidget<UChoosePlayerWidget>(this, ChoosePlayerWidgetClass);
-    if (ChoosePlayerWidget) {
-      ChoosePlayerWidget->OnPlayerLockedIn.AddDynamic(
-          this, &ASkaldPlayerController::HandlePlayerLockedIn);
-      ChoosePlayerWidget->AddToViewport();
-      // While the player is choosing their faction, restrict controls to the UI
-      SetInputMode(FInputModeUIOnly());
-      SetIgnoreMoveInput(true);
-      SetIgnoreLookInput(true);
+    if (!ChoosePlayerWidget && ChoosePlayerWidgetClass) {
+      ChoosePlayerWidget =
+          CreateWidget<UChoosePlayerWidget>(this, ChoosePlayerWidgetClass);
+      if (ChoosePlayerWidget) {
+        ChoosePlayerWidget->OnPlayerLockedIn.AddDynamic(
+            this, &ASkaldPlayerController::HandlePlayerLockedIn);
+        ChoosePlayerWidget->AddToViewport();
+        // While the player is choosing their faction, restrict controls to the
+        // UI
+        SetInputMode(FInputModeUIOnly());
+        SetIgnoreMoveInput(true);
+        SetIgnoreLookInput(true);
+      }
     }
-  }
 
-  InitializeFighterSelectionIfNeeded();
+    InitializeFighterSelectionIfNeeded();
+  }
 
   if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
           GetWorld(), AWorldMap::StaticClass()))) {
@@ -151,9 +158,6 @@ void ASkaldPlayerController::BeginPlay() {
         this, &ASkaldPlayerController::HandleTerritorySelected);
   }
 
-  if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
-    bIsAI = PS->bIsAI;
-  }
 }
 
 void ASkaldPlayerController::OnRep_PlayerState() {

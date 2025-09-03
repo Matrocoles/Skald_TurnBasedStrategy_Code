@@ -210,23 +210,28 @@ void ASkaldGameMode::PopulateAIPlayers() {
 
   while (GS->PlayerArray.Num() < ExpectedPlayerCount &&
          SpawnAttempts++ < MaxSpawnAttempts) {
-    ASkaldPlayerController *AIController =
-        GetWorld()->SpawnActor<ASkaldPlayerController>(PlayerControllerClass);
-    if (!AIController) {
-      break;
-    }
-
     ASkaldPlayerState *AIState =
         GetWorld()->SpawnActor<ASkaldPlayerState>(PlayerStateClass);
     if (!AIState) {
-      AIController->Destroy();
+      break;
+    }
+
+    AIState->bIsAI = true;
+
+    FTransform SpawnTransform;
+    ASkaldPlayerController *AIController =
+        GetWorld()->SpawnActorDeferred<ASkaldPlayerController>(
+            PlayerControllerClass, SpawnTransform, nullptr, nullptr,
+            ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+    if (!AIController) {
+      AIState->Destroy();
       break;
     }
 
     AIController->SetIsAIController(true);
     AIController->SetPlayerState(AIState);
+    AIController->FinishSpawning(SpawnTransform);
 
-    AIState->bIsAI = true;
     AIState->PlayerDisplayName =
         FString::Printf(TEXT("AI_%d"), GS->PlayerArray.Num());
 
