@@ -377,39 +377,36 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     return;
   }
 
-  // Ensure all expected players have locked in before starting the game.
+  bool bAllLockedIn = true;
   for (APlayerState *PSBase : GS->PlayerArray) {
     if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
       if (!PS->bHasLockedIn) {
-        return;
+        bAllLockedIn = false;
+        break;
       }
     } else {
-      return;
+      bAllLockedIn = false;
+      break;
     }
   }
 
-  const bool bReadyToStart = GS->PlayerArray.Num() >= ExpectedPlayerCount;
+  const bool bReadyToStart =
+      bAllLockedIn && GS->PlayerArray.Num() == ExpectedPlayerCount;
 
-  if (!bWorldInitialized && bReadyToStart && InitializeWorld()) {
-    bWorldInitialized = true;
-
+  if (PendingControllers.Num() > 0) {
     for (ASkaldPlayerController *PC : PendingControllers) {
       if (TurnManager) {
         TurnManager->RegisterController(PC);
       }
     }
     PendingControllers.Empty();
-
-    BeginArmyPlacementPhase();
   }
 
-  if (bWorldInitialized && PendingControllers.Num() > 0) {
-    for (ASkaldPlayerController *PC : PendingControllers) {
-      if (TurnManager) {
-        TurnManager->RegisterController(PC);
-      }
+  if (!bWorldInitialized && bReadyToStart) {
+    if (InitializeWorld()) {
+      bWorldInitialized = true;
+      BeginArmyPlacementPhase();
     }
-    PendingControllers.Empty();
   }
 
   if (bWorldInitialized && bReadyToStart && !bTurnsStarted && TurnManager &&
