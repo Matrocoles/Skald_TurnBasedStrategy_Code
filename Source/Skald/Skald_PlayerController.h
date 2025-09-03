@@ -201,6 +201,13 @@ public:
   UFUNCTION()
   void HandleWorldStateChanged();
 
+  /**
+   * Legacy alias for HandleFactionLockedIn.
+   * Enables player movement and look input after locking in their faction.
+   */
+  UFUNCTION()
+  void HandlePlayerLockedIn();
+
   /** React to the player finishing their pre-game selection. */
   UFUNCTION()
   void HandleFactionLockedIn();

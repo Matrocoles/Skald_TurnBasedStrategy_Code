@@ -999,6 +999,10 @@ void ASkaldPlayerController::HandleWorldStateChanged() {
   }
 }
 
+void ASkaldPlayerController::HandlePlayerLockedIn() {
+  HandleFactionLockedIn();
+}
+
 void ASkaldPlayerController::HandleFactionLockedIn() {
   if (ChoosePlayerWidget) {
     ChoosePlayerWidget->OnPlayerLockedIn.RemoveDynamic(
