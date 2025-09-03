@@ -31,6 +31,7 @@ void AFighterPawn::BeginPlay() {
   OnHealthChanged.Broadcast(Stats.Health);
 
   if (UGridOverlayComponent *Grid = GetGrid()) {
+    CurrentCell = Grid->WorldToGrid(GetActorLocation());
     Grid->SetOccupied(CurrentCell, true);
   }
 }
