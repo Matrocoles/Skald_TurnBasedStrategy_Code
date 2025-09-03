@@ -32,3 +32,15 @@ ASkaldPlayerState* ASkaldGameState::GetCurrentPlayer() const
     return Players.IsValidIndex(CurrentTurnIndex) ? Players[CurrentTurnIndex] : nullptr;
 }
 
+ASkaldPlayerState* ASkaldGameState::GetPlayerById(int32 PlayerID) const
+{
+    for (ASkaldPlayerState* PS : Players)
+    {
+        if (PS && PS->GetPlayerId() == PlayerID)
+        {
+            return PS;
+        }
+    }
+    return nullptr;
+}
+

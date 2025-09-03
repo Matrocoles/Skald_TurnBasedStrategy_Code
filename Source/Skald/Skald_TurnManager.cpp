@@ -5,6 +5,7 @@
 #include "Skald_GameInstance.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
+#include "Skald_GameState.h"
 #include "GridBattleManager.h"
 #include "Territory.h"
 #include "UI/SkaldMainHUDWidget.h"
@@ -380,11 +381,8 @@ void ATurnManager::ClientBattleResolved_Implementation(
     }
     if (Target) {
       ASkaldPlayerState *NewOwner = nullptr;
-      for (TActorIterator<ASkaldPlayerState> It(GetWorld()); It; ++It) {
-        if (It->GetPlayerId() == NewOwnerPlayerID) {
-          NewOwner = *It;
-          break;
-        }
+      if (ASkaldGameState *GS = GetWorld()->GetGameState<ASkaldGameState>()) {
+        NewOwner = GS->GetPlayerById(NewOwnerPlayerID);
       }
       Target->OwningPlayer = NewOwner;
       Target->ArmyUnits = TargetArmy;
@@ -421,17 +419,23 @@ void ATurnManager::AdvancePhase() {
     return;
   }
 
-  if (CurrentPhase == ETurnPhase::Attack) {
+  switch (CurrentPhase) {
+  case ETurnPhase::Attack:
     CurrentPhase = ETurnPhase::Engineering;
-  } else if (CurrentPhase == ETurnPhase::Engineering) {
+    break;
+  case ETurnPhase::Engineering:
     CurrentPhase = ETurnPhase::Treasure;
-  } else if (CurrentPhase == ETurnPhase::Treasure) {
+    break;
+  case ETurnPhase::Treasure:
     CurrentPhase = ETurnPhase::Movement;
-  } else if (CurrentPhase == ETurnPhase::Movement) {
+    break;
+  case ETurnPhase::Movement:
     CurrentPhase = ETurnPhase::EndTurn;
-  } else if (CurrentPhase == ETurnPhase::EndTurn) {
+    break;
+  case ETurnPhase::EndTurn:
     CurrentPhase = ETurnPhase::Revolt;
-  } else {
+    break;
+  default:
     return;
   }
 

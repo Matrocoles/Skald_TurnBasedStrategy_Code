@@ -14,6 +14,7 @@ class ATerritory;
 class ASkaldGameMode;
 class ASkaldGameState;
 class USkaldGameInstance;
+class UFighterSelectionWidget;
 
 /** Command issued by the player during a battle. */
 UENUM()
@@ -110,6 +111,11 @@ protected:
   UPROPERTY(BlueprintReadOnly, Category = "UI",
             meta = (AllowPrivateAccess = "true"))
   TObjectPtr<UBattleHUDWidget> BattleHudWidget;
+
+  /** Fighter selection widget used during battle setup. */
+  UPROPERTY(BlueprintReadOnly, Category = "UI",
+            meta = (AllowPrivateAccess = "true"))
+  TObjectPtr<UFighterSelectionWidget> FighterSelectionWidget;
 
   /** Player selection widget instance. */
   UPROPERTY(BlueprintReadOnly, Category = "UI",
@@ -269,4 +275,7 @@ private:
 
   UFUNCTION(Client, Reliable)
   void NotifyActionError(const FString &Message);
+
+  /** Ensure a valid TurnManager is available, attempting reacquisition if needed. */
+  bool EnsureTurnManager(const TCHAR *Caller);
 };

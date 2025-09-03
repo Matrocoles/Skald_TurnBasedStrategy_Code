@@ -37,5 +37,9 @@ public:
 
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="GameState")
     ASkaldPlayerState* GetCurrentPlayer() const;
+
+    /** Retrieve a player state by its PlayerID. */
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="GameState")
+    ASkaldPlayerState* GetPlayerById(int32 PlayerID) const;
 };
 

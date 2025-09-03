@@ -39,7 +39,8 @@ void AWorldMap::BeginPlay() {
     if (GEngine) {
       GEngine->AddOnScreenDebugMessage(
           -1, 5.f, FColor::Red,
-          FString::Printf(TEXT("WorldMap %s missing TerritoryTable"),
+          FString::Printf(TEXT("WorldMap %s missing TerritoryTable."
+                               " Expected /Game/DataTables/TerritoriesDataTable"),
                           *GetName()));
     }
 
@@ -50,6 +51,7 @@ void AWorldMap::BeginPlay() {
     if (Placeholder) {
       Placeholder->TerritoryID = -1;
       Placeholder->TerritoryName = TEXT("Placeholder Territory");
+      RegisterTerritory(Placeholder);
     }
 
     return;
