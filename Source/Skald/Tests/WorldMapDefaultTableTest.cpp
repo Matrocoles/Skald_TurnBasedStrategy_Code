@@ -1,11 +1,11 @@
 #include "Misc/AutomationTest.h"
 #include "WorldMap.h"
 #include "Tests/AutomationEditorCommon.h"
-#include "Engine\World.h"
+#include "Engine\\World.h"
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWorldMapMissingAssetsTest, "Skald.WorldMap.MissingAssetsLogged", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWorldMapDefaultTableTest, "Skald.WorldMap.DefaultTableAssigned", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
-bool FWorldMapMissingAssetsTest::RunTest(const FString& Parameters)
+bool FWorldMapDefaultTableTest::RunTest(const FString& Parameters)
 {
     UWorld* World = FAutomationEditorCommonUtils::CreateNewMap();
     TestNotNull(TEXT("World should be created"), World);
@@ -21,7 +21,6 @@ bool FWorldMapMissingAssetsTest::RunTest(const FString& Parameters)
         return false;
     }
 
-    AddExpectedError(TEXT("WorldMap requires valid TerritoryClass and TerritoryTable."), EAutomationExpectedErrorFlags::Contains);
-    Map->BeginPlay();
+    TestNotNull(TEXT("TerritoryTable defaulted"), Map->TerritoryTable);
     return true;
 }
