@@ -1,4 +1,5 @@
 #include "WorldMap.h"
+#include "Algo/Reverse.h"
 #include "Components/StaticMeshComponent.h"
 #include "Containers/Map.h"
 #include "Containers/Queue.h"
@@ -39,9 +40,10 @@ void AWorldMap::BeginPlay() {
     if (GEngine) {
       GEngine->AddOnScreenDebugMessage(
           -1, 5.f, FColor::Red,
-          FString::Printf(TEXT("WorldMap %s missing TerritoryTable."
-                               " Expected /Game/DataTables/TerritoriesDataTable"),
-                          *GetName()));
+          FString::Printf(
+              TEXT("WorldMap %s missing TerritoryTable."
+                   " Expected /Game/DataTables/TerritoriesDataTable"),
+              *GetName()));
     }
 
     FActorSpawnParameters Params;
@@ -319,9 +321,10 @@ bool AWorldMap::FindPath(ATerritory *From, ATerritory *To,
 
   ATerritory *Step = To;
   while (Step) {
-    OutPath.Insert(Step, 0);
+    OutPath.Add(Step);
     Step = CameFrom[Step];
   }
+  Algo::Reverse(OutPath);
 
   return true;
 }
