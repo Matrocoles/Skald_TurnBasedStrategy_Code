@@ -42,17 +42,23 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
   if (Distance > ActionsRemaining) {
     return;
   }
-
-  CurrentCell = TargetCell;
-  FVector NewLocation = GetActorLocation();
   UGridOverlayComponent *Grid = nullptr;
   if (UWorld *World = GetWorld()) {
     for (TActorIterator<AActor> It(World); It; ++It) {
       if ((Grid = It->FindComponentByClass<UGridOverlayComponent>())) {
-        NewLocation = Grid->GridToWorld(TargetCell);
         break;
       }
     }
+  }
+  if (Grid && Grid->IsObscured(TargetCell)) {
+    return;
+  }
+
+  CurrentCell = TargetCell;
+  FVector NewLocation = GetActorLocation();
+  if (Grid) {
+    NewLocation = Grid->GridToWorld(TargetCell);
+    NewLocation.Z = Grid->GetCellHeight(TargetCell);
   }
   SetActorLocation(NewLocation);
   ActionsRemaining -= Distance;
@@ -69,6 +75,53 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
 void AFighterPawn::PerformAttack(AFighterPawn *Target) {
   if (!Target || ActionsRemaining <= 0 || !Target->IsAlive()) {
     return;
+  }
+
+  const int32 Distance = FMath::Abs(Target->CurrentCell.X - CurrentCell.X) +
+                         FMath::Abs(Target->CurrentCell.Y - CurrentCell.Y);
+  if (Distance > Stats.AttackRange) {
+    return;
+  }
+
+  UGridOverlayComponent *Grid = nullptr;
+  if (UWorld *World = GetWorld()) {
+    for (TActorIterator<AActor> It(World); It; ++It) {
+      if ((Grid = It->FindComponentByClass<UGridOverlayComponent>())) {
+        break;
+      }
+    }
+  }
+  if (Grid) {
+    FIntPoint StartCell = CurrentCell;
+    FIntPoint TargetCell = Target->CurrentCell;
+    int32 x0 = StartCell.X;
+    int32 y0 = StartCell.Y;
+    int32 x1 = TargetCell.X;
+    int32 y1 = TargetCell.Y;
+    int32 dx = FMath::Abs(x1 - x0);
+    int32 sx = x0 < x1 ? 1 : -1;
+    int32 dy = -FMath::Abs(y1 - y0);
+    int32 sy = y0 < y1 ? 1 : -1;
+    int32 err = dx + dy;
+    FIntPoint Current(x0, y0);
+
+    while (true) {
+      if (Current != StartCell && Grid->IsObscured(Current)) {
+        return;
+      }
+      if (Current.X == x1 && Current.Y == y1) {
+        break;
+      }
+      int32 e2 = 2 * err;
+      if (e2 >= dy) {
+        err += dy;
+        Current.X += sx;
+      }
+      if (e2 <= dx) {
+        err += dx;
+        Current.Y += sy;
+      }
+    }
   }
 
   FRandomStream *RandomStream = nullptr;
@@ -117,14 +170,8 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
   }
   --ActionsRemaining;
 
-  if (UWorld *World = GetWorld()) {
-    for (TActorIterator<AActor> It(World); It; ++It) {
-      if (UGridOverlayComponent *Grid =
-              It->FindComponentByClass<UGridOverlayComponent>()) {
-        Grid->ClearHighlights();
-        break;
-      }
-    }
+  if (Grid) {
+    Grid->ClearHighlights();
   }
 }
 
