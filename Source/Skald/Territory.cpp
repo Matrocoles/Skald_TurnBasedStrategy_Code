@@ -223,10 +223,14 @@ void ATerritory::HandleMouseLeave(UPrimitiveComponent *TouchedComponent) {
 
 void ATerritory::HandleClicked(UPrimitiveComponent *TouchedComponent,
                                FKey ButtonPressed) {
-  if (!bIsSelected) {
-    Select();
-  } else {
-    Deselect();
+  if (AWorldMap *WorldMap =
+          Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+              this, AWorldMap::StaticClass()))) {
+    if (!bIsSelected) {
+      WorldMap->MulticastSelectTerritory(this);
+    } else {
+      WorldMap->MulticastSelectTerritory(nullptr);
+    }
   }
 }
 
