@@ -24,7 +24,8 @@ public class Skald : ModuleRules
                         "Slate",
                         "SlateCore",
                         "UMG",
-                        "OnlineSubsystem"
+                        "OnlineSubsystem",
+                        "Landscape"
                 });
 
                 PrivateIncludePaths.AddRange(new string[]
