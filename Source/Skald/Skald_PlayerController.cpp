@@ -27,10 +27,6 @@
 
 constexpr int32 MaxAIIterations = 100;
 
-namespace {
-TWeakObjectPtr<UFighterSelectionWidget> GFighterSelectionWidget;
-}
-
 ASkaldPlayerController::ASkaldPlayerController() {
   bIsAI = false;
   TurnManager = nullptr;
@@ -152,7 +148,7 @@ void ASkaldPlayerController::BeginPlay() {
     if (UFighterSelectionWidget *Selection =
             CreateWidget<UFighterSelectionWidget>(
                 this, UFighterSelectionWidget::StaticClass())) {
-      GFighterSelectionWidget = Selection;
+      FighterSelectionWidget = Selection;
       if (CachedGameInstance && CachedGameInstance->GridBattleManager) {
         if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
           const ESkaldFaction PlayerFaction = PS->Faction;
@@ -244,50 +240,16 @@ void ASkaldPlayerController::StartTurn() {
 
 void ASkaldPlayerController::EndTurn() {
   SetInputMode(FInputModeGameOnly());
-
-  if (!TurnManager) {
-    UE_LOG(
-        LogSkald, Warning,
-        TEXT("EndTurn called without a TurnManager. Attempting to reacquire."));
-
-    if (!CachedGameMode) {
-      CachedGameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
-    }
-
-    if (CachedGameMode) {
-      SetTurnManager(CachedGameMode->GetTurnManager());
-    }
-
-    if (!TurnManager) {
-      UE_LOG(LogSkald, Warning,
-             TEXT("TurnManager still missing; aborting EndTurn."));
-      return;
-    }
+  if (!EnsureTurnManager(TEXT("EndTurn"))) {
+    return;
   }
 
   TurnManager->AdvanceTurn();
 }
 
 void ASkaldPlayerController::EndPhase() {
-  if (!TurnManager) {
-    UE_LOG(
-        LogSkald, Warning,
-        TEXT(
-            "EndPhase called without a TurnManager. Attempting to reacquire."));
-
-    if (!CachedGameMode) {
-      CachedGameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
-    }
-
-    if (CachedGameMode) {
-      SetTurnManager(CachedGameMode->GetTurnManager());
-    }
-
-    if (!TurnManager) {
-      UE_LOG(LogSkald, Warning,
-             TEXT("TurnManager still missing; aborting EndPhase."));
-      return;
-    }
+  if (!EnsureTurnManager(TEXT("EndPhase"))) {
+    return;
   }
 
   ETurnPhase Phase = TurnManager->GetCurrentPhase();
@@ -879,6 +841,32 @@ void ASkaldPlayerController::NotifyActionError_Implementation(
   }
 }
 
+bool ASkaldPlayerController::EnsureTurnManager(const TCHAR *Caller) {
+  if (TurnManager) {
+    return true;
+  }
+
+  UE_LOG(LogSkald, Warning,
+         TEXT("%s called without a TurnManager. Attempting to reacquire."),
+         Caller);
+
+  if (!CachedGameMode) {
+    CachedGameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
+  }
+
+  if (CachedGameMode) {
+    SetTurnManager(CachedGameMode->GetTurnManager());
+  }
+
+  if (!TurnManager) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("TurnManager still missing; aborting %s."), Caller);
+    return false;
+  }
+
+  return true;
+}
+
 void ASkaldPlayerController::BuildPlayerDataArray(
     TArray<FS_PlayerData> &OutPlayers) const {
   OutPlayers.Reset();
@@ -967,8 +955,8 @@ void ASkaldPlayerController::HandlePlayerLockedIn() {
         this, &ASkaldPlayerController::HandlePlayerLockedIn);
     ChoosePlayerWidget->RemoveFromParent();
   }
-  if (GFighterSelectionWidget.IsValid()) {
-    UFighterSelectionWidget *Selection = GFighterSelectionWidget.Get();
+  if (FighterSelectionWidget) {
+    UFighterSelectionWidget *Selection = FighterSelectionWidget;
     Selection->OnLockedIn.RemoveDynamic(
         this, &ASkaldPlayerController::HandlePlayerLockedIn);
     Selection->RemoveFromParent();
@@ -1006,7 +994,7 @@ void ASkaldPlayerController::HandlePlayerLockedIn() {
         }
       }
     }
-    GFighterSelectionWidget = nullptr;
+    FighterSelectionWidget = nullptr;
   }
 
   // Restore game controls now that the player has locked in
