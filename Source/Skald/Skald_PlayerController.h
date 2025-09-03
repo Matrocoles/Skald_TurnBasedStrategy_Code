@@ -18,11 +18,7 @@ class UFighterSelectionWidget;
 
 /** Command issued by the player during a battle. */
 UENUM()
-enum class EBattleCommandMode : uint8 {
-  None,
-  Move,
-  Attack
-};
+enum class EBattleCommandMode : uint8 { None, Move, Attack };
 
 /**
  * Player controller capable of participating in turn based gameplay.
@@ -208,8 +204,7 @@ public:
 
   /** React to the end of a battle. */
   UFUNCTION()
-  void HandleBattleEnded(ESkaldFaction WinningFaction,
-                         int32 AttackerCasualties,
+  void HandleBattleEnded(ESkaldFaction WinningFaction, int32 AttackerCasualties,
                          int32 DefenderCasualties);
 
   /** Server-side processing of an attack request. */
@@ -276,6 +271,11 @@ private:
   UFUNCTION(Client, Reliable)
   void NotifyActionError(const FString &Message);
 
-  /** Ensure a valid TurnManager is available, attempting reacquisition if needed. */
+  /** Ensure a valid TurnManager is available, attempting reacquisition if
+   * needed. */
   bool EnsureTurnManager(const TCHAR *Caller);
+
+  /** Create the fighter selection widget if we are on a battle map and it is
+   * not already shown. */
+  void InitializeFighterSelectionIfNeeded();
 };
