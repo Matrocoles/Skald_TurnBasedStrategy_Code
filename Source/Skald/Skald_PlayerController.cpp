@@ -23,6 +23,7 @@
 #include "UI/SkaldMainHUDWidget.h"
 #include "UObject/ConstructorHelpers.h"
 #include "WorldMap.h"
+#include "TimerManager.h"
 #include <limits>
 
 constexpr int32 MaxAIIterations = 100;
@@ -153,10 +154,18 @@ void ASkaldPlayerController::BeginPlay() {
     InitializeFighterSelectionIfNeeded();
   }
 
+  TryBindWorldMap();
+}
+
+void ASkaldPlayerController::TryBindWorldMap() {
   if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
           GetWorld(), AWorldMap::StaticClass()))) {
     WorldMap->OnTerritorySelected.AddDynamic(
         this, &ASkaldPlayerController::HandleTerritorySelected);
+  } else {
+    GetWorldTimerManager().SetTimer(
+        WorldMapSearchHandle, this,
+        &ASkaldPlayerController::TryBindWorldMap, 0.5f, false);
   }
 }
 
