@@ -218,5 +218,8 @@ protected:
 
     UPROPERTY(BlueprintReadOnly, Category="Battle")
     int32 DefenderSurvivorCount = 0;
+
+    /** Whether fighters have been assigned to attacker or defender sides. */
+    bool bTeamsAssigned = false;
 };
 

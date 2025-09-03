@@ -41,6 +41,10 @@ public:
   UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Fighter")
   FFighterStats Stats;
 
+  /** True if this fighter belongs to the attacking side. */
+  UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Fighter")
+  bool bIsAttacker = false;
+
   /** Actions remaining for the current activation. */
   UPROPERTY(BlueprintReadOnly, Category = "Fighter")
   int32 ActionsRemaining;
