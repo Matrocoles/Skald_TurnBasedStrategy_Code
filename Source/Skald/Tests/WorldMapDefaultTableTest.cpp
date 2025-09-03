@@ -3,7 +3,7 @@
 #include "Tests/AutomationEditorCommon.h"
 #include "Engine\\World.h"
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWorldMapDefaultTableTest, "Skald.WorldMap.DefaultTableAssigned", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWorldMapDefaultTableTest, "Skald.WorldMap.DefaultTableUnset", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FWorldMapDefaultTableTest::RunTest(const FString& Parameters)
 {
@@ -21,6 +21,6 @@ bool FWorldMapDefaultTableTest::RunTest(const FString& Parameters)
         return false;
     }
 
-    TestNotNull(TEXT("TerritoryTable defaulted"), Map->TerritoryTable);
+    TestNull(TEXT("TerritoryTable should be unset"), Map->TerritoryTable);
     return true;
 }
