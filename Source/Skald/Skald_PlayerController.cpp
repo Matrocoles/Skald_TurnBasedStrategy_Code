@@ -80,7 +80,8 @@ void ASkaldPlayerController::BeginPlay() {
     bIsAI = PS->bIsAI;
   }
 
-  if (IsLocalPlayerController() && !IsAIController()) {
+  if (IsLocalPlayerController() && !IsAIController() &&
+      GetLocalPlayer() != nullptr) {
     // Create and show the HUD widget if a class has been assigned (expected via
     // blueprint or constructor).
     if (HUDWidgetClass) {
@@ -157,7 +158,6 @@ void ASkaldPlayerController::BeginPlay() {
     WorldMap->OnTerritorySelected.AddDynamic(
         this, &ASkaldPlayerController::HandleTerritorySelected);
   }
-
 }
 
 void ASkaldPlayerController::OnRep_PlayerState() {
@@ -199,12 +199,16 @@ void ASkaldPlayerController::SetTurnManager(ATurnManager *Manager) {
   if (TurnManager) {
     TurnManager->OnWorldStateChanged.AddDynamic(
         this, &ASkaldPlayerController::HandleWorldStateChanged);
-    InitializeFighterSelectionIfNeeded();
+    if (IsLocalPlayerController() && !IsAIController() &&
+        GetLocalPlayer() != nullptr) {
+      InitializeFighterSelectionIfNeeded();
+    }
   }
 }
 
 void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
-  if (FighterSelectionWidget) {
+  if (FighterSelectionWidget || IsAIController() ||
+      GetLocalPlayer() == nullptr || !IsLocalPlayerController()) {
     return;
   }
 
