@@ -36,7 +36,7 @@ void UGridOverlayComponent::BeginPlay() {
         FHitResult Hit;
         if (World->LineTraceSingleByChannel(Hit, Start, End, ECC_WorldStatic)) {
           CellHeights[Idx] = Hit.Location.Z;
-          if (Hit.Component && Hit.Component->IsA<ULandscapeComponent>()) {
+          if (Cast<ULandscapeComponent>(Hit.GetComponent())) {
             HandleLandscapeHit(Hit, FIntPoint(X, Y), Idx);
           }
         } else {
