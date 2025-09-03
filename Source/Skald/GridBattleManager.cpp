@@ -76,6 +76,7 @@ void UGridBattleManager::InitBattle(const TArray<FFighter>& Attackers, const TAr
         if (Fighter.Stats.Health > 0)
         {
             AttackerSurvivorCount += Fighter.Stats.ArmyCost;
+            ++AttackerSurvivorCount;
         }
     }
     DefenderSurvivorCount = 0;
@@ -84,6 +85,7 @@ void UGridBattleManager::InitBattle(const TArray<FFighter>& Attackers, const TAr
         if (Fighter.Stats.Health > 0)
         {
             DefenderSurvivorCount += Fighter.Stats.ArmyCost;
+            ++DefenderSurvivorCount;
         }
     }
 }
@@ -116,6 +118,8 @@ void UGridBattleManager::StartBattle(FRandomStream& RandomStream)
 
     int32 AttackerSurvivorCost = AttackerSurvivorCount;
     int32 DefenderSurvivorCost = DefenderSurvivorCount;
+    int32 AttackerSurvivors = AttackerSurvivorCount;
+    int32 DefenderSurvivors = DefenderSurvivorCount;
 
     TArray<FIntPoint> PreviousAttackerPositions;
     PreviousAttackerPositions.Reserve(AttackerTeam.Num());
@@ -239,6 +243,8 @@ void UGridBattleManager::StartBattle(FRandomStream& RandomStream)
 
     AttackerSurvivorCount = AttackerSurvivorCost;
     DefenderSurvivorCount = DefenderSurvivorCost;
+    AttackerSurvivorCount = AttackerSurvivors;
+    DefenderSurvivorCount = DefenderSurvivors;
 
     ESkaldFaction Winner = ESkaldFaction::None;
     if (AttackerSurvivors > 0 && DefenderSurvivors <= 0)
@@ -304,13 +310,29 @@ bool UGridBattleManager::ResolveAttack(FFighter& Attacker, FFighter& Defender, i
     return bDefeated;
 }
 
-int32 UGridBattleManager::GetAttackerSurvivors() const
+int32 UGridBattleManager::GetAttackerSurvivors()
 {
+    AttackerSurvivorCount = 0;
+    for (const FFighter& Fighter : AttackerTeam)
+    {
+        if (Fighter.Stats.Health > 0)
+        {
+            ++AttackerSurvivorCount;
+        }
+    }
     return AttackerSurvivorCount;
 }
 
-int32 UGridBattleManager::GetDefenderSurvivors() const
+int32 UGridBattleManager::GetDefenderSurvivors()
 {
+    DefenderSurvivorCount = 0;
+    for (const FFighter& Fighter : DefenderTeam)
+    {
+        if (Fighter.Stats.Health > 0)
+        {
+            ++DefenderSurvivorCount;
+        }
+    }
     return DefenderSurvivorCount;
 }
 
