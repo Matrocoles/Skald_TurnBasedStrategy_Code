@@ -810,8 +810,23 @@ bool ASkaldGameMode::InitializeWorld() {
     }
   }
 
-  // Assign territories round-robin to players in initiative order
+  // Ensure the expected number of players are present before assigning territories
   const int32 PlayerCount = GS->PlayerArray.Num();
+  if (PlayerCount != ExpectedPlayerCount) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("InitializeWorld aborted: expected %d players but found %d"),
+           ExpectedPlayerCount, PlayerCount);
+    if (GEngine) {
+      GEngine->AddOnScreenDebugMessage(
+          -1, 5.f, FColor::Yellow,
+          FString::Printf(
+              TEXT("InitializeWorld: expected %d players but found %d"),
+              ExpectedPlayerCount, PlayerCount));
+    }
+    return false;
+  }
+
+  // Assign territories round-robin to players in initiative order
   int32 Index = 0;
   for (ATerritory *Territory : WorldMap->Territories) {
     if (Territory && PlayerCount > 0) {
