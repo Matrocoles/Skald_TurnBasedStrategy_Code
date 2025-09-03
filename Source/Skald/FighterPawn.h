@@ -3,9 +3,9 @@
 #include "Blueprint/UserWidget.h"
 #include "Components/WidgetComponent.h"
 #include "CoreMinimal.h"
-#include "FighterPawn.generated.h"
 #include "GameFramework/Pawn.h"
 #include "GridBattleManager.h"
+#include "FighterPawn.generated.h"
 
 class UGridOverlayComponent;
 
