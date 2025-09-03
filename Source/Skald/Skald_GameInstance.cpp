@@ -1,4 +1,5 @@
 #include "Skald_GameInstance.h"
+#include "GridBattleManager.h"
 
 void USkaldGameInstance::Init()
 {
@@ -9,5 +10,14 @@ void USkaldGameInstance::Init()
 void USkaldGameInstance::SeedCombatRandomStream(int32 Seed)
 {
     CombatRandomStream.Initialize(Seed);
+}
+
+UGridBattleManager* USkaldGameInstance::GetGridBattleManager()
+{
+    if (!GridBattleManager)
+    {
+        GridBattleManager = NewObject<UGridBattleManager>(this);
+    }
+    return GridBattleManager;
 }
 
