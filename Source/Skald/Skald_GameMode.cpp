@@ -81,12 +81,12 @@ void ASkaldGameMode::BeginPlay() {
   // Auto-select fighters for AI players on the battle map
   const FString CurrentLevel =
       UGameplayStatics::GetCurrentLevelName(this, true);
-  bool bIsBattleMap = CurrentLevel.Equals(TEXT("BattleMap"),
-                                         ESearchCase::IgnoreCase);
+  bool bIsBattleMap =
+      CurrentLevel.Equals(TEXT("BattleMap"), ESearchCase::IgnoreCase);
   if (!bIsBattleMap && TurnManager) {
     for (const TSoftObjectPtr<UWorld> &Map : TurnManager->BattleMaps) {
       if (CurrentLevel.Equals(Map.ToSoftObjectPath().GetAssetName(),
-                             ESearchCase::IgnoreCase)) {
+                              ESearchCase::IgnoreCase)) {
         bIsBattleMap = true;
         break;
       }
@@ -686,12 +686,14 @@ bool ASkaldGameMode::InitializeWorld() {
   }
   if (!WorldMap) {
     UE_LOG(LogSkald, Error,
-           TEXT("InitializeWorld failed: WorldMap missing in %s. Place a WorldMap actor in the level."),
+           TEXT("InitializeWorld failed: WorldMap missing in %s. Place a "
+                "WorldMap actor in the level."),
            *GetName());
     if (GEngine) {
       GEngine->AddOnScreenDebugMessage(
           -1, 5.f, FColor::Red,
-          FString::Printf(TEXT("InitializeWorld: WorldMap missing in %s. Place a WorldMap actor in the level."),
+          FString::Printf(TEXT("InitializeWorld: WorldMap missing in %s. Place "
+                               "a WorldMap actor in the level."),
                           *GetName()));
     }
     return false;
@@ -716,15 +718,41 @@ bool ASkaldGameMode::InitializeWorld() {
   }
 
   if (WorldMap->Territories.Num() == 0) {
-    if (!WorldMap->GenerateTerritoriesFromTable()) {
+    if (!WorldMap->TerritoryClass) {
       UE_LOG(LogSkald, Error,
-             TEXT("InitializeWorld failed: WorldMap %s could not generate territories"),
+             TEXT("InitializeWorld failed: WorldMap %s missing TerritoryClass"),
              *WorldMap->GetName());
       if (GEngine) {
         GEngine->AddOnScreenDebugMessage(
             -1, 5.f, FColor::Red,
-            FString::Printf(TEXT("InitializeWorld: %s could not generate territories"),
+            FString::Printf(TEXT("InitializeWorld: %s missing TerritoryClass"),
                             *WorldMap->GetName()));
+      }
+      return false;
+    }
+    if (!WorldMap->TerritoryTable) {
+      UE_LOG(LogSkald, Error,
+             TEXT("InitializeWorld failed: WorldMap %s missing TerritoryTable"),
+             *WorldMap->GetName());
+      if (GEngine) {
+        GEngine->AddOnScreenDebugMessage(
+            -1, 5.f, FColor::Red,
+            FString::Printf(TEXT("InitializeWorld: %s missing TerritoryTable"),
+                            *WorldMap->GetName()));
+      }
+      return false;
+    }
+    if (!WorldMap->GenerateTerritoriesFromTable()) {
+      UE_LOG(LogSkald, Error,
+             TEXT("InitializeWorld failed: WorldMap %s could not generate "
+                  "territories"),
+             *WorldMap->GetName());
+      if (GEngine) {
+        GEngine->AddOnScreenDebugMessage(
+            -1, 5.f, FColor::Red,
+            FString::Printf(
+                TEXT("InitializeWorld: %s could not generate territories"),
+                *WorldMap->GetName()));
       }
       return false;
     }
