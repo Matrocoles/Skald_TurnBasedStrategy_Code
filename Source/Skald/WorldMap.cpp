@@ -4,12 +4,15 @@
 #include "Containers/Map.h"
 #include "Containers/Queue.h"
 #include "Engine/Engine.h"
+#include "Engine/StaticMesh.h"
 #include "Engine/World.h"
+#include "Materials/MaterialInterface.h"
 #include "Skald.h"
 #include "Skald_GameMode.h"
 #include "Skald_PlayerState.h"
 #include "Templates/Function.h"
 #include "Territory.h"
+#include "UObject/ConstructorHelpers.h"
 #include <cfloat>
 
 // Constructor sets default properties but leaves TerritoryTable unassigned so
@@ -57,20 +60,67 @@ bool AWorldMap::GenerateTerritoriesFromTable() {
       DefaultTerritory
           ? DefaultTerritory->FindComponentByClass<UStaticMeshComponent>()
           : nullptr;
-  if (!MeshComp || !MeshComp->GetStaticMesh() ||
-      MeshComp->GetNumMaterials() == 0) {
-    const FString MissingAsset = (!MeshComp || !MeshComp->GetStaticMesh())
-                                     ? TEXT("mesh")
-                                     : TEXT("material");
-    UE_LOG(LogSkald, Error, TEXT("WorldMap %s TerritoryClass %s missing %s"),
-           *GetName(), *TerritoryClass->GetName(), *MissingAsset);
+  if (!MeshComp) {
+    UE_LOG(LogSkald, Error,
+           TEXT("WorldMap %s TerritoryClass %s missing StaticMeshComponent"),
+           *GetName(), *TerritoryClass->GetName());
     if (GEngine) {
       GEngine->AddOnScreenDebugMessage(
           -1, 5.f, FColor::Red,
-          FString::Printf(TEXT("%s missing %s"), *TerritoryClass->GetName(),
-                          *MissingAsset));
+          FString::Printf(TEXT("%s missing StaticMeshComponent"),
+                          *TerritoryClass->GetName()));
     }
     return false;
+  }
+
+  if (!MeshComp->GetStaticMesh()) {
+    if (UStaticMesh *FallbackMesh = LoadObject<UStaticMesh>(
+            nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"))) {
+      MeshComp->SetStaticMesh(FallbackMesh);
+      UE_LOG(
+          LogSkald, Warning,
+          TEXT(
+              "WorldMap %s TerritoryClass %s missing mesh; using default cube"),
+          *GetName(), *TerritoryClass->GetName());
+    } else {
+      UE_LOG(
+          LogSkald, Error,
+          TEXT(
+              "WorldMap %s TerritoryClass %s missing mesh and fallback failed"),
+          *GetName(), *TerritoryClass->GetName());
+      if (GEngine) {
+        GEngine->AddOnScreenDebugMessage(
+            -1, 5.f, FColor::Red,
+            FString::Printf(TEXT("%s missing mesh"),
+                            *TerritoryClass->GetName()));
+      }
+      return false;
+    }
+  }
+
+  if (MeshComp->GetNumMaterials() == 0) {
+    if (UMaterialInterface *FallbackMat = LoadObject<UMaterialInterface>(
+            nullptr,
+            TEXT(
+                "/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"))) {
+      MeshComp->SetMaterial(0, FallbackMat);
+      UE_LOG(LogSkald, Warning,
+             TEXT("WorldMap %s TerritoryClass %s missing material; using basic "
+                  "material"),
+             *GetName(), *TerritoryClass->GetName());
+    } else {
+      UE_LOG(LogSkald, Error,
+             TEXT("WorldMap %s TerritoryClass %s missing material and fallback "
+                  "failed"),
+             *GetName(), *TerritoryClass->GetName());
+      if (GEngine) {
+        GEngine->AddOnScreenDebugMessage(
+            -1, 5.f, FColor::Red,
+            FString::Printf(TEXT("%s missing material"),
+                            *TerritoryClass->GetName()));
+      }
+      return false;
+    }
   }
 
   // Spawn territories defined in the data table at random locations.
