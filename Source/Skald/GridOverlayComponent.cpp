@@ -5,6 +5,8 @@
 #include "Engine/World.h"
 #include "FighterPawn.h"
 #include "GridObstacleComponent.h"
+#include "Landscape.h"
+#include "LandscapeComponent.h"
 
 UGridOverlayComponent::UGridOverlayComponent() {
   PrimaryComponentTick.bCanEverTick = false;
@@ -34,6 +36,9 @@ void UGridOverlayComponent::BeginPlay() {
         FHitResult Hit;
         if (World->LineTraceSingleByChannel(Hit, Start, End, ECC_WorldStatic)) {
           CellHeights[Idx] = Hit.Location.Z;
+          if (Hit.Component && Hit.Component->IsA<ULandscapeComponent>()) {
+            HandleLandscapeHit(Hit, FIntPoint(X, Y), Idx);
+          }
         } else {
           CellHeights[Idx] = Origin.Z;
         }
@@ -144,6 +149,21 @@ void UGridOverlayComponent::RegisterObstacle(UGridObstacleComponent *Obstacle) {
         }
       }
     }
+  }
+}
+
+void UGridOverlayComponent::HandleLandscapeHit(const FHitResult &Hit,
+                                               const FIntPoint &Cell,
+                                               int32 CellIndex) {
+  if (!bTreatLandscapeAsObstacle) {
+    return;
+  }
+  const FVector Normal = Hit.Normal.GetSafeNormal();
+  const float Slope = FMath::RadiansToDegrees(
+      FMath::Acos(FVector::DotProduct(Normal, FVector::UpVector)));
+  if (Slope >= LandscapeSlopeThreshold) {
+    Cells[CellIndex] = true;
+    ObscuredCells[CellIndex] = true;
   }
 }
 

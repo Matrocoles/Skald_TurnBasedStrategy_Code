@@ -6,6 +6,7 @@
 
 class AFighterPawn;
 class UGridObstacleComponent;
+struct FHitResult;
 
 /**
  * Component that tracks grid cell occupancy and provides world/grid conversion.
@@ -65,6 +66,15 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Grid")
     void RegisterObstacle(UGridObstacleComponent *Obstacle);
 
+  /** Whether landscape should be treated as an obstacle based on slope. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Landscape")
+  bool bTreatLandscapeAsObstacle = true;
+
+  /** Minimum slope angle for landscape to block movement or sight. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Landscape",
+            meta = (EditCondition = "bTreatLandscapeAsObstacle"))
+  float LandscapeSlopeThreshold = 45.f;
+
 protected:
   /** Width of the grid in cells. */
   int32 Width = 0;
@@ -99,4 +109,8 @@ protected:
     /** Obstacles currently registered with this grid. */
     UPROPERTY()
     TArray<UGridObstacleComponent *> Obstacles;
+
+    /** Process a landscape hit to potentially flag a cell as blocked. */
+    void HandleLandscapeHit(const FHitResult &Hit, const FIntPoint &Cell,
+                            int32 CellIndex);
 };
