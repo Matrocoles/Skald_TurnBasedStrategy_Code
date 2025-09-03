@@ -1,9 +1,13 @@
 #include "Skald_PlayerController.h"
 #include "Blueprint/UserWidget.h"
 #include "ChoosePlayerWidget.h"
+#include "Components/InputComponent.h"
 #include "Engine/Engine.h"
+#include "EngineUtils.h"
+#include "FighterPawn.h"
 #include "GridBattleManager.h"
 #include "GridOverlayComponent.h"
+#include "InputCoreTypes.h"
 #include "Kismet/GameplayStatics.h"
 #include "Skald.h"
 #include "SkaldTypes.h"
@@ -13,16 +17,12 @@
 #include "Skald_PlayerState.h"
 #include "Skald_TurnManager.h"
 #include "Territory.h"
+#include "UI/BattleHUDWidget.h"
 #include "UI/DeployWidget.h"
 #include "UI/FighterSelectionWidget.h"
 #include "UI/SkaldMainHUDWidget.h"
-#include "UI/BattleHUDWidget.h"
 #include "UObject/ConstructorHelpers.h"
 #include "WorldMap.h"
-#include "FighterPawn.h"
-#include "InputCoreTypes.h"
-#include "Components/InputComponent.h"
-#include "EngineUtils.h"
 #include <limits>
 
 constexpr int32 MaxAIIterations = 100;
@@ -143,41 +143,7 @@ void ASkaldPlayerController::BeginPlay() {
     }
   }
 
-  const FString CurrentMap = UGameplayStatics::GetCurrentLevelName(this, true);
-  bool bIsBattleMap = CurrentMap.Equals(TEXT("BattleMap"),
-                                        ESearchCase::IgnoreCase);
-  if (ATurnManager *TM = Cast<ATurnManager>(UGameplayStatics::GetActorOfClass(
-          GetWorld(), ATurnManager::StaticClass()))) {
-  bool bIsBattleMap = false;
-  if (CachedGameMode && CachedGameMode->GetTurnManager()) {
-    ATurnManager *TM = CachedGameMode->GetTurnManager();
-    for (const TSoftObjectPtr<UWorld> &Map : TM->BattleMaps) {
-      if (CurrentMap.Equals(Map.ToSoftObjectPath().GetAssetName(),
-                           ESearchCase::IgnoreCase)) {
-        bIsBattleMap = true;
-        break;
-      }
-    }
-  }
-
-  if (bIsBattleMap && CachedGameInstance && CachedGameInstance->GridBattleManager) {
-    if (UFighterSelectionWidget *Selection =
-            CreateWidget<UFighterSelectionWidget>(
-                this, UFighterSelectionWidget::StaticClass())) {
-      FighterSelectionWidget = Selection;
-      if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
-        const ESkaldFaction PlayerFaction = PS->Faction;
-        Selection->PlayerFaction = PlayerFaction;
-        Selection->AvailableFighters =
-            CachedGameInstance->GridBattleManager->GetFightersForFaction(
-                PlayerFaction);
-      }
-      Selection->OnLockedIn.AddDynamic(
-          this, &ASkaldPlayerController::HandlePlayerLockedIn);
-      Selection->AddToViewport();
-      SetIgnoreMoveInput(true);
-    }
-  }
+  InitializeFighterSelectionIfNeeded();
 
   if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
           GetWorld(), AWorldMap::StaticClass()))) {
@@ -229,6 +195,64 @@ void ASkaldPlayerController::SetTurnManager(ATurnManager *Manager) {
   if (TurnManager) {
     TurnManager->OnWorldStateChanged.AddDynamic(
         this, &ASkaldPlayerController::HandleWorldStateChanged);
+    InitializeFighterSelectionIfNeeded();
+  }
+}
+
+void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
+  if (FighterSelectionWidget) {
+    return;
+  }
+
+  if (!CachedGameInstance) {
+    CachedGameInstance = GetGameInstance<USkaldGameInstance>();
+  }
+  if (!CachedGameInstance || !CachedGameInstance->GridBattleManager) {
+    return;
+  }
+
+  ATurnManager *TM = TurnManager;
+  if (!TM) {
+    if (!CachedGameMode) {
+      CachedGameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
+    }
+    if (CachedGameMode) {
+      TM = CachedGameMode->GetTurnManager();
+    }
+  }
+  if (!TM) {
+    return;
+  }
+
+  const FString CurrentMap = UGameplayStatics::GetCurrentLevelName(this, true);
+  bool bIsBattleMap = false;
+  for (const TSoftObjectPtr<UWorld> &Map : TM->BattleMaps) {
+    if (CurrentMap.Equals(Map.ToSoftObjectPath().GetAssetName(),
+                          ESearchCase::IgnoreCase)) {
+      bIsBattleMap = true;
+      break;
+    }
+  }
+
+  if (!bIsBattleMap) {
+    return;
+  }
+
+  if (UFighterSelectionWidget *Selection =
+          CreateWidget<UFighterSelectionWidget>(
+              this, UFighterSelectionWidget::StaticClass())) {
+    FighterSelectionWidget = Selection;
+    if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+      const ESkaldFaction PlayerFaction = PS->Faction;
+      Selection->PlayerFaction = PlayerFaction;
+      Selection->AvailableFighters =
+          CachedGameInstance->GridBattleManager->GetFightersForFaction(
+              PlayerFaction);
+    }
+    Selection->OnLockedIn.AddDynamic(
+        this, &ASkaldPlayerController::HandlePlayerLockedIn);
+    Selection->AddToViewport();
+    SetIgnoreMoveInput(true);
   }
 }
 
@@ -873,8 +897,8 @@ bool ASkaldPlayerController::EnsureTurnManager(const TCHAR *Caller) {
   }
 
   if (!TurnManager) {
-    UE_LOG(LogSkald, Warning,
-           TEXT("TurnManager still missing; aborting %s."), Caller);
+    UE_LOG(LogSkald, Warning, TEXT("TurnManager still missing; aborting %s."),
+           Caller);
     return false;
   }
 
@@ -975,18 +999,18 @@ void ASkaldPlayerController::HandlePlayerLockedIn() {
         this, &ASkaldPlayerController::HandlePlayerLockedIn);
     Selection->RemoveFromParent();
 
-      if (CachedGameInstance && CachedGameInstance->GridBattleManager) {
-        TArray<FFighter> Fighters;
-        if (Selection) {
-          for (const FFighterDefinition &Def : Selection->ChosenFighters) {
-            FFighter Fighter;
-            Fighter.Stats = Def.Stats;
-            if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
-              Fighter.Faction = PS->Faction;
-            }
-            Fighters.Add(Fighter);
+    if (CachedGameInstance && CachedGameInstance->GridBattleManager) {
+      TArray<FFighter> Fighters;
+      if (Selection) {
+        for (const FFighterDefinition &Def : Selection->ChosenFighters) {
+          FFighter Fighter;
+          Fighter.Stats = Def.Stats;
+          if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+            Fighter.Faction = PS->Faction;
           }
+          Fighters.Add(Fighter);
         }
+      }
       CachedGameInstance->GridBattleManager->InitBattle(Fighters, Fighters);
       CachedGameInstance->GridBattleManager->RollInitiative();
       CachedGameInstance->GridBattleManager->OnBattleEnded.AddDynamic(
@@ -1074,8 +1098,7 @@ void ASkaldPlayerController::HandleGridClick() {
 
   GridBattleManager->AdvanceTurn();
   if (BattleHudWidget) {
-    BattleHudWidget->BindToFighter(
-        GridBattleManager->GetActiveFighter());
+    BattleHudWidget->BindToFighter(GridBattleManager->GetActiveFighter());
   }
 
   if (GridOverlay) {
@@ -1093,7 +1116,8 @@ void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,
   }
 
   if (VictoryWidgetClass) {
-    if (UUserWidget *Widget = CreateWidget<UUserWidget>(this, VictoryWidgetClass)) {
+    if (UUserWidget *Widget =
+            CreateWidget<UUserWidget>(this, VictoryWidgetClass)) {
       Widget->AddToViewport();
     }
   }
