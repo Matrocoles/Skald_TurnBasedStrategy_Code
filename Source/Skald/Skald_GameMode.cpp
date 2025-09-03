@@ -223,7 +223,7 @@ void ASkaldGameMode::PopulateAIPlayers() {
       break;
     }
 
-    AIController->bIsAI = true;
+    AIController->SetIsAIController(true);
     AIController->SetPlayerState(AIState);
 
     AIState->bIsAI = true;
