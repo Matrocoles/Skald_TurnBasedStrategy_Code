@@ -8,6 +8,7 @@
 class ASkaldPlayerController;
 class ASkaldPlayerState;
 class AWorldMap;
+class UWorld;
 
 // Broadcast whenever the overall world state changes so HUDs can refresh.
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSkaldWorldStateChanged);
@@ -24,6 +25,9 @@ public:
     ATurnManager();
 
     virtual void BeginPlay() override;
+
+    virtual void GetLifetimeReplicatedProps(
+        TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
     UFUNCTION(BlueprintCallable, Category="Turn")
     void RegisterController(ASkaldPlayerController* Controller);
@@ -88,6 +92,10 @@ public:
     /** Event fired when the world state has changed. */
     UPROPERTY(BlueprintAssignable, Category="Turn")
     FSkaldWorldStateChanged OnWorldStateChanged;
+
+    /** Maps that can be used for grid based battles. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category="Battle")
+    TArray<TSoftObjectPtr<UWorld>> BattleMaps;
 
 protected:
     UPROPERTY()

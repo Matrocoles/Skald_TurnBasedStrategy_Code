@@ -13,12 +13,19 @@
 #include "Skald_GameMode.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "Net/UnrealNetwork.h"
 
 ATurnManager::ATurnManager() {
   PrimaryActorTick.bCanEverTick = false;
   bReplicates = true;
   CurrentIndex = 0;
   CachedWorldMap = nullptr;
+}
+
+void ATurnManager::GetLifetimeReplicatedProps(
+    TArray<FLifetimeProperty>& OutLifetimeProps) const {
+  Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+  DOREPLIFETIME(ATurnManager, BattleMaps);
 }
 
 void ATurnManager::BeginPlay() {
@@ -283,7 +290,16 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
 
   // Load a battle map where the grid based combat takes place.
   if (UWorld *World = GetWorld()) {
-    World->ServerTravel(TEXT("BattleMap"));
+    FString MapToLoad = TEXT("BattleMap");
+    if (BattleMaps.Num() > 0) {
+      const int32 Index = FMath::RandRange(0, BattleMaps.Num() - 1);
+      const FString Selected =
+          BattleMaps[Index].ToSoftObjectPath().GetLongPackageName();
+      if (!Selected.IsEmpty()) {
+        MapToLoad = Selected;
+      }
+    }
+    World->ServerTravel(MapToLoad);
   }
 }
 

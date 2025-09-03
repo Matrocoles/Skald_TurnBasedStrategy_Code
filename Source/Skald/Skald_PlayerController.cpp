@@ -144,19 +144,30 @@ void ASkaldPlayerController::BeginPlay() {
   }
 
   const FString CurrentMap = UGameplayStatics::GetCurrentLevelName(this, true);
-  if (CurrentMap.Equals(TEXT("BattleMap"), ESearchCase::IgnoreCase)) {
+  bool bIsBattleMap = CurrentMap.Equals(TEXT("BattleMap"),
+                                        ESearchCase::IgnoreCase);
+  if (ATurnManager *TM = Cast<ATurnManager>(UGameplayStatics::GetActorOfClass(
+          GetWorld(), ATurnManager::StaticClass()))) {
+    for (const TSoftObjectPtr<UWorld> &Map : TM->BattleMaps) {
+      if (CurrentMap.Equals(Map.ToSoftObjectPath().GetAssetName(),
+                           ESearchCase::IgnoreCase)) {
+        bIsBattleMap = true;
+        break;
+      }
+    }
+  }
+
+  if (bIsBattleMap && CachedGameInstance && CachedGameInstance->GridBattleManager) {
     if (UFighterSelectionWidget *Selection =
             CreateWidget<UFighterSelectionWidget>(
                 this, UFighterSelectionWidget::StaticClass())) {
       FighterSelectionWidget = Selection;
-      if (CachedGameInstance && CachedGameInstance->GridBattleManager) {
-        if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
-          const ESkaldFaction PlayerFaction = PS->Faction;
-          Selection->PlayerFaction = PlayerFaction;
-          Selection->AvailableFighters =
-              CachedGameInstance->GridBattleManager->GetFightersForFaction(
-                  PlayerFaction);
-        }
+      if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+        const ESkaldFaction PlayerFaction = PS->Faction;
+        Selection->PlayerFaction = PlayerFaction;
+        Selection->AvailableFighters =
+            CachedGameInstance->GridBattleManager->GetFightersForFaction(
+                PlayerFaction);
       }
       Selection->OnLockedIn.AddDynamic(
           this, &ASkaldPlayerController::HandlePlayerLockedIn);
