@@ -204,6 +204,14 @@ protected:
     UPROPERTY(BlueprintReadOnly, Category="Battle")
     int32 CurrentTurn = 0;
 
+    /** Total starting army cost for attackers. */
+    UPROPERTY(BlueprintReadOnly, Category="Battle")
+    int32 AttackerInitialArmyCost = 0;
+
+    /** Total starting army cost for defenders. */
+    UPROPERTY(BlueprintReadOnly, Category="Battle")
+    int32 DefenderInitialArmyCost = 0;
+
     /** Cached surviving army-cost totals for each side. */
     UPROPERTY(BlueprintReadOnly, Category="Battle")
     int32 AttackerSurvivorCount = 0;
