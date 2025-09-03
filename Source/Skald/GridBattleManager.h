@@ -144,21 +144,21 @@ public:
     UFUNCTION(BlueprintCallable, Category="Battle")
     void EndBattle();
 
-    /** Number of surviving attackers after the battle concludes. */
+    /** Total army cost of surviving attackers after the battle concludes. */
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
     int32 GetAttackerSurvivors();
 
-    /** Number of surviving defenders after the battle concludes. */
+    /** Total army cost of surviving defenders after the battle concludes. */
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
     int32 GetDefenderSurvivors();
 
-    /** Total army cost of surviving attackers. */
+    /** Total army cost of surviving attackers. Equivalent to GetAttackerSurvivors. */
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
     int32 GetAttackerSurvivorCost() const;
 
-      /** Total army cost of surviving defenders. */
-      UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
-      int32 GetDefenderSurvivorCost() const;
+    /** Total army cost of surviving defenders. Equivalent to GetDefenderSurvivors. */
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
+    int32 GetDefenderSurvivorCost() const;
 
       /** Fighter currently taking its turn. */
       UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
@@ -204,7 +204,7 @@ protected:
     UPROPERTY(BlueprintReadOnly, Category="Battle")
     int32 CurrentTurn = 0;
 
-    /** Cached surviving counts for each side. */
+    /** Cached surviving army-cost totals for each side. */
     UPROPERTY(BlueprintReadOnly, Category="Battle")
     int32 AttackerSurvivorCount = 0;
 
