@@ -130,7 +130,7 @@ public:
   UTextBlock *CostDisplayText;
 
   /** Blueprint class used for each fighter entry. */
-  UPROPERTY(EditAnywhere, Category = "Skald|Fighter")
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Fighter")
   TSubclassOf<UFighterEntryWidget> FighterEntryClass;
 
   /** Delegate fired when Lock In is triggered. */

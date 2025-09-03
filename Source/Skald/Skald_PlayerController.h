@@ -81,19 +81,19 @@ protected:
 
   /** Widget class to instantiate for the player's HUD.
    *  Settable via Blueprint or loaded in the constructor. */
-  UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "UI")
   TSubclassOf<UUserWidget> HUDWidgetClass;
 
   /** Widget class used for in-battle HUD. */
-  UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "UI")
   TSubclassOf<UBattleHUDWidget> BattleHUDWidgetClass;
 
   /** Widget class used for the player faction selection screen. */
-  UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "UI")
   TSubclassOf<UChoosePlayerWidget> ChoosePlayerWidgetClass;
 
   /** Widget class used for displaying battle victory. */
-  UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "UI")
   TSubclassOf<UUserWidget> VictoryWidgetClass;
 
   /** Reference to the HUD widget instance. */

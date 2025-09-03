@@ -36,13 +36,13 @@ public:
     UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta=(BindWidgetOptional))
     UButton* ExitButton;
 
-    UPROPERTY(EditAnywhere, Category="Lobby")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Lobby")
     TSubclassOf<ULoadGameWidget> LoadGameWidgetClass;
 
-    UPROPERTY(EditAnywhere, Category="Lobby")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Lobby")
     TSubclassOf<USettingsWidget> SettingsWidgetClass;
 
-    UPROPERTY(EditAnywhere, Category="Lobby")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Lobby")
     TSubclassOf<UStartGameWidget> StartGameWidgetClass;
 
 protected:

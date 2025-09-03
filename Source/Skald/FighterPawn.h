@@ -53,11 +53,11 @@ public:
     UWidgetComponent* HealthWidget;
 
     /** Widget class used for the health display. */
-    UPROPERTY(EditDefaultsOnly, Category="Fighter|UI")
+    UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Fighter|UI")
     TSubclassOf<UUserWidget> HealthWidgetTemplate;
 
     /** Widget class used for optional damage float indicators. */
-    UPROPERTY(EditDefaultsOnly, Category="Fighter|UI")
+    UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Fighter|UI")
     TSubclassOf<UUserWidget> DamageFloatWidgetTemplate;
 
     /** Event broadcast when health changes. */

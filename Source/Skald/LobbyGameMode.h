@@ -18,7 +18,7 @@ public:
     virtual void BeginPlay() override;
 
 protected:
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
+    UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "UI")
     TSubclassOf<class UUserWidget> LobbyWidgetClass;
 };
 
