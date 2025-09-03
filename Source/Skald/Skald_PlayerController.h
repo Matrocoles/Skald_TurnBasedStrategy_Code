@@ -15,6 +15,8 @@ class ASkaldGameMode;
 class ASkaldGameState;
 class USkaldGameInstance;
 class UFighterSelectionWidget;
+class AWorldMap;
+struct FTimerHandle;
 
 /** Command issued by the player during a battle. */
 UENUM()
@@ -269,13 +271,19 @@ public:
    *  turn events without keeping an external pointer that might be
    *  uninitialised.
    */
-protected:
-  UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Turn",
-            meta = (ExposeOnSpawn = true))
-  TObjectPtr<ATurnManager> TurnManager;
+  protected:
+    UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Turn",
+              meta = (ExposeOnSpawn = true))
+    TObjectPtr<ATurnManager> TurnManager;
 
-private:
-  void BuildPlayerDataArray(TArray<FS_PlayerData> &OutPlayers) const;
+  private:
+    /** Attempt to locate the world map and bind to its selection event. */
+    void TryBindWorldMap();
+
+    /** Timer used to poll for the world map actor until it exists. */
+    FTimerHandle WorldMapSearchHandle;
+
+    void BuildPlayerDataArray(TArray<FS_PlayerData> &OutPlayers) const;
 
   bool ValidateAttack(int32 FromID, int32 ToID, int32 ArmySent, bool bUseSiege,
                       FString *OutError);
