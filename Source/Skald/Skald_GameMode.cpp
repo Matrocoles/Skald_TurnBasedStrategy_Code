@@ -176,8 +176,10 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
       }
 
       if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
-        PS->PlayerDisplayName = GI->DisplayName;
-        PS->Faction = GI->Faction;
+        if (!PS->bIsAI) {
+          PS->PlayerDisplayName = GI->DisplayName;
+          PS->Faction = GI->Faction;
+        }
       }
 
       const int32 Index = GS->PlayerArray.IndexOfByKey(PS);
@@ -208,11 +210,22 @@ void ASkaldGameMode::PopulateAIPlayers() {
 
   while (GS->PlayerArray.Num() < ExpectedPlayerCount &&
          SpawnAttempts++ < MaxSpawnAttempts) {
+    ASkaldPlayerController *AIController =
+        GetWorld()->SpawnActor<ASkaldPlayerController>(PlayerControllerClass);
+    if (!AIController) {
+      break;
+    }
+
     ASkaldPlayerState *AIState =
         GetWorld()->SpawnActor<ASkaldPlayerState>(PlayerStateClass);
     if (!AIState) {
+      AIController->Destroy();
       break;
     }
+
+    AIController->bIsAI = true;
+    AIController->SetPlayerState(AIState);
+
     AIState->bIsAI = true;
     AIState->PlayerDisplayName =
         FString::Printf(TEXT("AI_%d"), GS->PlayerArray.Num());
@@ -245,23 +258,21 @@ void ASkaldGameMode::PopulateAIPlayers() {
       GI->TakenFactions.AddUnique(AIState->Faction);
     }
 
-    // Mark AI players as locked in so the game can start without further input.
     AIState->bHasLockedIn = true;
 
-    GS->AddPlayerState(AIState);
+    RegisterPlayer(AIController);
 
-    if (PlayerDataArray.Num() < GS->PlayerArray.Num()) {
-      PlayerDataArray.SetNum(GS->PlayerArray.Num());
+    if (!AIController->GetPawn() && DefaultPawnClass) {
+      FActorSpawnParameters PawnParams;
+      PawnParams.SpawnCollisionHandlingOverride =
+          ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+      if (APawn *Pawn = GetWorld()->SpawnActor<APawn>(
+              DefaultPawnClass, FVector::ZeroVector, FRotator::ZeroRotator,
+              PawnParams)) {
+        AIController->Possess(Pawn);
+      }
     }
-    const int32 Index = GS->PlayerArray.Num() - 1;
-    PlayerDataArray[Index].PlayerID = AIState->GetPlayerId();
-    PlayerDataArray[Index].PlayerName = AIState->PlayerDisplayName;
-    PlayerDataArray[Index].IsAI = true;
-    PlayerDataArray[Index].Faction = AIState->Faction;
-    PlayerDataArray[Index].Resources = AIState->Resources;
 
-    // Refresh player data and attempt to initialize the world as soon as all
-    // AI players are created.
     HandlePlayerLockedIn(AIState);
   }
 
