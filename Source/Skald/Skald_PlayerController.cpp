@@ -210,14 +210,30 @@ void ASkaldPlayerController::OnRep_PlayerState() {
 
 void ASkaldPlayerController::ServerInitPlayerState_Implementation(
     const FString &Name, ESkaldFaction Faction) {
+  UE_LOG(LogSkald, Log,
+         TEXT("ServerInitPlayerState_Implementation: Name=%s Faction=%d"),
+         *Name, static_cast<int32>(Faction));
+
   if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+    UE_LOG(LogSkald, Log,
+           TEXT("ServerInitPlayerState_Implementation: PlayerState=%s"),
+           *PS->GetName());
     PS->PlayerDisplayName = Name;
     PS->Faction = Faction;
     PS->bHasLockedIn = true;
 
     if (ASkaldGameMode *GM = GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
+      UE_LOG(LogSkald, Log,
+             TEXT("ServerInitPlayerState_Implementation: Notify GameMode %s"),
+             *GM->GetName());
       GM->HandlePlayerLockedIn(PS);
+    } else {
+      UE_LOG(LogSkald, Warning,
+             TEXT("ServerInitPlayerState_Implementation: GameMode is null"));
     }
+  } else {
+    UE_LOG(LogSkald, Warning,
+           TEXT("ServerInitPlayerState_Implementation: PlayerState is null"));
   }
 }
 
