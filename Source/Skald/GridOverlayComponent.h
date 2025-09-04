@@ -37,6 +37,10 @@ public:
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Grid")
   bool IsObscured(const FIntPoint &GridCoord) const;
 
+  /** Check if there is line of sight between two grid cells. */
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Grid")
+  bool HasLineOfSight(const FIntPoint &Start, const FIntPoint &End) const;
+
   /** Get the cached height for a grid cell. */
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Grid")
   float GetCellHeight(const FIntPoint &GridCoord) const;
