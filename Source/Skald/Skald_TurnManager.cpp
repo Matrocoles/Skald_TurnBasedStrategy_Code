@@ -193,6 +193,12 @@ void ATurnManager::AdvanceTurn() {
     return;
   }
 
+  if (!CachedWorldMap || CachedWorldMap->Territories.Num() == 0) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("AdvanceTurn aborted: WorldMap missing or has no territories"));
+    return;
+  }
+
   int32 FoundIndex = Controllers.IndexOfByPredicate(
       [PreviousController](const TWeakObjectPtr<ASkaldPlayerController> &Ptr) {
         return Ptr.Get() == PreviousController;
