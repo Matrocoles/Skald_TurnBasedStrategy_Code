@@ -152,6 +152,12 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
     return;
   }
 
+  if (bWorldInitialized) {
+    PC->ClientMessage(TEXT("Game already in progress."));
+    PC->Destroy();
+    return;
+  }
+
   if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
     if (GS->PlayerArray.Num() >= ExpectedPlayerCount) {
       PC->ClientMessage(
