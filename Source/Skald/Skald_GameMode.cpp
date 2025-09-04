@@ -390,9 +390,6 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     }
   }
 
-  const bool bReadyToStart =
-      bAllLockedIn && GS->PlayerArray.Num() == ExpectedPlayerCount;
-
   if (PendingControllers.Num() > 0) {
     for (ASkaldPlayerController *PC : PendingControllers) {
       if (TurnManager) {
@@ -401,6 +398,22 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     }
     PendingControllers.Empty();
   }
+
+  // Fallback: ensure any existing player controllers are registered with the
+  // turn manager even if RegisterPlayer was not called for them.
+  if (TurnManager) {
+    for (FConstPlayerControllerIterator It =
+             GetWorld()->GetPlayerControllerIterator();
+         It; ++It) {
+      if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(*It)) {
+        TurnManager->RegisterController(PC);
+      }
+    }
+  }
+
+  const bool bReadyToStart =
+      bAllLockedIn && GS->PlayerArray.Num() >= ExpectedPlayerCount &&
+      TurnManager && TurnManager->GetControllerCount() >= ExpectedPlayerCount;
 
   if (!bWorldInitialized && bReadyToStart) {
     if (InitializeWorld()) {
@@ -816,21 +829,27 @@ bool ASkaldGameMode::InitializeWorld() {
   }
 
   // Ensure the expected number of players are present before assigning
-  // territories
-  const int32 PlayerCount = GS->PlayerArray.Num();
-  if (PlayerCount != ExpectedPlayerCount) {
+  // territories. Proceed if there are extra players but require at least the
+  // expected amount.
+  const int32 TotalPlayerCount = GS->PlayerArray.Num();
+  if (TotalPlayerCount < ExpectedPlayerCount) {
     UE_LOG(LogSkald, Warning,
-           TEXT("InitializeWorld aborted: expected %d players but found %d"),
-           ExpectedPlayerCount, PlayerCount);
+           TEXT("InitializeWorld aborted: expected at least %d players but found %d"),
+           ExpectedPlayerCount, TotalPlayerCount);
     if (GEngine) {
       GEngine->AddOnScreenDebugMessage(
           -1, 5.f, FColor::Yellow,
-          FString::Printf(
-              TEXT("InitializeWorld: expected %d players but found %d"),
-              ExpectedPlayerCount, PlayerCount));
+          FString::Printf(TEXT("InitializeWorld: expected at least %d players but found %d"),
+                          ExpectedPlayerCount, TotalPlayerCount));
     }
     return false;
   }
+  if (TotalPlayerCount > ExpectedPlayerCount) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("InitializeWorld: expected %d players but found %d; proceeding with first %d players"),
+           ExpectedPlayerCount, TotalPlayerCount, ExpectedPlayerCount);
+  }
+  const int32 PlayerCount = FMath::Min(TotalPlayerCount, ExpectedPlayerCount);
 
   // Assign territories round-robin to players in initiative order
   int32 Index = 0;
