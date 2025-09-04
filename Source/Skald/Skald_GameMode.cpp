@@ -74,7 +74,8 @@ void ASkaldGameMode::BeginPlay() {
     }
   }
 
-  PopulateAIPlayers();
+  // Defer AI population until a human player locks in so the game state is
+  // fully established before spawning bots.
   RefreshHUDs();
 
   TryInitializeWorldAndStart();
@@ -169,7 +170,6 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
   }
 
   RegisterPlayer(PC);
-  PopulateAIPlayers();
   RefreshHUDs();
 
   TryInitializeWorldAndStart();
@@ -354,10 +354,12 @@ void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
   UE_LOG(LogSkald, Log,
          TEXT("HandlePlayerLockedIn: Player=%s bIsAI=%d"),
          *PS->PlayerDisplayName, PS->bIsAI);
+  ASkaldGameState *GS = GetGameState<ASkaldGameState>();
   UE_LOG(LogSkald, Log,
-         TEXT("HandlePlayerLockedIn: TurnManager=%s ControllerCount=%d"),
+         TEXT("HandlePlayerLockedIn: TurnManager=%s ControllerCount=%d PlayerCount=%d"),
          TurnManager ? *TurnManager->GetName() : TEXT("null"),
-         TurnManager ? TurnManager->GetControllerCount() : 0);
+         TurnManager ? TurnManager->GetControllerCount() : 0,
+         GS ? GS->PlayerArray.Num() : 0);
 
   FS_PlayerData *PlayerData =
       PlayerDataArray.FindByPredicate([PS](const FS_PlayerData &Data) {
