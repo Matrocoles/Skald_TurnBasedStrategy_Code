@@ -351,6 +351,14 @@ void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
     return;
   }
 
+  UE_LOG(LogSkald, Log,
+         TEXT("HandlePlayerLockedIn: Player=%s bIsAI=%d"),
+         *PS->PlayerDisplayName, PS->bIsAI);
+  UE_LOG(LogSkald, Log,
+         TEXT("HandlePlayerLockedIn: TurnManager=%s ControllerCount=%d"),
+         TurnManager ? *TurnManager->GetName() : TEXT("null"),
+         TurnManager ? TurnManager->GetControllerCount() : 0);
+
   FS_PlayerData *PlayerData =
       PlayerDataArray.FindByPredicate([PS](const FS_PlayerData &Data) {
         return Data.PlayerID == PS->GetPlayerId();
@@ -431,6 +439,11 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     return;
   }
 
+  UE_LOG(LogSkald, Log,
+         TEXT("TryInitializeWorldAndStart: TurnManager=%s PlayerCount=%d"),
+         TurnManager ? *TurnManager->GetName() : TEXT("null"),
+         GS->PlayerArray.Num());
+
   bool bAllLockedIn = true;
   for (APlayerState *PSBase : GS->PlayerArray) {
     if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
@@ -470,6 +483,12 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
                              CurrentPlayerCount >= MinPlayerCount && TurnManager &&
                              TurnManager->GetControllerCount() >= CurrentPlayerCount;
 
+  UE_LOG(LogSkald, Log,
+         TEXT("TryInitializeWorldAndStart: bAllLockedIn=%s CurrentPlayerCount=%d ControllerCount=%d bReadyToStart=%s"),
+         bAllLockedIn ? TEXT("true") : TEXT("false"), CurrentPlayerCount,
+         TurnManager ? TurnManager->GetControllerCount() : 0,
+         bReadyToStart ? TEXT("true") : TEXT("false"));
+
   if (GEngine && CurrentPlayerCount < MinPlayerCount) {
     GEngine->AddOnScreenDebugMessage(
         -1, 4.f, FColor::Yellow,
@@ -478,6 +497,8 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
   }
 
   if (!bWorldInitialized && bReadyToStart) {
+    UE_LOG(LogSkald, Log,
+           TEXT("TryInitializeWorldAndStart: Initializing world"));
     if (InitializeWorld()) {
       bWorldInitialized = true;
       BeginArmyPlacementPhase();
@@ -491,6 +512,8 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     TurnManager->SortControllersByInitiative();
     TurnManager->StartTurns();
 
+    UE_LOG(LogSkald, Log,
+           TEXT("TryInitializeWorldAndStart: Turns started"));
     if (GEngine) {
       GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Green,
                                        TEXT("Game started"));
