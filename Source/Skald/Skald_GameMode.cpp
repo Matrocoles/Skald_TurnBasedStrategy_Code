@@ -208,6 +208,13 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
       GS->AddPlayerState(PS);
     }
 
+    if (TurnManager) {
+      TurnManager->RegisterController(PC);
+      UE_LOG(LogSkald, Log,
+             TEXT("RegisterPlayer: ControllerCount=%d"),
+             TurnManager->GetControllerCount());
+    }
+
     if (PlayerDataArray.Num() < GS->PlayerArray.Num()) {
       PlayerDataArray.SetNum(GS->PlayerArray.Num());
     }
