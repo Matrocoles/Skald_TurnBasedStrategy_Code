@@ -172,33 +172,42 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
     return;
   }
 
-  PendingControllers.AddUnique(PC);
+  ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>();
+  if (!PS) {
+    // Player state not yet replicated; queue a retry next tick.
+    PendingControllers.AddUnique(PC);
+    FTimerDelegate RetryDelegate = FTimerDelegate::CreateUObject(
+        this, &ASkaldGameMode::RegisterPlayer, PC);
+    GetWorldTimerManager().SetTimerForNextTick(RetryDelegate);
+    return;
+  }
+
+  // Player state is valid; perform normal registration.
+  PendingControllers.Remove(PC);
 
   if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
-    if (ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>()) {
-      if (!GS->PlayerArray.Contains(PS)) {
-        GS->AddPlayerState(PS);
-      }
+    if (!GS->PlayerArray.Contains(PS)) {
+      GS->AddPlayerState(PS);
+    }
 
-      if (PlayerDataArray.Num() < GS->PlayerArray.Num()) {
-        PlayerDataArray.SetNum(GS->PlayerArray.Num());
-      }
+    if (PlayerDataArray.Num() < GS->PlayerArray.Num()) {
+      PlayerDataArray.SetNum(GS->PlayerArray.Num());
+    }
 
-      if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
-        if (!PS->bIsAI) {
-          PS->PlayerDisplayName = GI->DisplayName;
-          PS->Faction = GI->Faction;
-        }
+    if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+      if (!PS->bIsAI) {
+        PS->PlayerDisplayName = GI->DisplayName;
+        PS->Faction = GI->Faction;
       }
+    }
 
-      const int32 Index = GS->PlayerArray.IndexOfByKey(PS);
-      if (PlayerDataArray.IsValidIndex(Index)) {
-        PlayerDataArray[Index].PlayerID = PS->GetPlayerId();
-        PlayerDataArray[Index].PlayerName = PS->PlayerDisplayName;
-        PlayerDataArray[Index].IsAI = PS->bIsAI;
-        PlayerDataArray[Index].Faction = PS->Faction;
-        PlayerDataArray[Index].Resources = PS->Resources;
-      }
+    const int32 Index = GS->PlayerArray.IndexOfByKey(PS);
+    if (PlayerDataArray.IsValidIndex(Index)) {
+      PlayerDataArray[Index].PlayerID = PS->GetPlayerId();
+      PlayerDataArray[Index].PlayerName = PS->PlayerDisplayName;
+      PlayerDataArray[Index].IsAI = PS->bIsAI;
+      PlayerDataArray[Index].Faction = PS->Faction;
+      PlayerDataArray[Index].Resources = PS->Resources;
     }
   }
 }
