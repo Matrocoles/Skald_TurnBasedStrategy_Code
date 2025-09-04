@@ -39,6 +39,7 @@ ASkaldGameMode::ASkaldGameMode() {
   WorldMap = nullptr;
   bTurnsStarted = false;
   bWorldInitialized = false;
+  bAIPlayersSpawned = false;
 
   // Preallocate slots so blueprint scripts can safely write
   // player data to indices without hitting "invalid index" warnings.
@@ -370,10 +371,11 @@ void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
     PlayerData->Faction = PS->Faction;
   }
 
-  // If a human player has locked in and there are still open slots,
-  // populate them with AI players so the match can start.
-  if (!PS->bIsAI) {
+  // If a human player has locked in and AI players have not yet been spawned,
+  // populate remaining slots so the match can start.
+  if (!PS->bIsAI && !bAIPlayersSpawned) {
     PopulateAIPlayers();
+    bAIPlayersSpawned = true;
   }
 
   RefreshHUDs();
