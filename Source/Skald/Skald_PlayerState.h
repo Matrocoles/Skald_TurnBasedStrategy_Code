@@ -32,7 +32,7 @@ public:
     int32 Resources;
 
     /** Player chosen display name. */
-    UPROPERTY(BlueprintReadWrite, Replicated, Category="PlayerState")
+    UPROPERTY(BlueprintReadWrite, ReplicatedUsing = OnRep_PlayerDisplayName, Category="PlayerState")
     FString PlayerDisplayName;
 
     /** Selected faction for this player. */
@@ -55,6 +55,9 @@ public:
 
     UFUNCTION()
     void OnRep_IsEliminated();
+
+    UFUNCTION()
+    void OnRep_PlayerDisplayName();
 
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 };

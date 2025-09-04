@@ -209,6 +209,13 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
       PlayerDataArray[Index].Faction = PS->Faction;
       PlayerDataArray[Index].Resources = PS->Resources;
     }
+
+    // Notify listeners that player data has changed and refresh HUDs on the
+    // next tick once replication has a chance to update clients.
+    GS->OnPlayersUpdated.Broadcast();
+    FTimerDelegate RefreshDelegate = FTimerDelegate::CreateUObject(
+        this, &ASkaldGameMode::RefreshHUDs);
+    GetWorldTimerManager().SetTimerForNextTick(RefreshDelegate);
   }
 }
 
@@ -257,10 +264,13 @@ void ASkaldGameMode::PopulateAIPlayers() {
 
     AIController->SetIsAIController(true);
     AIController->SetPlayerState(AIState);
-    AIController->FinishSpawning(SpawnTransform);
 
+    // Assign a display name before the controller finishes spawning to ensure
+    // PostLogin sees a valid name.
     AIState->PlayerDisplayName =
         FString::Printf(TEXT("AI_%d"), GS->PlayerArray.Num());
+
+    AIController->FinishSpawning(SpawnTransform);
 
     TArray<ESkaldFaction> Taken;
     for (APlayerState *ExistingPS : GS->PlayerArray) {
@@ -352,6 +362,17 @@ void ASkaldGameMode::RefreshHUDs() {
   ASkaldGameState *GS = GetGameState<ASkaldGameState>();
   if (!GS) {
     return;
+  }
+
+  // Ensure all AI players have valid names before refreshing any HUDs.
+  for (APlayerState *PSBase : GS->PlayerArray) {
+    if (ASkaldPlayerState *SPS = Cast<ASkaldPlayerState>(PSBase)) {
+      if (SPS->bIsAI && SPS->PlayerDisplayName.IsEmpty()) {
+        UE_LOG(LogSkald, Error,
+               TEXT("AI PlayerState missing display name before RefreshHUDs"));
+        ensure(!SPS->PlayerDisplayName.IsEmpty());
+      }
+    }
   }
 
   TArray<FS_PlayerData> AllPlayers;

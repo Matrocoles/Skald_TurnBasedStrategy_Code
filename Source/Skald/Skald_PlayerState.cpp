@@ -68,3 +68,14 @@ void ASkaldPlayerState::OnRep_IsEliminated()
     }
 }
 
+void ASkaldPlayerState::OnRep_PlayerDisplayName()
+{
+    if (UWorld* World = GetWorld())
+    {
+        if (ASkaldGameState* GS = World->GetGameState<ASkaldGameState>())
+        {
+            GS->OnPlayersUpdated.Broadcast();
+        }
+    }
+}
+
