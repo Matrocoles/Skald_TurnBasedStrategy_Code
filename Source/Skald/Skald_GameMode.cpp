@@ -304,10 +304,11 @@ void ASkaldGameMode::PopulateAIPlayers() {
       }
     }
     if (Available.Num() > 0) {
-      FRandomStream RandStream;
-      RandStream.Initialize(FMath::Rand());
-      AIState->Faction =
-          Available[RandStream.RandRange(0, Available.Num() - 1)];
+      // Use the game instance's deterministic random stream so that AI faction
+      // selection is reproducible across runs and clients.
+      const int32 FactionIndex =
+          GI->CombatRandomStream.RandRange(0, Available.Num() - 1);
+      AIState->Faction = Available[FactionIndex];
       GI->TakenFactions.AddUnique(AIState->Faction);
     } else {
       UE_LOG(LogSkald, Error,
