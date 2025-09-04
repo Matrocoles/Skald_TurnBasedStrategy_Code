@@ -1,19 +1,19 @@
 #include "Skald_TurnManager.h"
 #include "Engine/Engine.h"
+#include "Engine/World.h"
+#include "EngineUtils.h"
+#include "GridBattleManager.h"
 #include "Kismet/GameplayStatics.h"
+#include "Net/UnrealNetwork.h"
 #include "Skald.h"
 #include "Skald_GameInstance.h"
+#include "Skald_GameMode.h"
+#include "Skald_GameState.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
-#include "Skald_GameState.h"
-#include "GridBattleManager.h"
 #include "Territory.h"
 #include "UI/SkaldMainHUDWidget.h"
 #include "WorldMap.h"
-#include "Skald_GameMode.h"
-#include "Engine/World.h"
-#include "EngineUtils.h"
-#include "Net/UnrealNetwork.h"
 
 ATurnManager::ATurnManager() {
   PrimaryActorTick.bCanEverTick = false;
@@ -23,7 +23,7 @@ ATurnManager::ATurnManager() {
 }
 
 void ATurnManager::GetLifetimeReplicatedProps(
-    TArray<FLifetimeProperty>& OutLifetimeProps) const {
+    TArray<FLifetimeProperty> &OutLifetimeProps) const {
   Super::GetLifetimeReplicatedProps(OutLifetimeProps);
   DOREPLIFETIME(ATurnManager, BattleMaps);
 }
@@ -45,7 +45,8 @@ void ATurnManager::BeginPlay() {
       GI->bResumeTurns = false;
 
       if (Controllers.IsValidIndex(CurrentIndex)) {
-        if (ASkaldPlayerController *Controller = Controllers[CurrentIndex].Get()) {
+        if (ASkaldPlayerController *Controller =
+                Controllers[CurrentIndex].Get()) {
           Controller->StartTurn();
           BroadcastCurrentPhase();
         }
@@ -67,15 +68,55 @@ void ATurnManager::StartArmyPlacementPhase() {
   BroadcastCurrentPhase();
 }
 
+void ATurnManager::ApplyReinforcementsAndResources(ASkaldPlayerState *PS,
+                                                   const TCHAR *Caller) {
+  if (!PS) {
+    return;
+  }
+  int32 Owned = 0;
+  int32 ResourceGain = 0;
+  if (CachedWorldMap) {
+    if (CachedWorldMap->Territories.Num() == 0) {
+      UE_LOG(LogSkald, Error, TEXT("%s: WorldMap %s has no territories"),
+             Caller, *CachedWorldMap->GetName());
+      if (GEngine) {
+        GEngine->AddOnScreenDebugMessage(
+            -1, 5.f, FColor::Red,
+            FString::Printf(TEXT("%s: %s has no territories"), Caller,
+                            *CachedWorldMap->GetName()));
+      }
+    } else {
+      for (ATerritory *Terr : CachedWorldMap->Territories) {
+        if (Terr && Terr->OwningPlayer == PS) {
+          ++Owned;
+          ResourceGain += Terr->Resources;
+        }
+      }
+    }
+  } else {
+    UE_LOG(LogSkald, Error, TEXT("%s: WorldMap actor missing"), Caller);
+    if (GEngine) {
+      GEngine->AddOnScreenDebugMessage(
+          -1, 5.f, FColor::Red,
+          FString::Printf(TEXT("%s: WorldMap missing"), Caller));
+    }
+  }
+  const int32 Reinforcements = FMath::CeilToInt(Owned / 3.0f);
+  PS->DeployableUnits += Reinforcements;
+  PS->Resources += ResourceGain;
+  BroadcastDeployableUnits(PS);
+  BroadcastResources(PS);
+}
+
 void ATurnManager::StartTurns() {
   SortControllersByInitiative();
   CurrentIndex = 0;
   if (Controllers.Num() == 0) {
-    UE_LOG(LogSkald, Error, TEXT("StartTurns failed: no controllers registered"));
+    UE_LOG(LogSkald, Error,
+           TEXT("StartTurns failed: no controllers registered"));
     if (GEngine) {
-      GEngine->AddOnScreenDebugMessage(
-          -1, 5.f, FColor::Red,
-          TEXT("StartTurns failed: no players"));
+      GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red,
+                                       TEXT("StartTurns failed: no players"));
     }
     return;
   }
@@ -93,48 +134,11 @@ void ATurnManager::StartTurns() {
   }
 
   ASkaldPlayerController *CurrentController = Controllers[CurrentIndex].Get();
-  ASkaldPlayerState *PS = CurrentController
-                              ? CurrentController->GetPlayerState<ASkaldPlayerState>()
-                              : nullptr;
+  ASkaldPlayerState *PS =
+      CurrentController ? CurrentController->GetPlayerState<ASkaldPlayerState>()
+                        : nullptr;
   const FString PlayerName = PS ? PS->PlayerDisplayName : TEXT("Unknown");
-
-  // Determine reinforcements and resources based on owned territories.
-  if (PS) {
-    int32 Owned = 0;
-    int32 ResourceGain = 0;
-    if (CachedWorldMap) {
-      if (CachedWorldMap->Territories.Num() == 0) {
-        UE_LOG(LogSkald, Error,
-               TEXT("StartTurns: WorldMap %s has no territories"),
-               *CachedWorldMap->GetName());
-        if (GEngine) {
-          GEngine->AddOnScreenDebugMessage(
-              -1, 5.f, FColor::Red,
-              FString::Printf(TEXT("StartTurns: %s has no territories"),
-                              *CachedWorldMap->GetName()));
-        }
-      } else {
-        for (ATerritory *Terr : CachedWorldMap->Territories) {
-          if (Terr && Terr->OwningPlayer == PS) {
-            ++Owned;
-            ResourceGain += Terr->Resources;
-          }
-        }
-      }
-    } else {
-      UE_LOG(LogSkald, Error, TEXT("StartTurns: WorldMap actor missing"));
-      if (GEngine) {
-        GEngine->AddOnScreenDebugMessage(
-            -1, 5.f, FColor::Red,
-            TEXT("StartTurns: WorldMap missing"));
-      }
-    }
-    const int32 Reinforcements = FMath::CeilToInt(Owned / 3.0f);
-    PS->DeployableUnits += Reinforcements;
-    PS->Resources += ResourceGain;
-    BroadcastDeployableUnits(PS);
-    BroadcastResources(PS);
-  }
+  ApplyReinforcementsAndResources(PS, TEXT("StartTurns"));
 
   CurrentPhase = ETurnPhase::Reinforcement;
   for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr :
@@ -161,8 +165,7 @@ void ATurnManager::StartTurns() {
 
   if (CurrentController) {
     CurrentController->StartTurn();
-    if (ASkaldGameMode *GM =
-            GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
+    if (ASkaldGameMode *GM = GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
       GM->CheckVictoryConditions();
     }
   }
@@ -172,7 +175,8 @@ void ATurnManager::StartTurns() {
 
 void ATurnManager::AdvanceTurn() {
   ASkaldPlayerController *PreviousController =
-      Controllers.IsValidIndex(CurrentIndex) ? Controllers[CurrentIndex].Get() : nullptr;
+      Controllers.IsValidIndex(CurrentIndex) ? Controllers[CurrentIndex].Get()
+                                             : nullptr;
 
   Controllers.RemoveAll([](const TWeakObjectPtr<ASkaldPlayerController> &Ptr) {
     if (!Ptr.IsValid()) {
@@ -193,35 +197,20 @@ void ATurnManager::AdvanceTurn() {
       [PreviousController](const TWeakObjectPtr<ASkaldPlayerController> &Ptr) {
         return Ptr.Get() == PreviousController;
       });
-  CurrentIndex = (FoundIndex != INDEX_NONE) ? FoundIndex : Controllers.Num() - 1;
+  CurrentIndex =
+      (FoundIndex != INDEX_NONE) ? FoundIndex : Controllers.Num() - 1;
 
   CurrentIndex = (CurrentIndex + 1) % Controllers.Num();
-  if (ASkaldPlayerController *CurrentController = Controllers[CurrentIndex].Get()) {
+  if (ASkaldPlayerController *CurrentController =
+          Controllers[CurrentIndex].Get()) {
     ASkaldPlayerState *PS =
         CurrentController->GetPlayerState<ASkaldPlayerState>();
     const FString PlayerName = PS ? PS->PlayerDisplayName : TEXT("Unknown");
-
-    // Calculate reinforcements and resources for the new active player.
-    if (PS) {
-      int32 Owned = 0;
-      int32 ResourceGain = 0;
-      if (CachedWorldMap) {
-        for (ATerritory *Terr : CachedWorldMap->Territories) {
-          if (Terr && Terr->OwningPlayer == PS) {
-            ++Owned;
-            ResourceGain += Terr->Resources;
-          }
-        }
-      }
-      const int32 Reinforcements = FMath::CeilToInt(Owned / 3.0f);
-      PS->DeployableUnits += Reinforcements;
-      PS->Resources += ResourceGain;
-      BroadcastDeployableUnits(PS);
-      BroadcastResources(PS);
-    }
+    ApplyReinforcementsAndResources(PS, TEXT("AdvanceTurn"));
 
     CurrentPhase = ETurnPhase::Reinforcement;
-    for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr : Controllers) {
+    for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr :
+         Controllers) {
       if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
         const bool bIsActive = Controller == CurrentController;
         Controller->ShowTurnAnnouncement(PlayerName, bIsActive);
@@ -233,8 +222,7 @@ void ATurnManager::AdvanceTurn() {
     }
 
     CurrentController->StartTurn();
-    if (ASkaldGameMode *GM =
-            GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
+    if (ASkaldGameMode *GM = GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
       GM->CheckVictoryConditions();
     }
   }
@@ -258,9 +246,9 @@ void ATurnManager::SortControllersByInitiative() {
   });
 }
 
-TArray<ASkaldPlayerController*> ATurnManager::GetControllers() const {
-  TArray<ASkaldPlayerController*> Result;
-  for (const TWeakObjectPtr<ASkaldPlayerController>& Ptr : Controllers) {
+TArray<ASkaldPlayerController *> ATurnManager::GetControllers() const {
+  TArray<ASkaldPlayerController *> Result;
+  for (const TWeakObjectPtr<ASkaldPlayerController> &Ptr : Controllers) {
     if (Ptr.IsValid()) {
       Result.Add(Ptr.Get());
     }
@@ -317,7 +305,8 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
   }
 
   ATerritory *Source = CachedWorldMap->GetTerritoryById(Battle.FromTerritoryID);
-  ATerritory *Target = CachedWorldMap->GetTerritoryById(Battle.TargetTerritoryID);
+  ATerritory *Target =
+      CachedWorldMap->GetTerritoryById(Battle.TargetTerritoryID);
   if (!Source || !Target) {
     return;
   }
@@ -329,10 +318,8 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
   const int32 InitialSourceArmy = Source->ArmyUnits;
   const int32 InitialTargetArmy = Target->ArmyUnits;
 
-  const int32 AttackerSurvivors =
-      GI->GridBattleManager->GetAttackerSurvivors();
-  const int32 DefenderSurvivors =
-      GI->GridBattleManager->GetDefenderSurvivors();
+  const int32 AttackerSurvivors = GI->GridBattleManager->GetAttackerSurvivors();
+  const int32 DefenderSurvivors = GI->GridBattleManager->GetDefenderSurvivors();
 
   // Army-cost totals for potential downstream use
   const int32 AttackerSurvivorCost =
@@ -355,8 +342,7 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
 
   const int32 AttackerCasualties =
       InitialSourceArmy - (Source->ArmyUnits + AttackerSurvivors);
-  const int32 DefenderCasualties =
-      InitialTargetArmy - DefenderSurvivors;
+  const int32 DefenderCasualties = InitialTargetArmy - DefenderSurvivors;
 
   Source->RefreshAppearance();
   Target->RefreshAppearance();
@@ -372,22 +358,21 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
     GI->bResumeTurns = false;
 
     if (Controllers.IsValidIndex(CurrentIndex)) {
-      if (ASkaldPlayerController *Controller = Controllers[CurrentIndex].Get()) {
+      if (ASkaldPlayerController *Controller =
+              Controllers[CurrentIndex].Get()) {
         Controller->StartTurn();
         BroadcastCurrentPhase();
       }
     }
   }
 
-  if (ASkaldGameMode *GM =
-          GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
+  if (ASkaldGameMode *GM = GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
     GM->CheckVictoryConditions();
   }
 
-  ClientBattleResolved(WinningPlayerID, AttackerCasualties,
-                       DefenderCasualties, Source->TerritoryID,
-                       Target->TerritoryID, NewOwnerPlayerID,
-                       Source->ArmyUnits, Target->ArmyUnits);
+  ClientBattleResolved(WinningPlayerID, AttackerCasualties, DefenderCasualties,
+                       Source->TerritoryID, Target->TerritoryID,
+                       NewOwnerPlayerID, Source->ArmyUnits, Target->ArmyUnits);
 }
 
 void ATurnManager::ClientBattleResolved_Implementation(
@@ -412,7 +397,8 @@ void ATurnManager::ClientBattleResolved_Implementation(
     }
   }
 
-  for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator();
+  for (FConstPlayerControllerIterator It =
+           GetWorld()->GetPlayerControllerIterator();
        It; ++It) {
     if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(It->Get())) {
       if (USkaldMainHUDWidget *HUD = PC->GetHUDWidget()) {
@@ -468,7 +454,8 @@ void ATurnManager::BroadcastDeployableUnits(ASkaldPlayerState *ForPlayer) {
   if (!ForPlayer) {
     return;
   }
-  for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr : Controllers) {
+  for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr :
+       Controllers) {
     if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
       ASkaldPlayerState *PS = Controller->GetPlayerState<ASkaldPlayerState>();
       if (PS == ForPlayer) {
@@ -491,7 +478,8 @@ void ATurnManager::BroadcastResources(ASkaldPlayerState *ForPlayer) {
     GM->UpdatePlayerResources(ForPlayer);
   }
 
-  for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr : Controllers) {
+  for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr :
+       Controllers) {
     if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
       if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
         HUD->UpdateResources(ForPlayer->Resources);
@@ -511,7 +499,8 @@ void ATurnManager::BroadcastCurrentPhase() {
         FString::Printf(TEXT("Current Phase: %s"), *PhaseString));
   }
 
-  for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr : Controllers) {
+  for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr :
+       Controllers) {
     if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
       if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
         HUD->UpdatePhaseBanner(CurrentPhase);
