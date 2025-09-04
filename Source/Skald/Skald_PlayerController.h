@@ -277,6 +277,15 @@ public:
     TObjectPtr<ATurnManager> TurnManager;
 
   private:
+    /** Cache references to key game singletons and bind delegates. */
+    void CacheGameReferences();
+
+    /** Set up the main HUD widget for the local player. */
+    void InitializeHUDWidget();
+
+    /** Create the faction selection widget for the local player. */
+    void InitializeChoosePlayerWidget();
+
     /** Attempt to locate the world map and bind to its selection event. */
     void TryBindWorldMap();
 
