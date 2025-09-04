@@ -297,13 +297,6 @@ void ASkaldGameMode::PopulateAIPlayers() {
 
     AIController->FinishSpawning(SpawnTransform);
 
-    if (TurnManager) {
-      TurnManager->RegisterController(AIController);
-      UE_LOG(LogSkald, Log,
-             TEXT("PopulateAIPlayers: ControllerCount=%d"),
-             TurnManager->GetControllerCount());
-    }
-
     TArray<ESkaldFaction> Taken;
     for (APlayerState *ExistingPS : GS->PlayerArray) {
       if (ASkaldPlayerState *EPS = Cast<ASkaldPlayerState>(ExistingPS)) {
@@ -342,6 +335,13 @@ void ASkaldGameMode::PopulateAIPlayers() {
     AIState->bHasLockedIn = true;
 
     RegisterPlayer(AIController);
+
+    if (TurnManager) {
+      TurnManager->RegisterController(AIController);
+      UE_LOG(LogSkald, Log,
+             TEXT("PopulateAIPlayers: ControllerCount=%d PlayerCount=%d"),
+             TurnManager->GetControllerCount(), GS->PlayerArray.Num());
+    }
 
     if (!AIController->GetPawn() && DefaultPawnClass) {
       FActorSpawnParameters PawnParams;
@@ -469,28 +469,41 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
          GS->PlayerArray.Num());
 
   bool bAllLockedIn = true;
+  bool bAllHaveControllers = true;
+  TArray<ASkaldPlayerController *> RegisteredControllers =
+      TurnManager ? TurnManager->GetControllers()
+                  : TArray<ASkaldPlayerController *>();
   for (APlayerState *PSBase : GS->PlayerArray) {
-    if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
-      if (!PS->bHasLockedIn) {
-        bAllLockedIn = false;
-        break;
-      }
-    } else {
+    ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase);
+    if (!PS || !PS->bHasLockedIn) {
       bAllLockedIn = false;
+    }
+    ASkaldPlayerController *Owner =
+        PS ? Cast<ASkaldPlayerController>(PS->GetOwner()) : nullptr;
+    if (!Owner || !RegisteredControllers.Contains(Owner)) {
+      bAllHaveControllers = false;
+      UE_LOG(LogSkald, Warning,
+             TEXT("TryInitializeWorldAndStart: PlayerState %s missing controller"),
+             *GetNameSafe(PS));
+    }
+    if (!bAllLockedIn || !bAllHaveControllers) {
       break;
     }
   }
 
   const int32 CurrentPlayerCount = GS->PlayerArray.Num();
-  const bool bReadyToStart = bAllLockedIn &&
+  const bool bReadyToStart = bAllLockedIn && bAllHaveControllers &&
                              CurrentPlayerCount >= MinPlayerCount && TurnManager &&
                              TurnManager->GetControllerCount() >= CurrentPlayerCount;
 
-  UE_LOG(LogSkald, Log,
-         TEXT("TryInitializeWorldAndStart: bAllLockedIn=%s CurrentPlayerCount=%d ControllerCount=%d bReadyToStart=%s"),
-         bAllLockedIn ? TEXT("true") : TEXT("false"), CurrentPlayerCount,
-         TurnManager ? TurnManager->GetControllerCount() : 0,
-         bReadyToStart ? TEXT("true") : TEXT("false"));
+  UE_LOG(
+      LogSkald, Log,
+      TEXT(
+          "TryInitializeWorldAndStart: bAllLockedIn=%s bAllHaveControllers=%s CurrentPlayerCount=%d ControllerCount=%d bReadyToStart=%s"),
+      bAllLockedIn ? TEXT("true") : TEXT("false"),
+      bAllHaveControllers ? TEXT("true") : TEXT("false"), CurrentPlayerCount,
+      TurnManager ? TurnManager->GetControllerCount() : 0,
+      bReadyToStart ? TEXT("true") : TEXT("false"));
 
   if (GEngine && CurrentPlayerCount < MinPlayerCount) {
     GEngine->AddOnScreenDebugMessage(
