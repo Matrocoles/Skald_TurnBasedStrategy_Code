@@ -168,13 +168,16 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
 }
 
 void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
-  if (!PC) {
+  // Bail out if the controller has been destroyed or is otherwise invalid.
+  if (!IsValid(PC)) {
+    PendingControllers.Remove(PC);
     return;
   }
 
   ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>();
   if (!PS) {
-    // Player state not yet replicated; queue a retry next tick.
+    // Player state not yet replicated; queue a retry next tick, but only
+    // while the controller remains valid.
     PendingControllers.AddUnique(PC);
     FTimerDelegate RetryDelegate = FTimerDelegate::CreateUObject(
         this, &ASkaldGameMode::RegisterPlayer, PC);
