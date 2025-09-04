@@ -154,7 +154,9 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
 
   if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
     if (GS->PlayerArray.Num() >= ExpectedPlayerCount) {
-      PC->ClientMessage(TEXT("Game is full."));
+      PC->ClientMessage(
+          FString::Printf(TEXT("Game is full (%d players max)."),
+                          ExpectedPlayerCount));
       PC->Destroy();
       return;
     }
@@ -456,9 +458,17 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     }
   }
 
-  const bool bReadyToStart =
-      bAllLockedIn && GS->PlayerArray.Num() >= ExpectedPlayerCount &&
-      TurnManager && TurnManager->GetControllerCount() >= ExpectedPlayerCount;
+  const int32 CurrentPlayerCount = GS->PlayerArray.Num();
+  const bool bReadyToStart = bAllLockedIn &&
+                             CurrentPlayerCount >= MinPlayerCount && TurnManager &&
+                             TurnManager->GetControllerCount() >= CurrentPlayerCount;
+
+  if (GEngine && CurrentPlayerCount < MinPlayerCount) {
+    GEngine->AddOnScreenDebugMessage(
+        -1, 4.f, FColor::Yellow,
+        FString::Printf(TEXT("Waiting for players: %d/%d ready"),
+                        CurrentPlayerCount, MinPlayerCount));
+  }
 
   if (!bWorldInitialized && bReadyToStart) {
     if (InitializeWorld()) {
@@ -783,7 +793,7 @@ bool ASkaldGameMode::InitializeWorld() {
   int32 TotalPlayerCount = GS->PlayerArray.Num();
   if (TotalPlayerCount > ExpectedPlayerCount) {
     UE_LOG(LogSkald, Warning,
-           TEXT("InitializeWorld: expected %d players but found %d; proceeding "
+           TEXT("InitializeWorld: maximum %d players supported but found %d; proceeding "
                 "with first %d players"),
            ExpectedPlayerCount, TotalPlayerCount, ExpectedPlayerCount);
     while (GS->PlayerArray.Num() > ExpectedPlayerCount) {
@@ -795,18 +805,16 @@ bool ASkaldGameMode::InitializeWorld() {
     }
     TotalPlayerCount = ExpectedPlayerCount;
   }
-  if (TotalPlayerCount < ExpectedPlayerCount) {
+  if (TotalPlayerCount < MinPlayerCount) {
     UE_LOG(LogSkald, Warning,
-           TEXT("InitializeWorld aborted: expected at least %d players but "
-                "found %d"),
-           ExpectedPlayerCount, TotalPlayerCount);
+           TEXT("InitializeWorld aborted: need at least %d players but found %d"),
+           MinPlayerCount, TotalPlayerCount);
     if (GEngine) {
       GEngine->AddOnScreenDebugMessage(
           -1, 5.f, FColor::Yellow,
           FString::Printf(
-              TEXT(
-                  "InitializeWorld: expected at least %d players but found %d"),
-              ExpectedPlayerCount, TotalPlayerCount));
+              TEXT("InitializeWorld: need at least %d players but found %d"),
+              MinPlayerCount, TotalPlayerCount));
     }
     return false;
   }

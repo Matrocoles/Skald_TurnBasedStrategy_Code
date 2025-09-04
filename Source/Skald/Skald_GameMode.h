@@ -69,6 +69,10 @@ protected:
   UPROPERTY(BlueprintReadOnly, Category = "Players")
   TArray<FS_PlayerData> PlayerDataArray;
 
+  /** Minimum number of players required to start the match. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Players", meta = (ClampMin = "1"))
+  int32 MinPlayerCount = 1;
+
   /** All siege equipment constructed on the map. */
   UPROPERTY(BlueprintReadOnly, Category = "Siege")
   TArray<FS_Siege> SiegePool;
