@@ -117,7 +117,7 @@ private:
   /** Whether AI players have already been spawned. */
   bool bAIPlayersSpawned;
 
-  /** Controllers waiting for world initialization before registration. */
+  /** Controllers whose PlayerState is not yet valid, queued for retry. */
   TArray<ASkaldPlayerController *> PendingControllers;
 
   /** Index of the controller currently placing armies. */

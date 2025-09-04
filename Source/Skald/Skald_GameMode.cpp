@@ -290,6 +290,13 @@ void ASkaldGameMode::PopulateAIPlayers() {
 
     AIController->FinishSpawning(SpawnTransform);
 
+    if (TurnManager) {
+      TurnManager->RegisterController(AIController);
+      UE_LOG(LogSkald, Log,
+             TEXT("PopulateAIPlayers: ControllerCount=%d"),
+             TurnManager->GetControllerCount());
+    }
+
     TArray<ESkaldFaction> Taken;
     for (APlayerState *ExistingPS : GS->PlayerArray) {
       if (ASkaldPlayerState *EPS = Cast<ASkaldPlayerState>(ExistingPS)) {
@@ -464,27 +471,6 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     } else {
       bAllLockedIn = false;
       break;
-    }
-  }
-
-  if (PendingControllers.Num() > 0) {
-    for (ASkaldPlayerController *PC : PendingControllers) {
-      if (TurnManager) {
-        TurnManager->RegisterController(PC);
-      }
-    }
-    PendingControllers.Empty();
-  }
-
-  // Fallback: ensure any existing player controllers are registered with the
-  // turn manager even if RegisterPlayer was not called for them.
-  if (TurnManager) {
-    for (FConstPlayerControllerIterator It =
-             GetWorld()->GetPlayerControllerIterator();
-         It; ++It) {
-      if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(*It)) {
-        TurnManager->RegisterController(PC);
-      }
     }
   }
 
