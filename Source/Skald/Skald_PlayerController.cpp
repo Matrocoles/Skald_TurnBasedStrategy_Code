@@ -17,13 +17,13 @@
 #include "Skald_PlayerState.h"
 #include "Skald_TurnManager.h"
 #include "Territory.h"
+#include "TimerManager.h"
 #include "UI/BattleHUDWidget.h"
 #include "UI/DeployWidget.h"
 #include "UI/FighterSelectionWidget.h"
 #include "UI/SkaldMainHUDWidget.h"
 #include "UObject/ConstructorHelpers.h"
 #include "WorldMap.h"
-#include "TimerManager.h"
 #include <limits>
 
 constexpr int32 MaxAIIterations = 100;
@@ -167,22 +167,25 @@ void ASkaldPlayerController::TryBindWorldMap() {
             this, &ASkaldPlayerController::HandleTerritorySelected)) {
       WorldMap->OnTerritorySelected.AddDynamic(
           this, &ASkaldPlayerController::HandleTerritorySelected);
-      ensureMsgf(
-          WorldMap->OnTerritorySelected.IsAlreadyBound(
-              this, &ASkaldPlayerController::HandleTerritorySelected),
-          TEXT("Failed to bind HandleTerritorySelected to WorldMap."));
+      ensureMsgf(WorldMap->OnTerritorySelected.IsAlreadyBound(
+                     this, &ASkaldPlayerController::HandleTerritorySelected),
+                 TEXT("Failed to bind HandleTerritorySelected to WorldMap."));
     }
     WorldMapSearchAttempts = 0;
+    GetWorldTimerManager().ClearTimer(WorldMapSearchHandle);
   } else {
     ++WorldMapSearchAttempts;
     if (WorldMapSearchAttempts >= MaxWorldMapSearchAttempts) {
       UE_LOG(LogSkald, Warning,
-             TEXT("ASkaldPlayerController could not find AWorldMap after %d attempts."),
+             TEXT("ASkaldPlayerController could not find AWorldMap after %d "
+                  "attempts."),
              WorldMapSearchAttempts);
+      GetWorldTimerManager().ClearTimer(WorldMapSearchHandle);
+    } else {
+      GetWorldTimerManager().SetTimer(WorldMapSearchHandle, this,
+                                      &ASkaldPlayerController::TryBindWorldMap,
+                                      0.5f, false);
     }
-    GetWorldTimerManager().SetTimer(
-        WorldMapSearchHandle, this,
-        &ASkaldPlayerController::TryBindWorldMap, 0.5f, false);
   }
 }
 
@@ -1025,9 +1028,7 @@ void ASkaldPlayerController::HandleWorldStateChanged() {
   }
 }
 
-void ASkaldPlayerController::HandlePlayerLockedIn() {
-  HandleFactionLockedIn();
-}
+void ASkaldPlayerController::HandlePlayerLockedIn() { HandleFactionLockedIn(); }
 
 void ASkaldPlayerController::HandleFactionLockedIn() {
   if (ChoosePlayerWidget) {
