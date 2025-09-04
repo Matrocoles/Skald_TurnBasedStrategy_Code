@@ -50,6 +50,12 @@ ASkaldGameMode::ASkaldGameMode() {
 void ASkaldGameMode::BeginPlay() {
   Super::BeginPlay();
 
+  if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
+    GS->Players.Empty();
+    GS->PlayerArray.Empty();
+  }
+  PlayerDataArray.Empty();
+
   if (!TurnManager) {
     TurnManager = GetWorld()->SpawnActor<ATurnManager>();
   }
