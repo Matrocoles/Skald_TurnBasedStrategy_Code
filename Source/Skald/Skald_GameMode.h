@@ -114,6 +114,9 @@ private:
   /** Whether the world has been initialized and territories assigned. */
   bool bWorldInitialized;
 
+  /** Whether AI players have already been spawned. */
+  bool bAIPlayersSpawned;
+
   /** Controllers waiting for world initialization before registration. */
   TArray<ASkaldPlayerController *> PendingControllers;
 
