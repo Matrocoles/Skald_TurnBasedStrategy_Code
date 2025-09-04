@@ -81,6 +81,13 @@ private:
   /** Get the grid overlay component, caching the result. */
   UGridOverlayComponent *GetGrid();
 
+  /** Retrieve or create a damage widget from the pool. */
+  UUserWidget *GetDamageWidgetFromPool();
+
+  /** Pool of reusable damage widgets to avoid repeated allocations. */
+  UPROPERTY()
+  TArray<UUserWidget *> DamageWidgetPool;
+
   /** Current cell occupied by the fighter. */
   FIntPoint CurrentCell;
 

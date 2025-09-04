@@ -5,6 +5,7 @@
 #include "EngineUtils.h"
 #include "GridOverlayComponent.h"
 #include "Skald_GameInstance.h"
+#include "TimerManager.h"
 
 AFighterPawn::AFighterPawn() {
   PrimaryActorTick.bCanEverTick = false;
@@ -52,6 +53,24 @@ UGridOverlayComponent *AFighterPawn::GetGrid() {
   return CachedGrid;
 }
 
+UUserWidget *AFighterPawn::GetDamageWidgetFromPool() {
+  for (UUserWidget *Widget : DamageWidgetPool) {
+    if (Widget && !Widget->IsInViewport()) {
+      return Widget;
+    }
+  }
+  if (DamageFloatWidgetTemplate) {
+    if (UWorld *World = GetWorld()) {
+      if (UUserWidget *NewWidget =
+              CreateWidget<UUserWidget>(World, DamageFloatWidgetTemplate)) {
+        DamageWidgetPool.Add(NewWidget);
+        return NewWidget;
+      }
+    }
+  }
+  return nullptr;
+}
+
 void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
   int32 Distance = FMath::Abs(TargetCell.X - CurrentCell.X) +
                    FMath::Abs(TargetCell.Y - CurrentCell.Y);
@@ -93,46 +112,9 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
     return;
   }
 
-  UGridOverlayComponent *Grid = nullptr;
-  if (UWorld *World = GetWorld()) {
-    for (TActorIterator<AActor> It(World); It; ++It) {
-      Grid = It->FindComponentByClass<UGridOverlayComponent>();
-      if (Grid != nullptr) {
-        break;
-      }
-    }
-  }
-  if (Grid) {
-    FIntPoint StartCell = CurrentCell;
-    FIntPoint TargetCell = Target->CurrentCell;
-    int32 x0 = StartCell.X;
-    int32 y0 = StartCell.Y;
-    int32 x1 = TargetCell.X;
-    int32 y1 = TargetCell.Y;
-    int32 dx = FMath::Abs(x1 - x0);
-    int32 sx = x0 < x1 ? 1 : -1;
-    int32 dy = -FMath::Abs(y1 - y0);
-    int32 sy = y0 < y1 ? 1 : -1;
-    int32 err = dx + dy;
-    FIntPoint Current(x0, y0);
-
-    while (true) {
-      if (Current != StartCell && Grid->IsObscured(Current)) {
-        return;
-      }
-      if (Current.X == x1 && Current.Y == y1) {
-        break;
-      }
-      int32 e2 = 2 * err;
-      if (e2 >= dy) {
-        err += dy;
-        Current.X += sx;
-      }
-      if (e2 <= dx) {
-        err += dx;
-        Current.Y += sy;
-      }
-    }
+  UGridOverlayComponent *Grid = GetGrid();
+  if (Grid && !Grid->HasLineOfSight(CurrentCell, Target->CurrentCell)) {
+    return;
   }
 
   FRandomStream *RandomStream = nullptr;
@@ -142,10 +124,8 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
       RandomStream = &GameInstance->CombatRandomStream;
     }
   }
-  static FRandomStream FallbackStream;
   if (!RandomStream) {
-    FallbackStream.Initialize(FMath::Rand());
-    RandomStream = &FallbackStream;
+    return;
   }
 
   const int32 RequiredRoll =
@@ -159,16 +139,20 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
       Target->Stats.Health =
           FMath::Max(0, Target->Stats.Health - Stats.AttackDamage);
 
-      if (DamageFloatWidgetTemplate && Target) {
+      if (UUserWidget *DamageWidget = GetDamageWidgetFromPool()) {
+        if (UTextBlock *Text = Cast<UTextBlock>(
+                DamageWidget->GetWidgetFromName(TEXT("DamageText")))) {
+          Text->SetText(FText::AsNumber(Stats.AttackDamage));
+        }
+        DamageWidget->AddToViewport();
         if (UWorld *World = GetWorld()) {
-          if (UUserWidget *DamageWidget =
-                  CreateWidget<UUserWidget>(World, DamageFloatWidgetTemplate)) {
-            if (UTextBlock *Text = Cast<UTextBlock>(
-                    DamageWidget->GetWidgetFromName(TEXT("DamageText")))) {
-              Text->SetText(FText::AsNumber(Stats.AttackDamage));
-            }
-            DamageWidget->AddToViewport();
-          }
+          FTimerHandle Timer;
+          World->GetTimerManager().SetTimer(
+              Timer,
+              FTimerDelegate::CreateLambda([DamageWidget]() {
+                DamageWidget->RemoveFromParent();
+              }),
+              1.f, false);
         }
       }
     }

@@ -85,6 +85,37 @@ bool UGridOverlayComponent::IsObscured(const FIntPoint &GridCoord) const {
   return ObscuredCells[Index(GridCoord)];
 }
 
+bool UGridOverlayComponent::HasLineOfSight(const FIntPoint &Start,
+                                           const FIntPoint &End) const {
+  FIntPoint Current = Start;
+  const int32 x1 = End.X;
+  const int32 y1 = End.Y;
+  int32 dx = FMath::Abs(x1 - Current.X);
+  int32 sx = Current.X < x1 ? 1 : -1;
+  int32 dy = -FMath::Abs(y1 - Current.Y);
+  int32 sy = Current.Y < y1 ? 1 : -1;
+  int32 err = dx + dy;
+
+  while (true) {
+    if (Current != Start && IsObscured(Current)) {
+      return false;
+    }
+    if (Current.X == x1 && Current.Y == y1) {
+      break;
+    }
+    int32 e2 = 2 * err;
+    if (e2 >= dy) {
+      err += dy;
+      Current.X += sx;
+    }
+    if (e2 <= dx) {
+      err += dx;
+      Current.Y += sy;
+    }
+  }
+  return true;
+}
+
 float UGridOverlayComponent::GetCellHeight(const FIntPoint &GridCoord) const {
   if (!IsValidGrid(GridCoord)) {
     return Origin.Z;
@@ -231,38 +262,7 @@ void UGridOverlayComponent::HighlightAttack(AFighterPawn *Fighter) {
         continue;
       }
 
-      int32 x0 = StartCell.X;
-      int32 y0 = StartCell.Y;
-      int32 x1 = Target.X;
-      int32 y1 = Target.Y;
-      int32 dx = FMath::Abs(x1 - x0);
-      int32 sx = x0 < x1 ? 1 : -1;
-      int32 dy = -FMath::Abs(y1 - y0);
-      int32 sy = y0 < y1 ? 1 : -1;
-      int32 err = dx + dy;
-      FIntPoint Current(x0, y0);
-      bool bBlocked = false;
-
-      while (true) {
-        if (Current != StartCell && IsObscured(Current)) {
-          bBlocked = true;
-          break;
-        }
-        if (Current.X == x1 && Current.Y == y1) {
-          break;
-        }
-        int32 e2 = 2 * err;
-        if (e2 >= dy) {
-          err += dy;
-          Current.X += sx;
-        }
-        if (e2 <= dx) {
-          err += dx;
-          Current.Y += sy;
-        }
-      }
-
-      if (!bBlocked) {
+      if (HasLineOfSight(StartCell, Target)) {
         HighlightCell(Target, FColor::Red, 0.f, true);
       }
     }
