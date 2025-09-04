@@ -55,8 +55,7 @@ ASkaldPlayerController::ASkaldPlayerController() {
   }
 }
 
-void ASkaldPlayerController::BeginPlay() {
-  Super::BeginPlay();
+void ASkaldPlayerController::CacheGameReferences() {
   CachedGameState = GetWorld()->GetGameState<ASkaldGameState>();
   if (!CachedGameState) {
     UE_LOG(LogSkald, Error,
@@ -80,80 +79,85 @@ void ASkaldPlayerController::BeginPlay() {
     CachedGameInstance->OnFactionsUpdated.AddDynamic(
         this, &ASkaldPlayerController::HandleFactionsUpdated);
   }
+
   if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
     bIsAI = PS->bIsAI;
   }
+}
+
+void ASkaldPlayerController::InitializeHUDWidget() {
+  if (!HUDWidgetClass) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("HUDWidgetClass is null; HUD will not be displayed."));
+    return;
+  }
+
+  MainHudWidget = CreateWidget<USkaldMainHUDWidget>(this, HUDWidgetClass);
+  if (!MainHudWidget) {
+    return;
+  }
+
+  HUDRef = MainHudWidget;
+  MainHudWidget->AddToViewport();
+  MainHudWidget->SetVisibility(ESlateVisibility::Hidden);
+
+  if (CachedGameState) {
+    TArray<FS_PlayerData> Players;
+    BuildPlayerDataArray(Players);
+    const ASkaldPlayerState *CurrentPS = CachedGameState->GetCurrentPlayer();
+    const int32 CurrentID = CurrentPS ? CurrentPS->GetPlayerId() : -1;
+    MainHudWidget->RefreshFromState(CurrentID, /*TurnNumber*/ 1,
+                                    ETurnPhase::Reinforcement, Players);
+  }
+
+  // Ensure local player details are registered with the HUD once available.
+  OnRep_PlayerState();
+
+  MainHudWidget->OnAttackRequested.AddDynamic(
+      this, &ASkaldPlayerController::HandleAttackRequested);
+  MainHudWidget->OnMoveRequested.AddDynamic(
+      this, &ASkaldPlayerController::HandleMoveRequested);
+  MainHudWidget->OnEndAttackRequested.AddDynamic(
+      this, &ASkaldPlayerController::HandleEndAttackRequested);
+  MainHudWidget->OnEndMovementRequested.AddDynamic(
+      this, &ASkaldPlayerController::HandleEndMovementRequested);
+  MainHudWidget->OnEngineeringRequested.AddDynamic(
+      this, &ASkaldPlayerController::HandleEngineeringRequested);
+  MainHudWidget->OnBuildSiegeRequested.AddDynamic(
+      this, &ASkaldPlayerController::HandleBuildSiegeRequested);
+  MainHudWidget->OnDigTreasureRequested.AddDynamic(
+      this, &ASkaldPlayerController::HandleDigTreasureRequested);
+}
+
+void ASkaldPlayerController::InitializeChoosePlayerWidget() {
+  if (ChoosePlayerWidget || !ChoosePlayerWidgetClass) {
+    return;
+  }
+
+  ChoosePlayerWidget =
+      CreateWidget<UChoosePlayerWidget>(this, ChoosePlayerWidgetClass);
+  if (!ChoosePlayerWidget) {
+    return;
+  }
+
+  ChoosePlayerWidget->OnPlayerLockedIn.AddDynamic(
+      this, &ASkaldPlayerController::HandleFactionLockedIn);
+  ChoosePlayerWidget->AddToViewport();
+
+  // While the player is choosing their faction, restrict controls to the UI.
+  SetInputMode(FInputModeUIOnly());
+  SetIgnoreMoveInput(true);
+  SetIgnoreLookInput(true);
+}
+
+void ASkaldPlayerController::BeginPlay() {
+  Super::BeginPlay();
+  CacheGameReferences();
 
   if (IsLocalPlayerController() && !IsAIController() &&
       GetLocalPlayer() != nullptr) {
-    // Create and show the HUD widget if a class has been assigned (expected via
-    // blueprint or constructor).
-    if (HUDWidgetClass) {
-      MainHudWidget = CreateWidget<USkaldMainHUDWidget>(this, HUDWidgetClass);
-      if (MainHudWidget) {
-        HUDRef = MainHudWidget;
-        MainHudWidget->AddToViewport();
-        MainHudWidget->SetVisibility(ESlateVisibility::Hidden);
-
-        if (CachedGameState) {
-          TArray<FS_PlayerData> Players;
-          for (APlayerState *PSBase : CachedGameState->PlayerArray) {
-            if (ASkaldPlayerState *LPS = Cast<ASkaldPlayerState>(PSBase)) {
-              FS_PlayerData Data;
-              Data.PlayerID = LPS->GetPlayerId();
-              Data.PlayerName = LPS->PlayerDisplayName;
-              Data.IsAI = LPS->bIsAI;
-              Data.Faction = LPS->Faction;
-              Players.Add(Data);
-            }
-          }
-
-          const ASkaldPlayerState *CurrentPS =
-              CachedGameState->GetCurrentPlayer();
-          const int32 CurrentID = CurrentPS ? CurrentPS->GetPlayerId() : -1;
-          MainHudWidget->RefreshFromState(CurrentID, /*TurnNumber*/ 1,
-                                          ETurnPhase::Reinforcement, Players);
-        }
-
-        // Ensure local player details are registered with the HUD once
-        // available.
-        OnRep_PlayerState();
-
-        MainHudWidget->OnAttackRequested.AddDynamic(
-            this, &ASkaldPlayerController::HandleAttackRequested);
-        MainHudWidget->OnMoveRequested.AddDynamic(
-            this, &ASkaldPlayerController::HandleMoveRequested);
-        MainHudWidget->OnEndAttackRequested.AddDynamic(
-            this, &ASkaldPlayerController::HandleEndAttackRequested);
-        MainHudWidget->OnEndMovementRequested.AddDynamic(
-            this, &ASkaldPlayerController::HandleEndMovementRequested);
-        MainHudWidget->OnEngineeringRequested.AddDynamic(
-            this, &ASkaldPlayerController::HandleEngineeringRequested);
-        MainHudWidget->OnBuildSiegeRequested.AddDynamic(
-            this, &ASkaldPlayerController::HandleBuildSiegeRequested);
-        MainHudWidget->OnDigTreasureRequested.AddDynamic(
-            this, &ASkaldPlayerController::HandleDigTreasureRequested);
-      }
-    } else {
-      UE_LOG(LogSkald, Warning,
-             TEXT("HUDWidgetClass is null; HUD will not be displayed."));
-    }
-
-    if (!ChoosePlayerWidget && ChoosePlayerWidgetClass) {
-      ChoosePlayerWidget =
-          CreateWidget<UChoosePlayerWidget>(this, ChoosePlayerWidgetClass);
-      if (ChoosePlayerWidget) {
-        ChoosePlayerWidget->OnPlayerLockedIn.AddDynamic(
-            this, &ASkaldPlayerController::HandleFactionLockedIn);
-        ChoosePlayerWidget->AddToViewport();
-        // While the player is choosing their faction, restrict controls to the
-        // UI
-        SetInputMode(FInputModeUIOnly());
-        SetIgnoreMoveInput(true);
-        SetIgnoreLookInput(true);
-      }
-    }
-
+    InitializeHUDWidget();
+    InitializeChoosePlayerWidget();
     InitializeFighterSelectionIfNeeded();
   }
 
