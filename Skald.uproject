@@ -25,7 +25,7 @@
     },
     {
       "Name": "OnlineSubsystem",
-      "Enabled": false
+      "Enabled": true
     }
   ],
   "AdditionalRootDirectories": [],
