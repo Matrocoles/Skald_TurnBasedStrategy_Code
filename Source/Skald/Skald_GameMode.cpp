@@ -21,6 +21,7 @@
 
 namespace {
 constexpr int32 ExpectedPlayerCount = 4;
+constexpr int32 MaxAIPlayers = 3;
 constexpr float StartGameTimeout = 10.f;
 constexpr int32 StartingResources = 100;
 constexpr int32 DefaultAIMaxCost = 10;
@@ -216,8 +217,17 @@ void ASkaldGameMode::PopulateAIPlayers() {
   const int32 MaxSpawnAttempts = ExpectedPlayerCount * 2;
   int32 SpawnAttempts = 0;
 
+  int32 AICount = 0;
+  for (APlayerState *ExistingPS : GS->PlayerArray) {
+    if (ASkaldPlayerState *EPS = Cast<ASkaldPlayerState>(ExistingPS)) {
+      if (EPS->bIsAI) {
+        ++AICount;
+      }
+    }
+  }
+
   while (GS->PlayerArray.Num() < ExpectedPlayerCount &&
-         SpawnAttempts++ < MaxSpawnAttempts) {
+         AICount < MaxAIPlayers && SpawnAttempts++ < MaxSpawnAttempts) {
     ASkaldPlayerState *AIState =
         GetWorld()->SpawnActor<ASkaldPlayerState>(PlayerStateClass);
     if (!AIState) {
@@ -293,6 +303,8 @@ void ASkaldGameMode::PopulateAIPlayers() {
     }
 
     HandlePlayerLockedIn(AIState);
+
+    ++AICount;
   }
 
   if (GS->PlayerArray.Num() < ExpectedPlayerCount) {
@@ -735,6 +747,38 @@ bool ASkaldGameMode::InitializeWorld() {
     return false;
   }
 
+  int32 TotalPlayerCount = GS->PlayerArray.Num();
+  if (TotalPlayerCount > ExpectedPlayerCount) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("InitializeWorld: expected %d players but found %d; proceeding "
+                "with first %d players"),
+           ExpectedPlayerCount, TotalPlayerCount, ExpectedPlayerCount);
+    while (GS->PlayerArray.Num() > ExpectedPlayerCount) {
+      if (APlayerState *Extra = GS->PlayerArray[ExpectedPlayerCount]) {
+        GS->RemovePlayerState(Extra);
+      } else {
+        GS->PlayerArray.RemoveAt(ExpectedPlayerCount);
+      }
+    }
+    TotalPlayerCount = ExpectedPlayerCount;
+  }
+  if (TotalPlayerCount < ExpectedPlayerCount) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("InitializeWorld aborted: expected at least %d players but "
+                "found %d"),
+           ExpectedPlayerCount, TotalPlayerCount);
+    if (GEngine) {
+      GEngine->AddOnScreenDebugMessage(
+          -1, 5.f, FColor::Yellow,
+          FString::Printf(
+              TEXT(
+                  "InitializeWorld: expected at least %d players but found %d"),
+              ExpectedPlayerCount, TotalPlayerCount));
+    }
+    return false;
+  }
+  const int32 PlayerCount = TotalPlayerCount;
+
   if (WorldMap->Territories.Num() == 0) {
     if (!WorldMap->TerritoryClass) {
       UE_LOG(LogSkald, Error,
@@ -827,30 +871,6 @@ bool ASkaldGameMode::InitializeWorld() {
       }
     }
   }
-
-  // Ensure the expected number of players are present before assigning
-  // territories. Proceed if there are extra players but require at least the
-  // expected amount.
-  const int32 TotalPlayerCount = GS->PlayerArray.Num();
-  if (TotalPlayerCount < ExpectedPlayerCount) {
-    UE_LOG(LogSkald, Warning,
-           TEXT("InitializeWorld aborted: expected at least %d players but found %d"),
-           ExpectedPlayerCount, TotalPlayerCount);
-    if (GEngine) {
-      GEngine->AddOnScreenDebugMessage(
-          -1, 5.f, FColor::Yellow,
-          FString::Printf(TEXT("InitializeWorld: expected at least %d players but found %d"),
-                          ExpectedPlayerCount, TotalPlayerCount));
-    }
-    return false;
-  }
-  if (TotalPlayerCount > ExpectedPlayerCount) {
-    UE_LOG(LogSkald, Warning,
-           TEXT("InitializeWorld: expected %d players but found %d; proceeding with first %d players"),
-           ExpectedPlayerCount, TotalPlayerCount, ExpectedPlayerCount);
-  }
-  const int32 PlayerCount = FMath::Min(TotalPlayerCount, ExpectedPlayerCount);
-
   // Assign territories round-robin to players in initiative order
   int32 Index = 0;
   for (ATerritory *Territory : WorldMap->Territories) {
