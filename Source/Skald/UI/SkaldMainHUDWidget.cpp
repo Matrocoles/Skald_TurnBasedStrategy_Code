@@ -12,6 +12,7 @@
 #include "Skald_GameState.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
+#include "Skald_AIController.h"
 #include "Skald_TurnManager.h"
 #include "Territory.h"
 #include "UI/ConfirmAttackWidget.h"
@@ -516,7 +517,7 @@ void USkaldMainHUDWidget::HandlePlayersUpdated() {
       FS_PlayerData Data;
       Data.PlayerID = PS->GetPlayerId();
       Data.PlayerName = PS->PlayerDisplayName;
-      Data.IsAI = PS->bIsAI;
+      Data.IsAI = Cast<ASkaldAIController>(PS->GetOwner()) != nullptr;
       Data.Faction = PS->Faction;
       Players.Add(Data);
     }

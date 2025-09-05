@@ -265,9 +265,6 @@ struct SKALD_API FPlayerSaveStruct
     FString PlayerName;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
-    bool IsAI = false;
-
-    UPROPERTY(BlueprintReadWrite, EditAnywhere)
     ESkaldFaction Faction = ESkaldFaction::Human;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)

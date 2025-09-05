@@ -15,6 +15,7 @@
 #include "Skald_GameMode.h"
 #include "Skald_GameState.h"
 #include "Skald_PlayerState.h"
+#include "Skald_AIController.h"
 #include "Skald_TurnManager.h"
 #include "Territory.h"
 #include "TimerManager.h"
@@ -821,7 +822,7 @@ void ASkaldPlayerController::BuildPlayerDataArray(
       FS_PlayerData Data;
       Data.PlayerID = PS->GetPlayerId();
       Data.PlayerName = PS->PlayerDisplayName;
-      Data.IsAI = PS->bIsAI;
+      Data.IsAI = Cast<ASkaldAIController>(PS->GetOwner()) != nullptr;
       Data.Faction = PS->Faction;
       Data.Resources = PS->Resources;
       Data.IsEliminated = PS->IsEliminated;
