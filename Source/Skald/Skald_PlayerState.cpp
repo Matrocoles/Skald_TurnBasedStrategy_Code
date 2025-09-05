@@ -30,7 +30,6 @@ void ASkaldPlayerState::GetLifetimeReplicatedProps(
     DOREPLIFETIME(ASkaldPlayerState, Resources);
     DOREPLIFETIME(ASkaldPlayerState, bHasLockedIn);
     DOREPLIFETIME(ASkaldPlayerState, IsEliminated);
-    DOREPLIFETIME(ASkaldPlayerState, bIsAI);
 }
 
 void ASkaldPlayerState::OnRep_DeployableUnits()
