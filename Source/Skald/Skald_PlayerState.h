@@ -37,7 +37,6 @@ public:
     ESkaldFaction Faction;
 
     /** Whether this player is controlled by AI. */
-    UPROPERTY(BlueprintReadWrite, Replicated, Category="PlayerState")
     UPROPERTY(BlueprintReadWrite, ReplicatedUsing = OnRep_IsAI, Category="PlayerState")
     bool bIsAI;
 
