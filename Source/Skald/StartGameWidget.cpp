@@ -33,11 +33,23 @@ void UStartGameWidget::NativeConstruct() {
   }
 }
 
-void UStartGameWidget::OnSingleplayer() { StartGame(false); }
+void UStartGameWidget::OnSingleplayer() {
+  if (UWorld *World = GetWorld()) {
+    if (USkaldGameInstance *GI = World->GetGameInstance<USkaldGameInstance>()) {
+      GI->ResetSession();
+    }
+  }
+  StartGame(false);
+}
 
 void UStartGameWidget::OnMultiplayer() { StartGame(true); }
 
 void UStartGameWidget::OnMainMenu() {
+  if (UWorld *World = GetWorld()) {
+    if (USkaldGameInstance *GI = World->GetGameInstance<USkaldGameInstance>()) {
+      GI->ResetSession();
+    }
+  }
   RemoveFromParent();
   if (OwningLobbyMenu.IsValid()) {
     OwningLobbyMenu->SetVisibility(ESlateVisibility::Visible);
