@@ -38,6 +38,7 @@ public:
 
     /** Whether this player is controlled by AI. */
     UPROPERTY(BlueprintReadWrite, Replicated, Category="PlayerState")
+    UPROPERTY(BlueprintReadWrite, ReplicatedUsing = OnRep_IsAI, Category="PlayerState")
     bool bIsAI;
 
     /** Whether the player has locked in their actions for the current turn. */
@@ -59,6 +60,9 @@ public:
 
     UFUNCTION()
     void OnRep_PlayerDisplayName();
+
+    UFUNCTION()
+    void OnRep_IsAI();
 
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 };

@@ -203,6 +203,7 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
   PendingControllers.Remove(PC);
 
   PS->bIsAI = Cast<ASkaldAIController>(PC) != nullptr;
+  PS->bIsAI = PC->IsA<ASkaldAIController>();
 
   if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
     if (!GS->PlayerArray.Contains(PS)) {
