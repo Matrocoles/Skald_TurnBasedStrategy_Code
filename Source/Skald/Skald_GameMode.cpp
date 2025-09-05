@@ -208,9 +208,11 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
     }
 
     if (TurnManager) {
-      TurnManager->RegisterController(PC);
-      UE_LOG(LogSkald, Log, TEXT("RegisterPlayer: ControllerCount=%d"),
-             TurnManager->GetControllerCount());
+      if (!TurnManager->GetControllers().Contains(PC)) {
+        TurnManager->RegisterController(PC);
+        UE_LOG(LogSkald, Log, TEXT("RegisterPlayer: ControllerCount=%d"),
+               TurnManager->GetControllerCount());
+      }
     } else {
       // Defer final registration until the turn manager is available. Only
       // queue retries when running in multiplayer.
