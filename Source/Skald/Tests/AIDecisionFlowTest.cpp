@@ -1,7 +1,6 @@
 #include "Misc/AutomationTest.h"
 #include "Tests/AutomationEditorCommon.h"
 #include "Engine/World.h"
-#include "Skald_PlayerController.h"
 #include "Skald_AIController.h"
 #include "Skald_PlayerState.h"
 #include "Skald_TurnManager.h"
@@ -23,7 +22,6 @@ bool FSkaldAIDecisionFlowTest::RunTest(const FString& Parameters)
     ATurnManager* TM = World->SpawnActor<ATurnManager>();
     ASkaldAIController* PC1 = World->SpawnActor<ASkaldAIController>();
     ASkaldPlayerState* PS1 = World->SpawnActor<ASkaldPlayerState>();
-    ASkaldPlayerController* PC2 = World->SpawnActor<ASkaldPlayerController>();
     ASkaldPlayerState* PS2 = World->SpawnActor<ASkaldPlayerState>();
     AWorldMap* Map = World->SpawnActor<AWorldMap>();
 
@@ -71,13 +69,13 @@ bool FSkaldAIDecisionFlowTest::RunTest(const FString& Parameters)
     Map->Territories = {TA, TB, TC};
 
     FMath::RandInit(1);
-    PC1->MakeAIDecision();
+    PC1->StartTurn();
 
     TestEqual(TEXT("Deployable units spent"), PS1->DeployableUnits, 0);
     TestEqual(TEXT("Resources spent"), PS1->Resources, 0);
     TestEqual(TEXT("Attack captured territory"), TB->OwningPlayer, PS1);
     TestTrue(TEXT("Movement reinforced"), TA->ArmyUnits > 1);
-    TestEqual(TEXT("Turn advanced"), TM->GetCurrentPhase(), ETurnPhase::Reinforcement);
+    TestEqual(TEXT("Turn ended"), TM->GetCurrentPhase(), ETurnPhase::EndTurn);
 
     return true;
 }
