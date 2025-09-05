@@ -202,6 +202,7 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
   // Player state is valid; perform normal registration.
   PendingControllers.Remove(PC);
 
+  PS->bIsAI = Cast<ASkaldAIController>(PC) != nullptr;
   PS->bIsAI = PC->IsA<ASkaldAIController>();
 
   if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
@@ -278,6 +279,7 @@ void ASkaldGameMode::PopulateAIPlayers() {
     }
 
     AIState->bHasLockedIn = true;
+    AIState->bIsAI = true;
 
     FTransform SpawnTransform = FTransform::Identity;
     APlayerController *NewController =
