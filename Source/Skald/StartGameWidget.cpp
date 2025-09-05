@@ -19,22 +19,68 @@ void UStartGameWidget::NativeConstruct() {
   Super::NativeConstruct();
 
   if (SingleplayerButton) {
-    SingleplayerButton->OnClicked.AddDynamic(this,
-                                             &UStartGameWidget::OnSingleplayer);
+    SingleplayerButton->OnClicked.AddDynamic(
+        this, &UStartGameWidget::OnSingleplayer);
     SingleplayerButton->SetIsEnabled(true);
     SingleplayerButton->SetVisibility(ESlateVisibility::Visible);
+  }
+
+  if (MultiplayerButton) {
+    MultiplayerButton->OnClicked.AddDynamic(
+        this, &UStartGameWidget::OnMultiplayer);
+    MultiplayerButton->SetIsEnabled(true);
+    MultiplayerButton->SetVisibility(ESlateVisibility::Visible);
   }
 
   if (HostButton) {
     HostButton->OnClicked.AddDynamic(this, &UStartGameWidget::OnHost);
     HostButton->SetIsEnabled(true);
-    HostButton->SetVisibility(ESlateVisibility::Visible);
+    HostButton->SetVisibility(ESlateVisibility::Collapsed);
   }
 
   if (JoinButton) {
     JoinButton->OnClicked.AddDynamic(this, &UStartGameWidget::OnJoin);
     JoinButton->SetIsEnabled(true);
-    JoinButton->SetVisibility(ESlateVisibility::Visible);
+    JoinButton->SetVisibility(ESlateVisibility::Collapsed);
+  }
+
+  if (JoinAddressBox) {
+    JoinAddressBox->SetVisibility(ESlateVisibility::Collapsed);
+  }
+
+  if (DisplayNameBox) {
+    DisplayNameBox->SetVisibility(ESlateVisibility::Collapsed);
+  }
+
+  if (FactionComboBox) {
+    FactionComboBox->ClearOptions();
+    if (UEnum *Enum = StaticEnum<ESkaldFaction>()) {
+      for (int32 i = 0; i < Enum->NumEnums(); ++i) {
+        if (Enum->HasMetaData(TEXT("Hidden"), i)) {
+          continue;
+        }
+        const FString Name = Enum->GetNameStringByIndex(i);
+        if (Name != TEXT("None")) {
+          FactionComboBox->AddOption(Name);
+        }
+      }
+    }
+    FactionComboBox->ClearSelection();
+    FactionComboBox->SetVisibility(ESlateVisibility::Collapsed);
+  }
+
+  if (AICountSpinBox) {
+    AICountSpinBox->SetMinValue(1.f);
+    AICountSpinBox->SetMaxValue(3.f);
+    AICountSpinBox->SetDelta(1.f);
+    AICountSpinBox->SetValue(1.f);
+    AICountSpinBox->SetVisibility(ESlateVisibility::Collapsed);
+  }
+
+  if (LockInButton) {
+    LockInButton->OnClicked.AddDynamic(this, &UStartGameWidget::OnLockIn);
+    LockInButton->SetIsEnabled(true);
+    LockInButton->SetVisibility(ESlateVisibility::Collapsed);
   }
 
   if (MainMenuButton) {
@@ -42,11 +88,50 @@ void UStartGameWidget::NativeConstruct() {
   }
 }
 
-void UStartGameWidget::OnSingleplayer() { StartGame(false, true); }
+void UStartGameWidget::OnSingleplayer() {
+  if (SingleplayerButton) {
+    SingleplayerButton->SetVisibility(ESlateVisibility::Collapsed);
+  }
+  if (MultiplayerButton) {
+    MultiplayerButton->SetVisibility(ESlateVisibility::Collapsed);
+  }
+  if (DisplayNameBox) {
+    DisplayNameBox->SetVisibility(ESlateVisibility::Visible);
+  }
+  if (FactionComboBox) {
+    FactionComboBox->SetVisibility(ESlateVisibility::Visible);
+  }
+  if (AICountSpinBox) {
+    AICountSpinBox->SetVisibility(ESlateVisibility::Visible);
+  }
+  if (LockInButton) {
+    LockInButton->SetVisibility(ESlateVisibility::Visible);
+  }
+}
+
+void UStartGameWidget::OnMultiplayer() {
+  if (SingleplayerButton) {
+    SingleplayerButton->SetVisibility(ESlateVisibility::Collapsed);
+  }
+  if (MultiplayerButton) {
+    MultiplayerButton->SetVisibility(ESlateVisibility::Collapsed);
+  }
+  if (HostButton) {
+    HostButton->SetVisibility(ESlateVisibility::Visible);
+  }
+  if (JoinButton) {
+    JoinButton->SetVisibility(ESlateVisibility::Visible);
+  }
+  if (JoinAddressBox) {
+    JoinAddressBox->SetVisibility(ESlateVisibility::Visible);
+  }
+}
 
 void UStartGameWidget::OnHost() { StartGame(true, true); }
 
 void UStartGameWidget::OnJoin() { StartGame(true, false); }
+
+void UStartGameWidget::OnLockIn() { StartGame(false, true); }
 
 void UStartGameWidget::OnMainMenu() {
   RemoveFromParent();
