@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Net/Core/NetworkResult.h"
 #include "Engine/GameInstance.h"
 #include "SkaldTypes.h"
 #include "Skald_GameInstance.generated.h"
