@@ -376,6 +376,10 @@ void ASkaldGameMode::PopulateAIPlayers() {
     }
 
     RegisterPlayer(AIController);
+
+    // RegisterPlayer may reset lock-in state; ensure AI players remain locked
+    // so TryInitializeWorldAndStart sees them as ready.
+    AIState->bHasLockedIn = true;
     ++ExistingAI;
 
     if (!AIController->GetPawn() && DefaultPawnClass) {
