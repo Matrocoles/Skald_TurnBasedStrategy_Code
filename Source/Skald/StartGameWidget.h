@@ -24,10 +24,20 @@ public:
             meta = (BindWidgetOptional))
   UButton *SingleplayerButton;
 
-  /** Button to start multiplayer. */
+  /** Button to host a multiplayer session. */
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
             meta = (BindWidgetOptional))
-  UButton *MultiplayerButton;
+  UButton *HostButton;
+
+  /** Button to join an existing multiplayer session. */
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
+            meta = (BindWidgetOptional))
+  UButton *JoinButton;
+
+  /** Entry box for the server address when joining. */
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
+            meta = (BindWidgetOptional))
+  UEditableTextBox *JoinAddressBox;
 
   /** Button to return to the lobby menu. */
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
@@ -64,12 +74,15 @@ protected:
   void OnSingleplayer();
 
   UFUNCTION(BlueprintCallable, Category = "Skald|Widgets")
-  void OnMultiplayer();
+  void OnHost();
+
+  UFUNCTION(BlueprintCallable, Category = "Skald|Widgets")
+  void OnJoin();
 
   UFUNCTION(BlueprintCallable, Category = "Skald|Widgets")
   void OnMainMenu();
 
-  void StartGame(bool bMultiplayer);
+  void StartGame(bool bMultiplayer, bool bHost);
 
 private:
   /** Reference back to the owning lobby menu so it can be restored. */

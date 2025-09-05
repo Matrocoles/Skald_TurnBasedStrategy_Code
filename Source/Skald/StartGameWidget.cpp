@@ -4,6 +4,7 @@
 #include "Components/ComboBoxString.h"
 #include "Components/EditableTextBox.h"
 #include "Components/SpinBox.h"
+#include "Engine/Engine.h"
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "LobbyMenuWidget.h"
@@ -24,11 +25,16 @@ void UStartGameWidget::NativeConstruct() {
     SingleplayerButton->SetVisibility(ESlateVisibility::Visible);
   }
 
-  if (MultiplayerButton) {
-    MultiplayerButton->OnClicked.AddDynamic(this,
-                                            &UStartGameWidget::OnMultiplayer);
-    MultiplayerButton->SetIsEnabled(true);
-    MultiplayerButton->SetVisibility(ESlateVisibility::Visible);
+  if (HostButton) {
+    HostButton->OnClicked.AddDynamic(this, &UStartGameWidget::OnHost);
+    HostButton->SetIsEnabled(true);
+    HostButton->SetVisibility(ESlateVisibility::Visible);
+  }
+
+  if (JoinButton) {
+    JoinButton->OnClicked.AddDynamic(this, &UStartGameWidget::OnJoin);
+    JoinButton->SetIsEnabled(true);
+    JoinButton->SetVisibility(ESlateVisibility::Visible);
   }
 
   if (MainMenuButton) {
@@ -36,9 +42,11 @@ void UStartGameWidget::NativeConstruct() {
   }
 }
 
-void UStartGameWidget::OnSingleplayer() { StartGame(false); }
+void UStartGameWidget::OnSingleplayer() { StartGame(false, true); }
 
-void UStartGameWidget::OnMultiplayer() { StartGame(true); }
+void UStartGameWidget::OnHost() { StartGame(true, true); }
+
+void UStartGameWidget::OnJoin() { StartGame(true, false); }
 
 void UStartGameWidget::OnMainMenu() {
   RemoveFromParent();
@@ -47,10 +55,11 @@ void UStartGameWidget::OnMainMenu() {
   }
 }
 
-void UStartGameWidget::StartGame(bool bMultiplayer) {
+void UStartGameWidget::StartGame(bool bMultiplayer, bool bHost) {
   if (UWorld *World = GetWorld()) {
     if (USkaldGameInstance *GI = World->GetGameInstance<USkaldGameInstance>()) {
       GI->bIsMultiplayer = bMultiplayer;
+      GI->bIsHost = bHost;
       if (!bMultiplayer) {
         if (DisplayNameBox) {
           const FString Name = DisplayNameBox->GetText().ToString();
@@ -80,11 +89,30 @@ void UStartGameWidget::StartGame(bool bMultiplayer) {
         if (GI->Faction != ESkaldFaction::None) {
           GI->TakenFactions.AddUnique(GI->Faction);
         }
+      } else if (!bHost) {
+        if (JoinAddressBox) {
+          GI->JoinAddress = JoinAddressBox->GetText().ToString();
+        }
       }
     }
 
     if (APlayerController *PC = GetOwningPlayer()) {
-      TravelToGameplayMap(PC, bMultiplayer);
+      if (!bMultiplayer || bHost) {
+        TravelToGameplayMap(PC, bMultiplayer);
+      } else {
+        FString Address;
+        if (USkaldGameInstance *GI = World->GetGameInstance<USkaldGameInstance>()) {
+          Address = GI->JoinAddress;
+        }
+        if (!Address.IsEmpty()) {
+          if (GEngine) {
+            GEngine->AddOnScreenDebugMessage(
+                -1, 4.f, FColor::Green,
+                FString::Printf(TEXT("Joining %s"), *Address));
+          }
+          PC->ClientTravel(Address, ETravelType::TRAVEL_Absolute);
+        }
+      }
     }
   }
 }

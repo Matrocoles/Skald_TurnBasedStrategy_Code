@@ -151,6 +151,13 @@ void ASkaldPlayerController::BeginPlay() {
 
   if (IsLocalPlayerController() && GetLocalPlayer() != nullptr) {
     InitializeHUDWidget();
+    if (CachedGameInstance && CachedGameInstance->bIsMultiplayer &&
+        !CachedGameInstance->bIsHost) {
+      if (GEngine) {
+        GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Green,
+                                         TEXT("Connected to host"));
+      }
+    }
     if (CachedGameInstance && CachedGameInstance->bIsMultiplayer) {
       InitializeChoosePlayerWidget();
     } else if (CachedGameInstance) {
