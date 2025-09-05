@@ -185,8 +185,9 @@ void ASkaldGameMode::Logout(AController *Exiting) {
   Super::Logout(Exiting);
 
   if (bHasValidPlayerState) {
-    PlayerDataArray.RemoveAll([
-        PlayerID](const FS_PlayerData &Data) { return Data.PlayerID == PlayerID; });
+    PlayerDataArray.RemoveAll([PlayerID](const FS_PlayerData &Data) {
+      return Data.PlayerID == PlayerID;
+    });
   }
 
   if (TurnManager) {
@@ -306,6 +307,7 @@ void ASkaldGameMode::PopulateAIPlayers() {
   const int32 TargetAI = FMath::Max(GI->AIPlayersToSpawn, 0);
   const int32 MaxSpawnAttempts = TargetAI * 2;
   int32 SpawnAttempts = 0;
+  TArray<ASkaldPlayerState *> NewlySpawnedAI;
 
   while (ExistingAI < TargetAI && SpawnAttempts++ < MaxSpawnAttempts) {
     ASkaldPlayerState *AIState =
@@ -376,6 +378,7 @@ void ASkaldGameMode::PopulateAIPlayers() {
     }
 
     RegisterPlayer(AIController);
+    NewlySpawnedAI.Add(AIState);
 
     // RegisterPlayer may reset lock-in state; ensure AI players remain locked
     // so TryInitializeWorldAndStart sees them as ready.
@@ -392,6 +395,10 @@ void ASkaldGameMode::PopulateAIPlayers() {
         AIController->Possess(Pawn);
       }
     }
+  }
+
+  for (ASkaldPlayerState *NewAIState : NewlySpawnedAI) {
+    HandlePlayerLockedIn(NewAIState);
   }
 
   if (ExistingAI < TargetAI) {
@@ -599,13 +606,13 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase);
     ASkaldPlayerController *OwningController =
         PS ? Cast<ASkaldPlayerController>(PS->GetOwner()) : nullptr;
-    UE_LOG(
-        LogSkald, Log,
-        TEXT("TryInitializeWorldAndStart: Player=%s IsAI=%s LockedIn=%s Controller=%s"),
-        PS ? *PS->GetPlayerName() : TEXT("null"),
-        PS && PS->bIsAI ? TEXT("true") : TEXT("false"),
-        PS && PS->bHasLockedIn ? TEXT("true") : TEXT("false"),
-        *GetNameSafe(OwningController));
+    UE_LOG(LogSkald, Log,
+           TEXT("TryInitializeWorldAndStart: Player=%s IsAI=%s LockedIn=%s "
+                "Controller=%s"),
+           PS ? *PS->GetPlayerName() : TEXT("null"),
+           PS && PS->bIsAI ? TEXT("true") : TEXT("false"),
+           PS && PS->bHasLockedIn ? TEXT("true") : TEXT("false"),
+           *GetNameSafe(OwningController));
   }
 
   bool bAllLockedIn = true;
