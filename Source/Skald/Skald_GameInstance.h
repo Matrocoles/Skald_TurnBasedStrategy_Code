@@ -21,11 +21,11 @@ public:
 
     /** Player chosen display name. */
     UPROPERTY(BlueprintReadWrite, Category="Player")
-    FString DisplayName;
+    FString DisplayName = TEXT("Player");
 
     /** Selected faction for this player. */
     UPROPERTY(BlueprintReadWrite, Category="Player")
-    ESkaldFaction Faction = ESkaldFaction::None;
+    ESkaldFaction Faction = ESkaldFaction::Human;
 
     /** Whether the game was started in multiplayer mode. */
     UPROPERTY(BlueprintReadWrite, Category="Player")
