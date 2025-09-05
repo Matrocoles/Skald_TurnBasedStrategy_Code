@@ -517,7 +517,7 @@ void USkaldMainHUDWidget::HandlePlayersUpdated() {
       FS_PlayerData Data;
       Data.PlayerID = PS->GetPlayerId();
       Data.PlayerName = PS->PlayerDisplayName;
-      Data.IsAI = Cast<ASkaldAIController>(PS->GetOwner()) != nullptr;
+      Data.IsAI = PS->bIsAI;
       Data.Faction = PS->Faction;
       Players.Add(Data);
     }

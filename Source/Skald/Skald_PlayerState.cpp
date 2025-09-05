@@ -11,6 +11,7 @@ ASkaldPlayerState::ASkaldPlayerState()
     , Resources(0)
     , PlayerDisplayName(TEXT("Player"))
     , Faction(ESkaldFaction::None)
+    , bIsAI(false)
     , bHasLockedIn(false)
     , IsEliminated(false)
 {
@@ -23,6 +24,7 @@ void ASkaldPlayerState::GetLifetimeReplicatedProps(
 
     DOREPLIFETIME(ASkaldPlayerState, PlayerDisplayName);
     DOREPLIFETIME(ASkaldPlayerState, Faction);
+    DOREPLIFETIME(ASkaldPlayerState, bIsAI);
     DOREPLIFETIME(ASkaldPlayerState, DeployableUnits);
     DOREPLIFETIME(ASkaldPlayerState, InitiativeRoll);
     DOREPLIFETIME(ASkaldPlayerState, Resources);
