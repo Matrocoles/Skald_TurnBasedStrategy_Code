@@ -24,6 +24,11 @@ public:
             meta = (BindWidgetOptional))
   UButton *SingleplayerButton;
 
+  /** Button to start the multiplayer flow. */
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
+            meta = (BindWidgetOptional))
+  UButton *MultiplayerButton;
+
   /** Button to host a multiplayer session. */
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
             meta = (BindWidgetOptional))
@@ -59,6 +64,11 @@ public:
             meta = (BindWidgetOptional))
   USpinBox *AICountSpinBox;
 
+  /** Button to confirm singleplayer settings. */
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
+            meta = (BindWidgetOptional))
+  UButton *LockInButton;
+
   /** Record the lobby menu that spawned this widget so we can unhide it later. */
   UFUNCTION(BlueprintCallable, Category = "Skald|Widgets")
   void SetLobbyMenu(ULobbyMenuWidget *InMenu);
@@ -74,6 +84,9 @@ protected:
   void OnSingleplayer();
 
   UFUNCTION(BlueprintCallable, Category = "Skald|Widgets")
+  void OnMultiplayer();
+
+  UFUNCTION(BlueprintCallable, Category = "Skald|Widgets")
   void OnHost();
 
   UFUNCTION(BlueprintCallable, Category = "Skald|Widgets")
@@ -81,6 +94,9 @@ protected:
 
   UFUNCTION(BlueprintCallable, Category = "Skald|Widgets")
   void OnMainMenu();
+
+  UFUNCTION(BlueprintCallable, Category = "Skald|Widgets")
+  void OnLockIn();
 
   void StartGame(bool bMultiplayer, bool bHost);
 
