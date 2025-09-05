@@ -248,11 +248,13 @@ void ASkaldGameMode::PopulateAIPlayers() {
   }
 
   bool bHasHuman = false;
+  int32 ExistingAI = 0;
   for (APlayerState *ExistingPS : GS->PlayerArray) {
     if (ASkaldPlayerState *EPS = Cast<ASkaldPlayerState>(ExistingPS)) {
-      if (!EPS->bIsAI) {
+      if (EPS->bIsAI) {
+        ++ExistingAI;
+      } else {
         bHasHuman = true;
-        break;
       }
     }
   }
@@ -260,11 +262,11 @@ void ASkaldGameMode::PopulateAIPlayers() {
     return;
   }
 
-  const int32 MaxSpawnAttempts = ExpectedPlayerCount * 2;
+  const int32 TargetAI = FMath::Max(GI->AIPlayersToSpawn, 0);
+  const int32 MaxSpawnAttempts = TargetAI * 2;
   int32 SpawnAttempts = 0;
 
-  while (GS->PlayerArray.Num() < ExpectedPlayerCount &&
-         SpawnAttempts++ < MaxSpawnAttempts) {
+  while (ExistingAI < TargetAI && SpawnAttempts++ < MaxSpawnAttempts) {
     ASkaldPlayerState *AIState =
         GetWorld()->SpawnActor<ASkaldPlayerState>(PlayerStateClass);
     if (!AIState) {
@@ -333,6 +335,7 @@ void ASkaldGameMode::PopulateAIPlayers() {
     }
 
     RegisterPlayer(AIController);
+    ++ExistingAI;
 
     if (!AIController->GetPawn() && DefaultPawnClass) {
       FActorSpawnParameters PawnParams;
@@ -346,11 +349,11 @@ void ASkaldGameMode::PopulateAIPlayers() {
     }
   }
 
-  if (GS->PlayerArray.Num() < ExpectedPlayerCount) {
-    UE_LOG(
-        LogSkald, Warning,
-        TEXT("PopulateAIPlayers spawned only %d/%d players after %d attempts"),
-        GS->PlayerArray.Num(), ExpectedPlayerCount, SpawnAttempts);
+  if (ExistingAI < TargetAI) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("PopulateAIPlayers spawned only %d/%d AI players after %d "
+                "attempts"),
+           ExistingAI, TargetAI, SpawnAttempts);
   }
 }
 
@@ -477,7 +480,18 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     RegisterPlayer(PendingControllers[Index]);
   }
 
-  PopulateAIPlayers();
+  USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+  if (GI && !GI->bIsMultiplayer) {
+    for (APlayerState *PSBase : GS->PlayerArray) {
+      ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase);
+      if (PS && !PS->bIsAI && !PS->bHasLockedIn) {
+        PS->bHasLockedIn = true;
+        HandlePlayerLockedIn(PS);
+      }
+    }
+
+    PopulateAIPlayers();
+  }
 
   UE_LOG(LogSkald, Log,
          TEXT("TryInitializeWorldAndStart: TurnManager=%s PlayerCount=%d"),
