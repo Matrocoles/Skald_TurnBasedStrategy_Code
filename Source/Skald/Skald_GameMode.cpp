@@ -214,6 +214,10 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
       TurnManager->RegisterController(PC);
       UE_LOG(LogSkald, Log, TEXT("RegisterPlayer: ControllerCount=%d"),
              TurnManager->GetControllerCount());
+    } else {
+      // Defer final registration until the turn manager is available.
+      PendingControllers.AddUnique(PC);
+      return;
     }
 
     if (PlayerDataArray.Num() < GS->PlayerArray.Num()) {
@@ -450,8 +454,13 @@ void ASkaldGameMode::UpdatePlayerResources(ASkaldPlayerState *Player) {
 
 void ASkaldGameMode::TryInitializeWorldAndStart() {
   ASkaldGameState *GS = GetGameState<ASkaldGameState>();
-  if (!GS) {
+  if (!GS || !TurnManager) {
     return;
+  }
+
+  // Register any controllers that joined before the turn manager was ready.
+  for (int32 Index = PendingControllers.Num() - 1; Index >= 0; --Index) {
+    RegisterPlayer(PendingControllers[Index]);
   }
 
   PopulateAIPlayers();
