@@ -16,7 +16,9 @@ public class Skald : ModuleRules
                         "InputCore",
                         "UMG",
                         "Slate",
-                        "SlateCore"
+                        "SlateCore",
+                        // Required for ENetworkFailure enum used in USkaldGameInstance
+                        "NetCore"
                 });
 
                 PrivateDependencyModuleNames.AddRange(new string[]
