@@ -173,17 +173,21 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
 void ASkaldGameMode::Logout(AController *Exiting) {
   ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(Exiting);
   int32 PlayerID = 0;
+  bool bHasValidPlayerState = false;
   if (PC) {
     PendingControllers.Remove(PC);
     if (ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>()) {
       PlayerID = PS->GetPlayerId();
+      bHasValidPlayerState = true;
     }
   }
 
   Super::Logout(Exiting);
 
-  PlayerDataArray.RemoveAll([
-      PlayerID](const FS_PlayerData &Data) { return Data.PlayerID == PlayerID; });
+  if (bHasValidPlayerState) {
+    PlayerDataArray.RemoveAll([
+        PlayerID](const FS_PlayerData &Data) { return Data.PlayerID == PlayerID; });
+  }
 
   if (TurnManager) {
     // Remove the exiting controller from the turn manager's list.
