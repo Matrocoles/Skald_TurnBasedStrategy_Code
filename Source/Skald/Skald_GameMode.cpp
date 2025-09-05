@@ -8,11 +8,11 @@
 #include "Kismet/GameplayStatics.h"
 #include "Skald.h"
 #include "SkaldSaveGame.h"
+#include "Skald_AIController.h"
 #include "Skald_GameInstance.h"
 #include "Skald_GameState.h"
 #include "Skald_PlayerCharacter.h"
 #include "Skald_PlayerController.h"
-#include "Skald_AIController.h"
 #include "Skald_PlayerState.h"
 #include "Skald_TurnManager.h"
 #include "Territory.h"
@@ -22,7 +22,6 @@
 
 namespace {
 constexpr int32 ExpectedPlayerCount = 4;
-constexpr int32 MaxAIPlayers = 3;
 constexpr float StartGameTimeout = 10.f;
 constexpr int32 StartingResources = 100;
 constexpr int32 DefaultAIMaxCost = 10;
@@ -40,7 +39,7 @@ ASkaldGameMode::ASkaldGameMode() {
   WorldMap = nullptr;
   bTurnsStarted = false;
   bWorldInitialized = false;
-  bAIPlayersSpawned = false;
+  AIControllerClass = ASkaldAIController::StaticClass();
 
   // Preallocate slots so blueprint scripts can safely write
   // player data to indices without hitting "invalid index" warnings.
@@ -169,9 +168,8 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
 
   if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
     if (GS->PlayerArray.Num() >= ExpectedPlayerCount) {
-      PC->ClientMessage(
-          FString::Printf(TEXT("Game is full (%d players max)."),
-                          ExpectedPlayerCount));
+      PC->ClientMessage(FString::Printf(TEXT("Game is full (%d players max)."),
+                                        ExpectedPlayerCount));
       PC->Destroy();
       return;
     }
@@ -211,8 +209,7 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
 
     if (TurnManager) {
       TurnManager->RegisterController(PC);
-      UE_LOG(LogSkald, Log,
-             TEXT("RegisterPlayer: ControllerCount=%d"),
+      UE_LOG(LogSkald, Log, TEXT("RegisterPlayer: ControllerCount=%d"),
              TurnManager->GetControllerCount());
     }
 
@@ -221,8 +218,10 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
     }
 
     if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
-      if (!PS->bIsAI) {
+      if (PS->PlayerDisplayName.IsEmpty()) {
         PS->PlayerDisplayName = GI->DisplayName;
+      }
+      if (PS->Faction == ESkaldFaction::None) {
         PS->Faction = GI->Faction;
       }
     }
@@ -239,8 +238,8 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
     // Notify listeners that player data has changed and refresh HUDs on the
     // next tick once replication has a chance to update clients.
     GS->OnPlayersUpdated.Broadcast();
-    FTimerDelegate RefreshDelegate = FTimerDelegate::CreateUObject(
-        this, &ASkaldGameMode::RefreshHUDs);
+    FTimerDelegate RefreshDelegate =
+        FTimerDelegate::CreateUObject(this, &ASkaldGameMode::RefreshHUDs);
     GetWorldTimerManager().SetTimerForNextTick(RefreshDelegate);
   }
 }
@@ -248,28 +247,28 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
 void ASkaldGameMode::PopulateAIPlayers() {
   ASkaldGameState *GS = GetGameState<ASkaldGameState>();
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
-  if (!GS || !GI || GI->bIsMultiplayer) {
+  if (!GS || !GI || GI->bIsMultiplayer || !AIControllerClass) {
     return;
   }
 
-  // Guard against the unlikely scenario where player states fail to be
-  // registered correctly and the loop below never makes progress. Without a
-  // hard iteration cap the game can lock up while endlessly spawning AI
-  // controllers during project startup.
-  const int32 MaxSpawnAttempts = ExpectedPlayerCount * 2;
-  int32 SpawnAttempts = 0;
-
-  int32 AICount = 0;
+  bool bHasHuman = false;
   for (APlayerState *ExistingPS : GS->PlayerArray) {
     if (ASkaldPlayerState *EPS = Cast<ASkaldPlayerState>(ExistingPS)) {
-      if (EPS->bIsAI) {
-        ++AICount;
+      if (!EPS->bIsAI) {
+        bHasHuman = true;
+        break;
       }
     }
   }
+  if (!bHasHuman) {
+    return;
+  }
+
+  const int32 MaxSpawnAttempts = ExpectedPlayerCount * 2;
+  int32 SpawnAttempts = 0;
 
   while (GS->PlayerArray.Num() < ExpectedPlayerCount &&
-         AICount < MaxAIPlayers && SpawnAttempts++ < MaxSpawnAttempts) {
+         SpawnAttempts++ < MaxSpawnAttempts) {
     ASkaldPlayerState *AIState =
         GetWorld()->SpawnActor<ASkaldPlayerState>(PlayerStateClass);
     if (!AIState) {
@@ -277,25 +276,32 @@ void ASkaldGameMode::PopulateAIPlayers() {
     }
 
     AIState->bIsAI = true;
+    AIState->bHasLockedIn = true;
 
     FTransform SpawnTransform = FTransform::Identity;
-    ASkaldAIController *AIController =
-        GetWorld()->SpawnActorDeferred<ASkaldAIController>(
-            ASkaldAIController::StaticClass(), SpawnTransform, nullptr, nullptr,
+    APlayerController *NewController =
+        GetWorld()->SpawnActorDeferred<APlayerController>(
+            AIControllerClass, SpawnTransform, nullptr, nullptr,
             ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
-    if (!AIController) {
+    if (!NewController) {
       AIState->Destroy();
       break;
     }
 
-    AIController->SetPlayerState(AIState);
+    NewController->SetPlayerState(AIState);
 
-    // Assign a display name before the controller finishes spawning to ensure
-    // PostLogin sees a valid name.
     AIState->PlayerDisplayName =
         FString::Printf(TEXT("AI_%d"), GS->PlayerArray.Num());
 
-    AIController->FinishSpawning(SpawnTransform);
+    NewController->FinishSpawning(SpawnTransform);
+
+    ASkaldPlayerController *AIController =
+        Cast<ASkaldPlayerController>(NewController);
+    if (!AIController) {
+      NewController->Destroy();
+      AIState->Destroy();
+      break;
+    }
 
     TArray<ESkaldFaction> Taken;
     for (APlayerState *ExistingPS : GS->PlayerArray) {
@@ -318,8 +324,6 @@ void ASkaldGameMode::PopulateAIPlayers() {
       }
     }
     if (Available.Num() > 0) {
-      // Use the game instance's deterministic random stream so that AI faction
-      // selection is reproducible across runs and clients.
       const int32 FactionIndex =
           GI->CombatRandomStream.RandRange(0, Available.Num() - 1);
       AIState->Faction = Available[FactionIndex];
@@ -332,16 +336,7 @@ void ASkaldGameMode::PopulateAIPlayers() {
       break;
     }
 
-    AIState->bHasLockedIn = true;
-
     RegisterPlayer(AIController);
-
-    if (TurnManager) {
-      TurnManager->RegisterController(AIController);
-      UE_LOG(LogSkald, Log,
-             TEXT("PopulateAIPlayers: ControllerCount=%d PlayerCount=%d"),
-             TurnManager->GetControllerCount(), GS->PlayerArray.Num());
-    }
 
     if (!AIController->GetPawn() && DefaultPawnClass) {
       FActorSpawnParameters PawnParams;
@@ -353,10 +348,6 @@ void ASkaldGameMode::PopulateAIPlayers() {
         AIController->Possess(Pawn);
       }
     }
-
-    HandlePlayerLockedIn(AIState);
-
-    ++AICount;
   }
 
   if (GS->PlayerArray.Num() < ExpectedPlayerCount) {
@@ -372,15 +363,19 @@ void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
     return;
   }
 
-  UE_LOG(LogSkald, Log,
-         TEXT("HandlePlayerLockedIn: Player=%s bIsAI=%d"),
+  UE_LOG(LogSkald, Log, TEXT("HandlePlayerLockedIn: Player=%s bIsAI=%d"),
          *PS->PlayerDisplayName, PS->bIsAI);
   ASkaldGameState *GS = GetGameState<ASkaldGameState>();
   UE_LOG(LogSkald, Log,
-         TEXT("HandlePlayerLockedIn: TurnManager=%s ControllerCount=%d PlayerCount=%d"),
+         TEXT("HandlePlayerLockedIn: TurnManager=%s ControllerCount=%d "
+              "PlayerCount=%d"),
          TurnManager ? *TurnManager->GetName() : TEXT("null"),
          TurnManager ? TurnManager->GetControllerCount() : 0,
          GS ? GS->PlayerArray.Num() : 0);
+
+  // Once a human has locked in their choice, populate remaining slots with AI
+  // opponents so they respect the player's faction selection.
+  PopulateAIPlayers();
 
   FS_PlayerData *PlayerData =
       PlayerDataArray.FindByPredicate([PS](const FS_PlayerData &Data) {
@@ -389,13 +384,6 @@ void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
   if (PlayerData) {
     PlayerData->PlayerName = PS->PlayerDisplayName;
     PlayerData->Faction = PS->Faction;
-  }
-
-  // If a human player has locked in and AI players have not yet been spawned,
-  // populate remaining slots so the match can start.
-  if (!PS->bIsAI && !bAIPlayersSpawned) {
-    PopulateAIPlayers();
-    bAIPlayersSpawned = true;
   }
 
   RefreshHUDs();
@@ -480,11 +468,13 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     }
     ASkaldPlayerController *OwningController =
         PS ? Cast<ASkaldPlayerController>(PS->GetOwner()) : nullptr;
-    if (!OwningController || !RegisteredControllers.Contains(OwningController)) {
+    if (!OwningController ||
+        !RegisteredControllers.Contains(OwningController)) {
       bAllHaveControllers = false;
-      UE_LOG(LogSkald, Warning,
-             TEXT("TryInitializeWorldAndStart: PlayerState %s missing controller"),
-             *GetNameSafe(PS));
+      UE_LOG(
+          LogSkald, Warning,
+          TEXT("TryInitializeWorldAndStart: PlayerState %s missing controller"),
+          *GetNameSafe(PS));
     }
     if (!bAllLockedIn || !bAllHaveControllers) {
       break;
@@ -492,14 +482,15 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
   }
 
   const int32 CurrentPlayerCount = GS->PlayerArray.Num();
-  const bool bReadyToStart = bAllLockedIn && bAllHaveControllers &&
-                             CurrentPlayerCount >= MinPlayerCount && TurnManager &&
-                             TurnManager->GetControllerCount() >= CurrentPlayerCount;
+  const bool bReadyToStart =
+      bAllLockedIn && bAllHaveControllers &&
+      CurrentPlayerCount >= MinPlayerCount && TurnManager &&
+      TurnManager->GetControllerCount() >= CurrentPlayerCount;
 
   UE_LOG(
       LogSkald, Log,
-      TEXT(
-          "TryInitializeWorldAndStart: bAllLockedIn=%s bAllHaveControllers=%s CurrentPlayerCount=%d ControllerCount=%d bReadyToStart=%s"),
+      TEXT("TryInitializeWorldAndStart: bAllLockedIn=%s bAllHaveControllers=%s "
+           "CurrentPlayerCount=%d ControllerCount=%d bReadyToStart=%s"),
       bAllLockedIn ? TEXT("true") : TEXT("false"),
       bAllHaveControllers ? TEXT("true") : TEXT("false"), CurrentPlayerCount,
       TurnManager ? TurnManager->GetControllerCount() : 0,
@@ -528,8 +519,7 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     TurnManager->SortControllersByInitiative();
     TurnManager->StartTurns();
 
-    UE_LOG(LogSkald, Log,
-           TEXT("TryInitializeWorldAndStart: Turns started"));
+    UE_LOG(LogSkald, Log, TEXT("TryInitializeWorldAndStart: Turns started"));
     if (GEngine) {
       GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Green,
                                        TEXT("Game started"));
@@ -839,7 +829,8 @@ bool ASkaldGameMode::InitializeWorld() {
   int32 TotalPlayerCount = GS->PlayerArray.Num();
   if (TotalPlayerCount > ExpectedPlayerCount) {
     UE_LOG(LogSkald, Warning,
-           TEXT("InitializeWorld: maximum %d players supported but found %d; proceeding "
+           TEXT("InitializeWorld: maximum %d players supported but found %d; "
+                "proceeding "
                 "with first %d players"),
            ExpectedPlayerCount, TotalPlayerCount, ExpectedPlayerCount);
     while (GS->PlayerArray.Num() > ExpectedPlayerCount) {
@@ -852,9 +843,10 @@ bool ASkaldGameMode::InitializeWorld() {
     TotalPlayerCount = ExpectedPlayerCount;
   }
   if (TotalPlayerCount < MinPlayerCount) {
-    UE_LOG(LogSkald, Warning,
-           TEXT("InitializeWorld aborted: need at least %d players but found %d"),
-           MinPlayerCount, TotalPlayerCount);
+    UE_LOG(
+        LogSkald, Warning,
+        TEXT("InitializeWorld aborted: need at least %d players but found %d"),
+        MinPlayerCount, TotalPlayerCount);
     if (GEngine) {
       GEngine->AddOnScreenDebugMessage(
           -1, 5.f, FColor::Yellow,
