@@ -185,8 +185,9 @@ void ASkaldGameMode::Logout(AController *Exiting) {
   Super::Logout(Exiting);
 
   if (bHasValidPlayerState) {
-    PlayerDataArray.RemoveAll([
-        PlayerID](const FS_PlayerData &Data) { return Data.PlayerID == PlayerID; });
+    PlayerDataArray.RemoveAll([PlayerID](const FS_PlayerData &Data) {
+      return Data.PlayerID == PlayerID;
+    });
   }
 
   if (TurnManager) {
@@ -306,41 +307,34 @@ void ASkaldGameMode::PopulateAIPlayers() {
   const int32 TargetAI = FMath::Max(GI->AIPlayersToSpawn, 0);
   const int32 MaxSpawnAttempts = TargetAI * 2;
   int32 SpawnAttempts = 0;
+  TArray<ASkaldPlayerState *> NewlySpawnedAI;
 
   while (ExistingAI < TargetAI && SpawnAttempts++ < MaxSpawnAttempts) {
-    ASkaldPlayerState *AIState =
-        GetWorld()->SpawnActor<ASkaldPlayerState>(PlayerStateClass);
-    if (!AIState) {
-      break;
-    }
-
-    AIState->bHasLockedIn = true;
-    AIState->bIsAI = true;
-
     FTransform SpawnTransform = FTransform::Identity;
-    APlayerController *NewController =
+    ASkaldPlayerController *AIController = Cast<ASkaldPlayerController>(
         GetWorld()->SpawnActorDeferred<APlayerController>(
             AIControllerClass, SpawnTransform, nullptr, nullptr,
-            ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
-    if (!NewController) {
-      AIState->Destroy();
+            ESpawnActorCollisionHandlingMethod::AlwaysSpawn));
+    if (!AIController) {
       break;
     }
 
-    NewController->SetPlayerState(AIState);
+    AIController->FinishSpawning(SpawnTransform);
+    AIController->InitPlayerState();
 
+    RegisterPlayer(AIController);
+
+    ASkaldPlayerState *AIState =
+        AIController->GetPlayerState<ASkaldPlayerState>();
+    if (!AIState) {
+      AIController->Destroy();
+      break;
+    }
+
+    AIState->bIsAI = true;
+    AIState->bHasLockedIn = true;
     AIState->PlayerDisplayName =
         FString::Printf(TEXT("AI_%d"), GS->PlayerArray.Num());
-
-    NewController->FinishSpawning(SpawnTransform);
-
-    ASkaldPlayerController *AIController =
-        Cast<ASkaldPlayerController>(NewController);
-    if (!AIController) {
-      NewController->Destroy();
-      AIState->Destroy();
-      break;
-    }
 
     TArray<ESkaldFaction> Taken;
     for (APlayerState *ExistingPS : GS->PlayerArray) {
@@ -349,6 +343,7 @@ void ASkaldGameMode::PopulateAIPlayers() {
       }
     }
     Taken.Append(GI->TakenFactions);
+
     TArray<ESkaldFaction> Available;
     if (UEnum *Enum = StaticEnum<ESkaldFaction>()) {
       for (int32 i = 0; i < Enum->NumEnums(); ++i) {
@@ -362,6 +357,7 @@ void ASkaldGameMode::PopulateAIPlayers() {
         }
       }
     }
+
     if (Available.Num() > 0) {
       const int32 FactionIndex =
           GI->CombatRandomStream.RandRange(0, Available.Num() - 1);
@@ -371,11 +367,10 @@ void ASkaldGameMode::PopulateAIPlayers() {
       UE_LOG(LogSkald, Error,
              TEXT("PopulateAIPlayers: no available factions for AI"));
       AIController->Destroy();
-      AIState->Destroy();
       break;
     }
 
-    RegisterPlayer(AIController);
+    NewlySpawnedAI.Add(AIState);
     ++ExistingAI;
 
     if (!AIController->GetPawn() && DefaultPawnClass) {
@@ -388,6 +383,10 @@ void ASkaldGameMode::PopulateAIPlayers() {
         AIController->Possess(Pawn);
       }
     }
+  }
+
+  for (ASkaldPlayerState *NewAIState : NewlySpawnedAI) {
+    HandlePlayerLockedIn(NewAIState);
   }
 
   if (ExistingAI < TargetAI) {
@@ -595,13 +594,13 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase);
     ASkaldPlayerController *OwningController =
         PS ? Cast<ASkaldPlayerController>(PS->GetOwner()) : nullptr;
-    UE_LOG(
-        LogSkald, Log,
-        TEXT("TryInitializeWorldAndStart: Player=%s IsAI=%s LockedIn=%s Controller=%s"),
-        PS ? *PS->GetPlayerName() : TEXT("null"),
-        PS && PS->bIsAI ? TEXT("true") : TEXT("false"),
-        PS && PS->bHasLockedIn ? TEXT("true") : TEXT("false"),
-        *GetNameSafe(OwningController));
+    UE_LOG(LogSkald, Log,
+           TEXT("TryInitializeWorldAndStart: Player=%s IsAI=%s LockedIn=%s "
+                "Controller=%s"),
+           PS ? *PS->GetPlayerName() : TEXT("null"),
+           PS && PS->bIsAI ? TEXT("true") : TEXT("false"),
+           PS && PS->bHasLockedIn ? TEXT("true") : TEXT("false"),
+           *GetNameSafe(OwningController));
   }
 
   bool bAllLockedIn = true;
