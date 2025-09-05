@@ -373,6 +373,10 @@ void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
          TurnManager ? TurnManager->GetControllerCount() : 0,
          GS ? GS->PlayerArray.Num() : 0);
 
+  // Once a human has locked in their choice, populate remaining slots with AI
+  // opponents so they respect the player's faction selection.
+  PopulateAIPlayers();
+
   FS_PlayerData *PlayerData =
       PlayerDataArray.FindByPredicate([PS](const FS_PlayerData &Data) {
         return Data.PlayerID == PS->GetPlayerId();
