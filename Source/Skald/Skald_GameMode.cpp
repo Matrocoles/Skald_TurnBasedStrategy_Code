@@ -478,9 +478,9 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     if (!PS || !PS->bHasLockedIn) {
       bAllLockedIn = false;
     }
-    ASkaldPlayerController *Owner =
+    ASkaldPlayerController *OwningController =
         PS ? Cast<ASkaldPlayerController>(PS->GetOwner()) : nullptr;
-    if (!Owner || !RegisteredControllers.Contains(Owner)) {
+    if (!OwningController || !RegisteredControllers.Contains(OwningController)) {
       bAllHaveControllers = false;
       UE_LOG(LogSkald, Warning,
              TEXT("TryInitializeWorldAndStart: PlayerState %s missing controller"),
