@@ -74,5 +74,9 @@ public:
     /** Save game loaded when transitioning from the main menu. */
     UPROPERTY(BlueprintReadWrite, Category="SaveGame")
     USkaldSaveGame* LoadedSaveGame = nullptr;
+
+    /** Reset transient session state before starting a new game. */
+    UFUNCTION(BlueprintCallable, Category="Player")
+    void ResetSession();
 };
 

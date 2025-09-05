@@ -254,7 +254,12 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
 void ASkaldGameMode::PopulateAIPlayers() {
   ASkaldGameState *GS = GetGameState<ASkaldGameState>();
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
-  if (!GS || !GI || GI->bIsMultiplayer || !AIControllerClass) {
+  if (!GS || !GI) {
+    UE_LOG(LogSkald, Error,
+           TEXT("PopulateAIPlayers: missing GameState or GameInstance"));
+    return;
+  }
+  if (GI->bIsMultiplayer || !AIControllerClass) {
     return;
   }
 
@@ -270,6 +275,8 @@ void ASkaldGameMode::PopulateAIPlayers() {
     }
   }
   if (!bHasHuman) {
+    UE_LOG(LogSkald, Error,
+           TEXT("PopulateAIPlayers: no human players present"));
     return;
   }
 
@@ -281,6 +288,8 @@ void ASkaldGameMode::PopulateAIPlayers() {
     ASkaldPlayerState *AIState =
         GetWorld()->SpawnActor<ASkaldPlayerState>(PlayerStateClass);
     if (!AIState) {
+      UE_LOG(LogSkald, Error,
+             TEXT("PopulateAIPlayers: failed to spawn AI player state"));
       break;
     }
 
@@ -293,6 +302,8 @@ void ASkaldGameMode::PopulateAIPlayers() {
             AIControllerClass, SpawnTransform, nullptr, nullptr,
             ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
     if (!NewController) {
+      UE_LOG(LogSkald, Error,
+             TEXT("PopulateAIPlayers: failed to spawn AI controller"));
       AIState->Destroy();
       break;
     }
@@ -307,6 +318,8 @@ void ASkaldGameMode::PopulateAIPlayers() {
     ASkaldPlayerController *AIController =
         Cast<ASkaldPlayerController>(NewController);
     if (!AIController) {
+      UE_LOG(LogSkald, Error,
+             TEXT("PopulateAIPlayers: controller cast failed"));
       NewController->Destroy();
       AIState->Destroy();
       break;
@@ -368,6 +381,29 @@ void ASkaldGameMode::PopulateAIPlayers() {
   }
 }
 
+void ASkaldGameMode::StartSingleplayerGame()
+{
+  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+    GI->bIsMultiplayer = false;
+  }
+
+  PopulateAIPlayers();
+
+  if (!WorldMap) {
+    WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+        GetWorld(), AWorldMap::StaticClass()));
+    if (!WorldMap) {
+      WorldMap = GetWorld()->SpawnActor<AWorldMap>();
+    }
+  }
+  if (!TurnManager) {
+    TurnManager = GetWorld()->SpawnActor<ATurnManager>();
+  }
+
+  RefreshHUDs();
+  TryInitializeWorldAndStart();
+}
+
 void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
   if (!PS) {
     return;
@@ -397,8 +433,22 @@ void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
   ExpectedPlayerCount = FMath::Max(HumanCount + AICount, MinPlayerCount);
   PlayerDataArray.SetNum(ExpectedPlayerCount);
 
-  // Once a human has locked in their choice, populate remaining slots with AI
-  // opponents so they respect the player's faction selection.
+  FS_PlayerData *PlayerData =
+      PlayerDataArray.FindByPredicate([PS](const FS_PlayerData &Data) {
+        return Data.PlayerID == PS->GetPlayerId();
+      });
+  if (PlayerData) {
+    PlayerData->PlayerName = PS->PlayerDisplayName;
+    PlayerData->Faction = PS->Faction;
+  }
+
+  if (GI && !GI->bIsMultiplayer) {
+    StartSingleplayerGame();
+    return;
+  }
+
+  // Once a human has locked in their choice in multiplayer, populate AI
+  // opponents and proceed with normal initialization.
   PopulateAIPlayers();
 
   if (!WorldMap) {
@@ -410,15 +460,6 @@ void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
   }
   if (!TurnManager) {
     TurnManager = GetWorld()->SpawnActor<ATurnManager>();
-  }
-
-  FS_PlayerData *PlayerData =
-      PlayerDataArray.FindByPredicate([PS](const FS_PlayerData &Data) {
-        return Data.PlayerID == PS->GetPlayerId();
-      });
-  if (PlayerData) {
-    PlayerData->PlayerName = PS->PlayerDisplayName;
-    PlayerData->Faction = PS->Faction;
   }
 
   RefreshHUDs();
@@ -514,20 +555,40 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
   TArray<ASkaldPlayerController *> RegisteredControllers =
       TurnManager ? TurnManager->GetControllers()
                   : TArray<ASkaldPlayerController *>();
+  bool bIsMultiplayer = true;
+  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+    bIsMultiplayer = GI->bIsMultiplayer;
+  }
   for (APlayerState *PSBase : GS->PlayerArray) {
     ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase);
-    if (!PS || !PS->bHasLockedIn) {
+    if (!PS) {
       bAllLockedIn = false;
+      UE_LOG(LogSkald, Error,
+             TEXT("TryInitializeWorldAndStart: null PlayerState in array"));
+      continue;
+    }
+    if (PS->bIsAI && !bIsMultiplayer) {
+      continue;
+    }
+    if (PS->Faction == ESkaldFaction::None) {
+      UE_LOG(LogSkald, Error,
+             TEXT("TryInitializeWorldAndStart: PlayerState %s has no faction"),
+             *GetNameSafe(PS));
+    }
+    if (!PS->bHasLockedIn) {
+      bAllLockedIn = false;
+      UE_LOG(LogSkald, Error,
+             TEXT("TryInitializeWorldAndStart: %s not locked in"),
+             *GetNameSafe(PS));
     }
     ASkaldPlayerController *OwningController =
-        PS ? Cast<ASkaldPlayerController>(PS->GetOwner()) : nullptr;
+        Cast<ASkaldPlayerController>(PS->GetOwner());
     if (!OwningController ||
         !RegisteredControllers.Contains(OwningController)) {
       bAllHaveControllers = false;
-      UE_LOG(
-          LogSkald, Warning,
-          TEXT("TryInitializeWorldAndStart: PlayerState %s missing controller"),
-          *GetNameSafe(PS));
+      UE_LOG(LogSkald, Error,
+             TEXT("TryInitializeWorldAndStart: PlayerState %s missing controller"),
+             *GetNameSafe(PS));
     }
     if (!bAllLockedIn || !bAllHaveControllers) {
       break;
@@ -562,6 +623,9 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     if (InitializeWorld()) {
       bWorldInitialized = true;
       BeginArmyPlacementPhase();
+    } else {
+      UE_LOG(LogSkald, Error,
+             TEXT("TryInitializeWorldAndStart: InitializeWorld failed"));
     }
   }
 

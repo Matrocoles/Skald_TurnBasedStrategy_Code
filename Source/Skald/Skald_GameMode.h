@@ -55,6 +55,9 @@ public:
   /** Handle a player confirming their name and faction selection. */
   void HandlePlayerLockedIn(ASkaldPlayerState *PS);
 
+  /** Start a singleplayer match once local setup is complete. */
+  void StartSingleplayerGame();
+
 protected:
   /** Handles turn sequencing for the match. */
   UPROPERTY(BlueprintReadOnly, Category = "GameMode")

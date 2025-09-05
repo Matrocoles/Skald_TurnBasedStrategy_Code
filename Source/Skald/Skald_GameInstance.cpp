@@ -11,3 +11,10 @@ void USkaldGameInstance::SeedCombatRandomStream(int32 Seed)
     CombatRandomStream.Initialize(Seed);
 }
 
+void USkaldGameInstance::ResetSession()
+{
+    TakenFactions.Empty();
+    AIPlayersToSpawn = 0;
+    bIsMultiplayer = false;
+}
+
