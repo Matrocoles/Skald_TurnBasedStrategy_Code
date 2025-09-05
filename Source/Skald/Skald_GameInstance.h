@@ -25,11 +25,11 @@ public:
 
     /** Selected faction for this player. */
     UPROPERTY(BlueprintReadWrite, Category="Player")
-    ESkaldFaction Faction;
+    ESkaldFaction Faction = ESkaldFaction::None;
 
     /** Whether the game was started in multiplayer mode. */
     UPROPERTY(BlueprintReadWrite, Category="Player")
-    bool bIsMultiplayer;
+    bool bIsMultiplayer = false;
 
     /** Number of AI opponents requested by the player. */
     UPROPERTY(BlueprintReadWrite, Category="Player")

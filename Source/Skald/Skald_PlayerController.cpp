@@ -151,7 +151,14 @@ void ASkaldPlayerController::BeginPlay() {
 
   if (IsLocalPlayerController() && GetLocalPlayer() != nullptr) {
     InitializeHUDWidget();
-    InitializeChoosePlayerWidget();
+    if (CachedGameInstance && CachedGameInstance->bIsMultiplayer) {
+      InitializeChoosePlayerWidget();
+    } else if (CachedGameInstance) {
+      ServerInitPlayerState(CachedGameInstance->DisplayName,
+                            CachedGameInstance->Faction,
+                            CachedGameInstance->AIPlayersToSpawn);
+      HandleFactionLockedIn();
+    }
     InitializeFighterSelectionIfNeeded();
   }
 
