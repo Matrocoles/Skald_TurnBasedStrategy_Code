@@ -8,6 +8,7 @@
 class UEditableTextBox;
 class UComboBoxString;
 class UButton;
+class USpinBox;
 namespace ESelectInfo
 {
     enum Type;
@@ -38,6 +39,10 @@ public:
     UPROPERTY(BlueprintReadOnly, meta=(BindWidget))
     UComboBoxString* FactionComboBox;
 
+    /** Spin box determining how many AI opponents to spawn. */
+    UPROPERTY(BlueprintReadOnly, meta=(BindWidget))
+    USpinBox* AICountSpinBox;
+
     /** Button used to lock in the selection. */
     UPROPERTY(BlueprintReadOnly, meta=(BindWidget))
     UButton* LockInButton;
@@ -54,6 +59,10 @@ protected:
     /** Faction combo selection handler. */
     UFUNCTION(BlueprintCallable, Category="Skald|Widgets")
     void HandleFactionSelected(FString SelectedItem, ESelectInfo::Type SelectionType);
+
+    /** AI count change handler. */
+    UFUNCTION(BlueprintCallable, Category="Skald|Widgets")
+    void HandleAICountChanged(float Value);
 
     /** Enable lock in button when prerequisites are met. */
     UFUNCTION(BlueprintCallable, Category="Skald|Widgets")

@@ -74,6 +74,11 @@ protected:
             meta = (ClampMin = "1"))
   int32 MinPlayerCount = 1;
 
+  /** Total number of players expected in the match (humans + AI). */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Players",
+            meta = (ClampMin = "1"))
+  int32 ExpectedPlayerCount = 4;
+
   /** Controller class used when spawning AI players. */
   UPROPERTY(EditDefaultsOnly, Category = "Players")
   TSubclassOf<APlayerController> AIControllerClass;
