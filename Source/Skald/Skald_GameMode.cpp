@@ -176,22 +176,26 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
     PendingControllers.Remove(PC);
     return;
   }
+  USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+  const bool bIsMultiplayer = GI && GI->bIsMultiplayer;
 
   ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>();
   if (!PS) {
-    // Player state not yet replicated; queue a retry next tick, but only
-    // while the controller remains valid.
-    PendingControllers.AddUnique(PC);
-    FTimerDelegate RetryDelegate = FTimerDelegate::CreateUObject(
-        this, &ASkaldGameMode::RegisterPlayer, PC);
-    GetWorldTimerManager().SetTimerForNextTick(RetryDelegate);
+    // Player state may not yet be replicated in multiplayer; queue a retry
+    // next tick while the controller remains valid. In singleplayer, assume
+    // the state will be ready without queuing retries.
+    if (bIsMultiplayer) {
+      PendingControllers.AddUnique(PC);
+      FTimerDelegate RetryDelegate = FTimerDelegate::CreateUObject(
+          this, &ASkaldGameMode::RegisterPlayer, PC);
+      GetWorldTimerManager().SetTimerForNextTick(RetryDelegate);
+    }
     return;
   }
 
   // Player state is valid; perform normal registration.
   PendingControllers.Remove(PC);
 
-  PS->bIsAI = Cast<ASkaldAIController>(PC) != nullptr;
   PS->bIsAI = PC->IsA<ASkaldAIController>();
 
   if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
@@ -199,13 +203,20 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
       GS->AddPlayerState(PS);
     }
 
+    if (!TurnManager && !bIsMultiplayer) {
+      TurnManager = GetWorld()->SpawnActor<ATurnManager>();
+    }
+
     if (TurnManager) {
       TurnManager->RegisterController(PC);
       UE_LOG(LogSkald, Log, TEXT("RegisterPlayer: ControllerCount=%d"),
              TurnManager->GetControllerCount());
     } else {
-      // Defer final registration until the turn manager is available.
-      PendingControllers.AddUnique(PC);
+      // Defer final registration until the turn manager is available. Only
+      // queue retries when running in multiplayer.
+      if (bIsMultiplayer) {
+        PendingControllers.AddUnique(PC);
+      }
       return;
     }
 
@@ -213,7 +224,7 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
       PlayerDataArray.SetNum(GS->PlayerArray.Num());
     }
 
-    if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+    if (GI) {
       if (PS->PlayerDisplayName.IsEmpty()) {
         PS->PlayerDisplayName = GI->DisplayName;
       }
