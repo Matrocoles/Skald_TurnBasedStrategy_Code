@@ -108,7 +108,7 @@ void ASkaldGameMode::BeginPlay() {
         if (GS) {
           for (APlayerState *BasePS : GS->PlayerArray) {
             ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(BasePS);
-            if (!PS || !Cast<ASkaldAIController>(PS->GetOwner())) {
+            if (!PS || !PS->bIsAI) {
               continue;
             }
 
@@ -202,6 +202,8 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
   // Player state is valid; perform normal registration.
   PendingControllers.Remove(PC);
 
+  PS->bIsAI = PC->IsA<ASkaldAIController>();
+
   if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
     if (!GS->PlayerArray.Contains(PS)) {
       GS->AddPlayerState(PS);
@@ -230,8 +232,7 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
     if (PlayerDataArray.IsValidIndex(Index)) {
       PlayerDataArray[Index].PlayerID = PS->GetPlayerId();
       PlayerDataArray[Index].PlayerName = PS->PlayerDisplayName;
-      PlayerDataArray[Index].IsAI =
-          Cast<ASkaldAIController>(PS->GetOwner()) != nullptr;
+      PlayerDataArray[Index].IsAI = PS->bIsAI;
       PlayerDataArray[Index].Faction = PS->Faction;
       PlayerDataArray[Index].Resources = PS->Resources;
     }
@@ -255,7 +256,7 @@ void ASkaldGameMode::PopulateAIPlayers() {
   bool bHasHuman = false;
   for (APlayerState *ExistingPS : GS->PlayerArray) {
     if (ASkaldPlayerState *EPS = Cast<ASkaldPlayerState>(ExistingPS)) {
-      if (!Cast<ASkaldAIController>(EPS->GetOwner())) {
+      if (!EPS->bIsAI) {
         bHasHuman = true;
         break;
       }
@@ -364,8 +365,7 @@ void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
   }
 
   UE_LOG(LogSkald, Log, TEXT("HandlePlayerLockedIn: Player=%s bIsAI=%d"),
-         *PS->PlayerDisplayName,
-         Cast<ASkaldAIController>(PS->GetOwner()) ? 1 : 0);
+         *PS->PlayerDisplayName, PS->bIsAI ? 1 : 0);
   ASkaldGameState *GS = GetGameState<ASkaldGameState>();
   UE_LOG(LogSkald, Log,
          TEXT("HandlePlayerLockedIn: TurnManager=%s ControllerCount=%d "
@@ -400,8 +400,7 @@ void ASkaldGameMode::RefreshHUDs() {
   // Ensure all AI players have valid names before refreshing any HUDs.
   for (APlayerState *PSBase : GS->PlayerArray) {
     if (ASkaldPlayerState *SPS = Cast<ASkaldPlayerState>(PSBase)) {
-      if (Cast<ASkaldAIController>(SPS->GetOwner()) &&
-          SPS->PlayerDisplayName.IsEmpty()) {
+      if (SPS->bIsAI && SPS->PlayerDisplayName.IsEmpty()) {
         UE_LOG(LogSkald, Error,
                TEXT("AI PlayerState missing display name before RefreshHUDs"));
         ensure(!SPS->PlayerDisplayName.IsEmpty());
@@ -415,7 +414,7 @@ void ASkaldGameMode::RefreshHUDs() {
       FS_PlayerData Data;
       Data.PlayerID = SPS->GetPlayerId();
       Data.PlayerName = SPS->PlayerDisplayName;
-      Data.IsAI = Cast<ASkaldAIController>(SPS->GetOwner()) != nullptr;
+      Data.IsAI = SPS->bIsAI;
       Data.Faction = SPS->Faction;
       Data.Resources = SPS->Resources;
       AllPlayers.Add(Data);
@@ -759,7 +758,7 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
     }
 
     // AI players automatically distribute their armies evenly.
-    if (Cast<ASkaldAIController>(PS->GetOwner())) {
+    if (PS->bIsAI) {
       TArray<ATerritory *> OwnedTerritories;
       for (ATerritory *Territory : WorldMap->Territories) {
         if (Territory && Territory->OwningPlayer == PS) {

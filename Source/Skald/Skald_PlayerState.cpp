@@ -11,6 +11,7 @@ ASkaldPlayerState::ASkaldPlayerState()
     , Resources(0)
     , PlayerDisplayName(TEXT("Player"))
     , Faction(ESkaldFaction::None)
+    , bIsAI(false)
     , bHasLockedIn(false)
     , IsEliminated(false)
 {
@@ -28,6 +29,7 @@ void ASkaldPlayerState::GetLifetimeReplicatedProps(
     DOREPLIFETIME(ASkaldPlayerState, Resources);
     DOREPLIFETIME(ASkaldPlayerState, bHasLockedIn);
     DOREPLIFETIME(ASkaldPlayerState, IsEliminated);
+    DOREPLIFETIME(ASkaldPlayerState, bIsAI);
 }
 
 void ASkaldPlayerState::OnRep_DeployableUnits()
@@ -67,6 +69,17 @@ void ASkaldPlayerState::OnRep_IsEliminated()
 }
 
 void ASkaldPlayerState::OnRep_PlayerDisplayName()
+{
+    if (UWorld* World = GetWorld())
+    {
+        if (ASkaldGameState* GS = World->GetGameState<ASkaldGameState>())
+        {
+            GS->OnPlayersUpdated.Broadcast();
+        }
+    }
+}
+
+void ASkaldPlayerState::OnRep_IsAI()
 {
     if (UWorld* World = GetWorld())
     {
