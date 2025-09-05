@@ -589,6 +589,21 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     return;
   }
 
+  UE_LOG(LogSkald, Log,
+         TEXT("TryInitializeWorldAndStart: Listing player lock states"));
+  for (APlayerState *PSBase : GS->PlayerArray) {
+    ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase);
+    ASkaldPlayerController *OwningController =
+        PS ? Cast<ASkaldPlayerController>(PS->GetOwner()) : nullptr;
+    UE_LOG(
+        LogSkald, Log,
+        TEXT("TryInitializeWorldAndStart: Player=%s IsAI=%s LockedIn=%s Controller=%s"),
+        PS ? *PS->GetPlayerName() : TEXT("null"),
+        PS && PS->bIsAI ? TEXT("true") : TEXT("false"),
+        PS && PS->bHasLockedIn ? TEXT("true") : TEXT("false"),
+        *GetNameSafe(OwningController));
+  }
+
   bool bAllLockedIn = true;
   bool bAllHaveControllers = true;
   for (APlayerState *PSBase : GS->PlayerArray) {
