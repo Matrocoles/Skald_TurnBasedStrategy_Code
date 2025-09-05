@@ -170,6 +170,30 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
   TryInitializeWorldAndStart();
 }
 
+void ASkaldGameMode::Logout(AController *Exiting) {
+  ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(Exiting);
+  int32 PlayerID = 0;
+  if (PC) {
+    PendingControllers.Remove(PC);
+    if (ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>()) {
+      PlayerID = PS->GetPlayerId();
+    }
+  }
+
+  Super::Logout(Exiting);
+
+  PlayerDataArray.RemoveAll([
+      PlayerID](const FS_PlayerData &Data) { return Data.PlayerID == PlayerID; });
+
+  if (TurnManager) {
+    // Remove the exiting controller from the turn manager's list.
+    TurnManager->SortControllersByInitiative();
+  }
+
+  RefreshHUDs();
+  TryInitializeWorldAndStart();
+}
+
 void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
   // Bail out if the controller has been destroyed or is otherwise invalid.
   if (!IsValid(PC)) {
@@ -488,6 +512,12 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     return;
   }
 
+  // Purge any stale controller references before we evaluate player counts. A
+  // player may have disconnected leaving behind a PlayerState with an owning
+  // controller that is pending kill. Ensuring the turn manager drops these
+  // entries keeps controller counts accurate when calculating readiness.
+  TurnManager->SortControllersByInitiative();
+
   // Register any controllers that joined before the turn manager was ready.
   for (int32 Index = PendingControllers.Num() - 1; Index >= 0; --Index) {
     RegisterPlayer(PendingControllers[Index]);
@@ -519,7 +549,7 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(GS->PlayerArray[Index]);
     ASkaldPlayerController *OwningController =
         PS ? Cast<ASkaldPlayerController>(PS->GetOwner()) : nullptr;
-    if (!OwningController) {
+    if (!IsValid(OwningController)) {
       UE_LOG(LogSkald, Warning,
              TEXT("TryInitializeWorldAndStart: Removing PlayerState %s with no "
                   "controller"),

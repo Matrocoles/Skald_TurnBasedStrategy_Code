@@ -29,6 +29,7 @@ public:
 
   virtual void BeginPlay() override;
   virtual void PostLogin(APlayerController *NewPlayer) override;
+  virtual void Logout(AController *Exiting) override;
 
   /** Advance army placement to the next controller. */
   void AdvanceArmyPlacement();
