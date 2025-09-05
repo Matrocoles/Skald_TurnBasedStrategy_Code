@@ -70,8 +70,13 @@ protected:
   TArray<FS_PlayerData> PlayerDataArray;
 
   /** Minimum number of players required to start the match. */
-  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Players", meta = (ClampMin = "1"))
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Players",
+            meta = (ClampMin = "1"))
   int32 MinPlayerCount = 1;
+
+  /** Controller class used when spawning AI players. */
+  UPROPERTY(EditDefaultsOnly, Category = "Players")
+  TSubclassOf<APlayerController> AIControllerClass;
 
   /** All siege equipment constructed on the map. */
   UPROPERTY(BlueprintReadOnly, Category = "Siege")
@@ -113,9 +118,6 @@ private:
 
   /** Whether the world has been initialized and territories assigned. */
   bool bWorldInitialized;
-
-  /** Whether AI players have already been spawned. */
-  bool bAIPlayersSpawned;
 
   /** Controllers whose PlayerState is not yet valid, queued for retry. */
   TArray<ASkaldPlayerController *> PendingControllers;
