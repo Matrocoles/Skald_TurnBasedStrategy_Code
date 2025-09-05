@@ -1,6 +1,9 @@
 #include "StartGameWidget.h"
 
 #include "Components/Button.h"
+#include "Components/ComboBoxString.h"
+#include "Components/EditableTextBox.h"
+#include "Components/SpinBox.h"
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "LobbyMenuWidget.h"
@@ -48,6 +51,31 @@ void UStartGameWidget::StartGame(bool bMultiplayer) {
   if (UWorld *World = GetWorld()) {
     if (USkaldGameInstance *GI = World->GetGameInstance<USkaldGameInstance>()) {
       GI->bIsMultiplayer = bMultiplayer;
+      if (!bMultiplayer) {
+        if (DisplayNameBox) {
+          GI->DisplayName = DisplayNameBox->GetText().ToString();
+        }
+
+        if (FactionComboBox) {
+          const FString Option = FactionComboBox->GetSelectedOption();
+          if (UEnum *Enum = StaticEnum<ESkaldFaction>()) {
+            const int64 Value = Enum->GetValueByNameString(Option);
+            if (Value != INDEX_NONE) {
+              GI->Faction = static_cast<ESkaldFaction>(Value);
+            }
+          }
+        }
+
+        if (AICountSpinBox) {
+          GI->AIPlayersToSpawn =
+              FMath::Clamp(FMath::RoundToInt(AICountSpinBox->GetValue()), 1, 3);
+        }
+
+        GI->TakenFactions.Empty();
+        if (GI->Faction != ESkaldFaction::None) {
+          GI->TakenFactions.AddUnique(GI->Faction);
+        }
+      }
     }
 
     if (APlayerController *PC = GetOwningPlayer()) {

@@ -7,6 +7,9 @@
 class ULobbyMenuWidget;
 class UButton;
 class APlayerController;
+class UEditableTextBox;
+class UComboBoxString;
+class USpinBox;
 
 /**
  * Menu shown after pressing Start Game, to choose single or multiplayer.
@@ -30,6 +33,21 @@ public:
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
             meta = (BindWidgetOptional))
   UButton *MainMenuButton;
+
+  /** Entry box for the player's display name. */
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
+            meta = (BindWidgetOptional))
+  UEditableTextBox *DisplayNameBox;
+
+  /** Combo box used to choose the player's faction. */
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
+            meta = (BindWidgetOptional))
+  UComboBoxString *FactionComboBox;
+
+  /** Spin box determining how many AI opponents to spawn. */
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
+            meta = (BindWidgetOptional))
+  USpinBox *AICountSpinBox;
 
   /** Record the lobby menu that spawned this widget so we can unhide it later. */
   UFUNCTION(BlueprintCallable, Category = "Skald|Widgets")
