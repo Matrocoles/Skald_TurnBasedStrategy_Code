@@ -45,15 +45,6 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void EndPhase();
 
-  UFUNCTION(BlueprintCallable, Category = "Turn")
-  void MakeAIDecision();
-
-  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Turn")
-  bool IsAIController() const;
-
-  UFUNCTION(BlueprintCallable, Category = "Turn")
-  void SetIsAIController(bool bInIsAI);
-
   /** Set the turn manager responsible for sequencing play. */
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void SetTurnManager(ATurnManager *Manager);
@@ -77,10 +68,6 @@ public:
   void ServerInitPlayerState(const FString &Name, ESkaldFaction Faction);
 
 protected:
-  /** Whether this controller is controlled by AI. */
-  UPROPERTY(BlueprintReadOnly, Category = "Turn")
-  bool bIsAI;
-
   /** Widget class to instantiate for the player's HUD.
    *  Settable via Blueprint or loaded in the constructor. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "UI")

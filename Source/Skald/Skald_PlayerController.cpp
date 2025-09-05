@@ -24,13 +24,10 @@
 #include "UI/SkaldMainHUDWidget.h"
 #include "UObject/ConstructorHelpers.h"
 #include "WorldMap.h"
-#include <limits>
 
-constexpr int32 MaxAIIterations = 100;
 constexpr int32 MaxWorldMapSearchAttempts = 5;
 
 ASkaldPlayerController::ASkaldPlayerController() {
-  bIsAI = false;
   TurnManager = nullptr;
   HUDRef = nullptr;
   MainHudWidget = nullptr;
@@ -80,9 +77,6 @@ void ASkaldPlayerController::CacheGameReferences() {
         this, &ASkaldPlayerController::HandleFactionsUpdated);
   }
 
-  if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
-    bIsAI = PS->bIsAI;
-  }
 }
 
 void ASkaldPlayerController::InitializeHUDWidget() {
@@ -154,8 +148,7 @@ void ASkaldPlayerController::BeginPlay() {
   Super::BeginPlay();
   CacheGameReferences();
 
-  if (IsLocalPlayerController() && !IsAIController() &&
-      GetLocalPlayer() != nullptr) {
+  if (IsLocalPlayerController() && GetLocalPlayer() != nullptr) {
     InitializeHUDWidget();
     InitializeChoosePlayerWidget();
     InitializeFighterSelectionIfNeeded();
@@ -248,16 +241,15 @@ void ASkaldPlayerController::SetTurnManager(ATurnManager *Manager) {
   if (TurnManager) {
     TurnManager->OnWorldStateChanged.AddDynamic(
         this, &ASkaldPlayerController::HandleWorldStateChanged);
-    if (IsLocalPlayerController() && !IsAIController() &&
-        GetLocalPlayer() != nullptr) {
+    if (IsLocalPlayerController() && GetLocalPlayer() != nullptr) {
       InitializeFighterSelectionIfNeeded();
     }
   }
 }
 
 void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
-  if (FighterSelectionWidget || IsAIController() ||
-      GetLocalPlayer() == nullptr || !IsLocalPlayerController()) {
+  if (FighterSelectionWidget || GetLocalPlayer() == nullptr ||
+      !IsLocalPlayerController()) {
     return;
   }
 
@@ -325,12 +317,8 @@ void ASkaldPlayerController::ShowTurnAnnouncement(const FString &PlayerName,
 }
 
 void ASkaldPlayerController::StartTurn() {
-  if (bIsAI) {
-    MakeAIDecision();
-  } else {
-    FInputModeGameAndUI InputMode;
-    SetInputMode(InputMode);
-  }
+  FInputModeGameAndUI InputMode;
+  SetInputMode(InputMode);
 }
 
 void ASkaldPlayerController::EndTurn() {
@@ -367,151 +355,6 @@ void ASkaldPlayerController::EndPhase() {
   TurnManager->AdvancePhase();
 }
 
-void ASkaldPlayerController::MakeAIDecision() {
-  if (!TurnManager) {
-    EndTurn();
-    return;
-  }
-
-  ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
-  if (!PS) {
-    EndTurn();
-    return;
-  }
-
-  // Cache the world map for subsequent phases.
-  AWorldMap *WorldMap = Cast<AWorldMap>(
-      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
-  if (!WorldMap) {
-    EndTurn();
-    return;
-  }
-
-  // Iterate through phases until the turn naturally ends.
-  ETurnPhase Phase = TurnManager->GetCurrentPhase();
-  int32 IterationCount = 0;
-  while (Phase != ETurnPhase::EndTurn && IterationCount++ < MaxAIIterations) {
-    const ETurnPhase PrevPhase = Phase;
-
-    if (Phase == ETurnPhase::Reinforcement) {
-      TArray<ATerritory *> OwnedTerritories;
-      for (ATerritory *Territory : WorldMap->Territories) {
-        if (Territory && Territory->OwningPlayer == PS) {
-          OwnedTerritories.Add(Territory);
-        }
-      }
-
-      int32 SpreadIndex = 0;
-      while (PS->DeployableUnits > 0 && OwnedTerritories.Num() > 0) {
-        ATerritory *TargetTerritory =
-            OwnedTerritories[SpreadIndex % OwnedTerritories.Num()];
-        ++TargetTerritory->ArmyUnits;
-        TargetTerritory->RefreshAppearance();
-        --PS->DeployableUnits;
-        --PS->Resources;
-        ++SpreadIndex;
-      }
-      TurnManager->BroadcastDeployableUnits(PS);
-      TurnManager->BroadcastResources(PS);
-
-      TurnManager->AdvancePhase();
-    } else if (Phase == ETurnPhase::Attack) {
-      ATerritory *BestSource = nullptr;
-      ATerritory *BestTarget = nullptr;
-      int32 WeakestStrength = std::numeric_limits<int32>::max();
-
-      for (ATerritory *Source : WorldMap->Territories) {
-        if (!Source || Source->OwningPlayer != PS || Source->ArmyUnits <= 1) {
-          continue;
-        }
-
-        for (ATerritory *Neighbor : Source->AdjacentTerritories) {
-          if (!Neighbor || Neighbor->OwningPlayer == PS) {
-            continue;
-          }
-
-          if (Neighbor->ArmyUnits < WeakestStrength) {
-            BestSource = Source;
-            BestTarget = Neighbor;
-            WeakestStrength = Neighbor->ArmyUnits;
-          }
-        }
-      }
-
-      if (BestSource && BestTarget && BestSource->ArmyUnits > 1) {
-        const int32 ArmySent = BestSource->ArmyUnits - 1;
-        HandleAttackRequested(BestSource->TerritoryID, BestTarget->TerritoryID,
-                              ArmySent, false);
-      }
-
-      TurnManager->AdvancePhase();
-    } else if (Phase == ETurnPhase::Engineering ||
-               Phase == ETurnPhase::Treasure) {
-      TurnManager->AdvancePhase();
-    } else if (Phase == ETurnPhase::Movement) {
-      ATerritory *BestSource = nullptr;
-      ATerritory *BestTarget = nullptr;
-      int32 WeakestStrength = std::numeric_limits<int32>::max();
-
-      for (ATerritory *Source : WorldMap->Territories) {
-        if (!Source || Source->OwningPlayer != PS || Source->ArmyUnits <= 1) {
-          continue;
-        }
-
-        for (ATerritory *Neighbor : Source->AdjacentTerritories) {
-          if (!Neighbor || Neighbor->OwningPlayer != PS) {
-            continue;
-          }
-
-          if (Neighbor->ArmyUnits < WeakestStrength) {
-            BestSource = Source;
-            BestTarget = Neighbor;
-            WeakestStrength = Neighbor->ArmyUnits;
-          }
-        }
-      }
-
-      if (BestSource && BestTarget) {
-        int32 TroopsToMove = BestSource->ArmyUnits / 2;
-        TroopsToMove = FMath::Clamp(TroopsToMove, 1, BestSource->ArmyUnits - 1);
-        HandleMoveRequested(BestSource->TerritoryID, BestTarget->TerritoryID,
-                            TroopsToMove);
-      }
-
-      TurnManager->AdvancePhase();
-    } else {
-      // Any other phase ends the turn immediately.
-      UE_LOG(LogSkald, Warning,
-             TEXT("MakeAIDecision encountered unexpected phase %s"),
-             *UEnum::GetValueAsString(Phase));
-      break;
-    }
-
-    Phase = TurnManager->GetCurrentPhase();
-    if (Phase == PrevPhase) {
-      UE_LOG(LogSkald, Warning,
-             TEXT("MakeAIDecision phase %s did not advance; breaking"),
-             *UEnum::GetValueAsString(Phase));
-      break;
-    }
-  }
-
-  if (IterationCount >= MaxAIIterations) {
-    UE_LOG(LogSkald, Warning, TEXT("MakeAIDecision hit iteration limit (%d)"),
-           MaxAIIterations);
-  } else {
-    UE_LOG(LogSkald, Log, TEXT("MakeAIDecision completed in %d iterations"),
-           IterationCount);
-  }
-
-  EndTurn();
-}
-
-bool ASkaldPlayerController::IsAIController() const { return bIsAI; }
-
-void ASkaldPlayerController::SetIsAIController(bool bInIsAI) {
-  bIsAI = bInIsAI;
-}
 
 bool ASkaldPlayerController::ValidateAttack(int32 FromID, int32 ToID,
                                             int32 ArmySent, bool bUseSiege,

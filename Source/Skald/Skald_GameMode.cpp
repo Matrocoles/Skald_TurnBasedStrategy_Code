@@ -12,6 +12,7 @@
 #include "Skald_GameState.h"
 #include "Skald_PlayerCharacter.h"
 #include "Skald_PlayerController.h"
+#include "Skald_AIController.h"
 #include "Skald_PlayerState.h"
 #include "Skald_TurnManager.h"
 #include "Territory.h"
@@ -278,16 +279,15 @@ void ASkaldGameMode::PopulateAIPlayers() {
     AIState->bIsAI = true;
 
     FTransform SpawnTransform = FTransform::Identity;
-    ASkaldPlayerController *AIController =
-        GetWorld()->SpawnActorDeferred<ASkaldPlayerController>(
-            PlayerControllerClass, SpawnTransform, nullptr, nullptr,
+    ASkaldAIController *AIController =
+        GetWorld()->SpawnActorDeferred<ASkaldAIController>(
+            ASkaldAIController::StaticClass(), SpawnTransform, nullptr, nullptr,
             ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
     if (!AIController) {
       AIState->Destroy();
       break;
     }
 
-    AIController->SetIsAIController(true);
     AIController->SetPlayerState(AIState);
 
     // Assign a display name before the controller finishes spawning to ensure

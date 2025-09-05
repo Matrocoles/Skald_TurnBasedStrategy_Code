@@ -2,6 +2,7 @@
 #include "Tests/AutomationEditorCommon.h"
 #include "Engine/World.h"
 #include "Skald_PlayerController.h"
+#include "Skald_AIController.h"
 #include "Skald_PlayerState.h"
 #include "Skald_TurnManager.h"
 #include "WorldMap.h"
@@ -20,7 +21,7 @@ bool FSkaldAIDecisionFlowTest::RunTest(const FString& Parameters)
 
     // Create core actors
     ATurnManager* TM = World->SpawnActor<ATurnManager>();
-    ASkaldPlayerController* PC1 = World->SpawnActor<ASkaldPlayerController>();
+    ASkaldAIController* PC1 = World->SpawnActor<ASkaldAIController>();
     ASkaldPlayerState* PS1 = World->SpawnActor<ASkaldPlayerState>();
     ASkaldPlayerController* PC2 = World->SpawnActor<ASkaldPlayerController>();
     ASkaldPlayerState* PS2 = World->SpawnActor<ASkaldPlayerState>();
