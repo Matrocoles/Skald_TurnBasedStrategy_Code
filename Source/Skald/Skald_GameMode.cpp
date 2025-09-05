@@ -108,7 +108,7 @@ void ASkaldGameMode::BeginPlay() {
         if (GS) {
           for (APlayerState *BasePS : GS->PlayerArray) {
             ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(BasePS);
-            if (!PS || !PS->bIsAI) {
+            if (!PS || !Cast<ASkaldAIController>(PS->GetOwner())) {
               continue;
             }
 
@@ -230,7 +230,8 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
     if (PlayerDataArray.IsValidIndex(Index)) {
       PlayerDataArray[Index].PlayerID = PS->GetPlayerId();
       PlayerDataArray[Index].PlayerName = PS->PlayerDisplayName;
-      PlayerDataArray[Index].IsAI = PS->bIsAI;
+      PlayerDataArray[Index].IsAI =
+          Cast<ASkaldAIController>(PS->GetOwner()) != nullptr;
       PlayerDataArray[Index].Faction = PS->Faction;
       PlayerDataArray[Index].Resources = PS->Resources;
     }
@@ -254,7 +255,7 @@ void ASkaldGameMode::PopulateAIPlayers() {
   bool bHasHuman = false;
   for (APlayerState *ExistingPS : GS->PlayerArray) {
     if (ASkaldPlayerState *EPS = Cast<ASkaldPlayerState>(ExistingPS)) {
-      if (!EPS->bIsAI) {
+      if (!Cast<ASkaldAIController>(EPS->GetOwner())) {
         bHasHuman = true;
         break;
       }
@@ -275,7 +276,6 @@ void ASkaldGameMode::PopulateAIPlayers() {
       break;
     }
 
-    AIState->bIsAI = true;
     AIState->bHasLockedIn = true;
 
     FTransform SpawnTransform = FTransform::Identity;
@@ -364,7 +364,8 @@ void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
   }
 
   UE_LOG(LogSkald, Log, TEXT("HandlePlayerLockedIn: Player=%s bIsAI=%d"),
-         *PS->PlayerDisplayName, PS->bIsAI);
+         *PS->PlayerDisplayName,
+         Cast<ASkaldAIController>(PS->GetOwner()) ? 1 : 0);
   ASkaldGameState *GS = GetGameState<ASkaldGameState>();
   UE_LOG(LogSkald, Log,
          TEXT("HandlePlayerLockedIn: TurnManager=%s ControllerCount=%d "
@@ -399,7 +400,8 @@ void ASkaldGameMode::RefreshHUDs() {
   // Ensure all AI players have valid names before refreshing any HUDs.
   for (APlayerState *PSBase : GS->PlayerArray) {
     if (ASkaldPlayerState *SPS = Cast<ASkaldPlayerState>(PSBase)) {
-      if (SPS->bIsAI && SPS->PlayerDisplayName.IsEmpty()) {
+      if (Cast<ASkaldAIController>(SPS->GetOwner()) &&
+          SPS->PlayerDisplayName.IsEmpty()) {
         UE_LOG(LogSkald, Error,
                TEXT("AI PlayerState missing display name before RefreshHUDs"));
         ensure(!SPS->PlayerDisplayName.IsEmpty());
@@ -413,7 +415,7 @@ void ASkaldGameMode::RefreshHUDs() {
       FS_PlayerData Data;
       Data.PlayerID = SPS->GetPlayerId();
       Data.PlayerName = SPS->PlayerDisplayName;
-      Data.IsAI = SPS->bIsAI;
+      Data.IsAI = Cast<ASkaldAIController>(SPS->GetOwner()) != nullptr;
       Data.Faction = SPS->Faction;
       Data.Resources = SPS->Resources;
       AllPlayers.Add(Data);
@@ -552,7 +554,6 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
     }
     PS->SetPlayerId(PlayerSave.PlayerID);
     PS->PlayerDisplayName = PlayerSave.PlayerName;
-    PS->bIsAI = PlayerSave.IsAI;
     PS->Faction = PlayerSave.Faction;
     PS->Resources = PlayerSave.Resources;
     if (GS) {
@@ -562,7 +563,6 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
     FS_PlayerData Data;
     Data.PlayerID = PlayerSave.PlayerID;
     Data.PlayerName = PlayerSave.PlayerName;
-    Data.IsAI = PlayerSave.IsAI;
     Data.Faction = PlayerSave.Faction;
     Data.Resources = PlayerSave.Resources;
     Data.CapitalTerritoryIDs = PlayerSave.CapitalTerritoryIDs;
@@ -759,7 +759,7 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
     }
 
     // AI players automatically distribute their armies evenly.
-    if (PS->bIsAI) {
+    if (Cast<ASkaldAIController>(PS->GetOwner())) {
       TArray<ATerritory *> OwnedTerritories;
       for (ATerritory *Territory : WorldMap->Territories) {
         if (Territory && Territory->OwningPlayer == PS) {
@@ -1075,7 +1075,6 @@ void ASkaldGameMode::FillSaveGame(USkaldSaveGame *SaveGameObject) const {
     FPlayerSaveStruct PlayerSave;
     PlayerSave.PlayerID = Data.PlayerID;
     PlayerSave.PlayerName = Data.PlayerName;
-    PlayerSave.IsAI = Data.IsAI;
     PlayerSave.Faction = Data.Faction;
     PlayerSave.Resources = Data.Resources;
     PlayerSave.CapitalTerritoryIDs = Data.CapitalTerritoryIDs;

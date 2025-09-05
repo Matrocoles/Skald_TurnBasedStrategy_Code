@@ -16,9 +16,6 @@ class SKALD_API ASkaldPlayerState : public APlayerState
 public:
     ASkaldPlayerState();
 
-    UPROPERTY(BlueprintReadWrite, Replicated, Category="PlayerState")
-    bool bIsAI;
-
     /** Deployable units available for placement. */
     UPROPERTY(BlueprintReadWrite, ReplicatedUsing = OnRep_DeployableUnits, Category="PlayerState")
     int32 DeployableUnits;

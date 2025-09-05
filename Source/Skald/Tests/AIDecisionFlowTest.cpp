@@ -37,14 +37,14 @@ bool FSkaldAIDecisionFlowTest::RunTest(const FString& Parameters)
     }
 
     PC1->PlayerState = PS1;
-    PS1->bIsAI = true;
+    PS1->SetOwner(PC1);
     PS1->DeployableUnits = 4;
     PS1->Resources = 4;
     PC1->SetTurnManager(TM);
 
     // Dummy opponent to prevent infinite turn loop
     PC2->PlayerState = PS2;
-    PS2->bIsAI = false;
+    PS2->SetOwner(PC2);
     TM->RegisterController(PC1);
     TM->RegisterController(PC2);
 

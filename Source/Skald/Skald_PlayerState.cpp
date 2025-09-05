@@ -6,8 +6,7 @@
 #include "UI/SkaldMainHUDWidget.h"
 
 ASkaldPlayerState::ASkaldPlayerState()
-    : bIsAI(false)
-    , DeployableUnits(0)
+    : DeployableUnits(0)
     , InitiativeRoll(0)
     , Resources(0)
     , PlayerDisplayName(TEXT("Player"))
@@ -25,7 +24,6 @@ void ASkaldPlayerState::GetLifetimeReplicatedProps(
     DOREPLIFETIME(ASkaldPlayerState, PlayerDisplayName);
     DOREPLIFETIME(ASkaldPlayerState, Faction);
     DOREPLIFETIME(ASkaldPlayerState, DeployableUnits);
-    DOREPLIFETIME(ASkaldPlayerState, bIsAI);
     DOREPLIFETIME(ASkaldPlayerState, InitiativeRoll);
     DOREPLIFETIME(ASkaldPlayerState, Resources);
     DOREPLIFETIME(ASkaldPlayerState, bHasLockedIn);
