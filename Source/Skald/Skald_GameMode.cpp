@@ -529,15 +529,18 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
 
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
   if (GI && !GI->bIsMultiplayer) {
+    TArray<ASkaldPlayerState *> AutoLockPlayers;
     for (APlayerState *PSBase : GS->PlayerArray) {
       ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase);
       if (PS && !PS->bIsAI && !PS->bHasLockedIn) {
-        PS->bHasLockedIn = true;
-        HandlePlayerLockedIn(PS);
+        AutoLockPlayers.Add(PS);
       }
     }
 
-    PopulateAIPlayers();
+    for (ASkaldPlayerState *PS : AutoLockPlayers) {
+      PS->bHasLockedIn = true;
+      HandlePlayerLockedIn(PS);
+    }
   }
 
   UE_LOG(LogSkald, Log,
