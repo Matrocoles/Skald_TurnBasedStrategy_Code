@@ -37,7 +37,7 @@ public:
   virtual void OnRep_PlayerState() override;
 
   UFUNCTION(BlueprintCallable, Category = "Turn")
-  void StartTurn();
+  virtual void StartTurn();
 
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void EndTurn();

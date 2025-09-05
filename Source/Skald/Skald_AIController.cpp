@@ -1,4 +1,5 @@
 #include "Skald_AIController.h"
+#include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 #include "Skald.h"
 #include "Skald_PlayerState.h"
