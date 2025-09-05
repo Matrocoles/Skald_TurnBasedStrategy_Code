@@ -509,11 +509,49 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
          TurnManager ? *TurnManager->GetName() : TEXT("null"),
          GS->PlayerArray.Num());
 
-  bool bAllLockedIn = true;
-  bool bAllHaveControllers = true;
   TArray<ASkaldPlayerController *> RegisteredControllers =
       TurnManager ? TurnManager->GetControllers()
                   : TArray<ASkaldPlayerController *>();
+  bool bNeedsRetry = false;
+  for (int32 Index = GS->PlayerArray.Num() - 1; Index >= 0; --Index) {
+    ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(GS->PlayerArray[Index]);
+    ASkaldPlayerController *OwningController =
+        PS ? Cast<ASkaldPlayerController>(PS->GetOwner()) : nullptr;
+    if (!OwningController) {
+      UE_LOG(LogSkald, Warning,
+             TEXT("TryInitializeWorldAndStart: Removing PlayerState %s with no "
+                  "controller"),
+             *GetNameSafe(PS));
+      GS->RemovePlayerState(PS);
+      PlayerDataArray.RemoveAt(Index);
+      bNeedsRetry = true;
+      continue;
+    }
+    if (!RegisteredControllers.Contains(OwningController)) {
+      UE_LOG(LogSkald, Warning,
+             TEXT("TryInitializeWorldAndStart: Requeuing controller %s"),
+             *GetNameSafe(OwningController));
+      PendingControllers.AddUnique(OwningController);
+      FTimerDelegate RetryDelegate = FTimerDelegate::CreateUObject(
+          this, &ASkaldGameMode::RegisterPlayer, OwningController);
+      GetWorldTimerManager().SetTimerForNextTick(RetryDelegate);
+      bNeedsRetry = true;
+    }
+  }
+
+  if (bNeedsRetry) {
+    GS->OnPlayersUpdated.Broadcast();
+    FTimerDelegate RefreshDelegate =
+        FTimerDelegate::CreateUObject(this, &ASkaldGameMode::RefreshHUDs);
+    GetWorldTimerManager().SetTimerForNextTick(RefreshDelegate);
+    FTimerDelegate RetryInit = FTimerDelegate::CreateUObject(
+        this, &ASkaldGameMode::TryInitializeWorldAndStart);
+    GetWorldTimerManager().SetTimerForNextTick(RetryInit);
+    return;
+  }
+
+  bool bAllLockedIn = true;
+  bool bAllHaveControllers = true;
   for (APlayerState *PSBase : GS->PlayerArray) {
     ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase);
     if (!PS || !PS->bHasLockedIn) {
