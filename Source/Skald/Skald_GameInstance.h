@@ -1,12 +1,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Engine/EngineBaseTypes.h"
 #include "Engine/GameInstance.h"
 #include "SkaldTypes.h"
 #include "Skald_GameInstance.generated.h"
 
 class UGridBattleManager;
 class USkaldSaveGame;
+class UNetDriver;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSkaldFactionsUpdated);
 /** Game instance storing player selections from the lobby. */
@@ -30,6 +32,14 @@ public:
     /** Whether the game was started in multiplayer mode. */
     UPROPERTY(BlueprintReadWrite, Category="Player")
     bool bIsMultiplayer = false;
+
+    /** True if this instance is hosting a multiplayer session. */
+    UPROPERTY(BlueprintReadWrite, Category="Network")
+    bool bIsHost = false;
+
+    /** Address to join when acting as a client. */
+    UPROPERTY(BlueprintReadWrite, Category="Network")
+    FString JoinAddress;
 
     /** Number of AI opponents requested by the player. */
     UPROPERTY(BlueprintReadWrite, Category="Player")
@@ -70,6 +80,12 @@ public:
     /** Seed the combat random stream so all clients use the same sequence. */
     UFUNCTION(BlueprintCallable, Category="Battle")
     void SeedCombatRandomStream(int32 Seed);
+
+    /** Handle network failures and return to the lobby. */
+    UFUNCTION()
+    void HandleNetworkFailure(UWorld* World, UNetDriver* Driver,
+                              ENetworkFailure::Type FailureType,
+                              const FString& ErrorString);
 
     /** Save game loaded when transitioning from the main menu. */
     UPROPERTY(BlueprintReadWrite, Category="SaveGame")
