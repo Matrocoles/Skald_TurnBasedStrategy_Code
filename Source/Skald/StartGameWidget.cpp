@@ -53,15 +53,20 @@ void UStartGameWidget::StartGame(bool bMultiplayer) {
       GI->bIsMultiplayer = bMultiplayer;
       if (!bMultiplayer) {
         if (DisplayNameBox) {
-          GI->DisplayName = DisplayNameBox->GetText().ToString();
+          const FString Name = DisplayNameBox->GetText().ToString();
+          if (!Name.IsEmpty()) {
+            GI->DisplayName = Name;
+          }
         }
 
         if (FactionComboBox) {
           const FString Option = FactionComboBox->GetSelectedOption();
-          if (UEnum *Enum = StaticEnum<ESkaldFaction>()) {
-            const int64 Value = Enum->GetValueByNameString(Option);
-            if (Value != INDEX_NONE) {
-              GI->Faction = static_cast<ESkaldFaction>(Value);
+          if (!Option.IsEmpty() && Option != TEXT("None")) {
+            if (UEnum *Enum = StaticEnum<ESkaldFaction>()) {
+              const int64 Value = Enum->GetValueByNameString(Option);
+              if (Value != INDEX_NONE) {
+                GI->Faction = static_cast<ESkaldFaction>(Value);
+              }
             }
           }
         }
