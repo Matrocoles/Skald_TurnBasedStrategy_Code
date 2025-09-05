@@ -21,6 +21,7 @@ bool FSkaldAIDecisionFlowTest::RunTest(const FString& Parameters)
     // Create core actors
     ATurnManager* TM = World->SpawnActor<ATurnManager>();
     ASkaldAIController* PC1 = World->SpawnActor<ASkaldAIController>();
+    ASkaldAIController* PC2 = World->SpawnActor<ASkaldAIController>();
     ASkaldPlayerState* PS1 = World->SpawnActor<ASkaldPlayerState>();
     ASkaldPlayerState* PS2 = World->SpawnActor<ASkaldPlayerState>();
     AWorldMap* Map = World->SpawnActor<AWorldMap>();
@@ -43,6 +44,7 @@ bool FSkaldAIDecisionFlowTest::RunTest(const FString& Parameters)
     // Dummy opponent to prevent infinite turn loop
     PC2->PlayerState = PS2;
     PS2->SetOwner(PC2);
+    PC2->SetTurnManager(TM);
     TM->RegisterController(PC1);
     TM->RegisterController(PC2);
 
