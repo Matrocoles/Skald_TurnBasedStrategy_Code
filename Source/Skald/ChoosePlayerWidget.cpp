@@ -3,6 +3,7 @@
 #include "Components/Button.h"
 #include "Components/ComboBoxString.h"
 #include "Components/EditableTextBox.h"
+#include "Components/SpinBox.h"
 #include "Skald_GameInstance.h"
 #include "Skald_PlayerController.h"
 
@@ -50,6 +51,15 @@ void UChoosePlayerWidget::NativeConstruct()
         DisplayNameBox->OnTextChanged.AddDynamic(this, &UChoosePlayerWidget::HandleDisplayNameChanged);
     }
 
+    if (AICountSpinBox)
+    {
+        AICountSpinBox->SetMinValue(0.f);
+        AICountSpinBox->SetMaxValue(3.f);
+        AICountSpinBox->SetDelta(1.f);
+        AICountSpinBox->SetValue(0.f);
+        AICountSpinBox->OnValueChanged.AddDynamic(this, &UChoosePlayerWidget::HandleAICountChanged);
+    }
+
     if (LockInButton)
     {
         LockInButton->OnClicked.AddDynamic(this, &UChoosePlayerWidget::OnLockIn);
@@ -80,12 +90,19 @@ void UChoosePlayerWidget::OnLockIn()
         }
     }
 
+    int32 AICount = 1;
+    if (AICountSpinBox)
+    {
+        AICount = FMath::Clamp(FMath::RoundToInt(AICountSpinBox->GetValue()), 1, 3);
+    }
+
     if (UWorld* World = GetWorld())
     {
         if (USkaldGameInstance* GI = World->GetGameInstance<USkaldGameInstance>())
         {
             GI->DisplayName = Name;
             GI->Faction = Faction;
+            GI->AIPlayersToSpawn = AICount;
             if (Faction != ESkaldFaction::None)
             {
                 GI->TakenFactions.AddUnique(Faction);
@@ -95,7 +112,7 @@ void UChoosePlayerWidget::OnLockIn()
 
     if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(GetOwningPlayer()))
     {
-        PC->ServerInitPlayerState(Name, Faction);
+        PC->ServerInitPlayerState(Name, Faction, AICount);
     }
 
     OnPlayerLockedIn.Broadcast();
@@ -111,13 +128,19 @@ void UChoosePlayerWidget::HandleFactionSelected(FString /*SelectedItem*/, ESelec
     UpdateLockInEnabled();
 }
 
+void UChoosePlayerWidget::HandleAICountChanged(float /*Value*/)
+{
+    UpdateLockInEnabled();
+}
+
 void UChoosePlayerWidget::UpdateLockInEnabled()
 {
     const bool bHasName = DisplayNameBox && !DisplayNameBox->GetText().IsEmpty();
     const bool bHasFaction = FactionComboBox && !FactionComboBox->GetSelectedOption().IsEmpty();
+    const bool bHasAI = AICountSpinBox && AICountSpinBox->GetValue() >= 1.f;
     if (LockInButton)
     {
-        LockInButton->SetIsEnabled(bHasName && bHasFaction);
+        LockInButton->SetIsEnabled(bHasName && bHasFaction && bHasAI);
     }
 }
 

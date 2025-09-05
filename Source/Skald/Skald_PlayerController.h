@@ -65,7 +65,8 @@ public:
 
   /** Send the local player's initial data to the server for replication. */
   UFUNCTION(Server, Reliable)
-  void ServerInitPlayerState(const FString &Name, ESkaldFaction Faction);
+  void ServerInitPlayerState(const FString &Name, ESkaldFaction Faction,
+                             int32 NumAIPlayers);
 
 protected:
   /** Widget class to instantiate for the player's HUD.

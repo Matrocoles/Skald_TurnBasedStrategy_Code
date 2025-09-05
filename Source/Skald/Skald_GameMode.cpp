@@ -21,7 +21,6 @@
 #include "WorldMap.h"
 
 namespace {
-constexpr int32 ExpectedPlayerCount = 4;
 constexpr float StartGameTimeout = 10.f;
 constexpr int32 StartingResources = 100;
 constexpr int32 DefaultAIMaxCost = 10;
@@ -56,15 +55,6 @@ void ASkaldGameMode::BeginPlay() {
   }
   PlayerDataArray.Empty();
 
-  if (!TurnManager) {
-    TurnManager = GetWorld()->SpawnActor<ATurnManager>();
-  }
-
-  if (!WorldMap) {
-    WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
-        GetWorld(), AWorldMap::StaticClass()));
-  }
-
   for (FConstPlayerControllerIterator It =
            GetWorld()->GetPlayerControllerIterator();
        It; ++It) {
@@ -81,8 +71,7 @@ void ASkaldGameMode::BeginPlay() {
     }
   }
 
-  // Defer AI population until a human player locks in so the game state is
-  // fully established before spawning bots.
+  // Defer AI population and world initialization until players lock in.
   RefreshHUDs();
 
   TryInitializeWorldAndStart();
@@ -380,9 +369,34 @@ void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
          TurnManager ? TurnManager->GetControllerCount() : 0,
          GS ? GS->PlayerArray.Num() : 0);
 
+  USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+  int32 HumanCount = 0;
+  if (GS) {
+    for (APlayerState *ExistingPS : GS->PlayerArray) {
+      ASkaldPlayerState *Existing = Cast<ASkaldPlayerState>(ExistingPS);
+      if (Existing && !Existing->bIsAI) {
+        ++HumanCount;
+      }
+    }
+  }
+  const int32 AICount = GI ? GI->AIPlayersToSpawn : 0;
+  ExpectedPlayerCount = FMath::Max(HumanCount + AICount, MinPlayerCount);
+  PlayerDataArray.SetNum(ExpectedPlayerCount);
+
   // Once a human has locked in their choice, populate remaining slots with AI
   // opponents so they respect the player's faction selection.
   PopulateAIPlayers();
+
+  if (!WorldMap) {
+    WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+        GetWorld(), AWorldMap::StaticClass()));
+    if (!WorldMap) {
+      WorldMap = GetWorld()->SpawnActor<AWorldMap>();
+    }
+  }
+  if (!TurnManager) {
+    TurnManager = GetWorld()->SpawnActor<ATurnManager>();
+  }
 
   FS_PlayerData *PlayerData =
       PlayerDataArray.FindByPredicate([PS](const FS_PlayerData &Data) {

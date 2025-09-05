@@ -203,10 +203,10 @@ void ASkaldPlayerController::OnRep_PlayerState() {
 }
 
 void ASkaldPlayerController::ServerInitPlayerState_Implementation(
-    const FString &Name, ESkaldFaction Faction) {
+    const FString &Name, ESkaldFaction Faction, int32 NumAIPlayers) {
   UE_LOG(LogSkald, Log,
-         TEXT("ServerInitPlayerState_Implementation: Name=%s Faction=%d"),
-         *Name, static_cast<int32>(Faction));
+         TEXT("ServerInitPlayerState_Implementation: Name=%s Faction=%d AI=%d"),
+         *Name, static_cast<int32>(Faction), NumAIPlayers);
 
   if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
     UE_LOG(LogSkald, Log,
@@ -215,6 +215,10 @@ void ASkaldPlayerController::ServerInitPlayerState_Implementation(
     PS->PlayerDisplayName = Name;
     PS->Faction = Faction;
     PS->bHasLockedIn = true;
+
+    if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+      GI->AIPlayersToSpawn = NumAIPlayers;
+    }
 
     if (ASkaldGameMode *GM = GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
       UE_LOG(LogSkald, Log,

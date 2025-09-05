@@ -31,6 +31,10 @@ public:
     UPROPERTY(BlueprintReadWrite, Category="Player")
     bool bIsMultiplayer;
 
+    /** Number of AI opponents requested by the player. */
+    UPROPERTY(BlueprintReadWrite, Category="Player")
+    int32 AIPlayersToSpawn = 1;
+
     /** Factions that have already been selected by players or AI. */
     UPROPERTY(BlueprintReadWrite, Category="Player")
     TArray<ESkaldFaction> TakenFactions;
