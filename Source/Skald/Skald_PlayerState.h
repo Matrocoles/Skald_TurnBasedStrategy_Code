@@ -36,6 +36,10 @@ public:
     UPROPERTY(BlueprintReadWrite, Replicated, Category="PlayerState")
     ESkaldFaction Faction;
 
+    /** Whether this player is controlled by AI. */
+    UPROPERTY(BlueprintReadWrite, ReplicatedUsing = OnRep_IsAI, Category="PlayerState")
+    bool bIsAI;
+
     /** Whether the player has locked in their actions for the current turn. */
     UPROPERTY(BlueprintReadWrite, ReplicatedUsing = OnRep_HasLockedIn, Category="PlayerState")
     bool bHasLockedIn;
@@ -55,6 +59,9 @@ public:
 
     UFUNCTION()
     void OnRep_PlayerDisplayName();
+
+    UFUNCTION()
+    void OnRep_IsAI();
 
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 };

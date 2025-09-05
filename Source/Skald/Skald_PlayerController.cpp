@@ -822,7 +822,7 @@ void ASkaldPlayerController::BuildPlayerDataArray(
       FS_PlayerData Data;
       Data.PlayerID = PS->GetPlayerId();
       Data.PlayerName = PS->PlayerDisplayName;
-      Data.IsAI = Cast<ASkaldAIController>(PS->GetOwner()) != nullptr;
+      Data.IsAI = PS->bIsAI;
       Data.Faction = PS->Faction;
       Data.Resources = PS->Resources;
       Data.IsEliminated = PS->IsEliminated;
