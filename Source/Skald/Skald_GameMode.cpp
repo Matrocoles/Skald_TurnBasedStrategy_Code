@@ -497,7 +497,9 @@ void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
 
   // Once a human has locked in their choice, populate remaining slots with AI
   // opponents so they respect the player's faction selection.
-  PopulateAIPlayers();
+  if (!PS->bIsAI) {
+    PopulateAIPlayers();
+  }
 
   if (!WorldMap) {
     WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
