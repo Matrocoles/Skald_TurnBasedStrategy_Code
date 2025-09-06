@@ -3,9 +3,8 @@
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
 #include "SkaldTypes.h"
+#include "TimerManager.h"
 #include "Skald_GameMode.generated.h"
-
-struct FTimerHandle;
 class ATurnManager;
 class ASkaldGameState;
 class ASkaldPlayerController;

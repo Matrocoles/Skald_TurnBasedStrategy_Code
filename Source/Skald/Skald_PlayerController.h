@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
 #include "SkaldTypes.h"
+#include "TimerManager.h"
 #include "Skald_PlayerController.generated.h"
 
 class ATurnManager;
@@ -16,7 +17,6 @@ class ASkaldGameState;
 class USkaldGameInstance;
 class UFighterSelectionWidget;
 class AWorldMap;
-struct FTimerHandle;
 
 /** Command issued by the player during a battle. */
 UENUM()

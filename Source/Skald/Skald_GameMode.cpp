@@ -659,8 +659,8 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
       if (!bIsAI && PC->IsLocalController() && !PC->GetHUDWidget()) {
         FTimerDelegate RetryInit = FTimerDelegate::CreateUObject(
             this, &ASkaldGameMode::TryInitializeWorldAndStart);
-        RetryInitTimerHandle =
-            GetWorldTimerManager().SetTimerForNextTick(RetryInit);
+        GetWorldTimerManager().SetTimer(RetryInitTimerHandle, RetryInit, 0.f,
+                                        false);
         return;
       }
     }
@@ -725,8 +725,8 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     GetWorldTimerManager().SetTimerForNextTick(RefreshDelegate);
     FTimerDelegate RetryInit = FTimerDelegate::CreateUObject(
         this, &ASkaldGameMode::TryInitializeWorldAndStart);
-    RetryInitTimerHandle =
-        GetWorldTimerManager().SetTimerForNextTick(RetryInit);
+    GetWorldTimerManager().SetTimer(RetryInitTimerHandle, RetryInit, 0.f,
+                                    false);
     return;
   }
 
