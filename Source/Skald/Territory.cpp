@@ -49,6 +49,7 @@ ATerritory::ATerritory() {
   PrimaryActorTick.bCanEverTick = false;
   bReplicates = true;
   MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
+  MeshComponent->SetCollisionProfileName(TEXT("BlockAll"));
   RootComponent = MeshComponent;
 
   // Provide basic visuals so the world map can function even if assets
