@@ -5,6 +5,7 @@
 #include "Components/EditableTextBox.h"
 #include "Components/SpinBox.h"
 #include "Skald_GameInstance.h"
+#include "Skald_GameMode.h"
 #include "Skald_PlayerController.h"
 
 void UChoosePlayerWidget::NativeConstruct()
@@ -112,7 +113,19 @@ void UChoosePlayerWidget::OnLockIn()
 
     if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(GetOwningPlayer()))
     {
-        PC->ServerInitPlayerState(Name, Faction, AICount);
+        bool bShouldInit = true;
+        if (UWorld* World = PC->GetWorld())
+        {
+            if (ASkaldGameMode* GM = World->GetAuthGameMode<ASkaldGameMode>())
+            {
+                bShouldInit = !GM->IsWorldInitialized();
+            }
+        }
+
+        if (bShouldInit)
+        {
+            PC->ServerInitPlayerState(Name, Faction, AICount);
+        }
     }
 
     OnPlayerLockedIn.Broadcast();
