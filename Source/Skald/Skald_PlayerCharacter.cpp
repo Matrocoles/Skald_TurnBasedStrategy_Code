@@ -131,8 +131,11 @@ void ASkald_PlayerCharacter::Select()
         {
                 if (ATerritory* Territory = Cast<ATerritory>(Hit.GetActor()))
                 {
-                        Territory->Select();
-                        CurrentSelection = Territory;
+                        if (IsValid(WorldMap))
+                        {
+                                WorldMap->SelectTerritory(Territory);
+                                CurrentSelection = WorldMap->SelectedTerritory;
+                        }
                 }
         }
 }
