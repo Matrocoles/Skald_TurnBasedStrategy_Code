@@ -619,6 +619,7 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
   TArray<ASkaldPlayerController *> RegisteredControllers =
       TurnManager ? TurnManager->GetControllers()
                   : TArray<ASkaldPlayerController *>();
+  TSet<ASkaldPlayerController *> UniqueControllers;
   bool bNeedsRetry = false;
   for (int32 Index = GS->PlayerArray.Num() - 1; Index >= 0; --Index) {
     ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(GS->PlayerArray[Index]);
@@ -634,6 +635,18 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
       bNeedsRetry = true;
       continue;
     }
+    if (UniqueControllers.Contains(OwningController)) {
+      UE_LOG(
+          LogSkald, Warning,
+          TEXT("TryInitializeWorldAndStart: Removing duplicate PlayerState %s "
+               "for controller %s"),
+          *GetNameSafe(PS), *GetNameSafe(OwningController));
+      GS->RemovePlayerState(PS);
+      PlayerDataArray.RemoveAt(Index);
+      bNeedsRetry = true;
+      continue;
+    }
+    UniqueControllers.Add(OwningController);
     if (!RegisteredControllers.Contains(OwningController)) {
       UE_LOG(LogSkald, Warning,
              TEXT("TryInitializeWorldAndStart: Requeuing controller %s"),
@@ -694,7 +707,7 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     }
   }
 
-  const int32 CurrentPlayerCount = GS->PlayerArray.Num();
+  const int32 CurrentPlayerCount = UniqueControllers.Num();
   const bool bReadyToStart =
       bAllLockedIn && bAllHaveControllers &&
       CurrentPlayerCount >= MinPlayerCount && TurnManager &&
