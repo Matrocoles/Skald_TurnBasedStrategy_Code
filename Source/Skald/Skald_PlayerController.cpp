@@ -162,11 +162,12 @@ void ASkaldPlayerController::BeginPlay() {
     }
     if (CachedGameInstance && CachedGameInstance->bIsMultiplayer) {
       InitializeChoosePlayerWidget();
-    } else if (CachedGameInstance && !bHasInitialized &&
-               (!CachedGameMode || !CachedGameMode->IsWorldInitialized())) {
-      ServerInitPlayerState(CachedGameInstance->DisplayName,
-                            CachedGameInstance->Faction,
-                            CachedGameInstance->AIPlayersToSpawn);
+    } else if (CachedGameInstance && !bHasInitialized) {
+      if (!CachedGameMode || !CachedGameMode->IsWorldInitialized()) {
+        ServerInitPlayerState(CachedGameInstance->DisplayName,
+                              CachedGameInstance->Faction,
+                              CachedGameInstance->AIPlayersToSpawn);
+      }
       HandleFactionLockedIn();
     }
     InitializeFighterSelectionIfNeeded();
@@ -235,7 +236,8 @@ void ASkaldPlayerController::ServerInitPlayerState_Implementation(
         GM->HandlePlayerLockedIn(PS);
       } else {
         UE_LOG(LogSkald, Log,
-               TEXT("ServerInitPlayerState_Implementation: World already initialized"));
+               TEXT("ServerInitPlayerState_Implementation: World already "
+                    "initialized"));
       }
     } else {
       UE_LOG(LogSkald, Warning,
