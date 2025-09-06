@@ -153,10 +153,13 @@ void ATurnManager::StartTurns() {
     if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
       const bool bIsActive = Controller == CurrentController;
       Controller->ShowTurnAnnouncement(PlayerName, bIsActive);
+      ASkaldPlayerState *ControllerPS =
+          Controller->GetPlayerState<ASkaldPlayerState>();
+      const bool bIsAI = ControllerPS && ControllerPS->bIsAI;
       if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
         HUD->UpdateTurnBanner(PS ? PS->GetPlayerId() : -1, 1);
         HUD->UpdatePhaseBanner(CurrentPhase);
-      } else {
+      } else if (!bIsAI && Controller->IsLocalController()) {
         UE_LOG(LogSkald, Warning,
                TEXT("StartTurns: Controller %s missing HUD widget"),
                *Controller->GetName());
