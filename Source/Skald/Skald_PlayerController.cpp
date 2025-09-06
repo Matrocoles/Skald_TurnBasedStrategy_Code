@@ -117,6 +117,12 @@ void ASkaldPlayerController::InitializeHUDWidget() {
       this, &ASkaldPlayerController::HandleBuildSiegeRequested);
   MainHudWidget->OnDigTreasureRequested.AddDynamic(
       this, &ASkaldPlayerController::HandleDigTreasureRequested);
+
+  // Notify the game mode that the HUD is now ready so world start checks can
+  // proceed only after widgets are initialized.
+  if (CachedGameMode) {
+    CachedGameMode->TryInitializeWorldAndStart();
+  }
 }
 
 void ASkaldPlayerController::InitializeChoosePlayerWidget() {

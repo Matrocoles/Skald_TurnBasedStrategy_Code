@@ -642,6 +642,24 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     PopulateAIPlayers();
   }
 
+  // Ensure local human controllers have their HUD widgets initialized before
+  // proceeding with world initialization. Retry on the next tick if any are
+  // still pending.
+  for (FConstPlayerControllerIterator It =
+           GetWorld()->GetPlayerControllerIterator();
+       It; ++It) {
+    if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(*It)) {
+      ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>();
+      const bool bIsAI = PS && PS->bIsAI;
+      if (!bIsAI && PC->IsLocalController() && !PC->GetHUDWidget()) {
+        FTimerDelegate RetryInit = FTimerDelegate::CreateUObject(
+            this, &ASkaldGameMode::TryInitializeWorldAndStart);
+        GetWorldTimerManager().SetTimerForNextTick(RetryInit);
+        return;
+      }
+    }
+  }
+
   UE_LOG(LogSkald, Log,
          TEXT("TryInitializeWorldAndStart: TurnManager=%s PlayerCount=%d"),
          TurnManager ? *TurnManager->GetName() : TEXT("null"),
@@ -1291,9 +1309,11 @@ bool ASkaldGameMode::InitializeWorld() {
              GetWorld()->GetPlayerControllerIterator();
          It; ++It) {
       if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(*It)) {
+        ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>();
+        const bool bIsAI = PS && PS->bIsAI;
         if (USkaldMainHUDWidget *HUD = PC->GetHUDWidget()) {
           HUD->UpdateInitiativeText(Message);
-        } else {
+        } else if (!bIsAI && PC->IsLocalController()) {
           UE_LOG(LogSkald, Warning,
                  TEXT("InitializeWorld: Controller %s missing HUD widget"),
                  *PC->GetName());
