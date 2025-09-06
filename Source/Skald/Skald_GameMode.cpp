@@ -310,39 +310,31 @@ void ASkaldGameMode::PopulateAIPlayers() {
   TArray<ASkaldPlayerState *> NewlySpawnedAI;
 
   while (ExistingAI < TargetAI && SpawnAttempts++ < MaxSpawnAttempts) {
-    ASkaldPlayerState *AIState =
-        GetWorld()->SpawnActor<ASkaldPlayerState>(PlayerStateClass);
-    if (!AIState) {
-      break;
-    }
-
-    AIState->bHasLockedIn = true;
-    AIState->bIsAI = true;
-
     FTransform SpawnTransform = FTransform::Identity;
-    APlayerController *NewController =
+    ASkaldPlayerController *AIController = Cast<ASkaldPlayerController>(
         GetWorld()->SpawnActorDeferred<APlayerController>(
             AIControllerClass, SpawnTransform, nullptr, nullptr,
-            ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
-    if (!NewController) {
-      AIState->Destroy();
+            ESpawnActorCollisionHandlingMethod::AlwaysSpawn));
+    if (!AIController) {
       break;
     }
 
-    NewController->SetPlayerState(AIState);
+    AIController->FinishSpawning(SpawnTransform);
+    AIController->InitPlayerState();
 
+    RegisterPlayer(AIController);
+
+    ASkaldPlayerState *AIState =
+        AIController->GetPlayerState<ASkaldPlayerState>();
+    if (!AIState) {
+      AIController->Destroy();
+      break;
+    }
+
+    AIState->bIsAI = true;
+    AIState->bHasLockedIn = true;
     AIState->PlayerDisplayName =
         FString::Printf(TEXT("AI_%d"), GS->PlayerArray.Num());
-
-    NewController->FinishSpawning(SpawnTransform);
-
-    ASkaldPlayerController *AIController =
-        Cast<ASkaldPlayerController>(NewController);
-    if (!AIController) {
-      NewController->Destroy();
-      AIState->Destroy();
-      break;
-    }
 
     TArray<ESkaldFaction> Taken;
     for (APlayerState *ExistingPS : GS->PlayerArray) {
@@ -351,6 +343,7 @@ void ASkaldGameMode::PopulateAIPlayers() {
       }
     }
     Taken.Append(GI->TakenFactions);
+
     TArray<ESkaldFaction> Available;
     if (UEnum *Enum = StaticEnum<ESkaldFaction>()) {
       for (int32 i = 0; i < Enum->NumEnums(); ++i) {
@@ -364,6 +357,7 @@ void ASkaldGameMode::PopulateAIPlayers() {
         }
       }
     }
+
     if (Available.Num() > 0) {
       const int32 FactionIndex =
           GI->CombatRandomStream.RandRange(0, Available.Num() - 1);
@@ -373,10 +367,10 @@ void ASkaldGameMode::PopulateAIPlayers() {
       UE_LOG(LogSkald, Error,
              TEXT("PopulateAIPlayers: no available factions for AI"));
       AIController->Destroy();
-      AIState->Destroy();
       break;
     }
 
+    NewlySpawnedAI.Add(AIState);
     RegisterPlayer(AIController);
     NewlySpawnedAI.Add(AIState);
 
