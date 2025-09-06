@@ -30,6 +30,7 @@ public:
   virtual void BeginPlay() override;
   virtual void PostLogin(APlayerController *NewPlayer) override;
   virtual void Logout(AController *Exiting) override;
+  virtual void HandleSeamlessTravelPlayer(AController *&C) override;
 
   /** Advance army placement to the next controller. */
   void AdvanceArmyPlacement();
@@ -142,4 +143,7 @@ private:
 
   /** Attempt to initialise the world and start the game flow. */
   void TryInitializeWorldAndStart();
+
+  /** Remove invalid player states before re-registering controllers. */
+  void CleanupStalePlayerStates();
 };
