@@ -280,8 +280,6 @@ public:
     /** Timer used to poll for the world map actor until it exists. */
     FTimerHandle WorldMapSearchHandle;
 
-    /** Number of times we've attempted to locate the world map. */
-    int32 WorldMapSearchAttempts;
 
     void BuildPlayerDataArray(TArray<FS_PlayerData> &OutPlayers) const;
 

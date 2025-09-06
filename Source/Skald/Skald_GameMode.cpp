@@ -1134,6 +1134,16 @@ bool ASkaldGameMode::InitializeWorld() {
     }
     return false;
   }
+
+  // The world map now exists with generated territories; ensure all player
+  // controllers bind to its selection event.
+  for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator();
+       It; ++It) {
+    if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(*It)) {
+      PC->TryBindWorldMap();
+    }
+  }
+
   // Shuffle territories before assignment
   Algo::RandomShuffle(WorldMap->Territories);
 
