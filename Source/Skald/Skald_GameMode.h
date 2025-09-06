@@ -78,7 +78,6 @@ protected:
             meta = (ClampMin = "1"))
   int32 MinPlayerCount = 1;
 
-
   /** Controller class used when spawning AI players. */
   UPROPERTY(EditDefaultsOnly, Category = "Players")
   TSubclassOf<APlayerController> AIControllerClass;
@@ -120,6 +119,9 @@ public:
 private:
   /** Timer that triggers auto-start of the turn sequence. */
   FTimerHandle StartGameTimerHandle;
+
+  /** Timer used to retry initialization until readiness checks pass. */
+  FTimerHandle RetryInitTimerHandle;
 
   /** Tracks whether turns have already begun to avoid duplicates. */
   bool bTurnsStarted;

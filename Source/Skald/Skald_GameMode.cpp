@@ -611,6 +611,11 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     return;
   }
 
+  if (bWorldInitialized && bTurnsStarted) {
+    GetWorldTimerManager().ClearTimer(RetryInitTimerHandle);
+    return;
+  }
+
   // Purge any stale controller references before we evaluate player counts. A
   // player may have disconnected leaving behind a PlayerState with an owning
   // controller that is pending kill. Ensuring the turn manager drops these
@@ -654,7 +659,8 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
       if (!bIsAI && PC->IsLocalController() && !PC->GetHUDWidget()) {
         FTimerDelegate RetryInit = FTimerDelegate::CreateUObject(
             this, &ASkaldGameMode::TryInitializeWorldAndStart);
-        GetWorldTimerManager().SetTimerForNextTick(RetryInit);
+        GetWorldTimerManager().SetTimerForNextTick(RetryInitTimerHandle,
+                                                   RetryInit);
         return;
       }
     }
@@ -719,7 +725,7 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     GetWorldTimerManager().SetTimerForNextTick(RefreshDelegate);
     FTimerDelegate RetryInit = FTimerDelegate::CreateUObject(
         this, &ASkaldGameMode::TryInitializeWorldAndStart);
-    GetWorldTimerManager().SetTimerForNextTick(RetryInit);
+    GetWorldTimerManager().SetTimerForNextTick(RetryInitTimerHandle, RetryInit);
     return;
   }
 
@@ -815,6 +821,10 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
       GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Green,
                                        TEXT("Game started"));
     }
+  }
+
+  if (bWorldInitialized && bTurnsStarted) {
+    GetWorldTimerManager().ClearTimer(RetryInitTimerHandle);
   }
 }
 
