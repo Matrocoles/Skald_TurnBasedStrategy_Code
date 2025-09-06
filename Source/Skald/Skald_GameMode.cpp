@@ -38,6 +38,7 @@ ASkaldGameMode::ASkaldGameMode() {
   WorldMap = nullptr;
   bTurnsStarted = false;
   bWorldInitialized = false;
+  bAIPlayersSpawned = false;
   AIControllerClass = ASkaldAIController::StaticClass();
 
   NextSiegeID = 1;
@@ -343,10 +344,12 @@ void ASkaldGameMode::PopulateAIPlayers() {
 
   bool bHasHuman = false;
   int32 ExistingAI = 0;
+  TArray<ASkaldPlayerState *> AIStates;
   for (APlayerState *ExistingPS : GS->PlayerArray) {
     if (ASkaldPlayerState *EPS = Cast<ASkaldPlayerState>(ExistingPS)) {
       if (EPS->bIsAI) {
         ++ExistingAI;
+        AIStates.Add(EPS);
       } else {
         bHasHuman = true;
       }
@@ -357,6 +360,26 @@ void ASkaldGameMode::PopulateAIPlayers() {
   }
 
   const int32 TargetAI = FMath::Max(GI->AIPlayersToSpawn, 0);
+
+  // Trim any excess AI players to respect the configured total.
+  if (ExistingAI > TargetAI) {
+    for (int32 Index = AIStates.Num() - 1; Index >= 0 && ExistingAI > TargetAI;
+         --Index) {
+      ASkaldPlayerState *ExcessPS = AIStates[Index];
+      if (AController *OwnerController =
+              Cast<AController>(ExcessPS->GetOwner())) {
+        OwnerController->Destroy();
+      }
+      GS->RemovePlayerState(ExcessPS);
+      PlayerDataArray.RemoveAll([ExcessPS](const FS_PlayerData &Data) {
+        return Data.PlayerID == ExcessPS->GetPlayerId();
+      });
+      GI->TakenFactions.Remove(ExcessPS->Faction);
+      --ExistingAI;
+    }
+    GS->OnPlayersUpdated.Broadcast();
+  }
+
   const int32 MaxSpawnAttempts = TargetAI * 2;
   int32 SpawnAttempts = 0;
   TArray<ASkaldPlayerState *> NewlySpawnedAI;
@@ -469,12 +492,6 @@ void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
          TurnManager ? TurnManager->GetControllerCount() : 0,
          GS ? GS->PlayerArray.Num() : 0);
 
-  // Once a human has locked in their choice, populate remaining slots with AI
-  // opponents so they respect the player's faction selection.
-  if (!PS->bIsAI) {
-    PopulateAIPlayers();
-  }
-
   if (!WorldMap) {
     WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
         GetWorld(), AWorldMap::StaticClass()));
@@ -585,6 +602,11 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
       PS->bHasLockedIn = true;
       HandlePlayerLockedIn(PS);
     }
+  }
+
+  if (!bAIPlayersSpawned) {
+    bAIPlayersSpawned = true;
+    PopulateAIPlayers();
   }
 
   UE_LOG(LogSkald, Log,
