@@ -212,7 +212,9 @@ void ASkaldGameMode::Logout(AController *Exiting) {
   }
 
   RefreshHUDs();
-  TryInitializeWorldAndStart();
+  if (!bWorldInitialized) {
+    TryInitializeWorldAndStart();
+  }
 }
 
 void ASkaldGameMode::HandleSeamlessTravelPlayer(AController *&C) {
@@ -325,7 +327,9 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
         FTimerDelegate::CreateUObject(this, &ASkaldGameMode::RefreshHUDs);
     GetWorldTimerManager().SetTimerForNextTick(RefreshDelegate);
 
-    TryInitializeWorldAndStart();
+    if (!bWorldInitialized) {
+      TryInitializeWorldAndStart();
+    }
   }
 }
 
@@ -476,15 +480,9 @@ void ASkaldGameMode::PopulateAIPlayers() {
       break;
     }
 
-    AIState->bHasLockedIn = true;
-
     RegisterPlayer(AIController);
 
     NewlySpawnedAI.Add(AIState);
-
-    // RegisterPlayer may reset lock-in state; ensure AI players remain locked
-    // so TryInitializeWorldAndStart sees them as ready.
-    AIState->bHasLockedIn = true;
     ++ExistingAI;
 
     if (!AIController->GetPawn() && DefaultPawnClass) {
@@ -512,9 +510,11 @@ void ASkaldGameMode::PopulateAIPlayers() {
 }
 
 void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
-  if (!PS) {
+  if (!PS || bWorldInitialized || PS->bHasLockedIn) {
     return;
   }
+
+  PS->bHasLockedIn = true;
 
   UE_LOG(LogSkald, Log, TEXT("HandlePlayerLockedIn: Player=%s bIsAI=%d"),
          *PS->PlayerDisplayName, PS->bIsAI ? 1 : 0);
@@ -633,7 +633,6 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     }
 
     for (ASkaldPlayerState *PS : AutoLockPlayers) {
-      PS->bHasLockedIn = true;
       HandlePlayerLockedIn(PS);
     }
   }

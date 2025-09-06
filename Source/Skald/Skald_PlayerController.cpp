@@ -214,7 +214,6 @@ void ASkaldPlayerController::ServerInitPlayerState_Implementation(
     PS->PlayerDisplayName = Name;
     PS->SetPlayerName(Name);
     PS->Faction = Faction;
-    PS->bHasLockedIn = true;
 
     if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
       GI->AIPlayersToSpawn = NumAIPlayers;

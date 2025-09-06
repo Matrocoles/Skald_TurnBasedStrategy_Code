@@ -54,6 +54,9 @@ public:
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "GameMode")
   ATurnManager *GetTurnManager() const { return TurnManager; }
 
+  /** Whether the world has already been initialised. */
+  bool IsWorldInitialized() const { return bWorldInitialized; }
+
   /** Handle a player confirming their name and faction selection. */
   void HandlePlayerLockedIn(ASkaldPlayerState *PS);
 
