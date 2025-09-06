@@ -49,10 +49,7 @@ ASkaldGameMode::ASkaldGameMode() {
 void ASkaldGameMode::BeginPlay() {
   Super::BeginPlay();
 
-  if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
-    GS->Players.Empty();
-    GS->PlayerArray.Empty();
-  }
+  CleanupStalePlayerStates();
   PlayerDataArray.Empty();
 
   for (FConstPlayerControllerIterator It =
@@ -138,6 +135,41 @@ void ASkaldGameMode::BeginPlay() {
         }
       }
     }
+
+    // Verification that player and controller counts match and a human owns
+    // at least one territory after travelling to the battle map.
+    if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
+      int32 ControllerCount = 0;
+      for (FConstPlayerControllerIterator It =
+               GetWorld()->GetPlayerControllerIterator();
+           It; ++It) {
+        ++ControllerCount;
+      }
+      ensureMsgf(GS->PlayerArray.Num() == ControllerCount,
+                 TEXT("PlayerCount %d != ControllerCount %d after travel"),
+                 GS->PlayerArray.Num(), ControllerCount);
+
+      bool bHumanHasTerritory = false;
+      if (WorldMap) {
+        for (APlayerState *BasePS : GS->PlayerArray) {
+          ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(BasePS);
+          if (!PS || PS->bIsAI) {
+            continue;
+          }
+          for (ATerritory *Territory : WorldMap->Territories) {
+            if (WorldMap->IsOwnedBy(Territory, PS)) {
+              bHumanHasTerritory = true;
+              break;
+            }
+          }
+          if (bHumanHasTerritory) {
+            break;
+          }
+        }
+      }
+      ensureMsgf(bHumanHasTerritory,
+                 TEXT("Human player does not own any territory after travel"));
+    }
   }
 }
 
@@ -197,6 +229,16 @@ void ASkaldGameMode::Logout(AController *Exiting) {
 
   RefreshHUDs();
   TryInitializeWorldAndStart();
+}
+
+void ASkaldGameMode::HandleSeamlessTravelPlayer(AController *&C) {
+  Super::HandleSeamlessTravelPlayer(C);
+
+  CleanupStalePlayerStates();
+
+  if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(C)) {
+    RegisterPlayer(PC);
+  }
 }
 
 void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
@@ -279,6 +321,30 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
     FTimerDelegate RefreshDelegate =
         FTimerDelegate::CreateUObject(this, &ASkaldGameMode::RefreshHUDs);
     GetWorldTimerManager().SetTimerForNextTick(RefreshDelegate);
+  }
+}
+
+void ASkaldGameMode::CleanupStalePlayerStates() {
+  ASkaldGameState *GS = GetGameState<ASkaldGameState>();
+  if (!GS) {
+    return;
+  }
+
+  bool bRemovedAny = false;
+  for (int32 i = GS->PlayerArray.Num() - 1; i >= 0; --i) {
+    APlayerState *BasePS = GS->PlayerArray[i];
+    AController *Owner = BasePS ? Cast<AController>(BasePS->GetOwner()) : nullptr;
+    if (!IsValid(Owner)) {
+      GS->PlayerArray.RemoveAt(i);
+      if (ASkaldPlayerState *SkaldPS = Cast<ASkaldPlayerState>(BasePS)) {
+        GS->Players.RemoveSwap(SkaldPS);
+      }
+      bRemovedAny = true;
+    }
+  }
+
+  if (bRemovedAny) {
+    GS->OnPlayersUpdated.Broadcast();
   }
 }
 
