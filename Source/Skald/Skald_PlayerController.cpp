@@ -212,6 +212,7 @@ void ASkaldPlayerController::ServerInitPlayerState_Implementation(
            TEXT("ServerInitPlayerState_Implementation: PlayerState=%s"),
            *PS->GetName());
     PS->PlayerDisplayName = Name;
+    PS->SetPlayerName(Name);
     PS->Faction = Faction;
     PS->bHasLockedIn = true;
 
