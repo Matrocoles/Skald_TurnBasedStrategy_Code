@@ -369,13 +369,9 @@ void ASkaldGameMode::PopulateAIPlayers() {
       if (AController *OwningController =
               Cast<AController>(ExcessPS->GetOwner())) {
         OwningController->Destroy();
-      if (AController *OwnerController =
-              Cast<AController>(ExcessPS->GetOwner())) {
-        OwnerController->Destroy();
-      if (AController *Owner = Cast<AController>(ExcessPS->GetOwner())) {
-        Owner->Destroy();
       }
       GS->RemovePlayerState(ExcessPS);
+      GS->Players.RemoveSwap(ExcessPS);
       PlayerDataArray.RemoveAll([ExcessPS](const FS_PlayerData &Data) {
         return Data.PlayerID == ExcessPS->GetPlayerId();
       });
