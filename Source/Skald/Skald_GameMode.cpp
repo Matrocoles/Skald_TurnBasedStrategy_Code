@@ -663,6 +663,8 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
         GetWorldTimerManager().ClearTimer(RetryInitTimerHandle);
         GetWorldTimerManager().SetTimer(RetryInitTimerHandle, RetryInit,
                                         RetryInitDelay, false);
+        GetWorldTimerManager().SetTimer(RetryInitTimerHandle, RetryInit, 0.f,
+                                        false);
         return;
       }
     }
@@ -730,6 +732,8 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     GetWorldTimerManager().ClearTimer(RetryInitTimerHandle);
     GetWorldTimerManager().SetTimer(RetryInitTimerHandle, RetryInit,
                                     RetryInitDelay, false);
+    GetWorldTimerManager().SetTimer(RetryInitTimerHandle, RetryInit, 0.f,
+                                    false);
     return;
   }
 
