@@ -93,8 +93,6 @@ void ULoadGameWidget::HandleLoadSlot(int32 SlotIndex)
         {
             PC->SetInputMode(FInputModeGameOnly());
             PC->bShowMouseCursor = false;
-            PC->bEnableClickEvents = false;
-            PC->bEnableMouseOverEvents = false;
         }
 
         // After loading, transition to the main gameplay map
