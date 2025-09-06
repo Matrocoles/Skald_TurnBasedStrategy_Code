@@ -180,9 +180,11 @@ void ASkaldPlayerController::TryBindWorldMap() {
     }
     GetWorldTimerManager().ClearTimer(WorldMapSearchHandle);
   } else {
-    GetWorldTimerManager().SetTimer(WorldMapSearchHandle, this,
-                                    &ASkaldPlayerController::TryBindWorldMap,
-                                    0.5f, false);
+    if (!GetWorldTimerManager().IsTimerActive(WorldMapSearchHandle)) {
+      GetWorldTimerManager().SetTimer(
+          WorldMapSearchHandle, this,
+          &ASkaldPlayerController::TryBindWorldMap, 0.5f, true);
+    }
   }
 }
 
