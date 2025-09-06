@@ -238,6 +238,8 @@ void ASkaldGameMode::HandleSeamlessTravelPlayer(AController *&C) {
 
   if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(C)) {
     RegisterPlayer(PC);
+    RefreshHUDs();
+    TryInitializeWorldAndStart();
   }
 }
 
@@ -333,7 +335,8 @@ void ASkaldGameMode::CleanupStalePlayerStates() {
   bool bRemovedAny = false;
   for (int32 i = GS->PlayerArray.Num() - 1; i >= 0; --i) {
     APlayerState *BasePS = GS->PlayerArray[i];
-    AController *Owner = BasePS ? Cast<AController>(BasePS->GetOwner()) : nullptr;
+    AController *Owner =
+        BasePS ? Cast<AController>(BasePS->GetOwner()) : nullptr;
     if (!IsValid(Owner)) {
       GS->PlayerArray.RemoveAt(i);
       if (ASkaldPlayerState *SkaldPS = Cast<ASkaldPlayerState>(BasePS)) {
