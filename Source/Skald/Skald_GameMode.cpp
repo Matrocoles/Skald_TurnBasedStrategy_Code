@@ -24,6 +24,7 @@ namespace {
 constexpr float StartGameTimeout = 10.f;
 constexpr int32 StartingResources = 100;
 constexpr int32 DefaultAIMaxCost = 10;
+constexpr float RetryInitDelay = 0.01f;
 // Instance variables moved into ASkaldGameMode to avoid cross-instance
 // interference; see header for declarations.
 } // namespace
@@ -659,6 +660,9 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
       if (!bIsAI && PC->IsLocalController() && !PC->GetHUDWidget()) {
         FTimerDelegate RetryInit = FTimerDelegate::CreateUObject(
             this, &ASkaldGameMode::TryInitializeWorldAndStart);
+        GetWorldTimerManager().ClearTimer(RetryInitTimerHandle);
+        GetWorldTimerManager().SetTimer(RetryInitTimerHandle, RetryInit,
+                                        RetryInitDelay, false);
         GetWorldTimerManager().SetTimer(RetryInitTimerHandle, RetryInit, 0.f,
                                         false);
         return;
@@ -725,6 +729,9 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     GetWorldTimerManager().SetTimerForNextTick(RefreshDelegate);
     FTimerDelegate RetryInit = FTimerDelegate::CreateUObject(
         this, &ASkaldGameMode::TryInitializeWorldAndStart);
+    GetWorldTimerManager().ClearTimer(RetryInitTimerHandle);
+    GetWorldTimerManager().SetTimer(RetryInitTimerHandle, RetryInit,
+                                    RetryInitDelay, false);
     GetWorldTimerManager().SetTimer(RetryInitTimerHandle, RetryInit, 0.f,
                                     false);
     return;
