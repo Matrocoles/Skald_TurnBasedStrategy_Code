@@ -71,8 +71,6 @@ void ASkaldGameMode::BeginPlay() {
   // Defer AI population and world initialization until players lock in.
   RefreshHUDs();
 
-  TryInitializeWorldAndStart();
-
   // Auto-select fighters for AI players on the battle map
   const FString CurrentLevel =
       UGameplayStatics::GetCurrentLevelName(this, true);
@@ -197,9 +195,6 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
   }
 
   RegisterPlayer(PC);
-  RefreshHUDs();
-
-  TryInitializeWorldAndStart();
 }
 
 void ASkaldGameMode::Logout(AController *Exiting) {
@@ -238,8 +233,6 @@ void ASkaldGameMode::HandleSeamlessTravelPlayer(AController *&C) {
 
   if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(C)) {
     RegisterPlayer(PC);
-    RefreshHUDs();
-    TryInitializeWorldAndStart();
   }
 }
 
@@ -323,6 +316,8 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
     FTimerDelegate RefreshDelegate =
         FTimerDelegate::CreateUObject(this, &ASkaldGameMode::RefreshHUDs);
     GetWorldTimerManager().SetTimerForNextTick(RefreshDelegate);
+
+    TryInitializeWorldAndStart();
   }
 }
 
