@@ -130,6 +130,9 @@ protected:
   /** Current command selection when issuing grid battle orders. */
   EBattleCommandMode CurrentCommandMode;
 
+  /** Ensures ServerInitPlayerState and lock-in handling run only once. */
+  bool bHasInitialized;
+
   virtual void SetupInputComponent() override;
 
   /** Begin selecting a move destination. */

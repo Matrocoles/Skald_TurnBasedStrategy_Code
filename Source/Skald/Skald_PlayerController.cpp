@@ -32,6 +32,7 @@ ASkaldPlayerController::ASkaldPlayerController() {
   MainHudWidget = nullptr;
   BattleHudWidget = nullptr;
   CurrentCommandMode = EBattleCommandMode::None;
+  bHasInitialized = false;
 
   bShowMouseCursor = true;
   bEnableClickEvents = true;
@@ -161,7 +162,8 @@ void ASkaldPlayerController::BeginPlay() {
     }
     if (CachedGameInstance && CachedGameInstance->bIsMultiplayer) {
       InitializeChoosePlayerWidget();
-    } else if (CachedGameInstance) {
+    } else if (CachedGameInstance && !bHasInitialized &&
+               (!CachedGameMode || !CachedGameMode->IsWorldInitialized())) {
       ServerInitPlayerState(CachedGameInstance->DisplayName,
                             CachedGameInstance->Faction,
                             CachedGameInstance->AIPlayersToSpawn);
@@ -226,10 +228,15 @@ void ASkaldPlayerController::ServerInitPlayerState_Implementation(
     }
 
     if (ASkaldGameMode *GM = GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
-      UE_LOG(LogSkald, Log,
-             TEXT("ServerInitPlayerState_Implementation: Notify GameMode %s"),
-             *GM->GetName());
-      GM->HandlePlayerLockedIn(PS);
+      if (!GM->IsWorldInitialized()) {
+        UE_LOG(LogSkald, Log,
+               TEXT("ServerInitPlayerState_Implementation: Notify GameMode %s"),
+               *GM->GetName());
+        GM->HandlePlayerLockedIn(PS);
+      } else {
+        UE_LOG(LogSkald, Log,
+               TEXT("ServerInitPlayerState_Implementation: World already initialized"));
+      }
     } else {
       UE_LOG(LogSkald, Warning,
              TEXT("ServerInitPlayerState_Implementation: GameMode is null"));
@@ -903,6 +910,11 @@ void ASkaldPlayerController::HandleWorldStateChanged() {
 void ASkaldPlayerController::HandlePlayerLockedIn() { HandleFactionLockedIn(); }
 
 void ASkaldPlayerController::HandleFactionLockedIn() {
+  if (bHasInitialized) {
+    return;
+  }
+  bHasInitialized = true;
+
   if (ChoosePlayerWidget) {
     ChoosePlayerWidget->OnPlayerLockedIn.RemoveDynamic(
         this, &ASkaldPlayerController::HandleFactionLockedIn);
