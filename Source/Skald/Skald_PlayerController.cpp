@@ -26,8 +26,6 @@
 #include "UObject/ConstructorHelpers.h"
 #include "WorldMap.h"
 
-constexpr int32 MaxWorldMapSearchAttempts = 5;
-
 ASkaldPlayerController::ASkaldPlayerController() {
   TurnManager = nullptr;
   HUDRef = nullptr;
@@ -43,8 +41,6 @@ ASkaldPlayerController::ASkaldPlayerController() {
   // blueprint-derived widget that may not exist or may be corrupt.
   HUDWidgetClass = USkaldMainHUDWidget::StaticClass();
   BattleHUDWidgetClass = UBattleHUDWidget::StaticClass();
-
-  WorldMapSearchAttempts = 0;
 
   static ConstructorHelpers::FClassFinder<UChoosePlayerWidget> ChooseBP(
       TEXT("/Game/Blueprints/UI/Skald_ChoosePlayerWidget"));
@@ -183,21 +179,11 @@ void ASkaldPlayerController::TryBindWorldMap() {
                      this, &ASkaldPlayerController::HandleTerritorySelected),
                  TEXT("Failed to bind HandleTerritorySelected to WorldMap."));
     }
-    WorldMapSearchAttempts = 0;
     GetWorldTimerManager().ClearTimer(WorldMapSearchHandle);
   } else {
-    ++WorldMapSearchAttempts;
-    if (WorldMapSearchAttempts >= MaxWorldMapSearchAttempts) {
-      UE_LOG(LogSkald, Warning,
-             TEXT("ASkaldPlayerController could not find AWorldMap after %d "
-                  "attempts."),
-             WorldMapSearchAttempts);
-      GetWorldTimerManager().ClearTimer(WorldMapSearchHandle);
-    } else {
-      GetWorldTimerManager().SetTimer(WorldMapSearchHandle, this,
-                                      &ASkaldPlayerController::TryBindWorldMap,
-                                      0.5f, false);
-    }
+    GetWorldTimerManager().SetTimer(WorldMapSearchHandle, this,
+                                    &ASkaldPlayerController::TryBindWorldMap,
+                                    0.5f, false);
   }
 }
 
