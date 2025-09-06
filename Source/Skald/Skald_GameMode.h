@@ -116,6 +116,9 @@ public:
   /** Update cached player resource values. */
   void UpdatePlayerResources(ASkaldPlayerState *Player);
 
+  /** Attempt to initialise the world and start the game flow. */
+  void TryInitializeWorldAndStart();
+
 private:
   /** Timer that triggers auto-start of the turn sequence. */
   FTimerHandle StartGameTimerHandle;
@@ -140,9 +143,6 @@ private:
 
   /** Notify HUDs of the current player roster. */
   void RefreshHUDs();
-
-  /** Attempt to initialise the world and start the game flow. */
-  void TryInitializeWorldAndStart();
 
   /** Remove invalid player states before re-registering controllers. */
   void CleanupStalePlayerStates();
