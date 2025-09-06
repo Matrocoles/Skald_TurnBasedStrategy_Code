@@ -330,9 +330,9 @@ void ASkaldGameMode::CleanupStalePlayerStates() {
   bool bRemovedAny = false;
   for (int32 i = GS->PlayerArray.Num() - 1; i >= 0; --i) {
     APlayerState *BasePS = GS->PlayerArray[i];
-    AController *Owner =
+    AController *OwnerController =
         BasePS ? Cast<AController>(BasePS->GetOwner()) : nullptr;
-    if (!IsValid(Owner)) {
+    if (!IsValid(OwnerController)) {
       GS->PlayerArray.RemoveAt(i);
       if (ASkaldPlayerState *SkaldPS = Cast<ASkaldPlayerState>(BasePS)) {
         GS->Players.RemoveSwap(SkaldPS);
