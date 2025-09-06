@@ -11,11 +11,11 @@
 #include "Kismet/GameplayStatics.h"
 #include "Skald.h"
 #include "SkaldTypes.h"
+#include "Skald_AIController.h"
 #include "Skald_GameInstance.h"
 #include "Skald_GameMode.h"
 #include "Skald_GameState.h"
 #include "Skald_PlayerState.h"
-#include "Skald_AIController.h"
 #include "Skald_TurnManager.h"
 #include "Territory.h"
 #include "TimerManager.h"
@@ -73,7 +73,6 @@ void ASkaldPlayerController::CacheGameReferences() {
     CachedGameInstance->OnFactionsUpdated.AddDynamic(
         this, &ASkaldPlayerController::HandleFactionsUpdated);
   }
-
 }
 
 void ASkaldPlayerController::InitializeHUDWidget() {
@@ -359,7 +358,6 @@ void ASkaldPlayerController::EndPhase() {
 
   TurnManager->AdvancePhase();
 }
-
 
 bool ASkaldPlayerController::ValidateAttack(int32 FromID, int32 ToID,
                                             int32 ArmySent, bool bUseSiege,
@@ -928,6 +926,15 @@ void ASkaldPlayerController::HandleFactionLockedIn() {
   SetIgnoreMoveInput(false);
   SetIgnoreLookInput(false);
   TryBindWorldMap();
+
+  // Refresh the HUD after any AI opponents have been spawned by the game
+  // mode's PopulateAIPlayers call. This ensures the local player sees the
+  // full roster once lock-in is complete.
+  if (CachedGameState) {
+    FTimerDelegate RefreshDelegate = FTimerDelegate::CreateUObject(
+        this, &ASkaldPlayerController::HandlePlayersUpdated);
+    GetWorldTimerManager().SetTimerForNextTick(RefreshDelegate);
+  }
 }
 
 void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
