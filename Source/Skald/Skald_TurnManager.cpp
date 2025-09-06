@@ -53,6 +53,11 @@ void ATurnManager::BeginPlay() {
       }
     }
   }
+
+  if (ASkaldGameMode *GM =
+          GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
+    GM->TryInitializeWorldAndStart();
+  }
 }
 
 void ATurnManager::RegisterController(ASkaldPlayerController *Controller) {
