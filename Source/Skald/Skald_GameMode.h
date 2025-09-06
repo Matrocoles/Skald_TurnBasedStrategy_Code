@@ -66,8 +66,7 @@ protected:
   UPROPERTY(BlueprintReadOnly, Category = "GameMode")
   AWorldMap *WorldMap;
 
-  /** Data describing each player in the match. Pre-sized so blueprints can
-   * safely write to indices without hitting invalid array warnings. */
+  /** Data describing each player in the match. */
   UPROPERTY(BlueprintReadOnly, Category = "Players")
   TArray<FS_PlayerData> PlayerDataArray;
 
@@ -76,10 +75,6 @@ protected:
             meta = (ClampMin = "1"))
   int32 MinPlayerCount = 1;
 
-  /** Total number of players expected in the match (humans + AI). */
-  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Players",
-            meta = (ClampMin = "1"))
-  int32 ExpectedPlayerCount = 4;
 
   /** Controller class used when spawning AI players. */
   UPROPERTY(EditDefaultsOnly, Category = "Players")
