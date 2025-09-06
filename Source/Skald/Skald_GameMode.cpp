@@ -386,8 +386,6 @@ void ASkaldGameMode::PopulateAIPlayers() {
     AIController->FinishSpawning(SpawnTransform);
     AIController->InitPlayerState();
 
-    RegisterPlayer(AIController);
-
     ASkaldPlayerState *AIState =
         AIController->GetPlayerState<ASkaldPlayerState>();
     if (!AIState) {
@@ -396,7 +394,6 @@ void ASkaldGameMode::PopulateAIPlayers() {
     }
 
     AIState->bIsAI = true;
-    AIState->bHasLockedIn = true;
     AIState->PlayerDisplayName =
         FString::Printf(TEXT("AI_%d"), GS->PlayerArray.Num());
 
@@ -434,8 +431,10 @@ void ASkaldGameMode::PopulateAIPlayers() {
       break;
     }
 
-    NewlySpawnedAI.Add(AIState);
+    AIState->bHasLockedIn = true;
+
     RegisterPlayer(AIController);
+
     NewlySpawnedAI.Add(AIState);
 
     // RegisterPlayer may reset lock-in state; ensure AI players remain locked
