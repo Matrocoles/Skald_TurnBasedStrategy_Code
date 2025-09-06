@@ -319,9 +319,9 @@ void ASkaldGameMode::CleanupStalePlayerStates() {
   bool bRemovedAny = false;
   for (int32 i = GS->PlayerArray.Num() - 1; i >= 0; --i) {
     APlayerState *BasePS = GS->PlayerArray[i];
-    AController *OwnerController =
+    AController *OwningController =
         BasePS ? Cast<AController>(BasePS->GetOwner()) : nullptr;
-    if (!IsValid(OwnerController)) {
+    if (!IsValid(OwningController)) {
       GS->PlayerArray.RemoveAt(i);
       if (ASkaldPlayerState *SkaldPS = Cast<ASkaldPlayerState>(BasePS)) {
         GS->Players.RemoveSwap(SkaldPS);
@@ -366,6 +366,9 @@ void ASkaldGameMode::PopulateAIPlayers() {
     for (int32 Index = AIStates.Num() - 1; Index >= 0 && ExistingAI > TargetAI;
          --Index) {
       ASkaldPlayerState *ExcessPS = AIStates[Index];
+      if (AController *OwningController =
+              Cast<AController>(ExcessPS->GetOwner())) {
+        OwningController->Destroy();
       if (AController *OwnerController =
               Cast<AController>(ExcessPS->GetOwner())) {
         OwnerController->Destroy();
