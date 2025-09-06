@@ -1086,6 +1086,10 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
     }
 
     // Human player: wait for manual deployment with current pool visible.
+    // Ensure the active controller is in interactive mode so they can deploy.
+    if (PC) {
+      PC->StartTurn();
+    }
     return;
   }
 
