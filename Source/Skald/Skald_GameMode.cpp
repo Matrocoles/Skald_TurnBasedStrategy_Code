@@ -40,9 +40,6 @@ ASkaldGameMode::ASkaldGameMode() {
   bWorldInitialized = false;
   AIControllerClass = ASkaldAIController::StaticClass();
 
-  // Preallocate slots so blueprint scripts can safely write
-  // player data to indices without hitting "invalid index" warnings.
-  PlayerDataArray.SetNum(ExpectedPlayerCount);
   NextSiegeID = 1;
 }
 
@@ -183,15 +180,6 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
     PC->ClientMessage(TEXT("Game already in progress."));
     PC->Destroy();
     return;
-  }
-
-  if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
-    if (GS->PlayerArray.Num() >= ExpectedPlayerCount) {
-      PC->ClientMessage(FString::Printf(TEXT("Game is full (%d players max)."),
-                                        ExpectedPlayerCount));
-      PC->Destroy();
-      return;
-    }
   }
 
   RegisterPlayer(PC);
@@ -480,20 +468,6 @@ void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
          TurnManager ? *TurnManager->GetName() : TEXT("null"),
          TurnManager ? TurnManager->GetControllerCount() : 0,
          GS ? GS->PlayerArray.Num() : 0);
-
-  USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
-  int32 HumanCount = 0;
-  if (GS) {
-    for (APlayerState *ExistingPS : GS->PlayerArray) {
-      ASkaldPlayerState *Existing = Cast<ASkaldPlayerState>(ExistingPS);
-      if (Existing && !Existing->bIsAI) {
-        ++HumanCount;
-      }
-    }
-  }
-  const int32 AICount = GI ? GI->AIPlayersToSpawn : 0;
-  ExpectedPlayerCount = FMath::Max(HumanCount + AICount, MinPlayerCount);
-  PlayerDataArray.SetNum(ExpectedPlayerCount);
 
   // Once a human has locked in their choice, populate remaining slots with AI
   // opponents so they respect the player's faction selection.
@@ -1068,22 +1042,7 @@ bool ASkaldGameMode::InitializeWorld() {
     return false;
   }
 
-  int32 TotalPlayerCount = GS->PlayerArray.Num();
-  if (TotalPlayerCount > ExpectedPlayerCount) {
-    UE_LOG(LogSkald, Warning,
-           TEXT("InitializeWorld: maximum %d players supported but found %d; "
-                "proceeding "
-                "with first %d players"),
-           ExpectedPlayerCount, TotalPlayerCount, ExpectedPlayerCount);
-    while (GS->PlayerArray.Num() > ExpectedPlayerCount) {
-      if (APlayerState *Extra = GS->PlayerArray[ExpectedPlayerCount]) {
-        GS->RemovePlayerState(Extra);
-      } else {
-        GS->PlayerArray.RemoveAt(ExpectedPlayerCount);
-      }
-    }
-    TotalPlayerCount = ExpectedPlayerCount;
-  }
+  const int32 TotalPlayerCount = GS->PlayerArray.Num();
   if (TotalPlayerCount < MinPlayerCount) {
     UE_LOG(
         LogSkald, Warning,
