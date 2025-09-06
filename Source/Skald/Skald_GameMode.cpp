@@ -631,7 +631,9 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
                   "controller"),
              *GetNameSafe(PS));
       GS->RemovePlayerState(PS);
-      PlayerDataArray.RemoveAt(Index);
+      PlayerDataArray.RemoveAll([PS](const FS_PlayerData &Data) {
+        return Data.PlayerID == PS->GetPlayerId();
+      });
       bNeedsRetry = true;
       continue;
     }
@@ -642,7 +644,9 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
                "for controller %s"),
           *GetNameSafe(PS), *GetNameSafe(OwningController));
       GS->RemovePlayerState(PS);
-      PlayerDataArray.RemoveAt(Index);
+      PlayerDataArray.RemoveAll([PS](const FS_PlayerData &Data) {
+        return Data.PlayerID == PS->GetPlayerId();
+      });
       bNeedsRetry = true;
       continue;
     }
@@ -1149,7 +1153,8 @@ bool ASkaldGameMode::InitializeWorld() {
 
   // The world map now exists with generated territories; ensure all player
   // controllers bind to its selection event.
-  for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator();
+  for (FConstPlayerControllerIterator It =
+           GetWorld()->GetPlayerControllerIterator();
        It; ++It) {
     if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(*It)) {
       PC->TryBindWorldMap();
