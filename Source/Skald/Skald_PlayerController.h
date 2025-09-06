@@ -29,6 +29,9 @@ UCLASS(Blueprintable, BlueprintType)
 class SKALD_API ASkaldPlayerController : public APlayerController {
   GENERATED_BODY()
 
+  /** Allow the game mode to trigger binding once the world map exists. */
+  friend class ASkaldGameMode;
+
 public:
   ASkaldPlayerController();
 
