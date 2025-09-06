@@ -670,6 +670,18 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     return;
   }
 
+  // Player IDs can grow without bound across repeated sessions. Reassign
+  // them to match the compact `PlayerDataArray` so blueprints that index by
+  // ID never read past the array length.
+  for (int32 i = 0; i < GS->PlayerArray.Num(); ++i) {
+    if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(GS->PlayerArray[i])) {
+      PS->SetPlayerId(i);
+      if (PlayerDataArray.IsValidIndex(i)) {
+        PlayerDataArray[i].PlayerID = i;
+      }
+    }
+  }
+
   UE_LOG(LogSkald, Log,
          TEXT("TryInitializeWorldAndStart: Listing player lock states"));
   for (APlayerState *PSBase : GS->PlayerArray) {
