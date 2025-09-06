@@ -234,7 +234,26 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
   const bool bIsMultiplayer = GI && GI->bIsMultiplayer;
 
+  ASkaldGameState *GS = GetGameState<ASkaldGameState>();
   ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>();
+
+  if (GS) {
+    // If a PlayerState already exists for this controller, reuse it instead of
+    // keeping a second one that may have been created by InitPlayerState.
+    for (APlayerState *ExistingPSBase : GS->PlayerArray) {
+      if (ExistingPSBase && ExistingPSBase->GetOwner() == PC &&
+          ExistingPSBase != PS) {
+        if (PS) {
+          GS->RemovePlayerState(PS);
+          PS->Destroy();
+        }
+        PS = Cast<ASkaldPlayerState>(ExistingPSBase);
+        PC->PlayerState = PS;
+        break;
+      }
+    }
+  }
+
   if (!PS) {
     // Player state may not yet be replicated in multiplayer; queue a retry
     // next tick while the controller remains valid. In singleplayer, assume
@@ -253,7 +272,7 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
 
   PS->bIsAI = PC->IsA<ASkaldAIController>();
 
-  if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
+  if (GS) {
     if (!GS->PlayerArray.Contains(PS)) {
       GS->AddPlayerState(PS);
     }
@@ -403,6 +422,20 @@ void ASkaldGameMode::PopulateAIPlayers() {
     if (!AIState) {
       AIController->Destroy();
       break;
+    }
+
+    // If this controller already has a PlayerState registered with the
+    // GameState, reuse it instead of creating a duplicate. This can happen if
+    // PopulateAIPlayers is called again for an existing AI controller.
+    for (APlayerState *ExistingPSBase : GS->PlayerArray) {
+      if (ExistingPSBase && ExistingPSBase->GetOwner() == AIController &&
+          ExistingPSBase != AIState) {
+        GS->RemovePlayerState(AIState);
+        AIState->Destroy();
+        AIState = Cast<ASkaldPlayerState>(ExistingPSBase);
+        AIController->PlayerState = AIState;
+        break;
+      }
     }
 
     AIState->bIsAI = true;
