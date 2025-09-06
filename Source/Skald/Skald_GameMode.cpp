@@ -366,6 +366,9 @@ void ASkaldGameMode::PopulateAIPlayers() {
     for (int32 Index = AIStates.Num() - 1; Index >= 0 && ExistingAI > TargetAI;
          --Index) {
       ASkaldPlayerState *ExcessPS = AIStates[Index];
+      if (AController *OwnerController =
+              Cast<AController>(ExcessPS->GetOwner())) {
+        OwnerController->Destroy();
       if (AController *Owner = Cast<AController>(ExcessPS->GetOwner())) {
         Owner->Destroy();
       }
