@@ -27,6 +27,11 @@ bool FTerritorySelectionFlowTest::RunTest(const FString& Parameters)
     ATerritorySelectionTestPC* PC = World->SpawnActor<ATerritorySelectionTestPC>();
     FString Error;
     ULocalPlayer* LocalPlayer = World->GetGameInstance()->CreateLocalPlayer(0, Error, false);
+    TestNotNull(TEXT("LocalPlayer"), LocalPlayer);
+    if (!LocalPlayer)
+    {
+        return false;
+    }
     PC->SetPlayer(LocalPlayer);
 
     TestNotNull(TEXT("WorldMap"), Map);
@@ -34,6 +39,7 @@ bool FTerritorySelectionFlowTest::RunTest(const FString& Parameters)
     TestNotNull(TEXT("PlayerController"), PC);
     if (!Map || !Terr || !PC)
     {
+        World->GetGameInstance()->RemoveLocalPlayer(LocalPlayer);
         return false;
     }
 
@@ -44,6 +50,7 @@ bool FTerritorySelectionFlowTest::RunTest(const FString& Parameters)
     TestNotNull(TEXT("Mesh component"), Mesh);
     if (!Mesh)
     {
+        World->GetGameInstance()->RemoveLocalPlayer(LocalPlayer);
         return false;
     }
 
@@ -52,6 +59,7 @@ bool FTerritorySelectionFlowTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("ServerSelectTerritory called"), PC->bServerSelectCalled);
     TestEqual(TEXT("SelectedTerritory updated"), Map->SelectedTerritory, Terr);
 
+    World->GetGameInstance()->RemoveLocalPlayer(LocalPlayer);
     return true;
 }
 
