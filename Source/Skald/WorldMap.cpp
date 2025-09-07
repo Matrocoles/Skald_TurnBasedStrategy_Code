@@ -293,8 +293,6 @@ bool AWorldMap::GenerateTerritoriesFromTable() {
 void AWorldMap::RegisterTerritory(ATerritory *Territory) {
   if (Territory && !Territories.Contains(Territory)) {
     Territories.Add(Territory);
-    Territory->OnTerritorySelected.AddDynamic(this,
-                                              &AWorldMap::SelectTerritory);
   }
 }
 

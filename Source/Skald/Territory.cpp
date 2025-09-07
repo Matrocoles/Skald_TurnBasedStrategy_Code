@@ -169,7 +169,6 @@ void ATerritory::Select() {
     DynamicMaterial->SetVectorParameterValue(FName("Color"),
                                              FLinearColor::White);
   }
-  OnTerritorySelected.Broadcast(this);
 }
 
 void ATerritory::Deselect() {

@@ -13,8 +13,6 @@ class UPrimitiveComponent;
 class UMaterialInstanceDynamic;
 class UTextRenderComponent;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FTerritorySelectedSignature, ATerritory*, Territory);
-
 /**
  * Actor representing a single territory on the world map.
  */
@@ -74,10 +72,6 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory", Replicated)
     bool bHasTreasure = false;
 
-
-    /** Called when the territory is selected. */
-    UPROPERTY(BlueprintAssignable, Category = "Territory")
-    FTerritorySelectedSignature OnTerritorySelected;
 
     /** Mark this territory as selected. */
     UFUNCTION(BlueprintCallable, Category = "Territory")
