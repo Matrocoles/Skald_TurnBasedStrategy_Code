@@ -932,8 +932,11 @@ void ASkaldPlayerController::HandleFactionLockedIn() {
       MainHudWidget->RefreshPlayerList(Players);
     }
     if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+      MainHudWidget->LocalPlayerID = PS->GetPlayerId();
       MainHudWidget->UpdateDeployableUnits(PS->DeployableUnits);
       MainHudWidget->UpdateResources(PS->Resources);
+      MainHudWidget->SyncPhaseButtons(MainHudWidget->CurrentPlayerID ==
+                                      MainHudWidget->LocalPlayerID);
     }
     if (TurnManager) {
       MainHudWidget->UpdatePhaseBanner(TurnManager->GetCurrentPhase());
