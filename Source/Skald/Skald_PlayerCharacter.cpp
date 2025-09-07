@@ -11,6 +11,7 @@
 #include "Skald_GameInstance.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "TimerManager.h"
 
 // Sets default values
 ASkald_PlayerCharacter::ASkald_PlayerCharacter()
@@ -37,12 +38,27 @@ void ASkald_PlayerCharacter::BeginPlay()
 {
         Super::BeginPlay();
 
-        // Cache reference to the world map if one exists in the level
-        WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
+        TryCacheWorldMap();
 
         CachedGameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
         CachedGameState = GetWorld()->GetGameState<ASkaldGameState>();
         CachedGameInstance = GetGameInstance<USkaldGameInstance>();
+}
+
+void ASkald_PlayerCharacter::TryCacheWorldMap()
+{
+        if (!WorldMap)
+        {
+                if (AWorldMap* Found = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass())))
+                {
+                        WorldMap = Found;
+                        GetWorldTimerManager().ClearTimer(WorldMapSearchHandle);
+                }
+                else
+                {
+                        GetWorldTimerManager().SetTimer(WorldMapSearchHandle, this, &ASkald_PlayerCharacter::TryCacheWorldMap, 0.5f, false);
+                }
+        }
 }
 
 // Called every frame
@@ -124,6 +140,11 @@ void ASkald_PlayerCharacter::Select()
         if (!PlayerController)
         {
                 return;
+        }
+
+        if (!IsValid(WorldMap))
+        {
+                TryCacheWorldMap();
         }
 
         FHitResult Hit;
