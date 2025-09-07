@@ -180,6 +180,11 @@ void ATerritory::Deselect() {
     // Restore the color that was in use prior to selection
     DynamicMaterial->SetVectorParameterValue(FName("Color"), DefaultColor);
   }
+  if (AWorldMap *Map = Cast<AWorldMap>(GetOwner())) {
+    if (Map->SelectedTerritory == this) {
+      Map->SelectedTerritory = nullptr;
+    }
+  }
 }
 
 bool ATerritory::IsAdjacentTo(const ATerritory *Other) const {
@@ -202,8 +207,12 @@ bool ATerritory::MoveTo(ATerritory *TargetTerritory, int32 Troops) {
   RefreshAppearance();
   TargetTerritory->RefreshAppearance();
 
-  Deselect();
-  TargetTerritory->Select();
+  if (AWorldMap *Map = Cast<AWorldMap>(GetOwner())) {
+    Map->SelectTerritory(TargetTerritory);
+  } else {
+    Deselect();
+    TargetTerritory->Select();
+  }
 
   return true;
 }
