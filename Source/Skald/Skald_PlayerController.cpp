@@ -25,6 +25,7 @@
 #include "UI/SkaldMainHUDWidget.h"
 #include "UObject/ConstructorHelpers.h"
 #include "WorldMap.h"
+#include "Runtime/Launch/Resources/Version.h"
 
 ASkaldPlayerController::ASkaldPlayerController() {
   TurnManager = nullptr;
