@@ -662,6 +662,8 @@ void ASkaldPlayerController::ServerDeployUnits_Implementation(int32 TerritoryID,
 
 void ASkaldPlayerController::ServerSelectTerritory_Implementation(
     int32 TerritoryID) {
+  UE_LOG(LogSkald, Log, TEXT("ServerSelectTerritory called with %d"),
+         TerritoryID);
   AWorldMap *WorldMap = Cast<AWorldMap>(
       UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
   if (!WorldMap) {
