@@ -5,6 +5,8 @@
 #include "WorldMap.h"
 #include "Territory.h"
 #include "InputCoreTypes.h"
+#include "Engine/GameInstance.h"
+#include "Engine/LocalPlayer.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTerritorySelectionFlowTest,
                                  "Skald.World.TerritorySelection",
@@ -23,6 +25,9 @@ bool FTerritorySelectionFlowTest::RunTest(const FString& Parameters)
     AWorldMap* Map = World->SpawnActor<AWorldMap>();
     ATerritory* Terr = World->SpawnActor<ATerritory>();
     ATerritorySelectionTestPC* PC = World->SpawnActor<ATerritorySelectionTestPC>();
+    FString Error;
+    ULocalPlayer* LocalPlayer = World->GetGameInstance()->CreateLocalPlayer(0, Error, false);
+    PC->SetPlayer(LocalPlayer);
 
     TestNotNull(TEXT("WorldMap"), Map);
     TestNotNull(TEXT("Territory"), Terr);
