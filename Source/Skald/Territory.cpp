@@ -231,6 +231,10 @@ void ATerritory::HandleMouseLeave(UPrimitiveComponent *TouchedComponent) {
 
 void ATerritory::HandleClicked(UPrimitiveComponent *TouchedComponent,
                                FKey ButtonPressed) {
+  UE_LOG(LogSkald, Log,
+         TEXT("Territory %d clicked; currently %s"), TerritoryID,
+         bIsSelected ? TEXT("selected") : TEXT("not selected"));
+
   if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(
           UGameplayStatics::GetPlayerController(this, 0))) {
     const bool bDeselected = bIsSelected;

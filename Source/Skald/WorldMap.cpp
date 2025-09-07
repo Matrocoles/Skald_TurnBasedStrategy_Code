@@ -292,6 +292,7 @@ bool AWorldMap::GenerateTerritoriesFromTable() {
 
 void AWorldMap::RegisterTerritory(ATerritory *Territory) {
   if (Territory && !Territories.Contains(Territory)) {
+    Territory->SetOwner(this);
     Territories.Add(Territory);
   }
 }
@@ -308,6 +309,11 @@ void AWorldMap::SelectTerritory(ATerritory *Territory) {
   if (Territory == SelectedTerritory) {
     return;
   }
+
+  UE_LOG(LogSkald, Log,
+         TEXT("WorldMap %s selecting territory %s (previous %s)"),
+         *GetName(), Territory ? *Territory->GetName() : TEXT("None"),
+         SelectedTerritory ? *SelectedTerritory->GetName() : TEXT("None"));
 
   if (SelectedTerritory) {
     SelectedTerritory->Deselect();
