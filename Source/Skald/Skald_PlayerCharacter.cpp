@@ -53,6 +53,7 @@ void ASkald_PlayerCharacter::TryCacheWorldMap()
                 if (AWorldMap* Found = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass())))
                 {
                         WorldMap = Found;
+                        WorldMap->OnTerritorySelected.AddUniqueDynamic(this, &ASkald_PlayerCharacter::HandleTerritorySelected);
                         GetWorldTimerManager().ClearTimer(WorldMapSearchHandle);
                 }
                 else
@@ -146,15 +147,23 @@ void ASkald_PlayerCharacter::Select()
         FHitResult Hit;
         if (PlayerController->GetHitResultUnderCursor(ECC_Visibility, false, Hit))
         {
-                if (ATerritory* Territory = Cast<ATerritory>(Hit.GetActor()))
+                if (Cast<ATerritory>(Hit.GetActor()))
                 {
-                        if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(PlayerController))
-                        {
-                                PC->ServerSelectTerritory(Territory->TerritoryID);
-                                CurrentSelection = Territory;
-                        }
+                        // ATerritory::HandleClicked already issues the RPC with toggle state
+                        return;
                 }
         }
+
+        // Clicked empty space; request deselection
+        if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(PlayerController))
+        {
+                PC->ServerSelectTerritory(-1);
+        }
+}
+
+void ASkald_PlayerCharacter::HandleTerritorySelected(ATerritory* Territory)
+{
+        CurrentSelection = Territory;
 }
 
 void ASkald_PlayerCharacter::AbilityOne()
