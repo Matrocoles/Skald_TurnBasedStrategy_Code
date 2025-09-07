@@ -87,9 +87,6 @@ public:
   UFUNCTION(BlueprintCallable, Category = "WorldMap")
   void SelectTerritory(ATerritory *Territory);
 
-  /** Multicast selection so all clients highlight the same territory. */
-  UFUNCTION(NetMulticast, Reliable)
-  void MulticastSelectTerritory(ATerritory *Territory);
 
   /** Generate territories from the assigned data table. */
   UFUNCTION(BlueprintCallable, Category = "WorldMap")

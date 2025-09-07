@@ -430,6 +430,3 @@ bool AWorldMap::IsOwnedBy(const ATerritory *Territory,
   return Territory->OwningPlayer->GetPlayerId() == Player->GetPlayerId();
 }
 
-void AWorldMap::MulticastSelectTerritory_Implementation(ATerritory *Territory) {
-  SelectTerritory(Territory);
-}

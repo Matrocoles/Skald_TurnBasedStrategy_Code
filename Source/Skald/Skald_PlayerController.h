@@ -244,6 +244,10 @@ public:
   UFUNCTION(Server, Reliable)
   void ServerSelectTerritory(int32 TerritoryID);
 
+  /** Client-side update for a territory selection. Pass -1 to clear. */
+  UFUNCTION(Client, Reliable)
+  void ClientSelectTerritory(int32 TerritoryID);
+
   /** Phase change handlers. */
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void HandleEngineeringPhase();

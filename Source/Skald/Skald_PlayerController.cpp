@@ -669,16 +669,31 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
   }
 
   if (TerritoryID < 0) {
-    WorldMap->MulticastSelectTerritory(nullptr);
+    WorldMap->SelectTerritory(nullptr);
+    ClientSelectTerritory(-1);
     return;
   }
 
   ATerritory *Terr = WorldMap->GetTerritoryById(TerritoryID);
-  if (!Terr || WorldMap->SelectedTerritory == Terr) {
+  if (!Terr) {
     return;
   }
 
-  WorldMap->MulticastSelectTerritory(Terr);
+  WorldMap->SelectTerritory(Terr);
+  ClientSelectTerritory(TerritoryID);
+}
+
+void ASkaldPlayerController::ClientSelectTerritory_Implementation(
+    int32 TerritoryID) {
+  AWorldMap *WorldMap = Cast<AWorldMap>(
+      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
+  if (!WorldMap) {
+    return;
+  }
+
+  ATerritory *Terr = TerritoryID >= 0 ? WorldMap->GetTerritoryById(TerritoryID)
+                                     : nullptr;
+  WorldMap->SelectTerritory(Terr);
 }
 
 void ASkaldPlayerController::HandleEndAttackRequested(bool bConfirmed) {

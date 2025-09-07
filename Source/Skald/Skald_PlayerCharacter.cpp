@@ -2,6 +2,7 @@
 #include "Skald.h"
 #include "WorldMap.h"
 #include "Territory.h"
+#include "Skald_PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/World.h"
 #include "Components/InputComponent.h"
@@ -142,20 +143,15 @@ void ASkald_PlayerCharacter::Select()
                 return;
         }
 
-        if (!IsValid(WorldMap))
-        {
-                TryCacheWorldMap();
-        }
-
         FHitResult Hit;
         if (PlayerController->GetHitResultUnderCursor(ECC_Visibility, false, Hit))
         {
                 if (ATerritory* Territory = Cast<ATerritory>(Hit.GetActor()))
                 {
-                        if (IsValid(WorldMap))
+                        if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(PlayerController))
                         {
-                                WorldMap->SelectTerritory(Territory);
-                                CurrentSelection = WorldMap->SelectedTerritory;
+                                PC->ServerSelectTerritory(Territory->TerritoryID);
+                                CurrentSelection = Territory;
                         }
                 }
         }
