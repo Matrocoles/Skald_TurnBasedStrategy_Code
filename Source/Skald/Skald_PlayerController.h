@@ -3,8 +3,8 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
 #include "SkaldTypes.h"
-#include "TimerManager.h"
 #include "Skald_PlayerController.generated.h"
+#include "TimerManager.h"
 
 class ATurnManager;
 class UUserWidget;

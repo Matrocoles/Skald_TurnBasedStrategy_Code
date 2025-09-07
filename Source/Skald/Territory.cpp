@@ -225,6 +225,9 @@ void ATerritory::HandleClicked(UPrimitiveComponent *TouchedComponent,
                                FKey ButtonPressed) {
   if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(
           UGameplayStatics::GetPlayerController(this, 0))) {
+    const bool bDeselected = bIsSelected;
+    PC->ServerSelectTerritory(bDeselected ? -1 : TerritoryID);
+    PC->HandleTerritorySelected(bDeselected ? nullptr : this);
     PC->ServerSelectTerritory(bIsSelected ? -1 : TerritoryID);
   }
 }
