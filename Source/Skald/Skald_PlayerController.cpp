@@ -668,6 +668,11 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
     return;
   }
 
+  if (TerritoryID < 0) {
+    WorldMap->MulticastSelectTerritory(nullptr);
+    return;
+  }
+
   ATerritory *Terr = WorldMap->GetTerritoryById(TerritoryID);
   if (!Terr || WorldMap->SelectedTerritory == Terr) {
     return;
