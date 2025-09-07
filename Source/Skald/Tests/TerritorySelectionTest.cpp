@@ -6,6 +6,7 @@
 #include "InputCoreTypes.h"
 #include "Misc/AutomationTest.h"
 #include "Territory.h"
+#include "Components/PrimitiveComponent.h"
 #include "Tests/AutomationEditorCommon.h"
 #include "WorldMap.h"
 
