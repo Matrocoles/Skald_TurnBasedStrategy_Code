@@ -336,8 +336,11 @@ void ASkaldPlayerController::ShowTurnAnnouncement(const FString &PlayerName,
 }
 
 void ASkaldPlayerController::StartTurn() {
-  FInputModeGameAndUI InputMode;
-  SetInputMode(InputMode);
+  FInputModeGameAndUI Mode;
+  Mode.SetWidgetToFocus(nullptr);
+  Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+  Mode.SetCaptureMouseOnClick(EMouseCaptureMode::NoCapture);
+  SetInputMode(Mode);
 }
 
 void ASkaldPlayerController::EndTurn() {
@@ -960,7 +963,11 @@ void ASkaldPlayerController::HandleFactionLockedIn() {
     }
   }
 
-  SetInputMode(FInputModeGameAndUI());
+  FInputModeGameAndUI Mode;
+  Mode.SetWidgetToFocus(nullptr);
+  Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+  Mode.SetCaptureMouseOnClick(EMouseCaptureMode::NoCapture);
+  SetInputMode(Mode);
   bShowMouseCursor = true;
   bEnableClickEvents = true;
   bEnableMouseOverEvents = true;
@@ -1022,7 +1029,11 @@ void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
     }
   }
 
-  SetInputMode(FInputModeGameAndUI());
+  FInputModeGameAndUI Mode;
+  Mode.SetWidgetToFocus(nullptr);
+  Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+  Mode.SetCaptureMouseOnClick(EMouseCaptureMode::NoCapture);
+  SetInputMode(Mode);
   SetIgnoreMoveInput(false);
   SetIgnoreLookInput(false);
 }
