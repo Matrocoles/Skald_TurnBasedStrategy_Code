@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "TimerManager.h"
 
 class AWorldMap;
 class ATerritory;
@@ -43,6 +44,12 @@ protected:
 
         UPROPERTY(BlueprintReadOnly, Category="Game")
         USkaldGameInstance* CachedGameInstance;
+
+        /** Timer handle used to repeatedly search for the world map */
+        FTimerHandle WorldMapSearchHandle;
+
+        /** Attempt to cache a reference to the world map */
+        void TryCacheWorldMap();
 
 public:
         /** Called every frame */
