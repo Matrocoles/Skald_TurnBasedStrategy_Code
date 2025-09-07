@@ -961,6 +961,7 @@ void ASkaldPlayerController::HandleFactionLockedIn() {
   SetInputMode(FInputModeGameAndUI());
   bShowMouseCursor = true;
   bEnableClickEvents = true;
+  bEnableMouseOverEvents = true;
   SetIgnoreMoveInput(false);
   SetIgnoreLookInput(false);
   TryBindWorldMap();
