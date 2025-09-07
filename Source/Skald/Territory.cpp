@@ -2,9 +2,9 @@
 #include "Components/PrimitiveComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
+#include "Engine/StaticMesh.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
-#include "Engine/StaticMesh.h"
 #include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
 #include "Skald.h"
@@ -130,9 +130,8 @@ void ATerritory::BeginPlay() {
   // Ensure this territory is registered with the world map. When territories
   // are placed manually in a level they may not have been added during map
   // initialization, so register here if needed.
-  if (AWorldMap *WorldMap =
-          Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
-              this, AWorldMap::StaticClass()))) {
+  if (AWorldMap *WorldMap = Cast<AWorldMap>(
+          UGameplayStatics::GetActorOfClass(this, AWorldMap::StaticClass()))) {
     if (!WorldMap->Territories.Contains(this)) {
       WorldMap->RegisterTerritory(this);
     }
@@ -224,14 +223,11 @@ void ATerritory::HandleMouseLeave(UPrimitiveComponent *TouchedComponent) {
 
 void ATerritory::HandleClicked(UPrimitiveComponent *TouchedComponent,
                                FKey ButtonPressed) {
-  if (AWorldMap *WorldMap =
-          Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
-              this, AWorldMap::StaticClass()))) {
-    if (!bIsSelected) {
-      WorldMap->MulticastSelectTerritory(this);
-    } else {
-      WorldMap->MulticastSelectTerritory(nullptr);
-    }
+  if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(
+          UGameplayStatics::GetPlayerController(this, 0))) {
+    const bool bDeselected = bIsSelected;
+    PC->ServerSelectTerritory(bDeselected ? -1 : TerritoryID);
+    PC->HandleTerritorySelected(bDeselected ? nullptr : this);
   }
 }
 
@@ -269,8 +265,7 @@ void ATerritory::UpdateLabel() {
 
   const FString OwnerName =
       OwningPlayer ? OwningPlayer->PlayerDisplayName : TEXT("Neutral");
-  const FString Text =
-      FString::Printf(TEXT("%s\nOwner: %s\nUnits: %d"), *TerritoryName,
-                      *OwnerName, ArmyUnits);
+  const FString Text = FString::Printf(TEXT("%s\nOwner: %s\nUnits: %d"),
+                                       *TerritoryName, *OwnerName, ArmyUnits);
   LabelComponent->SetText(FText::FromString(Text));
 }

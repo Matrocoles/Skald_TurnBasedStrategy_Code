@@ -668,6 +668,11 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
     return;
   }
 
+  if (TerritoryID < 0) {
+    WorldMap->MulticastSelectTerritory(nullptr);
+    return;
+  }
+
   ATerritory *Terr = WorldMap->GetTerritoryById(TerritoryID);
   if (!Terr || WorldMap->SelectedTerritory == Terr) {
     return;
@@ -775,20 +780,15 @@ void ASkaldPlayerController::HandleRevoltPhase() {
 }
 
 void ASkaldPlayerController::HandleTerritorySelected(ATerritory *Terr) {
-  if (!Terr) {
+  if (!Terr || !MainHudWidget) {
     return;
   }
 
-  ServerSelectTerritory(Terr->TerritoryID);
-
-  if (MainHudWidget) {
-    FString OwnerName = Terr->OwningPlayer
-                            ? Terr->OwningPlayer->PlayerDisplayName
-                            : TEXT("Neutral");
-    MainHudWidget->UpdateTerritoryInfo(Terr->TerritoryName, OwnerName,
-                                       Terr->ArmyUnits);
-    MainHudWidget->OnTerritoryClickedUI(Terr);
-  }
+  FString OwnerName = Terr->OwningPlayer ? Terr->OwningPlayer->PlayerDisplayName
+                                         : TEXT("Neutral");
+  MainHudWidget->UpdateTerritoryInfo(Terr->TerritoryName, OwnerName,
+                                     Terr->ArmyUnits);
+  MainHudWidget->OnTerritoryClickedUI(Terr);
 }
 
 void ASkaldPlayerController::NotifyActionError_Implementation(
