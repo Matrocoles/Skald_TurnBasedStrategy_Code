@@ -51,6 +51,10 @@ protected:
         /** Attempt to cache a reference to the world map */
         void TryCacheWorldMap();
 
+        /** Update current selection when the world map changes */
+        UFUNCTION()
+        void HandleTerritorySelected(ATerritory* Territory);
+
 public:
         /** Called every frame */
         virtual void Tick(float DeltaTime) override;
