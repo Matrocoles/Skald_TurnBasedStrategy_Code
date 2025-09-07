@@ -228,6 +228,7 @@ void ATerritory::HandleClicked(UPrimitiveComponent *TouchedComponent,
     const bool bDeselected = bIsSelected;
     PC->ServerSelectTerritory(bDeselected ? -1 : TerritoryID);
     PC->HandleTerritorySelected(bDeselected ? nullptr : this);
+    PC->ServerSelectTerritory(bIsSelected ? -1 : TerritoryID);
   }
 }
 
