@@ -339,7 +339,11 @@ void ASkaldPlayerController::StartTurn() {
   FInputModeGameAndUI Mode;
   Mode.SetWidgetToFocus(nullptr);
   Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5)
+  Mode.SetCaptureMouseOnClick(EMouseCaptureMode::NoCapture);
+#else
   Mode.SetMouseCaptureMode(EMouseCaptureMode::NoCapture);
+#endif
   SetInputMode(Mode);
 }
 
@@ -966,7 +970,11 @@ void ASkaldPlayerController::HandleFactionLockedIn() {
   FInputModeGameAndUI Mode;
   Mode.SetWidgetToFocus(nullptr);
   Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5)
+  Mode.SetCaptureMouseOnClick(EMouseCaptureMode::NoCapture);
+#else
   Mode.SetMouseCaptureMode(EMouseCaptureMode::NoCapture);
+#endif
   SetInputMode(Mode);
   bShowMouseCursor = true;
   bEnableClickEvents = true;
@@ -1032,7 +1040,11 @@ void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
   FInputModeGameAndUI Mode;
   Mode.SetWidgetToFocus(nullptr);
   Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5)
+  Mode.SetCaptureMouseOnClick(EMouseCaptureMode::NoCapture);
+#else
   Mode.SetMouseCaptureMode(EMouseCaptureMode::NoCapture);
+#endif
   SetInputMode(Mode);
   SetIgnoreMoveInput(false);
   SetIgnoreLookInput(false);
