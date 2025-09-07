@@ -3,8 +3,8 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
 #include "SkaldTypes.h"
-#include "TimerManager.h"
 #include "Skald_PlayerController.generated.h"
+#include "TimerManager.h"
 
 class ATurnManager;
 class UUserWidget;
@@ -240,7 +240,7 @@ public:
   UFUNCTION(Server, Reliable)
   void ServerDeployUnits(int32 TerritoryID, int32 Amount);
 
-  /** Server-side processing of a territory selection. */
+  /** Server-side processing of a territory selection. Pass -1 to deselect. */
   UFUNCTION(Server, Reliable)
   void ServerSelectTerritory(int32 TerritoryID);
 
@@ -265,29 +265,28 @@ public:
    *  turn events without keeping an external pointer that might be
    *  uninitialised.
    */
-  protected:
-    UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Turn",
-              meta = (ExposeOnSpawn = true))
-    TObjectPtr<ATurnManager> TurnManager;
+protected:
+  UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Turn",
+            meta = (ExposeOnSpawn = true))
+  TObjectPtr<ATurnManager> TurnManager;
 
-  private:
-    /** Cache references to key game singletons and bind delegates. */
-    void CacheGameReferences();
+private:
+  /** Cache references to key game singletons and bind delegates. */
+  void CacheGameReferences();
 
-    /** Set up the main HUD widget for the local player. */
-    void InitializeHUDWidget();
+  /** Set up the main HUD widget for the local player. */
+  void InitializeHUDWidget();
 
-    /** Create the faction selection widget for the local player. */
-    void InitializeChoosePlayerWidget();
+  /** Create the faction selection widget for the local player. */
+  void InitializeChoosePlayerWidget();
 
-    /** Attempt to locate the world map and bind to its selection event. */
-    void TryBindWorldMap();
+  /** Attempt to locate the world map and bind to its selection event. */
+  void TryBindWorldMap();
 
-    /** Timer used to poll for the world map actor until it exists. */
-    FTimerHandle WorldMapSearchHandle;
+  /** Timer used to poll for the world map actor until it exists. */
+  FTimerHandle WorldMapSearchHandle;
 
-
-    void BuildPlayerDataArray(TArray<FS_PlayerData> &OutPlayers) const;
+  void BuildPlayerDataArray(TArray<FS_PlayerData> &OutPlayers) const;
 
   bool ValidateAttack(int32 FromID, int32 ToID, int32 ArmySent, bool bUseSiege,
                       FString *OutError);
