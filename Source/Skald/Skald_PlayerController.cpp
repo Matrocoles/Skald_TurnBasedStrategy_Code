@@ -303,6 +303,9 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
     }
   }
 
+  // Persist map type for LMB handling
+  this->bIsBattleMap = bIsBattleMap;
+
   if (!bIsBattleMap) {
     return;
   }
@@ -704,6 +707,7 @@ void ASkaldPlayerController::ClientSelectTerritory_Implementation(
   ATerritory *Terr = TerritoryID >= 0 ? WorldMap->GetTerritoryById(TerritoryID)
                                      : nullptr;
   WorldMap->SelectTerritory(Terr);
+  UE_LOG(LogSkald, Log, TEXT("ClientSelectTerritory <- %d"), TerritoryID);
 }
 
 void ASkaldPlayerController::HandleEndAttackRequested(bool bConfirmed) {
@@ -1069,18 +1073,36 @@ void ASkaldPlayerController::BeginAttackMode() {
 }
 
 void ASkaldPlayerController::HandleGridClick() {
+  FHitResult Hit;
+#if 1 // Use Visibility by default
+  GetHitResultUnderCursor(ECC_Visibility, /*bTraceComplex*/ true, Hit);
+#else // Switch to this block if using custom channel (see step 6)
+  static constexpr ECollisionChannel TerritoryClickChannel = ECC_GameTraceChannel1;
+  GetHitResultUnderCursorByChannel(TerritoryClickChannel, /*bTraceComplex*/ true, Hit);
+#endif
+
+  // WORLD MAP mode: select/deselect territories on LMB
+  if (!bIsBattleMap) {
+    if (ATerritory* Terr = Cast<ATerritory>(Hit.GetActor())) {
+      ServerSelectTerritory(Terr->GetTerritoryId());
+      UE_LOG(LogSkald, Log, TEXT("PC click -> Select Territory %d"),
+             Terr->GetTerritoryId());
+    } else {
+      ServerSelectTerritory(-1);
+      UE_LOG(LogSkald, Log, TEXT("PC click -> Deselect (empty space)"));
+    }
+    return; // do not fall through to battle code
+  }
+
+  // BATTLE MAP mode (existing behavior)
   if (!CachedGameInstance || !CachedGameInstance->GridBattleManager) {
     return;
   }
-
   UGridBattleManager *GridBattleManager = CachedGameInstance->GridBattleManager;
   AFighterPawn *ActiveFighter = GridBattleManager->GetActiveFighter();
   if (!ActiveFighter) {
     return;
   }
-
-  FHitResult Hit;
-  GetHitResultUnderCursor(ECC_Visibility, false, Hit);
 
   UGridOverlayComponent *GridOverlay = nullptr;
   if (UWorld *World = GetWorld()) {

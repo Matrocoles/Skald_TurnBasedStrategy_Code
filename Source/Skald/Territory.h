@@ -81,6 +81,8 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Territory")
     void Deselect();
 
+    int32 GetTerritoryId() const { return TerritoryID; }
+
     /** Check if another territory is adjacent to this one. */
     UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Territory")
     bool IsAdjacentTo(const ATerritory* Other) const;

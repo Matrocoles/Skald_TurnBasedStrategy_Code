@@ -49,7 +49,10 @@ ATerritory::ATerritory() {
   PrimaryActorTick.bCanEverTick = false;
   bReplicates = true;
   MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
-  MeshComponent->SetCollisionProfileName(TEXT("BlockAll"));
+  MeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+  MeshComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
+  // Use visibility channel by default for clicks
+  MeshComponent->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
   RootComponent = MeshComponent;
 
   // Provide basic visuals so the world map can function even if assets

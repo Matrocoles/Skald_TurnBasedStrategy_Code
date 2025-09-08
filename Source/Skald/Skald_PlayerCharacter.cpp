@@ -88,7 +88,6 @@ void ASkald_PlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerIn
         PlayerInputComponent->BindAxis("Turn", this, &ASkald_PlayerCharacter::Turn);
         PlayerInputComponent->BindAxis("LookUp", this, &ASkald_PlayerCharacter::LookUp);
 
-        PlayerInputComponent->BindAction("Select", IE_Pressed, this, &ASkald_PlayerCharacter::Select);
         PlayerInputComponent->BindAction("Ability1", IE_Pressed, this, &ASkald_PlayerCharacter::AbilityOne);
         PlayerInputComponent->BindAction("Ability2", IE_Pressed, this, &ASkald_PlayerCharacter::AbilityTwo);
         PlayerInputComponent->BindAction("Ability3", IE_Pressed, this, &ASkald_PlayerCharacter::AbilityThree);

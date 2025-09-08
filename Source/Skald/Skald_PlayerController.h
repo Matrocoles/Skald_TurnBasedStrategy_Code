@@ -290,6 +290,9 @@ private:
   /** Timer used to poll for the world map actor until it exists. */
   FTimerHandle WorldMapSearchHandle;
 
+  /** Whether the current map is a battle map. */
+  bool bIsBattleMap = false;
+
   void BuildPlayerDataArray(TArray<FS_PlayerData> &OutPlayers) const;
 
   bool ValidateAttack(int32 FromID, int32 ToID, int32 ArmySent, bool bUseSiege,
