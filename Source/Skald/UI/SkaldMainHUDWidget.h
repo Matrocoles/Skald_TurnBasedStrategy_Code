@@ -322,4 +322,8 @@ protected:
   /** Refresh player list when the game state notifies us of a change. */
   UFUNCTION()
   void HandlePlayersUpdated();
+
+  /** GS -> HUD: react to turn index changes (client + server). */
+  UFUNCTION()
+  void HandleTurnIndexChanged(int32 NewTurnIndex);
 };
