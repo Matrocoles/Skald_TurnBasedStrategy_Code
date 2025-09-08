@@ -2,6 +2,7 @@
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 #include "Skald.h"
+#include "Skald_GameMode.h"
 #include "Skald_PlayerState.h"
 #include "Skald_TurnManager.h"
 #include "SkaldTypes.h"
@@ -36,10 +37,36 @@ void ASkaldAIController::MakeAIDecision() {
 
   ETurnPhase Phase = TurnManager->GetCurrentPhase();
   int32 IterationCount = 0;
-  while (Phase != ETurnPhase::EndTurn && IterationCount++ < MaxAIIterations) {
+  while (Phase != ETurnPhase::Revolt && IterationCount++ < MaxAIIterations) {
     const ETurnPhase PrevPhase = Phase;
 
-    if (Phase == ETurnPhase::Reinforcement) {
+    if (Phase == ETurnPhase::ArmyPlacement) {
+      TArray<ATerritory *> OwnedTerritories;
+      for (ATerritory *Territory : WorldMap->Territories) {
+        if (Territory && Territory->OwningPlayer == PS) {
+          OwnedTerritories.Add(Territory);
+        }
+      }
+
+      int32 SpreadIndex = 0;
+      while (PS->DeployableUnits > 0 && OwnedTerritories.Num() > 0) {
+        ATerritory *TargetTerritory =
+            OwnedTerritories[SpreadIndex % OwnedTerritories.Num()];
+        ++TargetTerritory->ArmyUnits;
+        TargetTerritory->RefreshAppearance();
+        --PS->DeployableUnits;
+        --PS->Resources;
+        ++SpreadIndex;
+      }
+
+      TurnManager->BroadcastDeployableUnits(PS);
+      TurnManager->BroadcastResources(PS);
+      if (ASkaldGameMode *GM =
+              GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
+        GM->AdvanceArmyPlacement();
+      }
+      return;
+    } else if (Phase == ETurnPhase::Reinforcement) {
       TArray<ATerritory *> OwnedTerritories;
       for (ATerritory *Territory : WorldMap->Territories) {
         if (Territory && Territory->OwningPlayer == PS) {
@@ -124,6 +151,8 @@ void ASkaldAIController::MakeAIDecision() {
                             TroopsToMove);
       }
 
+      TurnManager->AdvancePhase();
+    } else if (Phase == ETurnPhase::EndTurn) {
       TurnManager->AdvancePhase();
     } else {
       UE_LOG(LogSkald, Warning,
