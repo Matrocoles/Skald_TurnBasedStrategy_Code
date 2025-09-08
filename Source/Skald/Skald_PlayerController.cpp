@@ -350,6 +350,18 @@ void ASkaldPlayerController::StartTurn() {
   Mode.SetCaptureMouseOnClick(EMouseCaptureMode::NoCapture);
 #endif
   SetInputMode(Mode);
+
+  // Drive GameState turn index so HUDs can react on all clients.
+  if (ASkaldGameState *GS = GetWorld()->GetGameState<ASkaldGameState>()) {
+    if (ASkaldPlayerState *MyPS = GetPlayerState<ASkaldPlayerState>()) {
+      const int32 NewIndex = GS->PlayerArray.IndexOfByKey(MyPS);
+      if (NewIndex != INDEX_NONE) {
+        GS->CurrentTurnIndex = NewIndex; // RepNotify will fire OnTurnIndexChanged
+        // If you haven't applied RepNotifies yet, you can optionally direct-broadcast:
+        GS->OnTurnIndexChanged.Broadcast(NewIndex);
+      }
+    }
+  }
 }
 
 void ASkaldPlayerController::EndTurn() {

@@ -1053,6 +1053,15 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
 
     TurnManager->BroadcastDeployableUnits(PS);
 
+    // Mark whose placement turn it is so HUDs sync on all clients.
+    if (ASkaldGameState *GSLocal = GetGameState<ASkaldGameState>()) {
+      const int32 NewIndex = GSLocal->PlayerArray.IndexOfByKey(PS);
+      if (NewIndex != INDEX_NONE) {
+        GSLocal->CurrentTurnIndex = NewIndex;      // RepNotify → OnTurnIndexChanged
+        GSLocal->OnTurnIndexChanged.Broadcast(NewIndex); // optional immediate local broadcast
+      }
+    }
+
     // Announce whose placement turn it is.
     const FString PlayerName = PS->PlayerDisplayName;
     for (ASkaldPlayerController *Controller : Controllers) {
