@@ -1072,30 +1072,7 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
       }
     }
 
-    // AI players automatically distribute their armies evenly.
-    if (PS->bIsAI) {
-      TArray<ATerritory *> OwnedTerritories;
-      for (ATerritory *Territory : WorldMap->Territories) {
-        if (Territory && Territory->OwningPlayer == PS) {
-          OwnedTerritories.Add(Territory);
-        }
-      }
-      int32 SpreadIndex = 0;
-      while (PS->DeployableUnits > 0 && OwnedTerritories.Num() > 0) {
-        ATerritory *TargetTerritory =
-            OwnedTerritories[SpreadIndex % OwnedTerritories.Num()];
-        ++TargetTerritory->ArmyUnits;
-        TargetTerritory->RefreshAppearance();
-        --PS->DeployableUnits;
-        ++SpreadIndex;
-      }
-      TurnManager->BroadcastDeployableUnits(PS);
-      ++PlacementIndex;
-      continue;
-    }
-
-    // Human player: wait for manual deployment with current pool visible.
-    // Ensure the active controller is in interactive mode so they can deploy.
+    // Hand control to the active player (AI or human) to deploy units.
     if (PC) {
       PC->StartTurn();
     }
