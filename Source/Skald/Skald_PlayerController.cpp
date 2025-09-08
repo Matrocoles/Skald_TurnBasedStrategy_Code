@@ -9,7 +9,7 @@
 #include "GridOverlayComponent.h"
 #include "InputCoreTypes.h"
 #include "Kismet/GameplayStatics.h"
-#include "Runtime/Launch/Resources/Version.h"
+#include "Misc/EngineVersionComparison.h"
 #include "Skald.h"
 #include "SkaldTypes.h"
 #include "Skald_AIController.h"
@@ -350,7 +350,11 @@ void ASkaldPlayerController::StartTurn() {
   FInputModeGameAndUI Mode;
   Mode.SetWidgetToFocus(nullptr);
   Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+#if UE_VERSION_OLDER_THAN(5,5,0)
   Mode.SetCaptureMouseOnClick(EMouseCaptureMode::NoCapture);
+#else
+  Mode.SetMouseCaptureMode(EMouseCaptureMode::NoCapture);
+#endif
   SetInputMode(Mode);
 
   // Drive GameState turn index so HUDs can react on all clients.
@@ -992,7 +996,11 @@ void ASkaldPlayerController::HandleFactionLockedIn() {
   FInputModeGameAndUI Mode;
   Mode.SetWidgetToFocus(nullptr);
   Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+#if UE_VERSION_OLDER_THAN(5,5,0)
   Mode.SetCaptureMouseOnClick(EMouseCaptureMode::NoCapture);
+#else
+  Mode.SetMouseCaptureMode(EMouseCaptureMode::NoCapture);
+#endif
   SetInputMode(Mode);
   bShowMouseCursor = true;
   bEnableClickEvents = true;
@@ -1058,7 +1066,11 @@ void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
   FInputModeGameAndUI Mode;
   Mode.SetWidgetToFocus(nullptr);
   Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+#if UE_VERSION_OLDER_THAN(5,5,0)
   Mode.SetCaptureMouseOnClick(EMouseCaptureMode::NoCapture);
+#else
+  Mode.SetMouseCaptureMode(EMouseCaptureMode::NoCapture);
+#endif
   SetInputMode(Mode);
   SetIgnoreMoveInput(false);
   SetIgnoreLookInput(false);
