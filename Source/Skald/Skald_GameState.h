@@ -7,7 +7,7 @@
 class ASkaldPlayerState;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSkaldPlayersUpdated);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSkaldTurnChanged, int32, NewTurnIndex);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSkaldTurnIndexChanged, int32, NewTurnIndex);
 
 /**
  * Stores information about players and the current turn.
@@ -30,7 +30,7 @@ public:
 
     /** Broadcast when the active turn index changes (client & server). */
     UPROPERTY(BlueprintAssignable, Category="GameState|Events")
-    FSkaldTurnChanged OnTurnIndexChanged;
+    FSkaldTurnIndexChanged OnTurnIndexChanged;
 
     /** Index of the player whose turn is active. */
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_CurrentTurnIndex, Category="GameState")

@@ -121,4 +121,7 @@ protected:
    */
   void ApplyReinforcementsAndResources(ASkaldPlayerState *PS,
                                        const TCHAR *Caller);
+
+  /** Internal: set GameState.CurrentTurnIndex (and broadcast) to match CurrentIndex. */
+  void SyncGameStateTurnIndex();
 };
