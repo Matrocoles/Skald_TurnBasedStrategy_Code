@@ -9,6 +9,7 @@
 #include "GridOverlayComponent.h"
 #include "InputCoreTypes.h"
 #include "Kismet/GameplayStatics.h"
+#include "Runtime/Launch/Resources/Version.h"
 #include "Skald.h"
 #include "SkaldTypes.h"
 #include "Skald_AIController.h"
@@ -25,7 +26,6 @@
 #include "UI/SkaldMainHUDWidget.h"
 #include "UObject/ConstructorHelpers.h"
 #include "WorldMap.h"
-#include "Runtime/Launch/Resources/Version.h"
 
 ASkaldPlayerController::ASkaldPlayerController() {
   TurnManager = nullptr;
@@ -343,7 +343,8 @@ void ASkaldPlayerController::StartTurn() {
   FInputModeGameAndUI Mode;
   Mode.SetWidgetToFocus(nullptr);
   Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5)
+#if ENGINE_MAJOR_VERSION > 5 ||                                                \
+    (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5)
   Mode.SetMouseCaptureMode(EMouseCaptureMode::NoCapture);
 #else
   Mode.SetCaptureMouseOnClick(EMouseCaptureMode::NoCapture);
@@ -682,8 +683,8 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
   }
 
   if (TerritoryID < 0) {
-    WorldMap->SelectTerritory(nullptr);
-    ClientSelectTerritory(-1);
+    WorldMap->SelectTerritory(nullptr);     // server authority
+    WorldMap->MulticastSelectTerritory(-1); // replicate to all clients
     return;
   }
 
@@ -692,8 +693,8 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
     return;
   }
 
-  WorldMap->SelectTerritory(Terr);
-  ClientSelectTerritory(TerritoryID);
+  WorldMap->SelectTerritory(Terr);                 // server authority
+  WorldMap->MulticastSelectTerritory(TerritoryID); // replicate to all clients
 }
 
 void ASkaldPlayerController::ClientSelectTerritory_Implementation(
@@ -704,8 +705,8 @@ void ASkaldPlayerController::ClientSelectTerritory_Implementation(
     return;
   }
 
-  ATerritory *Terr = TerritoryID >= 0 ? WorldMap->GetTerritoryById(TerritoryID)
-                                     : nullptr;
+  ATerritory *Terr =
+      TerritoryID >= 0 ? WorldMap->GetTerritoryById(TerritoryID) : nullptr;
   WorldMap->SelectTerritory(Terr);
   UE_LOG(LogSkald, Log, TEXT("ClientSelectTerritory <- %d"), TerritoryID);
 }
@@ -975,7 +976,8 @@ void ASkaldPlayerController::HandleFactionLockedIn() {
   FInputModeGameAndUI Mode;
   Mode.SetWidgetToFocus(nullptr);
   Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5)
+#if ENGINE_MAJOR_VERSION > 5 ||                                                \
+    (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5)
   Mode.SetMouseCaptureMode(EMouseCaptureMode::NoCapture);
 #else
   Mode.SetCaptureMouseOnClick(EMouseCaptureMode::NoCapture);
@@ -1045,7 +1047,8 @@ void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
   FInputModeGameAndUI Mode;
   Mode.SetWidgetToFocus(nullptr);
   Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5)
+#if ENGINE_MAJOR_VERSION > 5 ||                                                \
+    (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5)
   Mode.SetMouseCaptureMode(EMouseCaptureMode::NoCapture);
 #else
   Mode.SetCaptureMouseOnClick(EMouseCaptureMode::NoCapture);
@@ -1077,13 +1080,15 @@ void ASkaldPlayerController::HandleGridClick() {
 #if 1 // Use Visibility by default
   GetHitResultUnderCursor(ECC_Visibility, /*bTraceComplex*/ true, Hit);
 #else // Switch to this block if using custom channel (see step 6)
-  static constexpr ECollisionChannel TerritoryClickChannel = ECC_GameTraceChannel1;
-  GetHitResultUnderCursorByChannel(TerritoryClickChannel, /*bTraceComplex*/ true, Hit);
+  static constexpr ECollisionChannel TerritoryClickChannel =
+      ECC_GameTraceChannel1;
+  GetHitResultUnderCursorByChannel(TerritoryClickChannel,
+                                   /*bTraceComplex*/ true, Hit);
 #endif
 
   // WORLD MAP mode: select/deselect territories on LMB
   if (!bIsBattleMap) {
-    if (ATerritory* Terr = Cast<ATerritory>(Hit.GetActor())) {
+    if (ATerritory *Terr = Cast<ATerritory>(Hit.GetActor())) {
       ServerSelectTerritory(Terr->GetTerritoryId());
       UE_LOG(LogSkald, Log, TEXT("PC click -> Select Territory %d"),
              Terr->GetTerritoryId());

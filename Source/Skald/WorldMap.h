@@ -87,6 +87,8 @@ public:
   UFUNCTION(BlueprintCallable, Category = "WorldMap")
   void SelectTerritory(ATerritory *Territory);
 
+  UFUNCTION(NetMulticast, Reliable)
+  void MulticastSelectTerritory(int32 TerritoryID);
 
   /** Generate territories from the assigned data table. */
   UFUNCTION(BlueprintCallable, Category = "WorldMap")
