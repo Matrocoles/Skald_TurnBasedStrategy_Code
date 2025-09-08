@@ -597,16 +597,23 @@ void USkaldMainHUDWidget::HandleTurnIndexChanged(int32 NewTurnIndex) {
   BP_SetTurnText(TurnNumber, CurrentPS->GetPlayerId());
   SyncPhaseButtons(CurrentPS->GetPlayerId() == LocalPlayerID);
 void USkaldMainHUDWidget::HandleTurnIndexChanged(int32 /*NewTurnIndex*/) {
-  // Derive current player ID from GameState.
+  // Derive current player ID and approximate turn number from GameState.
   int32 NewPlayerID = -1;
+  int32 NewTurnNumber = TurnNumber;
   if (GameState) {
     if (ASkaldPlayerState *PS = GameState->GetCurrentPlayer()) {
       NewPlayerID = PS->GetPlayerId();
     }
+
+    const int32 PlayerCount = GameState->Players.Num();
+    if (PlayerCount > 0) {
+      NewTurnNumber = GameState->CurrentTurnIndex / PlayerCount + 1;
+    }
   }
 
-  // Keep existing turn number; only the active player changed.
+  // Update cached turn state before refreshing widgets.
   CurrentPlayerID = NewPlayerID;
+  TurnNumber = NewTurnNumber;
 
   // Update widget text and cached state.
   BP_SetTurnText(TurnNumber, CurrentPlayerID);
