@@ -55,12 +55,10 @@ void ASkaldAIController::MakeAIDecision() {
         ++TargetTerritory->ArmyUnits;
         TargetTerritory->RefreshAppearance();
         --PS->DeployableUnits;
-        --PS->Resources;
         ++SpreadIndex;
       }
 
       TurnManager->BroadcastDeployableUnits(PS);
-      TurnManager->BroadcastResources(PS);
       if (ASkaldGameMode *GM =
               GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
         GM->AdvanceArmyPlacement();
