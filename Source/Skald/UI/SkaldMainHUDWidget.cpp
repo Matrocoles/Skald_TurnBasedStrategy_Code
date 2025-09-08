@@ -43,6 +43,11 @@ USkaldMainHUDWidget::USkaldMainHUDWidget(const FObjectInitializer& ObjectInitial
 void USkaldMainHUDWidget::NativeConstruct() {
   Super::NativeConstruct();
 
+  // Ensure the full-screen HUD doesn't swallow world clicks.
+  if (UWidget* Root = GetRootWidget()) {
+    Root->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+  }
+
   GameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
   if (!GameMode) {
     UE_LOG(LogSkald, Warning,
@@ -189,6 +194,25 @@ void USkaldMainHUDWidget::UpdateTerritoryInfo(const FString &TerritoryName,
                                               const FString &OwnerName,
                                               int32 ArmyCount) {
   BP_SetTerritoryPanel(TerritoryName, OwnerName, ArmyCount);
+
+  // Keep Deploy button visibility in sync with current selection ownership.
+  if (DeployButton && (CurrentPhase == ETurnPhase::Reinforcement ||
+                       CurrentPhase == ETurnPhase::ArmyPlacement)) {
+    bool bOwnedByLocal = false;
+    if (APlayerController* PC = GetOwningPlayer()) {
+      if (ASkaldPlayerState* PS = PC->GetPlayerState<ASkaldPlayerState>()) {
+        if (AWorldMap* Map = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+                GetWorld(), AWorldMap::StaticClass()))) {
+          if (ATerritory* Sel = Map->SelectedTerritory) {
+            bOwnedByLocal = (Sel->OwningPlayer &&
+                             Sel->OwningPlayer->GetPlayerId() == PS->GetPlayerId());
+          }
+        }
+      }
+    }
+    DeployButton->SetVisibility(bOwnedByLocal ? ESlateVisibility::Visible
+                                              : ESlateVisibility::Collapsed);
+  }
 }
 
 void USkaldMainHUDWidget::RefreshPlayerList(
@@ -403,6 +427,17 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
                                  LocalPS->GetPlayerId();
 
   if (bSelectingForAttack) {
+    // If player is mid-selection and clicks a different source,
+    // clear previous highlights so we don't accumulate stale visuals.
+    if (SelectedSourceID != -1 && SelectedTargetID == -1) {
+      for (ATerritory* T : HighlightedTerritories) {
+        if (T) {
+          T->Deselect();
+        }
+      }
+      HighlightedTerritories.Empty();
+    }
+
     if (SelectedSourceID == -1) {
       if (bOwnedByLocal && Territory->ArmyUnits > 1) {
         SelectedSourceID = Territory->TerritoryID;
