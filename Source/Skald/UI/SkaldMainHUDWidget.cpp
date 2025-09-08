@@ -566,22 +566,20 @@ void USkaldMainHUDWidget::HandlePlayersUpdated() {
   RefreshPlayerList(Players);
 }
 
-void USkaldMainHUDWidget::HandleTurnIndexChanged(int32 /*NewTurnIndex*/) {
-  // Derive current player ID from GameState.
-  int32 NewPlayerID = -1;
-  if (GameState) {
-    if (ASkaldPlayerState* PS = GameState->GetCurrentPlayer()) {
-      NewPlayerID = PS->GetPlayerId();
-    }
+void USkaldMainHUDWidget::HandleTurnIndexChanged(int32 NewTurnIndex) {
+  // Defensive check
+  if (!GameState) {
+    return;
   }
 
-  // Keep existing turn number; only the active player changed.
-  UpdateTurnBanner(NewPlayerID, TurnNumber);
+  ASkaldPlayerState* CurrentPS = GameState->GetCurrentPlayer();
+  if (!CurrentPS) {
+    return;
+  }
 
-  // Optional: show a brief turn message and re-sync buttons.
-  const bool bIsMyTurn = (NewPlayerID == LocalPlayerID);
-  ShowTurnMessage(bIsMyTurn);
-  // (UpdateTurnBanner already calls SyncPhaseButtons, so this is just UX sugar.)
+  // Update the HUD turn banner
+  BP_SetTurnText(TurnNumber, CurrentPS->GetPlayerId());
+  SyncPhaseButtons(CurrentPS->GetPlayerId() == LocalPlayerID);
 }
 
 void USkaldMainHUDWidget::SyncPhaseButtons(bool bIsMyTurn) {
