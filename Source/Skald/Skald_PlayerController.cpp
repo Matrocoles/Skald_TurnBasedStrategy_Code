@@ -172,6 +172,7 @@ void ASkaldPlayerController::BeginPlay() {
       HandleFactionLockedIn();
     }
     InitializeFighterSelectionIfNeeded();
+    DetectBattleMap();
   }
 
   TryBindWorldMap();
@@ -280,32 +281,7 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
     return;
   }
 
-  ATurnManager *TM = TurnManager;
-  if (!TM) {
-    if (!CachedGameMode) {
-      CachedGameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
-    }
-    if (CachedGameMode) {
-      TM = CachedGameMode->GetTurnManager();
-    }
-  }
-  if (!TM) {
-    return;
-  }
-
-  const FString CurrentMap = UGameplayStatics::GetCurrentLevelName(this, true);
-  bool bIsBattleMap = false;
-  for (const TSoftObjectPtr<UWorld> &Map : TM->BattleMaps) {
-    if (CurrentMap.Equals(Map.ToSoftObjectPath().GetAssetName(),
-                          ESearchCase::IgnoreCase)) {
-      bIsBattleMap = true;
-      break;
-    }
-  }
-
-  // Persist map type for LMB handling
-  this->bIsBattleMap = bIsBattleMap;
-
+  DetectBattleMap();
   if (!bIsBattleMap) {
     return;
   }
@@ -325,6 +301,37 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
         this, &ASkaldPlayerController::HandleFighterSelectionLockedIn);
     Selection->AddToViewport();
     SetIgnoreMoveInput(true);
+  }
+}
+
+void ASkaldPlayerController::DetectBattleMap() {
+  bIsBattleMap = false;
+
+  const FString CurrentMap = UGameplayStatics::GetCurrentLevelName(this, true);
+  if (CurrentMap.Equals(TEXT("BattleMap"), ESearchCase::IgnoreCase)) {
+    bIsBattleMap = true;
+    return;
+  }
+
+  ATurnManager *TM = TurnManager;
+  if (!TM) {
+    if (!CachedGameMode) {
+      CachedGameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
+    }
+    if (CachedGameMode) {
+      TM = CachedGameMode->GetTurnManager();
+    }
+  }
+  if (!TM) {
+    return;
+  }
+
+  for (const TSoftObjectPtr<UWorld> &Map : TM->BattleMaps) {
+    if (CurrentMap.Equals(Map.ToSoftObjectPath().GetAssetName(),
+                          ESearchCase::IgnoreCase)) {
+      bIsBattleMap = true;
+      break;
+    }
   }
 }
 
@@ -356,8 +363,10 @@ void ASkaldPlayerController::StartTurn() {
     if (ASkaldPlayerState *MyPS = GetPlayerState<ASkaldPlayerState>()) {
       const int32 NewIndex = GS->PlayerArray.IndexOfByKey(MyPS);
       if (NewIndex != INDEX_NONE) {
-        GS->CurrentTurnIndex = NewIndex; // RepNotify will fire OnTurnIndexChanged
-        // If you haven't applied RepNotifies yet, you can optionally direct-broadcast:
+        GS->CurrentTurnIndex =
+            NewIndex; // RepNotify will fire OnTurnIndexChanged
+        // If you haven't applied RepNotifies yet, you can optionally
+        // direct-broadcast:
         GS->OnTurnIndexChanged.Broadcast(NewIndex);
       }
     }
@@ -1089,29 +1098,18 @@ void ASkaldPlayerController::BeginAttackMode() {
 
 void ASkaldPlayerController::HandleGridClick() {
   FHitResult Hit;
-#if 1 // Use Visibility by default
-  GetHitResultUnderCursor(ECC_Visibility, /*bTraceComplex*/ true, Hit);
-#else // Switch to this block if using custom channel (see step 6)
-  static constexpr ECollisionChannel TerritoryClickChannel =
-      ECC_GameTraceChannel1;
-  GetHitResultUnderCursorByChannel(TerritoryClickChannel,
-                                   /*bTraceComplex*/ true, Hit);
-#endif
-
-  // WORLD MAP mode: select/deselect territories on LMB
   if (!bIsBattleMap) {
+    GetHitResultUnderCursor(ECC_Visibility, /*bTraceComplex*/ true, Hit);
     if (ATerritory *Terr = Cast<ATerritory>(Hit.GetActor())) {
-      ServerSelectTerritory(Terr->GetTerritoryId());
-      UE_LOG(LogSkald, Log, TEXT("PC click -> Select Territory %d"),
-             Terr->GetTerritoryId());
+      ServerSelectTerritory(Terr->TerritoryID);
     } else {
       ServerSelectTerritory(-1);
-      UE_LOG(LogSkald, Log, TEXT("PC click -> Deselect (empty space)"));
     }
-    return; // do not fall through to battle code
+    return;
   }
 
-  // BATTLE MAP mode (existing behavior)
+  GetHitResultUnderCursor(ECC_Visibility, /*bTraceComplex*/ true, Hit);
+
   if (!CachedGameInstance || !CachedGameInstance->GridBattleManager) {
     return;
   }

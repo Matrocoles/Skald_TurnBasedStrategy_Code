@@ -3,8 +3,8 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
 #include "SkaldTypes.h"
-#include "TimerManager.h"
 #include "Skald_PlayerController.generated.h"
+#include "TimerManager.h"
 
 class ATurnManager;
 class UUserWidget;
@@ -291,7 +291,12 @@ private:
   FTimerHandle WorldMapSearchHandle;
 
   /** Whether the current map is a battle map. */
+  UPROPERTY(BlueprintReadOnly, Category = "Turn",
+            meta = (AllowPrivateAccess = "true"))
   bool bIsBattleMap = false;
+
+  /** Detect if the current level is a battle map and update bIsBattleMap. */
+  void DetectBattleMap();
 
   void BuildPlayerDataArray(TArray<FS_PlayerData> &OutPlayers) const;
 
