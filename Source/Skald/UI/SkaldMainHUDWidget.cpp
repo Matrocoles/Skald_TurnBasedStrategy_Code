@@ -576,12 +576,15 @@ void USkaldMainHUDWidget::HandleTurnIndexChanged(int32 /*NewTurnIndex*/) {
   }
 
   // Keep existing turn number; only the active player changed.
-  UpdateTurnBanner(NewPlayerID, TurnNumber);
+  CurrentPlayerID = NewPlayerID;
 
-  // Optional: show a brief turn message and re-sync buttons.
-  const bool bIsMyTurn = (NewPlayerID == LocalPlayerID);
+  // Update widget text and cached state.
+  BP_SetTurnText(TurnNumber, CurrentPlayerID);
+
+  // Update buttons for the new player and show a brief turn message.
+  const bool bIsMyTurn = (CurrentPlayerID == LocalPlayerID);
+  SyncPhaseButtons(bIsMyTurn);
   ShowTurnMessage(bIsMyTurn);
-  // (UpdateTurnBanner already calls SyncPhaseButtons, so this is just UX sugar.)
 }
 
 void USkaldMainHUDWidget::SyncPhaseButtons(bool bIsMyTurn) {
