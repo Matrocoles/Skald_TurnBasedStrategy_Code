@@ -97,9 +97,9 @@ void ASkaldGameState::ClampTurnIndex()
 void ASkaldGameState::SortAndDedupPlayers()
 {
     // Stable order by PlayerId for deterministic turns/HUD lists
-    Players.Sort([](const ASkaldPlayerState* A, const ASkaldPlayerState* B)
+    Players.Sort([](const ASkaldPlayerState& A, const ASkaldPlayerState& B)
     {
-        return A->GetPlayerId() < B->GetPlayerId();
+        return A.GetPlayerId() < B.GetPlayerId();
     });
     // Dedup in case engine calls AddPlayerState twice for same actor (defensive)
     for (int32 i = Players.Num() - 1; i > 0; --i)
