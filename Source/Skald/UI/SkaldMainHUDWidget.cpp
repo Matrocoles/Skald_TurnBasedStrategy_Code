@@ -60,6 +60,9 @@ void USkaldMainHUDWidget::NativeConstruct() {
   } else {
     GameState->OnPlayersUpdated.AddDynamic(
         this, &USkaldMainHUDWidget::HandlePlayersUpdated);
+    // React to replicated turn changes.
+    GameState->OnTurnIndexChanged.AddDynamic(
+        this, &USkaldMainHUDWidget::HandleTurnIndexChanged);
   }
   GameInstance = GetGameInstance<USkaldGameInstance>();
   if (!GameInstance) {
@@ -101,6 +104,8 @@ void USkaldMainHUDWidget::NativeDestruct() {
   if (GameState) {
     GameState->OnPlayersUpdated.RemoveDynamic(
         this, &USkaldMainHUDWidget::HandlePlayersUpdated);
+    GameState->OnTurnIndexChanged.RemoveDynamic(
+        this, &USkaldMainHUDWidget::HandleTurnIndexChanged);
   }
 
   if (AttackButton) {
@@ -559,6 +564,24 @@ void USkaldMainHUDWidget::HandlePlayersUpdated() {
   }
 
   RefreshPlayerList(Players);
+}
+
+void USkaldMainHUDWidget::HandleTurnIndexChanged(int32 /*NewTurnIndex*/) {
+  // Derive current player ID from GameState.
+  int32 NewPlayerID = -1;
+  if (GameState) {
+    if (ASkaldPlayerState* PS = GameState->GetCurrentPlayer()) {
+      NewPlayerID = PS->GetPlayerId();
+    }
+  }
+
+  // Keep existing turn number; only the active player changed.
+  UpdateTurnBanner(NewPlayerID, TurnNumber);
+
+  // Optional: show a brief turn message and re-sync buttons.
+  const bool bIsMyTurn = (NewPlayerID == LocalPlayerID);
+  ShowTurnMessage(bIsMyTurn);
+  // (UpdateTurnBanner already calls SyncPhaseButtons, so this is just UX sugar.)
 }
 
 void USkaldMainHUDWidget::SyncPhaseButtons(bool bIsMyTurn) {
