@@ -582,20 +582,6 @@ void USkaldMainHUDWidget::HandlePlayersUpdated() {
   RefreshPlayerList(Players);
 }
 
-void USkaldMainHUDWidget::HandleTurnIndexChanged(int32 NewTurnIndex) {
-  // Defensive check
-  if (!GameState) {
-    return;
-  }
-
-  ASkaldPlayerState* CurrentPS = GameState->GetCurrentPlayer();
-  if (!CurrentPS) {
-    return;
-  }
-
-  // Update the HUD turn banner
-  BP_SetTurnText(TurnNumber, CurrentPS->GetPlayerId());
-  SyncPhaseButtons(CurrentPS->GetPlayerId() == LocalPlayerID);
 void USkaldMainHUDWidget::HandleTurnIndexChanged(int32 /*NewTurnIndex*/) {
   // Derive current player ID and approximate turn number from GameState.
   int32 NewPlayerID = -1;
