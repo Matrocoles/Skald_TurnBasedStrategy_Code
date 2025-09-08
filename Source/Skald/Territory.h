@@ -26,6 +26,8 @@ public:
 
     virtual void BeginPlay() override;
 
+    virtual void EndPlay(const EEndPlayReason::Type Reason) override;
+
     virtual void GetLifetimeReplicatedProps(
         TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
@@ -81,7 +83,7 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Territory")
     void Deselect();
 
-    int32 GetTerritoryId() const { return TerritoryID; }
+    FORCEINLINE int32 GetTerritoryId() const { return TerritoryID; }
 
     /** Check if another territory is adjacent to this one. */
     UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Territory")

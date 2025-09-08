@@ -51,8 +51,12 @@ ATerritory::ATerritory() {
   MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
   MeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
   MeshComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
-  // Use visibility channel by default for clicks
+  // If you are using Visibility for clicks:
   MeshComponent->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+  // If you switched to a custom click channel (ECC_GameTraceChannel1), use this
+  // instead:
+  // MeshComponent->SetCollisionResponseToChannel(ECC_GameTraceChannel1,
+  // ECR_Block);
   RootComponent = MeshComponent;
 
   // Provide basic visuals so the world map can function even if assets
@@ -190,6 +194,15 @@ void ATerritory::Deselect() {
   }
 }
 
+void ATerritory::EndPlay(const EEndPlayReason::Type Reason) {
+  if (AWorldMap *Map = Cast<AWorldMap>(GetOwner())) {
+    if (Map->SelectedTerritory == this) {
+      Map->SelectTerritory(nullptr);
+    }
+  }
+  Super::EndPlay(Reason);
+}
+
 bool ATerritory::IsAdjacentTo(const ATerritory *Other) const {
   return AdjacentTerritories.Contains(Other);
 }
@@ -234,8 +247,7 @@ void ATerritory::HandleMouseLeave(UPrimitiveComponent *TouchedComponent) {
 
 void ATerritory::HandleClicked(UPrimitiveComponent *TouchedComponent,
                                FKey ButtonPressed) {
-  UE_LOG(LogSkald, Log,
-         TEXT("Territory %d clicked; currently %s"), TerritoryID,
+  UE_LOG(LogSkald, Log, TEXT("Territory %d clicked; currently %s"), TerritoryID,
          bIsSelected ? TEXT("selected") : TEXT("not selected"));
 
   if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(

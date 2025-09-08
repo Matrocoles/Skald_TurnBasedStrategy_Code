@@ -311,21 +311,25 @@ void AWorldMap::SelectTerritory(ATerritory *Territory) {
   }
 
   UE_LOG(LogSkald, Log,
-         TEXT("WorldMap %s selecting territory %s (previous %s)"),
-         *GetName(), Territory ? *Territory->GetName() : TEXT("None"),
+         TEXT("WorldMap %s selecting territory %s (previous %s)"), *GetName(),
+         Territory ? *Territory->GetName() : TEXT("None"),
          SelectedTerritory ? *SelectedTerritory->GetName() : TEXT("None"));
 
-  if (SelectedTerritory) {
+  if (IsValid(SelectedTerritory)) {
     SelectedTerritory->Deselect();
   }
 
-  SelectedTerritory = Territory;
-
-  if (Territory) {
-    Territory->Select();
+  SelectedTerritory = IsValid(Territory) ? Territory : nullptr;
+  if (SelectedTerritory) {
+    SelectedTerritory->Select();
   }
 
-  OnTerritorySelected.Broadcast(Territory);
+  OnTerritorySelected.Broadcast(SelectedTerritory);
+}
+
+void AWorldMap::MulticastSelectTerritory_Implementation(int32 TerritoryID) {
+  ATerritory *Terr = GetTerritoryById(TerritoryID);
+  SelectTerritory(Terr);
 }
 
 bool AWorldMap::FindPath(ATerritory *From, ATerritory *To,
@@ -433,4 +437,3 @@ bool AWorldMap::IsOwnedBy(const ATerritory *Territory,
   }
   return Territory->OwningPlayer->GetPlayerId() == Player->GetPlayerId();
 }
-
