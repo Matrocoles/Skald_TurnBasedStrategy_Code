@@ -115,6 +115,22 @@ void ATurnManager::ApplyReinforcementsAndResources(ASkaldPlayerState *PS,
   BroadcastResources(PS);
 }
 
+/** Internal: set GameState.CurrentTurnIndex (and broadcast) to match CurrentIndex. */
+void ATurnManager::SyncGameStateTurnIndex() {
+  if (ASkaldGameState *GS = GetWorld()->GetGameState<ASkaldGameState>()) {
+    int32 NewIndex = -1;
+    if (Controllers.IsValidIndex(CurrentIndex) &&
+        Controllers[CurrentIndex].IsValid()) {
+      if (ASkaldPlayerState *PS =
+              Controllers[CurrentIndex]->GetPlayerState<ASkaldPlayerState>()) {
+        NewIndex = GS->PlayerArray.IndexOfByKey(PS);
+      }
+    }
+    GS->CurrentTurnIndex = NewIndex;
+    GS->OnTurnIndexChanged.Broadcast(NewIndex);
+  }
+}
+
 void ATurnManager::StartTurns() {
   SortControllersByInitiative();
   CurrentIndex = 0;
@@ -174,6 +190,7 @@ void ATurnManager::StartTurns() {
   }
 
   if (CurrentController) {
+    SyncGameStateTurnIndex();
     CurrentController->StartTurn();
     if (ASkaldGameMode *GM = GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
       GM->CheckVictoryConditions();
@@ -230,14 +247,15 @@ void ATurnManager::AdvanceTurn() {
       if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
         const bool bIsActive = Controller == CurrentController;
         Controller->ShowTurnAnnouncement(PlayerName, bIsActive);
-        if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
-          HUD->UpdateTurnBanner(PS ? PS->GetPlayerId() : -1, 1);
-          HUD->UpdatePhaseBanner(CurrentPhase);
-        }
+      if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
+        HUD->UpdateTurnBanner(PS ? PS->GetPlayerId() : -1, 1);
+        HUD->UpdatePhaseBanner(CurrentPhase);
       }
     }
+  }
 
     CurrentController->StartTurn();
+    SyncGameStateTurnIndex();
     if (ASkaldGameMode *GM = GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
       GM->CheckVictoryConditions();
     }
@@ -376,6 +394,7 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
     if (Controllers.IsValidIndex(CurrentIndex)) {
       if (ASkaldPlayerController *Controller =
               Controllers[CurrentIndex].Get()) {
+        SyncGameStateTurnIndex();
         Controller->StartTurn();
         BroadcastCurrentPhase();
       }
