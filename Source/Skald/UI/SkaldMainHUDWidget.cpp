@@ -7,20 +7,21 @@
 #include "Kismet/GameplayStatics.h"
 #include "Skald.h"
 #include "SkaldTypes.h"
+#include "Skald_AIController.h"
 #include "Skald_GameInstance.h"
 #include "Skald_GameMode.h"
 #include "Skald_GameState.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
-#include "Skald_AIController.h"
 #include "Skald_TurnManager.h"
 #include "Territory.h"
 #include "UI/ConfirmAttackWidget.h"
 #include "UI/DeployWidget.h"
-#include "WorldMap.h"
 #include "UObject/ConstructorHelpers.h"
+#include "WorldMap.h"
 
-USkaldMainHUDWidget::USkaldMainHUDWidget(const FObjectInitializer& ObjectInitializer)
+USkaldMainHUDWidget::USkaldMainHUDWidget(
+    const FObjectInitializer &ObjectInitializer)
     : Super(ObjectInitializer) {
   static ConstructorHelpers::FClassFinder<UDeployWidget> DeployBP(
       TEXT("/Game/Blueprints/UI/Skald_DeployWidget"));
@@ -35,8 +36,9 @@ USkaldMainHUDWidget::USkaldMainHUDWidget(const FObjectInitializer& ObjectInitial
   if (ConfirmBP.Succeeded()) {
     ConfirmAttackWidgetClass = ConfirmBP.Class;
   } else {
-    UE_LOG(LogSkald, Error,
-           TEXT("SkaldMainHUDWidget: failed to find confirm attack widget class"));
+    UE_LOG(
+        LogSkald, Error,
+        TEXT("SkaldMainHUDWidget: failed to find confirm attack widget class"));
   }
 }
 
@@ -44,7 +46,7 @@ void USkaldMainHUDWidget::NativeConstruct() {
   Super::NativeConstruct();
 
   // Ensure the full-screen HUD doesn't swallow world clicks.
-  if (UWidget* Root = GetRootWidget()) {
+  if (UWidget *Root = GetRootWidget()) {
     Root->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
   }
 
@@ -180,7 +182,8 @@ void USkaldMainHUDWidget::UpdatePhaseBanner(ETurnPhase InPhase) {
   if (CurrentPhase != ETurnPhase::Attack) {
     CancelAttackSelection();
   }
-  if (CurrentPhase != ETurnPhase::Reinforcement && CurrentPhase != ETurnPhase::ArmyPlacement) {
+  if (CurrentPhase != ETurnPhase::Reinforcement &&
+      CurrentPhase != ETurnPhase::ArmyPlacement) {
     ClearDeployWidget();
   }
   if (!FindFunction(TEXT("BP_SetPhaseButtons"))) {
@@ -204,13 +207,14 @@ void USkaldMainHUDWidget::UpdateTerritoryInfo(const FString &TerritoryName,
   if (DeployButton && (CurrentPhase == ETurnPhase::Reinforcement ||
                        CurrentPhase == ETurnPhase::ArmyPlacement)) {
     bool bOwnedByLocal = false;
-    if (APlayerController* PC = GetOwningPlayer()) {
-      if (ASkaldPlayerState* PS = PC->GetPlayerState<ASkaldPlayerState>()) {
-        if (AWorldMap* Map = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+    if (APlayerController *PC = GetOwningPlayer()) {
+      if (ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>()) {
+        if (AWorldMap *Map = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
                 GetWorld(), AWorldMap::StaticClass()))) {
-          if (ATerritory* Sel = Map->SelectedTerritory) {
-            bOwnedByLocal = (Sel->OwningPlayer &&
-                             Sel->OwningPlayer->GetPlayerId() == PS->GetPlayerId());
+          if (ATerritory *Sel = Map->SelectedTerritory) {
+            bOwnedByLocal =
+                (Sel->OwningPlayer &&
+                 Sel->OwningPlayer->GetPlayerId() == PS->GetPlayerId());
           }
         }
       }
@@ -427,20 +431,29 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
     LocalPS = PC->GetPlayerState<ASkaldPlayerState>();
   }
 
-  const bool bOwnedByLocal = LocalPS && Territory->OwningPlayer &&
-                             Territory->OwningPlayer->GetPlayerId() ==
-                                 LocalPS->GetPlayerId();
+  const bool bOwnedByLocal =
+      LocalPS && Territory->OwningPlayer &&
+      Territory->OwningPlayer->GetPlayerId() == LocalPS->GetPlayerId();
 
   if (bSelectingForAttack) {
-    // If player is mid-selection and clicks a different source,
+    // If player is mid-selection and clicks a different friendly source,
     // clear previous highlights so we don't accumulate stale visuals.
-    if (SelectedSourceID != -1 && SelectedTargetID == -1) {
-      for (ATerritory* T : HighlightedTerritories) {
+    if (SelectedSourceID != -1 && SelectedTargetID == -1 && bOwnedByLocal &&
+        Territory->TerritoryID != SelectedSourceID) {
+      for (ATerritory *T : HighlightedTerritories) {
         if (T) {
           T->Deselect();
         }
       }
       HighlightedTerritories.Empty();
+      if (AWorldMap *WorldMap =
+              Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+                  GetWorld(), AWorldMap::StaticClass()))) {
+        if (ATerritory *Source = WorldMap->GetTerritoryById(SelectedSourceID)) {
+          Source->Deselect();
+        }
+      }
+      SelectedSourceID = -1;
     }
 
     if (SelectedSourceID == -1) {
@@ -465,8 +478,10 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
     }
 
     // Source selected: only allow choosing highlighted enemy territories
-    const bool bIsHighlighted = HighlightedTerritories.ContainsByPredicate(
-        [Territory](ATerritory* T) { return T && T->TerritoryID == Territory->TerritoryID; });
+    const bool bIsHighlighted =
+        HighlightedTerritories.ContainsByPredicate([Territory](ATerritory *T) {
+          return T && T->TerritoryID == Territory->TerritoryID;
+        });
     if (bIsHighlighted) {
       SelectedTargetID = Territory->TerritoryID;
       if (SelectionPrompt) {
@@ -506,9 +521,10 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
         ShowErrorMessage(TEXT("Confirm attack widget missing"));
       }
     } else {
-      UE_LOG(LogSkald, Warning,
-             TEXT("OnTerritoryClickedUI: territory %d not highlighted for attack"),
-             Territory->TerritoryID);
+      UE_LOG(
+          LogSkald, Warning,
+          TEXT("OnTerritoryClickedUI: territory %d not highlighted for attack"),
+          Territory->TerritoryID);
       ShowErrorMessage(TEXT("Target not attackable"));
     }
     return;
@@ -570,7 +586,7 @@ void USkaldMainHUDWidget::HandleTurnIndexChanged(int32 /*NewTurnIndex*/) {
   // Derive current player ID from GameState.
   int32 NewPlayerID = -1;
   if (GameState) {
-    if (ASkaldPlayerState* PS = GameState->GetCurrentPlayer()) {
+    if (ASkaldPlayerState *PS = GameState->GetCurrentPlayer()) {
       NewPlayerID = PS->GetPlayerId();
     }
   }
@@ -585,6 +601,8 @@ void USkaldMainHUDWidget::HandleTurnIndexChanged(int32 /*NewTurnIndex*/) {
   const bool bIsMyTurn = (CurrentPlayerID == LocalPlayerID);
   SyncPhaseButtons(bIsMyTurn);
   ShowTurnMessage(bIsMyTurn);
+  // (UpdateTurnBanner already calls SyncPhaseButtons, so this is just UX
+  // sugar.)
 }
 
 void USkaldMainHUDWidget::SyncPhaseButtons(bool bIsMyTurn) {
@@ -609,7 +627,7 @@ void USkaldMainHUDWidget::SyncPhaseButtons(bool bIsMyTurn) {
   if (DeployButton) {
     const ESlateVisibility DesiredVisibility =
         (bIsMyTurn && (CurrentPhase == ETurnPhase::Reinforcement ||
-                        CurrentPhase == ETurnPhase::ArmyPlacement))
+                       CurrentPhase == ETurnPhase::ArmyPlacement))
             ? ESlateVisibility::Visible
             : ESlateVisibility::Collapsed;
     DeployButton->SetVisibility(DesiredVisibility);
@@ -771,4 +789,3 @@ void USkaldMainHUDWidget::ClearDeployWidget() {
     ActiveDeployWidget = nullptr;
   }
 }
-
