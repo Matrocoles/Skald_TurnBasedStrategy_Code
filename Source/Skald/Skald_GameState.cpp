@@ -22,8 +22,32 @@ void ASkaldGameState::AddPlayerState(APlayerState* PlayerState)
 
     if (ASkaldPlayerState* SkaldPlayer = Cast<ASkaldPlayerState>(PlayerState))
     {
-        Players.Add(SkaldPlayer);
-        OnPlayersUpdated.Broadcast();
+        // Avoid duplicates
+        if (!Players.Contains(SkaldPlayer))
+        {
+            Players.Add(SkaldPlayer);
+            SortAndDedupPlayers();
+            ClampTurnIndex();
+            OnPlayersUpdated.Broadcast();
+        }
+    }
+}
+
+void ASkaldGameState::RemovePlayerState(APlayerState* PlayerState)
+{
+    Super::RemovePlayerState(PlayerState);
+
+    if (ASkaldPlayerState* SkaldPlayer = Cast<ASkaldPlayerState>(PlayerState))
+    {
+        const int32 RemovedIndex = Players.IndexOfByKey(SkaldPlayer);
+        if (RemovedIndex != INDEX_NONE)
+        {
+            Players.RemoveAt(RemovedIndex);
+            ClampTurnIndex();
+            OnPlayersUpdated.Broadcast();
+            // Also notify turn change if index moved
+            OnTurnIndexChanged.Broadcast(CurrentTurnIndex);
+        }
     }
 }
 
@@ -42,5 +66,48 @@ ASkaldPlayerState* ASkaldGameState::GetPlayerById(int32 PlayerID) const
         }
     }
     return nullptr;
+}
+
+void ASkaldGameState::OnRep_Players()
+{
+    SortAndDedupPlayers();
+    ClampTurnIndex();
+    OnPlayersUpdated.Broadcast();
+}
+
+void ASkaldGameState::OnRep_CurrentTurnIndex()
+{
+    ClampTurnIndex();
+    OnTurnIndexChanged.Broadcast(CurrentTurnIndex);
+}
+
+void ASkaldGameState::ClampTurnIndex()
+{
+    if (Players.Num() == 0)
+    {
+        CurrentTurnIndex = 0;
+        return;
+    }
+    if (CurrentTurnIndex < 0 || CurrentTurnIndex >= Players.Num())
+    {
+        CurrentTurnIndex = FMath::Clamp(CurrentTurnIndex, 0, FMath::Max(0, Players.Num() - 1));
+    }
+}
+
+void ASkaldGameState::SortAndDedupPlayers()
+{
+    // Stable order by PlayerId for deterministic turns/HUD lists
+    Players.Sort([](const ASkaldPlayerState* A, const ASkaldPlayerState* B)
+    {
+        return A->GetPlayerId() < B->GetPlayerId();
+    });
+    // Dedup in case engine calls AddPlayerState twice for same actor (defensive)
+    for (int32 i = Players.Num() - 1; i > 0; --i)
+    {
+        if (Players[i] == Players[i - 1])
+        {
+            Players.RemoveAt(i);
+        }
+    }
 }
 
