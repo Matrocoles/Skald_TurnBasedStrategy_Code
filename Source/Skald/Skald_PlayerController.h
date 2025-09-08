@@ -4,6 +4,7 @@
 #include "GameFramework/PlayerController.h"
 #include "SkaldTypes.h"
 #include "TimerManager.h"
+#include "Engine/EngineTypes.h"
 #include "Skald_PlayerController.generated.h"
 
 class ATurnManager;
@@ -132,6 +133,10 @@ protected:
 
   /** Ensures ServerInitPlayerState and lock-in handling run only once. */
   bool bHasInitialized;
+
+  /** Default mouse capture behavior for this controller. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
+  EMouseCaptureMode DefaultMouseCaptureMode;
 
   virtual void SetupInputComponent() override;
 

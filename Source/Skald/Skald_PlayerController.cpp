@@ -38,6 +38,7 @@ ASkaldPlayerController::ASkaldPlayerController() {
   bShowMouseCursor = true;
   bEnableClickEvents = true;
   bEnableMouseOverEvents = true;
+  DefaultMouseCaptureMode = EMouseCaptureMode::NoCapture;
 
   // Default to the native HUD widget class. This avoids loading a
   // blueprint-derived widget that may not exist or may be corrupt.
@@ -350,12 +351,11 @@ void ASkaldPlayerController::StartTurn() {
   FInputModeGameAndUI Mode;
   Mode.SetWidgetToFocus(nullptr);
   Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-#if UE_VERSION_OLDER_THAN(5,5,0)
-  Mode.SetCaptureMouseOnClick(EMouseCaptureMode::NoCapture);
-#else
-  Mode.SetMouseCaptureMode(EMouseCaptureMode::NoCapture);
-#endif
   SetInputMode(Mode);
+  bShowMouseCursor = true;
+  bEnableClickEvents = true;
+  bEnableMouseOverEvents = true;
+  DefaultMouseCaptureMode = EMouseCaptureMode::NoCapture;
 
   // Drive GameState turn index so HUDs can react on all clients.
   if (ASkaldGameState *GS = GetWorld()->GetGameState<ASkaldGameState>()) {
@@ -996,15 +996,11 @@ void ASkaldPlayerController::HandleFactionLockedIn() {
   FInputModeGameAndUI Mode;
   Mode.SetWidgetToFocus(nullptr);
   Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-#if UE_VERSION_OLDER_THAN(5,5,0)
-  Mode.SetCaptureMouseOnClick(EMouseCaptureMode::NoCapture);
-#else
-  Mode.SetMouseCaptureMode(EMouseCaptureMode::NoCapture);
-#endif
   SetInputMode(Mode);
   bShowMouseCursor = true;
   bEnableClickEvents = true;
   bEnableMouseOverEvents = true;
+  DefaultMouseCaptureMode = EMouseCaptureMode::NoCapture;
   SetIgnoreMoveInput(false);
   SetIgnoreLookInput(false);
   TryBindWorldMap();
@@ -1066,12 +1062,11 @@ void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
   FInputModeGameAndUI Mode;
   Mode.SetWidgetToFocus(nullptr);
   Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-#if UE_VERSION_OLDER_THAN(5,5,0)
-  Mode.SetCaptureMouseOnClick(EMouseCaptureMode::NoCapture);
-#else
-  Mode.SetMouseCaptureMode(EMouseCaptureMode::NoCapture);
-#endif
   SetInputMode(Mode);
+  bShowMouseCursor = true;
+  bEnableClickEvents = true;
+  bEnableMouseOverEvents = true;
+  DefaultMouseCaptureMode = EMouseCaptureMode::NoCapture;
   SetIgnoreMoveInput(false);
   SetIgnoreLookInput(false);
 }
