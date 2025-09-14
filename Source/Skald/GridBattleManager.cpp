@@ -466,14 +466,30 @@ void UGridBattleManager::AdvanceTurn()
         return;
     }
 
-    InitiativeOrder.RemoveAll([](AFighterPawn* Fighter)
-    {
+    // Remove dead or null fighters
+    InitiativeOrder.RemoveAll([](AFighterPawn* Fighter) {
         return !Fighter || !Fighter->IsAlive();
     });
 
+    // If no fighters remain, end immediately
     if (InitiativeOrder.Num() == 0)
     {
         ActiveFighter = nullptr;
+        EndBattle();
+        return;
+    }
+
+    // Victory check: ensure both sides still exist
+    bool bAnyAttackers = false, bAnyDefenders = false;
+    for (AFighterPawn* F : InitiativeOrder)
+    {
+        if (!F) continue;
+        if (F->bIsAttacker) bAnyAttackers = true; else bAnyDefenders = true;
+        if (bAnyAttackers && bAnyDefenders) break;
+    }
+    if (!bAnyAttackers || !bAnyDefenders)
+    {
+        EndBattle();
         return;
     }
 
