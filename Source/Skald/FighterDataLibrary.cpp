@@ -30,8 +30,7 @@ TArray<FFighterDefinition> UFighterDataLibrary::GetFightersForFaction(UObject* W
     TArray<FFighterDefinition> Out;
     if (UDataTable* DT = ResolveFighterDataTable(WorldContext))
     {
-        TArray<FName> Rows;
-        DT->GetRowNames(Rows);
+        const TArray<FName> Rows = DT->GetRowNames();
         for (const FName& N : Rows)
         {
             if (const FFighterDefinition* Row = DT->FindRow<FFighterDefinition>(N, TEXT("FighterFilter")))
