@@ -1118,25 +1118,49 @@ void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
         Fighters.Add(Fighter);
       }
       CachedGameInstance->GridBattleManager->InitBattle(Fighters, Fighters);
-      CachedGameInstance->GridBattleManager->RollInitiative();
-      CachedGameInstance->GridBattleManager->OnBattleEnded.AddDynamic(
-          this, &ASkaldPlayerController::HandleBattleEnded);
-      CachedGameInstance->GridBattleManager->StartRound(
-          CachedGameInstance->CombatRandomStream);
 
-      if (BattleHUDWidgetClass) {
-        BattleHudWidget =
-            CreateWidget<UBattleHUDWidget>(this, BattleHUDWidgetClass);
-        if (BattleHudWidget) {
-          BattleHudWidget->AddToViewport();
-          BattleHudWidget->OnMovePressed.AddDynamic(
-              this, &ASkaldPlayerController::BeginMoveMode);
-          BattleHudWidget->OnAttackPressed.AddDynamic(
-              this, &ASkaldPlayerController::BeginAttackMode);
-          BattleHudWidget->BindToFighter(
-              CachedGameInstance->GridBattleManager->GetActiveFighter());
+      UGridOverlayComponent *Grid = FindGridOverlay();
+      UWorld *World = GetWorld();
+      auto *BM = CachedGameInstance->GridBattleManager;
+      FRandomStream &RS = CachedGameInstance->CombatRandomStream;
+
+      const int32 Edge = 3;
+      const int32 MaxX = UGridBattleManager::GridSize - 1;
+      const int32 MaxY = UGridBattleManager::GridSize - 1;
+
+      auto SpawnAtCell = [&](const FIntPoint &Cell, const FFighterDefinition &Def,
+                             bool bAsAttacker) {
+        const FVector SpawnLoc = Grid ? Grid->GridToWorld(Cell) : FVector::ZeroVector;
+        FActorSpawnParameters Params;
+        Params.SpawnCollisionHandlingOverride =
+            ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+        AFighterPawn *Pawn = World->SpawnActor<AFighterPawn>(
+            AFighterPawn::StaticClass(), SpawnLoc, FRotator::ZeroRotator, Params);
+        if (Pawn) {
+          Pawn->Stats = Def.Stats;
+          Pawn->bIsAttacker = bAsAttacker;
+          BM->RegisterFighter(Pawn, bAsAttacker);
         }
+      };
+
+      // Spawn attackers on the left edge
+      for (const FFighterDefinition &Def : Selection->ChosenFighters) {
+        FIntPoint Cell(RS.RandRange(0, Edge - 1), RS.RandRange(0, MaxY));
+        SpawnAtCell(Cell, Def, /*bAsAttacker=*/true);
       }
+      // Spawn defenders on the right edge (mirror selection for now)
+      for (const FFighterDefinition &Def : Selection->ChosenFighters) {
+        FIntPoint Cell(RS.RandRange(MaxX - (Edge - 1), MaxX),
+                       RS.RandRange(0, MaxY));
+        SpawnAtCell(Cell, Def, /*bAsAttacker=*/false);
+      }
+
+      BM->RollInitiative();
+      BM->StartRound(RS);
+      BM->OnBattleEnded.AddDynamic(
+          this, &ASkaldPlayerController::HandleBattleEnded);
+
+      InitializeBattleHUD();
     }
     FighterSelectionWidget = nullptr;
     if (MainHudWidget) {
@@ -1229,6 +1253,12 @@ void ASkaldPlayerController::HandleGridClick() {
     Grid->ClearHighlights();
     if (Active->ActionsRemaining <= 0) {
       CurrentCommandMode = EBattleCommandMode::None;
+      if (USkaldGameInstance *GI =
+              GetGameInstance<USkaldGameInstance>()) {
+        if (GI->GridBattleManager) {
+          GI->GridBattleManager->AdvanceTurn();
+        }
+      }
     }
     break;
   }
@@ -1245,6 +1275,12 @@ void ASkaldPlayerController::HandleGridClick() {
     Grid->ClearHighlights();
     if (Active->ActionsRemaining <= 0) {
       CurrentCommandMode = EBattleCommandMode::None;
+      if (USkaldGameInstance *GI =
+              GetGameInstance<USkaldGameInstance>()) {
+        if (GI->GridBattleManager) {
+          GI->GridBattleManager->AdvanceTurn();
+        }
+      }
     }
     break;
   }
