@@ -91,6 +91,7 @@ bool UFighterSelectionWidget::ChooseFighter(const FFighterDefinition &Fighter) {
 }
 
 void UFighterSelectionWidget::LockIn() {
+  // Prevent empty or over-budget lock-ins.
   if (ChosenFighters.Num() == 0 || CurrentCost > MaxCost) {
     return;
   }
