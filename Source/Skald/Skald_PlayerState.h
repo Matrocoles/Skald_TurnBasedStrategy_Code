@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerState.h"
 #include "SkaldTypes.h"
+#include "GridBattleManager.h"
 #include "Skald_PlayerState.generated.h"
 
 /**
@@ -33,8 +34,16 @@ public:
     FString PlayerDisplayName;
 
     /** Selected faction for this player. */
-    UPROPERTY(BlueprintReadWrite, Replicated, Category="PlayerState")
-    ESkaldFaction Faction;
+    UPROPERTY(Replicated, BlueprintReadOnly, Category="Skald|Player")
+    ESkaldFaction Faction = ESkaldFaction::None;
+
+    /** Fighters chosen during pre-battle selection. */
+    UPROPERTY(Replicated, BlueprintReadOnly, Category="Skald|Player")
+    TArray<FFighterDefinition> PendingArmy;
+
+    /** Whether the player has finalised their army selection. */
+    UPROPERTY(Replicated, BlueprintReadOnly, Category="Skald|Player")
+    bool bArmyLockedIn = false;
 
     /** Whether this player is controlled by AI. */
     UPROPERTY(BlueprintReadWrite, ReplicatedUsing = OnRep_IsAI, Category="PlayerState")
