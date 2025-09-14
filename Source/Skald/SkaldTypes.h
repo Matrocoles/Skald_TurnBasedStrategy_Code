@@ -117,6 +117,9 @@ struct SKALD_API FS_BattlePayload
     int32 ArmyCountSent = 0;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    int32 DefenderArmyCount = 0;
+
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
     bool IsCapitalAttack = false;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)

@@ -309,6 +309,17 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
     }
     Selection->OnLockedIn.AddDynamic(
         this, &ASkaldPlayerController::HandleFighterSelectionLockedIn);
+
+    // Set MaxCost from the pending battle payload
+    if (CachedGameInstance)
+    {
+      const FS_BattlePayload& Battle = CachedGameInstance->PendingBattle;
+      int32 MyId = -1;
+      if (ASkaldPlayerState* PS = GetPlayerState<ASkaldPlayerState>()) { MyId = PS->GetPlayerId(); }
+      const bool bImAttacker = (Battle.AttackerPlayerID == MyId);
+
+      Selection->MaxCost = bImAttacker ? Battle.ArmyCountSent : Battle.DefenderArmyCount;
+    }
     Selection->AddToViewport();
     SetIgnoreMoveInput(true);
   }
@@ -579,6 +590,7 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
     Battle.FromTerritoryID = FromID;
     Battle.TargetTerritoryID = ToID;
     Battle.ArmyCountSent = ArmySent;
+    Battle.DefenderArmyCount = Target->ArmyUnits;
     Battle.IsCapitalAttack = Target->bIsCapital;
     if (bUseSiege && CachedGameMode) {
       const int32 SiegeID = CachedGameMode->ConsumeSiege(FromID);
