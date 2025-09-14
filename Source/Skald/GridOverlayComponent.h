@@ -70,6 +70,10 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Grid")
     void RegisterObstacle(UGridObstacleComponent *Obstacle);
 
+  /** If true, ClearHighlights() will FlushPersistentDebugLines for the entire world. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grid|Debug")
+  bool bFlushAllPersistentOnClear = true;
+
   /** Whether landscape should be treated as an obstacle based on slope. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Landscape")
   bool bTreatLandscapeAsObstacle = true;
