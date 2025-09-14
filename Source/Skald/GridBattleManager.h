@@ -5,6 +5,7 @@
 #include "Engine/DataTable.h"
 #include "GameFramework/Actor.h"
 #include "SkaldTypes.h"
+#include "GridBattleManager.generated.h"
 
 class AFighterPawn; // MUST be before the delegates
 
@@ -12,8 +13,6 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
     FOnBattleEnded, ESkaldFaction, WinningFaction, int32, AttackerCasualties, int32, DefenderCasualties);
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnActiveFighterChanged, AFighterPawn*, NewFighter);
-
-#include "GridBattleManager.generated.h"
 
 /** Statistics for a fighter in grid battle mode. */
 USTRUCT(BlueprintType)
