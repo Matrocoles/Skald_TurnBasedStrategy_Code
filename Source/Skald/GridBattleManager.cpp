@@ -352,6 +352,11 @@ AFighterPawn* UGridBattleManager::GetActiveFighter() const
     return ActiveFighter;
 }
 
+void UGridBattleManager::BroadcastActiveFighter()
+{
+    OnActiveFighterChanged.Broadcast(ActiveFighter);
+}
+
 TArray<FFighterDefinition> UGridBattleManager::GetFightersForFaction(ESkaldFaction Faction) const
 {
     TArray<FFighterDefinition> Fighters;
@@ -409,6 +414,7 @@ void UGridBattleManager::RollInitiative()
     {
         ActiveFighter->BeginActivation();
     }
+    BroadcastActiveFighter();
 }
 
 void UGridBattleManager::StartRound(FRandomStream& RandomStream)
@@ -458,6 +464,7 @@ void UGridBattleManager::StartRound(FRandomStream& RandomStream)
     if (ActiveFighter) {
         ActiveFighter->BeginActivation();
     }
+    BroadcastActiveFighter();
 }
 
 void UGridBattleManager::AdvanceTurn()
@@ -476,6 +483,7 @@ void UGridBattleManager::AdvanceTurn()
     if (InitiativeOrder.Num() == 0)
     {
         ActiveFighter = nullptr;
+        BroadcastActiveFighter();
         EndBattle();
         return;
     }
@@ -500,6 +508,7 @@ void UGridBattleManager::AdvanceTurn()
     {
         ActiveFighter->BeginActivation();
     }
+    BroadcastActiveFighter();
 }
 
 void UGridBattleManager::EndBattle()
