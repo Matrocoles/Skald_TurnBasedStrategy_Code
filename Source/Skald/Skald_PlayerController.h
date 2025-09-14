@@ -18,6 +18,8 @@ class ASkaldGameState;
 class USkaldGameInstance;
 class UFighterSelectionWidget;
 class AWorldMap;
+class AFighterPawn;
+class UGridOverlayComponent;
 
 /** Command issued by the player during a battle. */
 UENUM()
@@ -225,6 +227,9 @@ public:
   void HandleBattleEnded(ESkaldFaction WinningFaction, int32 AttackerCasualties,
                          int32 DefenderCasualties);
 
+  UFUNCTION()
+  void HandleActiveFighterChanged(AFighterPawn* NewFighter);
+
   /** Server-side processing of an attack request. */
   UFUNCTION(Server, Reliable)
   void ServerHandleAttack(int32 FromID, int32 ToID, int32 ArmySent,
@@ -293,6 +298,9 @@ private:
 
   /** Create the faction selection widget for the local player. */
   void InitializeChoosePlayerWidget();
+
+  void InitializeBattleHUD();
+  UGridOverlayComponent* FindGridOverlay() const;
 
   /** Attempt to locate the world map and bind to its selection event. */
   void TryBindWorldMap();
