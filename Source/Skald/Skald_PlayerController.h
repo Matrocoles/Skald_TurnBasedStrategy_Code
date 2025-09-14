@@ -1,11 +1,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Engine/EngineTypes.h"
 #include "GameFramework/PlayerController.h"
 #include "SkaldTypes.h"
-#include "TimerManager.h"
-#include "Engine/EngineTypes.h"
 #include "Skald_PlayerController.generated.h"
+#include "TimerManager.h"
 
 class ATurnManager;
 class UUserWidget;
@@ -139,6 +139,8 @@ protected:
   EMouseCaptureMode DefaultMouseCaptureMode;
 
   virtual void SetupInputComponent() override;
+
+  virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
   /** Begin selecting a move destination. */
   UFUNCTION()
@@ -302,6 +304,9 @@ private:
 
   /** Detect if the current level is a battle map and update bIsBattleMap. */
   void DetectBattleMap();
+
+  /** Re-run fighter selection setup after level transitions. */
+  void HandlePostLoadMap(UWorld *LoadedWorld);
 
   void BuildPlayerDataArray(TArray<FS_PlayerData> &OutPlayers) const;
 

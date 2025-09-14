@@ -54,8 +54,7 @@ void ATurnManager::BeginPlay() {
     }
   }
 
-  if (ASkaldGameMode *GM =
-          GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
+  if (ASkaldGameMode *GM = GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
     if (!GM->IsWorldInitialized()) {
       GM->TryInitializeWorldAndStart();
     }
@@ -115,7 +114,8 @@ void ATurnManager::ApplyReinforcementsAndResources(ASkaldPlayerState *PS,
   BroadcastResources(PS);
 }
 
-/** Internal: set GameState.CurrentTurnIndex (and broadcast) to match CurrentIndex. */
+/** Internal: set GameState.CurrentTurnIndex (and broadcast) to match
+ * CurrentIndex. */
 void ATurnManager::SyncGameStateTurnIndex() {
   if (ASkaldGameState *GS = GetWorld()->GetGameState<ASkaldGameState>()) {
     int32 NewIndex = -1;
@@ -247,12 +247,12 @@ void ATurnManager::AdvanceTurn() {
       if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
         const bool bIsActive = Controller == CurrentController;
         Controller->ShowTurnAnnouncement(PlayerName, bIsActive);
-      if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
-        HUD->UpdateTurnBanner(PS ? PS->GetPlayerId() : -1, 1);
-        HUD->UpdatePhaseBanner(CurrentPhase);
+        if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
+          HUD->UpdateTurnBanner(PS ? PS->GetPlayerId() : -1, 1);
+          HUD->UpdatePhaseBanner(CurrentPhase);
+        }
       }
     }
-  }
 
     CurrentController->StartTurn();
     SyncGameStateTurnIndex();
@@ -321,12 +321,18 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
         MapToLoad = Selected;
       }
     }
+    if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+      GI->bIsInBattleMap = true;
+    }
     World->ServerTravel(MapToLoad);
   }
 }
 
 void ATurnManager::ResolveGridBattleResult_Implementation() {
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+  if (GI) {
+    GI->bIsInBattleMap = false;
+  }
   if (!GI || !GI->GridBattleManager) {
     return;
   }
