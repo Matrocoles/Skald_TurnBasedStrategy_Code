@@ -116,8 +116,8 @@ struct SKALD_API FS_BattlePayload
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     int32 ArmyCountSent = 0;
 
-    // Budget for the defending side (e.g., target army units). Optional; 0 = unknown.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    /** Defending army’s budget for fighter selection. If zero, fall back to ArmyCountSent. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
     int32 DefenderArmyCount = 0;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)

@@ -606,7 +606,7 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
         Battle.AssignedSiegeIDs.Add(SiegeID);
       }
     }
-    Battle.DefenderArmyCount = Target ? FMath::Max(0, Target->ArmyUnits) : 0;
+    Battle.DefenderArmyCount = Target ? Target->ArmyUnits : 0;
     TurnManager->TriggerGridBattle(Battle);
     return;
   }

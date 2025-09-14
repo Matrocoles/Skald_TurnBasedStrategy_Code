@@ -425,11 +425,11 @@ void UGridBattleManager::RollInitiative()
 
     CurrentTurn = 0;
     ActiveFighter = InitiativeOrder.Num() > 0 ? InitiativeOrder[0] : nullptr;
+    OnActiveFighterChanged.Broadcast(ActiveFighter);
     if (ActiveFighter)
     {
         ActiveFighter->BeginActivation();
     }
-    OnActiveFighterChanged.Broadcast(ActiveFighter);
 }
 
 void UGridBattleManager::StartRound(FRandomStream& RandomStream)
@@ -476,10 +476,10 @@ void UGridBattleManager::StartRound(FRandomStream& RandomStream)
 
     CurrentTurn = 0;
     ActiveFighter = InitiativeOrder.Num() > 0 ? InitiativeOrder[0] : nullptr;
+    OnActiveFighterChanged.Broadcast(ActiveFighter);
     if (ActiveFighter) {
         ActiveFighter->BeginActivation();
     }
-    OnActiveFighterChanged.Broadcast(ActiveFighter);
 }
 
 void UGridBattleManager::AdvanceTurn()
@@ -489,43 +489,25 @@ void UGridBattleManager::AdvanceTurn()
         return;
     }
 
-    // Remove dead or null fighters
-    InitiativeOrder.RemoveAll([](AFighterPawn* Fighter) {
+    InitiativeOrder.RemoveAll([](AFighterPawn* Fighter)
+    {
         return !Fighter || !Fighter->IsAlive();
     });
 
     if (InitiativeOrder.Num() == 0)
     {
         ActiveFighter = nullptr;
-        OnActiveFighterChanged.Broadcast(nullptr);
-        return;
-    }
-    if (CurrentTurn >= InitiativeOrder.Num())
-    {
-        CurrentTurn = 0;
-    }
-
-    // Victory check: ensure both sides still exist
-    bool bAnyAttackers = false, bAnyDefenders = false;
-    for (AFighterPawn* F : InitiativeOrder)
-    {
-        if (!F) continue;
-        if (F->bIsAttacker) bAnyAttackers = true; else bAnyDefenders = true;
-        if (bAnyAttackers && bAnyDefenders) break;
-    }
-    if (!bAnyAttackers || !bAnyDefenders)
-    {
-        EndBattle();
+        OnActiveFighterChanged.Broadcast(ActiveFighter);
         return;
     }
 
     CurrentTurn = (CurrentTurn + 1) % InitiativeOrder.Num();
     ActiveFighter = InitiativeOrder[CurrentTurn];
+    OnActiveFighterChanged.Broadcast(ActiveFighter);
     if (ActiveFighter)
     {
         ActiveFighter->BeginActivation();
     }
-    OnActiveFighterChanged.Broadcast(ActiveFighter);
 }
 
 void UGridBattleManager::EndBattle()
