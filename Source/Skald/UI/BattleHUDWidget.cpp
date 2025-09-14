@@ -19,6 +19,8 @@ void UBattleHUDWidget::NativeConstruct() {
   }
 }
 
+void UBattleHUDWidget::RefreshStats() { UpdateStatPanel(); }
+
 void UBattleHUDWidget::BindToFighter(AFighterPawn *Fighter) {
   if (BoundFighter) {
     BoundFighter->OnHealthChanged.RemoveDynamic(
@@ -29,6 +31,28 @@ void UBattleHUDWidget::BindToFighter(AFighterPawn *Fighter) {
     BoundFighter->OnHealthChanged.AddDynamic(
         this, &UBattleHUDWidget::HandleHealthChanged);
     UpdateStatPanel();
+  } else {
+    if (HealthText) {
+      HealthText->SetText(FText::GetEmpty());
+    }
+    if (AttackText) {
+      AttackText->SetText(FText::GetEmpty());
+    }
+    if (MoveText) {
+      MoveText->SetText(FText::GetEmpty());
+    }
+    if (StrengthText) {
+      StrengthText->SetText(FText::GetEmpty());
+    }
+    if (DefenceText) {
+      DefenceText->SetText(FText::GetEmpty());
+    }
+    if (AttackRangeText) {
+      AttackRangeText->SetText(FText::GetEmpty());
+    }
+    if (AttackDiceText) {
+      AttackDiceText->SetText(FText::GetEmpty());
+    }
   }
 }
 

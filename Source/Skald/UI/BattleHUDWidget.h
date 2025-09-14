@@ -18,6 +18,10 @@ class SKALD_API UBattleHUDWidget : public UUserWidget {
 public:
   virtual void NativeConstruct() override;
 
+  /** Refresh all stat text from the currently bound fighter. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Battle")
+  void RefreshStats();
+
   /** Bind this HUD to a fighter so its stats are displayed. */
   UFUNCTION(BlueprintCallable, Category = "Skald|Battle")
   void BindToFighter(AFighterPawn *Fighter);
