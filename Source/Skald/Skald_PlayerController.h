@@ -5,6 +5,7 @@
 #include "GameFramework/PlayerController.h"
 #include "SkaldTypes.h"
 #include "TimerManager.h"
+#include "GridBattleManager.h"
 #include "Skald_PlayerController.generated.h"
 
 class ATurnManager;
@@ -76,6 +77,12 @@ public:
   UFUNCTION(Server, Reliable)
   void ServerInitPlayerState(const FString &Name, ESkaldFaction Faction,
                              int32 NumAIPlayers);
+
+  UFUNCTION(Client, Reliable)
+  void Client_ShowFighterSelection(int32 MaxBudget, ESkaldFaction Faction);
+
+  UFUNCTION(Server, Reliable)
+  void Server_CommitArmy(const TArray<FFighterDefinition>& Chosen);
 
 protected:
   /** Widget class to instantiate for the player's HUD.
@@ -290,6 +297,12 @@ protected:
   TObjectPtr<ATurnManager> TurnManager;
 
 private:
+  UPROPERTY()
+  class UFighterSelectionWidget* CurrentSelectionWidget;
+
+  UFUNCTION()
+  void HandleLockedIn();
+
   /** Cache references to key game singletons and bind delegates. */
   void CacheGameReferences();
 
