@@ -8,6 +8,8 @@
 
 class AFighterPawn;
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnActiveFighterChanged, AFighterPawn*, NewFighter);
+
 #include "GridBattleManager.generated.h"
 
 /** Statistics for a fighter in grid battle mode. */
@@ -173,10 +175,14 @@ public:
     FOnBattleEnded OnBattleEnded;
 
     /** Event fired when the active fighter changes. */
-    DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnActiveFighterChanged, AFighterPawn*, NewFighter);
-
     UPROPERTY(BlueprintAssignable, Category="Battle|Events")
     FOnActiveFighterChanged OnActiveFighterChanged;
+
+    UFUNCTION(BlueprintCallable, Category="Battle")
+    void RegisterFighter(AFighterPawn* Fighter, bool bAsAttacker);
+
+    UFUNCTION(BlueprintCallable, Category="Battle")
+    void UnregisterFighter(AFighterPawn* Fighter);
 
     /** Table containing fighter definitions. */
     UPROPERTY(BlueprintReadOnly, Category="Battle")
@@ -227,8 +233,5 @@ protected:
 
     /** Whether fighters have been assigned to attacker or defender sides. */
     bool bTeamsAssigned = false;
-
-private:
-    void BroadcastActiveFighter();
 };
 

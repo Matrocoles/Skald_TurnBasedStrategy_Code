@@ -352,9 +352,24 @@ AFighterPawn* UGridBattleManager::GetActiveFighter() const
     return ActiveFighter;
 }
 
-void UGridBattleManager::BroadcastActiveFighter()
+void UGridBattleManager::RegisterFighter(AFighterPawn* Fighter, bool bAsAttacker)
 {
-    OnActiveFighterChanged.Broadcast(ActiveFighter);
+    if (!Fighter) return;
+    if (!InitiativeOrder.Contains(Fighter))
+    {
+        InitiativeOrder.Add(Fighter);
+    }
+    Fighter->bIsAttacker = bAsAttacker;
+}
+
+void UGridBattleManager::UnregisterFighter(AFighterPawn* Fighter)
+{
+    InitiativeOrder.Remove(Fighter);
+    if (ActiveFighter == Fighter)
+    {
+        ActiveFighter = nullptr;
+        OnActiveFighterChanged.Broadcast(nullptr);
+    }
 }
 
 TArray<FFighterDefinition> UGridBattleManager::GetFightersForFaction(ESkaldFaction Faction) const
@@ -414,7 +429,7 @@ void UGridBattleManager::RollInitiative()
     {
         ActiveFighter->BeginActivation();
     }
-    BroadcastActiveFighter();
+    OnActiveFighterChanged.Broadcast(ActiveFighter);
 }
 
 void UGridBattleManager::StartRound(FRandomStream& RandomStream)
@@ -464,7 +479,7 @@ void UGridBattleManager::StartRound(FRandomStream& RandomStream)
     if (ActiveFighter) {
         ActiveFighter->BeginActivation();
     }
-    BroadcastActiveFighter();
+    OnActiveFighterChanged.Broadcast(ActiveFighter);
 }
 
 void UGridBattleManager::AdvanceTurn()
@@ -479,13 +494,15 @@ void UGridBattleManager::AdvanceTurn()
         return !Fighter || !Fighter->IsAlive();
     });
 
-    // If no fighters remain, end immediately
     if (InitiativeOrder.Num() == 0)
     {
         ActiveFighter = nullptr;
-        BroadcastActiveFighter();
-        EndBattle();
+        OnActiveFighterChanged.Broadcast(nullptr);
         return;
+    }
+    if (CurrentTurn >= InitiativeOrder.Num())
+    {
+        CurrentTurn = 0;
     }
 
     // Victory check: ensure both sides still exist
@@ -508,7 +525,7 @@ void UGridBattleManager::AdvanceTurn()
     {
         ActiveFighter->BeginActivation();
     }
-    BroadcastActiveFighter();
+    OnActiveFighterChanged.Broadcast(ActiveFighter);
 }
 
 void UGridBattleManager::EndBattle()
@@ -542,7 +559,8 @@ void UGridBattleManager::EndBattle()
 
     int32 AttackerCasualties = AttackerInitialArmyCost - AttackerSurvivorCount;
     int32 DefenderCasualties = DefenderInitialArmyCost - DefenderSurvivorCount;
-
+    ActiveFighter = nullptr;
+    OnActiveFighterChanged.Broadcast(nullptr);
     OnBattleEnded.Broadcast(Winner, AttackerCasualties, DefenderCasualties);
 }
 
