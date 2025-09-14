@@ -2,6 +2,7 @@
 #include "Engine/DataTable.h"
 #include "UObject/ConstructorHelpers.h"
 #include "FighterPawn.h"
+#include "GridOverlayComponent.h"
 
 namespace
 {
@@ -427,16 +428,28 @@ void UGridBattleManager::StartRound(FRandomStream& RandomStream)
 
         Fighter->BeginActivation();
 
-        FIntPoint Cell;
-        Cell.Y = RandomStream.RandRange(0, GridSize - 1);
-        if (Fighter->bIsAttacker) {
-            Cell.X = RandomStream.RandRange(0, EdgeRange - 1);
-        }
-        else {
-            Cell.X = RandomStream.RandRange(GridSize - EdgeRange, GridSize - 1);
+        // Try to find a valid, free, non-obscured cell near the proper edge
+        bool bPlaced = false;
+        for (int32 tries = 0; tries < 50 && !bPlaced; ++tries) {
+            FIntPoint Cell;
+            Cell.Y = RandomStream.RandRange(0, GridSize - 1);
+            Cell.X = Fighter->bIsAttacker
+                ? RandomStream.RandRange(0, EdgeRange - 1)
+                : RandomStream.RandRange(GridSize - EdgeRange, GridSize - 1);
+
+            if (UGridOverlayComponent* Grid = Fighter->GetGrid()) {
+                if (!Grid->IsOccupied(Cell) && !Grid->IsObscured(Cell)) {
+                    Fighter->MoveToCell(Cell);
+                    bPlaced = true;
+                }
+            } else {
+                // Fallback: place anyway if we can’t query the grid
+                Fighter->MoveToCell(Cell);
+                bPlaced = true;
+            }
         }
 
-        Fighter->MoveToCell(Cell);
+        // Clear setup action
         Fighter->ActionsRemaining = 0;
     }
 
