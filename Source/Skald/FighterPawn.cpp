@@ -134,15 +134,23 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
           : (Stats.Strength < Target->Stats.Defence ? 5 : 4);
 
   for (int32 i = 0; i < Stats.AttackDice && Target->IsAlive(); ++i) {
-    int32 Roll = RandomStream->RandRange(1, 6);
-    if (Roll >= RequiredRoll) {
+    const int32 Roll = RandomStream->RandRange(1, 6);
+    int32 DamageThisDie = 0;
+
+    if (Roll == 6) {
+      DamageThisDie = Stats.AttackDamage + 3; // crit
+    } else if (Roll >= RequiredRoll) {
+      DamageThisDie = Stats.AttackDamage;
+    }
+
+    if (DamageThisDie > 0) {
       Target->Stats.Health =
-          FMath::Max(0, Target->Stats.Health - Stats.AttackDamage);
+          FMath::Max(0, Target->Stats.Health - DamageThisDie);
 
       if (UUserWidget *DamageWidget = GetDamageWidgetFromPool()) {
         if (UTextBlock *Text = Cast<UTextBlock>(
                 DamageWidget->GetWidgetFromName(TEXT("DamageText")))) {
-          Text->SetText(FText::AsNumber(Stats.AttackDamage));
+          Text->SetText(FText::AsNumber(DamageThisDie));
         }
         DamageWidget->AddToViewport();
         if (UWorld *World = GetWorld()) {
