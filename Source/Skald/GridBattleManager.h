@@ -6,13 +6,11 @@
 #include "GameFramework/Actor.h"
 #include "SkaldTypes.h"
 
-class AFighterPawn;
+class AFighterPawn; // MUST be before the delegates
 
-// Event fired when a grid battle concludes.
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
     FOnBattleEnded, ESkaldFaction, WinningFaction, int32, AttackerCasualties, int32, DefenderCasualties);
 
-// Event fired whenever the active fighter changes (including nullptr)
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnActiveFighterChanged, AFighterPawn*, NewFighter);
 
 #include "GridBattleManager.generated.h"
