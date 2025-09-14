@@ -306,20 +306,29 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
       Selection->AvailableFighters =
           CachedGameInstance->GridBattleManager->GetFightersForFaction(
               PlayerFaction);
+      // Set selection budget from pending battle; attacker uses ArmyCountSent,
+      // defender uses DefenderArmyCount.
+      const FS_BattlePayload &Battle =
+          CachedGameInstance->PendingBattle;
+
+      int32 MyId = -1;
+      if (ASkaldPlayerState *PS_Local =
+              GetPlayerState<ASkaldPlayerState>()) {
+        MyId = PS_Local->GetPlayerId();
+      }
+      const bool bImAttacker = (Battle.AttackerPlayerID == MyId);
+
+      // Fallback: if DefenderArmyCount isn’t populated, mirror the
+      // attacker’s budget.
+      const int32 DefenderBudget =
+          (Battle.DefenderArmyCount > 0) ? Battle.DefenderArmyCount
+                                         : Battle.ArmyCountSent;
+
+      Selection->MaxCost =
+          bImAttacker ? Battle.ArmyCountSent : DefenderBudget;
     }
     Selection->OnLockedIn.AddDynamic(
         this, &ASkaldPlayerController::HandleFighterSelectionLockedIn);
-
-    // Set MaxCost from the pending battle payload
-    if (CachedGameInstance)
-    {
-      const FS_BattlePayload& Battle = CachedGameInstance->PendingBattle;
-      int32 MyId = -1;
-      if (ASkaldPlayerState* PS = GetPlayerState<ASkaldPlayerState>()) { MyId = PS->GetPlayerId(); }
-      const bool bImAttacker = (Battle.AttackerPlayerID == MyId);
-
-      Selection->MaxCost = bImAttacker ? Battle.ArmyCountSent : Battle.DefenderArmyCount;
-    }
     Selection->AddToViewport();
     SetIgnoreMoveInput(true);
   }
