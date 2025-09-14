@@ -6,6 +6,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Skald_GameState.h"
+#include "UI/FighterSelectionWidget.h"
 
 ULobbyMenuWidget::ULobbyMenuWidget(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer) {
@@ -39,6 +41,17 @@ void ULobbyMenuWidget::NativeConstruct()
     if (ExitButton)
     {
         ExitButton->OnClicked.AddDynamic(this, &ULobbyMenuWidget::OnExit);
+    }
+
+    if (ASkaldGameState* GS = GetWorld() ? GetWorld()->GetGameState<ASkaldGameState>() : nullptr)
+    {
+        if (FighterSelection)
+        {
+            // Initial fill
+            FighterSelection->SetAvailableFighters(GS->GetFighterRoster());
+            // Live updates
+            GS->OnFighterRosterUpdated.AddDynamic(this, &ULobbyMenuWidget::HandleFighterRosterUpdated);
+        }
     }
 }
 
@@ -104,6 +117,17 @@ void ULobbyMenuWidget::OnExit()
     if (APlayerController* PC = GetOwningPlayer())
     {
         UKismetSystemLibrary::QuitGame(this, PC, EQuitPreference::Quit, false);
+    }
+}
+
+void ULobbyMenuWidget::HandleFighterRosterUpdated()
+{
+    if (ASkaldGameState* GS = GetWorld() ? GetWorld()->GetGameState<ASkaldGameState>() : nullptr)
+    {
+        if (FighterSelection)
+        {
+            FighterSelection->SetAvailableFighters(GS->GetFighterRoster());
+        }
     }
 }
 

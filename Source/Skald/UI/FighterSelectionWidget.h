@@ -96,13 +96,15 @@ class SKALD_API UFighterSelectionWidget : public UUserWidget {
 
 public:
   virtual void NativeConstruct() override;
+  virtual void NativePreConstruct() override;
 
   /** Faction of the player owning this selection widget. */
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Fighter")
   ESkaldFaction PlayerFaction = ESkaldFaction::None;
 
   /** Fighters that can be chosen. */
-  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Fighter")
+  // Make these spawn-exposed so they can be passed at CreateWidget time:
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ExposeOnSpawn=true), Category = "Skald|Fighter")
   TArray<FFighterDefinition> AvailableFighters;
 
   /** Fighters chosen by the player. */
@@ -110,7 +112,7 @@ public:
   TArray<FFighterDefinition> ChosenFighters;
 
   /** Maximum total army cost allowed. */
-  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Fighter")
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ExposeOnSpawn=true), Category = "Skald|Fighter")
   int32 MaxCost = 0;
 
   /** Current cost of chosen fighters. */
@@ -148,6 +150,10 @@ public:
   /** Lock in the current selection. */
   UFUNCTION(BlueprintCallable, Category = "Skald|Fighter")
   void LockIn();
+
+  // Add a setter that repopulates when data arrives later:
+  UFUNCTION(BlueprintCallable, Category="Skald|Fighter")
+  void SetAvailableFighters(const TArray<FFighterDefinition>& InFighters);
 
 protected:
   /** Populate the fighter list scroll box. */

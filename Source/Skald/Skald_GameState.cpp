@@ -14,6 +14,7 @@ void ASkaldGameState::GetLifetimeReplicatedProps(
 
     DOREPLIFETIME(ASkaldGameState, Players);
     DOREPLIFETIME(ASkaldGameState, CurrentTurnIndex);
+    DOREPLIFETIME(ASkaldGameState, FighterRoster); // NEW
 }
 
 void ASkaldGameState::AddPlayerState(APlayerState* PlayerState)
@@ -81,6 +82,11 @@ void ASkaldGameState::OnRep_CurrentTurnIndex()
     OnTurnIndexChanged.Broadcast(CurrentTurnIndex);
 }
 
+void ASkaldGameState::OnRep_FighterRoster()
+{
+    OnFighterRosterUpdated.Broadcast();
+}
+
 void ASkaldGameState::ClampTurnIndex()
 {
     if (Players.Num() == 0)
@@ -109,5 +115,12 @@ void ASkaldGameState::SortAndDedupPlayers()
             Players.RemoveAt(i);
         }
     }
+}
+
+void ASkaldGameState::ServerSetFighterRoster_Implementation(const TArray<FFighterDefinition>& InRoster)
+{
+    FighterRoster = InRoster;
+    // Fire local notify so server-side UI (if any) also refreshes immediately
+    OnRep_FighterRoster();
 }
 
