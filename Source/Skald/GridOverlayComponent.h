@@ -2,6 +2,7 @@
 
 #include "Components/ActorComponent.h"
 #include "CoreMinimal.h"
+#include "GridBattleManager.h"
 #include "GridOverlayComponent.generated.h"
 
 class AFighterPawn;
@@ -85,12 +86,15 @@ public:
 
 protected:
   /** Width of the grid in cells. */
-  int32 Width = 0;
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid")
+  int32 Width = UGridBattleManager::GridSize;
 
   /** Height of the grid in cells. */
-  int32 Height = 0;
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid")
+  int32 Height = UGridBattleManager::GridSize;
 
   /** Size of one cell in world units. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid")
   float CellSize = 100.f;
 
   /** World origin of the grid (cell 0,0). */

@@ -15,8 +15,6 @@ UGridOverlayComponent::UGridOverlayComponent() {
 void UGridOverlayComponent::BeginPlay() {
   Super::BeginPlay();
 
-  Width = 50;
-  Height = 50;
   Cells.Init(false, Width * Height);
   ObscuredCells.Init(false, Width * Height);
 
