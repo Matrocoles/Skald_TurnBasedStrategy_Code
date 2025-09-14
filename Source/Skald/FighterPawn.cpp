@@ -3,8 +3,8 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextBlock.h"
 #include "EngineUtils.h"
-#include "GridOverlayComponent.h"
 #include "GridBattleManager.h"
+#include "GridOverlayComponent.h"
 #include "Skald_GameInstance.h"
 #include "TimerManager.h"
 
@@ -35,6 +35,15 @@ void AFighterPawn::BeginPlay() {
   if (UGridOverlayComponent *Grid = GetGrid()) {
     CurrentCell = Grid->WorldToGrid(GetActorLocation());
     Grid->SetOccupied(CurrentCell, true);
+  }
+
+  if (UWorld *World = GetWorld()) {
+    if (USkaldGameInstance *GI =
+            Cast<USkaldGameInstance>(World->GetGameInstance())) {
+      if (GI->GridBattleManager) {
+        GI->GridBattleManager->RegisterFighter(this, bIsAttacker);
+      }
+    }
   }
 }
 
@@ -168,8 +177,7 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
         if (UWorld *World = GetWorld()) {
           FTimerHandle Timer;
           World->GetTimerManager().SetTimer(
-              Timer,
-              FTimerDelegate::CreateLambda([DamageWidget]() {
+              Timer, FTimerDelegate::CreateLambda([DamageWidget]() {
                 DamageWidget->RemoveFromParent();
               }),
               1.f, false);
@@ -217,6 +225,14 @@ void AFighterPawn::UpdateHealthDisplay(int32 NewHealth) {
 void AFighterPawn::Destroyed() {
   if (UGridOverlayComponent *Grid = GetGrid()) {
     Grid->SetOccupied(CurrentCell, false);
+  }
+  if (UWorld *World = GetWorld()) {
+    if (USkaldGameInstance *GI =
+            Cast<USkaldGameInstance>(World->GetGameInstance())) {
+      if (GI->GridBattleManager) {
+        GI->GridBattleManager->UnregisterFighter(this);
+      }
+    }
   }
   CurrentCell = FIntPoint::ZeroValue;
   Super::Destroyed();
