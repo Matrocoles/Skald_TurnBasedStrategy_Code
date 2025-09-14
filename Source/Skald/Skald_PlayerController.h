@@ -4,8 +4,8 @@
 #include "Engine/EngineTypes.h"
 #include "GameFramework/PlayerController.h"
 #include "SkaldTypes.h"
-#include "Skald_PlayerController.generated.h"
 #include "TimerManager.h"
+#include "Skald_PlayerController.generated.h"
 
 class ATurnManager;
 class UUserWidget;
