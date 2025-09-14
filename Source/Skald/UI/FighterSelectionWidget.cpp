@@ -4,6 +4,8 @@
 #include "Components/ScrollBox.h"
 #include "Components/TextBlock.h"
 
+DEFINE_LOG_CATEGORY_STATIC(LogSkaldUI, Log, All);
+
 void UFighterEntryWidget::NativeConstruct() {
   Super::NativeConstruct();
   if (SelectButton) {
@@ -43,12 +45,37 @@ void UFighterEntryWidget::Init(const FFighterDefinition &InFighter,
   if (CostText) {
     CostText->SetText(FText::AsNumber(Fighter.Stats.ArmyCost));
   }
+
+  // Disable selection if fighter cannot be afforded.
+  if (SelectButton && Owner)
+  {
+      const bool bCan = Owner->CanAfford(Fighter);
+      SelectButton->SetIsEnabled(bCan);
+  }
 }
 
 void UFighterEntryWidget::HandleClicked() {
   if (Owner) {
     Owner->ChooseFighter(Fighter);
   }
+}
+
+void UFighterSelectionWidget::SetAvailableFighters(const TArray<FFighterDefinition>& InFighters)
+{
+    AvailableFighters = InFighters;
+    PopulateFighterList();
+}
+
+void UFighterSelectionWidget::NativePreConstruct()
+{
+    Super::NativePreConstruct();
+    UpdateCostDisplay();
+#if WITH_EDITOR
+    if (IsDesignTime())
+    {
+        PopulateFighterList();
+    }
+#endif
 }
 
 void UFighterSelectionWidget::NativeConstruct() {
@@ -61,17 +88,37 @@ void UFighterSelectionWidget::NativeConstruct() {
 }
 
 void UFighterSelectionWidget::PopulateFighterList() {
-  if (!FighterList || !FighterEntryClass) {
+  if (!FighterList)
+  {
+    UE_LOG(LogSkaldUI, Warning, TEXT("[FighterSelection] FighterList is null. "
+           "UMG variable must be named 'FighterList' and IsVariable=true."));
     return;
   }
+  if (!FighterEntryClass)
+  {
+    UE_LOG(LogSkaldUI, Warning, TEXT("[FighterSelection] FighterEntryClass is null. "
+           "Set it in the widget defaults."));
+    return;
+  }
+
   FighterList->ClearChildren();
+
+  if (AvailableFighters.Num() == 0)
+  {
+    UE_LOG(LogSkaldUI, Warning, TEXT("[FighterSelection] AvailableFighters is EMPTY."));
+  }
+
+  int32 Added = 0;
   for (const FFighterDefinition &Fighter : AvailableFighters) {
     if (UFighterEntryWidget *Entry =
             CreateWidget<UFighterEntryWidget>(this, FighterEntryClass)) {
       Entry->Init(Fighter, this);
       FighterList->AddChild(Entry);
+      ++Added;
     }
   }
+
+  UE_LOG(LogSkaldUI, Log, TEXT("[FighterSelection] Populated %d fighter entries."), Added);
 }
 
 bool UFighterSelectionWidget::CanAfford(

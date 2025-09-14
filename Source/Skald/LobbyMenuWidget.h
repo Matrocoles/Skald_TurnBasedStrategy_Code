@@ -9,6 +9,7 @@ class UVerticalBox;
 class ULoadGameWidget;
 class USettingsWidget;
 class UStartGameWidget;
+class UFighterSelectionWidget;
 
 /**
  * Main menu widget shown on the lobby map.
@@ -45,9 +46,12 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Lobby")
     TSubclassOf<UStartGameWidget> StartGameWidgetClass;
 
-protected:
     virtual void NativeConstruct() override;
 
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="UI")
+    UFighterSelectionWidget* GetFighterSelectionWidget() const { return FighterSelection; }
+
+protected:
     UFUNCTION(BlueprintCallable)
     void OnStartGame();
 
@@ -59,5 +63,12 @@ protected:
 
     UFUNCTION(BlueprintCallable)
     void OnExit();
+
+    // Must match the child widget name in the BP and be IsVariable=true
+    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+    UFighterSelectionWidget* FighterSelection;
+
+    UFUNCTION()
+    void HandleFighterRosterUpdated();
 };
 

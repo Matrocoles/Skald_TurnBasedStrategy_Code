@@ -2,12 +2,14 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameStateBase.h"
+#include "GridBattleManager.h" // for FFighterDefinition (ensure it’s a USTRUCT)
 #include "Skald_GameState.generated.h"
 
 class ASkaldPlayerState;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSkaldPlayersUpdated);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSkaldTurnIndexChanged, int32, NewTurnIndex);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FFighterRosterUpdated);
 
 /**
  * Stores information about players and the current turn.
@@ -32,6 +34,14 @@ public:
     UPROPERTY(BlueprintAssignable, Category="GameState|Events")
     FSkaldTurnIndexChanged OnTurnIndexChanged;
 
+    /** Replicated roster of all fighters available in the lobby. */
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_FighterRoster, Category="GameState|Fighters")
+    TArray<FFighterDefinition> FighterRoster;
+
+    /** Broadcast whenever FighterRoster replicates/changes. */
+    UPROPERTY(BlueprintAssignable, Category="GameState|Events")
+    FFighterRosterUpdated OnFighterRosterUpdated;
+
     /** Index of the player whose turn is active. */
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_CurrentTurnIndex, Category="GameState")
     int32 CurrentTurnIndex;
@@ -48,12 +58,23 @@ public:
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="GameState")
     ASkaldPlayerState* GetPlayerById(int32 PlayerID) const;
 
+    /** Server API to set/update roster. */
+    UFUNCTION(Server, Reliable)
+    void ServerSetFighterRoster(const TArray<FFighterDefinition>& InRoster);
+
+    /** Getter for BP/UI */
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="GameState|Fighters")
+    const TArray<FFighterDefinition>& GetFighterRoster() const { return FighterRoster; }
+
 protected:
     UFUNCTION()
     void OnRep_Players();
 
     UFUNCTION()
     void OnRep_CurrentTurnIndex();
+
+    UFUNCTION()
+    void OnRep_FighterRoster();
 
     /** Keep CurrentTurnIndex in bounds after roster changes. */
     void ClampTurnIndex();
