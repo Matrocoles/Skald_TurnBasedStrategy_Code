@@ -204,6 +204,13 @@ void ATurnManager::AdvanceTurn() {
   ASkaldPlayerController *PreviousController =
       Controllers.IsValidIndex(CurrentIndex) ? Controllers[CurrentIndex].Get()
                                              : nullptr;
+  FString PreviousPlayerName;
+  if (PreviousController) {
+    if (ASkaldPlayerState *PrevPS =
+            PreviousController->GetPlayerState<ASkaldPlayerState>()) {
+      PreviousPlayerName = PrevPS->PlayerDisplayName;
+    }
+  }
 
   Controllers.RemoveAll([](const TWeakObjectPtr<ASkaldPlayerController> &Ptr) {
     if (!Ptr.IsValid()) {
@@ -246,13 +253,14 @@ void ATurnManager::AdvanceTurn() {
          Controllers) {
       if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
         const bool bIsActive = Controller == CurrentController;
+        Controller->NotifyTurnEnded(PreviousPlayerName);
         Controller->ShowTurnAnnouncement(PlayerName, bIsActive);
-      if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
-        HUD->UpdateTurnBanner(PS ? PS->GetPlayerId() : -1, 1);
-        HUD->UpdatePhaseBanner(CurrentPhase);
+        if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
+          HUD->UpdateTurnBanner(PS ? PS->GetPlayerId() : -1, 1);
+          HUD->UpdatePhaseBanner(CurrentPhase);
+        }
       }
     }
-  }
 
     CurrentController->StartTurn();
     SyncGameStateTurnIndex();

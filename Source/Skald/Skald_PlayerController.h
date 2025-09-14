@@ -56,6 +56,9 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void ShowTurnAnnouncement(const FString &PlayerName, bool bIsMyTurn);
 
+  UFUNCTION(BlueprintCallable, Category = "Turn")
+  void NotifyTurnEnded(const FString &PlayerName);
+
   UFUNCTION(BlueprintCallable, Category = "UI")
   void HandleTerritorySelected(ATerritory *Terr);
 
