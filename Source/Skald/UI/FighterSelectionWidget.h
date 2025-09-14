@@ -158,8 +158,8 @@ public:
   // Add a setter that repopulates when data arrives later:
   UFUNCTION(BlueprintCallable, Category="Skald|Fighter")
   void SetAvailableFighters(const TArray<FFighterDefinition>& InFighters);
-
-protected:
+  
+public:
   /** Populate the fighter list scroll box. */
   UFUNCTION(BlueprintCallable, Category = "Skald|Fighter")
   void PopulateFighterList();
