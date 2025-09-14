@@ -26,43 +26,43 @@ public:
             UFighterSelectionWidget *InOwner);
 
   /** Button bound from the blueprint used to choose this fighter. */
-  UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UButton *SelectButton;
 
   /** Name text bound from the blueprint. */
-  UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *NameText;
 
   /** Strength display text. */
-  UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *StrengthText;
 
   /** Defence display text. */
-  UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *DefenceText;
 
   /** Health display text. */
-  UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *HealthText;
 
   /** Attack range display text. */
-  UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *AttackRangeText;
 
   /** Attack damage display text. */
-  UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *AttackDamageText;
 
   /** Attack dice display text. */
-  UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *AttackDiceText;
 
   /** Movement display text. */
-  UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *MovementText;
 
   /** Army cost display text. */
-  UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *CostText;
 
   /** Fighter definition represented by this entry. */
@@ -118,15 +118,15 @@ public:
   int32 CurrentCost = 0;
 
   /** Scroll box used to list available fighters. */
-  UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UScrollBox *FighterList;
 
   /** Button that finalises the fighter selection. */
-  UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UButton *LockInButton;
 
   /** Text displaying the current/maximum cost. */
-  UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *CostDisplayText;
 
   /** Blueprint class used for each fighter entry. */
