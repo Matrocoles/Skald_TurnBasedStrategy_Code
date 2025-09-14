@@ -315,35 +315,41 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
 }
 
 void ASkaldPlayerController::InitializeBattleHUD() {
-  if (!IsLocalController()) return;
-  if (!BattleHUDWidgetClass) return;
+  if (!IsLocalController())
+    return;
+  if (!BattleHUDWidgetClass)
+    return;
   if (!BattleHudWidget) {
-    BattleHudWidget = CreateWidget<UBattleHUDWidget>(this, BattleHUDWidgetClass);
+    BattleHudWidget =
+        CreateWidget<UBattleHUDWidget>(this, BattleHUDWidgetClass);
     if (BattleHudWidget) {
       BattleHudWidget->AddToViewport(20);
 
       // Hook HUD buttons to controller modes
-      BattleHudWidget->OnMovePressed.AddDynamic(this, &ASkaldPlayerController::BeginMoveMode);
-      BattleHudWidget->OnAttackPressed.AddDynamic(this, &ASkaldPlayerController::BeginAttackMode);
+      BattleHudWidget->OnMovePressed.AddDynamic(
+          this, &ASkaldPlayerController::BeginMoveMode);
+      BattleHudWidget->OnAttackPressed.AddDynamic(
+          this, &ASkaldPlayerController::BeginAttackMode);
     }
   }
 
   // Bind to active-fighter changes
-  if (USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>()) {
+  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
     if (GI->GridBattleManager) {
       GI->GridBattleManager->OnActiveFighterChanged.RemoveAll(this);
       GI->GridBattleManager->OnActiveFighterChanged.AddDynamic(
-        this, &ASkaldPlayerController::HandleActiveFighterChanged);
+          this, &ASkaldPlayerController::HandleActiveFighterChanged);
       // Initial bind
       HandleActiveFighterChanged(GI->GridBattleManager->GetActiveFighter());
     }
   }
 }
 
-UGridOverlayComponent* ASkaldPlayerController::FindGridOverlay() const {
-  if (UWorld* World = GetWorld()) {
+UGridOverlayComponent *ASkaldPlayerController::FindGridOverlay() const {
+  if (UWorld *World = GetWorld()) {
     for (TActorIterator<AActor> It(World); It; ++It) {
-      if (UGridOverlayComponent* Comp = It->FindComponentByClass<UGridOverlayComponent>()) {
+      if (UGridOverlayComponent *Comp =
+              It->FindComponentByClass<UGridOverlayComponent>()) {
         return Comp;
       }
     }
@@ -351,12 +357,13 @@ UGridOverlayComponent* ASkaldPlayerController::FindGridOverlay() const {
   return nullptr;
 }
 
-void ASkaldPlayerController::HandleActiveFighterChanged(AFighterPawn* NewFighter) {
+void ASkaldPlayerController::HandleActiveFighterChanged(
+    AFighterPawn *NewFighter) {
   if (BattleHudWidget) {
     BattleHudWidget->BindToFighter(NewFighter);
   }
   // Clear previous highlights when the turn swaps
-  if (UGridOverlayComponent* Grid = FindGridOverlay()) {
+  if (UGridOverlayComponent *Grid = FindGridOverlay()) {
     Grid->ClearHighlights();
   }
   CurrentCommandMode = EBattleCommandMode::None;
@@ -1160,13 +1167,31 @@ void ASkaldPlayerController::SetupInputComponent() {
 
 void ASkaldPlayerController::BeginMoveMode() {
   CurrentCommandMode = EBattleCommandMode::Move;
+  if (UGridOverlayComponent *Grid = FindGridOverlay()) {
+    if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+      if (GI->GridBattleManager && GI->GridBattleManager->GetActiveFighter()) {
+        Grid->HighlightMovement(GI->GridBattleManager->GetActiveFighter());
+      }
+    }
+  }
 }
 
 void ASkaldPlayerController::BeginAttackMode() {
   CurrentCommandMode = EBattleCommandMode::Attack;
+  if (UGridOverlayComponent *Grid = FindGridOverlay()) {
+    if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+      if (GI->GridBattleManager && GI->GridBattleManager->GetActiveFighter()) {
+        Grid->HighlightAttack(GI->GridBattleManager->GetActiveFighter());
+      }
+    }
+  }
 }
 
 void ASkaldPlayerController::HandleGridClick() {
+  if (!IsLocalController())
+    return;
+
+  // Non-battle map handling
   FHitResult Hit;
   if (!bIsBattleMap) {
     GetHitResultUnderCursor(ECC_Visibility, /*bTraceComplex*/ true, Hit);
@@ -1178,29 +1203,54 @@ void ASkaldPlayerController::HandleGridClick() {
     return;
   }
 
-  GetHitResultUnderCursor(ECC_Visibility, /*bTraceComplex*/ true, Hit);
-
-  if (!CachedGameInstance || !CachedGameInstance->GridBattleManager) {
-    return;
-  }
-  UGridBattleManager *GridBattleManager = CachedGameInstance->GridBattleManager;
-  AFighterPawn *ActiveFighter = GridBattleManager->GetActiveFighter();
-  if (!ActiveFighter) {
-    return;
-  }
-
-  UGridOverlayComponent *GridOverlay = FindGridOverlay();
-
-  if (CurrentCommandMode == EBattleCommandMode::Move && GridOverlay) {
-    const FIntPoint Cell = GridOverlay->WorldToGrid(Hit.Location);
-    ActiveFighter->MoveToCell(Cell);
-  } else if (CurrentCommandMode == EBattleCommandMode::Attack) {
-    if (AFighterPawn *Target = Cast<AFighterPawn>(Hit.GetActor())) {
-      ActiveFighter->PerformAttack(Target);
+  // Get active fighter
+  AFighterPawn *Active = nullptr;
+  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+    if (GI->GridBattleManager) {
+      Active = GI->GridBattleManager->GetActiveFighter();
     }
   }
+  if (!Active || !Active->IsAlive())
+    return;
 
-  GridBattleManager->AdvanceTurn();
+  // Trace under cursor
+  GetHitResultUnderCursor(ECC_Visibility, /*bTraceComplex*/ false, Hit);
+
+  UGridOverlayComponent *Grid = FindGridOverlay();
+  if (!Grid)
+    return;
+
+  switch (CurrentCommandMode) {
+  case EBattleCommandMode::Move: {
+    const FVector Impact =
+        Hit.bBlockingHit ? Hit.ImpactPoint : FVector::ZeroVector;
+    const FIntPoint Cell = Grid->WorldToGrid(Impact);
+    Active->MoveToCell(Cell);
+    Grid->ClearHighlights();
+    if (Active->ActionsRemaining <= 0) {
+      CurrentCommandMode = EBattleCommandMode::None;
+    }
+    break;
+  }
+  case EBattleCommandMode::Attack: {
+    AFighterPawn *TargetPawn = Cast<AFighterPawn>(Hit.GetActor());
+    if (!TargetPawn && Hit.bBlockingHit) {
+      // No pawn? For now require clicking on a pawn to attack.
+    }
+    if (TargetPawn && TargetPawn != Active && TargetPawn->IsAlive()) {
+      if (TargetPawn->bIsAttacker != Active->bIsAttacker) {
+        Active->PerformAttack(TargetPawn);
+      }
+    }
+    Grid->ClearHighlights();
+    if (Active->ActionsRemaining <= 0) {
+      CurrentCommandMode = EBattleCommandMode::None;
+    }
+    break;
+  }
+  default:
+    break;
+  }
 }
 
 void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,
