@@ -347,6 +347,12 @@ void ASkaldPlayerController::ShowTurnAnnouncement(const FString &PlayerName,
   }
 }
 
+void ASkaldPlayerController::NotifyTurnEnded(const FString &PlayerName) {
+  if (MainHudWidget) {
+    MainHudWidget->ShowTurnEnded(PlayerName);
+  }
+}
+
 void ASkaldPlayerController::StartTurn() {
   FInputModeGameAndUI Mode;
   Mode.SetWidgetToFocus(nullptr);

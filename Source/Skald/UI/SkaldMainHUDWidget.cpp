@@ -19,6 +19,7 @@
 #include "UI/DeployWidget.h"
 #include "UObject/ConstructorHelpers.h"
 #include "WorldMap.h"
+#include "TimerManager.h"
 
 USkaldMainHUDWidget::USkaldMainHUDWidget(
     const FObjectInitializer &ObjectInitializer)
@@ -98,7 +99,7 @@ void USkaldMainHUDWidget::NativeConstruct() {
     DeployButton->SetVisibility(ESlateVisibility::Collapsed);
   }
 
-  SyncPhaseButtons(CurrentPlayerID == LocalPlayerID);
+  SyncPhaseButtons(false);
   RebuildPlayerList(CachedPlayers);
 }
 
@@ -284,6 +285,12 @@ void USkaldMainHUDWidget::ShowEndingTurn() {
   if (EndingTurnText) {
     EndingTurnText->SetText(FText::FromString(TEXT("Ending turn.")));
     EndingTurnText->SetVisibility(ESlateVisibility::Visible);
+    if (UWorld *World = GetWorld()) {
+      World->GetTimerManager().ClearTimer(TurnMessageTimerHandle);
+      World->GetTimerManager().SetTimer(TurnMessageTimerHandle, this,
+                                       &USkaldMainHUDWidget::HideEndingTurn,
+                                       3.f, false);
+    }
   }
 }
 
@@ -300,12 +307,36 @@ void USkaldMainHUDWidget::ShowTurnMessage(bool bIsMyTurn) {
     EndingTurnText->SetVisibility(ESlateVisibility::Visible);
   }
   SyncPhaseButtons(bIsMyTurn);
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(TurnMessageTimerHandle);
+    World->GetTimerManager().SetTimer(TurnMessageTimerHandle, this,
+                                     &USkaldMainHUDWidget::HideEndingTurn, 3.f,
+                                     false);
+  }
 }
 
 void USkaldMainHUDWidget::UpdateInitiativeText(const FString &Message) {
   if (InitiativeText) {
     InitiativeText->SetText(FText::FromString(Message));
     InitiativeText->SetVisibility(ESlateVisibility::Visible);
+    if (UWorld *World = GetWorld()) {
+      World->GetTimerManager().ClearTimer(InitiativeTimerHandle);
+      World->GetTimerManager().SetTimer(InitiativeTimerHandle, this,
+                                       &USkaldMainHUDWidget::HideInitiativeText,
+                                       3.f, false);
+    }
+  }
+}
+
+void USkaldMainHUDWidget::ShowTurnEnded(const FString &PlayerName) {
+  const FString Text =
+      FString::Printf(TEXT("%s ended their turn"), *PlayerName);
+  UpdateInitiativeText(Text);
+}
+
+void USkaldMainHUDWidget::HideInitiativeText() {
+  if (InitiativeText) {
+    InitiativeText->SetVisibility(ESlateVisibility::Collapsed);
   }
 }
 

@@ -3,6 +3,7 @@
 #include "Blueprint/UserWidget.h"
 #include "CoreMinimal.h"
 #include "SkaldTypes.h"
+#include "TimerManager.h"
 #include "SkaldMainHUDWidget.generated.h"
 
 class UButton;
@@ -159,6 +160,10 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
   void ShowTurnMessage(bool bIsMyTurn);
 
+  /** Display a message that a player has ended their turn. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
+  void ShowTurnEnded(const FString &PlayerName);
+
   /** Update and display the initiative announcement. */
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
   void UpdateInitiativeText(const FString &Message);
@@ -292,6 +297,12 @@ public:
   TSubclassOf<UDeployWidget> DeployWidgetClass;
 
 protected:
+  UFUNCTION()
+  void HideInitiativeText();
+
+  FTimerHandle InitiativeTimerHandle;
+  FTimerHandle TurnMessageTimerHandle;
+
   // Internal handlers for widget actions
   UFUNCTION()
   void HandleEndTurnClicked();
