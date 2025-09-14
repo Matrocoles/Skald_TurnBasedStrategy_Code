@@ -590,7 +590,6 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
     Battle.FromTerritoryID = FromID;
     Battle.TargetTerritoryID = ToID;
     Battle.ArmyCountSent = ArmySent;
-    Battle.DefenderArmyCount = Target->ArmyUnits;
     Battle.IsCapitalAttack = Target->bIsCapital;
     if (bUseSiege && CachedGameMode) {
       const int32 SiegeID = CachedGameMode->ConsumeSiege(FromID);
@@ -598,6 +597,7 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
         Battle.AssignedSiegeIDs.Add(SiegeID);
       }
     }
+    Battle.DefenderArmyCount = Target ? FMath::Max(0, Target->ArmyUnits) : 0;
     TurnManager->TriggerGridBattle(Battle);
     return;
   }
