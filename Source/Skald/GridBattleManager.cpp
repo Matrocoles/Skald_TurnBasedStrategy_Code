@@ -413,24 +413,15 @@ void UGridBattleManager::RollInitiative()
 void UGridBattleManager::StartRound(FRandomStream& RandomStream)
 {
     const int32 EdgeRange = 3;
-    if (!bTeamsAssigned)
-    {
-        const int32 Half = InitiativeOrder.Num() / 2;
-        for (int32 Index = 0; Index < InitiativeOrder.Num(); ++Index)
-        {
-            AFighterPawn* Fighter = InitiativeOrder[Index];
-            if (Fighter)
-            {
-                Fighter->bIsAttacker = Index < Half;
-            }
-        }
+
+    // Fighters already know their side; don’t overwrite it here
+    if (!bTeamsAssigned) {
         bTeamsAssigned = true;
     }
 
     for (AFighterPawn* Fighter : InitiativeOrder)
     {
-        if (!Fighter)
-        {
+        if (!Fighter) {
             continue;
         }
 
@@ -438,12 +429,10 @@ void UGridBattleManager::StartRound(FRandomStream& RandomStream)
 
         FIntPoint Cell;
         Cell.Y = RandomStream.RandRange(0, GridSize - 1);
-        if (Fighter->bIsAttacker)
-        {
+        if (Fighter->bIsAttacker) {
             Cell.X = RandomStream.RandRange(0, EdgeRange - 1);
         }
-        else
-        {
+        else {
             Cell.X = RandomStream.RandRange(GridSize - EdgeRange, GridSize - 1);
         }
 
@@ -453,8 +442,7 @@ void UGridBattleManager::StartRound(FRandomStream& RandomStream)
 
     CurrentTurn = 0;
     ActiveFighter = InitiativeOrder.Num() > 0 ? InitiativeOrder[0] : nullptr;
-    if (ActiveFighter)
-    {
+    if (ActiveFighter) {
         ActiveFighter->BeginActivation();
     }
 }
