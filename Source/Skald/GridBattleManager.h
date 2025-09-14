@@ -174,7 +174,7 @@ public:
     UPROPERTY(BlueprintAssignable, Category="Battle|Events")
     FOnBattleEnded OnBattleEnded;
 
-    /** Event fired when the active fighter changes. */
+    /** Fired whenever the active fighter changes (including to nullptr). */
     UPROPERTY(BlueprintAssignable, Category="Battle|Events")
     FOnActiveFighterChanged OnActiveFighterChanged;
 
