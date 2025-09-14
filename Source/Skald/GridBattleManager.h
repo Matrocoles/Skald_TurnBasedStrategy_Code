@@ -172,6 +172,12 @@ public:
     UPROPERTY(BlueprintAssignable, Category="Battle|Events")
     FOnBattleEnded OnBattleEnded;
 
+    /** Event fired when the active fighter changes. */
+    DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnActiveFighterChanged, AFighterPawn*, NewFighter);
+
+    UPROPERTY(BlueprintAssignable, Category="Battle|Events")
+    FOnActiveFighterChanged OnActiveFighterChanged;
+
     /** Table containing fighter definitions. */
     UPROPERTY(BlueprintReadOnly, Category="Battle")
     UDataTable* FighterDefinitions;
@@ -221,5 +227,8 @@ protected:
 
     /** Whether fighters have been assigned to attacker or defender sides. */
     bool bTeamsAssigned = false;
+
+private:
+    void BroadcastActiveFighter();
 };
 
