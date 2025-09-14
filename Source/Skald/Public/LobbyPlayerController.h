@@ -4,6 +4,7 @@
 #include "LobbyPlayerController.generated.h"
 
 class ULobbyMenuWidget;
+class UUserWidget;
 
 UCLASS()
 class SKALD_API ALobbyPlayerController : public APlayerController
