@@ -90,12 +90,19 @@ bool UFighterSelectionWidget::ChooseFighter(const FFighterDefinition &Fighter) {
   return true;
 }
 
-void UFighterSelectionWidget::LockIn() { OnLockedIn.Broadcast(); }
+void UFighterSelectionWidget::LockIn() {
+  if (ChosenFighters.Num() == 0 || CurrentCost > MaxCost) {
+    return;
+  }
+  OnLockedIn.Broadcast();
+}
 
 void UFighterSelectionWidget::UpdateCostDisplay() {
   if (CostDisplayText) {
-    CostDisplayText->SetText(FText::Format(FText::FromString("{0} / {1}"),
-                                          FText::AsNumber(CurrentCost),
-                                          FText::AsNumber(MaxCost)));
+    FFormatNamedArguments Args;
+    Args.Add(TEXT("Cur"), CurrentCost);
+    Args.Add(TEXT("Max"), MaxCost);
+    CostDisplayText->SetText(
+        FText::Format(FText::FromString("{Cur} / {Max}"), Args));
   }
 }
