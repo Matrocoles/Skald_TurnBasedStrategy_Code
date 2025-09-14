@@ -26,6 +26,7 @@
 #include "UI/FighterSelectionWidget.h"
 #include "UI/SkaldMainHUDWidget.h"
 #include "UObject/ConstructorHelpers.h"
+#include "UObject/CoreUObjectDelegates.h"
 #include "WorldMap.h"
 
 ASkaldPlayerController::ASkaldPlayerController() {
@@ -154,7 +155,7 @@ void ASkaldPlayerController::BeginPlay() {
   Super::BeginPlay();
   CacheGameReferences();
 
-  FWorldDelegates::OnPostLoadMapWithWorld.AddUObject(
+  FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(
       this, &ASkaldPlayerController::HandlePostLoadMap);
 
   if (IsLocalPlayerController() && GetLocalPlayer() != nullptr) {
@@ -184,7 +185,7 @@ void ASkaldPlayerController::BeginPlay() {
 }
 
 void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
-  FWorldDelegates::OnPostLoadMapWithWorld.RemoveAll(this);
+  FCoreUObjectDelegates::PostLoadMapWithWorld.RemoveAll(this);
   Super::EndPlay(EndPlayReason);
 }
 
