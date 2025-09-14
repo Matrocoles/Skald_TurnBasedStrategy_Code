@@ -152,11 +152,6 @@ void USkaldMainHUDWidget::HandleEndPhaseClicked() {
     OnEndAttackRequested.Broadcast(true);
   } else if (CurrentPhase == ETurnPhase::Movement) {
     OnEndMovementRequested.Broadcast(true);
-  } else if (CurrentPhase == ETurnPhase::ArmyPlacement) {
-    if (GameMode) {
-      GameMode->AdvanceArmyPlacement();
-    }
-    return;
   }
 
   if (APlayerController *PC = GetOwningPlayer()) {
