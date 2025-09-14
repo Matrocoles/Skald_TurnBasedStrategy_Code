@@ -4,6 +4,7 @@
 #include "Components/TextBlock.h"
 #include "EngineUtils.h"
 #include "GridOverlayComponent.h"
+#include "GridBattleManager.h"
 #include "Skald_GameInstance.h"
 #include "TimerManager.h"
 
@@ -95,6 +96,17 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
   SetActorLocation(NewLocation);
   ActionsRemaining -= Distance;
 
+  if (ActionsRemaining <= 0) {
+    if (UWorld *World = GetWorld()) {
+      if (USkaldGameInstance *GI =
+              Cast<USkaldGameInstance>(World->GetGameInstance())) {
+        if (GI->GridBattleManager) {
+          GI->GridBattleManager->AdvanceTurn();
+        }
+      }
+    }
+  }
+
   if (Grid) {
     Grid->SetOccupied(TargetCell, true);
     Grid->ClearHighlights();
@@ -171,6 +183,17 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
     Target->Destroy();
   }
   --ActionsRemaining;
+
+  if (ActionsRemaining <= 0) {
+    if (UWorld *World = GetWorld()) {
+      if (USkaldGameInstance *GI =
+              Cast<USkaldGameInstance>(World->GetGameInstance())) {
+        if (GI->GridBattleManager) {
+          GI->GridBattleManager->AdvanceTurn();
+        }
+      }
+    }
+  }
 
   if (Grid) {
     Grid->ClearHighlights();
