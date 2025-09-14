@@ -314,6 +314,54 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
   }
 }
 
+void ASkaldPlayerController::InitializeBattleHUD() {
+  if (!IsLocalController()) return;
+  if (!BattleHUDWidgetClass) return;
+  if (!BattleHudWidget) {
+    BattleHudWidget = CreateWidget<UBattleHUDWidget>(this, BattleHUDWidgetClass);
+    if (BattleHudWidget) {
+      BattleHudWidget->AddToViewport(20);
+
+      // Hook HUD buttons to controller modes
+      BattleHudWidget->OnMovePressed.AddDynamic(this, &ASkaldPlayerController::BeginMoveMode);
+      BattleHudWidget->OnAttackPressed.AddDynamic(this, &ASkaldPlayerController::BeginAttackMode);
+    }
+  }
+
+  // Bind to active-fighter changes
+  if (USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>()) {
+    if (GI->GridBattleManager) {
+      GI->GridBattleManager->OnActiveFighterChanged.RemoveAll(this);
+      GI->GridBattleManager->OnActiveFighterChanged.AddDynamic(
+        this, &ASkaldPlayerController::HandleActiveFighterChanged);
+      // Initial bind
+      HandleActiveFighterChanged(GI->GridBattleManager->GetActiveFighter());
+    }
+  }
+}
+
+UGridOverlayComponent* ASkaldPlayerController::FindGridOverlay() const {
+  if (UWorld* World = GetWorld()) {
+    for (TActorIterator<AActor> It(World); It; ++It) {
+      if (UGridOverlayComponent* Comp = It->FindComponentByClass<UGridOverlayComponent>()) {
+        return Comp;
+      }
+    }
+  }
+  return nullptr;
+}
+
+void ASkaldPlayerController::HandleActiveFighterChanged(AFighterPawn* NewFighter) {
+  if (BattleHudWidget) {
+    BattleHudWidget->BindToFighter(NewFighter);
+  }
+  // Clear previous highlights when the turn swaps
+  if (UGridOverlayComponent* Grid = FindGridOverlay()) {
+    Grid->ClearHighlights();
+  }
+  CurrentCommandMode = EBattleCommandMode::None;
+}
+
 void ASkaldPlayerController::DetectBattleMap() {
   bIsBattleMap = false;
 
@@ -322,12 +370,14 @@ void ASkaldPlayerController::DetectBattleMap() {
   }
   if (CachedGameInstance && CachedGameInstance->bIsInBattleMap) {
     bIsBattleMap = true;
+    InitializeBattleHUD();
     return;
   }
 
   const FString CurrentMap = UGameplayStatics::GetCurrentLevelName(this, true);
   if (CurrentMap.Equals(TEXT("BattleMap"), ESearchCase::IgnoreCase)) {
     bIsBattleMap = true;
+    InitializeBattleHUD();
     return;
   }
 
@@ -348,6 +398,7 @@ void ASkaldPlayerController::DetectBattleMap() {
     if (CurrentMap.Equals(Map.ToSoftObjectPath().GetAssetName(),
                           ESearchCase::IgnoreCase)) {
       bIsBattleMap = true;
+      InitializeBattleHUD();
       break;
     }
   }
@@ -1138,16 +1189,7 @@ void ASkaldPlayerController::HandleGridClick() {
     return;
   }
 
-  UGridOverlayComponent *GridOverlay = nullptr;
-  if (UWorld *World = GetWorld()) {
-    for (TActorIterator<AActor> It(World); It; ++It) {
-      if (UGridOverlayComponent *Comp =
-              It->FindComponentByClass<UGridOverlayComponent>()) {
-        GridOverlay = Comp;
-        break;
-      }
-    }
-  }
+  UGridOverlayComponent *GridOverlay = FindGridOverlay();
 
   if (CurrentCommandMode == EBattleCommandMode::Move && GridOverlay) {
     const FIntPoint Cell = GridOverlay->WorldToGrid(Hit.Location);
@@ -1159,14 +1201,6 @@ void ASkaldPlayerController::HandleGridClick() {
   }
 
   GridBattleManager->AdvanceTurn();
-  if (BattleHudWidget) {
-    BattleHudWidget->BindToFighter(GridBattleManager->GetActiveFighter());
-  }
-
-  if (GridOverlay) {
-    GridOverlay->ClearHighlights();
-  }
-  CurrentCommandMode = EBattleCommandMode::None;
 }
 
 void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,
