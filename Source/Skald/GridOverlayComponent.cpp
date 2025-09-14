@@ -145,7 +145,7 @@ void UGridOverlayComponent::HighlightCell(const FIntPoint &GridCoord,
 }
 
 void UGridOverlayComponent::ClearHighlights() const {
-  if (GetWorld()) {
+  if (GetWorld() && bFlushAllPersistentOnClear) {
     FlushPersistentDebugLines(GetWorld());
   }
 }
@@ -220,7 +220,7 @@ void UGridOverlayComponent::HighlightMovement(AFighterPawn *Fighter) {
     const int32 Distance = Node.Value;
 
     if (Distance > 0) {
-      HighlightCell(Cell, FColor::Green, 0.f, true);
+      HighlightCell(Cell, FColor::Green, 0.f, false);
     }
 
     if (Distance >= Range) {
@@ -263,7 +263,7 @@ void UGridOverlayComponent::HighlightAttack(AFighterPawn *Fighter) {
       }
 
       if (HasLineOfSight(StartCell, Target)) {
-        HighlightCell(Target, FColor::Red, 0.f, true);
+        HighlightCell(Target, FColor::Red, 0.f, false);
       }
     }
   }
