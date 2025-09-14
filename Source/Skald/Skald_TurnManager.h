@@ -112,6 +112,9 @@ protected:
   UPROPERTY()
   AWorldMap *CachedWorldMap;
 
+  UFUNCTION()
+  void HandleGridBattleEnded(ESkaldFaction WinningFaction, int32 AttackerCasualties, int32 DefenderCasualties);
+
   /** Notify controllers and HUDs of a phase change. */
   void BroadcastCurrentPhase();
 

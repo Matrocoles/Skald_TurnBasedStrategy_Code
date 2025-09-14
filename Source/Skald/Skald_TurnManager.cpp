@@ -34,9 +34,18 @@ void ATurnManager::BeginPlay() {
   CachedWorldMap = Cast<AWorldMap>(
       UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
 
+  const bool bOnWorldMap = (CachedWorldMap != nullptr);
+
   if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
-    if (GI->GridBattleManager) {
+    // Only resolve results when we are back on the world map
+    if (GI->GridBattleManager && bOnWorldMap) {
       ResolveGridBattleResult();
+    }
+
+    // On the battle map, listen for battle end and travel back on event
+    if (GI->GridBattleManager && !bOnWorldMap) {
+      GI->GridBattleManager->OnBattleEnded.AddDynamic(
+          this, &ATurnManager::HandleGridBattleEnded);
     }
 
     if (GI->bResumeTurns) {
@@ -58,6 +67,13 @@ void ATurnManager::BeginPlay() {
     if (!GM->IsWorldInitialized()) {
       GM->TryInitializeWorldAndStart();
     }
+  }
+}
+
+void ATurnManager::HandleGridBattleEnded(ESkaldFaction /*WinningFaction*/, int32 /*AttackerCasualties*/, int32 /*DefenderCasualties*/) {
+  if (UWorld *World = GetWorld()) {
+    // Travel back to the overworld after the tactical battle ends
+    World->ServerTravel(TEXT("WorldMap"));
   }
 }
 
