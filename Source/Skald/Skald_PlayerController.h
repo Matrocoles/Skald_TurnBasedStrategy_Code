@@ -5,8 +5,8 @@
 #include "GameFramework/PlayerController.h"
 #include "GridBattleManager.h"
 #include "SkaldTypes.h"
-#include "Skald_PlayerController.generated.h"
 #include "TimerManager.h"
+#include "Skald_PlayerController.generated.h"
 
 class ATurnManager;
 class UUserWidget;
