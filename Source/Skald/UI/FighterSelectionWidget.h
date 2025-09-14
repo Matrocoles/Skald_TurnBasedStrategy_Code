@@ -151,6 +151,10 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Skald|Fighter")
   void LockIn();
 
+  /** Check whether a fighter can be afforded with remaining cost. */
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Skald|Fighter")
+  bool CanAfford(const FFighterDefinition& Fighter) const;
+
   // Add a setter that repopulates when data arrives later:
   UFUNCTION(BlueprintCallable, Category="Skald|Fighter")
   void SetAvailableFighters(const TArray<FFighterDefinition>& InFighters);
@@ -159,10 +163,6 @@ protected:
   /** Populate the fighter list scroll box. */
   UFUNCTION(BlueprintCallable, Category = "Skald|Fighter")
   void PopulateFighterList();
-
-  /** Check whether a fighter can be afforded with remaining cost. */
-  UFUNCTION(BlueprintCallable, Category = "Skald|Fighter")
-  bool CanAfford(const FFighterDefinition &Fighter) const;
 
   /** Update cost display text from current/max cost. */
   UFUNCTION(BlueprintCallable, Category = "Skald|Fighter")
