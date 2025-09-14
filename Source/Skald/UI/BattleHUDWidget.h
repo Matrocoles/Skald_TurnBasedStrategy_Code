@@ -87,6 +87,12 @@ private:
   /** Find the grid overlay component in the world. */
   UGridOverlayComponent *FindGridOverlay() const;
 
+  /** Whether movement preview is currently shown. */
+  bool bMoveSelected = false;
+
+  /** Whether attack preview is currently shown. */
+  bool bAttackSelected = false;
+
   /** Fighter currently bound to the HUD. */
   UPROPERTY()
   AFighterPawn *BoundFighter;

@@ -34,21 +34,35 @@ void UBattleHUDWidget::BindToFighter(AFighterPawn *Fighter) {
 
 void UBattleHUDWidget::HandleMovePressed() {
   OnMovePressed.Broadcast();
+  bAttackSelected = false;
   if (!BoundFighter) {
     return;
   }
   if (UGridOverlayComponent *Grid = FindGridOverlay()) {
-    Grid->HighlightMovement(BoundFighter);
+    if (bMoveSelected) {
+      Grid->ClearHighlights();
+      bMoveSelected = false;
+    } else {
+      Grid->HighlightMovement(BoundFighter);
+      bMoveSelected = true;
+    }
   }
 }
 
 void UBattleHUDWidget::HandleAttackPressed() {
   OnAttackPressed.Broadcast();
+  bMoveSelected = false;
   if (!BoundFighter) {
     return;
   }
   if (UGridOverlayComponent *Grid = FindGridOverlay()) {
-    Grid->HighlightAttack(BoundFighter);
+    if (bAttackSelected) {
+      Grid->ClearHighlights();
+      bAttackSelected = false;
+    } else {
+      Grid->HighlightAttack(BoundFighter);
+      bAttackSelected = true;
+    }
   }
 }
 
