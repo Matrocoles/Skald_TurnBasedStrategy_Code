@@ -5,9 +5,9 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "FighterDataLibrary.h"
 #include "FighterPawn.h"
 #include "GridBattleManager.h"
-#include "FighterDataLibrary.h"
 #include "GridOverlayComponent.h"
 #include "InputCoreTypes.h"
 #include "Kismet/GameplayStatics.h"
@@ -277,167 +277,194 @@ void ASkaldPlayerController::SetTurnManager(ATurnManager *Manager) {
 
 void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {}
 
-void ASkaldPlayerController::Client_ShowFighterSelection_Implementation(int32 MaxBudget, ESkaldFaction Faction)
-{
-    if (!IsLocalController())
-    {
-        return;
-    }
+void ASkaldPlayerController::Client_ShowFighterSelection_Implementation(
+    int32 MaxBudget, ESkaldFaction Faction) {
+  if (!IsLocalController()) {
+    return;
+  }
 
-    if (!CurrentSelectionWidget)
-    {
-        TSubclassOf<UFighterSelectionWidget> WidgetClass = UFighterSelectionWidget::StaticClass();
-        CurrentSelectionWidget = CreateWidget<UFighterSelectionWidget>(this, WidgetClass);
-    }
-    if (!CurrentSelectionWidget)
-    {
-        return;
-    }
+  if (!CurrentSelectionWidget) {
+    TSubclassOf<UFighterSelectionWidget> WidgetClass =
+        UFighterSelectionWidget::StaticClass();
+    CurrentSelectionWidget =
+        CreateWidget<UFighterSelectionWidget>(this, WidgetClass);
+  }
+  if (!CurrentSelectionWidget) {
+    return;
+  }
 
-    CurrentSelectionWidget->PlayerFaction = Faction;
-    CurrentSelectionWidget->MaxCost = MaxBudget;
-    CurrentSelectionWidget->ChosenFighters.Reset();
-    CurrentSelectionWidget->CurrentCost = 0;
-    CurrentSelectionWidget->AvailableFighters = UFighterDataLibrary::GetFightersForFaction(this, Faction);
-    CurrentSelectionWidget->PopulateFighterList();
-    CurrentSelectionWidget->UpdateCostDisplay();
+  CurrentSelectionWidget->PlayerFaction = Faction;
+  CurrentSelectionWidget->MaxCost = MaxBudget;
+  CurrentSelectionWidget->ChosenFighters.Reset();
+  CurrentSelectionWidget->CurrentCost = 0;
+  CurrentSelectionWidget->AvailableFighters =
+      UFighterDataLibrary::GetFightersForFaction(this, Faction);
+  CurrentSelectionWidget->PopulateFighterList();
+  CurrentSelectionWidget->UpdateCostDisplay();
 
-    CurrentSelectionWidget->OnLockedIn.RemoveAll(this);
-    CurrentSelectionWidget->OnLockedIn.AddDynamic(this, &ASkaldPlayerController::HandleLockedIn);
+  CurrentSelectionWidget->OnLockedIn.RemoveAll(this);
+  CurrentSelectionWidget->OnLockedIn.AddDynamic(
+      this, &ASkaldPlayerController::HandleLockedIn);
 
-    CurrentSelectionWidget->AddToViewport();
-    FInputModeUIOnly Mode;
-    SetInputMode(Mode);
-    bShowMouseCursor = true;
+  CurrentSelectionWidget->AddToViewport();
+  FInputModeUIOnly Mode;
+  SetInputMode(Mode);
+  bShowMouseCursor = true;
 }
 
-void ASkaldPlayerController::HandleLockedIn()
-{
-    if (!CurrentSelectionWidget)
-    {
-        return;
-    }
+void ASkaldPlayerController::HandleLockedIn() {
+  if (!CurrentSelectionWidget) {
+    return;
+  }
 
-    Server_CommitArmy(CurrentSelectionWidget->ChosenFighters);
+  Server_CommitArmy(CurrentSelectionWidget->ChosenFighters);
 
-    CurrentSelectionWidget->RemoveFromParent();
-    CurrentSelectionWidget = nullptr;
+  CurrentSelectionWidget->RemoveFromParent();
+  CurrentSelectionWidget = nullptr;
 
-    FInputModeGameOnly Mode;
-    SetInputMode(Mode);
-    bShowMouseCursor = false;
+  FInputModeGameOnly Mode;
+  SetInputMode(Mode);
+  bShowMouseCursor = false;
 }
 
-void ASkaldPlayerController::Server_CommitArmy_Implementation(const TArray<FFighterDefinition>& Chosen)
-{
-    if (ASkaldPlayerState* PS = GetPlayerState<ASkaldPlayerState>())
-    {
-        PS->PendingArmy = Chosen;
-        PS->bArmyLockedIn = true;
+bool ASkaldPlayerController::Server_CommitArmy_Validate(
+    const TArray<FFighterDefinition> &Chosen) {
+  ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
+  if (!PS) {
+    return false;
+  }
+
+  int32 TotalCost = 0;
+  for (const FFighterDefinition &Def : Chosen) {
+    if (Def.Faction != PS->Faction) {
+      return false;
+    }
+    TotalCost += FMath::Max(Def.Stats.ArmyCost, 0);
+    if (TotalCost > PS->PendingArmyBudget) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+void ASkaldPlayerController::Server_CommitArmy_Implementation(
+    const TArray<FFighterDefinition> &Chosen) {
+  ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
+  if (PS) {
+    TArray<FFighterDefinition> ValidFighters;
+    int32 TotalCost = 0;
+    for (const FFighterDefinition &Def : Chosen) {
+      if (Def.Faction != PS->Faction) {
+        continue;
+      }
+      const int32 Cost = FMath::Max(Def.Stats.ArmyCost, 0);
+      if (TotalCost + Cost > PS->PendingArmyBudget) {
+        break;
+      }
+      ValidFighters.Add(Def);
+      TotalCost += Cost;
     }
 
-    UWorld* W = GetWorld();
-    if (!W)
-    {
-        return;
-    }
+    PS->PendingArmy = ValidFighters;
+    PS->bArmyLockedIn = true;
+  }
 
-    ASkaldGameState* GS = W->GetGameState<ASkaldGameState>();
-    if (!GS)
-    {
-        return;
-    }
+  UWorld *W = GetWorld();
+  if (!W) {
+    return;
+  }
 
-    int32 ReadyCount = 0;
-    ASkaldPlayerState* First = nullptr;
-    ASkaldPlayerState* Second = nullptr;
-    for (APlayerState* Base : GS->PlayerArray)
-    {
-        if (ASkaldPlayerState* S = Cast<ASkaldPlayerState>(Base))
-        {
-            if (S->bArmyLockedIn)
-            {
-                ++ReadyCount;
-                if (!First)
-                {
-                    First = S;
-                }
-                else if (!Second)
-                {
-                    Second = S;
-                }
-            }
+  ASkaldGameState *GS = W->GetGameState<ASkaldGameState>();
+  if (!GS) {
+    return;
+  }
+
+  int32 ReadyCount = 0;
+  ASkaldPlayerState *First = nullptr;
+  ASkaldPlayerState *Second = nullptr;
+  for (APlayerState *Base : GS->PlayerArray) {
+    if (ASkaldPlayerState *S = Cast<ASkaldPlayerState>(Base)) {
+      if (S->bArmyLockedIn) {
+        ++ReadyCount;
+        if (!First) {
+          First = S;
+        } else if (!Second) {
+          Second = S;
         }
+      }
     }
+  }
 
-    if (ReadyCount >= 2 && First && Second)
-    {
-        if (USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>())
-        {
-            if (GI->GridBattleManager)
-            {
-                TArray<FFighter> Attackers;
-                for (const FFighterDefinition& Def : First->PendingArmy)
-                {
-                    FFighter F;
-                    F.Stats = Def.Stats;
-                    F.Faction = First->Faction;
-                    Attackers.Add(F);
-                }
-
-                TArray<FFighter> Defenders;
-                for (const FFighterDefinition& Def : Second->PendingArmy)
-                {
-                    FFighter F;
-                    F.Stats = Def.Stats;
-                    F.Faction = Second->Faction;
-                    Defenders.Add(F);
-                }
-
-                GI->GridBattleManager->InitBattle(Attackers, Defenders);
-
-                UGridOverlayComponent* Grid = FindGridOverlay();
-                auto* BM = GI->GridBattleManager;
-                FRandomStream& RS = GI->CombatRandomStream;
-                const int32 Edge = 3;
-                const int32 MaxX = UGridBattleManager::GridSize - 1;
-                const int32 MaxY = UGridBattleManager::GridSize - 1;
-
-                auto SpawnAtCell = [&](const FIntPoint& Cell, const FFighterDefinition& Def, bool bAsAttacker)
-                {
-                    const FVector SpawnLoc = Grid ? Grid->GridToWorld(Cell) : FVector::ZeroVector;
-                    FActorSpawnParameters Params;
-                    Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-                    AFighterPawn* Pawn = W->SpawnActor<AFighterPawn>(AFighterPawn::StaticClass(), SpawnLoc, FRotator::ZeroRotator, Params);
-                    if (Pawn)
-                    {
-                        Pawn->Stats = Def.Stats;
-                        Pawn->bIsAttacker = bAsAttacker;
-                        BM->RegisterFighter(Pawn, bAsAttacker);
-                    }
-                };
-
-                for (const FFighterDefinition& Def : First->PendingArmy)
-                {
-                    FIntPoint Cell(RS.RandRange(0, Edge - 1), RS.RandRange(0, MaxY));
-                    SpawnAtCell(Cell, Def, true);
-                }
-                for (const FFighterDefinition& Def : Second->PendingArmy)
-                {
-                    FIntPoint Cell(RS.RandRange(MaxX - (Edge - 1), MaxX), RS.RandRange(0, MaxY));
-                    SpawnAtCell(Cell, Def, false);
-                }
-
-                BM->RollInitiative();
-                BM->StartRound(RS);
-            }
+  if (ReadyCount >= 2 && First && Second) {
+    if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+      if (GI->GridBattleManager) {
+        TArray<FFighter> Attackers;
+        for (const FFighterDefinition &Def : First->PendingArmy) {
+          FFighter F;
+          F.Stats = Def.Stats;
+          F.Faction = First->Faction;
+          Attackers.Add(F);
         }
 
-        First->bArmyLockedIn = false;
-        Second->bArmyLockedIn = false;
-        First->PendingArmy.Reset();
-        Second->PendingArmy.Reset();
+        TArray<FFighter> Defenders;
+        for (const FFighterDefinition &Def : Second->PendingArmy) {
+          FFighter F;
+          F.Stats = Def.Stats;
+          F.Faction = Second->Faction;
+          Defenders.Add(F);
+        }
+
+        GI->GridBattleManager->InitBattle(Attackers, Defenders);
+
+        UGridOverlayComponent *Grid = FindGridOverlay();
+        auto *BM = GI->GridBattleManager;
+        FRandomStream &RS = GI->CombatRandomStream;
+        const int32 Edge = 3;
+        const int32 MaxX = UGridBattleManager::GridSize - 1;
+        const int32 MaxY = UGridBattleManager::GridSize - 1;
+
+        auto SpawnAtCell = [&](const FIntPoint &Cell,
+                               const FFighterDefinition &Def,
+                               bool bAsAttacker) {
+          const FVector SpawnLoc =
+              Grid ? Grid->GridToWorld(Cell) : FVector::ZeroVector;
+          FActorSpawnParameters Params;
+          Params.SpawnCollisionHandlingOverride =
+              ESpawnActorCollisionHandlingMethod::
+                  AdjustIfPossibleButAlwaysSpawn;
+          AFighterPawn *Pawn =
+              W->SpawnActor<AFighterPawn>(AFighterPawn::StaticClass(), SpawnLoc,
+                                          FRotator::ZeroRotator, Params);
+          if (Pawn) {
+            Pawn->Stats = Def.Stats;
+            Pawn->bIsAttacker = bAsAttacker;
+            BM->RegisterFighter(Pawn, bAsAttacker);
+          }
+        };
+
+        for (const FFighterDefinition &Def : First->PendingArmy) {
+          FIntPoint Cell(RS.RandRange(0, Edge - 1), RS.RandRange(0, MaxY));
+          SpawnAtCell(Cell, Def, true);
+        }
+        for (const FFighterDefinition &Def : Second->PendingArmy) {
+          FIntPoint Cell(RS.RandRange(MaxX - (Edge - 1), MaxX),
+                         RS.RandRange(0, MaxY));
+          SpawnAtCell(Cell, Def, false);
+        }
+
+        BM->RollInitiative();
+        BM->StartRound(RS);
+      }
     }
+
+    First->bArmyLockedIn = false;
+    Second->bArmyLockedIn = false;
+    First->PendingArmy.Reset();
+    Second->PendingArmy.Reset();
+    First->PendingArmyBudget = 0;
+    Second->PendingArmyBudget = 0;
+  }
 }
 
 void ASkaldPlayerController::InitializeBattleHUD() {
@@ -1255,14 +1282,16 @@ void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
       const int32 MaxX = UGridBattleManager::GridSize - 1;
       const int32 MaxY = UGridBattleManager::GridSize - 1;
 
-      auto SpawnAtCell = [&](const FIntPoint &Cell, const FFighterDefinition &Def,
-                             bool bAsAttacker) {
-        const FVector SpawnLoc = Grid ? Grid->GridToWorld(Cell) : FVector::ZeroVector;
+      auto SpawnAtCell = [&](const FIntPoint &Cell,
+                             const FFighterDefinition &Def, bool bAsAttacker) {
+        const FVector SpawnLoc =
+            Grid ? Grid->GridToWorld(Cell) : FVector::ZeroVector;
         FActorSpawnParameters Params;
         Params.SpawnCollisionHandlingOverride =
             ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
         AFighterPawn *Pawn = World->SpawnActor<AFighterPawn>(
-            AFighterPawn::StaticClass(), SpawnLoc, FRotator::ZeroRotator, Params);
+            AFighterPawn::StaticClass(), SpawnLoc, FRotator::ZeroRotator,
+            Params);
         if (Pawn) {
           Pawn->Stats = Def.Stats;
           Pawn->bIsAttacker = bAsAttacker;
@@ -1284,8 +1313,8 @@ void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
 
       BM->RollInitiative();
       BM->StartRound(RS);
-      BM->OnBattleEnded.AddDynamic(
-          this, &ASkaldPlayerController::HandleBattleEnded);
+      BM->OnBattleEnded.AddDynamic(this,
+                                   &ASkaldPlayerController::HandleBattleEnded);
 
       InitializeBattleHUD();
     }
@@ -1380,8 +1409,7 @@ void ASkaldPlayerController::HandleGridClick() {
     Grid->ClearHighlights();
     if (Active->ActionsRemaining <= 0) {
       CurrentCommandMode = EBattleCommandMode::None;
-      if (USkaldGameInstance *GI =
-              GetGameInstance<USkaldGameInstance>()) {
+      if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
         if (GI->GridBattleManager) {
           GI->GridBattleManager->AdvanceTurn();
         }
@@ -1402,8 +1430,7 @@ void ASkaldPlayerController::HandleGridClick() {
     Grid->ClearHighlights();
     if (Active->ActionsRemaining <= 0) {
       CurrentCommandMode = EBattleCommandMode::None;
-      if (USkaldGameInstance *GI =
-              GetGameInstance<USkaldGameInstance>()) {
+      if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
         if (GI->GridBattleManager) {
           GI->GridBattleManager->AdvanceTurn();
         }

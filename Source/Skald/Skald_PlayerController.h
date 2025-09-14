@@ -3,10 +3,10 @@
 #include "CoreMinimal.h"
 #include "Engine/EngineTypes.h"
 #include "GameFramework/PlayerController.h"
-#include "SkaldTypes.h"
-#include "TimerManager.h"
 #include "GridBattleManager.h"
+#include "SkaldTypes.h"
 #include "Skald_PlayerController.generated.h"
+#include "TimerManager.h"
 
 class ATurnManager;
 class UUserWidget;
@@ -81,8 +81,8 @@ public:
   UFUNCTION(Client, Reliable)
   void Client_ShowFighterSelection(int32 MaxBudget, ESkaldFaction Faction);
 
-  UFUNCTION(Server, Reliable)
-  void Server_CommitArmy(const TArray<FFighterDefinition>& Chosen);
+  UFUNCTION(Server, Reliable, WithValidation)
+  void Server_CommitArmy(const TArray<FFighterDefinition> &Chosen);
 
 protected:
   /** Widget class to instantiate for the player's HUD.
@@ -235,7 +235,7 @@ public:
                          int32 DefenderCasualties);
 
   UFUNCTION()
-  void HandleActiveFighterChanged(AFighterPawn* NewFighter);
+  void HandleActiveFighterChanged(AFighterPawn *NewFighter);
 
   /** Server-side processing of an attack request. */
   UFUNCTION(Server, Reliable)
@@ -298,7 +298,7 @@ protected:
 
 private:
   UPROPERTY()
-  class UFighterSelectionWidget* CurrentSelectionWidget;
+  class UFighterSelectionWidget *CurrentSelectionWidget;
 
   UFUNCTION()
   void HandleLockedIn();
@@ -313,7 +313,7 @@ private:
   void InitializeChoosePlayerWidget();
 
   void InitializeBattleHUD();
-  UGridOverlayComponent* FindGridOverlay() const;
+  UGridOverlayComponent *FindGridOverlay() const;
 
   /** Attempt to locate the world map and bind to its selection event. */
   void TryBindWorldMap();
