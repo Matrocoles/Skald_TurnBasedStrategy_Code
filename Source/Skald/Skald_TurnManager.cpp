@@ -54,8 +54,7 @@ void ATurnManager::BeginPlay() {
     }
   }
 
-  if (ASkaldGameMode *GM =
-          GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
+  if (ASkaldGameMode *GM = GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
     if (!GM->IsWorldInitialized()) {
       GM->TryInitializeWorldAndStart();
     }
@@ -115,7 +114,8 @@ void ATurnManager::ApplyReinforcementsAndResources(ASkaldPlayerState *PS,
   BroadcastResources(PS);
 }
 
-/** Internal: set GameState.CurrentTurnIndex (and broadcast) to match CurrentIndex. */
+/** Internal: set GameState.CurrentTurnIndex (and broadcast) to match
+ * CurrentIndex. */
 void ATurnManager::SyncGameStateTurnIndex() {
   if (ASkaldGameState *GS = GetWorld()->GetGameState<ASkaldGameState>()) {
     int32 NewIndex = -1;
@@ -329,12 +329,18 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
         MapToLoad = Selected;
       }
     }
+    if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+      GI->bIsInBattleMap = true;
+    }
     World->ServerTravel(MapToLoad);
   }
 }
 
 void ATurnManager::ResolveGridBattleResult_Implementation() {
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+  if (GI) {
+    GI->bIsInBattleMap = false;
+  }
   if (!GI || !GI->GridBattleManager) {
     return;
   }

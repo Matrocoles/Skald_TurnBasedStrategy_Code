@@ -13,82 +13,85 @@ class UNetDriver;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSkaldFactionsUpdated);
 /** Game instance storing player selections from the lobby. */
 UCLASS()
-class SKALD_API USkaldGameInstance : public UGameInstance
-{
-    GENERATED_BODY()
+class SKALD_API USkaldGameInstance : public UGameInstance {
+  GENERATED_BODY()
 
 public:
-    /** Initialize the game instance. */
-    virtual void Init() override;
+  /** Initialize the game instance. */
+  virtual void Init() override;
 
-    /** Player chosen display name. */
-    UPROPERTY(BlueprintReadWrite, Category="Player")
-    FString DisplayName = TEXT("Player");
+  /** Player chosen display name. */
+  UPROPERTY(BlueprintReadWrite, Category = "Player")
+  FString DisplayName = TEXT("Player");
 
-    /** Selected faction for this player. */
-    UPROPERTY(BlueprintReadWrite, Category="Player")
-    ESkaldFaction Faction = ESkaldFaction::Human;
+  /** Selected faction for this player. */
+  UPROPERTY(BlueprintReadWrite, Category = "Player")
+  ESkaldFaction Faction = ESkaldFaction::Human;
 
-    /** Whether the game was started in multiplayer mode. */
-    UPROPERTY(BlueprintReadWrite, Category="Player")
-    bool bIsMultiplayer = false;
+  /** Whether the game was started in multiplayer mode. */
+  UPROPERTY(BlueprintReadWrite, Category = "Player")
+  bool bIsMultiplayer = false;
 
-    /** True if this instance is hosting a multiplayer session. */
-    UPROPERTY(BlueprintReadWrite, Category="Network")
-    bool bIsHost = false;
+  /** True if this instance is hosting a multiplayer session. */
+  UPROPERTY(BlueprintReadWrite, Category = "Network")
+  bool bIsHost = false;
 
-    /** Address to join when acting as a client. */
-    UPROPERTY(BlueprintReadWrite, Category="Network")
-    FString JoinAddress;
+  /** Address to join when acting as a client. */
+  UPROPERTY(BlueprintReadWrite, Category = "Network")
+  FString JoinAddress;
 
-    /** Number of AI opponents requested by the player. */
-    UPROPERTY(BlueprintReadWrite, Category="Player")
-    int32 AIPlayersToSpawn = 1;
+  /** Number of AI opponents requested by the player. */
+  UPROPERTY(BlueprintReadWrite, Category = "Player")
+  int32 AIPlayersToSpawn = 1;
 
-    /** Factions that have already been selected by players or AI. */
-    UPROPERTY(BlueprintReadWrite, Category="Player")
-    TArray<ESkaldFaction> TakenFactions;
+  /** Factions that have already been selected by players or AI. */
+  UPROPERTY(BlueprintReadWrite, Category = "Player")
+  TArray<ESkaldFaction> TakenFactions;
 
-    /** Event fired when the taken faction list changes. */
-    UPROPERTY(BlueprintAssignable, Category="Player|Events")
-    FSkaldFactionsUpdated OnFactionsUpdated;
+  /** Event fired when the taken faction list changes. */
+  UPROPERTY(BlueprintAssignable, Category = "Player|Events")
+  FSkaldFactionsUpdated OnFactionsUpdated;
 
-    /** Payload describing the battle to resolve when returning from the battle map. */
-    UPROPERTY(BlueprintReadWrite, Category="Battle")
-    FS_BattlePayload PendingBattle;
+  /** Payload describing the battle to resolve when returning from the battle
+   * map. */
+  UPROPERTY(BlueprintReadWrite, Category = "Battle")
+  FS_BattlePayload PendingBattle;
 
-    /** Runtime manager used to execute grid based battles. */
-    UPROPERTY(BlueprintReadWrite, Category="Battle")
-    class UGridBattleManager* GridBattleManager = nullptr;
+  /** Runtime manager used to execute grid based battles. */
+  UPROPERTY(BlueprintReadWrite, Category = "Battle")
+  class UGridBattleManager *GridBattleManager = nullptr;
 
-    /** Random stream used for deterministic combat rolls. */
-    UPROPERTY()
-    FRandomStream CombatRandomStream;
+  /** True when the game has travelled to a dedicated battle map. */
+  UPROPERTY(BlueprintReadWrite, Category = "Battle")
+  bool bIsInBattleMap = false;
 
-    /** Index of the current player turn when travelling between maps. */
-    UPROPERTY(BlueprintReadWrite, Category="Turn")
-    int32 SavedTurnIndex = 0;
+  /** Random stream used for deterministic combat rolls. */
+  UPROPERTY()
+  FRandomStream CombatRandomStream;
 
-    /** Phase of the turn cycle that was active before travelling. */
-    UPROPERTY(BlueprintReadWrite, Category="Turn")
-    ETurnPhase SavedTurnPhase = ETurnPhase::Reinforcement;
+  /** Index of the current player turn when travelling between maps. */
+  UPROPERTY(BlueprintReadWrite, Category = "Turn")
+  int32 SavedTurnIndex = 0;
 
-    /** Flag indicating whether the turn manager should resume after travel. */
-    UPROPERTY(BlueprintReadWrite, Category="Turn")
-    bool bResumeTurns = false;
+  /** Phase of the turn cycle that was active before travelling. */
+  UPROPERTY(BlueprintReadWrite, Category = "Turn")
+  ETurnPhase SavedTurnPhase = ETurnPhase::Reinforcement;
 
-    /** Seed the combat random stream so all clients use the same sequence. */
-    UFUNCTION(BlueprintCallable, Category="Battle")
-    void SeedCombatRandomStream(int32 Seed);
+  /** Flag indicating whether the turn manager should resume after travel. */
+  UPROPERTY(BlueprintReadWrite, Category = "Turn")
+  bool bResumeTurns = false;
 
-    /** Handle network failures and return to the lobby. */
-    UFUNCTION()
-    void HandleNetworkFailure(UWorld* World, UNetDriver* Driver,
-                              ENetworkFailure::Type FailureType,
-                              const FString& ErrorString);
+  /** Seed the combat random stream so all clients use the same sequence. */
+  UFUNCTION(BlueprintCallable, Category = "Battle")
+  void SeedCombatRandomStream(int32 Seed);
 
-    /** Save game loaded when transitioning from the main menu. */
-    UPROPERTY(BlueprintReadWrite, Category="SaveGame")
-    USkaldSaveGame* LoadedSaveGame = nullptr;
+  /** Handle network failures and return to the lobby. */
+  UFUNCTION()
+  void HandleNetworkFailure(UWorld *World, UNetDriver *Driver,
+                            ENetworkFailure::Type FailureType,
+                            const FString &ErrorString);
+
+  /** Save game loaded when transitioning from the main menu. */
+  UPROPERTY(BlueprintReadWrite, Category = "SaveGame")
+  USkaldSaveGame *LoadedSaveGame = nullptr;
 };
-

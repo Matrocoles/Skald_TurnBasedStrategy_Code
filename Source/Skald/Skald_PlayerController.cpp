@@ -3,6 +3,7 @@
 #include "ChoosePlayerWidget.h"
 #include "Components/InputComponent.h"
 #include "Engine/Engine.h"
+#include "Engine/World.h"
 #include "EngineUtils.h"
 #include "FighterPawn.h"
 #include "GridBattleManager.h"
@@ -153,6 +154,9 @@ void ASkaldPlayerController::BeginPlay() {
   Super::BeginPlay();
   CacheGameReferences();
 
+  FWorldDelegates::OnPostLoadMapWithWorld.AddUObject(
+      this, &ASkaldPlayerController::HandlePostLoadMap);
+
   if (IsLocalPlayerController() && GetLocalPlayer() != nullptr) {
     InitializeHUDWidget();
     if (CachedGameInstance && CachedGameInstance->bIsMultiplayer &&
@@ -177,6 +181,11 @@ void ASkaldPlayerController::BeginPlay() {
   }
 
   TryBindWorldMap();
+}
+
+void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
+  FWorldDelegates::OnPostLoadMapWithWorld.RemoveAll(this);
+  Super::EndPlay(EndPlayReason);
 }
 
 void ASkaldPlayerController::TryBindWorldMap() {
@@ -308,6 +317,14 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
 void ASkaldPlayerController::DetectBattleMap() {
   bIsBattleMap = false;
 
+  if (!CachedGameInstance) {
+    CachedGameInstance = GetGameInstance<USkaldGameInstance>();
+  }
+  if (CachedGameInstance && CachedGameInstance->bIsInBattleMap) {
+    bIsBattleMap = true;
+    return;
+  }
+
   const FString CurrentMap = UGameplayStatics::GetCurrentLevelName(this, true);
   if (CurrentMap.Equals(TEXT("BattleMap"), ESearchCase::IgnoreCase)) {
     bIsBattleMap = true;
@@ -334,6 +351,10 @@ void ASkaldPlayerController::DetectBattleMap() {
       break;
     }
   }
+}
+
+void ASkaldPlayerController::HandlePostLoadMap(UWorld * /*LoadedWorld*/) {
+  InitializeFighterSelectionIfNeeded();
 }
 
 void ASkaldPlayerController::ShowTurnAnnouncement(const FString &PlayerName,
