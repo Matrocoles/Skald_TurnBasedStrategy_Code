@@ -551,26 +551,27 @@ void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
   TryInitializeWorldAndStart();
 }
 
-void ASkaldGameMode::BeginPreBattleSelection(ASkaldPlayerState* A, ASkaldPlayerState* D,
-                                             int32 ABudget, int32 DBudget)
-{
-    if (!HasAuthority())
-    {
-        return;
-    }
-    if (!A || !D)
-    {
-        return;
-    }
+void ASkaldGameMode::BeginPreBattleSelection(ASkaldPlayerState *A,
+                                             ASkaldPlayerState *D,
+                                             int32 ABudget, int32 DBudget) {
+  if (!HasAuthority()) {
+    return;
+  }
+  if (!A || !D) {
+    return;
+  }
 
-    if (ASkaldPlayerController* APC = Cast<ASkaldPlayerController>(A->GetOwner()))
-    {
-        APC->Client_ShowFighterSelection(ABudget, A->Faction);
-    }
-    if (ASkaldPlayerController* DPC = Cast<ASkaldPlayerController>(D->GetOwner()))
-    {
-        DPC->Client_ShowFighterSelection(DBudget, D->Faction);
-    }
+  A->PendingArmyBudget = ABudget;
+  D->PendingArmyBudget = DBudget;
+
+  if (ASkaldPlayerController *APC =
+          Cast<ASkaldPlayerController>(A->GetOwner())) {
+    APC->Client_ShowFighterSelection(ABudget, A->Faction);
+  }
+  if (ASkaldPlayerController *DPC =
+          Cast<ASkaldPlayerController>(D->GetOwner())) {
+    DPC->Client_ShowFighterSelection(DBudget, D->Faction);
+  }
 }
 
 void ASkaldGameMode::RefreshHUDs() {
@@ -1079,8 +1080,9 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
     if (ASkaldGameState *GSLocal = GetGameState<ASkaldGameState>()) {
       const int32 NewIndex = GSLocal->PlayerArray.IndexOfByKey(PS);
       if (NewIndex != INDEX_NONE) {
-        GSLocal->CurrentTurnIndex = NewIndex;      // RepNotify → OnTurnIndexChanged
-        GSLocal->OnTurnIndexChanged.Broadcast(NewIndex); // optional immediate local broadcast
+        GSLocal->CurrentTurnIndex = NewIndex; // RepNotify → OnTurnIndexChanged
+        GSLocal->OnTurnIndexChanged.Broadcast(
+            NewIndex); // optional immediate local broadcast
       }
     }
 
