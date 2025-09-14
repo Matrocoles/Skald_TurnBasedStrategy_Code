@@ -8,9 +8,14 @@
 
 class AFighterPawn;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnActiveFighterChanged, AFighterPawn*, NewFighter);
-
 #include "GridBattleManager.generated.h"
+
+// Event fired when a grid battle concludes.
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
+    FOnBattleEnded, ESkaldFaction, WinningFaction, int32, AttackerCasualties, int32, DefenderCasualties);
+
+// Event fired whenever the active fighter changes (including nullptr)
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnActiveFighterChanged, AFighterPawn*, NewFighter);
 
 /** Statistics for a fighter in grid battle mode. */
 USTRUCT(BlueprintType)
@@ -95,9 +100,6 @@ struct FFighter
     FIntPoint Position = FIntPoint::ZeroValue;
 };
 
-/** Event fired when a grid battle concludes. */
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnBattleEnded, ESkaldFaction, WinningFaction, int32, AttackerCasualties, int32, DefenderCasualties);
-
 /**
  * Manages a simple grid based battle between two teams of fighters.
  * This is a lightweight representation of the Warhammer style mode
@@ -174,7 +176,7 @@ public:
     UPROPERTY(BlueprintAssignable, Category="Battle|Events")
     FOnBattleEnded OnBattleEnded;
 
-    /** Fired whenever the active fighter changes (including to nullptr). */
+    /** Fired whenever the active fighter changes (including nullptr). */
     UPROPERTY(BlueprintAssignable, Category="Battle|Events")
     FOnActiveFighterChanged OnActiveFighterChanged;
 

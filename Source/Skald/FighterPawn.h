@@ -37,6 +37,9 @@ public:
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Fighter")
   bool IsAlive() const;
 
+  /** Get the grid overlay component, caching the result. */
+  UGridOverlayComponent *GetGrid();
+
   /** Statistics describing this fighter. */
   UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Fighter")
   FFighterStats Stats;
@@ -77,9 +80,6 @@ private:
   /** Update the health widget with a new value. */
   UFUNCTION()
   void UpdateHealthDisplay(int32 NewHealth);
-
-  /** Get the grid overlay component, caching the result. */
-  UGridOverlayComponent *GetGrid();
 
   /** Retrieve or create a damage widget from the pool. */
   UUserWidget *GetDamageWidgetFromPool();
