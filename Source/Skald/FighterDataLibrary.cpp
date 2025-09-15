@@ -1,6 +1,7 @@
 #include "FighterDataLibrary.h"
 
 #include "Engine/DataTable.h"
+#include "Engine/World.h"
 #include "Skald_GameInstance.h"
 
 /** Resolve the fighter data table from game singletons or a fallback path. */

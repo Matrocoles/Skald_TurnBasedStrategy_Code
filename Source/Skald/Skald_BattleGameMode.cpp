@@ -25,7 +25,7 @@ void ASkald_BattleGameMode::BeginPlay() {
         static_cast<int32>(FDateTime::Now().GetTicks() & 0x7FFFFFFF);
     BattleManager->SetRandomSeed(Seed);
     BattleManager->OnBattleEnded.AddDynamic(this,
-                                           &ASkaldGameMode::HandleBattleEnded);
+                                           &ASkald_BattleGameMode::HandleBattleEnded);
     if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
       GI->GridBattleManager = BattleManager;
     }
