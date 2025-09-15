@@ -592,7 +592,7 @@ void ASkaldGameMode::HandleBattleEnded(ESkaldFaction Winner, int32 AttackerCasua
     GS->LastBattleWinner = Winner;
     GS->LastAttackerCasualties = AttackerCasualties;
     GS->LastDefenderCasualties = DefenderCasualties;
-    GS->OnRep_BattleSummary();
+    GS->NotifyBattleSummaryChanged();
   }
 }
 

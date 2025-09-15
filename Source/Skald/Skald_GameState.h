@@ -83,6 +83,12 @@ public:
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="GameState|Fighters")
     const TArray<FFighterDefinition>& GetFighterRoster() const { return FighterRoster; }
 
+    /**
+     * Manual trigger for broadcasting battle summary updates on the server.
+     * Calls the OnRep handler so server-side UI can refresh immediately.
+     */
+    void NotifyBattleSummaryChanged();
+
 protected:
     UFUNCTION()
     void OnRep_Players();
