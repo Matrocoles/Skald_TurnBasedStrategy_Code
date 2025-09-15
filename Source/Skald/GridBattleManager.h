@@ -118,24 +118,24 @@ public:
     void InitBattle(const TArray<FFighter>& Attackers, const TArray<FFighter>& Defenders);
 
     /** Begin the battle and resolve rounds until a victor is found. */
-    UFUNCTION(BlueprintCallable, Category="Battle")
-    void StartBattle(UPARAM(ref) FRandomStream& RandomStream);
+    UFUNCTION(BlueprintCallable, Category="Skald|Battle")
+    void StartBattle();
 
-    /** Roll a D6 to determine initiative. */
-    UFUNCTION(BlueprintCallable, Category="Battle")
-    static int32 RollInitiativeDie(UPARAM(ref) FRandomStream& RandomStream);
+    /** Set the seed for the internal random stream. */
+    UFUNCTION(BlueprintCallable, Category="Skald|Battle")
+    void SetRandomSeed(int32 Seed);
 
     /** Resolve an attack following strength/defence rules. Returns true if the defender is defeated. */
     UFUNCTION(BlueprintCallable, Category="Battle")
     static bool ResolveAttack(FFighter& Attacker, FFighter& Defender, int32& OutDamage, UPARAM(ref) FRandomStream& RandomStream);
 
     /** Roll initiative for all fighters participating in the battle. */
-    UFUNCTION(BlueprintCallable, Category="Battle")
+    UFUNCTION(BlueprintCallable, Category="Skald|Battle")
     void RollInitiative();
 
     /** Randomly place all fighters at the start of a round. */
-    UFUNCTION(BlueprintCallable, Category="Battle")
-    void StartRound(UPARAM(ref) FRandomStream& RandomStream);
+    UFUNCTION(BlueprintCallable, Category="Skald|Battle")
+    void StartRound();
 
     /** Advance to the next fighter in the initiative order. */
     UFUNCTION(BlueprintCallable, Category="Battle")
@@ -146,19 +146,19 @@ public:
     void EndBattle();
 
     /** Total army cost of surviving attackers after the battle concludes. */
-    UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="Skald|Battle")
     int32 GetAttackerSurvivors();
 
     /** Total army cost of surviving defenders after the battle concludes. */
-    UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="Skald|Battle")
     int32 GetDefenderSurvivors();
 
     /** Total army cost of surviving attackers. Equivalent to GetAttackerSurvivors. */
-    UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="Skald|Battle")
     int32 GetAttackerSurvivorCost() const;
 
     /** Total army cost of surviving defenders. Equivalent to GetDefenderSurvivors. */
-    UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="Skald|Battle")
     int32 GetDefenderSurvivorCost() const;
 
       /** Fighter currently taking its turn. */
@@ -184,8 +184,12 @@ public:
     void UnregisterFighter(AFighterPawn* Fighter);
 
     /** Table containing fighter definitions. */
-    UPROPERTY(BlueprintReadOnly, Category="Battle")
-    UDataTable* FighterDefinitions;
+    UPROPERTY(EditDefaultsOnly, Category="Data")
+    UDataTable* FighterDefinitions = nullptr;
+
+    /** Random stream used for all rolls. */
+    UPROPERTY()
+    FRandomStream Rng;
 
     /** Size of the square grid used in battle. */
     static const int32 GridSize = 48;
@@ -215,20 +219,15 @@ protected:
     UPROPERTY(BlueprintReadOnly, Category="Battle")
     int32 CurrentTurn = 0;
 
-    /** Total starting army cost for attackers. */
-    UPROPERTY(BlueprintReadOnly, Category="Battle")
+private:
+    // Track both counts and costs separately
+    int32 AttackerSurvivorUnitCount = 0;
+    int32 DefenderSurvivorUnitCount = 0;
+    int32 AttackerSurvivorArmyCost = 0;
+    int32 DefenderSurvivorArmyCost = 0;
+
     int32 AttackerInitialArmyCost = 0;
-
-    /** Total starting army cost for defenders. */
-    UPROPERTY(BlueprintReadOnly, Category="Battle")
     int32 DefenderInitialArmyCost = 0;
-
-    /** Cached surviving army-cost totals for each side. */
-    UPROPERTY(BlueprintReadOnly, Category="Battle")
-    int32 AttackerSurvivorCount = 0;
-
-    UPROPERTY(BlueprintReadOnly, Category="Battle")
-    int32 DefenderSurvivorCount = 0;
 
     /** Whether fighters have been assigned to attacker or defender sides. */
     bool bTeamsAssigned = false;

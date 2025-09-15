@@ -48,6 +48,17 @@ ASkaldGameMode::ASkaldGameMode() {
 void ASkaldGameMode::BeginPlay() {
   Super::BeginPlay();
 
+  if (!BattleManager) {
+    UClass* ClassToUse = BattleManagerClass ? *BattleManagerClass : UGridBattleManager::StaticClass();
+    BattleManager = NewObject<UGridBattleManager>(this, ClassToUse);
+    const int32 Seed = static_cast<int32>(FDateTime::Now().GetTicks() & 0x7FFFFFFF);
+    BattleManager->SetRandomSeed(Seed);
+    BattleManager->OnBattleEnded.AddDynamic(this, &ASkaldGameMode::HandleBattleEnded);
+    if (USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>()) {
+      GI->GridBattleManager = BattleManager;
+    }
+  }
+
   CleanupStalePlayerStates();
   PlayerDataArray.Empty();
 
@@ -124,7 +135,7 @@ void ASkaldGameMode::BeginPlay() {
             if (Fighters.Num() > 0) {
               GI->GridBattleManager->InitBattle(Fighters, Fighters);
               GI->GridBattleManager->RollInitiative();
-              GI->GridBattleManager->StartRound(GI->CombatRandomStream);
+              GI->GridBattleManager->StartRound();
             }
 
             PS->bHasLockedIn = true;
@@ -571,6 +582,17 @@ void ASkaldGameMode::BeginPreBattleSelection(ASkaldPlayerState *A,
   if (ASkaldPlayerController *DPC =
           Cast<ASkaldPlayerController>(D->GetOwner())) {
     DPC->Client_ShowFighterSelection(DBudget, D->Faction);
+  }
+}
+
+void ASkaldGameMode::HandleBattleEnded(ESkaldFaction Winner, int32 AttackerCasualties, int32 DefenderCasualties)
+{
+  if (ASkaldGameState* GS = GetGameState<ASkaldGameState>())
+  {
+    GS->LastBattleWinner = Winner;
+    GS->LastAttackerCasualties = AttackerCasualties;
+    GS->LastDefenderCasualties = DefenderCasualties;
+    GS->OnRep_BattleSummary();
   }
 }
 

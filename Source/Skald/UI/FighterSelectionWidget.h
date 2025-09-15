@@ -151,6 +151,7 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Skald|Fighter")
   void LockIn();
 
+  // Ensure this is PUBLIC (not protected)
   /** Check whether a fighter can be afforded with remaining cost. */
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Skald|Fighter")
   bool CanAfford(const FFighterDefinition& Fighter) const;
