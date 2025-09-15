@@ -454,7 +454,7 @@ void ASkaldPlayerController::Server_CommitArmy_Implementation(
         }
 
         BM->RollInitiative();
-        BM->StartRound(RS);
+        BM->StartRound();
       }
     }
 
@@ -1312,7 +1312,7 @@ void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
       }
 
       BM->RollInitiative();
-      BM->StartRound(RS);
+      BM->StartRound();
       BM->OnBattleEnded.AddDynamic(this,
                                    &ASkaldPlayerController::HandleBattleEnded);
 

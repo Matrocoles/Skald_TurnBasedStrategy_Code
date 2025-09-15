@@ -4,6 +4,7 @@
 #include "GameFramework/GameModeBase.h"
 #include "SkaldTypes.h"
 #include "TimerManager.h"
+#include "GridBattleManager.h"
 #include "Skald_GameMode.generated.h"
 class ATurnManager;
 class ASkaldGameState;
@@ -25,8 +26,6 @@ class SKALD_API ASkaldGameMode : public AGameModeBase {
 
 public:
   ASkaldGameMode();
-
-  virtual void BeginPlay() override;
   virtual void PostLogin(APlayerController *NewPlayer) override;
   virtual void Logout(AController *Exiting) override;
   virtual void HandleSeamlessTravelPlayer(AController *&C) override;
@@ -64,7 +63,21 @@ public:
   void BeginPreBattleSelection(ASkaldPlayerState* AttackerPS, ASkaldPlayerState* DefenderPS,
                                int32 AttackerBudget, int32 DefenderBudget);
 
+public:
+  // Manager instance created at runtime and owned by the GameMode
+  UPROPERTY(Transient)
+  UGridBattleManager* BattleManager = nullptr;
+
+  // Optional override class (else uses UGridBattleManager::StaticClass())
+  UPROPERTY(EditDefaultsOnly, Category="Battle")
+  TSubclassOf<UGridBattleManager> BattleManagerClass = UGridBattleManager::StaticClass();
+
 protected:
+  virtual void BeginPlay() override;
+
+  UFUNCTION()
+  void HandleBattleEnded(ESkaldFaction Winner, int32 AttackerCasualties, int32 DefenderCasualties);
+
   /** Handles turn sequencing for the match. */
   UPROPERTY(BlueprintReadOnly, Category = "GameMode")
   ATurnManager *TurnManager;

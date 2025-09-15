@@ -42,6 +42,23 @@ public:
     UPROPERTY(BlueprintAssignable, Category="GameState|Events")
     FFighterRosterUpdated OnFighterRosterUpdated;
 
+    // ---- Battle Summary (replicated) ----
+    /** Winner of the last completed battle. */
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_BattleSummary, Category="GameState|Battle")
+    ESkaldFaction LastBattleWinner = ESkaldFaction::None;
+
+    /** Total attacker casualties (army cost) from the last battle. */
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_BattleSummary, Category="GameState|Battle")
+    int32 LastAttackerCasualties = 0;
+
+    /** Total defender casualties (army cost) from the last battle. */
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_BattleSummary, Category="GameState|Battle")
+    int32 LastDefenderCasualties = 0;
+
+    /** Notifies clients when the summary changes. */
+    UPROPERTY(BlueprintAssignable, Category="GameState|Events")
+    FSkaldPlayersUpdated OnBattleSummaryUpdated;
+
     /** Index of the player whose turn is active. */
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_CurrentTurnIndex, Category="GameState")
     int32 CurrentTurnIndex;
@@ -75,6 +92,9 @@ protected:
 
     UFUNCTION()
     void OnRep_FighterRoster();
+
+    UFUNCTION()
+    void OnRep_BattleSummary();
 
     /** Keep CurrentTurnIndex in bounds after roster changes. */
     void ClampTurnIndex();
