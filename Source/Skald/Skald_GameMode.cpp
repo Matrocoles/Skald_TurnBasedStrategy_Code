@@ -48,17 +48,6 @@ ASkaldGameMode::ASkaldGameMode() {
 void ASkaldGameMode::BeginPlay() {
   Super::BeginPlay();
 
-  if (!BattleManager) {
-    UClass* ClassToUse = BattleManagerClass ? *BattleManagerClass : UGridBattleManager::StaticClass();
-    BattleManager = NewObject<UGridBattleManager>(this, ClassToUse);
-    const int32 Seed = static_cast<int32>(FDateTime::Now().GetTicks() & 0x7FFFFFFF);
-    BattleManager->SetRandomSeed(Seed);
-    BattleManager->OnBattleEnded.AddDynamic(this, &ASkaldGameMode::HandleBattleEnded);
-    if (USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>()) {
-      GI->GridBattleManager = BattleManager;
-    }
-  }
-
   CleanupStalePlayerStates();
   PlayerDataArray.Empty();
 
@@ -80,105 +69,6 @@ void ASkaldGameMode::BeginPlay() {
 
   // Defer AI population and world initialization until players lock in.
   RefreshHUDs();
-
-  // Auto-select fighters for AI players on the battle map
-  const FString CurrentLevel =
-      UGameplayStatics::GetCurrentLevelName(this, true);
-  bool bIsBattleMap =
-      CurrentLevel.Equals(TEXT("BattleMap"), ESearchCase::IgnoreCase);
-  if (!bIsBattleMap && TurnManager) {
-    for (const TSoftObjectPtr<UWorld> &Map : TurnManager->BattleMaps) {
-      if (CurrentLevel.Equals(Map.ToSoftObjectPath().GetAssetName(),
-                              ESearchCase::IgnoreCase)) {
-        bIsBattleMap = true;
-        break;
-      }
-    }
-  }
-  if (bIsBattleMap) {
-    if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
-      if (GI->GridBattleManager) {
-        ASkaldGameState *GS = GetGameState<ASkaldGameState>();
-        if (GS) {
-          for (APlayerState *BasePS : GS->PlayerArray) {
-            ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(BasePS);
-            if (!PS || !PS->bIsAI) {
-              continue;
-            }
-
-            TArray<FFighterDefinition> Definitions =
-                GI->GridBattleManager->GetFightersForFaction(PS->Faction);
-            if (Definitions.Num() <= 0) {
-              PS->bHasLockedIn = true;
-              continue;
-            }
-
-            const int32 MaxCost = GI->PendingBattle.ArmyCountSent > 0
-                                      ? GI->PendingBattle.ArmyCountSent
-                                      : DefaultAIMaxCost;
-            int32 CurrentCost = 0;
-
-            Algo::RandomShuffle(Definitions);
-
-            TArray<FFighter> Fighters;
-            for (const FFighterDefinition &Def : Definitions) {
-              if (CurrentCost + Def.Stats.ArmyCost > MaxCost) {
-                continue;
-              }
-              FFighter Fighter;
-              Fighter.Stats = Def.Stats;
-              Fighter.Faction = PS->Faction;
-              Fighters.Add(Fighter);
-              CurrentCost += Def.Stats.ArmyCost;
-            }
-
-            if (Fighters.Num() > 0) {
-              GI->GridBattleManager->InitBattle(Fighters, Fighters);
-              GI->GridBattleManager->RollInitiative();
-              GI->GridBattleManager->StartRound();
-            }
-
-            PS->bHasLockedIn = true;
-          }
-        }
-      }
-    }
-
-    // Verification that player and controller counts match and a human owns
-    // at least one territory after travelling to the battle map.
-    if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
-      int32 ControllerCount = 0;
-      for (FConstPlayerControllerIterator It =
-               GetWorld()->GetPlayerControllerIterator();
-           It; ++It) {
-        ++ControllerCount;
-      }
-      ensureMsgf(GS->PlayerArray.Num() == ControllerCount,
-                 TEXT("PlayerCount %d != ControllerCount %d after travel"),
-                 GS->PlayerArray.Num(), ControllerCount);
-
-      bool bHumanHasTerritory = false;
-      if (WorldMap) {
-        for (APlayerState *BasePS : GS->PlayerArray) {
-          ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(BasePS);
-          if (!PS || PS->bIsAI) {
-            continue;
-          }
-          for (ATerritory *Territory : WorldMap->Territories) {
-            if (WorldMap->IsOwnedBy(Territory, PS)) {
-              bHumanHasTerritory = true;
-              break;
-            }
-          }
-          if (bHumanHasTerritory) {
-            break;
-          }
-        }
-      }
-      ensureMsgf(bHumanHasTerritory,
-                 TEXT("Human player does not own any territory after travel"));
-    }
-  }
 }
 
 void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
