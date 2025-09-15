@@ -131,7 +131,7 @@ public:
   void UpdatePlayerResources(ASkaldPlayerState *Player);
 
   /** Attempt to initialise the world and start the game flow. */
-  void TryInitializeWorldAndStart();
+  virtual void TryInitializeWorldAndStart();
 
 protected:
   /** Timer used to retry initialization until readiness checks pass. */
