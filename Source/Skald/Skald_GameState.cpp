@@ -90,6 +90,11 @@ void ASkaldGameState::OnRep_FighterRoster()
     OnFighterRosterUpdated.Broadcast();
 }
 
+void ASkaldGameState::NotifyBattleSummaryChanged()
+{
+    OnRep_BattleSummary();
+}
+
 void ASkaldGameState::OnRep_BattleSummary()
 {
     OnBattleSummaryUpdated.Broadcast();
