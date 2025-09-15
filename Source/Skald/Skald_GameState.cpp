@@ -15,6 +15,9 @@ void ASkaldGameState::GetLifetimeReplicatedProps(
     DOREPLIFETIME(ASkaldGameState, Players);
     DOREPLIFETIME(ASkaldGameState, CurrentTurnIndex);
     DOREPLIFETIME(ASkaldGameState, FighterRoster); // NEW
+    DOREPLIFETIME(ASkaldGameState, LastBattleWinner);
+    DOREPLIFETIME(ASkaldGameState, LastAttackerCasualties);
+    DOREPLIFETIME(ASkaldGameState, LastDefenderCasualties);
 }
 
 void ASkaldGameState::AddPlayerState(APlayerState* PlayerState)
@@ -85,6 +88,11 @@ void ASkaldGameState::OnRep_CurrentTurnIndex()
 void ASkaldGameState::OnRep_FighterRoster()
 {
     OnFighterRosterUpdated.Broadcast();
+}
+
+void ASkaldGameState::OnRep_BattleSummary()
+{
+    OnBattleSummaryUpdated.Broadcast();
 }
 
 void ASkaldGameState::ClampTurnIndex()
