@@ -133,10 +133,7 @@ public:
   /** Attempt to initialise the world and start the game flow. */
   void TryInitializeWorldAndStart();
 
-private:
-  /** Timer that triggers auto-start of the turn sequence. */
-  FTimerHandle StartGameTimerHandle;
-
+protected:
   /** Timer used to retry initialization until readiness checks pass. */
   FTimerHandle RetryInitTimerHandle;
 
@@ -145,6 +142,10 @@ private:
 
   /** Whether the world has been initialized and territories assigned. */
   bool bWorldInitialized;
+
+private:
+  /** Timer that triggers auto-start of the turn sequence. */
+  FTimerHandle StartGameTimerHandle;
 
   /** Flag to avoid spawning AI players multiple times. */
   bool bAIPlayersSpawned;
