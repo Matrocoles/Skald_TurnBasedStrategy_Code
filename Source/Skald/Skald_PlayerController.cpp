@@ -36,6 +36,7 @@ ASkaldPlayerController::ASkaldPlayerController() {
   HUDRef = nullptr;
   MainHudWidget = nullptr;
   BattleHudWidget = nullptr;
+  BattleResultWidget = nullptr;
   CurrentCommandMode = EBattleCommandMode::None;
   bHasInitialized = false;
 
@@ -1093,9 +1094,16 @@ void ASkaldPlayerController::HandleFactionsUpdated() {
 }
 
 void ASkaldPlayerController::HandleWorldStateChanged() {
+  if (BattleResultWidget) {
+    BattleResultWidget->RemoveFromParent();
+    BattleResultWidget = nullptr;
+  }
+
   if (!MainHudWidget) {
     return;
   }
+
+  MainHudWidget->SetVisibility(ESlateVisibility::Visible);
 
   // Update territory info for the currently selected territory if available.
   if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
@@ -1337,6 +1345,11 @@ void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,
     VictoryWidgetClass = UBattleResultWidget::StaticClass();
   }
 
+  if (BattleResultWidget) {
+    BattleResultWidget->RemoveFromParent();
+    BattleResultWidget = nullptr;
+  }
+
   if (VictoryWidgetClass) {
     if (UUserWidget *Widget =
             CreateWidget<UUserWidget>(this, VictoryWidgetClass)) {
@@ -1344,7 +1357,8 @@ void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,
         ResultWidget->SetBattleOutcome(bPlayerWon, bPlayerLost, AttackerCasualties,
                                        DefenderCasualties);
       }
-      Widget->AddToViewport();
+      BattleResultWidget = Widget;
+      BattleResultWidget->AddToViewport();
     }
   }
 
