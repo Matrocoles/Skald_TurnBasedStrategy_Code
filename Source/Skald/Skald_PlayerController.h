@@ -117,6 +117,11 @@ protected:
             meta = (AllowPrivateAccess = "true"))
   TObjectPtr<UBattleHUDWidget> BattleHudWidget;
 
+  /** Battle result widget displayed after combat resolves. */
+  UPROPERTY(BlueprintReadOnly, Category = "UI",
+            meta = (AllowPrivateAccess = "true"))
+  UUserWidget *BattleResultWidget;
+
   /** Fighter selection widget used during battle setup. */
   UPROPERTY(BlueprintReadOnly, Category = "UI",
             meta = (AllowPrivateAccess = "true"))
