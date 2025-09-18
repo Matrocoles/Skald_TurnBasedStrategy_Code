@@ -280,14 +280,33 @@ void UGridBattleManager::AdvanceTurn()
         return;
     }
 
-    if (InitiativeOrder.Num() == 0)
+    const int32 NumFighters = InitiativeOrder.Num();
+    if (NumFighters == 0)
     {
         ActiveFighter = nullptr;
         OnActiveFighterChanged.Broadcast(ActiveFighter);
         return;
     }
 
-    CurrentTurn = (CurrentTurn + 1) % InitiativeOrder.Num();
+    int32 NextTurnIndex = INDEX_NONE;
+    if (ActiveFighter)
+    {
+        const int32 ActiveIndex = InitiativeOrder.IndexOfByKey(ActiveFighter);
+        if (ActiveIndex != INDEX_NONE)
+        {
+            NextTurnIndex = (ActiveIndex + 1) % NumFighters;
+        }
+    }
+
+    if (NextTurnIndex == INDEX_NONE)
+    {
+        CurrentTurn = CurrentTurn % NumFighters;
+    }
+    else
+    {
+        CurrentTurn = NextTurnIndex;
+    }
+
     ActiveFighter = InitiativeOrder[CurrentTurn];
     OnActiveFighterChanged.Broadcast(ActiveFighter);
     if (ActiveFighter)
