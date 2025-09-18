@@ -457,20 +457,25 @@ void ASkaldGameMode::BeginPreBattleSelection(ASkaldPlayerState *A,
   if (!HasAuthority()) {
     return;
   }
-  if (!A || !D) {
-    return;
+
+  if (A) {
+    A->PendingArmyBudget = ABudget;
+    A->PendingArmy.Reset();
+    A->bArmyLockedIn = false;
+    if (ASkaldPlayerController *APC =
+            Cast<ASkaldPlayerController>(A->GetOwner())) {
+      APC->Client_ShowFighterSelection(ABudget, A->Faction);
+    }
   }
 
-  A->PendingArmyBudget = ABudget;
-  D->PendingArmyBudget = DBudget;
-
-  if (ASkaldPlayerController *APC =
-          Cast<ASkaldPlayerController>(A->GetOwner())) {
-    APC->Client_ShowFighterSelection(ABudget, A->Faction);
-  }
-  if (ASkaldPlayerController *DPC =
-          Cast<ASkaldPlayerController>(D->GetOwner())) {
-    DPC->Client_ShowFighterSelection(DBudget, D->Faction);
+  if (D) {
+    D->PendingArmyBudget = DBudget;
+    D->PendingArmy.Reset();
+    D->bArmyLockedIn = false;
+    if (ASkaldPlayerController *DPC =
+            Cast<ASkaldPlayerController>(D->GetOwner())) {
+      DPC->Client_ShowFighterSelection(DBudget, D->Faction);
+    }
   }
 }
 

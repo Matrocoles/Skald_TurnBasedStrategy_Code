@@ -3,62 +3,6 @@
 #include "FighterPawn.h"
 #include "GridOverlayComponent.h"
 
-namespace
-{
-    /** Compute Manhattan distance between two positions. */
-    int32 Distance(const FIntPoint& A, const FIntPoint& B)
-    {
-        return FMath::Abs(A.X - B.X) + FMath::Abs(A.Y - B.Y);
-    }
-
-    /** Move a fighter towards a target up to their movement allowance. */
-    void MoveTowards(FFighter& Mover, const FFighter& Target)
-    {
-        int32 Required = Distance(Mover.Position, Target.Position) - Mover.Stats.AttackRange;
-        if (Required <= 0)
-        {
-            return;
-        }
-
-        int32 Steps = FMath::Min(Mover.Stats.Movement, Required);
-
-        if (Mover.Position.X < Target.Position.X)
-        {
-            int32 StepX = FMath::Min(Steps, Target.Position.X - Mover.Position.X);
-            Mover.Position.X += StepX;
-            Steps -= StepX;
-        }
-        else if (Mover.Position.X > Target.Position.X)
-        {
-            int32 StepX = FMath::Min(Steps, Mover.Position.X - Target.Position.X);
-            Mover.Position.X -= StepX;
-            Steps -= StepX;
-        }
-
-        if (Steps > 0)
-        {
-            if (Mover.Position.Y < Target.Position.Y)
-            {
-                int32 StepY = FMath::Min(Steps, Target.Position.Y - Mover.Position.Y);
-                Mover.Position.Y += StepY;
-            }
-            else if (Mover.Position.Y > Target.Position.Y)
-            {
-                int32 StepY = FMath::Min(Steps, Mover.Position.Y - Target.Position.Y);
-                Mover.Position.Y -= StepY;
-            }
-        }
-
-        Mover.Position.X = FMath::Clamp(Mover.Position.X, 0, UGridBattleManager::GridSize - 1);
-        Mover.Position.Y = FMath::Clamp(Mover.Position.Y, 0, UGridBattleManager::GridSize - 1);
-    }
-
-    bool IsInRange(const FFighter& Attacker, const FFighter& Defender)
-    {
-        return Distance(Attacker.Position, Defender.Position) <= Attacker.Stats.AttackRange;
-    }
-}
-
 UGridBattleManager::UGridBattleManager()
 {
     // FighterDefinitions is provided via editor (EditDefaultsOnly)
@@ -97,173 +41,7 @@ void UGridBattleManager::InitBattle(const TArray<FFighter>& Attackers, const TAr
     AttackerSurvivorArmyCost = 0;
     DefenderSurvivorArmyCost = 0;
     bTeamsAssigned = false;
-}
-
-void UGridBattleManager::StartBattle()
-{
-    bool bAttackerTurn = Rng.RandRange(1, 6) >= Rng.RandRange(1, 6);
-
-    int32 AttackerSurvivors = 0;
-    int32 AttackerSurvivorCost = 0;
-    for (const FFighter& Fighter : AttackerTeam)
-    {
-        if (Fighter.Stats.Health > 0)
-        {
-            ++AttackerSurvivors;
-            AttackerSurvivorCost += Fighter.Stats.ArmyCost;
-        }
-    }
-
-    int32 DefenderSurvivors = 0;
-    int32 DefenderSurvivorCost = 0;
-    for (const FFighter& Fighter : DefenderTeam)
-    {
-        if (Fighter.Stats.Health > 0)
-        {
-            ++DefenderSurvivors;
-            DefenderSurvivorCost += Fighter.Stats.ArmyCost;
-        }
-    }
-
-    TArray<FIntPoint> PreviousAttackerPositions;
-    PreviousAttackerPositions.Reserve(AttackerTeam.Num());
-    for (const FFighter& Fighter : AttackerTeam)
-    {
-        PreviousAttackerPositions.Add(Fighter.Position);
-    }
-    TArray<FIntPoint> PreviousDefenderPositions;
-    PreviousDefenderPositions.Reserve(DefenderTeam.Num());
-    for (const FFighter& Fighter : DefenderTeam)
-    {
-        PreviousDefenderPositions.Add(Fighter.Position);
-    }
-
-    int32 StalemateTurns = 0;
-
-    while (AttackerSurvivors > 0 && DefenderSurvivors > 0 && CurrentRound <= MaxRounds)
-    {
-        bool bDamageDealt = false;
-        TArray<FFighter>& ActingTeam = bAttackerTurn ? AttackerTeam : DefenderTeam;
-        TArray<FFighter>& TargetTeam = bAttackerTurn ? DefenderTeam : AttackerTeam;
-
-        for (FFighter& Fighter : ActingTeam)
-        {
-            if (Fighter.Stats.Health <= 0)
-            {
-                continue;
-            }
-
-            FFighter* Target = nullptr;
-            for (FFighter& Candidate : TargetTeam)
-            {
-                if (Candidate.Stats.Health > 0)
-                {
-                    Target = &Candidate;
-                    break;
-                }
-            }
-            if (!Target)
-            {
-                break;
-            }
-
-            MoveTowards(Fighter, *Target);
-            if (IsInRange(Fighter, *Target))
-            {
-                int32 Damage = 0;
-                bool bDefeated = ResolveAttack(Fighter, *Target, Damage, Rng);
-                if (Damage > 0)
-                {
-                    bDamageDealt = true;
-                }
-                if (bDefeated)
-                {
-                    if (bAttackerTurn)
-                    {
-                        --DefenderSurvivors;
-                        DefenderSurvivorCost -= Target->Stats.ArmyCost;
-                    }
-                    else
-                    {
-                        --AttackerSurvivors;
-                        AttackerSurvivorCost -= Target->Stats.ArmyCost;
-                    }
-                }
-            }
-
-            if (AttackerSurvivors <= 0 || DefenderSurvivors <= 0)
-            {
-                break;
-            }
-        }
-
-        bool bPositionsChanged = false;
-        for (int32 Index = 0; Index < AttackerTeam.Num(); ++Index)
-        {
-            if (AttackerTeam[Index].Position != PreviousAttackerPositions[Index])
-            {
-                bPositionsChanged = true;
-                break;
-            }
-        }
-        if (!bPositionsChanged)
-        {
-            for (int32 Index = 0; Index < DefenderTeam.Num(); ++Index)
-            {
-                if (DefenderTeam[Index].Position != PreviousDefenderPositions[Index])
-                {
-                    bPositionsChanged = true;
-                    break;
-                }
-            }
-        }
-
-        if (!bDamageDealt && !bPositionsChanged)
-        {
-            ++StalemateTurns;
-        }
-        else
-        {
-            StalemateTurns = 0;
-        }
-
-        for (int32 Index = 0; Index < AttackerTeam.Num(); ++Index)
-        {
-            PreviousAttackerPositions[Index] = AttackerTeam[Index].Position;
-        }
-        for (int32 Index = 0; Index < DefenderTeam.Num(); ++Index)
-        {
-            PreviousDefenderPositions[Index] = DefenderTeam[Index].Position;
-        }
-
-        if (StalemateTurns >= 2)
-        {
-            break;
-        }
-
-        bAttackerTurn = !bAttackerTurn;
-        ++CurrentRound;
-    }
-
-    AttackerSurvivorUnitCount = AttackerSurvivors;
-    DefenderSurvivorUnitCount = DefenderSurvivors;
-    AttackerSurvivorArmyCost = AttackerSurvivorCost;
-    DefenderSurvivorArmyCost = DefenderSurvivorCost;
-
-    ESkaldFaction Winner = ESkaldFaction::None;
-    if (AttackerSurvivors > 0 && DefenderSurvivors <= 0)
-    {
-        Winner = AttackerTeam.Num() > 0 ? AttackerTeam[0].Faction : ESkaldFaction::None;
-    }
-    else if (DefenderSurvivors > 0 && AttackerSurvivors <= 0)
-    {
-        Winner = DefenderTeam.Num() > 0 ? DefenderTeam[0].Faction : ESkaldFaction::None;
-    }
-
-    const int32 AttackerCasualties = AttackerInitialArmyCost - AttackerSurvivorArmyCost;
-    const int32 DefenderCasualties = DefenderInitialArmyCost - DefenderSurvivorArmyCost;
-
-    OnBattleEnded.Broadcast(Winner, AttackerCasualties, DefenderCasualties);
+    bBattleConcluded = false;
 }
 
 bool UGridBattleManager::ResolveAttack(FFighter& Attacker, FFighter& Defender, int32& OutDamage, FRandomStream& RandomStream)
@@ -458,6 +236,11 @@ void UGridBattleManager::StartRound()
 
 void UGridBattleManager::AdvanceTurn()
 {
+    if (bBattleConcluded)
+    {
+        return;
+    }
+
     if (ActiveFighter && ActiveFighter->IsAlive() && ActiveFighter->ActionsRemaining > 0)
     {
         return;
@@ -467,6 +250,35 @@ void UGridBattleManager::AdvanceTurn()
     {
         return !Fighter || !Fighter->IsAlive();
     });
+
+    bool bAttackerAlive = false;
+    bool bDefenderAlive = false;
+    for (AFighterPawn* Fighter : InitiativeOrder)
+    {
+        if (!Fighter)
+        {
+            continue;
+        }
+        if (Fighter->bIsAttacker)
+        {
+            bAttackerAlive = true;
+        }
+        else
+        {
+            bDefenderAlive = true;
+        }
+
+        if (bAttackerAlive && bDefenderAlive)
+        {
+            break;
+        }
+    }
+
+    if (!bBattleConcluded && (!bAttackerAlive || !bDefenderAlive || InitiativeOrder.Num() == 0))
+    {
+        EndBattle();
+        return;
+    }
 
     if (InitiativeOrder.Num() == 0)
     {
@@ -486,6 +298,12 @@ void UGridBattleManager::AdvanceTurn()
 
 void UGridBattleManager::EndBattle()
 {
+    if (bBattleConcluded)
+    {
+        return;
+    }
+    bBattleConcluded = true;
+
     AttackerSurvivorUnitCount = 0;
     DefenderSurvivorUnitCount = 0;
     AttackerSurvivorArmyCost = 0;

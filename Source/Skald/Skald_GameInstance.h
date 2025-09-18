@@ -57,6 +57,14 @@ public:
   UPROPERTY(BlueprintReadWrite, Category = "Battle")
   FS_BattlePayload PendingBattle;
 
+  /** Serialized results waiting to be applied on the overworld. */
+  UPROPERTY(BlueprintReadWrite, Category = "Battle")
+  FGridBattleResolution PendingBattleResolution;
+
+  /** True when PendingBattleResolution contains unapplied data. */
+  UPROPERTY(BlueprintReadWrite, Category = "Battle")
+  bool bPendingBattleResolution = false;
+
   /** Runtime manager used to execute grid based battles. */
   UPROPERTY(BlueprintReadWrite, Category = "Battle")
   class UGridBattleManager *GridBattleManager = nullptr;

@@ -135,6 +135,57 @@ struct SKALD_API FS_BattlePayload
     /** Seed used for deterministic combat resolution. */
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     int32 RandomSeed = 0;
+
+    /** Map name to travel back to once the battle concludes. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    FString ReturnMap;
+};
+
+/** Serialized outcome of a resolved grid battle. */
+USTRUCT(BlueprintType)
+struct SKALD_API FGridBattleResolution
+{
+    GENERATED_BODY();
+
+    /** True when this structure holds valid resolution data. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    bool bValid = false;
+
+    /** Faction that won the battle (None for stalemates). */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    ESkaldFaction WinningFaction = ESkaldFaction::None;
+
+    /** Player ID of the winning side (-1 for stalemates). */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    int32 WinningPlayerID = -1;
+
+    /** Player ID that now owns the contested territory. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    int32 NewOwnerPlayerID = -1;
+
+    /** Total attacker casualties expressed in army-cost units. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    int32 AttackerCasualties = 0;
+
+    /** Total defender casualties expressed in army-cost units. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    int32 DefenderCasualties = 0;
+
+    /** Surviving attacker army cost that should garrison the captured territory. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    int32 AttackerSurvivorArmyCost = 0;
+
+    /** Surviving defender army cost that remains in the territory. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    int32 DefenderSurvivorArmyCost = 0;
+
+    /** Remaining army at the source territory after casualties. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    int32 SourceArmyRemaining = 0;
+
+    /** Remaining army at the target territory after casualties/application. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    int32 TargetArmyRemaining = 0;
 };
 
 USTRUCT(BlueprintType)
