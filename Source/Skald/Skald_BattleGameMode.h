@@ -9,8 +9,20 @@ UCLASS()
 class SKALD_API ASkald_BattleGameMode : public ASkaldGameMode {
   GENERATED_BODY()
 
+public:
+  /** Attempt to start the tactical battle once both sides have supplied armies. */
+  void TryLaunchBattle();
+
 protected:
   virtual void BeginPlay() override;
   virtual void TryInitializeWorldAndStart() override;
+
+private:
+  void SetupPendingBattle();
+  void AutoCommitAIArmy(ASkaldPlayerState *PlayerState, int32 Budget) const;
+  void SpawnFighterSide(const TArray<FFighterDefinition> &Roster, bool bAsAttacker);
+
+  /** Ensures the battle only launches once per travel. */
+  bool bBattleLaunched = false;
 };
 

@@ -38,12 +38,12 @@ void ATurnManager::BeginPlay() {
 
   if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
     // Only resolve results when we are back on the world map
-    if (GI->GridBattleManager && bOnWorldMap) {
+    if (bOnWorldMap && (GI->GridBattleManager || GI->bPendingBattleResolution)) {
       ResolveGridBattleResult();
     }
 
     // On the battle map, listen for battle end and travel back on event
-    if (GI->GridBattleManager && !bOnWorldMap) {
+    if (!bOnWorldMap && GI->GridBattleManager) {
       GI->GridBattleManager->OnBattleEnded.AddDynamic(
           this, &ATurnManager::HandleGridBattleEnded);
     }
@@ -71,9 +71,22 @@ void ATurnManager::BeginPlay() {
 }
 
 void ATurnManager::HandleGridBattleEnded(ESkaldFaction /*WinningFaction*/, int32 /*AttackerCasualties*/, int32 /*DefenderCasualties*/) {
+  FString ReturnMapName;
+  if (!PendingBattle.ReturnMap.IsEmpty()) {
+    ReturnMapName = PendingBattle.ReturnMap;
+  } else if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+    ReturnMapName = GI->PendingBattle.ReturnMap;
+  }
+
+  if (ReturnMapName.IsEmpty()) {
+    ReturnMapName = UGameplayStatics::GetCurrentLevelName(this, true);
+  }
+
+  ResolveGridBattleResult();
+
   if (UWorld *World = GetWorld()) {
     // Travel back to the overworld after the tactical battle ends
-    World->ServerTravel(TEXT("WorldMap"));
+    World->ServerTravel(ReturnMapName);
   }
 }
 
@@ -317,11 +330,16 @@ TArray<ASkaldPlayerController *> ATurnManager::GetControllers() const {
 void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
   FS_BattlePayload SeededBattle = Battle;
   SeededBattle.RandomSeed = FMath::Rand();
+  if (UWorld *World = GetWorld()) {
+    SeededBattle.ReturnMap = UGameplayStatics::GetCurrentLevelName(World, true);
+  }
   PendingBattle = SeededBattle;
 
   if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
     GI->SeedCombatRandomStream(SeededBattle.RandomSeed);
     GI->PendingBattle = SeededBattle;
+    GI->PendingBattleResolution = FGridBattleResolution();
+    GI->bPendingBattleResolution = false;
     if (!GI->GridBattleManager) {
       GI->GridBattleManager = NewObject<UGridBattleManager>(GI);
     }
@@ -354,20 +372,76 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
 
 void ATurnManager::ResolveGridBattleResult_Implementation() {
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
-  if (GI) {
-    GI->bIsInBattleMap = false;
-  }
-  if (!GI || !GI->GridBattleManager) {
+  if (!GI) {
     return;
   }
 
-  const FS_BattlePayload Battle = GI->PendingBattle;
-  PendingBattle = Battle;
+  GI->bIsInBattleMap = false;
+
+  // Always mirror the pending payload locally for reference.
+  PendingBattle = GI->PendingBattle;
+
+  // Capture the battle results from the active manager if available.
+  if (GI->GridBattleManager) {
+    FGridBattleResolution Resolution;
+    Resolution.bValid = true;
+    Resolution.AttackerSurvivorArmyCost =
+        GI->GridBattleManager->GetAttackerSurvivorCost();
+    Resolution.DefenderSurvivorArmyCost =
+        GI->GridBattleManager->GetDefenderSurvivorCost();
+    Resolution.AttackerCasualties = GI->GridBattleManager->GetAttackerInitialArmyCost() -
+                                    Resolution.AttackerSurvivorArmyCost;
+    Resolution.DefenderCasualties = GI->GridBattleManager->GetDefenderInitialArmyCost() -
+                                    Resolution.DefenderSurvivorArmyCost;
+
+    const FS_BattlePayload &Battle = GI->PendingBattle;
+    ASkaldGameState *GS = GetWorld()->GetGameState<ASkaldGameState>();
+    ESkaldFaction AttackerFaction = ESkaldFaction::None;
+    ESkaldFaction DefenderFaction = ESkaldFaction::None;
+    if (GS) {
+      if (ASkaldPlayerState *AttackerPS = GS->GetPlayerById(Battle.AttackerPlayerID)) {
+        AttackerFaction = AttackerPS->Faction;
+      }
+      if (ASkaldPlayerState *DefenderPS = GS->GetPlayerById(Battle.DefenderPlayerID)) {
+        DefenderFaction = DefenderPS->Faction;
+      }
+    }
+
+    const bool bAttackerVictory =
+        Resolution.AttackerSurvivorArmyCost > 0 &&
+        Resolution.DefenderSurvivorArmyCost <= 0;
+    const bool bDefenderVictory =
+        Resolution.DefenderSurvivorArmyCost > 0 &&
+        Resolution.AttackerSurvivorArmyCost <= 0;
+
+    if (bAttackerVictory) {
+      Resolution.WinningFaction = AttackerFaction;
+      Resolution.WinningPlayerID = Battle.AttackerPlayerID;
+      Resolution.NewOwnerPlayerID = Battle.AttackerPlayerID;
+    } else if (bDefenderVictory) {
+      Resolution.WinningFaction = DefenderFaction;
+      Resolution.WinningPlayerID = Battle.DefenderPlayerID;
+      Resolution.NewOwnerPlayerID = Battle.DefenderPlayerID;
+    } else {
+      Resolution.WinningFaction = ESkaldFaction::None;
+      Resolution.WinningPlayerID = Battle.DefenderPlayerID;
+      Resolution.NewOwnerPlayerID = Battle.DefenderPlayerID;
+    }
+
+    GI->PendingBattleResolution = Resolution;
+    GI->bPendingBattleResolution = true;
+    GI->GridBattleManager = nullptr;
+  }
+
+  if (!GI->bPendingBattleResolution || !GI->PendingBattleResolution.bValid) {
+    return;
+  }
 
   if (!CachedWorldMap) {
     return;
   }
 
+  const FS_BattlePayload Battle = GI->PendingBattle;
   ATerritory *Source = CachedWorldMap->GetTerritoryById(Battle.FromTerritoryID);
   ATerritory *Target =
       CachedWorldMap->GetTerritoryById(Battle.TargetTerritoryID);
@@ -375,47 +449,42 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
     return;
   }
 
-  const int32 AttackerID =
-      Source->OwningPlayer ? Source->OwningPlayer->GetPlayerId() : -1;
-  const int32 DefenderID =
-      Target->OwningPlayer ? Target->OwningPlayer->GetPlayerId() : -1;
+  FGridBattleResolution Resolution = GI->PendingBattleResolution;
+
   const int32 InitialSourceArmy = Source->ArmyUnits;
   const int32 InitialTargetArmy = Target->ArmyUnits;
 
-  const int32 AttackerSurvivors =
-      GI->GridBattleManager->GetAttackerSurvivorCost();
-  const int32 DefenderSurvivors =
-      GI->GridBattleManager->GetDefenderSurvivorCost();
+  Source->ArmyUnits = FMath::Max(0, InitialSourceArmy - Battle.ArmyCountSent);
 
-  // Army-cost totals for potential downstream use
-  const int32 AttackerSurvivorCost =
-      GI->GridBattleManager->GetAttackerSurvivorCost();
-  const int32 DefenderSurvivorCost =
-      GI->GridBattleManager->GetDefenderSurvivorCost();
-
-  Source->ArmyUnits -= Battle.ArmyCountSent;
-
-  int32 WinningPlayerID = DefenderID;
-  int32 NewOwnerPlayerID = DefenderID;
-  if (AttackerSurvivors > 0 && DefenderSurvivors <= 0) {
+  if (Resolution.AttackerSurvivorArmyCost > 0 &&
+      Resolution.DefenderSurvivorArmyCost <= 0) {
     Target->OwningPlayer = Source->OwningPlayer;
-    Target->ArmyUnits = AttackerSurvivors;
-    WinningPlayerID = AttackerID;
-    NewOwnerPlayerID = AttackerID;
+    Target->ArmyUnits = Resolution.AttackerSurvivorArmyCost;
   } else {
-    Target->ArmyUnits = DefenderSurvivors;
+    Target->ArmyUnits = Resolution.DefenderSurvivorArmyCost;
   }
 
-  const int32 AttackerCasualties =
-      InitialSourceArmy - (Source->ArmyUnits + AttackerSurvivors);
-  const int32 DefenderCasualties = InitialTargetArmy - DefenderSurvivors;
+  Resolution.SourceArmyRemaining = Source->ArmyUnits;
+  Resolution.TargetArmyRemaining = Target->ArmyUnits;
+
+  Resolution.AttackerCasualties =
+      InitialSourceArmy - (Source->ArmyUnits + Resolution.AttackerSurvivorArmyCost);
+  Resolution.DefenderCasualties =
+      InitialTargetArmy - Resolution.DefenderSurvivorArmyCost;
 
   Source->RefreshAppearance();
   Target->RefreshAppearance();
 
   GI->PendingBattle = FS_BattlePayload();
-  GI->GridBattleManager = nullptr;
   PendingBattle = FS_BattlePayload();
+
+  const int32 WinningPlayerID = Resolution.WinningPlayerID;
+  const int32 NewOwnerPlayerID = Resolution.NewOwnerPlayerID;
+  const int32 AttackerCasualties = Resolution.AttackerCasualties;
+  const int32 DefenderCasualties = Resolution.DefenderCasualties;
+
+  GI->bPendingBattleResolution = false;
+  GI->PendingBattleResolution = FGridBattleResolution();
 
   // Resume the saved turn sequence now that the battle has been resolved.
   if (GI->bResumeTurns) {

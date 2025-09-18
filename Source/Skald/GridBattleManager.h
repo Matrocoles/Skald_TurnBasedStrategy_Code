@@ -117,10 +117,6 @@ public:
     UFUNCTION(BlueprintCallable, Category="Battle")
     void InitBattle(const TArray<FFighter>& Attackers, const TArray<FFighter>& Defenders);
 
-    /** Begin the battle and resolve rounds until a victor is found. */
-    UFUNCTION(BlueprintCallable, Category="Skald|Battle")
-    void StartBattle();
-
     /** Set the seed for the internal random stream. */
     UFUNCTION(BlueprintCallable, Category="Skald|Battle")
     void SetRandomSeed(int32 Seed);
@@ -160,6 +156,14 @@ public:
     /** Total army cost of surviving defenders. Equivalent to GetDefenderSurvivors. */
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="Skald|Battle")
     int32 GetDefenderSurvivorCost() const;
+
+    /** Total initial cost of the attacking army. */
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="Skald|Battle")
+    int32 GetAttackerInitialArmyCost() const { return AttackerInitialArmyCost; }
+
+    /** Total initial cost of the defending army. */
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="Skald|Battle")
+    int32 GetDefenderInitialArmyCost() const { return DefenderInitialArmyCost; }
 
       /** Fighter currently taking its turn. */
       UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
@@ -231,5 +235,8 @@ private:
 
     /** Whether fighters have been assigned to attacker or defender sides. */
     bool bTeamsAssigned = false;
+
+    /** Ensures EndBattle only broadcasts once per encounter. */
+    bool bBattleConcluded = false;
 };
 

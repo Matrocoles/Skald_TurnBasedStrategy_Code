@@ -11,6 +11,10 @@ void USkaldGameInstance::Init() {
     TakenFactions.Add(Faction);
   }
 
+  PendingBattle = FS_BattlePayload();
+  PendingBattleResolution = FGridBattleResolution();
+  bPendingBattleResolution = false;
+
   if (GEngine) {
     GEngine->OnNetworkFailure().AddUObject(
         this, &USkaldGameInstance::HandleNetworkFailure);
@@ -42,6 +46,8 @@ void USkaldGameInstance::HandleNetworkFailure(
   }
   OnFactionsUpdated.Broadcast();
   PendingBattle = FS_BattlePayload();
+  PendingBattleResolution = FGridBattleResolution();
+  bPendingBattleResolution = false;
   GridBattleManager = nullptr;
   SeedCombatRandomStream(FMath::Rand());
   SavedTurnIndex = 0;
