@@ -915,6 +915,7 @@ void ASkaldGameMode::BeginArmyPlacementPhase() {
     }
   }
 
+  ArmyPlacementLeader.Reset();
   PlacementIndex = -1;
   AdvanceArmyPlacement();
 }
@@ -974,9 +975,13 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
       continue;
     }
 
-    if (PS->DeployableUnits <= 0) {
+    if (PS->IsEliminated) {
       ++PlacementIndex;
       continue;
+    }
+
+    if (!ArmyPlacementLeader.IsValid()) {
+      ArmyPlacementLeader = PC;
     }
 
     const FString PhaseString =
@@ -1020,8 +1025,10 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
   }
 
   // All players have finished placing armies; start the main turn loop.
+  ASkaldPlayerController *StartingController = ArmyPlacementLeader.Get();
+  ArmyPlacementLeader.Reset();
   bTurnsStarted = true;
-  TurnManager->StartTurns();
+  TurnManager->StartTurns(StartingController);
 }
 
 bool ASkaldGameMode::InitializeWorld() {

@@ -36,7 +36,7 @@ public:
   void StartArmyPlacementPhase();
 
   UFUNCTION(BlueprintCallable, Category = "Turn")
-  void StartTurns();
+  void StartTurns(ASkaldPlayerController *StartingController = nullptr);
 
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void AdvanceTurn();

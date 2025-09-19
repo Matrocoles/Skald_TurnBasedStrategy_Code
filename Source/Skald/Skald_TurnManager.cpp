@@ -160,9 +160,9 @@ void ATurnManager::SyncGameStateTurnIndex() {
   }
 }
 
-void ATurnManager::StartTurns() {
+void ATurnManager::StartTurns(ASkaldPlayerController *StartingController) {
   SortControllersByInitiative();
-  CurrentIndex = 0;
+
   if (Controllers.Num() == 0) {
     UE_LOG(LogSkald, Error,
            TEXT("StartTurns failed: no controllers registered"));
@@ -173,22 +173,44 @@ void ATurnManager::StartTurns() {
     return;
   }
 
-  if (!Controllers.IsValidIndex(CurrentIndex) ||
-      !Controllers[CurrentIndex].IsValid()) {
+  int32 StartIndex = INDEX_NONE;
+  if (StartingController) {
+    StartIndex = Controllers.IndexOfByPredicate(
+        [StartingController](const TWeakObjectPtr<ASkaldPlayerController> &Ptr) {
+          return Ptr.Get() == StartingController;
+        });
+  }
+
+  if (StartIndex == INDEX_NONE) {
+    for (int32 i = 0; i < Controllers.Num(); ++i) {
+      if (Controllers[i].IsValid()) {
+        StartIndex = i;
+        break;
+      }
+    }
+  }
+
+  if (StartIndex == INDEX_NONE || !Controllers.IsValidIndex(StartIndex) ||
+      !Controllers[StartIndex].IsValid()) {
     UE_LOG(LogSkald, Error,
-           TEXT("StartTurns failed: invalid starting controller"));
+           TEXT("StartTurns failed: could not find a valid starting controller"));
     if (GEngine) {
-      GEngine->AddOnScreenDebugMessage(
-          -1, 5.f, FColor::Red,
-          TEXT("StartTurns: invalid starting controller"));
+      GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red,
+                                       TEXT("StartTurns: no valid starting player"));
     }
     return;
   }
 
+  CurrentIndex = StartIndex;
+
   ASkaldPlayerController *CurrentController = Controllers[CurrentIndex].Get();
-  ASkaldPlayerState *PS =
-      CurrentController ? CurrentController->GetPlayerState<ASkaldPlayerState>()
-                        : nullptr;
+  if (!CurrentController) {
+    UE_LOG(LogSkald, Error,
+           TEXT("StartTurns failed: starting controller pointer invalid"));
+    return;
+  }
+
+  ASkaldPlayerState *PS = CurrentController->GetPlayerState<ASkaldPlayerState>();
   const FString PlayerName = PS ? PS->PlayerDisplayName : TEXT("Unknown");
   ApplyReinforcementsAndResources(PS, TEXT("StartTurns"));
 
@@ -218,12 +240,10 @@ void ATurnManager::StartTurns() {
     }
   }
 
-  if (CurrentController) {
-    SyncGameStateTurnIndex();
-    CurrentController->StartTurn();
-    if (ASkaldGameMode *GM = GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
-      GM->CheckVictoryConditions();
-    }
+  SyncGameStateTurnIndex();
+  CurrentController->StartTurn();
+  if (ASkaldGameMode *GM = GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
+    GM->CheckVictoryConditions();
   }
 
   OnWorldStateChanged.Broadcast();
