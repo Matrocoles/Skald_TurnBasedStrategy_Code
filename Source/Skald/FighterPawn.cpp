@@ -5,11 +5,15 @@
 #include "EngineUtils.h"
 #include "GridBattleManager.h"
 #include "GridOverlayComponent.h"
+#include "Net/UnrealNetwork.h"
 #include "Skald_GameInstance.h"
 #include "TimerManager.h"
 
 AFighterPawn::AFighterPawn() {
   PrimaryActorTick.bCanEverTick = false;
+
+  bReplicates = true;
+  SetReplicateMovement(true);
 
   DisplayMesh =
       CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DisplayMesh"));
@@ -20,6 +24,15 @@ AFighterPawn::AFighterPawn() {
 
   ActionsRemaining = 0;
   CurrentCell = FIntPoint::ZeroValue;
+}
+
+void AFighterPawn::GetLifetimeReplicatedProps(
+    TArray<FLifetimeProperty> &OutLifetimeProps) const {
+  Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+  DOREPLIFETIME(AFighterPawn, Stats);
+  DOREPLIFETIME(AFighterPawn, bIsAttacker);
+  DOREPLIFETIME(AFighterPawn, ActionsRemaining);
 }
 
 void AFighterPawn::BeginPlay() {
@@ -236,4 +249,16 @@ void AFighterPawn::Destroyed() {
   }
   CurrentCell = FIntPoint::ZeroValue;
   Super::Destroyed();
+}
+
+void AFighterPawn::OnRep_Stats(const FFighterStats &OldStats) {
+  if (Stats.Health != OldStats.Health) {
+    const bool bHadListeners = OnHealthChanged.IsBound();
+    OnHealthChanged.Broadcast(Stats.Health);
+    if (!bHadListeners) {
+      UpdateHealthDisplay(Stats.Health);
+    }
+  } else if (!OnHealthChanged.IsBound()) {
+    UpdateHealthDisplay(Stats.Health);
+  }
 }

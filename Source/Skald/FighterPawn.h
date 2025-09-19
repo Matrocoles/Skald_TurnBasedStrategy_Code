@@ -20,6 +20,8 @@ public:
   AFighterPawn();
 
   virtual void BeginPlay() override;
+  virtual void GetLifetimeReplicatedProps(
+      TArray<FLifetimeProperty> &OutLifetimeProps) const override;
 
   /** Prepare the fighter for its activation. */
   UFUNCTION(BlueprintCallable, Category = "Fighter")
@@ -41,15 +43,17 @@ public:
   UGridOverlayComponent *GetGrid();
 
   /** Statistics describing this fighter. */
-  UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Fighter")
+  UPROPERTY(BlueprintReadWrite, EditAnywhere, ReplicatedUsing = OnRep_Stats,
+            Category = "Fighter")
   FFighterStats Stats;
 
   /** True if this fighter belongs to the attacking side. */
-  UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Fighter")
+  UPROPERTY(BlueprintReadWrite, EditAnywhere, Replicated,
+            Category = "Fighter")
   bool bIsAttacker = false;
 
   /** Actions remaining for the current activation. */
-  UPROPERTY(BlueprintReadOnly, Category = "Fighter")
+  UPROPERTY(BlueprintReadOnly, Replicated, Category = "Fighter")
   int32 ActionsRemaining;
 
   /** Mesh used to display the fighter. */
@@ -80,6 +84,10 @@ private:
   /** Update the health widget with a new value. */
   UFUNCTION()
   void UpdateHealthDisplay(int32 NewHealth);
+
+  /** Respond when the fighter stats replicate to clients. */
+  UFUNCTION()
+  void OnRep_Stats(const FFighterStats &OldStats);
 
   /** Retrieve or create a damage widget from the pool. */
   UUserWidget *GetDamageWidgetFromPool();
