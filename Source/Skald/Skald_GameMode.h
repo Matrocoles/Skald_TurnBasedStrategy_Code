@@ -14,6 +14,11 @@ class AWorldMap;
 class APlayerController;
 class USkaldSaveGame;
 
+#if WITH_AUTOMATION_TESTS
+class FArmyPlacementInitiativeOrderTest;
+class FAIArmyPlacementAutoAdvanceTest;
+#endif // WITH_AUTOMATION_TESTS
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSkaldGameOver, ASkaldPlayerState *,
                                             Winner);
 
@@ -23,6 +28,12 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSkaldGameOver, ASkaldPlayerState *,
 UCLASS(Blueprintable, BlueprintType)
 class SKALD_API ASkaldGameMode : public AGameModeBase {
   GENERATED_BODY()
+
+#if WITH_AUTOMATION_TESTS
+  // Allow automation tests to drive protected game flow entry points.
+  friend class FArmyPlacementInitiativeOrderTest;
+  friend class FAIArmyPlacementAutoAdvanceTest;
+#endif // WITH_AUTOMATION_TESTS
 
 public:
   ASkaldGameMode();
