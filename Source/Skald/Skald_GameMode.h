@@ -156,6 +156,9 @@ private:
   /** Index of the controller currently placing armies. */
   int32 PlacementIndex = 0;
 
+  /** Controller that opened army placement with the highest initiative roll. */
+  TWeakObjectPtr<ASkaldPlayerController> ArmyPlacementLeader;
+
   /** Register a newly connected player and update player data. */
   void RegisterPlayer(ASkaldPlayerController *PC);
 
