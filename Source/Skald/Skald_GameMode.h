@@ -69,6 +69,9 @@ public:
   /** Handle a player confirming their name and faction selection. */
   void HandlePlayerLockedIn(ASkaldPlayerState *PS);
 
+  /** Capture the current overworld territory state for later restoration. */
+  void CacheWorldMapSnapshot();
+
   /** Initiate pre-battle fighter selection for both sides. */
   UFUNCTION(BlueprintCallable, Category="Skald|Battle")
   void BeginPreBattleSelection(ASkaldPlayerState* AttackerPS, ASkaldPlayerState* DefenderPS,

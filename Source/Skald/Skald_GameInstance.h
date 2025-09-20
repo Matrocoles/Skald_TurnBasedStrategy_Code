@@ -73,6 +73,10 @@ public:
   UPROPERTY(BlueprintReadWrite, Category = "Battle")
   bool bIsInBattleMap = false;
 
+  /** Snapshot of the overworld territories captured before travelling. */
+  UPROPERTY(BlueprintReadWrite, Category = "Battle")
+  TArray<FS_Territory> CachedWorldMapTerritories;
+
   /** Random stream used for deterministic combat rolls. */
   UPROPERTY()
   FRandomStream CombatRandomStream;
