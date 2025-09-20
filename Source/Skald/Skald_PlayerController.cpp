@@ -3,7 +3,7 @@
 #include "ChoosePlayerWidget.h"
 #include "Components/InputComponent.h"
 #include "Engine/Engine.h"
-#include "Engine/World.h"
+#include "Engine/World.h"                 // UWorld
 #include "EngineUtils.h"
 #include "FighterDataLibrary.h"
 #include "FighterPawn.h"
@@ -29,6 +29,11 @@
 #include "UI/FighterSelectionWidget.h"
 #include "UI/SkaldMainHUDWidget.h"
 #include "UObject/ConstructorHelpers.h"
+#if __has_include("UObject/CoreUObjectDelegates.h")
+#include "UObject/CoreUObjectDelegates.h" // FCoreUObjectDelegates::PostLoadMapWithWorld
+#else
+#include "UObject/UObjectGlobals.h" // FCoreUObjectDelegates::PostLoadMapWithWorld fallback
+#endif
 #include "WorldMap.h"
 
 ASkaldPlayerController::ASkaldPlayerController() {
@@ -181,27 +186,24 @@ void ASkaldPlayerController::BeginPlay() {
     InitializeFighterSelectionIfNeeded();
     DetectBattleMap();
 
-    if (CachedGameInstance && !PostLoadMapHandle.IsValid()) {
-      PostLoadMapHandle = CachedGameInstance->GetOnWorldChanged().AddUObject(
-          this, &ASkaldPlayerController::HandleWorldChanged);
-    if (!PostLoadMapHandle.IsValid()) {
-      PostLoadMapHandle =
-          FWorldDelegates::OnPostLoadMapWithWorld.AddUObject(
-              this, &ASkaldPlayerController::HandlePostLoadMap);
+    if (PostLoadMapHandle.IsValid()) {
+      FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(PostLoadMapHandle);
+      PostLoadMapHandle.Reset();
     }
+
+    PostLoadMapHandle = FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(
+        this, &ASkaldPlayerController::HandlePostLoadMap);
   }
 
   TryBindWorldMap();
 }
 
 void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
-  if (CachedGameInstance && PostLoadMapHandle.IsValid()) {
-    CachedGameInstance->GetOnWorldChanged().Remove(PostLoadMapHandle);
   if (PostLoadMapHandle.IsValid()) {
-    FWorldDelegates::OnPostLoadMapWithWorld.Remove(PostLoadMapHandle);
+    FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(PostLoadMapHandle);
     PostLoadMapHandle.Reset();
   }
-  PostLoadMapHandle.Reset();
+
   Super::EndPlay(EndPlayReason);
 }
 
@@ -550,15 +552,6 @@ void ASkaldPlayerController::HandlePostLoadMap(UWorld *LoadedWorld) {
 
   InitializeFighterSelectionIfNeeded();
   DetectBattleMap();
-}
-
-void ASkaldPlayerController::HandleWorldChanged(UWorld *OldWorld,
-                                                UWorld *NewWorld) {
-  if (!IsLocalPlayerController() || !NewWorld) {
-    return;
-  }
-
-  HandlePostLoadMap(NewWorld);
 }
 
 void ASkaldPlayerController::ShowTurnAnnouncement(const FString &PlayerName,
