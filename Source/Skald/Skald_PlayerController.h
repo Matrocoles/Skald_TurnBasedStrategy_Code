@@ -6,7 +6,7 @@
 #include "GridBattleManager.h"
 #include "SkaldTypes.h"
 #include "TimerManager.h"
-#include "Delegates/DelegateHandle.h"
+#include "Delegates/Delegate.h"
 #include "Skald_PlayerController.generated.h"
 
 class ATurnManager;
