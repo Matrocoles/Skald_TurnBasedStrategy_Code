@@ -39,6 +39,7 @@
 
 #if SKALD_USE_CORE_UOBJECT_DELEGATES
 #include "UObject/CoreUObjectDelegates.h" // FCoreUObjectDelegates::PostLoadMapWithWorld
+#define SKALD_USE_CORE_UOBJECT_DELEGATES 1
 #endif
 
 namespace Skald
