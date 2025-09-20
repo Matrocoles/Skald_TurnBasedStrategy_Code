@@ -6,6 +6,7 @@
 #include "GridBattleManager.h"
 #include "SkaldTypes.h"
 #include "TimerManager.h"
+#include "Delegates/DelegateHandle.h"
 #include "Skald_PlayerController.generated.h"
 
 class ATurnManager;
@@ -325,6 +326,9 @@ private:
 
   /** Timer used to poll for the world map actor until it exists. */
   FTimerHandle WorldMapSearchHandle;
+
+  /** Handle for the PostLoadMap delegate binding. */
+  FDelegateHandle PostLoadMapHandle;
 
   /** Whether the current map is a battle map. */
   UPROPERTY(BlueprintReadOnly, Category = "Turn",
