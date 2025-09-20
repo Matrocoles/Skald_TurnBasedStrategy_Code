@@ -14,7 +14,7 @@ class AWorldMap;
 class APlayerController;
 class USkaldSaveGame;
 
-#if WITH_AUTOMATION_TESTS
+#if defined(WITH_AUTOMATION_TESTS) && WITH_AUTOMATION_TESTS
 class FArmyPlacementInitiativeOrderTest;
 class FAIArmyPlacementAutoAdvanceTest;
 #endif // WITH_AUTOMATION_TESTS
@@ -29,7 +29,7 @@ UCLASS(Blueprintable, BlueprintType)
 class SKALD_API ASkaldGameMode : public AGameModeBase {
   GENERATED_BODY()
 
-#if WITH_AUTOMATION_TESTS
+#if defined(WITH_AUTOMATION_TESTS) && WITH_AUTOMATION_TESTS
   // Allow automation tests to drive protected game flow entry points.
   friend class FArmyPlacementInitiativeOrderTest;
   friend class FAIArmyPlacementAutoAdvanceTest;
