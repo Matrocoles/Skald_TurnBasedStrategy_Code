@@ -1,7 +1,7 @@
 #include "Misc/AutomationTest.h"
 #include "WorldMap.h"
 #include "Tests/AutomationEditorCommon.h"
-#include "Engine\\World.h"
+#include "Engine/World.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWorldMapDefaultTableTest, "Skald.WorldMap.DefaultTableUnset", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
