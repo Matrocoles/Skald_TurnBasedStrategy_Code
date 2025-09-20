@@ -29,12 +29,16 @@
 #include "UI/FighterSelectionWidget.h"
 #include "UI/SkaldMainHUDWidget.h"
 #include "UObject/ConstructorHelpers.h"
-#include "UObject/CoreUObjectDelegates.h" // FCoreUObjectDelegates::PostLoadMapWithWorld
 #include "WorldMap.h"
 
 #ifndef SKALD_USE_CORE_UOBJECT_DELEGATES
 // Projects that target engine variants lacking FCoreUObjectDelegates can
 // override this at build time to use the fallback implementation below.
+#define SKALD_USE_CORE_UOBJECT_DELEGATES 0
+#endif
+
+#if SKALD_USE_CORE_UOBJECT_DELEGATES
+#include "UObject/CoreUObjectDelegates.h" // FCoreUObjectDelegates::PostLoadMapWithWorld
 #define SKALD_USE_CORE_UOBJECT_DELEGATES 1
 #endif
 
