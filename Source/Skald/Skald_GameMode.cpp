@@ -488,6 +488,66 @@ void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
   TryInitializeWorldAndStart();
 }
 
+void ASkaldGameMode::CacheWorldMapSnapshot() {
+  USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+  if (!GI) {
+    return;
+  }
+
+  if (GI->bIsInBattleMap) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("CacheWorldMapSnapshot skipped: currently on battle map"));
+    return;
+  }
+
+  if (!WorldMap) {
+    WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+        GetWorld(), AWorldMap::StaticClass()));
+  }
+
+  if (!WorldMap) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("CacheWorldMapSnapshot failed: WorldMap not found"));
+    GI->CachedWorldMapTerritories.Reset();
+    return;
+  }
+
+  TArray<FS_Territory> TerritorySnapshots;
+  TerritorySnapshots.Reserve(WorldMap->Territories.Num());
+
+  for (ATerritory *Territory : WorldMap->Territories) {
+    if (!Territory) {
+      continue;
+    }
+
+    FS_Territory TerrData;
+    TerrData.TerritoryID = Territory->TerritoryID;
+    TerrData.TerritoryName = Territory->TerritoryName;
+    TerrData.OwnerPlayerID =
+        Territory->OwningPlayer ? Territory->OwningPlayer->GetPlayerId() : 0;
+    TerrData.IsCapital = Territory->bIsCapital;
+    TerrData.CapitalOwner = TerrData.OwnerPlayerID;
+    TerrData.ArmyUnits = Territory->ArmyUnits;
+    TerrData.ContinentID = Territory->ContinentID;
+    TerrData.AdjacentIDs.Reset();
+    for (ATerritory *Adj : Territory->AdjacentTerritories) {
+      if (Adj) {
+        TerrData.AdjacentIDs.Add(Adj->TerritoryID);
+      }
+    }
+    TerrData.Location = Territory->GetActorLocation();
+    TerrData.HasTreasure = Territory->bHasTreasure;
+    TerrData.BuiltSiegeID = Territory->BuiltSiegeID;
+
+    TerritorySnapshots.Add(MoveTemp(TerrData));
+  }
+
+  GI->CachedWorldMapTerritories = MoveTemp(TerritorySnapshots);
+
+  UE_LOG(LogSkald, Verbose, TEXT("CacheWorldMapSnapshot captured %d territories"),
+         GI->CachedWorldMapTerritories.Num());
+}
+
 void ASkaldGameMode::BeginPreBattleSelection(ASkaldPlayerState *A,
                                              ASkaldPlayerState *D,
                                              int32 ABudget, int32 DBudget) {

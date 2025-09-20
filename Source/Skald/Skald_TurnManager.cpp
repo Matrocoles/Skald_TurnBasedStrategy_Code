@@ -352,6 +352,9 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
   SeededBattle.RandomSeed = FMath::Rand();
   if (UWorld *World = GetWorld()) {
     SeededBattle.ReturnMap = UGameplayStatics::GetCurrentLevelName(World, true);
+    if (ASkaldGameMode *GameMode = World->GetAuthGameMode<ASkaldGameMode>()) {
+      GameMode->CacheWorldMapSnapshot();
+    }
   }
   PendingBattle = SeededBattle;
 

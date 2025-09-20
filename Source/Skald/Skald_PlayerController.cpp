@@ -669,6 +669,12 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
       }
     }
     Battle.DefenderArmyCount = Target ? Target->ArmyUnits : 0;
+    if (!CachedGameMode) {
+      CachedGameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
+    }
+    if (CachedGameMode) {
+      CachedGameMode->CacheWorldMapSnapshot();
+    }
     TurnManager->TriggerGridBattle(Battle);
     return;
   }
