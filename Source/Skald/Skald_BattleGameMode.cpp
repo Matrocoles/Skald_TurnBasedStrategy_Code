@@ -3,6 +3,7 @@
 #include "Algo/RandomShuffle.h"
 #include "Algo/Sort.h"
 #include "GridBattleManager.h"
+#include "Skald.h"
 #include "Skald_GameInstance.h"
 #include "Skald_GameState.h"
 #include "Skald_PlayerState.h"
