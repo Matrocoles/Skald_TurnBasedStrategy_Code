@@ -32,6 +32,47 @@
 #include "UObject/CoreUObjectDelegates.h" // FCoreUObjectDelegates::PostLoadMapWithWorld
 #include "WorldMap.h"
 
+#ifndef SKALD_USE_CORE_UOBJECT_DELEGATES
+// Projects that target engine variants lacking FCoreUObjectDelegates can
+// override this at build time to use the fallback implementation below.
+#define SKALD_USE_CORE_UOBJECT_DELEGATES 1
+#endif
+
+namespace Skald
+{
+namespace PlayerController
+{
+namespace Private
+{
+static FDelegateHandle RegisterPostLoadMapDelegate(ASkaldPlayerController *Controller)
+{
+#if SKALD_USE_CORE_UOBJECT_DELEGATES
+  return FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(
+      Controller, &ASkaldPlayerController::HandlePostLoadMap);
+#else
+  return FWorldDelegates::OnPostLoadMapWithWorld.AddUObject(
+      Controller, &ASkaldPlayerController::HandlePostLoadMap);
+#endif
+}
+
+static void UnregisterPostLoadMapDelegate(FDelegateHandle &Handle)
+{
+  if (!Handle.IsValid())
+  {
+    return;
+  }
+
+#if SKALD_USE_CORE_UOBJECT_DELEGATES
+  FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(Handle);
+#else
+  FWorldDelegates::OnPostLoadMapWithWorld.Remove(Handle);
+#endif
+  Handle.Reset();
+}
+} // namespace Private
+} // namespace PlayerController
+} // namespace Skald
+
 ASkaldPlayerController::ASkaldPlayerController() {
   TurnManager = nullptr;
   HUDRef = nullptr;
@@ -182,23 +223,19 @@ void ASkaldPlayerController::BeginPlay() {
     InitializeFighterSelectionIfNeeded();
     DetectBattleMap();
 
-    if (PostLoadMapHandle.IsValid()) {
-      FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(PostLoadMapHandle);
-      PostLoadMapHandle.Reset();
-    }
+    Skald::PlayerController::Private::UnregisterPostLoadMapDelegate(
+        PostLoadMapHandle);
 
-    PostLoadMapHandle = FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(
-        this, &ASkaldPlayerController::HandlePostLoadMap);
+    PostLoadMapHandle =
+        Skald::PlayerController::Private::RegisterPostLoadMapDelegate(this);
   }
 
   TryBindWorldMap();
 }
 
 void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
-  if (PostLoadMapHandle.IsValid()) {
-    FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(PostLoadMapHandle);
-    PostLoadMapHandle.Reset();
-  }
+  Skald::PlayerController::Private::UnregisterPostLoadMapDelegate(
+      PostLoadMapHandle);
 
   Super::EndPlay(EndPlayReason);
 }
