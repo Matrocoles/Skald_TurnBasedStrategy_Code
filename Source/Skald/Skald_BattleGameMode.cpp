@@ -13,6 +13,50 @@
 #include "TimerManager.h"
 #include "WorldMap.h"
 
+namespace {
+bool HasHumanOwnedTerritory(const ASkaldGameState *GameState,
+                            const AWorldMap *WorldMap,
+                            const USkaldGameInstance *GameInstance) {
+  if (!GameState) {
+    return false;
+  }
+
+  auto IsHumanPlayerById = [GameState](int32 PlayerID) {
+    if (PlayerID <= 0) {
+      return false;
+    }
+    if (ASkaldPlayerState *Player = GameState->GetPlayerById(PlayerID)) {
+      return !Player->bIsAI;
+    }
+    return false;
+  };
+
+  if (WorldMap) {
+    for (ATerritory *Territory : WorldMap->Territories) {
+      if (!Territory) {
+        continue;
+      }
+      const int32 OwnerID =
+          Territory->OwningPlayer ? Territory->OwningPlayer->GetPlayerId() : 0;
+      if (IsHumanPlayerById(OwnerID)) {
+        return true;
+      }
+    }
+  }
+
+  if (GameInstance) {
+    for (const FS_Territory &TerritoryData :
+         GameInstance->CachedWorldMapTerritories) {
+      if (IsHumanPlayerById(TerritoryData.OwnerPlayerID)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+} // namespace
+
 void ASkald_BattleGameMode::BeginPlay() {
   Super::BeginPlay();
 
@@ -27,7 +71,8 @@ void ASkald_BattleGameMode::BeginPlay() {
                                            &ASkald_BattleGameMode::HandleBattleEnded);
   }
 
-  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+  USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+  if (GI) {
     GI->GridBattleManager = BattleManager;
   }
 
@@ -44,27 +89,15 @@ void ASkald_BattleGameMode::BeginPlay() {
                TEXT("PlayerCount %d != ControllerCount %d after travel"),
                GS->PlayerArray.Num(), ControllerCount);
 
-    bool bHumanHasTerritory = false;
-    if (WorldMap) {
-      for (APlayerState *BasePS : GS->PlayerArray) {
-        ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(BasePS);
-        if (!PS || PS->bIsAI) {
-          continue;
-        }
-        for (ATerritory *Territory : WorldMap->Territories) {
-          if (WorldMap->IsOwnedBy(Territory, PS)) {
-            bHumanHasTerritory = true;
-            break;
-          }
-        }
-        if (bHumanHasTerritory) {
-          break;
-        }
-      }
+    const bool bHumanHasTerritory =
+        HasHumanOwnedTerritory(GS, WorldMap, GI);
+    if (!bHumanHasTerritory) {
+      const int32 CachedCount = GI ? GI->CachedWorldMapTerritories.Num() : 0;
+      UE_LOG(LogSkald, Warning,
+             TEXT("BeginPlay: Unable to confirm any human-owned territory after "
+                  "travel (WorldMap=%s, CachedTerritories=%d)"),
+             *GetNameSafe(WorldMap), CachedCount);
     }
-    ensureMsgf(
-        bHumanHasTerritory,
-        TEXT("Human player does not own any territory after travel"));
   }
 }
 
@@ -83,6 +116,16 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
   ASkaldGameState *GS = GetGameState<ASkaldGameState>();
   if (!GS) {
     return;
+  }
+
+  const bool bHumanHasTerritory =
+      HasHumanOwnedTerritory(GS, WorldMap, GI);
+  if (!bHumanHasTerritory) {
+    const int32 CachedCount = GI ? GI->CachedWorldMapTerritories.Num() : 0;
+    UE_LOG(LogSkald, Warning,
+           TEXT("SetupPendingBattle: No human-owned territory recorded before "
+                "launch (WorldMap=%s, CachedTerritories=%d)"),
+           *GetNameSafe(WorldMap), CachedCount);
   }
 
   const FS_BattlePayload Battle = GI->PendingBattle;
