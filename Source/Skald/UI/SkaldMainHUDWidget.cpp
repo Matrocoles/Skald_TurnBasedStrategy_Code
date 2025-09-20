@@ -735,6 +735,9 @@ void USkaldMainHUDWidget::HandleAttackApproved() {
           if (ATerritory *Source = WorldMap->GetTerritoryById(SourceID)) {
             if (Source->OwningPlayer) {
               Battle.AttackerPlayerID = Source->OwningPlayer->GetPlayerId();
+              Battle.AttackerFaction = Source->OwningPlayer->Faction;
+              Battle.AttackerDisplayName = Source->OwningPlayer->PlayerDisplayName;
+              Battle.bAttackerIsAI = Source->OwningPlayer->bIsAI;
             }
             if (bUseSiege && Source->BuiltSiegeID > 0) {
               Battle.AssignedSiegeIDs.Add(Source->BuiltSiegeID);
@@ -744,6 +747,9 @@ void USkaldMainHUDWidget::HandleAttackApproved() {
           if (ATerritory *Target = WorldMap->GetTerritoryById(TargetID)) {
             if (Target->OwningPlayer) {
               Battle.DefenderPlayerID = Target->OwningPlayer->GetPlayerId();
+              Battle.DefenderFaction = Target->OwningPlayer->Faction;
+              Battle.DefenderDisplayName = Target->OwningPlayer->PlayerDisplayName;
+              Battle.bDefenderIsAI = Target->OwningPlayer->bIsAI;
             }
             Battle.IsCapitalAttack = Target->bIsCapital;
           }
