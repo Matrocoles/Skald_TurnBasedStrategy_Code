@@ -29,6 +29,7 @@
 #include "UI/FighterSelectionWidget.h"
 #include "UI/SkaldMainHUDWidget.h"
 #include "UObject/ConstructorHelpers.h"
+#include "UObject/CoreUObjectDelegates.h"
 #include "WorldMap.h"
 
 ASkaldPlayerController::ASkaldPlayerController() {
@@ -180,12 +181,22 @@ void ASkaldPlayerController::BeginPlay() {
     }
     InitializeFighterSelectionIfNeeded();
     DetectBattleMap();
+
+    if (!PostLoadMapHandle.IsValid()) {
+      PostLoadMapHandle =
+          FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(
+              this, &ASkaldPlayerController::HandlePostLoadMap);
+    }
   }
 
   TryBindWorldMap();
 }
 
 void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
+  if (PostLoadMapHandle.IsValid()) {
+    FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(PostLoadMapHandle);
+    PostLoadMapHandle.Reset();
+  }
   Super::EndPlay(EndPlayReason);
 }
 
@@ -493,8 +504,13 @@ void ASkaldPlayerController::DetectBattleMap() {
   }
 }
 
-void ASkaldPlayerController::HandlePostLoadMap(UWorld * /*LoadedWorld*/) {
+void ASkaldPlayerController::HandlePostLoadMap(UWorld *LoadedWorld) {
+  if (!LoadedWorld || !IsLocalPlayerController()) {
+    return;
+  }
+
   InitializeFighterSelectionIfNeeded();
+  DetectBattleMap();
 }
 
 void ASkaldPlayerController::ShowTurnAnnouncement(const FString &PlayerName,
