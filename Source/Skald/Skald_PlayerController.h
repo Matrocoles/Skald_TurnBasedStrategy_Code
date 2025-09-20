@@ -330,6 +330,9 @@ private:
   /** Timer used to poll for the world map actor until it exists. */
   FTimerHandle WorldMapSearchHandle;
 
+  void RegisterPostLoadMapDelegate();
+  void UnregisterPostLoadMapDelegate();
+
   void HandlePostLoadMap(UWorld *LoadedWorld);
 
   FDelegateHandle PostLoadMapHandle;

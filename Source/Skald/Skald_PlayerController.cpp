@@ -1,4 +1,6 @@
 #include "Skald_PlayerController.h"
+
+#include <type_traits>
 #include "Blueprint/UserWidget.h"
 #include "ChoosePlayerWidget.h"
 #include "Components/InputComponent.h"
@@ -11,6 +13,7 @@
 #include "GridOverlayComponent.h"
 #include "InputCoreTypes.h"
 #include "Kismet/GameplayStatics.h"
+#include "Misc/CoreDelegates.h"
 #include "Misc/EngineVersionComparison.h"
 #include "Skald.h"
 #include "SkaldTypes.h"
@@ -29,8 +32,36 @@
 #include "UI/FighterSelectionWidget.h"
 #include "UI/SkaldMainHUDWidget.h"
 #include "UObject/ConstructorHelpers.h"
-#include "UObject/CoreUObjectDelegates.h" // FCoreUObjectDelegates::PostLoadMapWithWorld
 #include "WorldMap.h"
+
+#ifndef SKALD_USE_CORE_UOBJECT_DELEGATES
+// Projects that target engine variants lacking FCoreUObjectDelegates can
+// override this at build time to use the fallback implementation below.
+#define SKALD_USE_CORE_UOBJECT_DELEGATES 0
+#endif
+
+#if SKALD_USE_CORE_UOBJECT_DELEGATES
+#include "UObject/CoreUObjectDelegates.h" // FCoreUObjectDelegates::PostLoadMapWithWorld
+#else
+namespace Skald
+{
+namespace PlayerController
+{
+namespace Private
+{
+template <typename T, typename = void> struct TSupportsOnPostLoadMapWithWorld : std::false_type
+{
+};
+
+template <typename T>
+struct TSupportsOnPostLoadMapWithWorld<
+    T, std::void_t<decltype(T::OnPostLoadMapWithWorld)>> : std::true_type
+{
+};
+} // namespace Private
+} // namespace PlayerController
+} // namespace Skald
+#endif
 
 ASkaldPlayerController::ASkaldPlayerController() {
   TurnManager = nullptr;
@@ -57,6 +88,43 @@ ASkaldPlayerController::ASkaldPlayerController() {
   if (ChooseBP.Succeeded()) {
     ChoosePlayerWidgetClass = ChooseBP.Class;
   }
+}
+
+void ASkaldPlayerController::RegisterPostLoadMapDelegate() {
+#if SKALD_USE_CORE_UOBJECT_DELEGATES
+  PostLoadMapHandle = FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(
+      this, &ASkaldPlayerController::HandlePostLoadMap);
+#else
+  using FFallbackDelegates = FCoreDelegates;
+  static_assert(Skald::PlayerController::Private::
+                    TSupportsOnPostLoadMapWithWorld<FFallbackDelegates>::value,
+                "FCoreDelegates::OnPostLoadMapWithWorld is unavailable; "
+                "define SKALD_USE_CORE_UOBJECT_DELEGATES=1 or provide an "
+                "alternate registration path.");
+
+  PostLoadMapHandle = FFallbackDelegates::OnPostLoadMapWithWorld.AddUObject(
+      this, &ASkaldPlayerController::HandlePostLoadMap);
+#endif
+}
+
+void ASkaldPlayerController::UnregisterPostLoadMapDelegate() {
+  if (!PostLoadMapHandle.IsValid()) {
+    return;
+  }
+
+#if SKALD_USE_CORE_UOBJECT_DELEGATES
+  FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(PostLoadMapHandle);
+#else
+  using FFallbackDelegates = FCoreDelegates;
+  static_assert(Skald::PlayerController::Private::
+                    TSupportsOnPostLoadMapWithWorld<FFallbackDelegates>::value,
+                "FCoreDelegates::OnPostLoadMapWithWorld is unavailable; "
+                "define SKALD_USE_CORE_UOBJECT_DELEGATES=1 or provide an "
+                "alternate registration path.");
+
+  FFallbackDelegates::OnPostLoadMapWithWorld.Remove(PostLoadMapHandle);
+#endif
+  PostLoadMapHandle.Reset();
 }
 
 void ASkaldPlayerController::CacheGameReferences() {
@@ -182,23 +250,15 @@ void ASkaldPlayerController::BeginPlay() {
     InitializeFighterSelectionIfNeeded();
     DetectBattleMap();
 
-    if (PostLoadMapHandle.IsValid()) {
-      FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(PostLoadMapHandle);
-      PostLoadMapHandle.Reset();
-    }
-
-    PostLoadMapHandle = FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(
-        this, &ASkaldPlayerController::HandlePostLoadMap);
+    UnregisterPostLoadMapDelegate();
+    RegisterPostLoadMapDelegate();
   }
 
   TryBindWorldMap();
 }
 
 void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
-  if (PostLoadMapHandle.IsValid()) {
-    FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(PostLoadMapHandle);
-    PostLoadMapHandle.Reset();
-  }
+  UnregisterPostLoadMapDelegate();
 
   Super::EndPlay(EndPlayReason);
 }
