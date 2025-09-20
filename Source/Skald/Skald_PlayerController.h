@@ -22,6 +22,7 @@ class UFighterSelectionWidget;
 class AWorldMap;
 class AFighterPawn;
 class UGridOverlayComponent;
+class UWorld;
 
 /** Command issued by the player during a battle. */
 UENUM()
@@ -39,8 +40,6 @@ class SKALD_API ASkaldPlayerController : public APlayerController {
 
 public:
   ASkaldPlayerController();
-
-  virtual void BeginPlay() override;
 
   virtual void OnRep_PlayerState() override;
 
@@ -156,9 +155,11 @@ protected:
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
   EMouseCaptureMode DefaultMouseCaptureMode;
 
-  virtual void SetupInputComponent() override;
+  virtual void BeginPlay() override;
 
   virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+  virtual void SetupInputComponent() override;
 
   /** Begin selecting a move destination. */
   UFUNCTION()
@@ -329,7 +330,8 @@ private:
   /** Timer used to poll for the world map actor until it exists. */
   FTimerHandle WorldMapSearchHandle;
 
-  /** Handle for the game instance world change delegate binding. */
+  void HandlePostLoadMap(UWorld *LoadedWorld);
+
   FDelegateHandle PostLoadMapHandle;
 
   /** Whether the current map is a battle map. */
@@ -339,12 +341,6 @@ private:
 
   /** Detect if the current level is a battle map and update bIsBattleMap. */
   void DetectBattleMap();
-
-  /** Re-run fighter selection setup after level transitions. */
-  void HandlePostLoadMap(UWorld *LoadedWorld);
-
-  /** Forward world change notifications to HandlePostLoadMap for this controller. */
-  void HandleWorldChanged(UWorld *OldWorld, UWorld *NewWorld);
 
   void BuildPlayerDataArray(TArray<FS_PlayerData> &OutPlayers) const;
 
