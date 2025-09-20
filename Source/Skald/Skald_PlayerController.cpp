@@ -438,6 +438,29 @@ void ASkaldPlayerController::InitializeBattleHUD() {
   }
 }
 
+void ASkaldPlayerController::ShowOverworldHUD() {
+  if (MainHudWidget) {
+    MainHudWidget->SetVisibility(ESlateVisibility::Visible);
+  }
+
+  if (BattleHudWidget) {
+    BattleHudWidget->RemoveFromParent();
+    BattleHudWidget = nullptr;
+  }
+}
+
+void ASkaldPlayerController::HideOverworldHUDForBattle() {
+  if (MainHudWidget) {
+    MainHudWidget->SetVisibility(ESlateVisibility::Collapsed);
+  }
+
+  InitializeBattleHUD();
+
+  if (BattleHudWidget) {
+    BattleHudWidget->SetVisibility(ESlateVisibility::Visible);
+  }
+}
+
 UGridOverlayComponent *ASkaldPlayerController::FindGridOverlay() const {
   if (UWorld *World = GetWorld()) {
     for (TActorIterator<AActor> It(World); It; ++It) {
@@ -463,44 +486,55 @@ void ASkaldPlayerController::HandleActiveFighterChanged(
 }
 
 void ASkaldPlayerController::DetectBattleMap() {
-  bIsBattleMap = false;
+  bool bDetectedBattleMap = false;
 
   if (!CachedGameInstance) {
     CachedGameInstance = GetGameInstance<USkaldGameInstance>();
   }
   if (CachedGameInstance && CachedGameInstance->bIsInBattleMap) {
-    bIsBattleMap = true;
-    InitializeBattleHUD();
-    return;
+    bDetectedBattleMap = true;
   }
 
-  const FString CurrentMap = UGameplayStatics::GetCurrentLevelName(this, true);
-  if (CurrentMap.Equals(TEXT("BattleMap"), ESearchCase::IgnoreCase)) {
-    bIsBattleMap = true;
-    InitializeBattleHUD();
-    return;
+  FString CurrentMap;
+  if (!bDetectedBattleMap) {
+    CurrentMap = UGameplayStatics::GetCurrentLevelName(this, true);
+    if (CurrentMap.Equals(TEXT("BattleMap"), ESearchCase::IgnoreCase)) {
+      bDetectedBattleMap = true;
+    }
   }
 
-  ATurnManager *TM = TurnManager;
-  if (!TM) {
-    if (!CachedGameMode) {
-      CachedGameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
+  if (!bDetectedBattleMap) {
+    ATurnManager *TM = TurnManager;
+    if (!TM) {
+      if (!CachedGameMode) {
+        CachedGameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
+      }
+      if (CachedGameMode) {
+        TM = CachedGameMode->GetTurnManager();
+      }
     }
-    if (CachedGameMode) {
-      TM = CachedGameMode->GetTurnManager();
+
+    if (TM) {
+      if (CurrentMap.IsEmpty()) {
+        CurrentMap = UGameplayStatics::GetCurrentLevelName(this, true);
+      }
+
+      for (const TSoftObjectPtr<UWorld> &Map : TM->BattleMaps) {
+        if (CurrentMap.Equals(Map.ToSoftObjectPath().GetAssetName(),
+                              ESearchCase::IgnoreCase)) {
+          bDetectedBattleMap = true;
+          break;
+        }
+      }
     }
-  }
-  if (!TM) {
-    return;
   }
 
-  for (const TSoftObjectPtr<UWorld> &Map : TM->BattleMaps) {
-    if (CurrentMap.Equals(Map.ToSoftObjectPath().GetAssetName(),
-                          ESearchCase::IgnoreCase)) {
-      bIsBattleMap = true;
-      InitializeBattleHUD();
-      break;
-    }
+  bIsBattleMap = bDetectedBattleMap;
+
+  if (bIsBattleMap) {
+    HideOverworldHUDForBattle();
+  } else {
+    ShowOverworldHUD();
   }
 }
 
@@ -1131,6 +1165,15 @@ void ASkaldPlayerController::HandleWorldStateChanged() {
     BattleResultWidget = nullptr;
   }
 
+  if (!CachedGameInstance) {
+    CachedGameInstance = GetGameInstance<USkaldGameInstance>();
+  }
+  const bool bShouldShowOverworldHUD =
+      !bIsBattleMap || (CachedGameInstance && !CachedGameInstance->bIsInBattleMap);
+  if (bShouldShowOverworldHUD) {
+    ShowOverworldHUD();
+  }
+
   if (!MainHudWidget) {
     return;
   }
@@ -1229,11 +1272,8 @@ void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
         this, &ASkaldPlayerController::HandleFighterSelectionLockedIn);
     Selection->RemoveFromParent();
     Server_CommitArmy(Selection->ChosenFighters);
-    InitializeBattleHUD();
     FighterSelectionWidget = nullptr;
-    if (MainHudWidget) {
-      MainHudWidget->SetVisibility(ESlateVisibility::Collapsed);
-    }
+    HideOverworldHUDForBattle();
   }
 
   FInputModeGameAndUI Mode;
@@ -1396,5 +1436,14 @@ void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,
 
   if (MainHudWidget) {
     MainHudWidget->SetVisibility(ESlateVisibility::Collapsed);
+  }
+
+  if (!CachedGameInstance) {
+    CachedGameInstance = GetGameInstance<USkaldGameInstance>();
+  }
+  const bool bReadyForOverworldHUD =
+      !bIsBattleMap || (CachedGameInstance && !CachedGameInstance->bIsInBattleMap);
+  if (bReadyForOverworldHUD) {
+    ShowOverworldHUD();
   }
 }

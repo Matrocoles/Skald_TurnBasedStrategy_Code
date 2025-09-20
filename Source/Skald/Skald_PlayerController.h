@@ -319,6 +319,8 @@ private:
   void InitializeChoosePlayerWidget();
 
   void InitializeBattleHUD();
+  void ShowOverworldHUD();
+  void HideOverworldHUDForBattle();
   UGridOverlayComponent *FindGridOverlay() const;
 
   /** Attempt to locate the world map and bind to its selection event. */
