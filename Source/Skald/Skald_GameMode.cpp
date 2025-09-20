@@ -438,6 +438,39 @@ void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
     }
   }
 
+  if (WorldMap && GI && !bIsBattleMap) {
+    TArray<FS_Territory> TerritorySnapshots;
+    TerritorySnapshots.Reserve(WorldMap->Territories.Num());
+    for (ATerritory *Territory : WorldMap->Territories) {
+      if (!Territory) {
+        continue;
+      }
+
+      FS_Territory TerrData;
+      TerrData.TerritoryID = Territory->TerritoryID;
+      TerrData.TerritoryName = Territory->TerritoryName;
+      TerrData.OwnerPlayerID =
+          Territory->OwningPlayer ? Territory->OwningPlayer->GetPlayerId() : 0;
+      TerrData.IsCapital = Territory->bIsCapital;
+      TerrData.CapitalOwner = TerrData.OwnerPlayerID;
+      TerrData.ArmyUnits = Territory->ArmyUnits;
+      TerrData.ContinentID = Territory->ContinentID;
+      TerrData.AdjacentIDs.Reset();
+      for (ATerritory *Adj : Territory->AdjacentTerritories) {
+        if (Adj) {
+          TerrData.AdjacentIDs.Add(Adj->TerritoryID);
+        }
+      }
+      TerrData.Location = Territory->GetActorLocation();
+      TerrData.HasTreasure = Territory->bHasTreasure;
+      TerrData.BuiltSiegeID = Territory->BuiltSiegeID;
+
+      TerritorySnapshots.Add(MoveTemp(TerrData));
+    }
+
+    GI->CachedWorldMapTerritories = MoveTemp(TerritorySnapshots);
+  }
+
   if (!TurnManager) {
     TurnManager = GetWorld()->SpawnActor<ATurnManager>();
   }
