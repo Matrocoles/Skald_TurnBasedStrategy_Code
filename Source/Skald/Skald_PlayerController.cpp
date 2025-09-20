@@ -184,6 +184,10 @@ void ASkaldPlayerController::BeginPlay() {
     if (CachedGameInstance && !PostLoadMapHandle.IsValid()) {
       PostLoadMapHandle = CachedGameInstance->GetOnWorldChanged().AddUObject(
           this, &ASkaldPlayerController::HandleWorldChanged);
+    if (!PostLoadMapHandle.IsValid()) {
+      PostLoadMapHandle =
+          FWorldDelegates::OnPostLoadMapWithWorld.AddUObject(
+              this, &ASkaldPlayerController::HandlePostLoadMap);
     }
   }
 
@@ -193,6 +197,9 @@ void ASkaldPlayerController::BeginPlay() {
 void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
   if (CachedGameInstance && PostLoadMapHandle.IsValid()) {
     CachedGameInstance->GetOnWorldChanged().Remove(PostLoadMapHandle);
+  if (PostLoadMapHandle.IsValid()) {
+    FWorldDelegates::OnPostLoadMapWithWorld.Remove(PostLoadMapHandle);
+    PostLoadMapHandle.Reset();
   }
   PostLoadMapHandle.Reset();
   Super::EndPlay(EndPlayReason);
