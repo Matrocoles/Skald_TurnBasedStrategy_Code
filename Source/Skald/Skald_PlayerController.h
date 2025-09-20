@@ -329,7 +329,7 @@ private:
   /** Timer used to poll for the world map actor until it exists. */
   FTimerHandle WorldMapSearchHandle;
 
-  /** Handle for the PostLoadMap delegate binding. */
+  /** Handle for the game instance world change delegate binding. */
   FDelegateHandle PostLoadMapHandle;
 
   /** Whether the current map is a battle map. */
@@ -342,6 +342,9 @@ private:
 
   /** Re-run fighter selection setup after level transitions. */
   void HandlePostLoadMap(UWorld *LoadedWorld);
+
+  /** Forward world change notifications to HandlePostLoadMap for this controller. */
+  void HandleWorldChanged(UWorld *OldWorld, UWorld *NewWorld);
 
   void BuildPlayerDataArray(TArray<FS_PlayerData> &OutPlayers) const;
 

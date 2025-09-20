@@ -181,6 +181,9 @@ void ASkaldPlayerController::BeginPlay() {
     InitializeFighterSelectionIfNeeded();
     DetectBattleMap();
 
+    if (CachedGameInstance && !PostLoadMapHandle.IsValid()) {
+      PostLoadMapHandle = CachedGameInstance->GetOnWorldChanged().AddUObject(
+          this, &ASkaldPlayerController::HandleWorldChanged);
     if (!PostLoadMapHandle.IsValid()) {
       PostLoadMapHandle =
           FWorldDelegates::OnPostLoadMapWithWorld.AddUObject(
@@ -192,10 +195,13 @@ void ASkaldPlayerController::BeginPlay() {
 }
 
 void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
+  if (CachedGameInstance && PostLoadMapHandle.IsValid()) {
+    CachedGameInstance->GetOnWorldChanged().Remove(PostLoadMapHandle);
   if (PostLoadMapHandle.IsValid()) {
     FWorldDelegates::OnPostLoadMapWithWorld.Remove(PostLoadMapHandle);
     PostLoadMapHandle.Reset();
   }
+  PostLoadMapHandle.Reset();
   Super::EndPlay(EndPlayReason);
 }
 
@@ -544,6 +550,15 @@ void ASkaldPlayerController::HandlePostLoadMap(UWorld *LoadedWorld) {
 
   InitializeFighterSelectionIfNeeded();
   DetectBattleMap();
+}
+
+void ASkaldPlayerController::HandleWorldChanged(UWorld *OldWorld,
+                                                UWorld *NewWorld) {
+  if (!IsLocalPlayerController() || !NewWorld) {
+    return;
+  }
+
+  HandlePostLoadMap(NewWorld);
 }
 
 void ASkaldPlayerController::ShowTurnAnnouncement(const FString &PlayerName,
