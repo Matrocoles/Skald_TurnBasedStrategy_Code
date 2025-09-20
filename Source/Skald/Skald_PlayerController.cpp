@@ -43,6 +43,9 @@
 #if SKALD_USE_CORE_UOBJECT_DELEGATES
 #include "UObject/CoreUObjectDelegates.h" // FCoreUObjectDelegates::PostLoadMapWithWorld
 #else
+#define SKALD_USE_CORE_UOBJECT_DELEGATES 1
+#endif
+
 namespace Skald
 {
 namespace PlayerController
@@ -62,6 +65,35 @@ struct TSupportsOnPostLoadMapWithWorld<
 } // namespace PlayerController
 } // namespace Skald
 #endif
+=======
+static FDelegateHandle RegisterPostLoadMapDelegate(ASkaldPlayerController *Controller)
+{
+#if SKALD_USE_CORE_UOBJECT_DELEGATES
+  return FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(
+      Controller, &ASkaldPlayerController::HandlePostLoadMap);
+#else
+  return FWorldDelegates::OnPostLoadMapWithWorld.AddUObject(
+      Controller, &ASkaldPlayerController::HandlePostLoadMap);
+#endif
+}
+
+static void UnregisterPostLoadMapDelegate(FDelegateHandle &Handle)
+{
+  if (!Handle.IsValid())
+  {
+    return;
+  }
+
+#if SKALD_USE_CORE_UOBJECT_DELEGATES
+  FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(Handle);
+#else
+  FWorldDelegates::OnPostLoadMapWithWorld.Remove(Handle);
+#endif
+  Handle.Reset();
+}
+} // namespace Private
+} // namespace PlayerController
+} // namespace Skald
 
 ASkaldPlayerController::ASkaldPlayerController() {
   TurnManager = nullptr;
@@ -252,6 +284,11 @@ void ASkaldPlayerController::BeginPlay() {
 
     UnregisterPostLoadMapDelegate();
     RegisterPostLoadMapDelegate();
+    Skald::PlayerController::Private::UnregisterPostLoadMapDelegate(
+        PostLoadMapHandle);
+
+    PostLoadMapHandle =
+        Skald::PlayerController::Private::RegisterPostLoadMapDelegate(this);
   }
 
   TryBindWorldMap();
@@ -259,6 +296,8 @@ void ASkaldPlayerController::BeginPlay() {
 
 void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
   UnregisterPostLoadMapDelegate();
+  Skald::PlayerController::Private::UnregisterPostLoadMapDelegate(
+      PostLoadMapHandle);
 
   Super::EndPlay(EndPlayReason);
 }
