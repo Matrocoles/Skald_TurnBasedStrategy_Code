@@ -1,6 +1,7 @@
 #include "Skald_BattleGameMode.h"
 
 #include "Algo/RandomShuffle.h"
+#include "Algo/Sort.h"
 #include "GridBattleManager.h"
 #include "Skald_GameInstance.h"
 #include "Skald_GameState.h"
@@ -54,6 +55,86 @@ bool HasHumanOwnedTerritory(const ASkaldGameState *GameState,
   }
 
   return false;
+}
+
+ASkaldPlayerState *EnsureBattleParticipant(ASkaldGameState *GameState, UWorld *World,
+                                           int32 PlayerID, const FString &DisplayName,
+                                           ESkaldFaction Faction, bool bIsAI) {
+  if (!GameState || !World || PlayerID <= 0) {
+    return nullptr;
+  }
+
+  if (ASkaldPlayerState *Existing = GameState->GetPlayerById(PlayerID)) {
+    if (!DisplayName.IsEmpty()) {
+      Existing->PlayerDisplayName = DisplayName;
+    }
+    if (Faction != ESkaldFaction::None) {
+      Existing->Faction = Faction;
+    }
+    Existing->bIsAI = bIsAI;
+    return Existing;
+  }
+
+  for (APlayerState *BasePS : GameState->PlayerArray) {
+    ASkaldPlayerState *Candidate = Cast<ASkaldPlayerState>(BasePS);
+    if (!Candidate || Candidate->GetPlayerId() != PlayerID) {
+      continue;
+    }
+
+    if (!DisplayName.IsEmpty()) {
+      Candidate->PlayerDisplayName = DisplayName;
+    }
+    if (Faction != ESkaldFaction::None) {
+      Candidate->Faction = Faction;
+    }
+    Candidate->bIsAI = bIsAI;
+
+    bool bAddedToList = false;
+    if (!GameState->Players.Contains(Candidate)) {
+      GameState->Players.Add(Candidate);
+      GameState->Players.Sort([](ASkaldPlayerState *A, ASkaldPlayerState *B) {
+        if (!A) {
+          return false;
+        }
+        if (!B) {
+          return true;
+        }
+        return A->GetPlayerId() < B->GetPlayerId();
+      });
+      bAddedToList = true;
+    }
+    if (bAddedToList) {
+      GameState->OnPlayersUpdated.Broadcast();
+      GameState->ForceNetUpdate();
+    }
+
+    return Candidate;
+  }
+
+  FActorSpawnParameters Params;
+  Params.SpawnCollisionHandlingOverride =
+      ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+  ASkaldPlayerState *NewState = World->SpawnActor<ASkaldPlayerState>(
+      ASkaldPlayerState::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator,
+      Params);
+  if (!NewState) {
+    return nullptr;
+  }
+
+  NewState->SetPlayerId(PlayerID);
+  if (!DisplayName.IsEmpty()) {
+    NewState->PlayerDisplayName = DisplayName;
+  } else {
+    NewState->PlayerDisplayName = FString::Printf(TEXT("Player %d"), PlayerID);
+  }
+  if (Faction != ESkaldFaction::None) {
+    NewState->Faction = Faction;
+  }
+  NewState->bIsAI = bIsAI;
+
+  GameState->AddPlayerState(NewState);
+  GameState->ForceNetUpdate();
+  return NewState;
 }
 } // namespace
 
@@ -118,6 +199,11 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
     return;
   }
 
+  UWorld *World = GetWorld();
+  if (!World) {
+    return;
+  }
+
   const bool bHumanHasTerritory =
       HasHumanOwnedTerritory(GS, WorldMap, GI);
   if (!bHumanHasTerritory) {
@@ -129,8 +215,12 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
   }
 
   const FS_BattlePayload Battle = GI->PendingBattle;
-  ASkaldPlayerState *AttackerPS = GS->GetPlayerById(Battle.AttackerPlayerID);
-  ASkaldPlayerState *DefenderPS = GS->GetPlayerById(Battle.DefenderPlayerID);
+  ASkaldPlayerState *AttackerPS = EnsureBattleParticipant(
+      GS, World, Battle.AttackerPlayerID, Battle.AttackerDisplayName,
+      Battle.AttackerFaction, Battle.bAttackerIsAI);
+  ASkaldPlayerState *DefenderPS = EnsureBattleParticipant(
+      GS, World, Battle.DefenderPlayerID, Battle.DefenderDisplayName,
+      Battle.DefenderFaction, Battle.bDefenderIsAI);
 
   const int32 AttackerBudget = FMath::Max(0, Battle.ArmyCountSent);
   const int32 DefenderBudget =
@@ -241,9 +331,18 @@ void ASkald_BattleGameMode::TryLaunchBattle() {
     return;
   }
 
+  UWorld *World = GetWorld();
+  if (!World) {
+    return;
+  }
+
   const FS_BattlePayload &Battle = GI->PendingBattle;
-  ASkaldPlayerState *AttackerPS = GS->GetPlayerById(Battle.AttackerPlayerID);
-  ASkaldPlayerState *DefenderPS = GS->GetPlayerById(Battle.DefenderPlayerID);
+  ASkaldPlayerState *AttackerPS = EnsureBattleParticipant(
+      GS, World, Battle.AttackerPlayerID, Battle.AttackerDisplayName,
+      Battle.AttackerFaction, Battle.bAttackerIsAI);
+  ASkaldPlayerState *DefenderPS = EnsureBattleParticipant(
+      GS, World, Battle.DefenderPlayerID, Battle.DefenderDisplayName,
+      Battle.DefenderFaction, Battle.bDefenderIsAI);
 
   if ((AttackerPS && !AttackerPS->bArmyLockedIn) ||
       (DefenderPS && !DefenderPS->bArmyLockedIn)) {

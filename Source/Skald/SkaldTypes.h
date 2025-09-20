@@ -120,6 +120,30 @@ struct SKALD_API FS_BattlePayload
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     int32 DefenderArmyCount = 0;
 
+    /** Cached display name for the attacking player when travelling to the battle map. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    FString AttackerDisplayName;
+
+    /** Cached display name for the defending player when travelling to the battle map. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    FString DefenderDisplayName;
+
+    /** Faction the attacker was using on the world map. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    ESkaldFaction AttackerFaction = ESkaldFaction::None;
+
+    /** Faction the defender was using on the world map. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    ESkaldFaction DefenderFaction = ESkaldFaction::None;
+
+    /** True when the attacking player was controlled by AI at the time of travel. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    bool bAttackerIsAI = false;
+
+    /** True when the defending player was controlled by AI at the time of travel. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    bool bDefenderIsAI = false;
+
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     bool IsCapitalAttack = false;
 

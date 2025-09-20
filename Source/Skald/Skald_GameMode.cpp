@@ -240,14 +240,28 @@ void ASkaldGameMode::CleanupStalePlayerStates() {
     return;
   }
 
+  USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+  const bool bIsBattleMap = GI && GI->bIsInBattleMap;
+  const FS_BattlePayload BattleSnapshot =
+      bIsBattleMap ? GI->PendingBattle : FS_BattlePayload();
+
   bool bRemovedAny = false;
   for (int32 i = GS->PlayerArray.Num() - 1; i >= 0; --i) {
     APlayerState *BasePS = GS->PlayerArray[i];
     AController *OwningController =
         BasePS ? Cast<AController>(BasePS->GetOwner()) : nullptr;
     if (!IsValid(OwningController)) {
+      ASkaldPlayerState *SkaldPS = Cast<ASkaldPlayerState>(BasePS);
+      const bool bPreserveForBattle =
+          bIsBattleMap && SkaldPS &&
+          (SkaldPS->GetPlayerId() == BattleSnapshot.AttackerPlayerID ||
+           SkaldPS->GetPlayerId() == BattleSnapshot.DefenderPlayerID);
+      if (bPreserveForBattle) {
+        continue;
+      }
+
       GS->PlayerArray.RemoveAt(i);
-      if (ASkaldPlayerState *SkaldPS = Cast<ASkaldPlayerState>(BasePS)) {
+      if (SkaldPS) {
         GS->Players.RemoveSwap(SkaldPS);
       }
       bRemovedAny = true;

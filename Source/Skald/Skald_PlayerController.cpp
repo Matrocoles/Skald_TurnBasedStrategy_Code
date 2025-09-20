@@ -662,6 +662,16 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
     Battle.TargetTerritoryID = ToID;
     Battle.ArmyCountSent = ArmySent;
     Battle.IsCapitalAttack = Target->bIsCapital;
+    if (AttackerPS) {
+      Battle.AttackerFaction = AttackerPS->Faction;
+      Battle.AttackerDisplayName = AttackerPS->PlayerDisplayName;
+      Battle.bAttackerIsAI = AttackerPS->bIsAI;
+    }
+    if (DefenderPS) {
+      Battle.DefenderFaction = DefenderPS->Faction;
+      Battle.DefenderDisplayName = DefenderPS->PlayerDisplayName;
+      Battle.bDefenderIsAI = DefenderPS->bIsAI;
+    }
     if (bUseSiege && CachedGameMode) {
       const int32 SiegeID = CachedGameMode->ConsumeSiege(FromID);
       if (SiegeID > 0) {
