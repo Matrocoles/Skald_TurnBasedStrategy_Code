@@ -1,10 +1,11 @@
 #include "Skald_GameInstance.h"
 
 #include "Engine/Engine.h"
-#include "Engine/GameViewportClient.h"
 #include "Kismet/GameplayStatics.h"
 #include "Skald.h"
 #include "Blueprint/UserWidget.h"
+#include "Skald_PlayerController.h"
+#include "UI/SkaldUIHelpers.h"
 
 void USkaldGameInstance::Init() {
   Super::Init();
@@ -63,31 +64,31 @@ void USkaldGameInstance::ShowDeployWidget() {
     return;
   }
 
-  if (DeployWidgetSlateHandle.IsValid()) {
-    // Already displayed via the viewport.
-    return;
-  }
-
-  if (UWorld *World = GetWorld()) {
-    if (UGameViewportClient *Viewport = World->GetGameViewport()) {
-      DeployWidgetSlateHandle = DeployWidget->TakeWidget();
-      Viewport->AddViewportWidgetContent(DeployWidgetSlateHandle.ToSharedRef());
+  if (!DeployWidget->IsInViewport()) {
+    DeployWidget->AddToViewport();
+    if (UWorld *World = GetWorld()) {
+      if (APlayerController *PC = World->GetFirstPlayerController()) {
+        FocusWidgetUIOnly(PC, DeployWidget);
+      }
     }
   }
 }
 
 void USkaldGameInstance::HideDeployWidget() {
-  if (!DeployWidgetSlateHandle.IsValid()) {
+  if (!DeployWidget) {
     return;
   }
 
-  if (UWorld *World = GetWorld()) {
-    if (UGameViewportClient *Viewport = World->GetGameViewport()) {
-      Viewport->RemoveViewportWidgetContent(DeployWidgetSlateHandle.ToSharedRef());
-    }
+  if (DeployWidget->IsInViewport()) {
+    DeployWidget->RemoveFromParent();
   }
 
-  DeployWidgetSlateHandle.Reset();
+  if (UWorld *World = GetWorld()) {
+    if (ASkaldPlayerController *PC =
+            Cast<ASkaldPlayerController>(World->GetFirstPlayerController())) {
+      PC->ShowMainHUD();
+    }
+  }
 }
 
 void USkaldGameInstance::HandleNetworkFailure(

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Blueprint/UserWidget.h"
+#include "Blueprint/WidgetBlueprintLibrary.h"
 #include "GameFramework/PlayerController.h"
 
 static inline void FocusWidgetUIOnly(APlayerController *PC, UUserWidget *Widget) {
@@ -9,14 +10,9 @@ static inline void FocusWidgetUIOnly(APlayerController *PC, UUserWidget *Widget)
   }
 
   Widget->SetIsFocusable(true);
+  Widget->SetFocus();
 
-  FInputModeUIOnly Mode;
-  if (TSharedPtr<SWidget> Cached = Widget->GetCachedWidget()) {
-    Mode.SetWidgetToFocus(Cached);
-  } else {
-    Mode.SetWidgetToFocus(Widget->TakeWidget());
-  }
-  Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-  PC->SetInputMode(Mode);
+  UWidgetBlueprintLibrary::SetInputMode_UIOnlyEx(
+      PC, Widget, EMouseLockMode::DoNotLock, false);
   PC->bShowMouseCursor = true;
 }

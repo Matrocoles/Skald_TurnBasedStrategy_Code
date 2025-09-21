@@ -67,7 +67,13 @@ public:
 
   /** Accessor for the main HUD widget instance. */
   UFUNCTION(BlueprintCallable, Category = "UI")
-  USkaldMainHUDWidget *GetHUDWidget() const { return MainHudWidget; }
+  USkaldMainHUDWidget *GetHUDWidget() const { return MainHUD; }
+
+  UFUNCTION(BlueprintCallable)
+  void ShowMainHUD();
+
+  UFUNCTION(BlueprintCallable)
+  void HideMainHUD();
 
   /** Retrieve the turn manager controlling this player. */
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Turn")
@@ -88,7 +94,7 @@ protected:
   /** Widget class to instantiate for the player's HUD.
    *  Settable via Blueprint or loaded in the constructor. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "UI")
-  TSubclassOf<UUserWidget> HUDWidgetClass;
+  TSubclassOf<USkaldMainHUDWidget> MainHUDClass;
 
   /** Widget class used for in-battle HUD. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "UI")
@@ -110,7 +116,7 @@ protected:
   /** Typed reference to the main HUD widget. */
   UPROPERTY(BlueprintReadOnly, Category = "UI",
             meta = (AllowPrivateAccess = "true"))
-  TObjectPtr<USkaldMainHUDWidget> MainHudWidget;
+  TObjectPtr<USkaldMainHUDWidget> MainHUD;
 
   /** Typed reference to the battle HUD widget. */
   UPROPERTY(BlueprintReadOnly, Category = "UI",

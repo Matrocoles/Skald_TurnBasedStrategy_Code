@@ -10,7 +10,7 @@ void UTestHUDWidget::ShowErrorMessage(const FString& Message)
 
 void ATestPlayerController::SetHUD(USkaldMainHUDWidget* InHUD)
 {
-    MainHudWidget = InHUD;
+    MainHUD = InHUD;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldPlayerControllerValidationFeedbackTest,

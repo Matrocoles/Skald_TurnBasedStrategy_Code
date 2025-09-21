@@ -128,9 +128,6 @@ public:
   UPROPERTY(Transient)
   TObjectPtr<UUserWidget> DeployWidget = nullptr;
 
-  /** Slate handle returned by TakeWidget when the deploy widget is shown. */
-  TSharedPtr<SWidget> DeployWidgetSlateHandle;
-
   UFUNCTION(BlueprintCallable)
   void SetTravelState(const FSkaldTravelState &InState);
 

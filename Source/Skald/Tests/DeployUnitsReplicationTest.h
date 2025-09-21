@@ -19,6 +19,6 @@ UCLASS()
 class ADeployTestPlayerController : public ASkaldPlayerController {
     GENERATED_BODY()
 public:
-    void SetHUD(USkaldMainHUDWidget* InHUD) { MainHudWidget = InHUD; }
+    void SetHUD(USkaldMainHUDWidget* InHUD) { MainHUD = InHUD; }
 };
 

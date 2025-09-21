@@ -80,6 +80,8 @@ void UFighterSelectionWidget::NativePreConstruct()
 
 void UFighterSelectionWidget::NativeConstruct() {
   Super::NativeConstruct();
+  SetIsFocusable(true);
+  SetFocus();
   if (LockInButton) {
     LockInButton->OnClicked.AddDynamic(this, &UFighterSelectionWidget::LockIn);
   }
