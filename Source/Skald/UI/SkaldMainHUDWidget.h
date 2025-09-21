@@ -13,6 +13,7 @@ class ATerritory;
 class UConfirmAttackWidget;
 class UDeployWidget;
 class UWidget;
+class SWidget;
 class ASkaldGameMode;
 class ASkaldGameState;
 class USkaldGameInstance;
@@ -323,6 +324,9 @@ protected:
 
   UPROPERTY()
   UDeployWidget *ActiveDeployWidget = nullptr;
+
+  /** Slate handle when the deploy widget is added via the viewport. */
+  TSharedPtr<SWidget> ActiveDeployWidgetSlateHandle;
 
   UPROPERTY()
   TArray<ATerritory *> HighlightedTerritories;

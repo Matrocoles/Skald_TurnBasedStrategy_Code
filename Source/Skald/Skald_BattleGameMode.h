@@ -4,6 +4,7 @@
 #include "Skald_GameMode.h"
 #include "Skald_BattleGameMode.generated.h"
 
+class AAIController;
 class AController;
 
 /** GameMode dedicated to resolving grid-based battles. */
@@ -16,13 +17,18 @@ public:
   void TryLaunchBattle();
 
 protected:
+  virtual void InitGame(const FString &Map, const FString &Options,
+                        FString &Error) override;
   virtual void BeginPlay() override;
   virtual void PostLogin(APlayerController *NewPlayer) override;
   virtual void TryInitializeWorldAndStart() override;
 
 public:
   // Called by the AI controller when it’s ready (BeginPlay)
-  void OnAIControllerReady(AController *Controller);
+  void OnAIControllerReady(AAIController *Controller);
+
+  UFUNCTION(BlueprintCallable)
+  void OnControllerReady(AController *Controller);
 
 private:
   void SetupPendingBattle();
@@ -34,6 +40,7 @@ private:
   bool bBattleLaunched = false;
 
   // Expected count comes from GameInstance travel state
+  UPROPERTY(VisibleAnywhere, Transient)
   int32 ExpectedControllers = 0;
 
   // Track who has arrived/ready on the new map

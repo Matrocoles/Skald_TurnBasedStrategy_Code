@@ -44,6 +44,15 @@ ASkaldGameMode::ASkaldGameMode() {
   NextSiegeID = 1;
 }
 
+void ASkaldGameMode::InitGame(const FString &Map, const FString &Options,
+                              FString &Error) {
+  Super::InitGame(Map, Options, Error);
+
+  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+    GI->SetTravelPending(false);
+  }
+}
+
 void ASkaldGameMode::BeginPlay() {
   Super::BeginPlay();
 
@@ -1509,6 +1518,9 @@ void ASkaldGameMode::CheckVictoryConditions() {
   if (RemainingPlayers == 1 && WinningPlayer) {
     OnGameOver.Broadcast(WinningPlayer);
     if (UWorld *WorldToTravel = GetWorld()) {
+      if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+        GI->SetTravelPending(true);
+      }
       WorldToTravel->ServerTravel(TEXT("EndScreen"));
     }
   }
