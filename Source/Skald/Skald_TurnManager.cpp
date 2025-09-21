@@ -398,9 +398,9 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
 
       if (CachedWorldMap) {
         for (ATerritory *Territory : CachedWorldMap->Territories) {
-          const ASkaldPlayerState *Owner =
+          const ASkaldPlayerState *TerritoryOwner =
               Territory ? Territory->OwningPlayer : nullptr;
-          if (Owner && !Owner->bIsAI) {
+          if (TerritoryOwner && !TerritoryOwner->bIsAI) {
             TravelState.HumanOwnedTerritories.AddUnique(
                 Territory->TerritoryID);
           }
