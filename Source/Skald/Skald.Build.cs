@@ -11,7 +11,6 @@ public class Skald : ModuleRules
                 PublicDependencyModuleNames.AddRange(new string[]
                 {
                         "Core",
-                        "CoreUObject",
                         "Engine",
                         "InputCore",
                         "UMG",
@@ -23,6 +22,8 @@ public class Skald : ModuleRules
 
                 PrivateDependencyModuleNames.AddRange(new string[]
                 {
+                        "CoreUObject",
+                        "Engine",
                         "Slate",
                         "SlateCore",
                         "UMG",

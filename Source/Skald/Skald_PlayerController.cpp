@@ -4,7 +4,6 @@
 #include "ChoosePlayerWidget.h"
 #include "Components/InputComponent.h"
 #include "Engine/Engine.h"
-#include "Engine/World.h"                 // UWorld
 #include "EngineUtils.h"
 #include "FighterDataLibrary.h"
 #include "FighterPawn.h"
@@ -30,8 +29,18 @@
 #include "UI/FighterSelectionWidget.h"
 #include "UI/SkaldMainHUDWidget.h"
 #include "UObject/ConstructorHelpers.h"
-#include "UObject/CoreUObjectDelegates.h"
 #include "WorldMap.h"
+
+// Portable include for FCoreUObjectDelegates across UE versions
+#if __has_include("UObject/CoreUObjectDelegates.h")
+    #include "UObject/CoreUObjectDelegates.h"
+#elif __has_include("UObject/Package.h")
+    #include "UObject/Package.h"
+#else
+    #include "UObject/UObjectGlobals.h"
+#endif
+
+#include "Engine/World.h"
 
 ASkaldPlayerController::ASkaldPlayerController() {
   TurnManager = nullptr;
@@ -159,6 +168,15 @@ void ASkaldPlayerController::InitializeChoosePlayerWidget() {
 
 void ASkaldPlayerController::BeginPlay() {
   Super::BeginPlay();
+
+  if (PostLoadMapHandle.IsValid()) {
+    FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(PostLoadMapHandle);
+    PostLoadMapHandle.Reset();
+  }
+
+  PostLoadMapHandle = FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(
+      this, &ASkaldPlayerController::HandlePostLoadMap);
+
   CacheGameReferences();
 
   if (IsLocalPlayerController() && GetLocalPlayer() != nullptr) {
@@ -182,14 +200,6 @@ void ASkaldPlayerController::BeginPlay() {
     }
     InitializeFighterSelectionIfNeeded();
     DetectBattleMap();
-
-    if (PostLoadMapHandle.IsValid()) {
-      FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(PostLoadMapHandle);
-      PostLoadMapHandle.Reset();
-    }
-
-    PostLoadMapHandle = FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(
-        this, &ASkaldPlayerController::HandlePostLoadMap);
   }
 
   TryBindWorldMap();
