@@ -22,19 +22,40 @@
 namespace {
 bool HasHumanOwnedTerritory(const ASkaldGameState *GameState,
                             const AWorldMap *WorldMap,
-                            const USkaldGameInstance *GameInstance) {
-  if (!GameState) {
-    return false;
-  }
+                            const USkaldGameInstance *GameInstance,
+                            TSet<int32> &CachedHumanTerritories,
+                            const TMap<int32, FS_Territory> *CachedTerritoryMap) {
+  const FSkaldTravelState *TravelStatePtr =
+      GameInstance ? &GameInstance->GetTravelState() : nullptr;
 
   auto IsHumanPlayerById = [GameState](int32 PlayerID) {
-    if (PlayerID <= 0) {
+    if (!GameState || PlayerID <= 0) {
       return false;
     }
     if (ASkaldPlayerState *Player = GameState->GetPlayerById(PlayerID)) {
       return !Player->bIsAI;
     }
     return false;
+  };
+
+  auto RegisterHumanTerritory = [&](int32 TerritoryID, int32 OwnerID) {
+    if (TerritoryID <= 0) {
+      return;
+    }
+
+    if (CachedHumanTerritories.Contains(TerritoryID)) {
+      return;
+    }
+
+    if (IsHumanPlayerById(OwnerID)) {
+      CachedHumanTerritories.Add(TerritoryID);
+      return;
+    }
+
+    if (TravelStatePtr && TravelStatePtr->bValid &&
+        TravelStatePtr->HumanOwnedTerritories.Contains(TerritoryID)) {
+      CachedHumanTerritories.Add(TerritoryID);
+    }
   };
 
   if (WorldMap) {
@@ -44,22 +65,26 @@ bool HasHumanOwnedTerritory(const ASkaldGameState *GameState,
       }
       const int32 OwnerID =
           Territory->OwningPlayer ? Territory->OwningPlayer->GetPlayerId() : 0;
-      if (IsHumanPlayerById(OwnerID)) {
-        return true;
-      }
+      RegisterHumanTerritory(Territory->TerritoryID, OwnerID);
     }
   }
 
   if (GameInstance) {
     for (const FS_Territory &TerritoryData :
          GameInstance->CachedWorldMapTerritories) {
-      if (IsHumanPlayerById(TerritoryData.OwnerPlayerID)) {
-        return true;
-      }
+      RegisterHumanTerritory(TerritoryData.TerritoryID,
+                             TerritoryData.OwnerPlayerID);
     }
   }
 
-  return false;
+  if (CachedTerritoryMap) {
+    for (const TPair<int32, FS_Territory> &Pair : *CachedTerritoryMap) {
+      const FS_Territory &Territory = Pair.Value;
+      RegisterHumanTerritory(Territory.TerritoryID, Territory.OwnerPlayerID);
+    }
+  }
+
+  return CachedHumanTerritories.Num() > 0;
 }
 
 ASkaldPlayerState *EnsureBattleParticipant(ASkaldGameState *GameState, UWorld *World,
@@ -146,12 +171,51 @@ void ASkald_BattleGameMode::InitGame(const FString &Map, const FString &Options,
   Super::InitGame(Map, Options, Error);
 
   ReadyControllers.Empty();
+  CachedHumanTerritoryIDs.Reset();
+  CachedTerritoryMap.Reset();
 
   if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
     GI->SetTravelPending(false);
     const FSkaldTravelState &TravelState = GI->GetTravelState();
     ExpectedControllers =
         TravelState.bValid ? TravelState.ExpectedControllers : 0;
+    if (TravelState.bValid) {
+      for (int32 TerritoryID : TravelState.HumanOwnedTerritories) {
+        CachedHumanTerritoryIDs.Add(TerritoryID);
+      }
+
+      if (TravelState.CachedTerritories.Num() > 0) {
+        CachedTerritoryMap.Reserve(TravelState.CachedTerritories.Num());
+        for (const FS_Territory &Territory : TravelState.CachedTerritories) {
+          CachedTerritoryMap.Add(Territory.TerritoryID, Territory);
+        }
+        GI->CachedWorldMapTerritories = TravelState.CachedTerritories;
+      }
+    }
+
+    if (CachedTerritoryMap.Num() == 0 &&
+        GI->CachedWorldMapTerritories.Num() > 0) {
+      CachedTerritoryMap.Reserve(GI->CachedWorldMapTerritories.Num());
+      for (const FS_Territory &Territory : GI->CachedWorldMapTerritories) {
+        CachedTerritoryMap.Add(Territory.TerritoryID, Territory);
+      }
+    }
+
+    if (CachedHumanTerritoryIDs.Num() == 0 && CachedTerritoryMap.Num() > 0) {
+      for (const TPair<int32, FS_Territory> &Pair : CachedTerritoryMap) {
+        const FS_Territory &Territory = Pair.Value;
+        if (TravelState.bValid &&
+            TravelState.HumanOwnedTerritories.Contains(Territory.TerritoryID)) {
+          CachedHumanTerritoryIDs.Add(Territory.TerritoryID);
+        }
+      }
+    }
+
+    if (CachedHumanTerritoryIDs.Num() > 0) {
+      UE_LOG(LogSkald, Log,
+             TEXT("BattleGM InitGame: Restored %d human territories from travel cache"),
+             CachedHumanTerritoryIDs.Num());
+    }
     UE_LOG(LogSkald, Log, TEXT("BattleGM InitGame: ExpectedControllers=%d"),
            ExpectedControllers);
   } else {
@@ -189,7 +253,6 @@ void ASkald_BattleGameMode::BeginPlay() {
     ExpectedControllers = 0;
   }
 
-  const FSkaldTravelState *TravelStatePtr = nullptr;
   if (!WorldMap) {
     for (TActorIterator<AWorldMap> It(GetWorld()); It; ++It) {
       WorldMap = *It;
@@ -197,22 +260,21 @@ void ASkald_BattleGameMode::BeginPlay() {
     }
   }
 
-  if (GI) {
-    TravelStatePtr = &GI->GetTravelState();
-  }
-
-  if (WorldMap && TravelStatePtr && TravelStatePtr->bValid &&
-      TravelStatePtr->HumanOwnedTerritories.Num() > 0) {
+  if (WorldMap && CachedHumanTerritoryIDs.Num() > 0) {
     int32 ReacquiredCount = 0;
     for (ATerritory *Territory : WorldMap->Territories) {
       if (Territory &&
-          TravelStatePtr->HumanOwnedTerritories.Contains(Territory->TerritoryID)) {
+          CachedHumanTerritoryIDs.Contains(Territory->TerritoryID)) {
         ++ReacquiredCount;
       }
     }
     UE_LOG(LogSkald, Log,
            TEXT("BattleGM BeginPlay: Reacquired %d of %d cached human territories"),
-           ReacquiredCount, TravelStatePtr->HumanOwnedTerritories.Num());
+           ReacquiredCount, CachedHumanTerritoryIDs.Num());
+  } else if (!WorldMap && CachedHumanTerritoryIDs.Num() > 0) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("BattleGM BeginPlay: Cached %d human territories without a world map actor"),
+           CachedHumanTerritoryIDs.Num());
   }
 
   SetupPendingBattle();
@@ -231,12 +293,13 @@ void ASkald_BattleGameMode::BeginPlay() {
     }
 
     const bool bHumanHasTerritory =
-        HasHumanOwnedTerritory(GS, WorldMap, GI);
+        HasHumanOwnedTerritory(GS, WorldMap, GI, CachedHumanTerritoryIDs,
+                               &CachedTerritoryMap);
     if (!bHumanHasTerritory) {
-      const int32 CachedCount = GI ? GI->CachedWorldMapTerritories.Num() : 0;
+      const int32 CachedCount = CachedHumanTerritoryIDs.Num();
       UE_LOG(LogSkald, Warning,
              TEXT("BeginPlay: Unable to confirm any human-owned territory after "
-                  "travel (WorldMap=%s, CachedTerritories=%d)"),
+                  "travel (WorldMap=%s, CachedHumanTerritories=%d)"),
              *GetNameSafe(WorldMap), CachedCount);
     }
   }
@@ -267,12 +330,13 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
   }
 
   const bool bHumanHasTerritory =
-      HasHumanOwnedTerritory(GS, WorldMap, GI);
+      HasHumanOwnedTerritory(GS, WorldMap, GI, CachedHumanTerritoryIDs,
+                             &CachedTerritoryMap);
   if (!bHumanHasTerritory) {
-    const int32 CachedCount = GI ? GI->CachedWorldMapTerritories.Num() : 0;
+    const int32 CachedCount = CachedHumanTerritoryIDs.Num();
     UE_LOG(LogSkald, Warning,
            TEXT("SetupPendingBattle: No human-owned territory recorded before "
-                "launch (WorldMap=%s, CachedTerritories=%d)"),
+                "launch (WorldMap=%s, CachedHumanTerritories=%d)"),
            *GetNameSafe(WorldMap), CachedCount);
   }
 

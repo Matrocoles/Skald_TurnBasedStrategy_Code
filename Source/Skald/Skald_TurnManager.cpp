@@ -437,6 +437,9 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
 
       TravelState.AttackerTerritory = SeededBattle.FromTerritoryID;
       TravelState.DefenderTerritory = SeededBattle.TargetTerritoryID;
+      if (GI->CachedWorldMapTerritories.Num() > 0) {
+        TravelState.CachedTerritories = GI->CachedWorldMapTerritories;
+      }
 
       GI->SetTravelState(TravelState);
       GI->SetTravelPending(true);

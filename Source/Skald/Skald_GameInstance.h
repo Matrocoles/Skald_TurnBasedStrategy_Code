@@ -29,6 +29,10 @@ struct FSkaldTravelState
   UPROPERTY(BlueprintReadWrite, EditAnywhere)
   int32 DefenderTerritory = -1;
 
+  /** Snapshot of the overworld territories captured prior to travel. */
+  UPROPERTY(BlueprintReadWrite, EditAnywhere)
+  TArray<FS_Territory> CachedTerritories;
+
   UPROPERTY(BlueprintReadWrite, EditAnywhere)
   bool bValid = false;
 };
