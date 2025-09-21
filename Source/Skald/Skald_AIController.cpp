@@ -2,6 +2,7 @@
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 #include "Skald.h"
+#include "Skald_BattleGameMode.h"
 #include "Skald_GameMode.h"
 #include "Skald_PlayerState.h"
 #include "Skald_TurnManager.h"
@@ -12,6 +13,17 @@
 
 namespace {
 constexpr int32 MaxAIIterations = 100;
+}
+
+void ASkaldAIController::BeginPlay() {
+  Super::BeginPlay();
+
+  if (UWorld *World = GetWorld()) {
+    if (ASkald_BattleGameMode *BattleGM =
+            World->GetAuthGameMode<ASkald_BattleGameMode>()) {
+      BattleGM->OnAIControllerReady(this);
+    }
+  }
 }
 
 void ASkaldAIController::StartTurn() { MakeAIDecision(); }

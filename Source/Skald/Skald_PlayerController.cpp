@@ -28,6 +28,7 @@
 #include "UI/DeployWidget.h"
 #include "UI/FighterSelectionWidget.h"
 #include "UI/SkaldMainHUDWidget.h"
+#include "UI/SkaldUIHelpers.h"
 #include "UObject/ConstructorHelpers.h"
 #include "WorldMap.h"
 
@@ -161,7 +162,7 @@ void ASkaldPlayerController::InitializeChoosePlayerWidget() {
   ChoosePlayerWidget->AddToViewport();
 
   // While the player is choosing their faction, restrict controls to the UI.
-  SetInputMode(FInputModeUIOnly());
+  FocusWidgetUIOnly(this, ChoosePlayerWidget);
   SetIgnoreMoveInput(true);
   SetIgnoreLookInput(true);
 }
@@ -336,9 +337,7 @@ void ASkaldPlayerController::Client_ShowFighterSelection_Implementation(
       this, &ASkaldPlayerController::HandleLockedIn);
 
   CurrentSelectionWidget->AddToViewport();
-  FInputModeUIOnly Mode;
-  SetInputMode(Mode);
-  bShowMouseCursor = true;
+  FocusWidgetUIOnly(this, CurrentSelectionWidget);
 }
 
 void ASkaldPlayerController::HandleLockedIn() {

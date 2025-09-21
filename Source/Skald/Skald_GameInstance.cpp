@@ -2,6 +2,7 @@
 
 #include "Engine/Engine.h"
 #include "Kismet/GameplayStatics.h"
+#include "Skald.h"
 
 void USkaldGameInstance::Init() {
   Super::Init();
@@ -19,6 +20,15 @@ void USkaldGameInstance::Init() {
     GEngine->OnNetworkFailure().AddUObject(
         this, &USkaldGameInstance::HandleNetworkFailure);
   }
+}
+
+void USkaldGameInstance::SetTravelState(const FSkaldTravelState &InState) {
+  TravelState = InState;
+  TravelState.bValid = true;
+  UE_LOG(LogSkald, Log,
+         TEXT("GameInstance travel state set: Expected=%d Attacker=%d Defender=%d HumanTerritories=%d"),
+         TravelState.ExpectedControllers, TravelState.AttackerTerritory,
+         TravelState.DefenderTerritory, TravelState.HumanOwnedTerritories.Num());
 }
 
 void USkaldGameInstance::SeedCombatRandomStream(int32 Seed) {
