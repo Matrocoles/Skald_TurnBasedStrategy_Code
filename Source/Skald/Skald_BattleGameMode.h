@@ -4,6 +4,8 @@
 #include "Skald_GameMode.h"
 #include "Skald_BattleGameMode.generated.h"
 
+class AController;
+
 /** GameMode dedicated to resolving grid-based battles. */
 UCLASS()
 class SKALD_API ASkald_BattleGameMode : public ASkaldGameMode {
@@ -20,7 +22,7 @@ protected:
 
 public:
   // Called by the AI controller when it’s ready (BeginPlay)
-  void OnAIControllerReady(class AAIController *AI);
+  void OnAIControllerReady(AController *Controller);
 
 private:
   void SetupPendingBattle();

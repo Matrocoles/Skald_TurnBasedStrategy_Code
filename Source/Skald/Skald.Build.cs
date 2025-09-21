@@ -11,8 +11,10 @@ public class Skald : ModuleRules
                 PublicDependencyModuleNames.AddRange(new string[]
                 {
                         "Core",
+                        "CoreUObject",
                         "Engine",
                         "InputCore",
+                        "AIModule",
                         "UMG",
                         "Slate",
                         "SlateCore",

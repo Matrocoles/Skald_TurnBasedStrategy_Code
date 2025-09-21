@@ -2,7 +2,6 @@
 
 #include "Algo/RandomShuffle.h"
 #include "Algo/Sort.h"
-#include "AIController.h"
 #include "GridBattleManager.h"
 #include "Skald.h"
 #include "Skald_GameInstance.h"
@@ -11,6 +10,9 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "FighterPawn.h"
+#include "GameFramework/Controller.h"
+#include "GameFramework/GameStateBase.h"
+#include "GameFramework/PlayerController.h"
 #include "GridOverlayComponent.h"
 #include "Territory.h"
 #include "TimerManager.h"
@@ -466,11 +468,8 @@ void ASkald_BattleGameMode::PostLogin(APlayerController *NewPlayer) {
   TryStartBattle();
 }
 
-void ASkald_BattleGameMode::OnAIControllerReady(AAIController *AI) {
-  if (AI) {
-    ReadyControllers.Add(AI);
-  }
-
+void ASkald_BattleGameMode::OnAIControllerReady(AController *Controller) {
+  ReadyControllers.Add(Controller);
   TryStartBattle();
 }
 
