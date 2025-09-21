@@ -91,7 +91,7 @@ void ULoadGameWidget::HandleLoadSlot(int32 SlotIndex)
 
         if (APlayerController* PC = GetOwningPlayer())
         {
-            PC->SetInputMode(FInputModeGameOnly());
+            UWidgetBlueprintLibrary::SetInputMode_GameOnly(PC);
             PC->bShowMouseCursor = false;
         }
 

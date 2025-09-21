@@ -1,6 +1,7 @@
 #include "Skald_PlayerController.h"
 
 #include "Blueprint/UserWidget.h"
+#include "Blueprint/WidgetBlueprintLibrary.h"
 #include "ChoosePlayerWidget.h"
 #include "Components/InputComponent.h"
 #include "Engine/Engine.h"
@@ -46,7 +47,7 @@
 ASkaldPlayerController::ASkaldPlayerController() {
   TurnManager = nullptr;
   HUDRef = nullptr;
-  MainHudWidget = nullptr;
+  MainHUD = nullptr;
   BattleHudWidget = nullptr;
   BattleResultWidget = nullptr;
   CurrentCommandMode = EBattleCommandMode::None;
@@ -59,7 +60,7 @@ ASkaldPlayerController::ASkaldPlayerController() {
 
   // Default to the native HUD widget class. This avoids loading a
   // blueprint-derived widget that may not exist or may be corrupt.
-  HUDWidgetClass = USkaldMainHUDWidget::StaticClass();
+  MainHUDClass = USkaldMainHUDWidget::StaticClass();
   BattleHUDWidgetClass = UBattleHUDWidget::StaticClass();
   VictoryWidgetClass = UBattleResultWidget::StaticClass();
 
@@ -97,46 +98,51 @@ void ASkaldPlayerController::CacheGameReferences() {
 }
 
 void ASkaldPlayerController::InitializeHUDWidget() {
-  if (!HUDWidgetClass) {
+  if (MainHUD) {
+    return;
+  }
+
+  if (!MainHUDClass) {
     UE_LOG(LogSkald, Warning,
-           TEXT("HUDWidgetClass is null; HUD will not be displayed."));
+           TEXT("MainHUDClass is null; HUD will not be displayed."));
     return;
   }
 
-  MainHudWidget = CreateWidget<USkaldMainHUDWidget>(this, HUDWidgetClass);
-  if (!MainHudWidget) {
+  MainHUD = CreateWidget<USkaldMainHUDWidget>(this, MainHUDClass);
+  if (!MainHUD) {
     return;
   }
 
-  HUDRef = MainHudWidget;
-  MainHudWidget->AddToViewport();
-  MainHudWidget->SetVisibility(ESlateVisibility::Hidden);
+  HUDRef = MainHUD;
+  MainHUD->AddToViewport();
+  MainHUD->SetIsFocusable(true);
+  MainHUD->SetVisibility(ESlateVisibility::Hidden);
 
   if (CachedGameState) {
     TArray<FS_PlayerData> Players;
     BuildPlayerDataArray(Players);
     const ASkaldPlayerState *CurrentPS = CachedGameState->GetCurrentPlayer();
     const int32 CurrentID = CurrentPS ? CurrentPS->GetPlayerId() : -1;
-    MainHudWidget->RefreshFromState(CurrentID, /*TurnNumber*/ 1,
-                                    ETurnPhase::Reinforcement, Players);
+    MainHUD->RefreshFromState(CurrentID, /*TurnNumber*/ 1,
+                              ETurnPhase::Reinforcement, Players);
   }
 
   // Ensure local player details are registered with the HUD once available.
   OnRep_PlayerState();
 
-  MainHudWidget->OnAttackRequested.AddDynamic(
+  MainHUD->OnAttackRequested.AddDynamic(
       this, &ASkaldPlayerController::HandleAttackRequested);
-  MainHudWidget->OnMoveRequested.AddDynamic(
+  MainHUD->OnMoveRequested.AddDynamic(
       this, &ASkaldPlayerController::HandleMoveRequested);
-  MainHudWidget->OnEndAttackRequested.AddDynamic(
+  MainHUD->OnEndAttackRequested.AddDynamic(
       this, &ASkaldPlayerController::HandleEndAttackRequested);
-  MainHudWidget->OnEndMovementRequested.AddDynamic(
+  MainHUD->OnEndMovementRequested.AddDynamic(
       this, &ASkaldPlayerController::HandleEndMovementRequested);
-  MainHudWidget->OnEngineeringRequested.AddDynamic(
+  MainHUD->OnEngineeringRequested.AddDynamic(
       this, &ASkaldPlayerController::HandleEngineeringRequested);
-  MainHudWidget->OnBuildSiegeRequested.AddDynamic(
+  MainHUD->OnBuildSiegeRequested.AddDynamic(
       this, &ASkaldPlayerController::HandleBuildSiegeRequested);
-  MainHudWidget->OnDigTreasureRequested.AddDynamic(
+  MainHUD->OnDigTreasureRequested.AddDynamic(
       this, &ASkaldPlayerController::HandleDigTreasureRequested);
 
   // Notify the game mode that the HUD is now ready so world start checks can
@@ -182,6 +188,7 @@ void ASkaldPlayerController::BeginPlay() {
 
   if (IsLocalPlayerController() && GetLocalPlayer() != nullptr) {
     InitializeHUDWidget();
+    ShowMainHUD();
     if (CachedGameInstance && CachedGameInstance->bIsMultiplayer &&
         !CachedGameInstance->bIsHost) {
       if (GEngine) {
@@ -212,7 +219,52 @@ void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
     PostLoadMapHandle.Reset();
   }
 
+  if (MainHUD) {
+    MainHUD->RemoveFromParent();
+    MainHUD = nullptr;
+    HUDRef = nullptr;
+  }
+
+  if (ChoosePlayerWidget) {
+    ChoosePlayerWidget->RemoveFromParent();
+    ChoosePlayerWidget = nullptr;
+  }
+
+  if (CurrentSelectionWidget) {
+    CurrentSelectionWidget->RemoveFromParent();
+    CurrentSelectionWidget = nullptr;
+  }
+
+  if (BattleHudWidget) {
+    BattleHudWidget->RemoveFromParent();
+    BattleHudWidget = nullptr;
+  }
+
+  if (BattleResultWidget) {
+    BattleResultWidget->RemoveFromParent();
+    BattleResultWidget = nullptr;
+  }
+
   Super::EndPlay(EndPlayReason);
+}
+
+void ASkaldPlayerController::ShowMainHUD() {
+  if (MainHUD) {
+    MainHUD->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+    UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
+        this, MainHUD, EMouseLockMode::DoNotLock, /*bHideCursorDuringCapture*/
+        false);
+    bShowMouseCursor = true;
+    MainHUD->SetFocus();
+  }
+}
+
+void ASkaldPlayerController::HideMainHUD() {
+  if (MainHUD) {
+    MainHUD->SetVisibility(ESlateVisibility::Collapsed);
+    UWidgetBlueprintLibrary::SetInputMode_GameOnly(this);
+    bShowMouseCursor = false;
+  }
 }
 
 void ASkaldPlayerController::TryBindWorldMap() {
@@ -237,15 +289,15 @@ void ASkaldPlayerController::TryBindWorldMap() {
 void ASkaldPlayerController::OnRep_PlayerState() {
   Super::OnRep_PlayerState();
 
-  if (!MainHudWidget) {
+  if (!MainHUD) {
     return;
   }
 
   if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
-    MainHudWidget->LocalPlayerID = PS->GetPlayerId();
-    MainHudWidget->UpdateResources(PS->Resources);
-    MainHudWidget->SyncPhaseButtons(MainHudWidget->CurrentPlayerID ==
-                                    MainHudWidget->LocalPlayerID);
+    MainHUD->LocalPlayerID = PS->GetPlayerId();
+    MainHUD->UpdateResources(PS->Resources);
+    MainHUD->SyncPhaseButtons(MainHUD->CurrentPlayerID ==
+                                    MainHUD->LocalPlayerID);
   }
 }
 
@@ -350,8 +402,7 @@ void ASkaldPlayerController::HandleLockedIn() {
   CurrentSelectionWidget->RemoveFromParent();
   CurrentSelectionWidget = nullptr;
 
-  FInputModeGameOnly Mode;
-  SetInputMode(Mode);
+  UWidgetBlueprintLibrary::SetInputMode_GameOnly(this);
   bShowMouseCursor = false;
 }
 
@@ -452,9 +503,7 @@ void ASkaldPlayerController::InitializeBattleHUD() {
 }
 
 void ASkaldPlayerController::ShowOverworldHUD() {
-  if (MainHudWidget) {
-    MainHudWidget->SetVisibility(ESlateVisibility::Visible);
-  }
+  ShowMainHUD();
 
   if (BattleHudWidget) {
     BattleHudWidget->RemoveFromParent();
@@ -463,9 +512,7 @@ void ASkaldPlayerController::ShowOverworldHUD() {
 }
 
 void ASkaldPlayerController::HideOverworldHUDForBattle() {
-  if (MainHudWidget) {
-    MainHudWidget->SetVisibility(ESlateVisibility::Collapsed);
-  }
+  HideMainHUD();
 
   InitializeBattleHUD();
 
@@ -562,9 +609,9 @@ void ASkaldPlayerController::HandlePostLoadMap(UWorld *LoadedWorld) {
 
 void ASkaldPlayerController::ShowTurnAnnouncement(const FString &PlayerName,
                                                   bool bIsMyTurn) {
-  if (MainHudWidget) {
-    MainHudWidget->ShowTurnAnnouncement(PlayerName);
-    MainHudWidget->ShowTurnMessage(bIsMyTurn);
+  if (MainHUD) {
+    MainHUD->ShowTurnAnnouncement(PlayerName);
+    MainHUD->ShowTurnMessage(bIsMyTurn);
   } else if (GEngine) {
     const FString Message = FString::Printf(TEXT("%s's Turn"), *PlayerName);
     GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Yellow, Message);
@@ -572,16 +619,20 @@ void ASkaldPlayerController::ShowTurnAnnouncement(const FString &PlayerName,
 }
 
 void ASkaldPlayerController::NotifyTurnEnded(const FString &PlayerName) {
-  if (MainHudWidget) {
-    MainHudWidget->ShowTurnEnded(PlayerName);
+  if (MainHUD) {
+    MainHUD->ShowTurnEnded(PlayerName);
   }
 }
 
 void ASkaldPlayerController::StartTurn() {
-  FInputModeGameAndUI Mode;
-  Mode.SetWidgetToFocus(nullptr);
-  Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-  SetInputMode(Mode);
+  if (MainHUD) {
+    UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
+        this, MainHUD, EMouseLockMode::DoNotLock, false);
+    MainHUD->SetFocus();
+  } else {
+    UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
+        this, nullptr, EMouseLockMode::DoNotLock, false);
+  }
   bShowMouseCursor = true;
   bEnableClickEvents = true;
   bEnableMouseOverEvents = true;
@@ -603,7 +654,8 @@ void ASkaldPlayerController::StartTurn() {
 }
 
 void ASkaldPlayerController::EndTurn() {
-  SetInputMode(FInputModeGameOnly());
+  UWidgetBlueprintLibrary::SetInputMode_GameOnly(this);
+  bShowMouseCursor = false;
   if (!EnsureTurnManager(TEXT("EndTurn"))) {
     return;
   }
@@ -1043,10 +1095,10 @@ void ASkaldPlayerController::HandleEngineeringPhase() {
   }
 
   UE_LOG(LogSkald, Log, TEXT("Engineering phase started"));
-  if (MainHudWidget) {
-    MainHudWidget->CancelAttackSelection();
-    MainHudWidget->CancelMoveSelection();
-    MainHudWidget->UpdateInitiativeText(TEXT("Engineering Phase"));
+  if (MainHUD) {
+    MainHUD->CancelAttackSelection();
+    MainHUD->CancelMoveSelection();
+    MainHUD->UpdateInitiativeText(TEXT("Engineering Phase"));
   }
 }
 
@@ -1060,10 +1112,10 @@ void ASkaldPlayerController::HandleTreasurePhase() {
   }
 
   UE_LOG(LogSkald, Log, TEXT("Treasure phase started"));
-  if (MainHudWidget) {
-    MainHudWidget->CancelAttackSelection();
-    MainHudWidget->CancelMoveSelection();
-    MainHudWidget->UpdateInitiativeText(TEXT("Treasure Phase"));
+  if (MainHUD) {
+    MainHUD->CancelAttackSelection();
+    MainHUD->CancelMoveSelection();
+    MainHUD->UpdateInitiativeText(TEXT("Treasure Phase"));
   }
 }
 
@@ -1077,10 +1129,10 @@ void ASkaldPlayerController::HandleMovementPhase() {
   }
 
   UE_LOG(LogSkald, Log, TEXT("Movement phase started"));
-  if (MainHudWidget) {
-    MainHudWidget->CancelAttackSelection();
-    MainHudWidget->BeginMoveSelection();
-    MainHudWidget->UpdateInitiativeText(TEXT("Movement Phase"));
+  if (MainHUD) {
+    MainHUD->CancelAttackSelection();
+    MainHUD->BeginMoveSelection();
+    MainHUD->UpdateInitiativeText(TEXT("Movement Phase"));
   }
 }
 
@@ -1094,9 +1146,9 @@ void ASkaldPlayerController::HandleEndTurnPhase() {
   }
 
   UE_LOG(LogSkald, Log, TEXT("EndTurn phase started"));
-  if (MainHudWidget) {
-    MainHudWidget->ShowEndingTurn();
-    MainHudWidget->UpdateInitiativeText(TEXT("End Turn Phase"));
+  if (MainHUD) {
+    MainHUD->ShowEndingTurn();
+    MainHUD->UpdateInitiativeText(TEXT("End Turn Phase"));
   }
 }
 
@@ -1110,29 +1162,29 @@ void ASkaldPlayerController::HandleRevoltPhase() {
   }
 
   UE_LOG(LogSkald, Log, TEXT("Revolt phase started"));
-  if (MainHudWidget) {
-    MainHudWidget->HideEndingTurn();
-    MainHudWidget->UpdateInitiativeText(TEXT("Revolt Phase"));
+  if (MainHUD) {
+    MainHUD->HideEndingTurn();
+    MainHUD->UpdateInitiativeText(TEXT("Revolt Phase"));
   }
 }
 
 void ASkaldPlayerController::HandleTerritorySelected(ATerritory *Terr) {
-  if (!Terr || !MainHudWidget) {
+  if (!Terr || !MainHUD) {
     return;
   }
 
   FString OwnerName = Terr->OwningPlayer ? Terr->OwningPlayer->PlayerDisplayName
                                          : TEXT("Neutral");
-  MainHudWidget->UpdateTerritoryInfo(Terr->TerritoryName, OwnerName,
+  MainHUD->UpdateTerritoryInfo(Terr->TerritoryName, OwnerName,
                                      Terr->ArmyUnits);
-  MainHudWidget->OnTerritoryClickedUI(Terr);
+  MainHUD->OnTerritoryClickedUI(Terr);
 }
 
 void ASkaldPlayerController::NotifyActionError_Implementation(
     const FString &Message) {
   UE_LOG(LogSkald, Warning, TEXT("%s"), *Message);
-  if (MainHudWidget) {
-    MainHudWidget->ShowErrorMessage(Message);
+  if (MainHUD) {
+    MainHUD->ShowErrorMessage(Message);
   } else if (GEngine) {
     GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Red, Message);
   }
@@ -1186,29 +1238,29 @@ void ASkaldPlayerController::BuildPlayerDataArray(
 }
 
 void ASkaldPlayerController::HandlePlayersUpdated() {
-  if (!MainHudWidget || !CachedGameState) {
+  if (!MainHUD || !CachedGameState) {
     return;
   }
   TArray<FS_PlayerData> Players;
   BuildPlayerDataArray(Players);
-  MainHudWidget->RefreshPlayerList(Players);
+  MainHUD->RefreshPlayerList(Players);
 
   if (ASkaldPlayerState *LocalPS = GetPlayerState<ASkaldPlayerState>()) {
-    MainHudWidget->UpdateResources(LocalPS->Resources);
+    MainHUD->UpdateResources(LocalPS->Resources);
   }
 }
 
 void ASkaldPlayerController::HandleFactionsUpdated() {
-  if (!MainHudWidget || !CachedGameState) {
+  if (!MainHUD || !CachedGameState) {
     return;
   }
 
   TArray<FS_PlayerData> Players;
   BuildPlayerDataArray(Players);
-  MainHudWidget->RefreshPlayerList(Players);
+  MainHUD->RefreshPlayerList(Players);
 
   if (ASkaldPlayerState *LocalPS = GetPlayerState<ASkaldPlayerState>()) {
-    MainHudWidget->UpdateResources(LocalPS->Resources);
+    MainHUD->UpdateResources(LocalPS->Resources);
   }
 }
 
@@ -1227,11 +1279,11 @@ void ASkaldPlayerController::HandleWorldStateChanged() {
     ShowOverworldHUD();
   }
 
-  if (!MainHudWidget) {
+  if (!MainHUD) {
     return;
   }
 
-  MainHudWidget->SetVisibility(ESlateVisibility::Visible);
+  ShowMainHUD();
 
   // Update territory info for the currently selected territory if available.
   if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
@@ -1240,7 +1292,7 @@ void ASkaldPlayerController::HandleWorldStateChanged() {
       FString OwnerName = Terr->OwningPlayer
                               ? Terr->OwningPlayer->PlayerDisplayName
                               : TEXT("Neutral");
-      MainHudWidget->UpdateTerritoryInfo(Terr->TerritoryName, OwnerName,
+      MainHUD->UpdateTerritoryInfo(Terr->TerritoryName, OwnerName,
                                          Terr->ArmyUnits);
     }
   }
@@ -1249,16 +1301,16 @@ void ASkaldPlayerController::HandleWorldStateChanged() {
   if (CachedGameState) {
     TArray<FS_PlayerData> Players;
     BuildPlayerDataArray(Players);
-    MainHudWidget->RefreshPlayerList(Players);
+    MainHUD->RefreshPlayerList(Players);
   }
 
   // Update deploy/phase banners.
   if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
-    MainHudWidget->UpdateDeployableUnits(PS->DeployableUnits);
-    MainHudWidget->UpdateResources(PS->Resources);
+    MainHUD->UpdateDeployableUnits(PS->DeployableUnits);
+    MainHUD->UpdateResources(PS->Resources);
   }
   if (TurnManager) {
-    MainHudWidget->UpdatePhaseBanner(TurnManager->GetCurrentPhase());
+    MainHUD->UpdatePhaseBanner(TurnManager->GetCurrentPhase());
   }
 }
 
@@ -1277,29 +1329,25 @@ void ASkaldPlayerController::HandleFactionLockedIn() {
     ChoosePlayerWidget = nullptr;
   }
 
-  if (MainHudWidget) {
-    MainHudWidget->SetVisibility(ESlateVisibility::Visible);
+  if (MainHUD) {
+    ShowMainHUD();
     if (CachedGameState) {
       TArray<FS_PlayerData> Players;
       BuildPlayerDataArray(Players);
-      MainHudWidget->RefreshPlayerList(Players);
+      MainHUD->RefreshPlayerList(Players);
     }
     if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
-      MainHudWidget->LocalPlayerID = PS->GetPlayerId();
-      MainHudWidget->UpdateDeployableUnits(PS->DeployableUnits);
-      MainHudWidget->UpdateResources(PS->Resources);
-      MainHudWidget->SyncPhaseButtons(MainHudWidget->CurrentPlayerID ==
-                                      MainHudWidget->LocalPlayerID);
+      MainHUD->LocalPlayerID = PS->GetPlayerId();
+      MainHUD->UpdateDeployableUnits(PS->DeployableUnits);
+      MainHUD->UpdateResources(PS->Resources);
+      MainHUD->SyncPhaseButtons(MainHUD->CurrentPlayerID ==
+                                      MainHUD->LocalPlayerID);
     }
     if (TurnManager) {
-      MainHudWidget->UpdatePhaseBanner(TurnManager->GetCurrentPhase());
+      MainHUD->UpdatePhaseBanner(TurnManager->GetCurrentPhase());
     }
   }
 
-  FInputModeGameAndUI Mode;
-  Mode.SetWidgetToFocus(nullptr);
-  Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-  SetInputMode(Mode);
   bShowMouseCursor = true;
   bEnableClickEvents = true;
   bEnableMouseOverEvents = true;
@@ -1329,10 +1377,8 @@ void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
     HideOverworldHUDForBattle();
   }
 
-  FInputModeGameAndUI Mode;
-  Mode.SetWidgetToFocus(nullptr);
-  Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-  SetInputMode(Mode);
+  UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
+      this, nullptr, EMouseLockMode::DoNotLock, false);
   bShowMouseCursor = true;
   bEnableClickEvents = true;
   bEnableMouseOverEvents = true;
@@ -1487,9 +1533,7 @@ void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,
     }
   }
 
-  if (MainHudWidget) {
-    MainHudWidget->SetVisibility(ESlateVisibility::Collapsed);
-  }
+  HideMainHUD();
 
   if (!CachedGameInstance) {
     CachedGameInstance = GetGameInstance<USkaldGameInstance>();
