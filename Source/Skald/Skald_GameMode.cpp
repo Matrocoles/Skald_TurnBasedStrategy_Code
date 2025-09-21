@@ -215,6 +215,7 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
     if (GI) {
       if (PS->PlayerDisplayName.IsEmpty()) {
         PS->PlayerDisplayName = GI->DisplayName;
+        PS->SetPlayerName(PS->PlayerDisplayName);
       }
       if (PS->Faction == ESkaldFaction::None) {
         PS->Faction = GI->Faction;
@@ -224,7 +225,8 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
     const int32 Index = GS->PlayerArray.IndexOfByKey(PS);
     if (PlayerDataArray.IsValidIndex(Index)) {
       PlayerDataArray[Index].PlayerID = PS->GetPlayerId();
-      PlayerDataArray[Index].PlayerName = PS->PlayerDisplayName;
+      PlayerDataArray[Index].PlayerName =
+          PS->GetResolvedPlayerName(TEXT("RegisterPlayer"));
       PlayerDataArray[Index].IsAI = PS->bIsAI;
       PlayerDataArray[Index].Faction = PS->Faction;
       PlayerDataArray[Index].Resources = PS->Resources;
@@ -369,6 +371,7 @@ void ASkaldGameMode::PopulateAIPlayers() {
     AIState->bIsAI = true;
     AIState->PlayerDisplayName =
         FString::Printf(TEXT("AI_%d"), GS->PlayerArray.Num());
+    AIState->SetPlayerName(AIState->PlayerDisplayName);
 
     TArray<ESkaldFaction> Taken;
     for (APlayerState *ExistingPS : GS->PlayerArray) {
@@ -441,7 +444,8 @@ void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
   PS->bHasLockedIn = true;
 
   UE_LOG(LogSkald, Log, TEXT("HandlePlayerLockedIn: Player=%s bIsAI=%d"),
-         *PS->PlayerDisplayName, PS->bIsAI ? 1 : 0);
+         *PS->GetResolvedPlayerName(TEXT("HandlePlayerLockedIn")),
+         PS->bIsAI ? 1 : 0);
   ASkaldGameState *GS = GetGameState<ASkaldGameState>();
   UE_LOG(LogSkald, Log,
          TEXT("HandlePlayerLockedIn: TurnManager=%s ControllerCount=%d "
@@ -503,7 +507,8 @@ void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
         return Data.PlayerID == PS->GetPlayerId();
       });
   if (PlayerData) {
-    PlayerData->PlayerName = PS->PlayerDisplayName;
+    PlayerData->PlayerName =
+        PS->GetResolvedPlayerName(TEXT("RegisterPlayer_PlayerData"));
     PlayerData->Faction = PS->Faction;
   }
 
@@ -632,7 +637,8 @@ void ASkaldGameMode::RefreshHUDs() {
     if (ASkaldPlayerState *SPS = Cast<ASkaldPlayerState>(PSBase)) {
       FS_PlayerData Data;
       Data.PlayerID = SPS->GetPlayerId();
-      Data.PlayerName = SPS->PlayerDisplayName;
+      Data.PlayerName =
+          SPS->GetResolvedPlayerName(TEXT("RefreshHUDs_Player"));
       Data.IsAI = SPS->bIsAI;
       Data.Faction = SPS->Faction;
       Data.Resources = SPS->Resources;
@@ -918,6 +924,7 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
     }
     PS->SetPlayerId(PlayerSave.PlayerID);
     PS->PlayerDisplayName = PlayerSave.PlayerName;
+    PS->SetPlayerName(PlayerSave.PlayerName);
     PS->Faction = PlayerSave.Faction;
     PS->Resources = PlayerSave.Resources;
     if (GS) {
@@ -1000,6 +1007,9 @@ void ASkaldGameMode::BeginArmyPlacementPhase() {
     return;
   }
 
+  GetWorldTimerManager().ClearTimer(ArmyPlacementFailsafeHandle);
+  bArmyPlacementFailsafeTriggered = false;
+
   // Ensure controllers are sorted before placement begins and set phase.
   TurnManager->SortControllersByInitiative();
   TurnManager->StartArmyPlacementPhase();
@@ -1080,6 +1090,8 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
     return;
   }
 
+  GetWorldTimerManager().ClearTimer(ArmyPlacementFailsafeHandle);
+
   const TArray<ASkaldPlayerController *> Controllers =
       TurnManager->GetControllers();
   const int32 NumControllers = Controllers.Num();
@@ -1128,13 +1140,25 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
     }
 
     // Announce whose placement turn it is.
-    const FString PlayerName = PS->PlayerDisplayName;
+    const FString PlayerName =
+        PS->GetResolvedPlayerName(TEXT("AdvanceArmyPlacement_Announcement"));
     for (ASkaldPlayerController *Controller : Controllers) {
       const bool bIsActive = Controller == PC;
       Controller->ShowTurnAnnouncement(PlayerName, bIsActive);
       if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
         HUD->UpdateTurnBanner(PS->GetPlayerId(), 1);
       }
+    }
+
+    if (PS->bIsAI) {
+      WorldMap->AutoPlaceUnitsForAI(PS);
+      TurnManager->BroadcastDeployableUnits(PS);
+      bArmyPlacementFailsafeTriggered = false;
+      TurnManager->EndCurrentPhase();
+      GetWorldTimerManager().SetTimer(ArmyPlacementFailsafeHandle, this,
+                                      &ASkaldGameMode::HandleArmyPlacementFailsafe,
+                                      2.0f, false);
+      return;
     }
 
     // Hand control to the active player (AI or human) to deploy units.
@@ -1149,6 +1173,26 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
   ArmyPlacementLeader.Reset();
   bTurnsStarted = true;
   TurnManager->StartTurns(StartingController);
+}
+
+void ASkaldGameMode::HandleArmyPlacementFailsafe() {
+  GetWorldTimerManager().ClearTimer(ArmyPlacementFailsafeHandle);
+
+  if (!TurnManager) {
+    return;
+  }
+
+  if (TurnManager->GetCurrentPhase() != ETurnPhase::ArmyPlacement) {
+    return;
+  }
+
+  if (!bArmyPlacementFailsafeTriggered) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("Army placement failsafe triggered; forcing EndCurrentPhase"));
+    bArmyPlacementFailsafeTriggered = true;
+  }
+
+  TurnManager->EndCurrentPhase();
 }
 
 bool ASkaldGameMode::InitializeWorld() {
@@ -1377,9 +1421,10 @@ bool ASkaldGameMode::InitializeWorld() {
   }
 
   if (HighestPS) {
-    const FString Message =
-        FString::Printf(TEXT("%s wins initiative with a roll of %d"),
-                        *HighestPS->PlayerDisplayName, HighestRoll);
+    const FString Message = FString::Printf(
+        TEXT("%s wins initiative with a roll of %d"),
+        *HighestPS->GetResolvedPlayerName(TEXT("InitializeWorld_Initiative")),
+        HighestRoll);
     for (FConstPlayerControllerIterator It =
              GetWorld()->GetPlayerControllerIterator();
          It; ++It) {

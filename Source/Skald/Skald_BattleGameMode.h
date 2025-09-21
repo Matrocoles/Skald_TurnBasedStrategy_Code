@@ -33,6 +33,7 @@ public:
   void OnControllerReady(AController *Controller);
 
 private:
+  void BootstrapFromTravelState();
   void SetupPendingBattle();
   void AutoCommitAIArmy(ASkaldPlayerState *PlayerState, int32 Budget) const;
   void SpawnFighterSide(const TArray<FFighterDefinition> &Roster, bool bAsAttacker);
@@ -53,5 +54,14 @@ private:
 
   /** Snapshot of overworld territory data captured prior to travel. */
   TMap<int32, FS_Territory> CachedTerritoryMap;
+
+  /** Timer used to defer readiness checks until all PlayerStates exist. */
+  FTimerHandle TravelBootstrapHandle;
+
+  /** True once SetupPendingBattle has executed for the current travel. */
+  bool bPendingBattleSetupComplete = false;
+
+  /** Ensure we only log the cache restoration message once. */
+  bool bLoggedTravelCache = false;
 };
 

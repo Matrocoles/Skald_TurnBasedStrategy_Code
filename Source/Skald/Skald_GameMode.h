@@ -175,6 +175,12 @@ private:
   /** Controller that opened army placement with the highest initiative roll. */
   TWeakObjectPtr<ASkaldPlayerController> ArmyPlacementLeader;
 
+  /** Failsafe to ensure AI army placement advances the phase. */
+  FTimerHandle ArmyPlacementFailsafeHandle;
+
+  /** Guard to avoid logging the failsafe warning multiple times. */
+  bool bArmyPlacementFailsafeTriggered = false;
+
   /** Register a newly connected player and update player data. */
   void RegisterPlayer(ASkaldPlayerController *PC);
 
@@ -186,4 +192,7 @@ private:
 
   /** Remove invalid player states before re-registering controllers. */
   void CleanupStalePlayerStates();
+
+  /** Callback fired by the failsafe timer if the AI does not advance. */
+  void HandleArmyPlacementFailsafe();
 };

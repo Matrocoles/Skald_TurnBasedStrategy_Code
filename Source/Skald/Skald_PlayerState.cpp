@@ -2,6 +2,7 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Net/UnrealNetwork.h"
+#include "Skald.h"
 #include "Skald_GameState.h"
 #include "Skald_PlayerController.h"
 #include "Territory.h"
@@ -9,8 +10,24 @@
 
 ASkaldPlayerState::ASkaldPlayerState()
     : DeployableUnits(0), InitiativeRoll(0), Resources(0),
-      PlayerDisplayName(TEXT("Player")), Faction(ESkaldFaction::None),
-      bIsAI(false), bHasLockedIn(false), IsEliminated(false) {}
+      PlayerDisplayName(TEXT("")), Faction(ESkaldFaction::None), bIsAI(false),
+      bHasLockedIn(false), IsEliminated(false) {}
+
+FString ASkaldPlayerState::GetResolvedPlayerName(const TCHAR *Context) const {
+  FString Name = GetPlayerName();
+  if (Name.IsEmpty()) {
+    Name = PlayerDisplayName;
+  }
+
+  if (Name.IsEmpty()) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("%s: PlayerState %s missing assigned name"), Context,
+           *GetName());
+    Name = TEXT("Unknown");
+  }
+
+  return Name;
+}
 
 void ASkaldPlayerState::GetLifetimeReplicatedProps(
     TArray<FLifetimeProperty> &OutLifetimeProps) const {

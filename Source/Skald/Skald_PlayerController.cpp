@@ -44,6 +44,17 @@
 
 #include "Engine/World.h"
 
+namespace {
+FString ResolvePlayerName(const ASkaldPlayerState *PlayerState,
+                          const TCHAR *Context) {
+  if (!PlayerState) {
+    return TEXT("Neutral");
+  }
+
+  return PlayerState->GetResolvedPlayerName(Context);
+}
+}
+
 ASkaldPlayerController::ASkaldPlayerController() {
   TurnManager = nullptr;
   HUDRef = nullptr;
@@ -190,9 +201,15 @@ void ASkaldPlayerController::BeginPlay() {
 
   CacheGameReferences();
 
+  DetectBattleMap();
+
   if (IsLocalPlayerController() && GetLocalPlayer() != nullptr) {
-    InitializeHUDWidget();
-    ShowMainHUD();
+    if (!bIsBattleMap) {
+      InitializeHUDWidget();
+      ShowMainHUD();
+    } else {
+      UE_LOG(LogSkald, Log, TEXT("[HUD] Skipping MainHUD in BattleGameMode"));
+    }
     if (CachedGameInstance && CachedGameInstance->bIsMultiplayer &&
         !CachedGameInstance->bIsHost) {
       if (GEngine) {
@@ -211,7 +228,6 @@ void ASkaldPlayerController::BeginPlay() {
       HandleFactionLockedIn();
     }
     InitializeFighterSelectionIfNeeded();
-    DetectBattleMap();
   }
 
   TryBindWorldMap();
@@ -436,9 +452,18 @@ void ASkaldPlayerController::ShowFighterSelectionUI(int32 MaxBudget,
   FighterSelectionWidget->MaxCost = MaxBudget;
   FighterSelectionWidget->ChosenFighters.Reset();
   FighterSelectionWidget->CurrentCost = 0;
-  FighterSelectionWidget->AvailableFighters =
+  const TArray<FFighterDefinition> Available =
       UFighterDataLibrary::GetFightersForFaction(this, Faction);
-  FighterSelectionWidget->PopulateFighterList();
+  FighterSelectionWidget->SetAvailableFighters(Available);
+  if (Available.Num() > 0) {
+    UE_LOG(LogSkald, Log,
+           TEXT("SkaldUI: [FighterSelection] Populated %d fighter entries."),
+           Available.Num());
+  } else {
+    UE_LOG(LogSkald, Warning,
+           TEXT("SkaldUI: [FighterSelection] No fighters available for faction %d"),
+           static_cast<int32>(Faction));
+  }
   FighterSelectionWidget->UpdateCostDisplay();
 
   FighterSelectionWidget->AddToViewport(30);
@@ -572,9 +597,6 @@ void ASkaldPlayerController::HideOverworldHUDForBattle() {
 
   bBattleHUDVisible = false;
   bBattleHUDReadyToShow = false;
-
-  InitializeBattleHUD();
-
   if (BattleHudWidget) {
     BattleHudWidget->SetVisibility(ESlateVisibility::Collapsed);
   }
@@ -678,9 +700,9 @@ void ASkaldPlayerController::DetectBattleMap() {
 
   if (bIsBattleMap) {
     HideOverworldHUDForBattle();
-    bBattleHUDReadyToShow = true;
     if (CachedGameInstance && CachedGameInstance->GridBattleManager &&
-        CachedGameInstance->GridBattleManager->GetActiveFighter()) {
+        CachedGameInstance->GridBattleManager->GetActiveFighter() &&
+        bBattleHUDReadyToShow) {
       EnsureBattleHUDVisible();
     }
   } else {
@@ -758,18 +780,9 @@ void ASkaldPlayerController::EndPhase() {
       PS->DeployableUnits = 0;
       TurnManager->BroadcastDeployableUnits(PS);
     }
-
-    if (!CachedGameMode) {
-      CachedGameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
-    }
-
-    if (CachedGameMode) {
-      CachedGameMode->AdvanceArmyPlacement();
-    }
-    return;
   }
 
-  TurnManager->AdvancePhase();
+  TurnManager->EndCurrentPhase();
 }
 
 bool ASkaldPlayerController::ValidateAttack(int32 FromID, int32 ToID,
@@ -863,12 +876,14 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
     Battle.IsCapitalAttack = Target->bIsCapital;
     if (AttackerPS) {
       Battle.AttackerFaction = AttackerPS->Faction;
-      Battle.AttackerDisplayName = AttackerPS->PlayerDisplayName;
+      Battle.AttackerDisplayName =
+          ResolvePlayerName(AttackerPS, TEXT("ServerHandleAttack_Attacker"));
       Battle.bAttackerIsAI = AttackerPS->bIsAI;
     }
     if (DefenderPS) {
       Battle.DefenderFaction = DefenderPS->Faction;
-      Battle.DefenderDisplayName = DefenderPS->PlayerDisplayName;
+      Battle.DefenderDisplayName =
+          ResolvePlayerName(DefenderPS, TEXT("ServerHandleAttack_Defender"));
       Battle.bDefenderIsAI = DefenderPS->bIsAI;
     }
     if (bUseSiege && CachedGameMode) {
@@ -930,9 +945,8 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
     for (ASkaldPlayerController *Controller : TurnManager->GetControllers()) {
       if (USkaldMainHUDWidget *HUD =
               Controller ? Controller->GetHUDWidget() : nullptr) {
-        FString OwnerName = Target->OwningPlayer
-                                ? Target->OwningPlayer->PlayerDisplayName
-                                : TEXT("Neutral");
+        const FString OwnerName =
+            ResolvePlayerName(Target->OwningPlayer, TEXT("ServerHandleAttack_Update"));
         HUD->UpdateTerritoryInfo(Target->TerritoryName, OwnerName,
                                  Target->ArmyUnits);
       }
@@ -1000,14 +1014,12 @@ void ASkaldPlayerController::ServerHandleMove_Implementation(int32 FromID,
     for (ASkaldPlayerController *Controller : TurnManager->GetControllers()) {
       if (USkaldMainHUDWidget *HUD =
               Controller ? Controller->GetHUDWidget() : nullptr) {
-        FString SourceOwner = Source->OwningPlayer
-                                  ? Source->OwningPlayer->PlayerDisplayName
-                                  : TEXT("Neutral");
+        const FString SourceOwner =
+            ResolvePlayerName(Source->OwningPlayer, TEXT("ServerHandleMove_Source"));
         HUD->UpdateTerritoryInfo(Source->TerritoryName, SourceOwner,
                                  Source->ArmyUnits);
-        FString TargetOwner = Target->OwningPlayer
-                                  ? Target->OwningPlayer->PlayerDisplayName
-                                  : TEXT("Neutral");
+        const FString TargetOwner =
+            ResolvePlayerName(Target->OwningPlayer, TEXT("ServerHandleMove_Target"));
         HUD->UpdateTerritoryInfo(Target->TerritoryName, TargetOwner,
                                  Target->ArmyUnits);
       }
@@ -1257,8 +1269,8 @@ void ASkaldPlayerController::HandleTerritorySelected(ATerritory *Terr) {
     return;
   }
 
-  FString OwnerName = Terr->OwningPlayer ? Terr->OwningPlayer->PlayerDisplayName
-                                         : TEXT("Neutral");
+  const FString OwnerName =
+      ResolvePlayerName(Terr->OwningPlayer, TEXT("HandleTerritorySelected"));
   MainHUD->UpdateTerritoryInfo(Terr->TerritoryName, OwnerName,
                                      Terr->ArmyUnits);
   MainHUD->OnTerritoryClickedUI(Terr);
@@ -1311,7 +1323,7 @@ void ASkaldPlayerController::BuildPlayerDataArray(
     if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
       FS_PlayerData Data;
       Data.PlayerID = PS->GetPlayerId();
-      Data.PlayerName = PS->PlayerDisplayName;
+      Data.PlayerName = PS->GetResolvedPlayerName(TEXT("BuildPlayerDataArray"));
       Data.IsAI = PS->bIsAI;
       Data.Faction = PS->Faction;
       Data.Resources = PS->Resources;
@@ -1374,9 +1386,8 @@ void ASkaldPlayerController::HandleWorldStateChanged() {
   if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
           GetWorld(), AWorldMap::StaticClass()))) {
     if (ATerritory *Terr = WorldMap->SelectedTerritory) {
-      FString OwnerName = Terr->OwningPlayer
-                              ? Terr->OwningPlayer->PlayerDisplayName
-                              : TEXT("Neutral");
+      const FString OwnerName = ResolvePlayerName(
+          Terr->OwningPlayer, TEXT("HandleWorldStateChanged"));
       MainHUD->UpdateTerritoryInfo(Terr->TerritoryName, OwnerName,
                                          Terr->ArmyUnits);
     }
