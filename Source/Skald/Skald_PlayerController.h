@@ -161,6 +161,11 @@ protected:
 
   virtual void SetupInputComponent() override;
 
+  UFUNCTION()
+  void HandlePostLoadMap(UWorld *LoadedWorld);
+
+  FDelegateHandle PostLoadMapHandle;
+
   /** Begin selecting a move destination. */
   UFUNCTION()
   void BeginMoveMode();
@@ -329,13 +334,6 @@ private:
 
   /** Timer used to poll for the world map actor until it exists. */
   FTimerHandle WorldMapSearchHandle;
-
-  void RegisterPostLoadMapDelegate();
-  void UnregisterPostLoadMapDelegate();
-
-  void HandlePostLoadMap(UWorld *LoadedWorld);
-
-  FDelegateHandle PostLoadMapHandle;
 
   /** Whether the current map is a battle map. */
   UPROPERTY(BlueprintReadOnly, Category = "Turn",
