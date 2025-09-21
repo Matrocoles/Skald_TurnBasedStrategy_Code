@@ -62,7 +62,10 @@ ASkaldPlayerController::ASkaldPlayerController() {
   // blueprint-derived widget that may not exist or may be corrupt.
   MainHUDClass = USkaldMainHUDWidget::StaticClass();
   BattleHUDWidgetClass = UBattleHUDWidget::StaticClass();
+  FighterSelectionWidgetClass = UFighterSelectionWidget::StaticClass();
   VictoryWidgetClass = UBattleResultWidget::StaticClass();
+  bBattleHUDVisible = false;
+  bBattleHUDReadyToShow = false;
 
   static ConstructorHelpers::FClassFinder<UChoosePlayerWidget> ChooseBP(
       TEXT("/Game/Blueprints/UI/Skald_ChoosePlayerWidget"));
@@ -231,9 +234,9 @@ void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
     ChoosePlayerWidget = nullptr;
   }
 
-  if (CurrentSelectionWidget) {
-    CurrentSelectionWidget->RemoveFromParent();
-    CurrentSelectionWidget = nullptr;
+  if (FighterSelectionWidget) {
+    FighterSelectionWidget->RemoveFromParent();
+    FighterSelectionWidget = nullptr;
   }
 
   if (BattleHudWidget) {
@@ -358,53 +361,96 @@ void ASkaldPlayerController::SetTurnManager(ATurnManager *Manager) {
   }
 }
 
-void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {}
-
-void ASkaldPlayerController::Client_ShowFighterSelection_Implementation(
-    int32 MaxBudget, ESkaldFaction Faction) {
+void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
   if (!IsLocalController()) {
     return;
   }
 
-  if (!CurrentSelectionWidget) {
-    TSubclassOf<UFighterSelectionWidget> WidgetClass =
-        UFighterSelectionWidget::StaticClass();
-    CurrentSelectionWidget =
-        CreateWidget<UFighterSelectionWidget>(this, WidgetClass);
+  if (!CachedGameInstance) {
+    CachedGameInstance = GetGameInstance<USkaldGameInstance>();
   }
-  if (!CurrentSelectionWidget) {
+
+  const bool bOnBattleMap =
+      bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap);
+  if (!bOnBattleMap) {
+    if (FighterSelectionWidget) {
+      FighterSelectionWidget->RemoveFromParent();
+      FighterSelectionWidget = nullptr;
+    }
     return;
   }
 
-  CurrentSelectionWidget->PlayerFaction = Faction;
-  CurrentSelectionWidget->MaxCost = MaxBudget;
-  CurrentSelectionWidget->ChosenFighters.Reset();
-  CurrentSelectionWidget->CurrentCost = 0;
-  CurrentSelectionWidget->AvailableFighters =
-      UFighterDataLibrary::GetFightersForFaction(this, Faction);
-  CurrentSelectionWidget->PopulateFighterList();
-  CurrentSelectionWidget->UpdateCostDisplay();
+  ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
+  if (!PS || PS->bArmyLockedIn) {
+    return;
+  }
 
-  CurrentSelectionWidget->OnLockedIn.RemoveAll(this);
-  CurrentSelectionWidget->OnLockedIn.AddDynamic(
-      this, &ASkaldPlayerController::HandleLockedIn);
+  if (!CachedGameInstance) {
+    return;
+  }
 
-  CurrentSelectionWidget->AddToViewport();
-  FocusWidgetUIOnly(this, CurrentSelectionWidget);
+  const FS_BattlePayload &Battle = CachedGameInstance->PendingBattle;
+  const int32 PlayerID = PS->GetPlayerId();
+  const bool bIsParticipant =
+      Battle.AttackerPlayerID == PlayerID || Battle.DefenderPlayerID == PlayerID;
+
+  if (!bIsParticipant || PS->PendingArmyBudget <= 0) {
+    return;
+  }
+
+  if (!FighterSelectionWidget || !FighterSelectionWidget->IsInViewport()) {
+    ShowFighterSelectionUI(PS->PendingArmyBudget, PS->Faction);
+  }
 }
 
-void ASkaldPlayerController::HandleLockedIn() {
-  if (!CurrentSelectionWidget) {
+void ASkaldPlayerController::ShowFighterSelectionUI(int32 MaxBudget,
+                                                    ESkaldFaction Faction) {
+  if (!IsLocalController()) {
     return;
   }
 
-  Server_CommitArmy(CurrentSelectionWidget->ChosenFighters);
+  HideOverworldHUDForBattle();
+  bBattleHUDReadyToShow = false;
 
-  CurrentSelectionWidget->RemoveFromParent();
-  CurrentSelectionWidget = nullptr;
+  if (!FighterSelectionWidgetClass) {
+    FighterSelectionWidgetClass = UFighterSelectionWidget::StaticClass();
+  }
 
-  UWidgetBlueprintLibrary::SetInputMode_GameOnly(this);
-  bShowMouseCursor = false;
+  if (!FighterSelectionWidget ||
+      FighterSelectionWidget->GetClass() != FighterSelectionWidgetClass) {
+    if (FighterSelectionWidget) {
+      FighterSelectionWidget->RemoveFromParent();
+    }
+    FighterSelectionWidget =
+        CreateWidget<UFighterSelectionWidget>(this, FighterSelectionWidgetClass);
+  }
+
+  if (!FighterSelectionWidget) {
+    return;
+  }
+
+  FighterSelectionWidget->OnLockedIn.RemoveAll(this);
+  FighterSelectionWidget->OnLockedIn.AddDynamic(
+      this, &ASkaldPlayerController::HandleFighterSelectionLockedIn);
+  FighterSelectionWidget->PlayerFaction = Faction;
+  FighterSelectionWidget->MaxCost = MaxBudget;
+  FighterSelectionWidget->ChosenFighters.Reset();
+  FighterSelectionWidget->CurrentCost = 0;
+  FighterSelectionWidget->AvailableFighters =
+      UFighterDataLibrary::GetFightersForFaction(this, Faction);
+  FighterSelectionWidget->PopulateFighterList();
+  FighterSelectionWidget->UpdateCostDisplay();
+
+  FighterSelectionWidget->AddToViewport(30);
+  FocusWidgetUIOnly(this, FighterSelectionWidget);
+  bShowMouseCursor = true;
+  bEnableClickEvents = true;
+  bEnableMouseOverEvents = true;
+}
+
+void ASkaldPlayerController::Client_ShowFighterSelection_Implementation(
+    int32 MaxBudget, ESkaldFaction Faction) {
+  ShowFighterSelectionUI(MaxBudget, Faction);
 }
 
 bool ASkaldPlayerController::Server_CommitArmy_Validate(
@@ -478,6 +524,7 @@ void ASkaldPlayerController::InitializeBattleHUD() {
         CreateWidget<UBattleHUDWidget>(this, BattleHUDWidgetClass);
     if (BattleHudWidget) {
       BattleHudWidget->AddToViewport(20);
+      BattleHudWidget->SetVisibility(ESlateVisibility::Collapsed);
 
       // Hook HUD buttons to controller modes
       BattleHudWidget->OnMovePressed.AddDynamic(
@@ -510,16 +557,50 @@ void ASkaldPlayerController::ShowOverworldHUD() {
     BattleHudWidget->RemoveFromParent();
     BattleHudWidget = nullptr;
   }
+
+  if (FighterSelectionWidget) {
+    FighterSelectionWidget->RemoveFromParent();
+    FighterSelectionWidget = nullptr;
+  }
+
+  bBattleHUDVisible = false;
+  bBattleHUDReadyToShow = false;
 }
 
 void ASkaldPlayerController::HideOverworldHUDForBattle() {
   HideMainHUD();
 
+  bBattleHUDVisible = false;
+  bBattleHUDReadyToShow = false;
+
   InitializeBattleHUD();
 
   if (BattleHudWidget) {
-    BattleHudWidget->SetVisibility(ESlateVisibility::Visible);
+    BattleHudWidget->SetVisibility(ESlateVisibility::Collapsed);
   }
+}
+
+void ASkaldPlayerController::EnsureBattleHUDVisible() {
+  if (!IsLocalController()) {
+    return;
+  }
+
+  bBattleHUDReadyToShow = false;
+
+  InitializeBattleHUD();
+  if (!BattleHudWidget) {
+    return;
+  }
+
+  BattleHudWidget->SetVisibility(ESlateVisibility::Visible);
+  bBattleHUDVisible = true;
+
+  UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
+      this, BattleHudWidget, EMouseLockMode::DoNotLock, false);
+  bShowMouseCursor = true;
+  bEnableClickEvents = true;
+  bEnableMouseOverEvents = true;
+  DefaultMouseCaptureMode = EMouseCaptureMode::NoCapture;
 }
 
 UGridOverlayComponent *ASkaldPlayerController::FindGridOverlay() const {
@@ -538,6 +619,9 @@ void ASkaldPlayerController::HandleActiveFighterChanged(
     AFighterPawn *NewFighter) {
   if (BattleHudWidget) {
     BattleHudWidget->BindToFighter(NewFighter);
+  }
+  if (NewFighter && bBattleHUDReadyToShow && !bBattleHUDVisible) {
+    EnsureBattleHUDVisible();
   }
   // Clear previous highlights when the turn swaps
   if (UGridOverlayComponent *Grid = FindGridOverlay()) {
@@ -594,6 +678,11 @@ void ASkaldPlayerController::DetectBattleMap() {
 
   if (bIsBattleMap) {
     HideOverworldHUDForBattle();
+    bBattleHUDReadyToShow = true;
+    if (CachedGameInstance && CachedGameInstance->GridBattleManager &&
+        CachedGameInstance->GridBattleManager->GetActiveFighter()) {
+      EnsureBattleHUDVisible();
+    }
   } else {
     ShowOverworldHUD();
   }
@@ -604,8 +693,8 @@ void ASkaldPlayerController::HandlePostLoadMap(UWorld *LoadedWorld) {
     return;
   }
 
-  InitializeFighterSelectionIfNeeded();
   DetectBattleMap();
+  InitializeFighterSelectionIfNeeded();
 }
 
 void ASkaldPlayerController::ShowTurnAnnouncement(const FString &PlayerName,
@@ -1233,16 +1322,17 @@ void ASkaldPlayerController::BuildPlayerDataArray(
 }
 
 void ASkaldPlayerController::HandlePlayersUpdated() {
-  if (!MainHUD || !CachedGameState) {
-    return;
-  }
-  TArray<FS_PlayerData> Players;
-  BuildPlayerDataArray(Players);
-  MainHUD->RefreshPlayerList(Players);
+  if (CachedGameState && MainHUD) {
+    TArray<FS_PlayerData> Players;
+    BuildPlayerDataArray(Players);
+    MainHUD->RefreshPlayerList(Players);
 
-  if (ASkaldPlayerState *LocalPS = GetPlayerState<ASkaldPlayerState>()) {
-    MainHUD->UpdateResources(LocalPS->Resources);
+    if (ASkaldPlayerState *LocalPS = GetPlayerState<ASkaldPlayerState>()) {
+      MainHUD->UpdateResources(LocalPS->Resources);
+    }
   }
+
+  InitializeFighterSelectionIfNeeded();
 }
 
 void ASkaldPlayerController::HandleFactionsUpdated() {
@@ -1362,15 +1452,20 @@ void ASkaldPlayerController::HandleFactionLockedIn() {
 }
 
 void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
-  if (FighterSelectionWidget) {
-    UFighterSelectionWidget *Selection = FighterSelectionWidget;
-    Selection->OnLockedIn.RemoveDynamic(
-        this, &ASkaldPlayerController::HandleFighterSelectionLockedIn);
-    Selection->RemoveFromParent();
-    Server_CommitArmy(Selection->ChosenFighters);
-    FighterSelectionWidget = nullptr;
-    HideOverworldHUDForBattle();
+  if (!FighterSelectionWidget) {
+    return;
   }
+
+  UFighterSelectionWidget *Selection = FighterSelectionWidget;
+  Selection->OnLockedIn.RemoveDynamic(
+      this, &ASkaldPlayerController::HandleFighterSelectionLockedIn);
+  const TArray<FFighterDefinition> LockedFighters = Selection->ChosenFighters;
+  Selection->RemoveFromParent();
+  FighterSelectionWidget = nullptr;
+
+  Server_CommitArmy(LockedFighters);
+
+  bBattleHUDReadyToShow = true;
 
   UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
       this, nullptr, EMouseLockMode::DoNotLock, false);
@@ -1380,6 +1475,14 @@ void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
   DefaultMouseCaptureMode = EMouseCaptureMode::NoCapture;
   SetIgnoreMoveInput(false);
   SetIgnoreLookInput(false);
+
+  if (!CachedGameInstance) {
+    CachedGameInstance = GetGameInstance<USkaldGameInstance>();
+  }
+  if (CachedGameInstance && CachedGameInstance->GridBattleManager &&
+      CachedGameInstance->GridBattleManager->GetActiveFighter()) {
+    EnsureBattleHUDVisible();
+  }
 }
 
 void ASkaldPlayerController::SetupInputComponent() {

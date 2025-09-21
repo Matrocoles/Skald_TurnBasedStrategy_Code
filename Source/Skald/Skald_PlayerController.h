@@ -100,6 +100,10 @@ protected:
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "UI")
   TSubclassOf<UBattleHUDWidget> BattleHUDWidgetClass;
 
+  /** Widget class used for the fighter selection flow before battles. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "UI")
+  TSubclassOf<UFighterSelectionWidget> FighterSelectionWidgetClass;
+
   /** Widget class used for the player faction selection screen. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "UI")
   TSubclassOf<UChoosePlayerWidget> ChoosePlayerWidgetClass;
@@ -315,12 +319,6 @@ protected:
   TObjectPtr<ATurnManager> TurnManager;
 
 private:
-  UPROPERTY()
-  class UFighterSelectionWidget *CurrentSelectionWidget;
-
-  UFUNCTION()
-  void HandleLockedIn();
-
   /** Cache references to key game singletons and bind delegates. */
   void CacheGameReferences();
 
@@ -341,6 +339,12 @@ private:
   /** Timer used to poll for the world map actor until it exists. */
   FTimerHandle WorldMapSearchHandle;
 
+  /** Whether the battle HUD is currently visible. */
+  bool bBattleHUDVisible;
+
+  /** Whether we should display the battle HUD as soon as fighters activate. */
+  bool bBattleHUDReadyToShow;
+
   /** Whether the current map is a battle map. */
   UPROPERTY(BlueprintReadOnly, Category = "Turn",
             meta = (AllowPrivateAccess = "true"))
@@ -356,6 +360,12 @@ private:
 
   UFUNCTION(Client, Reliable)
   void NotifyActionError(const FString &Message);
+
+  /** Make sure the battle HUD is created and visible. */
+  void EnsureBattleHUDVisible();
+
+  /** Spawn or refresh the fighter selection UI. */
+  void ShowFighterSelectionUI(int32 MaxBudget, ESkaldFaction Faction);
 
   /** Ensure a valid TurnManager is available, attempting reacquisition if
    * needed. */
