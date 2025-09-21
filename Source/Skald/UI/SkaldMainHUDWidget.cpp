@@ -819,10 +819,8 @@ void USkaldMainHUDWidget::HandleDeployClicked() {
   if (ActiveDeployWidget) {
     ActiveDeployWidget->Setup(Territory, PS, this, PS->DeployableUnits);
     ActiveDeployWidget->AddToViewport();
-    if (APlayerController *PC = GetOwningPlayer()) {
-    PC = GetOwningPlayer();
-    if (PC) {
-      FocusWidgetUIOnly(PC, ActiveDeployWidget);
+    if (APlayerController *FocusPC = GetOwningPlayer()) {
+      FocusWidgetUIOnly(FocusPC, ActiveDeployWidget);
     }
   } else {
     UE_LOG(LogSkald, Warning,

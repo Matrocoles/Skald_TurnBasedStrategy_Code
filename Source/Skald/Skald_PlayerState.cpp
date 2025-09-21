@@ -1,8 +1,10 @@
 #include "Skald_PlayerState.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "Net/UnrealNetwork.h"
 #include "Skald_GameState.h"
 #include "Skald_PlayerController.h"
+#include "Territory.h"
 #include "UI/SkaldMainHUDWidget.h"
 
 ASkaldPlayerState::ASkaldPlayerState()
@@ -55,6 +57,13 @@ void ASkaldPlayerState::OnRep_IsEliminated() {
 
 void ASkaldPlayerState::OnRep_PlayerDisplayName() {
   if (UWorld *World = GetWorld()) {
+    for (TActorIterator<ATerritory> It(World); It; ++It) {
+      ATerritory *Territory = *It;
+      if (Territory && Territory->OwningPlayer == this) {
+        Territory->RefreshAppearance();
+      }
+    }
+
     if (ASkaldGameState *GS = World->GetGameState<ASkaldGameState>()) {
       GS->OnPlayersUpdated.Broadcast();
     }
