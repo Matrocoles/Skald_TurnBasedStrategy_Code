@@ -4,7 +4,6 @@
 #include "Components/VerticalBox.h"
 #include "Components/Widget.h"
 #include "Engine/Engine.h"
-#include "Engine/GameViewportClient.h"
 #include "Kismet/GameplayStatics.h"
 #include "Skald.h"
 #include "SkaldTypes.h"
@@ -18,6 +17,7 @@
 #include "Territory.h"
 #include "UI/ConfirmAttackWidget.h"
 #include "UI/DeployWidget.h"
+#include "UI/SkaldUIHelpers.h"
 #include "UObject/ConstructorHelpers.h"
 #include "WorldMap.h"
 #include "TimerManager.h"
@@ -46,6 +46,9 @@ USkaldMainHUDWidget::USkaldMainHUDWidget(
 
 void USkaldMainHUDWidget::NativeConstruct() {
   Super::NativeConstruct();
+
+  SetIsFocusable(true);
+  SetFocus();
 
   // Ensure the full-screen HUD doesn't swallow world clicks.
   if (UWidget *Root = GetRootWidget()) {
@@ -815,17 +818,9 @@ void USkaldMainHUDWidget::HandleDeployClicked() {
       CreateWidget<UDeployWidget>(GetWorld(), DeployWidgetClass);
   if (ActiveDeployWidget) {
     ActiveDeployWidget->Setup(Territory, PS, this, PS->DeployableUnits);
-    ActiveDeployWidgetSlateHandle.Reset();
-    if (UWorld *World = GetWorld()) {
-      if (UGameViewportClient *Viewport = World->GetGameViewport()) {
-        ActiveDeployWidgetSlateHandle = ActiveDeployWidget->TakeWidget();
-        Viewport->AddViewportWidgetContent(
-            ActiveDeployWidgetSlateHandle.ToSharedRef());
-      } else {
-        ActiveDeployWidget->AddToViewport();
-      }
-    } else {
-      ActiveDeployWidget->AddToViewport();
+    ActiveDeployWidget->AddToViewport();
+    if (APlayerController *PC = GetOwningPlayer()) {
+      FocusWidgetUIOnly(PC, ActiveDeployWidget);
     }
   } else {
     UE_LOG(LogSkald, Warning,
@@ -839,17 +834,14 @@ void USkaldMainHUDWidget::ClearDeployWidget() {
     return;
   }
 
-  if (ActiveDeployWidgetSlateHandle.IsValid()) {
-    if (UWorld *World = GetWorld()) {
-      if (UGameViewportClient *Viewport = World->GetGameViewport()) {
-        Viewport->RemoveViewportWidgetContent(
-            ActiveDeployWidgetSlateHandle.ToSharedRef());
-      }
-    }
-    ActiveDeployWidgetSlateHandle.Reset();
-  } else if (ActiveDeployWidget->IsInViewport()) {
+  if (ActiveDeployWidget->IsInViewport()) {
     ActiveDeployWidget->RemoveFromParent();
   }
 
   ActiveDeployWidget = nullptr;
+
+  if (ASkaldPlayerController *PC =
+          Cast<ASkaldPlayerController>(GetOwningPlayer())) {
+    PC->ShowMainHUD();
+  }
 }

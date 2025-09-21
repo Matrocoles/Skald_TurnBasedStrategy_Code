@@ -11,6 +11,9 @@
 void UDeployWidget::NativeConstruct() {
   Super::NativeConstruct();
 
+  SetIsFocusable(true);
+  SetFocus();
+
   if (AcceptButton) {
     AcceptButton->OnClicked.AddDynamic(this, &UDeployWidget::HandleAccept);
   }

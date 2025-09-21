@@ -44,7 +44,7 @@ bool FSkaldFullTurnFlowTest::RunTest(const FString &Parameters) {
   HUD->ResourcesText = NewObject<UTextBlock>(HUD);
 
   FObjectProperty *HUDProp = FindFProperty<FObjectProperty>(
-      ASkaldPlayerController::StaticClass(), TEXT("MainHudWidget"));
+      ASkaldPlayerController::StaticClass(), TEXT("MainHUD"));
   FObjectProperty *HUDRefProp = FindFProperty<FObjectProperty>(
       ASkaldPlayerController::StaticClass(), TEXT("HUDRef"));
   HUDProp->SetObjectPropertyValue_InContainer(PC, HUD);

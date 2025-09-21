@@ -325,9 +325,6 @@ protected:
   UPROPERTY()
   UDeployWidget *ActiveDeployWidget = nullptr;
 
-  /** Slate handle when the deploy widget is added via the viewport. */
-  TSharedPtr<SWidget> ActiveDeployWidgetSlateHandle;
-
   UPROPERTY()
   TArray<ATerritory *> HighlightedTerritories;
 

@@ -12,6 +12,9 @@ void UChoosePlayerWidget::NativeConstruct()
 {
     Super::NativeConstruct();
 
+    SetIsFocusable(true);
+    SetFocus();
+
     if (FactionComboBox)
     {
         FactionComboBox->ClearOptions();
