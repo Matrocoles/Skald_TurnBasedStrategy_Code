@@ -35,16 +35,30 @@
 #include "WorldMap.h"
 
 #if !defined(SKALD_USE_CORE_UOBJECT_DELEGATES)
-// Projects that target engine variants lacking FCoreUObjectDelegates can
-// override this at build time to use the fallback implementations below.
-#if defined(__has_include)
+// Follow engine feature detection to determine whether CoreUObject delegates
+// are available. Only override this manually if the project is certain the
+// CoreUObject header exists.
+#if defined(UE_WITH_COREUOBJECT)
+#if UE_WITH_COREUOBJECT
+#define SKALD_USE_CORE_UOBJECT_DELEGATES 1
+#else
+#define SKALD_USE_CORE_UOBJECT_DELEGATES 0
+#endif
+#elif defined(__has_include)
 #if __has_include("UObject/CoreUObjectDelegates.h")
 #define SKALD_USE_CORE_UOBJECT_DELEGATES 1
 #else
 #define SKALD_USE_CORE_UOBJECT_DELEGATES 0
 #endif
-#else
+#elif defined(_MSC_VER)
+#include <yvals_core.h>
+#if defined(_HAS_INCLUDE) && _HAS_INCLUDE("UObject/CoreUObjectDelegates.h")
 #define SKALD_USE_CORE_UOBJECT_DELEGATES 1
+#else
+#define SKALD_USE_CORE_UOBJECT_DELEGATES 0
+#endif
+#else
+#define SKALD_USE_CORE_UOBJECT_DELEGATES 0
 #endif
 #endif
 
