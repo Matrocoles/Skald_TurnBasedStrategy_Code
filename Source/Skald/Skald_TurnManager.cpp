@@ -402,7 +402,6 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
 
   if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
     GI->SeedCombatRandomStream(SeededBattle.RandomSeed);
-    GI->PendingBattle = SeededBattle;
     GI->PendingBattleResolution = FGridBattleResolution();
     GI->bPendingBattleResolution = false;
     if (!GI->GridBattleManager) {
@@ -456,6 +455,57 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
       }
 
       GI->SetTravelState(TravelState);
+
+      FS_BattlePayload PendingPayload = SeededBattle;
+
+      auto ResolveOwnerPS = [&](int32 TerritoryId) -> ASkaldPlayerState * {
+        if (CachedWorldMap) {
+          for (ATerritory *Territory : CachedWorldMap->Territories) {
+            if (Territory && Territory->TerritoryID == TerritoryId) {
+              return Territory->OwningPlayer;
+            }
+          }
+        }
+        for (const FS_Territory &Territory : GI->CachedWorldMapTerritories) {
+          if (Territory.TerritoryID == TerritoryId) {
+            if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
+              return GS->GetPlayerById(Territory.OwnerPlayerID);
+            }
+          }
+        }
+        return nullptr;
+      };
+
+      ASkaldPlayerState *AttPS =
+          ResolveOwnerPS(TravelState.AttackerTerritory);
+      ASkaldPlayerState *DefPS =
+          ResolveOwnerPS(TravelState.DefenderTerritory);
+
+      PendingPayload.AttackerPlayerID =
+          AttPS ? AttPS->GetPlayerId() : PendingPayload.AttackerPlayerID;
+      PendingPayload.DefenderPlayerID =
+          DefPS ? DefPS->GetPlayerId() : PendingPayload.DefenderPlayerID;
+      PendingPayload.AttackerDisplayName = AttPS
+                                               ? AttPS->PlayerDisplayName
+                                               : PendingPayload.AttackerDisplayName;
+      PendingPayload.DefenderDisplayName = DefPS
+                                               ? DefPS->PlayerDisplayName
+                                               : PendingPayload.DefenderDisplayName;
+      PendingPayload.AttackerFaction = AttPS ? AttPS->Faction
+                                             : PendingPayload.AttackerFaction;
+      PendingPayload.DefenderFaction = DefPS ? DefPS->Faction
+                                             : PendingPayload.DefenderFaction;
+      PendingPayload.bAttackerIsAI = AttPS ? AttPS->bIsAI
+                                           : PendingPayload.bAttackerIsAI;
+      PendingPayload.bDefenderIsAI = DefPS ? DefPS->bIsAI
+                                           : PendingPayload.bDefenderIsAI;
+
+      if (PendingPayload.DefenderArmyCount <= 0) {
+        PendingPayload.DefenderArmyCount = PendingPayload.ArmyCountSent;
+      }
+
+      PendingBattle = PendingPayload;
+      GI->PendingBattle = PendingPayload;
       GI->SetTravelPending(true);
       GI->bIsInBattleMap = true;
     }
@@ -782,7 +832,7 @@ void ATurnManager::BroadcastResources(ASkaldPlayerState *ForPlayer) {
 void ATurnManager::BroadcastCurrentPhase() {
   if (const UWorld *W = GetWorld()) {
     if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
-      if (GI->bTravelPending) {
+      if (GI->bTravelPending || GI->bIsInBattleMap) {
         return;
       }
     }

@@ -299,6 +299,8 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
 
   bBattleLaunched = false;
 
+  UE_LOG(LogSkald, Log, TEXT("BattleGM SetupPendingBattle called"));
+
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
   if (!GI || !GI->GridBattleManager) {
     return;
@@ -317,7 +319,52 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
   HasHumanOwnedTerritory(GS, WorldMap, GI, CachedHumanTerritoryIDs,
                          &CachedTerritoryMap);
 
-  const FS_BattlePayload Battle = GI->PendingBattle;
+  FS_BattlePayload Battle = GI->PendingBattle;
+
+  auto IsEmptyBattle = [](const FS_BattlePayload &Payload) {
+    return Payload.AttackerPlayerID <= 0 || Payload.DefenderPlayerID <= 0;
+  };
+
+  if (IsEmptyBattle(Battle)) {
+    const FSkaldTravelState &TravelState = GI->GetTravelState();
+    auto ResolveOwnerId = [&](int32 TerritoryId) -> int32 {
+      if (const FS_Territory *Territory = CachedTerritoryMap.Find(TerritoryId)) {
+        return Territory->OwnerPlayerID;
+      }
+      return 0;
+    };
+
+    Battle.FromTerritoryID = TravelState.AttackerTerritory;
+    Battle.TargetTerritoryID = TravelState.DefenderTerritory;
+    Battle.AttackerPlayerID = ResolveOwnerId(TravelState.AttackerTerritory);
+    Battle.DefenderPlayerID = ResolveOwnerId(TravelState.DefenderTerritory);
+
+    if (ASkaldPlayerState *AttackerState =
+            GS->GetPlayerById(Battle.AttackerPlayerID)) {
+      Battle.AttackerDisplayName = AttackerState->PlayerDisplayName;
+      Battle.AttackerFaction = AttackerState->Faction;
+      Battle.bAttackerIsAI = AttackerState->bIsAI;
+    }
+    if (ASkaldPlayerState *DefenderState =
+            GS->GetPlayerById(Battle.DefenderPlayerID)) {
+      Battle.DefenderDisplayName = DefenderState->PlayerDisplayName;
+      Battle.DefenderFaction = DefenderState->Faction;
+      Battle.bDefenderIsAI = DefenderState->bIsAI;
+    }
+
+    if (Battle.DefenderArmyCount <= 0) {
+      Battle.DefenderArmyCount = Battle.ArmyCountSent;
+    }
+
+    GI->PendingBattle = Battle;
+  }
+
+  UE_LOG(LogSkald, Log,
+         TEXT("BattleGM SetupPendingBattle: AttackerID=%d Name=%s Faction=%d DefenderID=%d Name=%s Faction=%d"),
+         Battle.AttackerPlayerID, *Battle.AttackerDisplayName,
+         static_cast<int32>(Battle.AttackerFaction), Battle.DefenderPlayerID,
+         *Battle.DefenderDisplayName, static_cast<int32>(Battle.DefenderFaction));
+
   ASkaldPlayerState *AttackerPS = EnsureBattleParticipant(
       GS, World, Battle.AttackerPlayerID, Battle.AttackerDisplayName,
       Battle.AttackerFaction, Battle.bAttackerIsAI);
@@ -329,10 +376,22 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
   const int32 DefenderBudget =
       Battle.DefenderArmyCount > 0 ? Battle.DefenderArmyCount : Battle.ArmyCountSent;
 
+  UE_LOG(LogSkald, Log,
+         TEXT("BattleGM: Calling BeginPreBattleSelection (A:%d, D:%d, Budgets %d/%d)"),
+         Battle.AttackerPlayerID, Battle.DefenderPlayerID, AttackerBudget,
+         DefenderBudget);
+
   BeginPreBattleSelection(AttackerPS, DefenderPS, AttackerBudget, DefenderBudget);
 
-  AutoCommitAIArmy(AttackerPS, AttackerBudget);
-  AutoCommitAIArmy(DefenderPS, DefenderBudget);
+  AutoCommitAIArmy(AttackerPS,
+                   AttackerPS && AttackerPS->bIsAI ? AttackerBudget : 0);
+  AutoCommitAIArmy(DefenderPS,
+                   DefenderPS && DefenderPS->bIsAI ? DefenderBudget : 0);
+
+  UE_LOG(LogSkald, Log,
+         TEXT("BattleGM: Selection started (A:%d, D:%d, Budgets %d/%d)"),
+         Battle.AttackerPlayerID, Battle.DefenderPlayerID, AttackerBudget,
+         DefenderBudget);
 
   // Mark setup complete before attempting to start the battle to avoid
   // TryStartBattle -> BootstrapFromTravelState -> SetupPendingBattle recursion.
@@ -613,28 +672,22 @@ void ASkald_BattleGameMode::TryStartBattle() {
     }
   }
 
-  const ASkaldGameState *GS = GetGameState<ASkaldGameState>();
-  const int32 PlayerStates = GS ? GS->PlayerArray.Num() : 0;
-  if (ExpectedControllers <= 0 && PlayerStates > 0) {
-    ExpectedControllers = PlayerStates;
+  ASkaldGameState *GS = GetGameState<ASkaldGameState>();
+  if (!GS) {
+    return;
   }
 
-  TSet<int32> ReadyPlayerIDs;
-  for (const TWeakObjectPtr<AController> &WeakController : ReadyControllers) {
-    if (const AController *ReadyController = WeakController.Get()) {
-      if (const APlayerState *PS = ReadyController->PlayerState) {
-        ReadyPlayerIDs.Add(PS->GetPlayerId());
-      }
-    }
+  const int32 ReadyPlayerStates = GS->PlayerArray.Num();
+  if (ExpectedControllers <= 0 && ReadyPlayerStates > 0) {
+    ExpectedControllers = ReadyPlayerStates;
   }
 
-  const int32 ReadyPlayerStates = ReadyPlayerIDs.Num();
-  UE_LOG(LogSkald, Log,
+  const int32 NeededPlayerStates = FMath::Max(2, ExpectedControllers);
+  UE_LOG(LogSkald, Verbose,
          TEXT("TryStartBattle: ReadyPlayerStates=%d Expected=%d"),
-         ReadyPlayerStates, ExpectedControllers);
+         ReadyPlayerStates, NeededPlayerStates);
 
-  if (ExpectedControllers <= 0 || PlayerStates < ExpectedControllers ||
-      ReadyPlayerStates < ExpectedControllers) {
+  if (ReadyPlayerStates < 2) {
     return;
   }
 

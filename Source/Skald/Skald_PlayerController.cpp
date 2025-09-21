@@ -455,11 +455,10 @@ void ASkaldPlayerController::ShowFighterSelectionUI(int32 MaxBudget,
   const TArray<FFighterDefinition> Available =
       UFighterDataLibrary::GetFightersForFaction(this, Faction);
   FighterSelectionWidget->SetAvailableFighters(Available);
-  if (Available.Num() > 0) {
-    UE_LOG(LogSkald, Log,
-           TEXT("SkaldUI: [FighterSelection] Populated %d fighter entries."),
-           Available.Num());
-  } else {
+  UE_LOG(LogSkald, Log,
+         TEXT("FighterSelectionWidget: Populated %d entries for faction %d"),
+         Available.Num(), static_cast<int32>(Faction));
+  if (Available.Num() == 0) {
     UE_LOG(LogSkald, Warning,
            TEXT("SkaldUI: [FighterSelection] No fighters available for faction %d"),
            static_cast<int32>(Faction));
