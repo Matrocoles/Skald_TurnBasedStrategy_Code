@@ -34,16 +34,22 @@
 #include "UObject/ConstructorHelpers.h"
 #include "WorldMap.h"
 
-#ifndef SKALD_USE_CORE_UOBJECT_DELEGATES
+#if !defined(SKALD_USE_CORE_UOBJECT_DELEGATES)
 // Projects that target engine variants lacking FCoreUObjectDelegates can
-// override this at build time to use the fallback implementation below.
+// override this at build time to use the fallback implementations below.
+#if defined(__has_include)
+#if __has_include("UObject/CoreUObjectDelegates.h")
+#define SKALD_USE_CORE_UOBJECT_DELEGATES 1
+#else
 #define SKALD_USE_CORE_UOBJECT_DELEGATES 0
+#endif
+#else
+#define SKALD_USE_CORE_UOBJECT_DELEGATES 1
+#endif
 #endif
 
 #if SKALD_USE_CORE_UOBJECT_DELEGATES
 #include "UObject/CoreUObjectDelegates.h" // FCoreUObjectDelegates::PostLoadMapWithWorld
-#else
-#define SKALD_USE_CORE_UOBJECT_DELEGATES 1
 #endif
 
 namespace Skald
@@ -52,7 +58,8 @@ namespace PlayerController
 {
 namespace Private
 {
-template <typename T, typename = void> struct TSupportsOnPostLoadMapWithWorld : std::false_type
+template <typename T, typename = void>
+struct TSupportsOnPostLoadMapWithWorld : std::false_type
 {
 };
 
@@ -61,20 +68,61 @@ struct TSupportsOnPostLoadMapWithWorld<
     T, std::void_t<decltype(T::OnPostLoadMapWithWorld)>> : std::true_type
 {
 };
-} // namespace Private
-} // namespace PlayerController
-} // namespace Skald
-#endif
-=======
+
+template <typename T, typename = void>
+struct TSupportsPostLoadMapWithWorld : std::false_type
+{
+};
+
+template <typename T>
+struct TSupportsPostLoadMapWithWorld<
+    T, std::void_t<decltype(T::PostLoadMapWithWorld)>> : std::true_type
+{
+};
+
+template <typename T>
+constexpr bool SupportsOnPostLoadMapWithWorld()
+{
+  return TSupportsOnPostLoadMapWithWorld<T>::value;
+}
+
+template <typename T>
+constexpr bool SupportsPostLoadMapWithWorld()
+{
+  return TSupportsPostLoadMapWithWorld<T>::value;
+}
+
 static FDelegateHandle RegisterPostLoadMapDelegate(ASkaldPlayerController *Controller)
 {
 #if SKALD_USE_CORE_UOBJECT_DELEGATES
-  return FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(
-      Controller, &ASkaldPlayerController::HandlePostLoadMap);
-#else
-  return FWorldDelegates::OnPostLoadMapWithWorld.AddUObject(
-      Controller, &ASkaldPlayerController::HandlePostLoadMap);
+  if constexpr (SupportsOnPostLoadMapWithWorld<FCoreUObjectDelegates>())
+  {
+    return FCoreUObjectDelegates::OnPostLoadMapWithWorld.AddUObject(
+        Controller, &ASkaldPlayerController::HandlePostLoadMap);
+  }
+
+  if constexpr (SupportsPostLoadMapWithWorld<FCoreUObjectDelegates>())
+  {
+    return FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(
+        Controller, &ASkaldPlayerController::HandlePostLoadMap);
+  }
 #endif
+
+  if constexpr (SupportsOnPostLoadMapWithWorld<FWorldDelegates>())
+  {
+    return FWorldDelegates::OnPostLoadMapWithWorld.AddUObject(
+        Controller, &ASkaldPlayerController::HandlePostLoadMap);
+  }
+
+  if constexpr (SupportsOnPostLoadMapWithWorld<FCoreDelegates>())
+  {
+    return FCoreDelegates::OnPostLoadMapWithWorld.AddUObject(
+        Controller, &ASkaldPlayerController::HandlePostLoadMap);
+  }
+
+  UE_LOG(LogSkald, Warning,
+         TEXT("Skipping PostLoadMap registration; OnPostLoadMapWithWorld is unavailable."));
+  return FDelegateHandle();
 }
 
 static void UnregisterPostLoadMapDelegate(FDelegateHandle &Handle)
@@ -85,10 +133,37 @@ static void UnregisterPostLoadMapDelegate(FDelegateHandle &Handle)
   }
 
 #if SKALD_USE_CORE_UOBJECT_DELEGATES
-  FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(Handle);
-#else
-  FWorldDelegates::OnPostLoadMapWithWorld.Remove(Handle);
+  if constexpr (SupportsOnPostLoadMapWithWorld<FCoreUObjectDelegates>())
+  {
+    FCoreUObjectDelegates::OnPostLoadMapWithWorld.Remove(Handle);
+    Handle.Reset();
+    return;
+  }
+
+  if constexpr (SupportsPostLoadMapWithWorld<FCoreUObjectDelegates>())
+  {
+    FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(Handle);
+    Handle.Reset();
+    return;
+  }
 #endif
+
+  if constexpr (SupportsOnPostLoadMapWithWorld<FWorldDelegates>())
+  {
+    FWorldDelegates::OnPostLoadMapWithWorld.Remove(Handle);
+    Handle.Reset();
+    return;
+  }
+
+  if constexpr (SupportsOnPostLoadMapWithWorld<FCoreDelegates>())
+  {
+    FCoreDelegates::OnPostLoadMapWithWorld.Remove(Handle);
+    Handle.Reset();
+    return;
+  }
+
+  UE_LOG(LogSkald, Warning,
+         TEXT("Skipping PostLoadMap unregistration; OnPostLoadMapWithWorld is unavailable."));
   Handle.Reset();
 }
 } // namespace Private
@@ -123,40 +198,13 @@ ASkaldPlayerController::ASkaldPlayerController() {
 }
 
 void ASkaldPlayerController::RegisterPostLoadMapDelegate() {
-#if SKALD_USE_CORE_UOBJECT_DELEGATES
-  PostLoadMapHandle = FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(
-      this, &ASkaldPlayerController::HandlePostLoadMap);
-#else
-  using FFallbackDelegates = FCoreDelegates;
-  static_assert(Skald::PlayerController::Private::
-                    TSupportsOnPostLoadMapWithWorld<FFallbackDelegates>::value,
-                "FCoreDelegates::OnPostLoadMapWithWorld is unavailable; "
-                "define SKALD_USE_CORE_UOBJECT_DELEGATES=1 or provide an "
-                "alternate registration path.");
-
-  PostLoadMapHandle = FFallbackDelegates::OnPostLoadMapWithWorld.AddUObject(
-      this, &ASkaldPlayerController::HandlePostLoadMap);
-#endif
+  PostLoadMapHandle =
+      Skald::PlayerController::Private::RegisterPostLoadMapDelegate(this);
 }
 
 void ASkaldPlayerController::UnregisterPostLoadMapDelegate() {
-  if (!PostLoadMapHandle.IsValid()) {
-    return;
-  }
-
-#if SKALD_USE_CORE_UOBJECT_DELEGATES
-  FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(PostLoadMapHandle);
-#else
-  using FFallbackDelegates = FCoreDelegates;
-  static_assert(Skald::PlayerController::Private::
-                    TSupportsOnPostLoadMapWithWorld<FFallbackDelegates>::value,
-                "FCoreDelegates::OnPostLoadMapWithWorld is unavailable; "
-                "define SKALD_USE_CORE_UOBJECT_DELEGATES=1 or provide an "
-                "alternate registration path.");
-
-  FFallbackDelegates::OnPostLoadMapWithWorld.Remove(PostLoadMapHandle);
-#endif
-  PostLoadMapHandle.Reset();
+  Skald::PlayerController::Private::UnregisterPostLoadMapDelegate(
+      PostLoadMapHandle);
 }
 
 void ASkaldPlayerController::CacheGameReferences() {
