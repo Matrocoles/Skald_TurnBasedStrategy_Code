@@ -2,6 +2,7 @@
 
 #include "Algo/RandomShuffle.h"
 #include "Algo/Sort.h"
+#include "AIController.h"
 #include "GridBattleManager.h"
 #include "Skald.h"
 #include "Skald_GameInstance.h"
@@ -140,6 +141,8 @@ ASkaldPlayerState *EnsureBattleParticipant(ASkaldGameState *GameState, UWorld *W
 void ASkald_BattleGameMode::BeginPlay() {
   Super::BeginPlay();
 
+  ReadyControllers.Empty();
+
   if (!BattleManager) {
     UClass *ClassToUse = BattleManagerClass ? *BattleManagerClass
                                             : UGridBattleManager::StaticClass();
@@ -154,6 +157,39 @@ void ASkald_BattleGameMode::BeginPlay() {
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
   if (GI) {
     GI->GridBattleManager = BattleManager;
+    const FSkaldTravelState &TravelState = GI->GetTravelState();
+    ExpectedControllers = TravelState.bValid ? TravelState.ExpectedControllers : 0;
+    UE_LOG(LogSkald, Log,
+           TEXT("BattleGM BeginPlay: ExpectedControllers=%d"),
+           ExpectedControllers);
+  } else {
+    ExpectedControllers = 0;
+  }
+
+  const FSkaldTravelState *TravelStatePtr = nullptr;
+  if (!WorldMap) {
+    for (TActorIterator<AWorldMap> It(GetWorld()); It; ++It) {
+      WorldMap = *It;
+      break;
+    }
+  }
+
+  if (GI) {
+    TravelStatePtr = &GI->GetTravelState();
+  }
+
+  if (WorldMap && TravelStatePtr && TravelStatePtr->bValid &&
+      TravelStatePtr->HumanOwnedTerritories.Num() > 0) {
+    int32 ReacquiredCount = 0;
+    for (ATerritory *Territory : WorldMap->Territories) {
+      if (Territory &&
+          TravelStatePtr->HumanOwnedTerritories.Contains(Territory->TerritoryID)) {
+        ++ReacquiredCount;
+      }
+    }
+    UE_LOG(LogSkald, Log,
+           TEXT("BattleGM BeginPlay: Reacquired %d of %d cached human territories"),
+           ReacquiredCount, TravelStatePtr->HumanOwnedTerritories.Num());
   }
 
   SetupPendingBattle();
@@ -165,9 +201,11 @@ void ASkald_BattleGameMode::BeginPlay() {
          It; ++It) {
       ++ControllerCount;
     }
-    ensureMsgf(GS->PlayerArray.Num() == ControllerCount,
-               TEXT("PlayerCount %d != ControllerCount %d after travel"),
-               GS->PlayerArray.Num(), ControllerCount);
+    if (GS->PlayerArray.Num() != ControllerCount) {
+      UE_LOG(LogSkald, Verbose,
+             TEXT("BattleGM BeginPlay: PlayerStates=%d ControllerCount=%d"),
+             GS->PlayerArray.Num(), ControllerCount);
+    }
 
     const bool bHumanHasTerritory =
         HasHumanOwnedTerritory(GS, WorldMap, GI);
@@ -179,6 +217,8 @@ void ASkald_BattleGameMode::BeginPlay() {
              *GetNameSafe(WorldMap), CachedCount);
     }
   }
+
+  TryStartBattle();
 }
 
 void ASkald_BattleGameMode::SetupPendingBattle() {
@@ -230,7 +270,7 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
   AutoCommitAIArmy(AttackerPS, AttackerBudget);
   AutoCommitAIArmy(DefenderPS, DefenderBudget);
 
-  TryLaunchBattle();
+  TryStartBattle();
 }
 
 void ASkald_BattleGameMode::AutoCommitAIArmy(ASkaldPlayerState *PlayerState,
@@ -320,6 +360,23 @@ void ASkald_BattleGameMode::TryLaunchBattle() {
     return;
   }
 
+  if (ExpectedControllers > 0) {
+    for (auto It = ReadyControllers.CreateIterator(); It; ++It) {
+      if (!It->IsValid()) {
+        It.RemoveCurrent();
+      }
+    }
+    const ASkaldGameState *GS = GetGameState<ASkaldGameState>();
+    const int32 PlayerStates = GS ? GS->PlayerArray.Num() : 0;
+    const int32 Controllers = ReadyControllers.Num();
+    if (Controllers < ExpectedControllers || PlayerStates < ExpectedControllers) {
+      UE_LOG(LogSkald, Log,
+             TEXT("TryLaunchBattle: Waiting for controllers. Ready=%d PlayerStates=%d Expected=%d"),
+             Controllers, PlayerStates, ExpectedControllers);
+      return;
+    }
+  }
+
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
   if (!GI || !GI->GridBattleManager) {
     return;
@@ -397,5 +454,56 @@ void ASkald_BattleGameMode::TryInitializeWorldAndStart() {
   bWorldInitialized = true;
   bTurnsStarted = true;
   GetWorldTimerManager().ClearTimer(RetryInitTimerHandle);
+}
+
+void ASkald_BattleGameMode::PostLogin(APlayerController *NewPlayer) {
+  Super::PostLogin(NewPlayer);
+
+  if (NewPlayer) {
+    ReadyControllers.Add(NewPlayer);
+  }
+
+  TryStartBattle();
+}
+
+void ASkald_BattleGameMode::OnAIControllerReady(AAIController *AI) {
+  if (AI) {
+    ReadyControllers.Add(AI);
+  }
+
+  TryStartBattle();
+}
+
+void ASkald_BattleGameMode::TryStartBattle() {
+  if (bBattleLaunched) {
+    return;
+  }
+
+  for (auto It = ReadyControllers.CreateIterator(); It; ++It) {
+    if (!It->IsValid()) {
+      It.RemoveCurrent();
+    }
+  }
+
+  const int32 Controllers = ReadyControllers.Num();
+  const ASkaldGameState *GS = GetGameState<ASkaldGameState>();
+  const int32 PlayerStates = GS ? GS->PlayerArray.Num() : 0;
+
+  UE_LOG(LogSkald, Log,
+         TEXT("TryStartBattle: ReadyControllers=%d PlayerStates=%d Expected=%d"),
+         Controllers, PlayerStates, ExpectedControllers);
+
+  if (ExpectedControllers <= 0) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("TryStartBattle: ExpectedControllers not provided; launching immediately"));
+    TryLaunchBattle();
+    return;
+  }
+
+  if (Controllers >= ExpectedControllers && PlayerStates >= ExpectedControllers) {
+    UE_LOG(LogSkald, Log,
+           TEXT("TryStartBattle: All controllers ready, launching battle"));
+    TryLaunchBattle();
+  }
 }
 

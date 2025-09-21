@@ -15,14 +15,26 @@ public:
 
 protected:
   virtual void BeginPlay() override;
+  virtual void PostLogin(APlayerController *NewPlayer) override;
   virtual void TryInitializeWorldAndStart() override;
+
+public:
+  // Called by the AI controller when it’s ready (BeginPlay)
+  void OnAIControllerReady(class AAIController *AI);
 
 private:
   void SetupPendingBattle();
   void AutoCommitAIArmy(ASkaldPlayerState *PlayerState, int32 Budget) const;
   void SpawnFighterSide(const TArray<FFighterDefinition> &Roster, bool bAsAttacker);
+  void TryStartBattle();
 
   /** Ensures the battle only launches once per travel. */
   bool bBattleLaunched = false;
+
+  // Expected count comes from GameInstance travel state
+  int32 ExpectedControllers = 0;
+
+  // Track who has arrived/ready on the new map
+  TSet<TWeakObjectPtr<AController>> ReadyControllers;
 };
 

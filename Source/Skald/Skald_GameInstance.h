@@ -10,6 +10,27 @@ class UGridBattleManager;
 class USkaldSaveGame;
 class UNetDriver;
 
+USTRUCT(BlueprintType)
+struct FSkaldTravelState
+{
+  GENERATED_BODY()
+
+  UPROPERTY(BlueprintReadWrite, EditAnywhere)
+  int32 ExpectedControllers = 0;
+
+  UPROPERTY(BlueprintReadWrite, EditAnywhere)
+  TArray<int32> HumanOwnedTerritories;
+
+  UPROPERTY(BlueprintReadWrite, EditAnywhere)
+  int32 AttackerTerritory = -1;
+
+  UPROPERTY(BlueprintReadWrite, EditAnywhere)
+  int32 DefenderTerritory = -1;
+
+  UPROPERTY(BlueprintReadWrite, EditAnywhere)
+  bool bValid = false;
+};
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSkaldFactionsUpdated);
 /** Game instance storing player selections from the lobby. */
 UCLASS()
@@ -93,6 +114,12 @@ public:
   UPROPERTY(BlueprintReadWrite, Category = "Turn")
   bool bResumeTurns = false;
 
+  UFUNCTION(BlueprintCallable)
+  void SetTravelState(const FSkaldTravelState &InState);
+
+  UFUNCTION(BlueprintCallable, BlueprintPure)
+  const FSkaldTravelState &GetTravelState() const { return TravelState; }
+
   /** Seed the combat random stream so all clients use the same sequence. */
   UFUNCTION(BlueprintCallable, Category = "Battle")
   void SeedCombatRandomStream(int32 Seed);
@@ -106,4 +133,8 @@ public:
   /** Save game loaded when transitioning from the main menu. */
   UPROPERTY(BlueprintReadWrite, Category = "SaveGame")
   USkaldSaveGame *LoadedSaveGame = nullptr;
+
+private:
+  UPROPERTY()
+  FSkaldTravelState TravelState;
 };

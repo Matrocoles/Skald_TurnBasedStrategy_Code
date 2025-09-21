@@ -387,6 +387,30 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
       }
     }
     if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+      FSkaldTravelState TravelState;
+      int32 ValidControllers = 0;
+      for (const TWeakObjectPtr<ASkaldPlayerController> &Ptr : Controllers) {
+        if (Ptr.IsValid()) {
+          ++ValidControllers;
+        }
+      }
+      TravelState.ExpectedControllers = ValidControllers;
+
+      if (CachedWorldMap) {
+        for (ATerritory *Territory : CachedWorldMap->Territories) {
+          const ASkaldPlayerState *Owner =
+              Territory ? Territory->OwningPlayer : nullptr;
+          if (Owner && !Owner->bIsAI) {
+            TravelState.HumanOwnedTerritories.AddUnique(
+                Territory->TerritoryID);
+          }
+        }
+      }
+
+      TravelState.AttackerTerritory = SeededBattle.FromTerritoryID;
+      TravelState.DefenderTerritory = SeededBattle.TargetTerritoryID;
+
+      GI->SetTravelState(TravelState);
       GI->bIsInBattleMap = true;
     }
     World->ServerTravel(MapToLoad);

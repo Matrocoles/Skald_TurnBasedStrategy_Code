@@ -1,6 +1,7 @@
 #include "LobbyPlayerController.h"
 #include "Blueprint/UserWidget.h"
 #include "LobbyMenuWidget.h"
+#include "UI/SkaldUIHelpers.h"
 
 void ALobbyPlayerController::BeginPlay()
 {
@@ -20,10 +21,7 @@ void ALobbyPlayerController::InitLobbyUI()
 
     LobbyWidgetInstance->AddToViewport();
 
-    FInputModeUIOnly Mode;
-    Mode.SetWidgetToFocus(LobbyWidgetInstance->TakeWidget());
-    Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-    SetInputMode(Mode);
+    FocusWidgetUIOnly(this, LobbyWidgetInstance);
 
     bShowMouseCursor = true;
     bEnableClickEvents = true;

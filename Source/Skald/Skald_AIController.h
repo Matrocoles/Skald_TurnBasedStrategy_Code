@@ -12,6 +12,7 @@ class SKALD_API ASkaldAIController : public ASkaldPlayerController {
   GENERATED_BODY()
 
 public:
+  virtual void BeginPlay() override;
   virtual void StartTurn() override;
 
   /** Execute the AI's decision making for the current turn. */
