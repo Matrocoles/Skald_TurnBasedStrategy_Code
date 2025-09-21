@@ -252,12 +252,12 @@ void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
 void ASkaldPlayerController::ShowMainHUD() {
   if (MainHUD) {
     MainHUD->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
-    UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
-        this, MainHUD, EMouseLockMode::DoNotLock, /*bHideCursorDuringCapture*/
-        false);
-    bShowMouseCursor = true;
-    MainHUD->SetFocus();
   }
+
+  UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
+      this, nullptr, EMouseLockMode::DoNotLock, /*bHideCursorDuringCapture*/
+      false);
+  bShowMouseCursor = true;
 }
 
 void ASkaldPlayerController::HideMainHUD() {
@@ -626,14 +626,8 @@ void ASkaldPlayerController::NotifyTurnEnded(const FString &PlayerName) {
 }
 
 void ASkaldPlayerController::StartTurn() {
-  if (MainHUD) {
-    UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
-        this, MainHUD, EMouseLockMode::DoNotLock, false);
-    MainHUD->SetFocus();
-  } else {
-    UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
-        this, nullptr, EMouseLockMode::DoNotLock, false);
-  }
+  UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
+      this, nullptr, EMouseLockMode::DoNotLock, false);
   bShowMouseCursor = true;
   bEnableClickEvents = true;
   bEnableMouseOverEvents = true;
