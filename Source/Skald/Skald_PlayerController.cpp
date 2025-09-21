@@ -114,6 +114,7 @@ void ASkaldPlayerController::InitializeHUDWidget() {
   }
 
   HUDRef = MainHUD;
+  MainHUD->AddToViewport();
   MainHUD->AddToViewport(10);
   MainHUD->SetIsFocusable(true);
   MainHUD->SetVisibility(ESlateVisibility::Hidden);
