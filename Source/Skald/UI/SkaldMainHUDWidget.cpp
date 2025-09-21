@@ -4,6 +4,7 @@
 #include "Components/VerticalBox.h"
 #include "Components/Widget.h"
 #include "Engine/Engine.h"
+#include "Engine/GameViewportClient.h"
 #include "Kismet/GameplayStatics.h"
 #include "Skald.h"
 #include "SkaldTypes.h"
@@ -814,7 +815,18 @@ void USkaldMainHUDWidget::HandleDeployClicked() {
       CreateWidget<UDeployWidget>(GetWorld(), DeployWidgetClass);
   if (ActiveDeployWidget) {
     ActiveDeployWidget->Setup(Territory, PS, this, PS->DeployableUnits);
-    ActiveDeployWidget->AddToViewport();
+    ActiveDeployWidgetSlateHandle.Reset();
+    if (UWorld *World = GetWorld()) {
+      if (UGameViewportClient *Viewport = World->GetGameViewport()) {
+        ActiveDeployWidgetSlateHandle = ActiveDeployWidget->TakeWidget();
+        Viewport->AddViewportWidgetContent(
+            ActiveDeployWidgetSlateHandle.ToSharedRef());
+      } else {
+        ActiveDeployWidget->AddToViewport();
+      }
+    } else {
+      ActiveDeployWidget->AddToViewport();
+    }
   } else {
     UE_LOG(LogSkald, Warning,
            TEXT("HandleDeployClicked failed: could not create widget"));
@@ -823,8 +835,21 @@ void USkaldMainHUDWidget::HandleDeployClicked() {
 }
 
 void USkaldMainHUDWidget::ClearDeployWidget() {
-  if (ActiveDeployWidget) {
-    ActiveDeployWidget->RemoveFromParent();
-    ActiveDeployWidget = nullptr;
+  if (!ActiveDeployWidget) {
+    return;
   }
+
+  if (ActiveDeployWidgetSlateHandle.IsValid()) {
+    if (UWorld *World = GetWorld()) {
+      if (UGameViewportClient *Viewport = World->GetGameViewport()) {
+        Viewport->RemoveViewportWidgetContent(
+            ActiveDeployWidgetSlateHandle.ToSharedRef());
+      }
+    }
+    ActiveDeployWidgetSlateHandle.Reset();
+  } else if (ActiveDeployWidget->IsInViewport()) {
+    ActiveDeployWidget->RemoveFromParent();
+  }
+
+  ActiveDeployWidget = nullptr;
 }

@@ -37,6 +37,8 @@ class SKALD_API ASkaldGameMode : public AGameModeBase {
 
 public:
   ASkaldGameMode();
+  virtual void InitGame(const FString &Map, const FString &Options,
+                        FString &Error) override;
   virtual void PostLogin(APlayerController *NewPlayer) override;
   virtual void Logout(AController *Exiting) override;
   virtual void HandleSeamlessTravelPlayer(AController *&C) override;

@@ -37,7 +37,11 @@ void UDeployWidget::Setup(ATerritory *InTerritory, ASkaldPlayerState *InPlayerSt
 
 void UDeployWidget::HandleAccept() {
   if (!Territory || !PlayerState || !OwningHUD.IsValid()) {
-    RemoveFromParent();
+    if (OwningHUD.IsValid()) {
+      OwningHUD->ClearDeployWidget();
+    } else if (IsInViewport()) {
+      RemoveFromParent();
+    }
     return;
   }
 
@@ -78,16 +82,18 @@ void UDeployWidget::HandleAccept() {
     }
   }
 
-  RemoveFromParent();
   if (OwningHUD.IsValid()) {
     OwningHUD->ClearDeployWidget();
+  } else if (IsInViewport()) {
+    RemoveFromParent();
   }
 }
 
 void UDeployWidget::HandleDecline() {
-  RemoveFromParent();
   if (OwningHUD.IsValid()) {
     OwningHUD->ClearDeployWidget();
+  } else if (IsInViewport()) {
+    RemoveFromParent();
   }
 }
 
