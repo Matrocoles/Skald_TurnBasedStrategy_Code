@@ -7,6 +7,8 @@
 #include "Skald_GameInstance.generated.h"
 
 class UGridBattleManager;
+class SWidget;
+class UUserWidget;
 class USkaldSaveGame;
 class UNetDriver;
 
@@ -94,6 +96,10 @@ public:
   UPROPERTY(BlueprintReadWrite, Category = "Battle")
   bool bIsInBattleMap = false;
 
+  /** True while a ServerTravel call is in flight. */
+  UPROPERTY(Transient)
+  bool bTravelPending = false;
+
   /** Snapshot of the overworld territories captured before travelling. */
   UPROPERTY(BlueprintReadWrite, Category = "Battle")
   TArray<FS_Territory> CachedWorldMapTerritories;
@@ -114,11 +120,32 @@ public:
   UPROPERTY(BlueprintReadWrite, Category = "Turn")
   bool bResumeTurns = false;
 
+  /** Widget class used when showing the deploy overlay via the viewport. */
+  UPROPERTY(EditDefaultsOnly, Category = "UI")
+  TSubclassOf<UUserWidget> DeployWidgetClass;
+
+  /** Deploy widget instance owned by the game instance for Slate insertion. */
+  UPROPERTY(Transient)
+  TObjectPtr<UUserWidget> DeployWidget = nullptr;
+
+  /** Slate handle returned by TakeWidget when the deploy widget is shown. */
+  TSharedPtr<SWidget> DeployWidgetSlateHandle;
+
   UFUNCTION(BlueprintCallable)
   void SetTravelState(const FSkaldTravelState &InState);
 
+  /** Toggle the travel pending guard and log the change. */
+  UFUNCTION(BlueprintCallable)
+  void SetTravelPending(bool bInPending);
+
   UFUNCTION(BlueprintCallable, BlueprintPure)
   const FSkaldTravelState &GetTravelState() const { return TravelState; }
+
+  UFUNCTION(BlueprintCallable)
+  void ShowDeployWidget();
+
+  UFUNCTION(BlueprintCallable)
+  void HideDeployWidget();
 
   /** Seed the combat random stream so all clients use the same sequence. */
   UFUNCTION(BlueprintCallable, Category = "Battle")

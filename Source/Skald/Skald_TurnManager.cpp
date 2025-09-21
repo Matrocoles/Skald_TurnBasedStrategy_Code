@@ -84,6 +84,10 @@ void ATurnManager::HandleGridBattleEnded(ESkaldFaction /*WinningFaction*/, int32
 
   ResolveGridBattleResult();
 
+  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+    GI->SetTravelPending(true);
+  }
+
   if (UWorld *World = GetWorld()) {
     // Travel back to the overworld after the tactical battle ends
     World->ServerTravel(ReturnMapName);
@@ -98,6 +102,14 @@ void ATurnManager::RegisterController(ASkaldPlayerController *Controller) {
 }
 
 void ATurnManager::StartArmyPlacementPhase() {
+  if (const UWorld *W = GetWorld()) {
+    if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
+      if (GI->bTravelPending) {
+        return;
+      }
+    }
+  }
+
   CurrentPhase = ETurnPhase::ArmyPlacement;
   CurrentIndex = 0;
   BroadcastCurrentPhase();
@@ -161,6 +173,14 @@ void ATurnManager::SyncGameStateTurnIndex() {
 }
 
 void ATurnManager::StartTurns(ASkaldPlayerController *StartingController) {
+  if (const UWorld *W = GetWorld()) {
+    if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
+      if (GI->bTravelPending) {
+        return;
+      }
+    }
+  }
+
   SortControllersByInitiative();
 
   if (Controllers.Num() == 0) {
@@ -250,6 +270,14 @@ void ATurnManager::StartTurns(ASkaldPlayerController *StartingController) {
 }
 
 void ATurnManager::AdvanceTurn() {
+  if (const UWorld *W = GetWorld()) {
+    if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
+      if (GI->bTravelPending) {
+        return;
+      }
+    }
+  }
+
   ASkaldPlayerController *PreviousController =
       Controllers.IsValidIndex(CurrentIndex) ? Controllers[CurrentIndex].Get()
                                              : nullptr;
@@ -411,6 +439,7 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
       TravelState.DefenderTerritory = SeededBattle.TargetTerritoryID;
 
       GI->SetTravelState(TravelState);
+      GI->SetTravelPending(true);
       GI->bIsInBattleMap = true;
     }
     World->ServerTravel(MapToLoad);
@@ -598,6 +627,14 @@ void ATurnManager::ClientBattleResolved_Implementation(
 }
 
 void ATurnManager::BeginAttackPhase() {
+  if (const UWorld *W = GetWorld()) {
+    if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
+      if (GI->bTravelPending) {
+        return;
+      }
+    }
+  }
+
   // Enter the attack phase and notify all listeners so they can swap controls.
   CurrentPhase = ETurnPhase::Attack;
 
@@ -605,6 +642,14 @@ void ATurnManager::BeginAttackPhase() {
 }
 
 void ATurnManager::AdvancePhase() {
+  if (const UWorld *W = GetWorld()) {
+    if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
+      if (GI->bTravelPending) {
+        return;
+      }
+    }
+  }
+
   if (CurrentPhase == ETurnPhase::Reinforcement) {
     BeginAttackPhase();
     return;
@@ -634,6 +679,14 @@ void ATurnManager::AdvancePhase() {
 }
 
 void ATurnManager::BroadcastDeployableUnits(ASkaldPlayerState *ForPlayer) {
+  if (const UWorld *W = GetWorld()) {
+    if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
+      if (GI->bTravelPending) {
+        return;
+      }
+    }
+  }
+
   if (!ForPlayer) {
     return;
   }
@@ -653,6 +706,14 @@ void ATurnManager::BroadcastDeployableUnits(ASkaldPlayerState *ForPlayer) {
 }
 
 void ATurnManager::BroadcastResources(ASkaldPlayerState *ForPlayer) {
+  if (const UWorld *W = GetWorld()) {
+    if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
+      if (GI->bTravelPending) {
+        return;
+      }
+    }
+  }
+
   if (!ForPlayer) {
     return;
   }
@@ -674,6 +735,14 @@ void ATurnManager::BroadcastResources(ASkaldPlayerState *ForPlayer) {
 }
 
 void ATurnManager::BroadcastCurrentPhase() {
+  if (const UWorld *W = GetWorld()) {
+    if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
+      if (GI->bTravelPending) {
+        return;
+      }
+    }
+  }
+
   const FString PhaseString = UEnum::GetValueAsString(CurrentPhase);
   UE_LOG(LogSkald, Log, TEXT("BroadcastCurrentPhase: %s"), *PhaseString);
   if (GEngine) {

@@ -1034,6 +1034,14 @@ void ASkaldPlayerController::ServerDigTreasure_Implementation(
 }
 
 void ASkaldPlayerController::HandleEngineeringPhase() {
+  if (const UWorld *W = GetWorld()) {
+    if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
+      if (GI->bTravelPending) {
+        return;
+      }
+    }
+  }
+
   UE_LOG(LogSkald, Log, TEXT("Engineering phase started"));
   if (MainHudWidget) {
     MainHudWidget->CancelAttackSelection();
@@ -1043,6 +1051,14 @@ void ASkaldPlayerController::HandleEngineeringPhase() {
 }
 
 void ASkaldPlayerController::HandleTreasurePhase() {
+  if (const UWorld *W = GetWorld()) {
+    if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
+      if (GI->bTravelPending) {
+        return;
+      }
+    }
+  }
+
   UE_LOG(LogSkald, Log, TEXT("Treasure phase started"));
   if (MainHudWidget) {
     MainHudWidget->CancelAttackSelection();
@@ -1052,6 +1068,14 @@ void ASkaldPlayerController::HandleTreasurePhase() {
 }
 
 void ASkaldPlayerController::HandleMovementPhase() {
+  if (const UWorld *W = GetWorld()) {
+    if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
+      if (GI->bTravelPending) {
+        return;
+      }
+    }
+  }
+
   UE_LOG(LogSkald, Log, TEXT("Movement phase started"));
   if (MainHudWidget) {
     MainHudWidget->CancelAttackSelection();
@@ -1061,6 +1085,14 @@ void ASkaldPlayerController::HandleMovementPhase() {
 }
 
 void ASkaldPlayerController::HandleEndTurnPhase() {
+  if (const UWorld *W = GetWorld()) {
+    if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
+      if (GI->bTravelPending) {
+        return;
+      }
+    }
+  }
+
   UE_LOG(LogSkald, Log, TEXT("EndTurn phase started"));
   if (MainHudWidget) {
     MainHudWidget->ShowEndingTurn();
@@ -1069,6 +1101,14 @@ void ASkaldPlayerController::HandleEndTurnPhase() {
 }
 
 void ASkaldPlayerController::HandleRevoltPhase() {
+  if (const UWorld *W = GetWorld()) {
+    if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
+      if (GI->bTravelPending) {
+        return;
+      }
+    }
+  }
+
   UE_LOG(LogSkald, Log, TEXT("Revolt phase started"));
   if (MainHudWidget) {
     MainHudWidget->HideEndingTurn();

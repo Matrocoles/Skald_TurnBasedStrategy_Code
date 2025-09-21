@@ -2,6 +2,7 @@
 
 #include "Algo/RandomShuffle.h"
 #include "Algo/Sort.h"
+#include "AIController.h"
 #include "GridBattleManager.h"
 #include "Skald.h"
 #include "Skald_GameInstance.h"
@@ -140,6 +141,26 @@ ASkaldPlayerState *EnsureBattleParticipant(ASkaldGameState *GameState, UWorld *W
 }
 } // namespace
 
+void ASkald_BattleGameMode::InitGame(const FString &Map, const FString &Options,
+                                     FString &Error) {
+  Super::InitGame(Map, Options, Error);
+
+  ReadyControllers.Empty();
+
+  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+    GI->SetTravelPending(false);
+    const FSkaldTravelState &TravelState = GI->GetTravelState();
+    ExpectedControllers =
+        TravelState.bValid ? TravelState.ExpectedControllers : 0;
+    UE_LOG(LogSkald, Log, TEXT("BattleGM InitGame: ExpectedControllers=%d"),
+           ExpectedControllers);
+  } else {
+    ExpectedControllers = 0;
+    UE_LOG(LogSkald, Warning,
+           TEXT("BattleGM InitGame: GameInstance unavailable; waiting for controllers"));
+  }
+}
+
 void ASkald_BattleGameMode::BeginPlay() {
   Super::BeginPlay();
 
@@ -159,11 +180,11 @@ void ASkald_BattleGameMode::BeginPlay() {
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
   if (GI) {
     GI->GridBattleManager = BattleManager;
-    const FSkaldTravelState &TravelState = GI->GetTravelState();
-    ExpectedControllers = TravelState.bValid ? TravelState.ExpectedControllers : 0;
-    UE_LOG(LogSkald, Log,
-           TEXT("BattleGM BeginPlay: ExpectedControllers=%d"),
-           ExpectedControllers);
+    if (ExpectedControllers == 0) {
+      const FSkaldTravelState &TravelState = GI->GetTravelState();
+      ExpectedControllers =
+          TravelState.bValid ? TravelState.ExpectedControllers : 0;
+    }
   } else {
     ExpectedControllers = 0;
   }
@@ -462,14 +483,31 @@ void ASkald_BattleGameMode::PostLogin(APlayerController *NewPlayer) {
   Super::PostLogin(NewPlayer);
 
   if (NewPlayer) {
-    ReadyControllers.Add(NewPlayer);
+    OnControllerReady(NewPlayer);
   }
-
-  TryStartBattle();
 }
 
-void ASkald_BattleGameMode::OnAIControllerReady(AController *Controller) {
+void ASkald_BattleGameMode::OnAIControllerReady(AAIController *Controller) {
+  OnControllerReady(Controller);
+}
+
+void ASkald_BattleGameMode::OnControllerReady(AController *Controller) {
+  if (!IsValid(Controller)) {
+    return;
+  }
+
+  for (auto It = ReadyControllers.CreateIterator(); It; ++It) {
+    if (!It->IsValid()) {
+      It.RemoveCurrent();
+    }
+  }
+
   ReadyControllers.Add(Controller);
+
+  UE_LOG(LogSkald, Log,
+         TEXT("OnControllerReady: %s ReadyControllers=%d Expected=%d"),
+         *GetNameSafe(Controller), ReadyControllers.Num(), ExpectedControllers);
+
   TryStartBattle();
 }
 
@@ -484,25 +522,32 @@ void ASkald_BattleGameMode::TryStartBattle() {
     }
   }
 
-  const int32 Controllers = ReadyControllers.Num();
+  if (ExpectedControllers == 0) {
+    if (const USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+      const FSkaldTravelState &TravelState = GI->GetTravelState();
+      if (TravelState.bValid) {
+        ExpectedControllers = TravelState.ExpectedControllers;
+      }
+    }
+
+    if (ExpectedControllers == 0) {
+      UE_LOG(LogSkald, Warning,
+             TEXT("TryStartBattle: ExpectedControllers not ready; waiting."));
+      return;
+    }
+  }
+
   const ASkaldGameState *GS = GetGameState<ASkaldGameState>();
   const int32 PlayerStates = GS ? GS->PlayerArray.Num() : 0;
-
+  const int32 ReadyCount = ReadyControllers.Num();
   UE_LOG(LogSkald, Log,
          TEXT("TryStartBattle: ReadyControllers=%d PlayerStates=%d Expected=%d"),
-         Controllers, PlayerStates, ExpectedControllers);
+         ReadyCount, PlayerStates, ExpectedControllers);
 
-  if (ExpectedControllers <= 0) {
-    UE_LOG(LogSkald, Warning,
-           TEXT("TryStartBattle: ExpectedControllers not provided; launching immediately"));
-    TryLaunchBattle();
+  if (PlayerStates < ExpectedControllers || ReadyCount < ExpectedControllers) {
     return;
   }
 
-  if (Controllers >= ExpectedControllers && PlayerStates >= ExpectedControllers) {
-    UE_LOG(LogSkald, Log,
-           TEXT("TryStartBattle: All controllers ready, launching battle"));
-    TryLaunchBattle();
-  }
+  TryLaunchBattle();
 }
 

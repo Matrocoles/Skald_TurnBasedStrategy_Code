@@ -1,8 +1,10 @@
 #include "Skald_GameInstance.h"
 
 #include "Engine/Engine.h"
+#include "Engine/GameViewportClient.h"
 #include "Kismet/GameplayStatics.h"
 #include "Skald.h"
+#include "Blueprint/UserWidget.h"
 
 void USkaldGameInstance::Init() {
   Super::Init();
@@ -31,8 +33,61 @@ void USkaldGameInstance::SetTravelState(const FSkaldTravelState &InState) {
          TravelState.DefenderTerritory, TravelState.HumanOwnedTerritories.Num());
 }
 
+void USkaldGameInstance::SetTravelPending(bool bInPending) {
+  if (bTravelPending == bInPending) {
+    return;
+  }
+
+  bTravelPending = bInPending;
+  UE_LOG(LogSkald, Log, TEXT("GameInstance travel pending set: %s"),
+         bTravelPending ? TEXT("true") : TEXT("false"));
+}
+
 void USkaldGameInstance::SeedCombatRandomStream(int32 Seed) {
   CombatRandomStream.Initialize(Seed);
+}
+
+void USkaldGameInstance::ShowDeployWidget() {
+  if (!DeployWidget) {
+    TSubclassOf<UUserWidget> WidgetClass = DeployWidgetClass;
+    if (!WidgetClass) {
+      UE_LOG(LogSkald, Warning,
+             TEXT("ShowDeployWidget: DeployWidgetClass not set."));
+      return;
+    }
+
+    DeployWidget = CreateWidget<UUserWidget>(this, WidgetClass);
+  }
+
+  if (!DeployWidget) {
+    return;
+  }
+
+  if (DeployWidgetSlateHandle.IsValid()) {
+    // Already displayed via the viewport.
+    return;
+  }
+
+  if (UWorld *World = GetWorld()) {
+    if (UGameViewportClient *Viewport = World->GetGameViewport()) {
+      DeployWidgetSlateHandle = DeployWidget->TakeWidget();
+      Viewport->AddViewportWidgetContent(DeployWidgetSlateHandle.ToSharedRef());
+    }
+  }
+}
+
+void USkaldGameInstance::HideDeployWidget() {
+  if (!DeployWidgetSlateHandle.IsValid()) {
+    return;
+  }
+
+  if (UWorld *World = GetWorld()) {
+    if (UGameViewportClient *Viewport = World->GetGameViewport()) {
+      Viewport->RemoveViewportWidgetContent(DeployWidgetSlateHandle.ToSharedRef());
+    }
+  }
+
+  DeployWidgetSlateHandle.Reset();
 }
 
 void USkaldGameInstance::HandleNetworkFailure(
