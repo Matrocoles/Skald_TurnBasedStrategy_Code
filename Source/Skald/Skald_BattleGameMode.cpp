@@ -334,9 +334,11 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
   AutoCommitAIArmy(AttackerPS, AttackerBudget);
   AutoCommitAIArmy(DefenderPS, DefenderBudget);
 
-  TryStartBattle();
-
+  // Mark setup complete before attempting to start the battle to avoid
+  // TryStartBattle -> BootstrapFromTravelState -> SetupPendingBattle recursion.
   bPendingBattleSetupComplete = true;
+
+  TryStartBattle();
 }
 
 void ASkald_BattleGameMode::BootstrapFromTravelState() {
