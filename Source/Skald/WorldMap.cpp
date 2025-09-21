@@ -437,3 +437,44 @@ bool AWorldMap::IsOwnedBy(const ATerritory *Territory,
   }
   return Territory->OwningPlayer->GetPlayerId() == Player->GetPlayerId();
 }
+
+int32 AWorldMap::AutoPlaceUnitsForAI(ASkaldPlayerState *PlayerState) {
+  if (!PlayerState || PlayerState->DeployableUnits <= 0) {
+    return 0;
+  }
+
+  TArray<ATerritory *> OwnedTerritories;
+  for (ATerritory *Territory : Territories) {
+    if (Territory && Territory->OwningPlayer == PlayerState) {
+      OwnedTerritories.Add(Territory);
+    }
+  }
+
+  if (OwnedTerritories.Num() == 0) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("AutoPlaceUnitsForAI: PlayerState %d owns no territories"),
+           PlayerState->GetPlayerId());
+    return 0;
+  }
+
+  int32 UnitsPlaced = 0;
+  int32 Remaining = PlayerState->DeployableUnits;
+  int32 Index = 0;
+
+  while (Remaining > 0 && OwnedTerritories.Num() > 0) {
+    ATerritory *Target = OwnedTerritories[Index % OwnedTerritories.Num()];
+    if (!Target) {
+      ++Index;
+      continue;
+    }
+
+    ++Target->ArmyUnits;
+    Target->RefreshAppearance();
+    ++UnitsPlaced;
+    --Remaining;
+    ++Index;
+  }
+
+  PlayerState->DeployableUnits = Remaining;
+  return UnitsPlaced;
+}

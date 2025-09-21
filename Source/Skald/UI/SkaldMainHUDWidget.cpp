@@ -602,7 +602,8 @@ void USkaldMainHUDWidget::HandlePlayersUpdated() {
     if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
       FS_PlayerData Data;
       Data.PlayerID = PS->GetPlayerId();
-      Data.PlayerName = PS->PlayerDisplayName;
+      Data.PlayerName =
+          PS->GetResolvedPlayerName(TEXT("SkaldMainHUDWidget::RefreshPlayers"));
       Data.IsAI = PS->bIsAI;
       Data.Faction = PS->Faction;
       Players.Add(Data);
@@ -740,7 +741,11 @@ void USkaldMainHUDWidget::HandleAttackApproved() {
             if (Source->OwningPlayer) {
               Battle.AttackerPlayerID = Source->OwningPlayer->GetPlayerId();
               Battle.AttackerFaction = Source->OwningPlayer->Faction;
-              Battle.AttackerDisplayName = Source->OwningPlayer->PlayerDisplayName;
+              Battle.AttackerDisplayName = Source->OwningPlayer
+                                                 ? Source->OwningPlayer
+                                                       ->GetResolvedPlayerName(
+                                                           TEXT("HUD_Attack_Attacker"))
+                                                 : TEXT("Neutral");
               Battle.bAttackerIsAI = Source->OwningPlayer->bIsAI;
             }
             if (bUseSiege && Source->BuiltSiegeID > 0) {
@@ -752,7 +757,11 @@ void USkaldMainHUDWidget::HandleAttackApproved() {
             if (Target->OwningPlayer) {
               Battle.DefenderPlayerID = Target->OwningPlayer->GetPlayerId();
               Battle.DefenderFaction = Target->OwningPlayer->Faction;
-              Battle.DefenderDisplayName = Target->OwningPlayer->PlayerDisplayName;
+              Battle.DefenderDisplayName = Target->OwningPlayer
+                                                 ? Target->OwningPlayer
+                                                       ->GetResolvedPlayerName(
+                                                           TEXT("HUD_Attack_Defender"))
+                                                 : TEXT("Neutral");
               Battle.bDefenderIsAI = Target->OwningPlayer->bIsAI;
             }
             Battle.IsCapitalAttack = Target->bIsCapital;

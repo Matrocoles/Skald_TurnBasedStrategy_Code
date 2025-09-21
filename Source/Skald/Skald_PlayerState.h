@@ -16,6 +16,10 @@ class SKALD_API ASkaldPlayerState : public APlayerState {
 public:
   ASkaldPlayerState();
 
+  /** Retrieve the player name, logging if none has been assigned. */
+  FString GetResolvedPlayerName(const TCHAR *Context = TEXT("SkaldPlayerState"))
+      const;
+
   /** Deployable units available for placement. */
   UPROPERTY(BlueprintReadWrite, ReplicatedUsing = OnRep_DeployableUnits,
             Category = "PlayerState")

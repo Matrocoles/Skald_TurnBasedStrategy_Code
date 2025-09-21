@@ -53,28 +53,6 @@ void ASkaldAIController::MakeAIDecision() {
     const ETurnPhase PrevPhase = Phase;
 
     if (Phase == ETurnPhase::ArmyPlacement) {
-      TArray<ATerritory *> OwnedTerritories;
-      for (ATerritory *Territory : WorldMap->Territories) {
-        if (Territory && Territory->OwningPlayer == PS) {
-          OwnedTerritories.Add(Territory);
-        }
-      }
-
-      int32 SpreadIndex = 0;
-      while (PS->DeployableUnits > 0 && OwnedTerritories.Num() > 0) {
-        ATerritory *TargetTerritory =
-            OwnedTerritories[SpreadIndex % OwnedTerritories.Num()];
-        ++TargetTerritory->ArmyUnits;
-        TargetTerritory->RefreshAppearance();
-        --PS->DeployableUnits;
-        ++SpreadIndex;
-      }
-
-      TurnManager->BroadcastDeployableUnits(PS);
-      if (ASkaldGameMode *GM =
-              GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
-        GM->AdvanceArmyPlacement();
-      }
       return;
     } else if (Phase == ETurnPhase::Reinforcement) {
       TArray<ATerritory *> OwnedTerritories;

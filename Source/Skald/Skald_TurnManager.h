@@ -50,6 +50,10 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void AdvancePhase();
 
+  /** Resolve the active phase immediately, progressing when appropriate. */
+  UFUNCTION(BlueprintCallable, Category = "Turn")
+  void EndCurrentPhase();
+
   /** Update all players' HUDs with the specified player's deployable units. */
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void BroadcastDeployableUnits(class ASkaldPlayerState *ForPlayer);

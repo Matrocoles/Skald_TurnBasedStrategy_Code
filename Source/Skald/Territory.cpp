@@ -289,8 +289,10 @@ void ATerritory::UpdateLabel() {
     return;
   }
 
-  const FString OwnerName =
-      OwningPlayer ? OwningPlayer->PlayerDisplayName : TEXT("Neutral");
+  const FString OwnerName = OwningPlayer
+                               ? OwningPlayer->GetResolvedPlayerName(
+                                     TEXT("Territory::UpdateLabel"))
+                               : TEXT("Neutral");
   const FString Text = FString::Printf(TEXT("%s\nOwner: %s\nUnits: %d"),
                                        *TerritoryName, *OwnerName, ArmyUnits);
   LabelComponent->SetText(FText::FromString(Text));

@@ -137,5 +137,9 @@ public:
   bool IsOwnedBy(const ATerritory *Territory,
                  const ASkaldPlayerState *Player) const;
 
+  /** Automatically distribute remaining deployable units across owned territories. */
+  UFUNCTION(BlueprintCallable, Category = "WorldMap")
+  int32 AutoPlaceUnitsForAI(ASkaldPlayerState *PlayerState);
+
 protected:
 };

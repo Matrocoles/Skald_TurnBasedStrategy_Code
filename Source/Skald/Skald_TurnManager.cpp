@@ -15,6 +15,17 @@
 #include "UI/SkaldMainHUDWidget.h"
 #include "WorldMap.h"
 
+namespace {
+FString GetResolvedPlayerName(const ASkaldPlayerState *PlayerState,
+                              const TCHAR *Context) {
+  if (!PlayerState) {
+    return TEXT("Unknown");
+  }
+
+  return PlayerState->GetResolvedPlayerName(Context);
+}
+} // namespace
+
 ATurnManager::ATurnManager() {
   PrimaryActorTick.bCanEverTick = false;
   bReplicates = true;
@@ -231,7 +242,8 @@ void ATurnManager::StartTurns(ASkaldPlayerController *StartingController) {
   }
 
   ASkaldPlayerState *PS = CurrentController->GetPlayerState<ASkaldPlayerState>();
-  const FString PlayerName = PS ? PS->PlayerDisplayName : TEXT("Unknown");
+  const FString PlayerName =
+      GetResolvedPlayerName(PS, TEXT("StartTurns_Current"));
   ApplyReinforcementsAndResources(PS, TEXT("StartTurns"));
 
   CurrentPhase = ETurnPhase::Reinforcement;
@@ -285,7 +297,8 @@ void ATurnManager::AdvanceTurn() {
   if (PreviousController) {
     if (ASkaldPlayerState *PrevPS =
             PreviousController->GetPlayerState<ASkaldPlayerState>()) {
-      PreviousPlayerName = PrevPS->PlayerDisplayName;
+      PreviousPlayerName =
+          GetResolvedPlayerName(PrevPS, TEXT("AdvanceTurn_Previous"));
     }
   }
 
@@ -322,7 +335,8 @@ void ATurnManager::AdvanceTurn() {
           Controllers[CurrentIndex].Get()) {
     ASkaldPlayerState *PS =
         CurrentController->GetPlayerState<ASkaldPlayerState>();
-    const FString PlayerName = PS ? PS->PlayerDisplayName : TEXT("Unknown");
+    const FString PlayerName =
+        GetResolvedPlayerName(PS, TEXT("AdvanceTurn_Current"));
     ApplyReinforcementsAndResources(PS, TEXT("AdvanceTurn"));
 
     CurrentPhase = ETurnPhase::Reinforcement;
@@ -617,8 +631,17 @@ void ATurnManager::ClientBattleResolved_Implementation(
        It; ++It) {
     if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(It->Get())) {
       if (USkaldMainHUDWidget *HUD = PC->GetHUDWidget()) {
+        FString WinnerName = TEXT("Unknown");
+        if (ASkaldGameState *GSLocal =
+                GetWorld()->GetGameState<ASkaldGameState>()) {
+          if (ASkaldPlayerState *WinnerPS =
+                  GSLocal->GetPlayerById(WinningPlayerID)) {
+            WinnerName =
+                GetResolvedPlayerName(WinnerPS, TEXT("ClientBattleResolved"));
+          }
+        }
         const FString Msg = FString::Printf(
-            TEXT("Player %d won: A-%d D-%d casualties"), WinningPlayerID,
+            TEXT("%s won: A-%d D-%d casualties"), *WinnerName,
             AttackerCasualties, DefenderCasualties);
         HUD->UpdateInitiativeText(Msg);
       }
@@ -679,6 +702,25 @@ void ATurnManager::AdvancePhase() {
   }
 
   BroadcastCurrentPhase();
+}
+
+void ATurnManager::EndCurrentPhase() {
+  if (const UWorld *W = GetWorld()) {
+    if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
+      if (GI->bTravelPending) {
+        return;
+      }
+    }
+  }
+
+  if (CurrentPhase == ETurnPhase::ArmyPlacement) {
+    if (ASkaldGameMode *GM = GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
+      GM->AdvanceArmyPlacement();
+    }
+    return;
+  }
+
+  AdvancePhase();
 }
 
 void ATurnManager::BroadcastDeployableUnits(ASkaldPlayerState *ForPlayer) {
