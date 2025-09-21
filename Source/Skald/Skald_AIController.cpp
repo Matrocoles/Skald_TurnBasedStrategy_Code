@@ -21,7 +21,7 @@ void ASkaldAIController::BeginPlay() {
   if (UWorld *World = GetWorld()) {
     if (ASkald_BattleGameMode *BattleGM =
             World->GetAuthGameMode<ASkald_BattleGameMode>()) {
-      BattleGM->OnAIControllerReady(this);
+      BattleGM->OnControllerReady(this);
     }
   }
 }
