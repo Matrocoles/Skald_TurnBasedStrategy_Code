@@ -28,6 +28,9 @@ void USkaldGameInstance::Init() {
 void USkaldGameInstance::SetTravelState(const FSkaldTravelState &InState) {
   TravelState = InState;
   TravelState.bValid = true;
+  if (TravelState.CachedTerritories.Num() > 0) {
+    CachedWorldMapTerritories = TravelState.CachedTerritories;
+  }
   UE_LOG(LogSkald, Log,
          TEXT("GameInstance travel state set: Expected=%d Attacker=%d Defender=%d HumanTerritories=%d"),
          TravelState.ExpectedControllers, TravelState.AttackerTerritory,

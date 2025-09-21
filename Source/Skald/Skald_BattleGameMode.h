@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Skald_GameMode.h"
+#include "SkaldTypes.h"
 #include "AIController.h"
 #include "Skald_BattleGameMode.generated.h"
 
@@ -46,5 +47,11 @@ private:
 
   // Track who has arrived/ready on the new map
   TSet<TWeakObjectPtr<AController>> ReadyControllers;
+
+  /** Territory IDs owned by human players when travel began. */
+  TSet<int32> CachedHumanTerritoryIDs;
+
+  /** Snapshot of overworld territory data captured prior to travel. */
+  TMap<int32, FS_Territory> CachedTerritoryMap;
 };
 
