@@ -468,8 +468,11 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
         }
         for (const FS_Territory &Territory : GI->CachedWorldMapTerritories) {
           if (Territory.TerritoryID == TerritoryId) {
-            if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
-              return GS->GetPlayerById(Territory.OwnerPlayerID);
+            if (UWorld *World = GetWorld()) {
+              if (ASkaldGameState *GS =
+                      World->GetGameState<ASkaldGameState>()) {
+                return GS->GetPlayerById(Territory.OwnerPlayerID);
+              }
             }
           }
         }
