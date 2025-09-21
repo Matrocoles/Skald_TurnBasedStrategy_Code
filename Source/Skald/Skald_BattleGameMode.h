@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Skald_GameMode.h"
+#include "AIController.h"
 #include "Skald_BattleGameMode.generated.h"
 
 class AAIController;
