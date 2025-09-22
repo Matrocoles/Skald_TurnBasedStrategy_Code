@@ -9,6 +9,8 @@
 class AAIController;
 class AController;
 
+DECLARE_LOG_CATEGORY_EXTERN(LogSkaldBattle, Log, All);
+
 /** GameMode dedicated to resolving grid-based battles. */
 UCLASS()
 class SKALD_API ASkald_BattleGameMode : public ASkaldGameMode {
@@ -33,34 +35,30 @@ public:
   void OnControllerReady(AController *Controller);
 
 private:
-  void BootstrapFromTravelState();
   void SetupPendingBattle();
   void AutoCommitAIArmy(ASkaldPlayerState *PlayerState, int32 Budget) const;
   void SpawnFighterSide(const TArray<FFighterDefinition> &Roster, bool bAsAttacker);
   void TryStartBattle();
-  void PruneInvalidReadyControllers();
+
+  bool IsSoloMatch() const;
+  void PollBattleBootstrap();
 
   /** Ensures the battle only launches once per travel. */
   bool bBattleLaunched = false;
 
   // Expected count comes from GameInstance travel state
-  UPROPERTY(VisibleAnywhere, Transient)
-  int32 ExpectedControllers = 0;
+  UPROPERTY(EditDefaultsOnly, Category = "Battle|Bootstrap")
+  int32 ExpectedControllers = 1;
 
-  // Track who has arrived/ready on the new map
-  TSet<TWeakObjectPtr<AController>> ReadyControllers;
+  FTimerHandle WaitForPlayersHandle;
+  bool bSetupStarted = false;
+  bool bSetupCompleted = false;
 
   /** Territory IDs owned by human players when travel began. */
   TSet<int32> CachedHumanTerritoryIDs;
 
   /** Snapshot of overworld territory data captured prior to travel. */
   TMap<int32, FS_Territory> CachedTerritoryMap;
-
-  /** Timer used to defer readiness checks until all PlayerStates exist. */
-  FTimerHandle TravelBootstrapHandle;
-
-  /** True once SetupPendingBattle has executed for the current travel. */
-  bool bPendingBattleSetupComplete = false;
 
   /** Ensure we only log the cache restoration message once. */
   bool bLoggedTravelCache = false;

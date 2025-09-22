@@ -87,8 +87,14 @@ public:
   UFUNCTION(Client, Reliable)
   void Client_ShowFighterSelection(int32 MaxBudget, ESkaldFaction Faction);
 
+  UFUNCTION(Client, Reliable)
+  void Client_ShowDeployUI();
+
   UFUNCTION(Server, Reliable, WithValidation)
   void Server_CommitArmy(const TArray<FFighterDefinition> &Chosen);
+
+  UFUNCTION()
+  void HandleBattlePhaseChanged();
 
 protected:
   /** Widget class to instantiate for the player's HUD.
@@ -345,6 +351,8 @@ private:
   /** Whether we should display the battle HUD as soon as fighters activate. */
   bool bBattleHUDReadyToShow;
 
+  bool bDeployWidgetShown = false;
+
   /** Whether the current map is a battle map. */
   UPROPERTY(BlueprintReadOnly, Category = "Turn",
             meta = (AllowPrivateAccess = "true"))
@@ -366,6 +374,8 @@ private:
 
   /** Spawn or refresh the fighter selection UI. */
   void ShowFighterSelectionUI(int32 MaxBudget, ESkaldFaction Faction);
+
+  void ShowDeployUIInternal();
 
   /** Ensure a valid TurnManager is available, attempting reacquisition if
    * needed. */

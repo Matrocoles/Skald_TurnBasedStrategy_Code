@@ -11,6 +11,14 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSkaldPlayersUpdated);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSkaldTurnIndexChanged, int32, NewTurnIndex);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FFighterRosterUpdated);
 
+UENUM(BlueprintType)
+enum class EBattlePhase : uint8
+{
+    None,
+    Deploy,
+    // Additional phases can be added here as the flow expands
+};
+
 /**
  * Stores information about players and the current turn.
  */
@@ -25,6 +33,9 @@ public:
     /** List of players participating in the match. */
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_Players, Category="GameState")
     TArray<ASkaldPlayerState*> Players;
+
+    UPROPERTY(ReplicatedUsing=OnRep_BattlePhase)
+    EBattlePhase BattlePhase = EBattlePhase::None;
 
     /** Broadcast whenever the player list changes. */
     UPROPERTY(BlueprintAssignable, Category="GameState|Events")
@@ -79,6 +90,8 @@ public:
     UFUNCTION(Server, Reliable)
     void ServerSetFighterRoster(const TArray<FFighterDefinition>& InRoster);
 
+    void SetBattlePhase(EBattlePhase NewPhase);
+
     /** Getter for BP/UI */
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="GameState|Fighters")
     const TArray<FFighterDefinition>& GetFighterRoster() const { return FighterRoster; }
@@ -92,6 +105,9 @@ public:
 protected:
     UFUNCTION()
     void OnRep_Players();
+
+    UFUNCTION()
+    void OnRep_BattlePhase();
 
     UFUNCTION()
     void OnRep_CurrentTurnIndex();
