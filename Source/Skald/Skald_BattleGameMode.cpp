@@ -398,30 +398,34 @@ void ASkald_BattleGameMode::BootstrapFromTravelState() {
   if (ExpectedControllers <= 0) {
     if (TravelState.bValid && TravelState.ExpectedControllers > 0) {
       ExpectedControllers = TravelState.ExpectedControllers;
-    } else {
+    }
+    if (ExpectedControllers <= 0) {
       ExpectedControllers = GS->PlayerArray.Num();
     }
   }
 
-  int32 ControllerCount = 0;
-  for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It;
-       ++It) {
-    ++ControllerCount;
-  }
+  PruneInvalidReadyControllers();
 
   const int32 PlayerStateCount = GS->PlayerArray.Num();
-  if (ControllerCount > 0) {
-    ExpectedControllers = FMath::Max(ExpectedControllers, ControllerCount);
+  const int32 ReadyControllerCount = ReadyControllers.Num();
+
+  if (ReadyControllerCount > ExpectedControllers) {
+    ExpectedControllers = ReadyControllerCount;
   }
-  const int32 NeededControllers = FMath::Max(2, ExpectedControllers);
+
+  const bool bSinglePlayer = (ExpectedControllers <= 1);
+  const bool bEnoughToSetup = bSinglePlayer
+                                  ? (PlayerStateCount >= 1 || ReadyControllerCount >= 1)
+                                  : (PlayerStateCount >= ExpectedControllers &&
+                                     ReadyControllerCount >= ExpectedControllers);
 
   UE_LOG(LogSkald, Verbose,
-         TEXT("BattleGM BootstrapFromTravelState: Controllers=%d PlayerStates=%d Expected=%d ReadyControllers=%d SetupComplete=%s"),
-         ControllerCount, PlayerStateCount, NeededControllers,
-         ReadyControllers.Num(),
+         TEXT("BattleGM BootstrapFromTravelState: PlayerStates=%d ReadyControllers=%d Expected=%d SinglePlayer=%s SetupComplete=%s"),
+         PlayerStateCount, ReadyControllerCount, ExpectedControllers,
+         bSinglePlayer ? TEXT("true") : TEXT("false"),
          bPendingBattleSetupComplete ? TEXT("true") : TEXT("false"));
 
-  if (ControllerCount < NeededControllers || PlayerStateCount < NeededControllers) {
+  if (!bEnoughToSetup) {
     World->GetTimerManager().SetTimer(
         TravelBootstrapHandle, this,
         &ASkald_BattleGameMode::BootstrapFromTravelState, 0.25f, false);
@@ -431,6 +435,10 @@ void ASkald_BattleGameMode::BootstrapFromTravelState() {
   World->GetTimerManager().ClearTimer(TravelBootstrapHandle);
 
   if (!bPendingBattleSetupComplete) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("BattleGM Bootstrap: proceeding to SetupPendingBattle (SinglePlayer=%s, PlayerStates=%d, ReadyControllers=%d, Expected=%d)"),
+           bSinglePlayer ? TEXT("true") : TEXT("false"), PlayerStateCount,
+           ReadyControllerCount, ExpectedControllers);
     SetupPendingBattle();
   } else {
     TryStartBattle();
@@ -676,6 +684,18 @@ void ASkald_BattleGameMode::TryStartBattle() {
     return;
   }
 
+  PruneInvalidReadyControllers();
+
+  if (!bPendingBattleSetupComplete) {
+    BootstrapFromTravelState();
+    if (!bPendingBattleSetupComplete) {
+      UE_LOG(LogSkald, Verbose,
+             TEXT("BattleGM TryStartBattle: pending setup incomplete (ReadyControllers=%d Expected=%d)"),
+             ReadyControllers.Num(), ExpectedControllers);
+      return;
+    }
+  }
+
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
   if (!GI || !GI->GridBattleManager) {
     return;
@@ -686,28 +706,26 @@ void ASkald_BattleGameMode::TryStartBattle() {
     return;
   }
 
-  PruneInvalidReadyControllers();
+  const FS_BattlePayload &Battle = GI->PendingBattle;
 
-  if (!bPendingBattleSetupComplete) {
+  ASkaldPlayerState *AttackerPS =
+      GS->GetPlayerById(Battle.AttackerPlayerID);
+  ASkaldPlayerState *DefenderPS =
+      GS->GetPlayerById(Battle.DefenderPlayerID);
+
+  if (!AttackerPS || !DefenderPS) {
     UE_LOG(LogSkald, Verbose,
-           TEXT("BattleGM TryStartBattle: Pending setup incomplete; ReadyControllers=%d Expected=%d"),
-           ReadyControllers.Num(), ExpectedControllers);
+           TEXT("BattleGM TryStartBattle: waiting for participant PlayerStates (AttackerId=%d Status=%s DefenderId=%d Status=%s)"),
+           Battle.AttackerPlayerID, AttackerPS ? TEXT("ready") : TEXT("missing"),
+           Battle.DefenderPlayerID, DefenderPS ? TEXT("ready") : TEXT("missing"));
     return;
   }
 
-  const int32 PlayerStateCount = GS->PlayerArray.Num();
-  if (ExpectedControllers <= 0 && PlayerStateCount > 0) {
-    ExpectedControllers = PlayerStateCount;
-  }
-
-  const int32 NeededControllers = FMath::Max(2, ExpectedControllers);
-  const int32 ReadyCount = ReadyControllers.Num();
-
-  UE_LOG(LogSkald, Verbose,
-         TEXT("BattleGM TryStartBattle: ReadyControllers=%d PlayerStates=%d Expected=%d"),
-         ReadyCount, PlayerStateCount, NeededControllers);
-
-  if (ReadyCount < NeededControllers || PlayerStateCount < NeededControllers) {
+  if (!AttackerPS->bArmyLockedIn || !DefenderPS->bArmyLockedIn) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("BattleGM TryStartBattle: waiting for armies lock-in (Attacker=%s Defender=%s)"),
+           AttackerPS->bArmyLockedIn ? TEXT("locked") : TEXT("pending"),
+           DefenderPS->bArmyLockedIn ? TEXT("locked") : TEXT("pending"));
     return;
   }
 
