@@ -32,9 +32,15 @@ void USkaldGameInstance::SetTravelState(const FSkaldTravelState &InState) {
     CachedWorldMapTerritories = TravelState.CachedTerritories;
   }
   UE_LOG(LogSkald, Log,
-         TEXT("GameInstance travel state set: Expected=%d Attacker=%d Defender=%d HumanTerritories=%d"),
+         TEXT("GameInstance travel state set: Expected=%d Attacker=%d Defender=%d HumanTerritories=%d CachedTerritories=%d"),
          TravelState.ExpectedControllers, TravelState.AttackerTerritory,
-         TravelState.DefenderTerritory, TravelState.HumanOwnedTerritories.Num());
+         TravelState.DefenderTerritory, TravelState.HumanOwnedTerritories.Num(),
+         TravelState.CachedTerritories.Num());
+
+  if (TravelState.CachedTerritories.Num() == 0) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("GameInstance travel state missing cached territories snapshot"));
+  }
 }
 
 void USkaldGameInstance::SetTravelPending(bool bInPending) {

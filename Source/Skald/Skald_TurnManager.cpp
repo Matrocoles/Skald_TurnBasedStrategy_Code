@@ -427,91 +427,147 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
         MapToLoad = Selected;
       }
     }
-    if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
-      FSkaldTravelState TravelState;
-      int32 ValidControllers = 0;
-      for (const TWeakObjectPtr<ASkaldPlayerController> &Ptr : Controllers) {
-        if (Ptr.IsValid()) {
-          ++ValidControllers;
-        }
-      }
-      TravelState.ExpectedControllers = ValidControllers;
 
-      if (CachedWorldMap) {
-        for (ATerritory *Territory : CachedWorldMap->Territories) {
-          const ASkaldPlayerState *TerritoryOwner =
-              Territory ? Territory->OwningPlayer : nullptr;
-          if (TerritoryOwner && !TerritoryOwner->bIsAI) {
-            TravelState.HumanOwnedTerritories.AddUnique(
-                Territory->TerritoryID);
+    USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+    ASkaldGameState *GS = World->GetGameState<ASkaldGameState>();
+
+    FSkaldTravelState TravelState;
+    int32 ValidControllers = 0;
+    for (const TWeakObjectPtr<ASkaldPlayerController> &Ptr : Controllers) {
+      if (Ptr.IsValid()) {
+        ++ValidControllers;
+      }
+    }
+    TravelState.ExpectedControllers = ValidControllers;
+    TravelState.AttackerTerritory = SeededBattle.FromTerritoryID;
+    TravelState.DefenderTerritory = SeededBattle.TargetTerritoryID;
+
+    auto AppendHumanOwnership = [&](ASkaldPlayerState *Owner, int32 TerritoryID) {
+      if (Owner && !Owner->bIsAI && TerritoryID > 0) {
+        TravelState.HumanOwnedTerritories.AddUnique(TerritoryID);
+      }
+    };
+
+    TArray<FS_Territory> TerritorySnapshots;
+    if (CachedWorldMap) {
+      TerritorySnapshots.Reserve(CachedWorldMap->Territories.Num());
+      for (ATerritory *Territory : CachedWorldMap->Territories) {
+        if (!Territory) {
+          continue;
+        }
+
+        ASkaldPlayerState *Owner = Territory->OwningPlayer;
+        AppendHumanOwnership(Owner, Territory->TerritoryID);
+
+        FS_Territory Snapshot;
+        Snapshot.TerritoryID = Territory->TerritoryID;
+        Snapshot.TerritoryName = Territory->TerritoryName;
+        Snapshot.OwnerPlayerID = Owner ? Owner->GetPlayerId() : 0;
+        Snapshot.IsCapital = Territory->bIsCapital;
+        Snapshot.CapitalOwner = Snapshot.OwnerPlayerID;
+        Snapshot.ArmyUnits = Territory->ArmyUnits;
+        Snapshot.ContinentID = Territory->ContinentID;
+        Snapshot.Location = Territory->GetActorLocation();
+        Snapshot.HasTreasure = Territory->bHasTreasure;
+        Snapshot.BuiltSiegeID = Territory->BuiltSiegeID;
+        Snapshot.AdjacentIDs.Reset();
+        for (ATerritory *Adjacent : Territory->AdjacentTerritories) {
+          if (Adjacent) {
+            Snapshot.AdjacentIDs.Add(Adjacent->TerritoryID);
+          }
+        }
+
+        TerritorySnapshots.Add(MoveTemp(Snapshot));
+      }
+    } else if (GI && GI->CachedWorldMapTerritories.Num() > 0) {
+      TerritorySnapshots = GI->CachedWorldMapTerritories;
+      for (const FS_Territory &Snapshot : TerritorySnapshots) {
+        if (Snapshot.OwnerPlayerID > 0 && GS) {
+          if (ASkaldPlayerState *Owner = GS->GetPlayerById(Snapshot.OwnerPlayerID)) {
+            AppendHumanOwnership(Owner, Snapshot.TerritoryID);
           }
         }
       }
+    }
 
-      TravelState.AttackerTerritory = SeededBattle.FromTerritoryID;
-      TravelState.DefenderTerritory = SeededBattle.TargetTerritoryID;
-      if (GI->CachedWorldMapTerritories.Num() > 0) {
-        TravelState.CachedTerritories = GI->CachedWorldMapTerritories;
-      }
+    TravelState.CachedTerritories = MoveTemp(TerritorySnapshots);
 
-      GI->SetTravelState(TravelState);
+    FS_BattlePayload PendingPayload = SeededBattle;
+    PendingPayload.FromTerritoryID = SeededBattle.FromTerritoryID;
+    PendingPayload.TargetTerritoryID = SeededBattle.TargetTerritoryID;
 
-      FS_BattlePayload PendingPayload = SeededBattle;
-
-      auto ResolveOwnerPS = [&](int32 TerritoryId) -> ASkaldPlayerState * {
-        if (CachedWorldMap) {
-          for (ATerritory *Territory : CachedWorldMap->Territories) {
-            if (Territory && Territory->TerritoryID == TerritoryId) {
-              return Territory->OwningPlayer;
-            }
-          }
-        }
-        for (const FS_Territory &Territory : GI->CachedWorldMapTerritories) {
-          if (Territory.TerritoryID == TerritoryId) {
-            if (UWorld *World = GetWorld()) {
-              if (ASkaldGameState *GS =
-                      World->GetGameState<ASkaldGameState>()) {
-                return GS->GetPlayerById(Territory.OwnerPlayerID);
-              }
-            }
-          }
-        }
+    auto FindTerritory = [&](int32 TerritoryId) -> ATerritory * {
+      if (!CachedWorldMap) {
         return nullptr;
-      };
-
-      ASkaldPlayerState *AttPS =
-          ResolveOwnerPS(TravelState.AttackerTerritory);
-      ASkaldPlayerState *DefPS =
-          ResolveOwnerPS(TravelState.DefenderTerritory);
-
-      PendingPayload.AttackerPlayerID =
-          AttPS ? AttPS->GetPlayerId() : PendingPayload.AttackerPlayerID;
-      PendingPayload.DefenderPlayerID =
-          DefPS ? DefPS->GetPlayerId() : PendingPayload.DefenderPlayerID;
-      PendingPayload.AttackerDisplayName = AttPS
-                                               ? AttPS->PlayerDisplayName
-                                               : PendingPayload.AttackerDisplayName;
-      PendingPayload.DefenderDisplayName = DefPS
-                                               ? DefPS->PlayerDisplayName
-                                               : PendingPayload.DefenderDisplayName;
-      PendingPayload.AttackerFaction = AttPS ? AttPS->Faction
-                                             : PendingPayload.AttackerFaction;
-      PendingPayload.DefenderFaction = DefPS ? DefPS->Faction
-                                             : PendingPayload.DefenderFaction;
-      PendingPayload.bAttackerIsAI = AttPS ? AttPS->bIsAI
-                                           : PendingPayload.bAttackerIsAI;
-      PendingPayload.bDefenderIsAI = DefPS ? DefPS->bIsAI
-                                           : PendingPayload.bDefenderIsAI;
-
-      if (PendingPayload.DefenderArmyCount <= 0) {
-        PendingPayload.DefenderArmyCount = PendingPayload.ArmyCountSent;
       }
+      for (ATerritory *Territory : CachedWorldMap->Territories) {
+        if (Territory && Territory->TerritoryID == TerritoryId) {
+          return Territory;
+        }
+      }
+      return nullptr;
+    };
 
-      PendingBattle = PendingPayload;
+    auto ResolveParticipant = [&](int32 TerritoryId,
+                                   ASkaldPlayerState *ExistingPS,
+                                   int32 &OutPlayerID, FString &OutName,
+                                   ESkaldFaction &OutFaction, bool &bOutIsAI)
+        -> ASkaldPlayerState * {
+      ASkaldPlayerState *Resolved = ExistingPS;
+      if (!Resolved) {
+        if (ATerritory *Territory = FindTerritory(TerritoryId)) {
+          Resolved = Territory->OwningPlayer;
+        }
+      }
+      if (!Resolved && GS && OutPlayerID > 0) {
+        Resolved = GS->GetPlayerById(OutPlayerID);
+      }
+      if (Resolved) {
+        OutPlayerID = Resolved->GetPlayerId();
+        OutName = Resolved->GetResolvedPlayerName(TEXT("TriggerGridBattle"));
+        OutFaction = Resolved->Faction;
+        bOutIsAI = Resolved->bIsAI;
+      }
+      return Resolved;
+    };
+
+    ResolveParticipant(PendingPayload.FromTerritoryID, nullptr,
+                      PendingPayload.AttackerPlayerID,
+                      PendingPayload.AttackerDisplayName,
+                      PendingPayload.AttackerFaction,
+                      PendingPayload.bAttackerIsAI);
+    ResolveParticipant(PendingPayload.TargetTerritoryID, nullptr,
+                      PendingPayload.DefenderPlayerID,
+                      PendingPayload.DefenderDisplayName,
+                      PendingPayload.DefenderFaction,
+                      PendingPayload.bDefenderIsAI);
+
+    if (PendingPayload.DefenderArmyCount <= 0) {
+      if (ATerritory *DefTerritory = FindTerritory(PendingPayload.TargetTerritoryID)) {
+        PendingPayload.DefenderArmyCount = DefTerritory->ArmyUnits;
+      }
+    }
+    if (PendingPayload.DefenderArmyCount <= 0) {
+      PendingPayload.DefenderArmyCount = PendingPayload.ArmyCountSent;
+    }
+
+    PendingBattle = PendingPayload;
+    if (GI) {
+      GI->SetTravelState(TravelState);
       GI->PendingBattle = PendingPayload;
       GI->SetTravelPending(true);
       GI->bIsInBattleMap = true;
     }
+
+    UE_LOG(LogSkald, Log,
+           TEXT("TriggerGridBattle: AttackerID=%d Name=%s Budget=%d DefenderID=%d Name=%s Budget=%d HumanOwned=%d CachedTerritories=%d"),
+           PendingPayload.AttackerPlayerID, *PendingPayload.AttackerDisplayName,
+           PendingPayload.ArmyCountSent, PendingPayload.DefenderPlayerID,
+           *PendingPayload.DefenderDisplayName,
+           PendingPayload.DefenderArmyCount,
+           TravelState.HumanOwnedTerritories.Num(),
+           TravelState.CachedTerritories.Num());
+
     World->ServerTravel(MapToLoad);
   }
 }
