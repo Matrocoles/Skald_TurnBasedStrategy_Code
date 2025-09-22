@@ -1,6 +1,5 @@
 #include "Skald_BattleGameMode.h"
-
-DEFINE_LOG_CATEGORY(LogSkaldBattle);
+#include "SkaldLogging.h"
 
 #include "Algo/RandomShuffle.h"
 #include "Algo/Sort.h"

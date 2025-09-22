@@ -3,8 +3,9 @@
 #include "Net/UnrealNetwork.h"
 #include "Skald_PlayerController.h"
 #include "Engine/World.h"
+#include "SkaldLogging.h"
 
-DECLARE_LOG_CATEGORY_EXTERN(LogSkaldBattle, Log, All);
+DEFINE_LOG_CATEGORY(LogSkaldBattle);
 
 ASkaldGameState::ASkaldGameState()
     : CurrentTurnIndex(0)
