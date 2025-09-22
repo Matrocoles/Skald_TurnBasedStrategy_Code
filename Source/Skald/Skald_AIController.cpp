@@ -1,5 +1,7 @@
 #include "Skald_AIController.h"
+#include "AIController.h"
 #include "Engine/World.h"
+#include "GameFramework/Controller.h"
 #include "Kismet/GameplayStatics.h"
 #include "Skald.h"
 #include "Skald_BattleGameMode.h"
@@ -21,7 +23,7 @@ void ASkaldAIController::BeginPlay() {
   if (UWorld *World = GetWorld()) {
     if (ASkald_BattleGameMode *BattleGM =
             World->GetAuthGameMode<ASkald_BattleGameMode>()) {
-      BattleGM->OnAIControllerReady(this);
+      BattleGM->OnControllerReady(this);
     }
   }
 }

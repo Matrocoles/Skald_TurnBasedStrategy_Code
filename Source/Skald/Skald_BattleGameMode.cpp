@@ -658,8 +658,6 @@ void ASkald_BattleGameMode::PostLogin(APlayerController *NewPlayer) {
 }
 
 void ASkald_BattleGameMode::OnAIControllerReady(AAIController *Controller) {
-  UE_LOG(LogSkald, Log, TEXT("BattleGM OnAIControllerReady: %s"),
-         *GetNameSafe(Controller));
   OnControllerReady(Controller);
 }
 
