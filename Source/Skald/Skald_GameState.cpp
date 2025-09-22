@@ -1,6 +1,10 @@
 #include "Skald_GameState.h"
 #include "Skald_PlayerState.h"
 #include "Net/UnrealNetwork.h"
+#include "Skald_PlayerController.h"
+#include "Engine/World.h"
+
+DECLARE_LOG_CATEGORY_EXTERN(LogSkaldBattle, Log, All);
 
 ASkaldGameState::ASkaldGameState()
     : CurrentTurnIndex(0)
@@ -18,6 +22,7 @@ void ASkaldGameState::GetLifetimeReplicatedProps(
     DOREPLIFETIME(ASkaldGameState, LastBattleWinner);
     DOREPLIFETIME(ASkaldGameState, LastAttackerCasualties);
     DOREPLIFETIME(ASkaldGameState, LastDefenderCasualties);
+    DOREPLIFETIME(ASkaldGameState, BattlePhase);
 }
 
 void ASkaldGameState::AddPlayerState(APlayerState* PlayerState)
@@ -135,5 +140,30 @@ void ASkaldGameState::ServerSetFighterRoster_Implementation(const TArray<FFighte
     FighterRoster = InRoster;
     // Fire local notify so server-side UI (if any) also refreshes immediately
     OnRep_FighterRoster();
+}
+
+void ASkaldGameState::SetBattlePhase(EBattlePhase NewPhase)
+{
+    if (HasAuthority() && BattlePhase != NewPhase)
+    {
+        BattlePhase = NewPhase;
+        OnRep_BattlePhase();
+    }
+}
+
+void ASkaldGameState::OnRep_BattlePhase()
+{
+    UE_LOG(LogSkaldBattle, Log, TEXT("GameState BattlePhase -> %d"), static_cast<int32>(BattlePhase));
+
+    if (UWorld* World = GetWorld())
+    {
+        for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+        {
+            if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
+            {
+                PC->HandleBattlePhaseChanged();
+            }
+        }
+    }
 }
 

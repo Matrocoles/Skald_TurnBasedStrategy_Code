@@ -203,6 +203,21 @@ void ASkaldPlayerController::BeginPlay() {
 
   DetectBattleMap();
 
+  if (ASkaldGameState* SGS = GetWorld() ? GetWorld()->GetGameState<ASkaldGameState>() : nullptr)
+  {
+    if (SGS->BattlePhase == EBattlePhase::Deploy)
+    {
+      if (HasAuthority())
+      {
+        Client_ShowDeployUI();
+      }
+      else
+      {
+        ShowDeployUIInternal();
+      }
+    }
+  }
+
   if (IsLocalPlayerController() && GetLocalPlayer() != nullptr) {
     if (!bIsBattleMap) {
       InitializeHUDWidget();
@@ -472,9 +487,40 @@ void ASkaldPlayerController::ShowFighterSelectionUI(int32 MaxBudget,
   bEnableMouseOverEvents = true;
 }
 
+void ASkaldPlayerController::ShowDeployUIInternal() {
+  if (!IsLocalController() || bDeployWidgetShown) {
+    return;
+  }
+
+  bDeployWidgetShown = true;
+
+  if (UDeployWidget *DeployWidget =
+          CreateWidget<UDeployWidget>(this, UDeployWidget::StaticClass())) {
+    DeployWidget->AddToViewport(1000);
+  }
+}
+
 void ASkaldPlayerController::Client_ShowFighterSelection_Implementation(
     int32 MaxBudget, ESkaldFaction Faction) {
   ShowFighterSelectionUI(MaxBudget, Faction);
+}
+
+void ASkaldPlayerController::Client_ShowDeployUI_Implementation() {
+  UE_LOG(LogSkaldBattle, Log, TEXT("Client_ShowDeployUI on %s"), *GetName());
+  ShowDeployUIInternal();
+}
+
+void ASkaldPlayerController::HandleBattlePhaseChanged() {
+  if (const ASkaldGameState *SGS =
+          GetWorld() ? GetWorld()->GetGameState<ASkaldGameState>() : nullptr) {
+    if (SGS->BattlePhase == EBattlePhase::Deploy) {
+      if (HasAuthority()) {
+        Client_ShowDeployUI();
+      } else {
+        ShowDeployUIInternal();
+      }
+    }
+  }
 }
 
 bool ASkaldPlayerController::Server_CommitArmy_Validate(

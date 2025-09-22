@@ -1,5 +1,7 @@
 #include "Skald_BattleGameMode.h"
 
+DEFINE_LOG_CATEGORY(LogSkaldBattle);
+
 #include "Algo/RandomShuffle.h"
 #include "Algo/Sort.h"
 #include "AIController.h"
@@ -161,14 +163,14 @@ void ASkald_BattleGameMode::InitGame(const FString &Map, const FString &Options,
                                      FString &Error) {
   Super::InitGame(Map, Options, Error);
 
-  ReadyControllers.Empty();
   CachedHumanTerritoryIDs.Reset();
   CachedTerritoryMap.Reset();
-  bPendingBattleSetupComplete = false;
+  bSetupStarted = false;
+  bSetupCompleted = false;
   bBattleLaunched = false;
   bLoggedTravelCache = false;
   if (UWorld *World = GetWorld()) {
-    World->GetTimerManager().ClearTimer(TravelBootstrapHandle);
+    World->GetTimerManager().ClearTimer(WaitForPlayersHandle);
   }
 
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
@@ -180,7 +182,11 @@ void ASkald_BattleGameMode::InitGame(const FString &Map, const FString &Options,
 
   if (GI) {
     const FSkaldTravelState &TravelState = GI->GetTravelState();
-    ExpectedControllers = TravelState.bValid ? TravelState.ExpectedControllers : 0;
+    if (TravelState.bValid && TravelState.ExpectedControllers > 0) {
+      ExpectedControllers = TravelState.ExpectedControllers;
+    } else if (ExpectedControllers <= 0) {
+      ExpectedControllers = 1;
+    }
 
     const TArray<FS_Territory> *Source = &TravelState.CachedTerritories;
     if (Source->Num() == 0) {
@@ -191,25 +197,23 @@ void ASkald_BattleGameMode::InitGame(const FString &Map, const FString &Options,
     MergeHumanTerritories(TravelState, GS, CachedTerritoryMap,
                           CachedHumanTerritoryIDs);
 
-    UE_LOG(LogSkald, Log,
+    UE_LOG(LogSkaldBattle, Log,
            TEXT("BattleGM InitGame: Restored %d human territories from travel cache; ExpectedControllers=%d"),
            CachedHumanTerritoryIDs.Num(), ExpectedControllers);
     bLoggedTravelCache = true;
   } else {
-    ExpectedControllers = 0;
-    UE_LOG(LogSkald, Warning,
+    if (ExpectedControllers <= 0) {
+      ExpectedControllers = 1;
+    }
+    UE_LOG(LogSkaldBattle, Warning,
            TEXT("BattleGM InitGame: GameInstance unavailable; ExpectedControllers reset"));
   }
 
   UE_LOG(LogSkald, Log, TEXT("[HUD] Skipping MainHUD in BattleGameMode"));
-
-  BootstrapFromTravelState();
 }
 
 void ASkald_BattleGameMode::BeginPlay() {
   Super::BeginPlay();
-
-  ReadyControllers.Empty();
 
   if (!BattleManager) {
     UClass *ClassToUse = BattleManagerClass ? *BattleManagerClass
@@ -231,11 +235,16 @@ void ASkald_BattleGameMode::BeginPlay() {
     }
   }
 
-  UE_LOG(LogSkald, Log,
+  UE_LOG(LogSkaldBattle, Log,
          TEXT("BattleGM BeginPlay: BattleManager ready; ExpectedControllers=%d"),
          ExpectedControllers);
+  UE_LOG(LogSkaldBattle, Log, TEXT("BGM BeginPlay. ExpectedControllers=%d"),
+         ExpectedControllers);
 
-  BootstrapFromTravelState();
+  GetWorldTimerManager().SetTimer(
+      WaitForPlayersHandle, this, &ASkald_BattleGameMode::PollBattleBootstrap, 0.25f,
+      true);
+  PollBattleBootstrap();
 }
 
 void ASkald_BattleGameMode::SetupPendingBattle() {
@@ -243,28 +252,33 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
     return;
   }
 
-  if (bPendingBattleSetupComplete) {
+  if (bSetupCompleted) {
     return;
   }
 
   bBattleLaunched = false;
 
+  auto ResetSetupStarted = [this]() { bSetupStarted = false; };
+
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
   if (!GI || !GI->GridBattleManager) {
-    UE_LOG(LogSkald, Warning,
+    UE_LOG(LogSkaldBattle, Warning,
            TEXT("BattleGM SetupPendingBattle: GameInstance or GridBattleManager missing"));
+    ResetSetupStarted();
     return;
   }
 
   ASkaldGameState *GS = GetGameState<ASkaldGameState>();
   if (!GS) {
-    UE_LOG(LogSkald, Warning,
+    UE_LOG(LogSkaldBattle, Warning,
            TEXT("BattleGM SetupPendingBattle: GameState unavailable"));
+    ResetSetupStarted();
     return;
   }
 
   UWorld *World = GetWorld();
   if (!World) {
+    ResetSetupStarted();
     return;
   }
 
@@ -316,10 +330,11 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
                      Battle.bDefenderIsAI);
 
   if (Battle.AttackerPlayerID <= 0 || Battle.DefenderPlayerID <= 0) {
-    UE_LOG(LogSkald, Error,
+    UE_LOG(LogSkaldBattle, Error,
            TEXT("BattleGM SetupPendingBattle: Unable to resolve participants (AttackerId=%d DefenderId=%d Territories=%d/%d)"),
            Battle.AttackerPlayerID, Battle.DefenderPlayerID,
            Battle.FromTerritoryID, Battle.TargetTerritoryID);
+    ResetSetupStarted();
     return;
   }
 
@@ -336,7 +351,7 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
   }
   Battle.DefenderArmyCount = DefenderBudget;
 
-  UE_LOG(LogSkald, Log,
+  UE_LOG(LogSkaldBattle, Log,
          TEXT("BattleGM SetupPendingBattle: AttackerID=%d Name=%s Faction=%d Budget=%d DefenderID=%d Name=%s Faction=%d Budget=%d"),
          Battle.AttackerPlayerID, *Battle.AttackerDisplayName,
          static_cast<int32>(Battle.AttackerFaction), AttackerBudget,
@@ -351,15 +366,16 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
       Battle.DefenderFaction, Battle.bDefenderIsAI);
 
   if (!AttackerPS || !DefenderPS) {
-    UE_LOG(LogSkald, Error,
+    UE_LOG(LogSkaldBattle, Error,
            TEXT("BattleGM SetupPendingBattle: Failed to ensure participants (AttackerValid=%s DefenderValid=%s)"),
            AttackerPS ? TEXT("true") : TEXT("false"),
            DefenderPS ? TEXT("true") : TEXT("false"));
+    ResetSetupStarted();
     return;
   }
 
   BeginPreBattleSelection(AttackerPS, DefenderPS, AttackerBudget, DefenderBudget);
-  UE_LOG(LogSkald, Log,
+  UE_LOG(LogSkaldBattle, Log,
          TEXT("BattleGM: BeginPreBattleSelection started (AttackerID=%d DefenderID=%d Budgets=%d/%d)"),
          Battle.AttackerPlayerID, Battle.DefenderPlayerID, AttackerBudget,
          DefenderBudget);
@@ -367,15 +383,22 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
   AutoCommitAIArmy(AttackerPS, AttackerPS->bIsAI ? AttackerBudget : 0);
   AutoCommitAIArmy(DefenderPS, DefenderPS->bIsAI ? DefenderBudget : 0);
 
-  bPendingBattleSetupComplete = true;
+  bSetupCompleted = true;
   GI->PendingBattle = Battle;
 
-  UE_LOG(LogSkald, Log, TEXT("BattleGM SetupPendingBattle complete"));
+  GS->SetBattlePhase(EBattlePhase::Deploy);
+
+  UE_LOG(LogSkaldBattle, Log, TEXT("SetupPendingBattle completed. Phase=Deploy"));
 
   TryStartBattle();
 }
 
-void ASkald_BattleGameMode::BootstrapFromTravelState() {
+bool ASkald_BattleGameMode::IsSoloMatch() const {
+  // Solo if only the human travels; AI is created inside SetupPendingBattle
+  return ExpectedControllers <= 1;
+}
+
+void ASkald_BattleGameMode::PollBattleBootstrap() {
   if (!HasAuthority()) {
     return;
   }
@@ -385,63 +408,40 @@ void ASkald_BattleGameMode::BootstrapFromTravelState() {
     return;
   }
 
-  USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
-  ASkaldGameState *GS = GetGameState<ASkaldGameState>();
-  if (!GI || !GS) {
-    World->GetTimerManager().SetTimer(
-        TravelBootstrapHandle, this,
-        &ASkald_BattleGameMode::BootstrapFromTravelState, 0.25f, false);
-    return;
-  }
-
-  const FSkaldTravelState &TravelState = GI->GetTravelState();
-  if (ExpectedControllers <= 0) {
-    if (TravelState.bValid && TravelState.ExpectedControllers > 0) {
-      ExpectedControllers = TravelState.ExpectedControllers;
-    }
-    if (ExpectedControllers <= 0) {
-      ExpectedControllers = GS->PlayerArray.Num();
+  int32 ControllerCount = 0;
+  for (FConstControllerIterator It = World->GetControllerIterator(); It; ++It) {
+    if (It->Get()) {
+      ++ControllerCount;
     }
   }
 
-  PruneInvalidReadyControllers();
+  const int32 PlayerStateCount = (GameState && GameState->PlayerArray.IsValidIndex(0))
+                                     ? GameState->PlayerArray.Num()
+                                     : 0;
 
-  const int32 PlayerStateCount = GS->PlayerArray.Num();
-  const int32 ReadyControllerCount = ReadyControllers.Num();
+  UE_LOG(LogSkaldBattle, Verbose,
+         TEXT("PollBootstrap: Controllers=%d PlayerStates=%d SetupStarted=%d"),
+         ControllerCount, PlayerStateCount, bSetupStarted ? 1 : 0);
 
-  if (ReadyControllerCount > ExpectedControllers) {
-    ExpectedControllers = ReadyControllerCount;
-  }
+  const bool bSolo = IsSoloMatch();
 
-  const bool bSinglePlayer = (ExpectedControllers <= 1);
-  const bool bEnoughToSetup = bSinglePlayer
-                                  ? (PlayerStateCount >= 1 || ReadyControllerCount >= 1)
-                                  : (PlayerStateCount >= ExpectedControllers &&
-                                     ReadyControllerCount >= ExpectedControllers);
+  const bool CanSetup = bSolo
+                            ? (ControllerCount >= 1 && PlayerStateCount >= 1)
+                            : (ControllerCount >= ExpectedControllers &&
+                               PlayerStateCount >= ExpectedControllers);
 
-  UE_LOG(LogSkald, Verbose,
-         TEXT("BattleGM BootstrapFromTravelState: PlayerStates=%d ReadyControllers=%d Expected=%d SinglePlayer=%s SetupComplete=%s"),
-         PlayerStateCount, ReadyControllerCount, ExpectedControllers,
-         bSinglePlayer ? TEXT("true") : TEXT("false"),
-         bPendingBattleSetupComplete ? TEXT("true") : TEXT("false"));
+  if (!bSetupStarted && CanSetup) {
+    UE_LOG(LogSkaldBattle, Log, TEXT("Starting SetupPendingBattle (bSolo=%d)"),
+           bSolo ? 1 : 0);
+    bSetupStarted = true;
 
-  if (!bEnoughToSetup) {
-    World->GetTimerManager().SetTimer(
-        TravelBootstrapHandle, this,
-        &ASkald_BattleGameMode::BootstrapFromTravelState, 0.25f, false);
-    return;
-  }
-
-  World->GetTimerManager().ClearTimer(TravelBootstrapHandle);
-
-  if (!bPendingBattleSetupComplete) {
-    UE_LOG(LogSkald, Verbose,
-           TEXT("BattleGM Bootstrap: proceeding to SetupPendingBattle (SinglePlayer=%s, PlayerStates=%d, ReadyControllers=%d, Expected=%d)"),
-           bSinglePlayer ? TEXT("true") : TEXT("false"), PlayerStateCount,
-           ReadyControllerCount, ExpectedControllers);
     SetupPendingBattle();
-  } else {
-    TryStartBattle();
+  }
+
+  if (bSetupCompleted) {
+    UE_LOG(LogSkaldBattle, Log,
+           TEXT("Setup completed; clearing bootstrap timer."));
+    GetWorldTimerManager().ClearTimer(WaitForPlayersHandle);
   }
 }
 
@@ -533,14 +533,6 @@ void ASkald_BattleGameMode::SpawnFighterSide(const TArray<FFighterDefinition> &R
       Pawn->Stats = Def.Stats;
       Pawn->bIsAttacker = bAsAttacker;
       BattleManager->RegisterFighter(Pawn, bAsAttacker);
-    }
-  }
-}
-
-void ASkald_BattleGameMode::PruneInvalidReadyControllers() {
-  for (auto It = ReadyControllers.CreateIterator(); It; ++It) {
-    if (!It->IsValid()) {
-      It.RemoveCurrent();
     }
   }
 }
@@ -652,9 +644,8 @@ void ASkald_BattleGameMode::TryInitializeWorldAndStart() {
 void ASkald_BattleGameMode::PostLogin(APlayerController *NewPlayer) {
   Super::PostLogin(NewPlayer);
 
-  if (NewPlayer) {
-    OnControllerReady(NewPlayer);
-  }
+  UE_LOG(LogSkaldBattle, Log, TEXT("PostLogin: %s"), *GetNameSafe(NewPlayer));
+  OnControllerReady(NewPlayer);
 }
 
 void ASkald_BattleGameMode::OnAIControllerReady(AAIController *Controller) {
@@ -662,18 +653,14 @@ void ASkald_BattleGameMode::OnAIControllerReady(AAIController *Controller) {
 }
 
 void ASkald_BattleGameMode::OnControllerReady(AController *Controller) {
-  if (!IsValid(Controller)) {
+  UE_LOG(LogSkaldBattle, Log, TEXT("OnControllerReady: %s  HasAuthority=%d"),
+         *GetNameSafe(Controller), HasAuthority() ? 1 : 0);
+
+  if (!HasAuthority() || !IsValid(Controller)) {
     return;
   }
 
-  PruneInvalidReadyControllers();
-  ReadyControllers.Add(Controller);
-
-  UE_LOG(LogSkald, Log,
-         TEXT("BattleGM OnControllerReady: %s ReadyControllers=%d Expected=%d"),
-         *GetNameSafe(Controller), ReadyControllers.Num(), ExpectedControllers);
-
-  BootstrapFromTravelState();
+  PollBattleBootstrap();
   TryStartBattle();
 }
 
@@ -682,14 +669,14 @@ void ASkald_BattleGameMode::TryStartBattle() {
     return;
   }
 
-  PruneInvalidReadyControllers();
-
-  if (!bPendingBattleSetupComplete) {
-    BootstrapFromTravelState();
-    if (!bPendingBattleSetupComplete) {
-      UE_LOG(LogSkald, Verbose,
-             TEXT("BattleGM TryStartBattle: pending setup incomplete (ReadyControllers=%d Expected=%d)"),
-             ReadyControllers.Num(), ExpectedControllers);
+  if (!bSetupCompleted) {
+    if (HasAuthority()) {
+      PollBattleBootstrap();
+    }
+    if (!bSetupCompleted) {
+      UE_LOG(LogSkaldBattle, Verbose,
+             TEXT("BattleGM TryStartBattle: pending setup incomplete (SetupStarted=%d ExpectedControllers=%d)"),
+             bSetupStarted ? 1 : 0, ExpectedControllers);
       return;
     }
   }
@@ -712,7 +699,7 @@ void ASkald_BattleGameMode::TryStartBattle() {
       GS->GetPlayerById(Battle.DefenderPlayerID);
 
   if (!AttackerPS || !DefenderPS) {
-    UE_LOG(LogSkald, Verbose,
+    UE_LOG(LogSkaldBattle, Verbose,
            TEXT("BattleGM TryStartBattle: waiting for participant PlayerStates (AttackerId=%d Status=%s DefenderId=%d Status=%s)"),
            Battle.AttackerPlayerID, AttackerPS ? TEXT("ready") : TEXT("missing"),
            Battle.DefenderPlayerID, DefenderPS ? TEXT("ready") : TEXT("missing"));
@@ -720,7 +707,7 @@ void ASkald_BattleGameMode::TryStartBattle() {
   }
 
   if (!AttackerPS->bArmyLockedIn || !DefenderPS->bArmyLockedIn) {
-    UE_LOG(LogSkald, Verbose,
+    UE_LOG(LogSkaldBattle, Verbose,
            TEXT("BattleGM TryStartBattle: waiting for armies lock-in (Attacker=%s Defender=%s)"),
            AttackerPS->bArmyLockedIn ? TEXT("locked") : TEXT("pending"),
            DefenderPS->bArmyLockedIn ? TEXT("locked") : TEXT("pending"));
