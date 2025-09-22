@@ -19,6 +19,7 @@
 #include "Skald_GameInstance.h"
 #include "Skald_GameMode.h"
 #include "Skald_BattleGameMode.h"
+#include "SkaldLogging.h"
 #include "Skald_GameState.h"
 #include "Skald_PlayerState.h"
 #include "Skald_TurnManager.h"

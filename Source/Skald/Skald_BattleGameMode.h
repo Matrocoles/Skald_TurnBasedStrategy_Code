@@ -4,12 +4,11 @@
 #include "Skald_GameMode.h"
 #include "SkaldTypes.h"
 #include "AIController.h"
+#include "SkaldLogging.h"
 #include "Skald_BattleGameMode.generated.h"
 
 class AAIController;
 class AController;
-
-DECLARE_LOG_CATEGORY_EXTERN(LogSkaldBattle, Log, All);
 
 /** GameMode dedicated to resolving grid-based battles. */
 UCLASS()
