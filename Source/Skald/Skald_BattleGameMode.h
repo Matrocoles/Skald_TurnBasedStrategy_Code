@@ -38,6 +38,7 @@ private:
   void AutoCommitAIArmy(ASkaldPlayerState *PlayerState, int32 Budget) const;
   void SpawnFighterSide(const TArray<FFighterDefinition> &Roster, bool bAsAttacker);
   void TryStartBattle();
+  void PruneInvalidReadyControllers();
 
   /** Ensures the battle only launches once per travel. */
   bool bBattleLaunched = false;
