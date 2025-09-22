@@ -439,7 +439,13 @@ void ASkald_BattleGameMode::BootstrapFromTravelState() {
     ExpectedControllers = PlayerStates;
   }
 
-  if (ExpectedControllers > 0 && PlayerStates < ExpectedControllers) {
+  int32 PlayerControllerCount = 0;
+  for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It;
+       ++It) {
+    ++PlayerControllerCount;
+  }
+
+  if (PlayerControllerCount <= 0) {
     World->GetTimerManager().SetTimer(TravelBootstrapHandle, this,
                                       &ASkald_BattleGameMode::BootstrapFromTravelState,
                                       0.25f, false);
@@ -447,6 +453,12 @@ void ASkald_BattleGameMode::BootstrapFromTravelState() {
   }
 
   World->GetTimerManager().ClearTimer(TravelBootstrapHandle);
+
+  if (ExpectedControllers <= 0) {
+    ExpectedControllers = PlayerControllerCount;
+  } else {
+    ExpectedControllers = FMath::Max(ExpectedControllers, PlayerControllerCount);
+  }
 
   if (!bPendingBattleSetupComplete) {
     SetupPendingBattle();
@@ -684,12 +696,8 @@ void ASkald_BattleGameMode::TryStartBattle() {
 
   const int32 NeededPlayerStates = FMath::Max(2, ExpectedControllers);
   UE_LOG(LogSkald, Verbose,
-         TEXT("TryStartBattle: ReadyPlayerStates=%d Expected=%d"),
-         ReadyPlayerStates, NeededPlayerStates);
-
-  if (ReadyPlayerStates < 2) {
-    return;
-  }
+         TEXT("TryStartBattle: ReadyPlayerStates=%d Expected=%d ReadyControllers=%d"),
+         ReadyPlayerStates, NeededPlayerStates, ReadyControllers.Num());
 
   TryLaunchBattle();
 }
