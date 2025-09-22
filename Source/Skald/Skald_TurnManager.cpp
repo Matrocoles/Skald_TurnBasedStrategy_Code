@@ -442,8 +442,8 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
     TravelState.AttackerTerritory = SeededBattle.FromTerritoryID;
     TravelState.DefenderTerritory = SeededBattle.TargetTerritoryID;
 
-    auto AppendHumanOwnership = [&](ASkaldPlayerState *Owner, int32 TerritoryID) {
-      if (Owner && !Owner->bIsAI && TerritoryID > 0) {
+    auto AppendHumanOwnership = [&](ASkaldPlayerState *OwnerPS, int32 TerritoryID) {
+      if (OwnerPS && !OwnerPS->bIsAI && TerritoryID > 0) {
         TravelState.HumanOwnedTerritories.AddUnique(TerritoryID);
       }
     };
@@ -456,13 +456,13 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
           continue;
         }
 
-        ASkaldPlayerState *Owner = Territory->OwningPlayer;
-        AppendHumanOwnership(Owner, Territory->TerritoryID);
+        ASkaldPlayerState *OwnerPS = Territory->OwningPlayer;
+        AppendHumanOwnership(OwnerPS, Territory->TerritoryID);
 
         FS_Territory Snapshot;
         Snapshot.TerritoryID = Territory->TerritoryID;
         Snapshot.TerritoryName = Territory->TerritoryName;
-        Snapshot.OwnerPlayerID = Owner ? Owner->GetPlayerId() : 0;
+        Snapshot.OwnerPlayerID = OwnerPS ? OwnerPS->GetPlayerId() : 0;
         Snapshot.IsCapital = Territory->bIsCapital;
         Snapshot.CapitalOwner = Snapshot.OwnerPlayerID;
         Snapshot.ArmyUnits = Territory->ArmyUnits;
@@ -483,8 +483,8 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
       TerritorySnapshots = GI->CachedWorldMapTerritories;
       for (const FS_Territory &Snapshot : TerritorySnapshots) {
         if (Snapshot.OwnerPlayerID > 0 && GS) {
-          if (ASkaldPlayerState *Owner = GS->GetPlayerById(Snapshot.OwnerPlayerID)) {
-            AppendHumanOwnership(Owner, Snapshot.TerritoryID);
+          if (ASkaldPlayerState *OwnerPS = GS->GetPlayerById(Snapshot.OwnerPlayerID)) {
+            AppendHumanOwnership(OwnerPS, Snapshot.TerritoryID);
           }
         }
       }
