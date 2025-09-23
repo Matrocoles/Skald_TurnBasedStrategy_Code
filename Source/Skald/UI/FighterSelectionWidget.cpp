@@ -3,13 +3,12 @@
 #include "Components/Button.h"
 #include "Components/ScrollBox.h"
 #include "Components/TextBlock.h"
+#include "SkaldLogging.h"
 #include "Skald_PlayerController.h"
-
-DEFINE_LOG_CATEGORY_STATIC(LogSkaldUI, Log, All);
 
 bool UFighterSelectionWidget::Initialize()
 {
-  const bool bInitialized = Super::Initialize();
+  const bool bSuperInitialized = Super::Initialize();
   if (LockInButton)
   {
     LockInButton->OnClicked.Clear();
@@ -22,7 +21,7 @@ bool UFighterSelectionWidget::Initialize()
            TEXT("FighterSelection: LockInButton not bound (name mismatch?)"));
   }
 
-  return bInitialized;
+  return bSuperInitialized;
 }
 
 void UFighterEntryWidget::NativeConstruct() {
