@@ -461,13 +461,11 @@ void ASkaldPlayerController::ShowFighterSelectionUI(int32 MaxBudget,
     return;
   }
 
-  FighterSelectionWidget->OnLockedIn.RemoveAll(this);
-  FighterSelectionWidget->OnLockedIn.AddDynamic(
-      this, &ASkaldPlayerController::HandleFighterSelectionLockedIn);
   FighterSelectionWidget->PlayerFaction = Faction;
   FighterSelectionWidget->MaxCost = MaxBudget;
   FighterSelectionWidget->ChosenFighters.Reset();
   FighterSelectionWidget->CurrentCost = 0;
+  FighterSelectionWidget->SetLockInButtonEnabled(true);
   const TArray<FFighterDefinition> Available =
       UFighterDataLibrary::GetFightersForFaction(this, Faction);
   FighterSelectionWidget->SetAvailableFighters(Available);
@@ -511,11 +509,58 @@ void ASkaldPlayerController::Client_ShowDeployUI_Implementation() {
   ShowDeployUIInternal();
 }
 
+void ASkaldPlayerController::Server_LockInSelection_Implementation(
+    const TArray<FFighterDefinition> &SelectedFighters)
+{
+  UE_LOG(LogSkaldBattle, Log,
+         TEXT("Server_LockInSelection: %s sent %d fighters"), *GetName(),
+         SelectedFighters.Num());
+
+  if (ASkald_BattleGameMode *GameMode =
+          GetWorld()->GetAuthGameMode<ASkald_BattleGameMode>())
+  {
+    GameMode->HandleHumanLockIn(this, SelectedFighters);
+  }
+}
+
+void ASkaldPlayerController::Client_OnLockInResult_Implementation(
+    bool bSuccess, const FString &Reason)
+{
+  UE_LOG(LogSkaldUI, Log, TEXT("LockIn result: %s (%s)"),
+         bSuccess ? TEXT("SUCCESS") : TEXT("FAIL"), *Reason);
+
+  if (!bSuccess)
+  {
+    if (!Reason.IsEmpty())
+    {
+      UE_LOG(LogSkaldUI, Warning, TEXT("LockIn failed: %s"), *Reason);
+    }
+
+    if (IsLocalController() && GEngine && !Reason.IsEmpty())
+    {
+      GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, Reason);
+    }
+
+    if (FighterSelectionWidget)
+    {
+      FighterSelectionWidget->SetLockInButtonEnabled(true);
+    }
+    return;
+  }
+
+  HandleFighterSelectionLockedIn();
+}
+
 void ASkaldPlayerController::HandleBattlePhaseChanged() {
   if (const ASkaldGameState *SGS =
           GetWorld() ? GetWorld()->GetGameState<ASkaldGameState>() : nullptr) {
     if (SGS->BattlePhase == EBattlePhase::Deploy) {
       if (HasAuthority()) {
+        if (const ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+          if (PS->bIsAI) {
+            return;
+          }
+        }
         Client_ShowDeployUI();
       } else {
         ShowDeployUIInternal();
@@ -1509,18 +1554,10 @@ void ASkaldPlayerController::HandleFactionLockedIn() {
 }
 
 void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
-  if (!FighterSelectionWidget) {
-    return;
+  if (UFighterSelectionWidget *Selection = FighterSelectionWidget) {
+    Selection->RemoveFromParent();
+    FighterSelectionWidget = nullptr;
   }
-
-  UFighterSelectionWidget *Selection = FighterSelectionWidget;
-  Selection->OnLockedIn.RemoveDynamic(
-      this, &ASkaldPlayerController::HandleFighterSelectionLockedIn);
-  const TArray<FFighterDefinition> LockedFighters = Selection->ChosenFighters;
-  Selection->RemoveFromParent();
-  FighterSelectionWidget = nullptr;
-
-  Server_CommitArmy(LockedFighters);
 
   bBattleHUDReadyToShow = true;
 

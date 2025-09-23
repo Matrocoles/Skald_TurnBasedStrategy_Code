@@ -95,6 +95,7 @@ class SKALD_API UFighterSelectionWidget : public UUserWidget {
   GENERATED_BODY()
 
 public:
+  virtual bool Initialize() override;
   virtual void NativeConstruct() override;
   virtual void NativePreConstruct() override;
 
@@ -123,10 +124,6 @@ public:
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UScrollBox *FighterList;
 
-  /** Button that finalises the fighter selection. */
-  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
-  UButton *LockInButton;
-
   /** Text displaying the current/maximum cost. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *CostDisplayText;
@@ -151,6 +148,10 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Skald|Fighter")
   void LockIn();
 
+  /** Enable or disable the Lock In button. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Fighter")
+  void SetLockInButtonEnabled(bool bEnabled);
+
   // Ensure this is PUBLIC (not protected)
   /** Check whether a fighter can be afforded with remaining cost. */
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Skald|Fighter")
@@ -168,4 +169,13 @@ public:
   /** Update cost display text from current/max cost. */
   UFUNCTION(BlueprintCallable, Category = "Skald|Fighter")
   void UpdateCostDisplay();
+
+private:
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidget, AllowPrivateAccess = "true"))
+  UButton *LockInButton = nullptr;
+
+  UFUNCTION()
+  void HandleLockInClicked();
+
+  void GatherSelectedFighters(TArray<FFighterDefinition> &OutFighters) const;
 };

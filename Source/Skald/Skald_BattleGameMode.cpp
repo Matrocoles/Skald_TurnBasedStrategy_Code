@@ -553,6 +553,42 @@ void ASkald_BattleGameMode::ProcessDeferredControllers() {
   }
 }
 
+void ASkald_BattleGameMode::BeginPreBattleSelection(ASkaldPlayerState *AttackerPS,
+                                                    ASkaldPlayerState *DefenderPS,
+                                                    int32 AttackerBudget,
+                                                    int32 DefenderBudget)
+{
+  if (!HasAuthority()) {
+    return;
+  }
+
+  if (AttackerPS) {
+    AttackerPS->PendingArmyBudget = AttackerBudget;
+    AttackerPS->PendingArmy.Reset();
+    AttackerPS->bArmyLockedIn = false;
+
+    if (!AttackerPS->bIsAI) {
+      if (ASkaldPlayerController *APC =
+              Cast<ASkaldPlayerController>(AttackerPS->GetOwner())) {
+        APC->Client_ShowFighterSelection(AttackerBudget, AttackerPS->Faction);
+      }
+    }
+  }
+
+  if (DefenderPS) {
+    DefenderPS->PendingArmyBudget = DefenderBudget;
+    DefenderPS->PendingArmy.Reset();
+    DefenderPS->bArmyLockedIn = false;
+
+    if (!DefenderPS->bIsAI) {
+      if (ASkaldPlayerController *DPC =
+              Cast<ASkaldPlayerController>(DefenderPS->GetOwner())) {
+        DPC->Client_ShowFighterSelection(DefenderBudget, DefenderPS->Faction);
+      }
+    }
+  }
+}
+
 void ASkald_BattleGameMode::SetupPendingBattle() {
   if (!HasAuthority()) {
     return;
@@ -742,6 +778,8 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
     return;
   }
 
+  LockedInPlayers.Reset();
+
   BeginPreBattleSelection(AttackerPS, DefenderPS, AttackerBudget, DefenderBudget);
   UE_LOG(LogSkaldBattle, Log,
          TEXT("BattleGM: BeginPreBattleSelection started (AttackerID=%d DefenderID=%d Budgets=%d/%d)"),
@@ -751,12 +789,21 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
   AutoCommitAIArmy(AttackerPS, AttackerPS->bIsAI ? AttackerBudget : 0);
   AutoCommitAIArmy(DefenderPS, DefenderPS->bIsAI ? DefenderBudget : 0);
 
+  if (AttackerPS && AttackerPS->bIsAI && AttackerPS->bArmyLockedIn) {
+    LockedInPlayers.Add(AttackerPS->GetPlayerId());
+  }
+  if (DefenderPS && DefenderPS->bIsAI && DefenderPS->bArmyLockedIn) {
+    LockedInPlayers.Add(DefenderPS->GetPlayerId());
+  }
+
   bSetupCompleted = true;
   GI->PendingBattle = Battle;
 
-  GS->SetBattlePhase(EBattlePhase::Deploy);
+  TryAdvanceAfterLockIn();
 
-  UE_LOG(LogSkaldBattle, Log, TEXT("SetupPendingBattle completed. Phase=Deploy"));
+  UE_LOG(LogSkaldBattle, Log,
+         TEXT("SetupPendingBattle completed. Awaiting lock-in (AttackerAI=%d DefenderAI=%d)"),
+         AttackerPS->bIsAI ? 1 : 0, DefenderPS->bIsAI ? 1 : 0);
 
   TryStartBattle();
 }
@@ -1001,6 +1048,7 @@ void ASkald_BattleGameMode::TryLaunchBattle() {
   }
 
   bBattleLaunched = true;
+  LockedInPlayers.Reset();
 }
 
 void ASkald_BattleGameMode::TryInitializeWorldAndStart() {
@@ -1134,5 +1182,174 @@ void ASkald_BattleGameMode::TryStartBattle() {
   }
 
   TryLaunchBattle();
+}
+
+void ASkald_BattleGameMode::HandleHumanLockIn(
+    ASkaldPlayerController *PC,
+    const TArray<FFighterDefinition> &SelectedFighters)
+{
+  if (!PC) {
+    return;
+  }
+
+  ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>();
+  if (!PS) {
+    PC->Client_OnLockInResult(false, TEXT("No PlayerState"));
+    return;
+  }
+
+  if (PS->bIsAI) {
+    PC->Client_OnLockInResult(false, TEXT("AI controllers cannot lock in"));
+    return;
+  }
+
+  USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+  if (!GI) {
+    PC->Client_OnLockInResult(false, TEXT("GameInstance unavailable"));
+    return;
+  }
+
+  const FS_BattlePayload &Battle = GI->PendingBattle;
+  const int32 PlayerId = PS->GetPlayerId();
+  if (PlayerId != Battle.AttackerPlayerID &&
+      PlayerId != Battle.DefenderPlayerID) {
+    PC->Client_OnLockInResult(false, TEXT("Not part of pending battle"));
+    return;
+  }
+
+  if (LockedInPlayers.Contains(PlayerId)) {
+    PC->Client_OnLockInResult(true, TEXT("Already locked"));
+    return;
+  }
+
+  FString FailureReason;
+  if (!ValidateAndRecordSelection(PS, SelectedFighters, FailureReason)) {
+    UE_LOG(LogSkaldBattle, Warning,
+           TEXT("HandleHumanLockIn: validation failed for PlayerId=%d (%s)"),
+           PlayerId, *FailureReason);
+    PC->Client_OnLockInResult(false, FailureReason);
+    return;
+  }
+
+  LockedInPlayers.Add(PlayerId);
+  UE_LOG(LogSkaldBattle, Log,
+         TEXT("HandleHumanLockIn: PlayerId=%d locked selection"), PlayerId);
+  PC->Client_OnLockInResult(true, TEXT("Committed"));
+
+  TryAdvanceAfterLockIn();
+}
+
+bool ASkald_BattleGameMode::AreBothParticipantsLocked() const
+{
+  const USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+  if (!GI) {
+    return false;
+  }
+
+  const FS_BattlePayload &Battle = GI->PendingBattle;
+  if (Battle.AttackerPlayerID <= 0 || Battle.DefenderPlayerID <= 0) {
+    return LockedInPlayers.Num() >= 2;
+  }
+
+  return LockedInPlayers.Contains(Battle.AttackerPlayerID) &&
+         LockedInPlayers.Contains(Battle.DefenderPlayerID);
+}
+
+void ASkald_BattleGameMode::TryAdvanceAfterLockIn()
+{
+  if (!AreBothParticipantsLocked()) {
+    return;
+  }
+
+  if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
+    if (GS->BattlePhase != EBattlePhase::Deploy) {
+      UE_LOG(LogSkaldBattle, Log,
+             TEXT("Both participants locked in -> advancing to Deploy"));
+    }
+    GS->SetBattlePhase(EBattlePhase::Deploy);
+  } else {
+    UE_LOG(LogSkaldBattle, Warning,
+           TEXT("TryAdvanceAfterLockIn: GameState unavailable"));
+  }
+
+  TryStartBattle();
+}
+
+bool ASkald_BattleGameMode::ValidateAndRecordSelection(
+    ASkaldPlayerState *PlayerState,
+    const TArray<FFighterDefinition> &SelectedFighters,
+    FString &OutReason)
+{
+  OutReason.Reset();
+
+  if (!PlayerState) {
+    OutReason = TEXT("Invalid player");
+    return false;
+  }
+
+  if (!BattleManager) {
+    OutReason = TEXT("Battle data unavailable");
+    return false;
+  }
+
+  const int32 Budget = PlayerState->PendingArmyBudget;
+  if (SelectedFighters.Num() == 0 && Budget > 0) {
+    OutReason = TEXT("No fighters selected");
+    return false;
+  }
+
+  TArray<FFighterDefinition> Available =
+      BattleManager->GetFightersForFaction(PlayerState->Faction);
+  TMap<FName, FFighterDefinition> AvailableById;
+  AvailableById.Reserve(Available.Num());
+  for (const FFighterDefinition &Def : Available) {
+    AvailableById.Add(Def.Id, Def);
+  }
+
+  TArray<FFighterDefinition> ValidSelection;
+  ValidSelection.Reserve(SelectedFighters.Num());
+  int32 TotalCost = 0;
+
+  for (const FFighterDefinition &Requested : SelectedFighters) {
+    const FName FighterId = Requested.Id;
+    if (FighterId.IsNone()) {
+      OutReason = TEXT("Invalid fighter in selection");
+      break;
+    }
+
+    const FFighterDefinition *Canonical = AvailableById.Find(FighterId);
+    if (!Canonical) {
+      OutReason = TEXT("Invalid fighter in selection");
+      break;
+    }
+
+    const int32 Cost = FMath::Max(Canonical->Stats.ArmyCost, 0);
+    if (Budget >= 0 && TotalCost + Cost > Budget) {
+      OutReason = TEXT("Selection exceeds budget");
+      break;
+    }
+
+    ValidSelection.Add(*Canonical);
+    TotalCost += Cost;
+  }
+
+  if (!OutReason.IsEmpty()) {
+    return false;
+  }
+
+  if (Budget >= 0 && TotalCost > Budget) {
+    OutReason = TEXT("Selection exceeds budget");
+    return false;
+  }
+
+  PlayerState->PendingArmy = MoveTemp(ValidSelection);
+  PlayerState->bArmyLockedIn = true;
+
+  UE_LOG(LogSkaldBattle, Log,
+         TEXT("ValidateAndRecordSelection: Player %d locked in %d fighters (Cost=%d / Budget=%d)"),
+         PlayerState->GetPlayerId(), PlayerState->PendingArmy.Num(), TotalCost,
+         Budget);
+
+  return true;
 }
 

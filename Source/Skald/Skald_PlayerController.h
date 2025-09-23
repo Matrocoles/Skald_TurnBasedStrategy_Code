@@ -93,6 +93,12 @@ public:
   UFUNCTION(Server, Reliable, WithValidation)
   void Server_CommitArmy(const TArray<FFighterDefinition> &Chosen);
 
+  UFUNCTION(Server, Reliable)
+  void Server_LockInSelection(const TArray<FFighterDefinition> &SelectedFighters);
+
+  UFUNCTION(Client, Reliable)
+  void Client_OnLockInResult(bool bSuccess, const FString &Reason);
+
   UFUNCTION()
   void HandleBattlePhaseChanged();
 
