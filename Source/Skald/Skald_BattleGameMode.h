@@ -19,6 +19,9 @@ public:
   /** Attempt to start the tactical battle once both sides have supplied armies. */
   void TryLaunchBattle();
 
+  // Returns true once we’ve detected at least two valid controllers and kicked off setup.
+  bool TrySetupBattleWhenReady();
+
 protected:
   virtual void InitGame(const FString &Map, const FString &Options,
                         FString &Error) override;
