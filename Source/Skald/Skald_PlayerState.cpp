@@ -95,3 +95,25 @@ void ASkaldPlayerState::OnRep_IsAI() {
     }
   }
 }
+
+void ASkaldPlayerState::OnRep_PlayerId() {
+  Super::OnRep_PlayerId();
+
+  if (APlayerController *PC = GetOwner<APlayerController>()) {
+    if (ASkaldPlayerController *SkaldPC = Cast<ASkaldPlayerController>(PC)) {
+      if (USkaldMainHUDWidget *HUD = SkaldPC->GetHUDWidget()) {
+        const bool bLocalIdChanged = (HUD->LocalPlayerID != GetPlayerId());
+        HUD->LocalPlayerID = GetPlayerId();
+        if (bLocalIdChanged) {
+          HUD->SyncPhaseButtons(HUD->CurrentPlayerID == HUD->LocalPlayerID);
+        }
+      }
+    }
+  }
+
+  if (UWorld *World = GetWorld()) {
+    if (ASkaldGameState *GS = World->GetGameState<ASkaldGameState>()) {
+      GS->OnPlayersUpdated.Broadcast();
+    }
+  }
+}
