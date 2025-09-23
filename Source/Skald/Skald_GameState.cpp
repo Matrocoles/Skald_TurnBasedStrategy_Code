@@ -5,8 +5,6 @@
 #include "Engine/World.h"
 #include "SkaldLogging.h"
 
-DEFINE_LOG_CATEGORY(LogSkaldBattle);
-
 ASkaldGameState::ASkaldGameState()
     : CurrentTurnIndex(0)
 {
