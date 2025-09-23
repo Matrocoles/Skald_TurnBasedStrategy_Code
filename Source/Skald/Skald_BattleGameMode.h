@@ -41,6 +41,14 @@ private:
 
   bool IsSoloMatch() const;
   void PollBattleBootstrap();
+  void EnsureBattleControllers();
+  void ProcessDeferredControllers();
+
+  /** Controllers waiting for bootstrap while we rebuild the roster. */
+  TArray<TWeakObjectPtr<AController>> DeferredReadyControllers;
+
+  /** Guard to defer OnControllerReady callbacks during bootstrap. */
+  bool bEnsuringBattleControllers = false;
 
   /** Ensures the battle only launches once per travel. */
   bool bBattleLaunched = false;
