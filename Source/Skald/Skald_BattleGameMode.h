@@ -22,6 +22,13 @@ public:
   // Returns true once we’ve detected at least two valid controllers and kicked off setup.
   bool TrySetupBattleWhenReady();
 
+  void BeginPreBattleSelection(class ASkaldPlayerState* AttackerPS,
+                               class ASkaldPlayerState* DefenderPS,
+                               int32 AttackerBudget, int32 DefenderBudget);
+
+  void HandleHumanLockIn(class ASkaldPlayerController* PC,
+                         const TArray<FFighterDefinition>& SelectedFighters);
+
 protected:
   virtual void InitGame(const FString &Map, const FString &Options,
                         FString &Error) override;
@@ -41,6 +48,12 @@ private:
   void AutoCommitAIArmy(ASkaldPlayerState *PlayerState, int32 Budget) const;
   void SpawnFighterSide(const TArray<FFighterDefinition> &Roster, bool bAsAttacker);
   void TryStartBattle();
+
+  bool AreBothParticipantsLocked() const;
+  void TryAdvanceAfterLockIn();
+  bool ValidateAndRecordSelection(ASkaldPlayerState *PlayerState,
+                                  const TArray<FFighterDefinition> &SelectedFighters,
+                                  FString &OutReason);
 
   bool IsSoloMatch() const;
   void PollBattleBootstrap();
@@ -72,5 +85,8 @@ private:
 
   /** Ensure we only log the cache restoration message once. */
   bool bLoggedTravelCache = false;
+
+  /** Tracks which participant player IDs have finalised their selection. */
+  TSet<int32> LockedInPlayers;
 };
 

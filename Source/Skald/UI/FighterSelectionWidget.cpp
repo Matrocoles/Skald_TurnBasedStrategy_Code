@@ -3,8 +3,27 @@
 #include "Components/Button.h"
 #include "Components/ScrollBox.h"
 #include "Components/TextBlock.h"
+#include "Skald_PlayerController.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogSkaldUI, Log, All);
+
+bool UFighterSelectionWidget::Initialize()
+{
+  const bool bInitialized = Super::Initialize();
+  if (LockInButton)
+  {
+    LockInButton->OnClicked.Clear();
+    LockInButton->OnClicked.AddDynamic(this, &UFighterSelectionWidget::HandleLockInClicked);
+    LockInButton->SetIsEnabled(true);
+  }
+  else
+  {
+    UE_LOG(LogSkaldUI, Warning,
+           TEXT("FighterSelection: LockInButton not bound (name mismatch?)"));
+  }
+
+  return bInitialized;
+}
 
 void UFighterEntryWidget::NativeConstruct() {
   Super::NativeConstruct();
@@ -66,6 +85,14 @@ void UFighterSelectionWidget::SetAvailableFighters(const TArray<FFighterDefiniti
     PopulateFighterList();
 }
 
+void UFighterSelectionWidget::SetLockInButtonEnabled(bool bEnabled)
+{
+  if (LockInButton)
+  {
+    LockInButton->SetIsEnabled(bEnabled);
+  }
+}
+
 void UFighterSelectionWidget::NativePreConstruct()
 {
     Super::NativePreConstruct();
@@ -82,9 +109,7 @@ void UFighterSelectionWidget::NativeConstruct() {
   Super::NativeConstruct();
   SetIsFocusable(true);
   SetFocus();
-  if (LockInButton) {
-    LockInButton->OnClicked.AddDynamic(this, &UFighterSelectionWidget::LockIn);
-  }
+  SetLockInButtonEnabled(true);
   UpdateCostDisplay();
   PopulateFighterList();
 }
@@ -140,10 +165,43 @@ bool UFighterSelectionWidget::ChooseFighter(const FFighterDefinition &Fighter) {
 }
 
 void UFighterSelectionWidget::LockIn() {
-  // Prevent empty or over-budget lock-ins.
-  if (ChosenFighters.Num() == 0 || CurrentCost > MaxCost) {
+  HandleLockInClicked();
+}
+
+void UFighterSelectionWidget::GatherSelectedFighters(
+    TArray<FFighterDefinition> &OutFighters) const
+{
+  OutFighters.Reset();
+  OutFighters.Append(ChosenFighters);
+}
+
+void UFighterSelectionWidget::HandleLockInClicked()
+{
+  UE_LOG(LogSkaldUI, Log, TEXT("FighterSelection: Lock In clicked (client)"));
+
+  SetLockInButtonEnabled(false);
+
+  TArray<FFighterDefinition> SelectedFighters;
+  GatherSelectedFighters(SelectedFighters);
+
+  bool bSubmitted = false;
+  if (APlayerController *PC = GetOwningPlayer())
+  {
+    if (ASkaldPlayerController *SkaldPC = Cast<ASkaldPlayerController>(PC))
+    {
+      SkaldPC->Server_LockInSelection(SelectedFighters);
+      bSubmitted = true;
+    }
+  }
+
+  if (!bSubmitted)
+  {
+    UE_LOG(LogSkaldUI, Warning,
+           TEXT("FighterSelection: Unable to submit lock-in (no owning player)"));
+    SetLockInButtonEnabled(true);
     return;
   }
+
   OnLockedIn.Broadcast();
 }
 
