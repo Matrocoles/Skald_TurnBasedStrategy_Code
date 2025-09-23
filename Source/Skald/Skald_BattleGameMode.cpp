@@ -8,6 +8,7 @@
 #include "Skald.h"
 #include "Skald_GameInstance.h"
 #include "Skald_GameState.h"
+#include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -240,10 +241,215 @@ void ASkald_BattleGameMode::BeginPlay() {
   UE_LOG(LogSkaldBattle, Log, TEXT("BGM BeginPlay. ExpectedControllers=%d"),
          ExpectedControllers);
 
+  EnsureBattleControllers();
+
   GetWorldTimerManager().SetTimer(
       WaitForPlayersHandle, this, &ASkald_BattleGameMode::PollBattleBootstrap, 0.25f,
       true);
   PollBattleBootstrap();
+}
+
+void ASkald_BattleGameMode::EnsureBattleControllers() {
+  if (!HasAuthority()) {
+    return;
+  }
+
+  UWorld *World = GetWorld();
+  if (!World || World->GetNetMode() != NM_Standalone) {
+    return;
+  }
+
+  USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+  if (!GI || GI->bIsMultiplayer) {
+    return;
+  }
+
+  const FS_BattlePayload &Battle = GI->PendingBattle;
+
+  struct FBattleParticipant {
+    int32 PlayerId;
+    bool bIsAI;
+    FString DisplayName;
+    ESkaldFaction Faction;
+  };
+
+  TArray<FBattleParticipant> Participants;
+  auto AddParticipant = [&](int32 PlayerId, bool bIsAI, const FString &Name,
+                            ESkaldFaction Faction) {
+    if (PlayerId > 0) {
+      Participants.Add({PlayerId, bIsAI, Name, Faction});
+    }
+  };
+
+  AddParticipant(Battle.AttackerPlayerID, Battle.bAttackerIsAI,
+                 Battle.AttackerDisplayName, Battle.AttackerFaction);
+  AddParticipant(Battle.DefenderPlayerID, Battle.bDefenderIsAI,
+                 Battle.DefenderDisplayName, Battle.DefenderFaction);
+
+  if (Participants.Num() == 0) {
+    return;
+  }
+
+  ExpectedControllers = FMath::Max(ExpectedControllers, Participants.Num());
+
+  bEnsuringBattleControllers = true;
+  DeferredReadyControllers.Reset();
+
+  TArray<ASkaldPlayerController *> HumanControllers;
+  TArray<ASkaldPlayerController *> AIControllers;
+  TMap<int32, ASkaldPlayerController *> ControllersById;
+  TSet<ASkaldPlayerController *> UsedControllers;
+
+  for (FConstControllerIterator It = World->GetControllerIterator(); It; ++It) {
+    ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(*It);
+    if (!PC) {
+      continue;
+    }
+
+    if (AIControllerClass && PC->IsA(AIControllerClass)) {
+      AIControllers.Add(PC);
+    } else {
+      HumanControllers.Add(PC);
+    }
+
+    if (ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>()) {
+      ControllersById.Add(PS->GetPlayerId(), PC);
+    }
+  }
+
+  auto EnsurePlayerState = [&](ASkaldPlayerController *Controller,
+                               bool bIsAI) -> ASkaldPlayerState * {
+    if (!Controller) {
+      return nullptr;
+    }
+
+    ASkaldPlayerState *PS = Controller->GetPlayerState<ASkaldPlayerState>();
+    if (!PS) {
+      Controller->InitPlayerState();
+      PS = Controller->GetPlayerState<ASkaldPlayerState>();
+    }
+    if (!PS) {
+      return nullptr;
+    }
+
+    PS->bIsAI = bIsAI;
+
+    if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
+      if (!GS->PlayerArray.Contains(PS)) {
+        GS->AddPlayerState(PS);
+      }
+    }
+
+    return PS;
+  };
+
+  auto AcquireController = [&](const FBattleParticipant &Participant)
+      -> ASkaldPlayerController * {
+    if (Participant.PlayerId > 0) {
+      if (ASkaldPlayerController **Existing =
+              ControllersById.Find(Participant.PlayerId)) {
+        ASkaldPlayerController *Controller = *Existing;
+        if (Controller && !UsedControllers.Contains(Controller)) {
+          UsedControllers.Add(Controller);
+          return Controller;
+        }
+      }
+    }
+
+    TArray<ASkaldPlayerController *> &Pool =
+        Participant.bIsAI ? AIControllers : HumanControllers;
+    for (ASkaldPlayerController *Candidate : Pool) {
+      if (Candidate && !UsedControllers.Contains(Candidate)) {
+        UsedControllers.Add(Candidate);
+        return Candidate;
+      }
+    }
+
+    if (!Participant.bIsAI || !AIControllerClass) {
+      return nullptr;
+    }
+
+    FTransform SpawnTransform = FTransform::Identity;
+    ASkaldPlayerController *NewController = Cast<ASkaldPlayerController>(
+        World->SpawnActorDeferred<APlayerController>(
+            AIControllerClass, SpawnTransform, nullptr, nullptr,
+            ESpawnActorCollisionHandlingMethod::AlwaysSpawn));
+    if (!NewController) {
+      return nullptr;
+    }
+
+    NewController->FinishSpawning(SpawnTransform);
+    ASkaldPlayerState *NewPS = EnsurePlayerState(NewController, true);
+    if (NewPS) {
+      ControllersById.Add(NewPS->GetPlayerId(), NewController);
+    }
+
+    AIControllers.Add(NewController);
+    UsedControllers.Add(NewController);
+    return NewController;
+  };
+
+  bool bUpdatedPlayers = false;
+
+  for (const FBattleParticipant &Participant : Participants) {
+    ASkaldPlayerController *Controller = AcquireController(Participant);
+    if (!Controller) {
+      UE_LOG(LogSkaldBattle, Warning,
+             TEXT("EnsureBattleControllers: Unable to allocate controller for PlayerId=%d"),
+             Participant.PlayerId);
+      continue;
+    }
+
+    ASkaldPlayerState *PS = EnsurePlayerState(Controller, Participant.bIsAI);
+    if (!PS) {
+      continue;
+    }
+
+    const int32 PreviousId = PS->GetPlayerId();
+    if (Participant.PlayerId > 0 && PreviousId != Participant.PlayerId) {
+      ControllersById.Remove(PreviousId);
+    }
+
+    if (Participant.PlayerId > 0) {
+      PS->SetPlayerId(Participant.PlayerId);
+      ControllersById.Add(Participant.PlayerId, Controller);
+    }
+    if (!Participant.DisplayName.IsEmpty()) {
+      PS->PlayerDisplayName = Participant.DisplayName;
+      PS->SetPlayerName(Participant.DisplayName);
+    }
+    if (Participant.Faction != ESkaldFaction::None) {
+      PS->Faction = Participant.Faction;
+    }
+    PS->bIsAI = Participant.bIsAI;
+    bUpdatedPlayers = true;
+  }
+
+  if (bUpdatedPlayers) {
+    if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
+      GS->OnPlayersUpdated.Broadcast();
+      GS->ForceNetUpdate();
+    }
+  }
+
+  bEnsuringBattleControllers = false;
+  ProcessDeferredControllers();
+}
+
+void ASkald_BattleGameMode::ProcessDeferredControllers() {
+  if (DeferredReadyControllers.Num() == 0) {
+    return;
+  }
+
+  TArray<TWeakObjectPtr<AController>> PendingControllers =
+      DeferredReadyControllers;
+  DeferredReadyControllers.Reset();
+
+  for (const TWeakObjectPtr<AController> &WeakController : PendingControllers) {
+    if (AController *Controller = WeakController.Get()) {
+      OnControllerReady(Controller);
+    }
+  }
 }
 
 void ASkald_BattleGameMode::SetupPendingBattle() {
@@ -655,7 +861,16 @@ void ASkald_BattleGameMode::OnControllerReady(AController *Controller) {
   UE_LOG(LogSkaldBattle, Log, TEXT("OnControllerReady: %s  HasAuthority=%d"),
          *GetNameSafe(Controller), HasAuthority() ? 1 : 0);
 
-  if (!HasAuthority() || !IsValid(Controller)) {
+  if (!IsValid(Controller)) {
+    return;
+  }
+
+  if (bEnsuringBattleControllers) {
+    DeferredReadyControllers.AddUnique(Controller);
+    return;
+  }
+
+  if (!HasAuthority()) {
     return;
   }
 
