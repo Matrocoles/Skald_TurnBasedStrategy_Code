@@ -84,7 +84,6 @@ public:
   UFUNCTION()
   void OnRep_IsAI();
 
-  UFUNCTION()
   virtual void OnRep_PlayerId() override;
 
   virtual void GetLifetimeReplicatedProps(
