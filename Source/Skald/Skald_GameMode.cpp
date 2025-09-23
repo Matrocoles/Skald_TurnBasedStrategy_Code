@@ -804,13 +804,14 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
   }
 
   // Player IDs can grow without bound across repeated sessions. Reassign
-  // them to match the compact `PlayerDataArray` so blueprints that index by
-  // ID never read past the array length.
+  // them to a compact, 1-based range so blueprints that index by ID never
+  // read past the array length while keeping IDs strictly positive.
   for (int32 i = 0; i < GS->PlayerArray.Num(); ++i) {
     if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(GS->PlayerArray[i])) {
-      PS->SetPlayerId(i);
+      const int32 NewPlayerId = i + 1;
+      PS->SetPlayerId(NewPlayerId);
       if (PlayerDataArray.IsValidIndex(i)) {
-        PlayerDataArray[i].PlayerID = i;
+        PlayerDataArray[i].PlayerID = NewPlayerId;
       }
     }
   }
