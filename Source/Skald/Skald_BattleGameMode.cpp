@@ -1,6 +1,8 @@
 #include "Skald_BattleGameMode.h"
 #include "SkaldLogging.h"
 
+#include "Skald_AIController.h"
+
 #include "Algo/RandomShuffle.h"
 #include "Algo/Sort.h"
 #include "AIController.h"
@@ -22,51 +24,150 @@
 #include "WorldMap.h"
 
 namespace {
-TArray<TWeakObjectPtr<AController>> PendingControllers;
-bool bPendingBattleSetupTriggered = false;
 
-void AssignControllerSlot(AController *Controller,
-                          const TSubclassOf<APlayerController> &AIControllerClass) {
-  PendingControllers.SetNum(2);
+struct FPendingControllerSlot {
+  TWeakObjectPtr<AController> Controller;
+  bool bIsAI = false;
+  int32 PlayerId = INDEX_NONE;
+  FString DisplayName;
+};
 
-  ASkaldPlayerController *PlayerController =
-      Controller ? Cast<ASkaldPlayerController>(Controller) : nullptr;
-  if (!PlayerController) {
+static TArray<FPendingControllerSlot> GPendingControllers;
+static bool GBattleSetupTriggered = false;
+static TWeakObjectPtr<ASkald_BattleGameMode> GActiveBattleGameMode;
+
+static bool IsAIController(const AController *C) {
+  return C && C->IsA(ASkald_AIController::StaticClass());
+}
+
+static int32 GetPlayerIdFrom(AController *C) {
+  if (!C) {
+    return INDEX_NONE;
+  }
+  if (!C->PlayerState) {
+    C->InitPlayerState();
+  }
+  if (const ASkaldPlayerState *SPS = C->GetPlayerState<ASkaldPlayerState>()) {
+    return SPS->GetPlayerId();
+  }
+  return INDEX_NONE;
+}
+
+static FString GetDisplayName(AController *C) {
+  if (!C) {
+    return TEXT("");
+  }
+  if (APlayerState *PS = C->PlayerState) {
+    return PS->GetPlayerName();
+  }
+  return C->GetName();
+}
+
+static void CompactSlots() {
+  GPendingControllers.RemoveAll([](const FPendingControllerSlot &S) {
+    return !S.Controller.IsValid();
+  });
+}
+
+static void AssignControllerSlot(AController *C) {
+  if (!C) {
     return;
   }
+  if (!C->PlayerState) {
+    C->InitPlayerState();
+  }
 
-  bool bIsAI = AIControllerClass && Controller->IsA(AIControllerClass);
-  if (!bIsAI) {
-    if (ASkaldPlayerState *SlotPS =
-            PlayerController->GetPlayerState<ASkaldPlayerState>()) {
-      bIsAI = SlotPS->bIsAI;
+  const ASkaldPlayerState *SPS = C->GetPlayerState<ASkaldPlayerState>();
+  const bool bAIFlag = IsAIController(C) || (SPS && SPS->bIsAI);
+  const int32 PlayerId = GetPlayerIdFrom(C);
+  const FString Name = GetDisplayName(C);
+
+  CompactSlots();
+
+  for (int32 i = 0; i < GPendingControllers.Num(); ++i) {
+    auto &S = GPendingControllers[i];
+    if (S.Controller.Get() == C || (PlayerId > 0 && S.PlayerId == PlayerId)) {
+      S.Controller = C;
+      S.bIsAI = bAIFlag;
+      S.PlayerId = PlayerId;
+      S.DisplayName = Name;
+      UE_LOG(LogSkaldBattle, Log,
+             TEXT("Assigned %s to slot %d (update)"), *GetNameSafe(C), i);
+      return;
     }
   }
-  const int32 SlotIndex = bIsAI ? 1 : 0;
-  PendingControllers[SlotIndex] = Controller;
 
+  for (int32 i = 0; i < GPendingControllers.Num(); ++i) {
+    auto &S = GPendingControllers[i];
+    if (!S.Controller.IsValid()) {
+      S.Controller = C;
+      S.bIsAI = bAIFlag;
+      S.PlayerId = PlayerId;
+      S.DisplayName = Name;
+      UE_LOG(LogSkaldBattle, Log,
+             TEXT("Assigned %s to slot %d (empty)"), *GetNameSafe(C), i);
+      return;
+    }
+  }
+
+  FPendingControllerSlot NewSlot;
+  NewSlot.Controller = C;
+  NewSlot.bIsAI = bAIFlag;
+  NewSlot.PlayerId = PlayerId;
+  NewSlot.DisplayName = Name;
+  const int32 NewIdx = GPendingControllers.Add(NewSlot);
   UE_LOG(LogSkaldBattle, Log,
-         TEXT("BattleGM Normalized controller slot %d: %s"), SlotIndex,
-         *GetNameSafe(Controller));
+         TEXT("Assigned %s to slot %d (append)"), *GetNameSafe(C), NewIdx);
 }
 
 bool TrySetupBattleWhenReady() {
-  PendingControllers.SetNum(2);
-
-  if (!PendingControllers[0].IsValid() || !PendingControllers[1].IsValid()) {
+  if (GBattleSetupTriggered) {
     return false;
   }
 
-  if (bPendingBattleSetupTriggered) {
+  CompactSlots();
+
+  TArray<AController *> Valid;
+  Valid.Reserve(GPendingControllers.Num());
+  for (const auto &S : GPendingControllers) {
+    if (AController *C = S.Controller.Get()) {
+      Valid.Add(C);
+    }
+  }
+
+  if (Valid.Num() < 2) {
     return false;
   }
 
-  bPendingBattleSetupTriggered = true;
+  GBattleSetupTriggered = true;
 
-  UE_LOG(LogSkaldBattle, Log,
-         TEXT("BattleGM TrySetupBattleWhenReady: controllers ready (Human=%s AI=%s)"),
-         *GetNameSafe(PendingControllers[0].Get()),
-         *GetNameSafe(PendingControllers[1].Get()));
+  FString Summary;
+  for (int32 i = 0; i < GPendingControllers.Num(); ++i) {
+    const auto &S = GPendingControllers[i];
+    if (AController *C = S.Controller.Get()) {
+      Summary += FString::Printf(TEXT(" [%d:%s AI=%d Pid=%d]"), i,
+                                 *GetNameSafe(C), S.bIsAI ? 1 : 0, S.PlayerId);
+    }
+  }
+  UE_LOG(LogSkaldBattle, Log, TEXT("Controllers ready (%d)%s"), Valid.Num(),
+         *Summary);
+
+  ASkald_BattleGameMode *GameMode = GActiveBattleGameMode.Get();
+  if (!GameMode && Valid.Num() > 0) {
+    if (UWorld *World = Valid[0]->GetWorld()) {
+      GameMode = World->GetAuthGameMode<ASkald_BattleGameMode>();
+      GActiveBattleGameMode = GameMode;
+    }
+  }
+
+  if (!GameMode) {
+    UE_LOG(LogSkaldBattle, Warning,
+           TEXT("TrySetupBattleWhenReady: Unable to access BattleGameMode for setup."));
+    GBattleSetupTriggered = false;
+    return false;
+  }
+
+  GameMode->SetupPendingBattle();
   return true;
 }
 
@@ -211,9 +312,9 @@ void ASkald_BattleGameMode::InitGame(const FString &Map, const FString &Options,
                                      FString &Error) {
   Super::InitGame(Map, Options, Error);
 
-  PendingControllers.Reset();
-  PendingControllers.SetNum(2);
-  bPendingBattleSetupTriggered = false;
+  GPendingControllers.Reset();
+  GBattleSetupTriggered = false;
+  GActiveBattleGameMode = this;
 
   CachedHumanTerritoryIDs.Reset();
   CachedTerritoryMap.Reset();
@@ -539,35 +640,96 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
     return;
   }
 
-  const FSkaldTravelState &TravelState = GI->GetTravelState();
-  MergeHumanTerritories(TravelState, GS, CachedTerritoryMap,
+  const FSkaldTravelState &TS = GI->GetTravelState();
+  MergeHumanTerritories(TS, GS, CachedTerritoryMap,
                         CachedHumanTerritoryIDs);
 
   FS_BattlePayload Battle = GI->PendingBattle;
   Battle.FromTerritoryID = Battle.FromTerritoryID > 0
                                ? Battle.FromTerritoryID
-                               : TravelState.AttackerTerritory;
+                               : TS.AttackerTerritory;
   Battle.TargetTerritoryID = Battle.TargetTerritoryID > 0
                                  ? Battle.TargetTerritoryID
-                                 : TravelState.DefenderTerritory;
+                                 : TS.DefenderTerritory;
 
-  const int32 AttackerId = Battle.bAttackerIsAI ? 1 : 0;
-  const int32 DefenderId = Battle.bDefenderIsAI ? 1 : 0;
+  CompactSlots();
 
-  PendingControllers.SetNum(2);
+  auto SeatController = [&](int32 SeatIdx) -> AController * {
+    return (SeatIdx >= 0 && SeatIdx < GPendingControllers.Num() &&
+            GPendingControllers[SeatIdx].Controller.IsValid())
+               ? GPendingControllers[SeatIdx].Controller.Get()
+               : nullptr;
+  };
 
-  AController *AttackerC = PendingControllers.IsValidIndex(AttackerId)
-                               ? PendingControllers[AttackerId].Get()
-                               : nullptr;
-  AController *DefenderC = PendingControllers.IsValidIndex(DefenderId)
-                               ? PendingControllers[DefenderId].Get()
-                               : nullptr;
+  AController *AttackerC = SeatController(TS.AttackerId);
+  AController *DefenderC = SeatController(TS.DefenderId);
 
   if (!AttackerC || !DefenderC) {
-    UE_LOG(LogSkaldBattle, Error,
-           TEXT("BattleGM SetupPendingBattle: Unable to resolve participants (AttackerId=%d DefenderId=%d Territories=%d/%d)"),
-           Battle.AttackerPlayerID, Battle.DefenderPlayerID,
-           Battle.FromTerritoryID, Battle.TargetTerritoryID);
+    TSet<int32> Used;
+
+    auto MarkUsed = [&](AController *Controller) {
+      if (!Controller) {
+        return;
+      }
+      for (int32 SlotIdx = 0; SlotIdx < GPendingControllers.Num(); ++SlotIdx) {
+        if (GPendingControllers[SlotIdx].Controller.Get() == Controller) {
+          Used.Add(SlotIdx);
+          break;
+        }
+      }
+    };
+
+    MarkUsed(AttackerC);
+    MarkUsed(DefenderC);
+
+    auto Acquire = [&](int32 PrefPid, bool bPrefAI) -> AController * {
+      if (PrefPid > 0) {
+        for (int32 SlotIdx = 0; SlotIdx < GPendingControllers.Num(); ++SlotIdx) {
+          const auto &S = GPendingControllers[SlotIdx];
+          if (Used.Contains(SlotIdx) || !S.Controller.IsValid()) {
+            continue;
+          }
+          if (S.PlayerId == PrefPid) {
+            Used.Add(SlotIdx);
+            return S.Controller.Get();
+          }
+        }
+      }
+      for (int32 SlotIdx = 0; SlotIdx < GPendingControllers.Num(); ++SlotIdx) {
+        const auto &S = GPendingControllers[SlotIdx];
+        if (Used.Contains(SlotIdx) || !S.Controller.IsValid()) {
+          continue;
+        }
+        if (S.bIsAI == bPrefAI) {
+          Used.Add(SlotIdx);
+          return S.Controller.Get();
+        }
+      }
+      for (int32 SlotIdx = 0; SlotIdx < GPendingControllers.Num(); ++SlotIdx) {
+        const auto &S = GPendingControllers[SlotIdx];
+        if (Used.Contains(SlotIdx) || !S.Controller.IsValid()) {
+          continue;
+        }
+        Used.Add(SlotIdx);
+        return S.Controller.Get();
+      }
+      return nullptr;
+    };
+
+    if (!AttackerC) {
+      AttackerC = Acquire(Battle.AttackerPlayerID, Battle.bAttackerIsAI);
+    }
+    if (!DefenderC) {
+      DefenderC = Acquire(Battle.DefenderPlayerID, Battle.bDefenderIsAI);
+    }
+  }
+
+  if (!AttackerC || !DefenderC) {
+    UE_LOG(
+        LogSkaldBattle, Error,
+        TEXT("BattleGM SetupPendingBattle: Unable to resolve participants (Seats A=%d D=%d From=%d To=%d Controllers=%d)"),
+        TS.AttackerId, TS.DefenderId, Battle.FromTerritoryID,
+        Battle.TargetTerritoryID, GPendingControllers.Num());
     ResetSetupStarted();
     return;
   }
@@ -961,11 +1123,8 @@ void ASkald_BattleGameMode::OnControllerReady(AController *Controller) {
     Controller->InitPlayerState();
   }
 
-  AssignControllerSlot(Controller, AIControllerClass);
-
-  if (TrySetupBattleWhenReady()) {
-    PollBattleBootstrap();
-  }
+  AssignControllerSlot(Controller);
+  TrySetupBattleWhenReady();
 
   TryStartBattle();
 }
