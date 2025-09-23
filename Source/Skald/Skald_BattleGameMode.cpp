@@ -34,10 +34,9 @@ struct FPendingControllerSlot {
 
 static TArray<FPendingControllerSlot> GPendingControllers;
 static bool GBattleSetupTriggered = false;
-static TWeakObjectPtr<ASkald_BattleGameMode> GActiveBattleGameMode;
 
 static bool IsAIController(const AController *C) {
-  return C && C->IsA(ASkald_AIController::StaticClass());
+  return C && C->IsA(ASkaldAIController::StaticClass());
 }
 
 static int32 GetPlayerIdFrom(AController *C) {
@@ -77,8 +76,9 @@ static void AssignControllerSlot(AController *C) {
     C->InitPlayerState();
   }
 
-  const ASkaldPlayerState *SPS = C->GetPlayerState<ASkaldPlayerState>();
-  const bool bAIFlag = IsAIController(C) || (SPS && SPS->bIsAI);
+  const bool bAIFlag = IsAIController(C) ||
+                       (C->GetPlayerState<ASkaldPlayerState>() &&
+                        C->GetPlayerState<ASkaldPlayerState>()->bIsAI);
   const int32 PlayerId = GetPlayerIdFrom(C);
   const FString Name = GetDisplayName(C);
 
@@ -115,60 +115,9 @@ static void AssignControllerSlot(AController *C) {
   NewSlot.bIsAI = bAIFlag;
   NewSlot.PlayerId = PlayerId;
   NewSlot.DisplayName = Name;
-  const int32 NewIdx = GPendingControllers.Add(NewSlot);
+  const int32 NewIdx = GPendingControllers.Add(MoveTemp(NewSlot));
   UE_LOG(LogSkaldBattle, Log,
          TEXT("Assigned %s to slot %d (append)"), *GetNameSafe(C), NewIdx);
-}
-
-bool TrySetupBattleWhenReady() {
-  if (GBattleSetupTriggered) {
-    return false;
-  }
-
-  CompactSlots();
-
-  TArray<AController *> Valid;
-  Valid.Reserve(GPendingControllers.Num());
-  for (const auto &S : GPendingControllers) {
-    if (AController *C = S.Controller.Get()) {
-      Valid.Add(C);
-    }
-  }
-
-  if (Valid.Num() < 2) {
-    return false;
-  }
-
-  GBattleSetupTriggered = true;
-
-  FString Summary;
-  for (int32 i = 0; i < GPendingControllers.Num(); ++i) {
-    const auto &S = GPendingControllers[i];
-    if (AController *C = S.Controller.Get()) {
-      Summary += FString::Printf(TEXT(" [%d:%s AI=%d Pid=%d]"), i,
-                                 *GetNameSafe(C), S.bIsAI ? 1 : 0, S.PlayerId);
-    }
-  }
-  UE_LOG(LogSkaldBattle, Log, TEXT("Controllers ready (%d)%s"), Valid.Num(),
-         *Summary);
-
-  ASkald_BattleGameMode *GameMode = GActiveBattleGameMode.Get();
-  if (!GameMode && Valid.Num() > 0) {
-    if (UWorld *World = Valid[0]->GetWorld()) {
-      GameMode = World->GetAuthGameMode<ASkald_BattleGameMode>();
-      GActiveBattleGameMode = GameMode;
-    }
-  }
-
-  if (!GameMode) {
-    UE_LOG(LogSkaldBattle, Warning,
-           TEXT("TrySetupBattleWhenReady: Unable to access BattleGameMode for setup."));
-    GBattleSetupTriggered = false;
-    return false;
-  }
-
-  GameMode->SetupPendingBattle();
-  return true;
 }
 
 void BuildTerritoryMap(const TArray<FS_Territory> &Source,
@@ -314,7 +263,6 @@ void ASkald_BattleGameMode::InitGame(const FString &Map, const FString &Options,
 
   GPendingControllers.Reset();
   GBattleSetupTriggered = false;
-  GActiveBattleGameMode = this;
 
   CachedHumanTerritoryIDs.Reset();
   CachedTerritoryMap.Reset();
@@ -654,82 +602,52 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
 
   CompactSlots();
 
-  auto SeatController = [&](int32 SeatIdx) -> AController * {
-    return (SeatIdx >= 0 && SeatIdx < GPendingControllers.Num() &&
-            GPendingControllers[SeatIdx].Controller.IsValid())
-               ? GPendingControllers[SeatIdx].Controller.Get()
-               : nullptr;
-  };
+  TSet<int32> Used;
 
-  AController *AttackerC = SeatController(TS.AttackerId);
-  AController *DefenderC = SeatController(TS.DefenderId);
-
-  if (!AttackerC || !DefenderC) {
-    TSet<int32> Used;
-
-    auto MarkUsed = [&](AController *Controller) {
-      if (!Controller) {
-        return;
-      }
-      for (int32 SlotIdx = 0; SlotIdx < GPendingControllers.Num(); ++SlotIdx) {
-        if (GPendingControllers[SlotIdx].Controller.Get() == Controller) {
-          Used.Add(SlotIdx);
-          break;
-        }
-      }
-    };
-
-    MarkUsed(AttackerC);
-    MarkUsed(DefenderC);
-
-    auto Acquire = [&](int32 PrefPid, bool bPrefAI) -> AController * {
-      if (PrefPid > 0) {
-        for (int32 SlotIdx = 0; SlotIdx < GPendingControllers.Num(); ++SlotIdx) {
-          const auto &S = GPendingControllers[SlotIdx];
-          if (Used.Contains(SlotIdx) || !S.Controller.IsValid()) {
-            continue;
-          }
-          if (S.PlayerId == PrefPid) {
-            Used.Add(SlotIdx);
-            return S.Controller.Get();
-          }
-        }
-      }
+  auto Acquire = [&](int32 PrefPid, bool bPrefAI) -> AController * {
+    if (PrefPid > 0) {
       for (int32 SlotIdx = 0; SlotIdx < GPendingControllers.Num(); ++SlotIdx) {
         const auto &S = GPendingControllers[SlotIdx];
         if (Used.Contains(SlotIdx) || !S.Controller.IsValid()) {
           continue;
         }
-        if (S.bIsAI == bPrefAI) {
+        if (S.PlayerId == PrefPid) {
           Used.Add(SlotIdx);
           return S.Controller.Get();
         }
       }
-      for (int32 SlotIdx = 0; SlotIdx < GPendingControllers.Num(); ++SlotIdx) {
-        const auto &S = GPendingControllers[SlotIdx];
-        if (Used.Contains(SlotIdx) || !S.Controller.IsValid()) {
-          continue;
-        }
+    }
+    for (int32 SlotIdx = 0; SlotIdx < GPendingControllers.Num(); ++SlotIdx) {
+      const auto &S = GPendingControllers[SlotIdx];
+      if (Used.Contains(SlotIdx) || !S.Controller.IsValid()) {
+        continue;
+      }
+      if (S.bIsAI == bPrefAI) {
         Used.Add(SlotIdx);
         return S.Controller.Get();
       }
-      return nullptr;
-    };
+    }
+    for (int32 SlotIdx = 0; SlotIdx < GPendingControllers.Num(); ++SlotIdx) {
+      const auto &S = GPendingControllers[SlotIdx];
+      if (Used.Contains(SlotIdx) || !S.Controller.IsValid()) {
+        continue;
+      }
+      Used.Add(SlotIdx);
+      return S.Controller.Get();
+    }
+    return nullptr;
+  };
 
-    if (!AttackerC) {
-      AttackerC = Acquire(Battle.AttackerPlayerID, Battle.bAttackerIsAI);
-    }
-    if (!DefenderC) {
-      DefenderC = Acquire(Battle.DefenderPlayerID, Battle.bDefenderIsAI);
-    }
-  }
+  AController *AttackerC =
+      Acquire(Battle.AttackerPlayerID, Battle.bAttackerIsAI);
+  AController *DefenderC =
+      Acquire(Battle.DefenderPlayerID, Battle.bDefenderIsAI);
 
   if (!AttackerC || !DefenderC) {
-    UE_LOG(
-        LogSkaldBattle, Error,
-        TEXT("BattleGM SetupPendingBattle: Unable to resolve participants (Seats A=%d D=%d From=%d To=%d Controllers=%d)"),
-        TS.AttackerId, TS.DefenderId, Battle.FromTerritoryID,
-        Battle.TargetTerritoryID, GPendingControllers.Num());
+    UE_LOG(LogSkaldBattle, Error,
+           TEXT("BattleGM SetupPendingBattle: Unable to resolve participants (From=%d To=%d PendingControllers=%d)"),
+           Battle.FromTerritoryID, Battle.TargetTerritoryID,
+           GPendingControllers.Num());
     ResetSetupStarted();
     return;
   }
@@ -1100,6 +1018,42 @@ void ASkald_BattleGameMode::PostLogin(APlayerController *NewPlayer) {
 
 void ASkald_BattleGameMode::OnAIControllerReady(AAIController *Controller) {
   OnControllerReady(Controller);
+}
+
+bool ASkald_BattleGameMode::TrySetupBattleWhenReady() {
+  if (GBattleSetupTriggered) {
+    return false;
+  }
+
+  CompactSlots();
+
+  TArray<AController *> Valid;
+  Valid.Reserve(GPendingControllers.Num());
+  for (const auto &S : GPendingControllers) {
+    if (AController *C = S.Controller.Get()) {
+      Valid.Add(C);
+    }
+  }
+
+  if (Valid.Num() < 2) {
+    return false;
+  }
+
+  GBattleSetupTriggered = true;
+
+  FString Summary;
+  for (int32 i = 0; i < GPendingControllers.Num(); ++i) {
+    const auto &S = GPendingControllers[i];
+    if (AController *C = S.Controller.Get()) {
+      Summary += FString::Printf(TEXT(" [%d:%s AI=%d Pid=%d]"), i,
+                                 *GetNameSafe(C), S.bIsAI ? 1 : 0, S.PlayerId);
+    }
+  }
+  UE_LOG(LogSkaldBattle, Log,
+         TEXT("BattleGM: controllers ready (%d)%s"), Valid.Num(), *Summary);
+
+  SetupPendingBattle();
+  return true;
 }
 
 void ASkald_BattleGameMode::OnControllerReady(AController *Controller) {
