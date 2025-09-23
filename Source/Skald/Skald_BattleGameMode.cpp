@@ -22,13 +22,23 @@
 #include "WorldMap.h"
 
 namespace {
-TArray<TWeakObjectPtr<AController>> PendingControllers;
+struct FPendingControllerSlot {
+  TWeakObjectPtr<AController> Controller;
+  bool bIsAI = false;
+  int32 PlayerId = 0;
+};
+
+TArray<FPendingControllerSlot> PendingControllers;
 bool bPendingBattleSetupTriggered = false;
+
+void CompactPendingControllerSlots() {
+  PendingControllers.RemoveAll([](const FPendingControllerSlot &Slot) {
+    return !Slot.Controller.IsValid();
+  });
+}
 
 void AssignControllerSlot(AController *Controller,
                           const TSubclassOf<APlayerController> &AIControllerClass) {
-  PendingControllers.SetNum(2);
-
   ASkaldPlayerController *PlayerController =
       Controller ? Cast<ASkaldPlayerController>(Controller) : nullptr;
   if (!PlayerController) {
@@ -36,24 +46,52 @@ void AssignControllerSlot(AController *Controller,
   }
 
   bool bIsAI = AIControllerClass && Controller->IsA(AIControllerClass);
-  if (!bIsAI) {
-    if (ASkaldPlayerState *SlotPS =
-            PlayerController->GetPlayerState<ASkaldPlayerState>()) {
-      bIsAI = SlotPS->bIsAI;
+  ASkaldPlayerState *SlotPS =
+      PlayerController->GetPlayerState<ASkaldPlayerState>();
+  if (!bIsAI && SlotPS) {
+    bIsAI = SlotPS->bIsAI;
+  }
+
+  const int32 PlayerId = SlotPS ? SlotPS->GetPlayerId() : 0;
+
+  CompactPendingControllerSlots();
+
+  int32 SlotIndex = INDEX_NONE;
+  for (int32 Index = 0; Index < PendingControllers.Num(); ++Index) {
+    const FPendingControllerSlot &Slot = PendingControllers[Index];
+    if (Slot.Controller.Get() == Controller ||
+        (PlayerId > 0 && Slot.PlayerId == PlayerId)) {
+      SlotIndex = Index;
+      break;
     }
   }
-  const int32 SlotIndex = bIsAI ? 1 : 0;
-  PendingControllers[SlotIndex] = Controller;
+
+  if (SlotIndex == INDEX_NONE) {
+    SlotIndex = PendingControllers.AddDefaulted();
+  }
+
+  FPendingControllerSlot &Slot = PendingControllers[SlotIndex];
+  Slot.Controller = Controller;
+  Slot.bIsAI = bIsAI;
+  Slot.PlayerId = PlayerId;
 
   UE_LOG(LogSkaldBattle, Log,
-         TEXT("BattleGM Normalized controller slot %d: %s"), SlotIndex,
-         *GetNameSafe(Controller));
+         TEXT("BattleGM Normalized controller slot %d (PlayerId=%d bIsAI=%d): %s"),
+         SlotIndex, PlayerId, bIsAI ? 1 : 0, *GetNameSafe(Controller));
 }
 
 bool TrySetupBattleWhenReady() {
-  PendingControllers.SetNum(2);
+  CompactPendingControllerSlots();
 
-  if (!PendingControllers[0].IsValid() || !PendingControllers[1].IsValid()) {
+  TArray<AController *> ValidControllers;
+  ValidControllers.Reserve(PendingControllers.Num());
+  for (const FPendingControllerSlot &Slot : PendingControllers) {
+    if (AController *Controller = Slot.Controller.Get()) {
+      ValidControllers.Add(Controller);
+    }
+  }
+
+  if (ValidControllers.Num() < 2) {
     return false;
   }
 
@@ -63,10 +101,19 @@ bool TrySetupBattleWhenReady() {
 
   bPendingBattleSetupTriggered = true;
 
+  FString ControllerSummary;
+  for (int32 Index = 0; Index < PendingControllers.Num(); ++Index) {
+    const FPendingControllerSlot &Slot = PendingControllers[Index];
+    if (AController *Controller = Slot.Controller.Get()) {
+      ControllerSummary += FString::Printf(
+          TEXT(" [%d:%s AI=%d PlayerId=%d]"), Index,
+          *GetNameSafe(Controller), Slot.bIsAI ? 1 : 0, Slot.PlayerId);
+    }
+  }
+
   UE_LOG(LogSkaldBattle, Log,
-         TEXT("BattleGM TrySetupBattleWhenReady: controllers ready (Human=%s AI=%s)"),
-         *GetNameSafe(PendingControllers[0].Get()),
-         *GetNameSafe(PendingControllers[1].Get()));
+         TEXT("BattleGM TrySetupBattleWhenReady: controllers ready (%d)%s"),
+         ValidControllers.Num(), *ControllerSummary);
   return true;
 }
 
@@ -212,7 +259,6 @@ void ASkald_BattleGameMode::InitGame(const FString &Map, const FString &Options,
   Super::InitGame(Map, Options, Error);
 
   PendingControllers.Reset();
-  PendingControllers.SetNum(2);
   bPendingBattleSetupTriggered = false;
 
   CachedHumanTerritoryIDs.Reset();
@@ -551,23 +597,69 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
                                  ? Battle.TargetTerritoryID
                                  : TravelState.DefenderTerritory;
 
-  const int32 AttackerId = Battle.bAttackerIsAI ? 1 : 0;
-  const int32 DefenderId = Battle.bDefenderIsAI ? 1 : 0;
+  CompactPendingControllerSlots();
 
-  PendingControllers.SetNum(2);
+  TSet<int32> UsedControllerSlots;
+  auto AcquirePendingController =
+      [&](int32 PreferredPlayerId,
+          bool bPreferredAI) -> AController * {
+    int32 SelectedIndex = INDEX_NONE;
 
-  AController *AttackerC = PendingControllers.IsValidIndex(AttackerId)
-                               ? PendingControllers[AttackerId].Get()
-                               : nullptr;
-  AController *DefenderC = PendingControllers.IsValidIndex(DefenderId)
-                               ? PendingControllers[DefenderId].Get()
-                               : nullptr;
+    if (PreferredPlayerId > 0) {
+      for (int32 Index = 0; Index < PendingControllers.Num(); ++Index) {
+        const FPendingControllerSlot &Slot = PendingControllers[Index];
+        if (UsedControllerSlots.Contains(Index) || !Slot.Controller.IsValid()) {
+          continue;
+        }
+        if (Slot.PlayerId == PreferredPlayerId) {
+          SelectedIndex = Index;
+          break;
+        }
+      }
+    }
+
+    if (SelectedIndex == INDEX_NONE) {
+      for (int32 Index = 0; Index < PendingControllers.Num(); ++Index) {
+        const FPendingControllerSlot &Slot = PendingControllers[Index];
+        if (UsedControllerSlots.Contains(Index) || !Slot.Controller.IsValid()) {
+          continue;
+        }
+        if (Slot.bIsAI == bPreferredAI) {
+          SelectedIndex = Index;
+          break;
+        }
+      }
+    }
+
+    if (SelectedIndex == INDEX_NONE) {
+      for (int32 Index = 0; Index < PendingControllers.Num(); ++Index) {
+        const FPendingControllerSlot &Slot = PendingControllers[Index];
+        if (UsedControllerSlots.Contains(Index) || !Slot.Controller.IsValid()) {
+          continue;
+        }
+        SelectedIndex = Index;
+        break;
+      }
+    }
+
+    if (SelectedIndex != INDEX_NONE) {
+      UsedControllerSlots.Add(SelectedIndex);
+      return PendingControllers[SelectedIndex].Controller.Get();
+    }
+    return nullptr;
+  };
+
+  AController *AttackerC =
+      AcquirePendingController(Battle.AttackerPlayerID, Battle.bAttackerIsAI);
+  AController *DefenderC =
+      AcquirePendingController(Battle.DefenderPlayerID, Battle.bDefenderIsAI);
 
   if (!AttackerC || !DefenderC) {
     UE_LOG(LogSkaldBattle, Error,
-           TEXT("BattleGM SetupPendingBattle: Unable to resolve participants (AttackerId=%d DefenderId=%d Territories=%d/%d)"),
+           TEXT("BattleGM SetupPendingBattle: Unable to resolve participants (AttackerId=%d DefenderId=%d Territories=%d/%d PendingControllers=%d)"),
            Battle.AttackerPlayerID, Battle.DefenderPlayerID,
-           Battle.FromTerritoryID, Battle.TargetTerritoryID);
+           Battle.FromTerritoryID, Battle.TargetTerritoryID,
+           PendingControllers.Num());
     ResetSetupStarted();
     return;
   }
