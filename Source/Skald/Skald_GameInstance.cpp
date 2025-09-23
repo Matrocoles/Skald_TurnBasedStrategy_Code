@@ -3,6 +3,7 @@
 #include "Engine/Engine.h"
 #include "Kismet/GameplayStatics.h"
 #include "Skald.h"
+#include "SkaldLogging.h"
 #include "Blueprint/UserWidget.h"
 #include "Skald_PlayerController.h"
 #include "UI/SkaldUIHelpers.h"

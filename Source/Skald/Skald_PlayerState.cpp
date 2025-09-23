@@ -3,6 +3,7 @@
 #include "EngineUtils.h"
 #include "Net/UnrealNetwork.h"
 #include "Skald.h"
+#include "SkaldLogging.h"
 #include "Skald_GameState.h"
 #include "Skald_PlayerController.h"
 #include "Territory.h"

@@ -8,6 +8,7 @@
 #include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
 #include "Skald.h"
+#include "SkaldLogging.h"
 #include "SkaldTypes.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"

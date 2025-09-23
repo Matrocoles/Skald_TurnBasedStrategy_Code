@@ -1,5 +1,6 @@
 #include "Skald_PlayerCharacter.h"
 #include "Skald.h"
+#include "SkaldLogging.h"
 #include "WorldMap.h"
 #include "Territory.h"
 #include "Skald_PlayerController.h"
