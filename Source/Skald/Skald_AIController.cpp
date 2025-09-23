@@ -4,6 +4,7 @@
 #include "GameFramework/Controller.h"
 #include "Kismet/GameplayStatics.h"
 #include "Skald.h"
+#include "SkaldLogging.h"
 #include "Skald_BattleGameMode.h"
 #include "Skald_GameMode.h"
 #include "Skald_PlayerState.h"

@@ -6,6 +6,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
 #include "Skald.h"
+#include "SkaldLogging.h"
 #include "Skald_GameInstance.h"
 #include "Skald_GameMode.h"
 #include "Skald_GameState.h"

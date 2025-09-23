@@ -8,6 +8,7 @@
 #include "Engine/World.h"
 #include "Materials/MaterialInterface.h"
 #include "Skald.h"
+#include "SkaldLogging.h"
 #include "Skald_GameMode.h"
 #include "Skald_PlayerState.h"
 #include "Templates/Function.h"

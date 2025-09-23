@@ -3,6 +3,5 @@
 #pragma once
 
 #include "CoreMinimal.h"
-
-DECLARE_LOG_CATEGORY_EXTERN(LogSkald, Log, All);
+#include "SkaldLogging.h"
 

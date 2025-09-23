@@ -1,5 +1,6 @@
 #include "LoadGameWidget.h"
 #include "Skald.h"
+#include "SkaldLogging.h"
 #include "Components/Button.h"
 #include "Kismet/GameplayStatics.h"
 #include "LobbyMenuWidget.h"

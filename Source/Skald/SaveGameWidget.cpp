@@ -3,6 +3,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "LobbyMenuWidget.h"
 #include "Skald.h"
+#include "SkaldLogging.h"
 #include "SkaldSaveGame.h"
 #include "Skald_GameMode.h"
 #include "SlotNameConstants.h"

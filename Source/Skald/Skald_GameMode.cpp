@@ -7,6 +7,7 @@
 #include "GridBattleManager.h"
 #include "Kismet/GameplayStatics.h"
 #include "Skald.h"
+#include "SkaldLogging.h"
 #include "SkaldSaveGame.h"
 #include "Skald_AIController.h"
 #include "Skald_GameInstance.h"
