@@ -22,6 +22,54 @@
 #include "WorldMap.h"
 
 namespace {
+TArray<TWeakObjectPtr<AController>> PendingControllers;
+bool bPendingBattleSetupTriggered = false;
+
+void AssignControllerSlot(AController *Controller,
+                          const TSubclassOf<APlayerController> &AIControllerClass) {
+  PendingControllers.SetNum(2);
+
+  ASkaldPlayerController *PlayerController =
+      Controller ? Cast<ASkaldPlayerController>(Controller) : nullptr;
+  if (!PlayerController) {
+    return;
+  }
+
+  bool bIsAI = AIControllerClass && Controller->IsA(AIControllerClass);
+  if (!bIsAI) {
+    if (ASkaldPlayerState *SlotPS =
+            PlayerController->GetPlayerState<ASkaldPlayerState>()) {
+      bIsAI = SlotPS->bIsAI;
+    }
+  }
+  const int32 SlotIndex = bIsAI ? 1 : 0;
+  PendingControllers[SlotIndex] = Controller;
+
+  UE_LOG(LogSkaldBattle, Log,
+         TEXT("BattleGM Normalized controller slot %d: %s"), SlotIndex,
+         *GetNameSafe(Controller));
+}
+
+bool TrySetupBattleWhenReady() {
+  PendingControllers.SetNum(2);
+
+  if (!PendingControllers[0].IsValid() || !PendingControllers[1].IsValid()) {
+    return false;
+  }
+
+  if (bPendingBattleSetupTriggered) {
+    return false;
+  }
+
+  bPendingBattleSetupTriggered = true;
+
+  UE_LOG(LogSkaldBattle, Log,
+         TEXT("BattleGM TrySetupBattleWhenReady: controllers ready (Human=%s AI=%s)"),
+         *GetNameSafe(PendingControllers[0].Get()),
+         *GetNameSafe(PendingControllers[1].Get()));
+  return true;
+}
+
 void BuildTerritoryMap(const TArray<FS_Territory> &Source,
                        TMap<int32, FS_Territory> &Destination) {
   Destination.Reset();
@@ -162,6 +210,10 @@ ASkaldPlayerState *EnsureBattleParticipant(ASkaldGameState *GameState, UWorld *W
 void ASkald_BattleGameMode::InitGame(const FString &Map, const FString &Options,
                                      FString &Error) {
   Super::InitGame(Map, Options, Error);
+
+  PendingControllers.Reset();
+  PendingControllers.SetNum(2);
+  bPendingBattleSetupTriggered = false;
 
   CachedHumanTerritoryIDs.Reset();
   CachedTerritoryMap.Reset();
@@ -499,10 +551,37 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
                                  ? Battle.TargetTerritoryID
                                  : TravelState.DefenderTerritory;
 
+  const int32 AttackerId = Battle.bAttackerIsAI ? 1 : 0;
+  const int32 DefenderId = Battle.bDefenderIsAI ? 1 : 0;
+
+  PendingControllers.SetNum(2);
+
+  AController *AttackerC = PendingControllers.IsValidIndex(AttackerId)
+                               ? PendingControllers[AttackerId].Get()
+                               : nullptr;
+  AController *DefenderC = PendingControllers.IsValidIndex(DefenderId)
+                               ? PendingControllers[DefenderId].Get()
+                               : nullptr;
+
+  if (!AttackerC || !DefenderC) {
+    UE_LOG(LogSkaldBattle, Error,
+           TEXT("BattleGM SetupPendingBattle: Unable to resolve participants (AttackerId=%d DefenderId=%d Territories=%d/%d)"),
+           Battle.AttackerPlayerID, Battle.DefenderPlayerID,
+           Battle.FromTerritoryID, Battle.TargetTerritoryID);
+    ResetSetupStarted();
+    return;
+  }
+
+  ASkaldPlayerState *AttackerSlotPS =
+      AttackerC->GetPlayerState<ASkaldPlayerState>();
+  ASkaldPlayerState *DefenderSlotPS =
+      DefenderC->GetPlayerState<ASkaldPlayerState>();
+
   auto ResolveParticipant = [&](int32 TerritoryId, int32 &InOutPlayerId,
                                 FString &InOutDisplayName,
                                 ESkaldFaction &InOutFaction,
-                                bool &bInOutIsAI) {
+                                bool &bInOutIsAI,
+                                ASkaldPlayerState *SlotPlayerState) {
     if (TerritoryId > 0) {
       if (const FS_Territory *Territory = CachedTerritoryMap.Find(TerritoryId)) {
         if (Territory->OwnerPlayerID > 0) {
@@ -513,6 +592,10 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
 
     ASkaldPlayerState *PlayerState =
         (InOutPlayerId > 0) ? GS->GetPlayerById(InOutPlayerId) : nullptr;
+    if (!PlayerState && SlotPlayerState) {
+      InOutPlayerId = SlotPlayerState->GetPlayerId();
+      PlayerState = SlotPlayerState;
+    }
     if (!PlayerState) {
       return;
     }
@@ -529,10 +612,10 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
 
   ResolveParticipant(Battle.FromTerritoryID, Battle.AttackerPlayerID,
                      Battle.AttackerDisplayName, Battle.AttackerFaction,
-                     Battle.bAttackerIsAI);
+                     Battle.bAttackerIsAI, AttackerSlotPS);
   ResolveParticipant(Battle.TargetTerritoryID, Battle.DefenderPlayerID,
                      Battle.DefenderDisplayName, Battle.DefenderFaction,
-                     Battle.bDefenderIsAI);
+                     Battle.bDefenderIsAI, DefenderSlotPS);
 
   if (Battle.AttackerPlayerID <= 0 || Battle.DefenderPlayerID <= 0) {
     UE_LOG(LogSkaldBattle, Error,
@@ -874,7 +957,16 @@ void ASkald_BattleGameMode::OnControllerReady(AController *Controller) {
     return;
   }
 
-  PollBattleBootstrap();
+  if (Controller && !Controller->PlayerState) {
+    Controller->InitPlayerState();
+  }
+
+  AssignControllerSlot(Controller, AIControllerClass);
+
+  if (TrySetupBattleWhenReady()) {
+    PollBattleBootstrap();
+  }
+
   TryStartBattle();
 }
 
