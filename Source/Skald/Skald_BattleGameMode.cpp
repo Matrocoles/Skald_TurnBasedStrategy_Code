@@ -441,11 +441,11 @@ void ASkald_BattleGameMode::ProcessDeferredControllers() {
     return;
   }
 
-  TArray<TWeakObjectPtr<AController>> PendingControllers =
+  TArray<TWeakObjectPtr<AController>> LocalPendingControllers =
       DeferredReadyControllers;
   DeferredReadyControllers.Reset();
 
-  for (const TWeakObjectPtr<AController> &WeakController : PendingControllers) {
+  for (const TWeakObjectPtr<AController> &WeakController : LocalPendingControllers) {
     if (AController *Controller = WeakController.Get()) {
       OnControllerReady(Controller);
     }
