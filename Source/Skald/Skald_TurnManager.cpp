@@ -568,7 +568,16 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
            TravelState.HumanOwnedTerritories.Num(),
            TravelState.CachedTerritories.Num());
 
-    World->ServerTravel(MapToLoad);
+    if (IsRunningDedicatedServer() || World->GetNetMode() != NM_Standalone) {
+      FString ListenMap = MapToLoad;
+      if (!ListenMap.Contains(TEXT("?"))) {
+        ListenMap.Append(TEXT("?listen"));
+      }
+      World->ServerTravel(ListenMap);
+    } else {
+      const FName LevelName = FName(*MapToLoad);
+      UGameplayStatics::OpenLevel(World, LevelName, /*bAbsolute=*/true);
+    }
   }
 }
 
