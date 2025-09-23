@@ -650,20 +650,26 @@ void ASkaldPlayerController::InitializeBattleHUD() {
     }
   }
 
-  // Bind to active-fighter changes
-  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
-    if (GI->GridBattleManager) {
-      GI->GridBattleManager->OnActiveFighterChanged.RemoveAll(this);
-      GI->GridBattleManager->OnActiveFighterChanged.AddDynamic(
-          this, &ASkaldPlayerController::HandleActiveFighterChanged);
-      GI->GridBattleManager->OnBattleEnded.RemoveDynamic(
-          this, &ASkaldPlayerController::HandleBattleEnded);
-      GI->GridBattleManager->OnBattleEnded.AddDynamic(
-          this, &ASkaldPlayerController::HandleBattleEnded);
-      // Initial bind
-      HandleActiveFighterChanged(GI->GridBattleManager->GetActiveFighter());
-    }
+  USkaldGameInstance *GI = CachedGameInstance;
+  if (!GI) {
+    GI = GetGameInstance<USkaldGameInstance>();
+    CachedGameInstance = GI;
   }
+
+  AFighterPawn *ActiveFighter = nullptr;
+  // Bind to active-fighter changes
+  if (GI && GI->GridBattleManager) {
+    GI->GridBattleManager->OnActiveFighterChanged.RemoveAll(this);
+    GI->GridBattleManager->OnActiveFighterChanged.AddDynamic(
+        this, &ASkaldPlayerController::HandleActiveFighterChanged);
+    GI->GridBattleManager->OnBattleEnded.RemoveDynamic(
+        this, &ASkaldPlayerController::HandleBattleEnded);
+    GI->GridBattleManager->OnBattleEnded.AddDynamic(
+        this, &ASkaldPlayerController::HandleBattleEnded);
+    ActiveFighter = GI->GridBattleManager->GetActiveFighter();
+  }
+
+  HandleActiveFighterChanged(ActiveFighter);
 }
 
 void ASkaldPlayerController::ShowOverworldHUD() {
@@ -1561,6 +1567,10 @@ void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
 
   bBattleHUDReadyToShow = true;
 
+  // Ensure the HUD is initialized so the controller is bound to active-fighter
+  // updates even if no pawn has been selected yet.
+  InitializeBattleHUD();
+
   UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
       this, nullptr, EMouseLockMode::DoNotLock, false);
   bShowMouseCursor = true;
@@ -1574,8 +1584,11 @@ void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
     CachedGameInstance = GetGameInstance<USkaldGameInstance>();
   }
   if (CachedGameInstance && CachedGameInstance->GridBattleManager &&
-      CachedGameInstance->GridBattleManager->GetActiveFighter()) {
-    EnsureBattleHUDVisible();
+      !bBattleHUDVisible) {
+    if (AFighterPawn *ActiveFighter =
+            CachedGameInstance->GridBattleManager->GetActiveFighter()) {
+      EnsureBattleHUDVisible();
+    }
   }
 }
 
