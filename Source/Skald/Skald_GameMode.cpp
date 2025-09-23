@@ -816,6 +816,8 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     }
   }
 
+  GS->OnPlayersUpdated.Broadcast();
+
   UE_LOG(LogSkald, Log,
          TEXT("TryInitializeWorldAndStart: Listing player lock states"));
   for (APlayerState *PSBase : GS->PlayerArray) {

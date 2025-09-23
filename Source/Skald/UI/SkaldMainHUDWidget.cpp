@@ -598,6 +598,13 @@ void USkaldMainHUDWidget::HandlePlayersUpdated() {
     return;
   }
 
+  int32 NewLocalPlayerId = LocalPlayerID;
+  if (APlayerController *PC = GetOwningPlayer()) {
+    if (ASkaldPlayerState *LocalPS = PC->GetPlayerState<ASkaldPlayerState>()) {
+      NewLocalPlayerId = LocalPS->GetPlayerId();
+    }
+  }
+
   TArray<FS_PlayerData> Players;
   for (APlayerState *PSBase : GameState->PlayerArray) {
     if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
@@ -612,6 +619,12 @@ void USkaldMainHUDWidget::HandlePlayersUpdated() {
   }
 
   RefreshPlayerList(Players);
+
+  const bool bLocalIdChanged = (NewLocalPlayerId != LocalPlayerID);
+  LocalPlayerID = NewLocalPlayerId;
+  if (bLocalIdChanged) {
+    SyncPhaseButtons(CurrentPlayerID == LocalPlayerID);
+  }
 }
 
 void USkaldMainHUDWidget::HandleTurnIndexChanged(int32 /*NewTurnIndex*/) {
