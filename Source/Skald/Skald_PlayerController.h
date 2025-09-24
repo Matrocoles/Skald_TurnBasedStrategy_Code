@@ -210,6 +210,9 @@ protected:
   UFUNCTION()
   void HandleEndTurnPressed();
 
+  /** Respond when our PlayerState receives an updated PlayerId. */
+  void HandlePlayerIdUpdated();
+
   UFUNCTION()
   void HandleRightClick();
 

@@ -1984,6 +1984,11 @@ void ASkaldPlayerController::DetermineControlledBattleSide() {
   }
 }
 
+void ASkaldPlayerController::HandlePlayerIdUpdated() {
+  DetermineControlledBattleSide();
+  UpdateBattleHUDButtons();
+}
+
 void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,
                                                int32 AttackerCasualties,
                                                int32 DefenderCasualties) {
