@@ -52,6 +52,10 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void EndPhase();
 
+  /** Request the server to end the current phase for this controller. */
+  UFUNCTION(Server, Reliable)
+  void ServerEndPhase();
+
   /** Set the turn manager responsible for sequencing play. */
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void SetTurnManager(ATurnManager *Manager);
@@ -182,6 +186,9 @@ protected:
 
   UFUNCTION()
   void HandlePostLoadMap(UWorld *LoadedWorld);
+
+  /** Shared implementation for ending the current phase on the server. */
+  void HandleEndPhaseInternal();
 
   FDelegateHandle PostLoadMapHandle;
 

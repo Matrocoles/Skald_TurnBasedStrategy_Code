@@ -857,6 +857,19 @@ void ASkaldPlayerController::EndTurn() {
 }
 
 void ASkaldPlayerController::EndPhase() {
+  if (!HasAuthority()) {
+    ServerEndPhase();
+    return;
+  }
+
+  HandleEndPhaseInternal();
+}
+
+void ASkaldPlayerController::ServerEndPhase_Implementation() {
+  HandleEndPhaseInternal();
+}
+
+void ASkaldPlayerController::HandleEndPhaseInternal() {
   if (!EnsureTurnManager(TEXT("EndPhase"))) {
     return;
   }
