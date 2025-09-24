@@ -108,6 +108,7 @@ void ASkaldPlayerState::OnRep_PlayerId() {
           HUD->SyncPhaseButtons(HUD->CurrentPlayerID == HUD->LocalPlayerID);
         }
       }
+      SkaldPC->HandlePlayerIdUpdated();
     }
   }
 
