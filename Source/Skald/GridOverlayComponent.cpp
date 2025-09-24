@@ -207,6 +207,10 @@ bool UGridOverlayComponent::IsObscured(const FIntPoint &GridCoord) const {
   return ObscuredCells.IsValidIndex(Idx) ? ObscuredCells[Idx] : false;
 }
 
+bool UGridOverlayComponent::IsCellInBounds(const FIntPoint &GridCoord) const {
+  return IsValidGrid(GridCoord);
+}
+
 bool UGridOverlayComponent::HasLineOfSight(const FIntPoint &Start,
                                            const FIntPoint &End) const {
   FIntPoint Current = Start;
