@@ -942,8 +942,21 @@ void ASkald_BattleGameMode::SpawnFighterSide(const TArray<FFighterDefinition> &R
     FActorSpawnParameters Params;
     Params.SpawnCollisionHandlingOverride =
         ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+
+    UClass *DesiredClass = AFighterPawn::StaticClass();
+    if (UClass *SelectedClass = Def.MeshClass.Get()) {
+      if (SelectedClass->IsChildOf(AFighterPawn::StaticClass())) {
+        DesiredClass = SelectedClass;
+      } else {
+        UE_LOG(LogSkaldBattle, Warning,
+               TEXT("SpawnFighterSide: MeshClass %s for fighter %s is not an "
+                    "AFighterPawn; falling back to default."),
+               *GetNameSafe(SelectedClass), *Def.Id.ToString());
+      }
+    }
+
     AFighterPawn *Pawn = GetWorld()->SpawnActor<AFighterPawn>(
-        AFighterPawn::StaticClass(), SpawnLoc, FRotator::ZeroRotator, Params);
+        DesiredClass, SpawnLoc, FRotator::ZeroRotator, Params);
     if (Pawn) {
       Pawn->Stats = Def.Stats;
       Pawn->bIsAttacker = bAsAttacker;
