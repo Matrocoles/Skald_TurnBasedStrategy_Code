@@ -7,9 +7,52 @@
 #include "GridObstacleComponent.h"
 #include "Landscape.h"
 #include "LandscapeComponent.h"
+#include "Components/InstancedStaticMeshComponent.h"
+#include "Components/SceneComponent.h"
+#include "GameFramework/Actor.h"
 
 UGridOverlayComponent::UGridOverlayComponent() {
   PrimaryComponentTick.bCanEverTick = false;
+
+  HighlightMeshComponent =
+      CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("HighlightMesh"));
+  if (HighlightMeshComponent) {
+    HighlightMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    HighlightMeshComponent->SetGenerateOverlapEvents(false);
+    HighlightMeshComponent->SetCastShadow(false);
+    HighlightMeshComponent->bSelectable = false;
+    HighlightMeshComponent->SetCanEverAffectNavigation(false);
+    HighlightMeshComponent->NumCustomDataFloats = 4;
+  }
+}
+
+void UGridOverlayComponent::OnRegister() {
+  Super::OnRegister();
+
+  if (!HighlightMeshComponent) {
+    return;
+  }
+
+  if (HighlightMesh && HighlightMeshComponent->GetStaticMesh() != HighlightMesh) {
+    HighlightMeshComponent->SetStaticMesh(HighlightMesh);
+  }
+
+  if (HighlightMaterial && HighlightMeshComponent->GetMaterial(0) != HighlightMaterial) {
+    HighlightMeshComponent->SetMaterial(0, HighlightMaterial);
+  }
+
+  if (AActor *Owner = GetOwner()) {
+    if (USceneComponent *Root = Owner->GetRootComponent()) {
+      HighlightMeshComponent->AttachToComponent(
+          Root, FAttachmentTransformRules::KeepRelativeTransform);
+    }
+  }
+
+  HighlightMeshComponent->SetRelativeTransform(FTransform::Identity);
+
+  if (!HighlightMeshComponent->IsRegistered()) {
+    HighlightMeshComponent->RegisterComponent();
+  }
 }
 
 void UGridOverlayComponent::BeginPlay() {
@@ -129,23 +172,109 @@ void UGridOverlayComponent::SetOccupied(const FIntPoint &GridCoord,
   Cells[Index(GridCoord)] = bOccupied;
 }
 
-void UGridOverlayComponent::HighlightCell(const FIntPoint &GridCoord,
-                                          const FColor &Color, float Duration,
-                                          bool bPersistent) const {
-  if (!IsValidGrid(GridCoord) || !GetWorld()) {
+bool UGridOverlayComponent::EnsureHighlightComponentSetup() {
+  if (!HighlightMeshComponent) {
+    return false;
+  }
+
+  HighlightMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+  HighlightMeshComponent->SetGenerateOverlapEvents(false);
+  HighlightMeshComponent->SetCastShadow(false);
+  HighlightMeshComponent->bSelectable = false;
+  HighlightMeshComponent->SetCanEverAffectNavigation(false);
+
+  if (HighlightMeshComponent->NumCustomDataFloats < 4) {
+    HighlightMeshComponent->NumCustomDataFloats = 4;
+  }
+
+  if (!HighlightMeshComponent->IsRegistered()) {
+    HighlightMeshComponent->RegisterComponent();
+  }
+
+  if (AActor *Owner = GetOwner()) {
+    if (USceneComponent *Root = Owner->GetRootComponent()) {
+      if (HighlightMeshComponent->GetAttachParent() != Root) {
+        HighlightMeshComponent->AttachToComponent(
+            Root, FAttachmentTransformRules::KeepRelativeTransform);
+      }
+    }
+  }
+
+  HighlightMeshComponent->SetRelativeTransform(FTransform::Identity);
+
+  if (HighlightMesh && HighlightMeshComponent->GetStaticMesh() != HighlightMesh) {
+    HighlightMeshComponent->SetStaticMesh(HighlightMesh);
+  }
+
+  if (HighlightMaterial &&
+      HighlightMeshComponent->GetMaterial(0) != HighlightMaterial) {
+    HighlightMeshComponent->SetMaterial(0, HighlightMaterial);
+  }
+
+  return HighlightMeshComponent->GetStaticMesh() != nullptr;
+}
+
+void UGridOverlayComponent::ApplyHighlightColor(int32 InstanceIndex,
+                                                const FLinearColor &Color) {
+  if (!HighlightMeshComponent || HighlightMeshComponent->NumCustomDataFloats < 4 ||
+      InstanceIndex == INDEX_NONE) {
     return;
   }
 
-  FVector Center = GridToWorld(GridCoord);
-  FVector Extent(CellSize * 0.5f, CellSize * 0.5f, 10.f);
-  Center.Z += Extent.Z; // raise the box above the ground
-  DrawDebugSolidBox(GetWorld(), Center, Extent, Color, bPersistent, Duration);
+  HighlightMeshComponent->SetCustomDataValue(InstanceIndex, 0, Color.R, false);
+  HighlightMeshComponent->SetCustomDataValue(InstanceIndex, 1, Color.G, false);
+  HighlightMeshComponent->SetCustomDataValue(InstanceIndex, 2, Color.B, false);
+  HighlightMeshComponent->SetCustomDataValue(InstanceIndex, 3, Color.A, true);
 }
 
-void UGridOverlayComponent::ClearHighlights() const {
+void UGridOverlayComponent::HighlightCell(const FIntPoint &GridCoord,
+                                          const FColor &Color, float /*Duration*/,
+                                          bool /*bPersistent*/) {
+  if (!IsValidGrid(GridCoord)) {
+    return;
+  }
+
+  if (!EnsureHighlightComponentSetup()) {
+    return;
+  }
+
+  const FVector WorldCenter =
+      GridToWorld(GridCoord) + FVector(0.f, 0.f, HighlightHeightOffset);
+  const float EffectiveCellSize = FMath::Max(CellSize, KINDA_SMALL_NUMBER);
+  const FVector InstanceScale(EffectiveCellSize / 100.f,
+                              EffectiveCellSize / 100.f, 1.f);
+  const FTransform WorldTransform(FQuat::Identity, WorldCenter, InstanceScale);
+  const FTransform ComponentTransform = HighlightMeshComponent->GetComponentTransform();
+  const FTransform RelativeTransform =
+      WorldTransform.GetRelativeTransform(ComponentTransform);
+
+  int32 InstanceIndex = INDEX_NONE;
+  if (int32 *ExistingIndex = HighlightedInstances.Find(GridCoord)) {
+    InstanceIndex = *ExistingIndex;
+    HighlightMeshComponent->UpdateInstanceTransform(InstanceIndex, RelativeTransform,
+                                                    false, true, true);
+  } else {
+    InstanceIndex = HighlightMeshComponent->AddInstance(RelativeTransform);
+    if (InstanceIndex == INDEX_NONE) {
+      return;
+    }
+    HighlightedInstances.Add(GridCoord, InstanceIndex);
+  }
+
+  ApplyHighlightColor(InstanceIndex, FLinearColor(Color));
+}
+
+void UGridOverlayComponent::ClearHighlights() {
+  HighlightedInstances.Empty();
+  if (HighlightMeshComponent) {
+    HighlightMeshComponent->ClearInstances();
+  }
+
+#if WITH_EDITOR
   if (GetWorld() && bFlushAllPersistentOnClear) {
     FlushPersistentDebugLines(GetWorld());
   }
+#endif
 }
 
 void UGridOverlayComponent::RegisterObstacle(UGridObstacleComponent *Obstacle) {
