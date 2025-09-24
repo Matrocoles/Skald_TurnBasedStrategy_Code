@@ -17,6 +17,14 @@ void UBattleHUDWidget::NativeConstruct() {
     AttackButton->OnClicked.AddDynamic(this,
                                        &UBattleHUDWidget::HandleAttackPressed);
   }
+  if (ActivateButton) {
+    ActivateButton->OnClicked.AddDynamic(
+        this, &UBattleHUDWidget::HandleActivatePressed);
+  }
+  if (EndTurnButton) {
+    EndTurnButton->OnClicked.AddDynamic(
+        this, &UBattleHUDWidget::HandleEndTurnPressed);
+  }
 }
 
 void UBattleHUDWidget::RefreshStats() { UpdateStatPanel(); }
@@ -31,6 +39,10 @@ void UBattleHUDWidget::BindToFighter(AFighterPawn *Fighter) {
     BoundFighter->OnHealthChanged.AddDynamic(
         this, &UBattleHUDWidget::HandleHealthChanged);
     UpdateStatPanel();
+    if (FighterNameText) {
+      FighterNameText->SetText(
+          FText::FromString(BoundFighter->GetHumanReadableName()));
+    }
   } else {
     if (HealthText) {
       HealthText->SetText(FText::GetEmpty());
@@ -52,6 +64,9 @@ void UBattleHUDWidget::BindToFighter(AFighterPawn *Fighter) {
     }
     if (AttackDiceText) {
       AttackDiceText->SetText(FText::GetEmpty());
+    }
+    if (FighterNameText) {
+      FighterNameText->SetText(FText::GetEmpty());
     }
   }
 }
@@ -90,6 +105,16 @@ void UBattleHUDWidget::HandleAttackPressed() {
   }
 }
 
+void UBattleHUDWidget::HandleActivatePressed() {
+  OnActivatePressed.Broadcast();
+  ClearCommandPreviews();
+}
+
+void UBattleHUDWidget::HandleEndTurnPressed() {
+  OnEndTurnPressed.Broadcast();
+  ClearCommandPreviews();
+}
+
 void UBattleHUDWidget::HandleHealthChanged(int32 NewHealth) {
   if (HealthText) {
     HealthText->SetText(FText::AsNumber(NewHealth));
@@ -120,6 +145,49 @@ void UBattleHUDWidget::UpdateStatPanel() {
   }
   if (AttackDiceText) {
     AttackDiceText->SetText(FText::AsNumber(BoundFighter->Stats.AttackDice));
+  }
+}
+
+void UBattleHUDWidget::SetRoundInfo(const FText &RoundLabel,
+                                    const FText &InitiativeLabel) {
+  if (RoundText) {
+    RoundText->SetText(RoundLabel);
+  }
+  if (InitiativeText) {
+    InitiativeText->SetText(InitiativeLabel);
+  }
+}
+
+void UBattleHUDWidget::SetSelectedFighterName(const FText &Name) {
+  if (FighterNameText) {
+    FighterNameText->SetText(Name);
+  }
+}
+
+void UBattleHUDWidget::SetActivateEnabled(bool bEnabled) {
+  if (ActivateButton) {
+    ActivateButton->SetIsEnabled(bEnabled);
+  }
+}
+
+void UBattleHUDWidget::SetEndTurnEnabled(bool bEnabled) {
+  if (EndTurnButton) {
+    EndTurnButton->SetIsEnabled(bEnabled);
+  }
+}
+
+void UBattleHUDWidget::SetEndTurnVisibility(bool bVisible) {
+  if (EndTurnButton) {
+    EndTurnButton->SetVisibility(
+        bVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+  }
+}
+
+void UBattleHUDWidget::ClearCommandPreviews() {
+  bMoveSelected = false;
+  bAttackSelected = false;
+  if (UGridOverlayComponent *Grid = FindGridOverlay()) {
+    Grid->ClearHighlights();
   }
 }
 

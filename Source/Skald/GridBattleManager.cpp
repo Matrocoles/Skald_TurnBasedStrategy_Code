@@ -17,7 +17,12 @@ void UGridBattleManager::InitBattle(const TArray<FFighter>& Attackers, const TAr
 {
     AttackerTeam = Attackers;
     DefenderTeam = Defenders;
-    CurrentRound = 1;
+    CurrentRound = 0;
+    InitiativeOrder.Empty();
+    ActiveFighter = nullptr;
+    CurrentTurn = 0;
+    InitiativeWinnerFaction = ESkaldFaction::None;
+    bIsAttackerTurn = true;
     AttackerInitialArmyCost = 0;
     for (const FFighter& Fighter : AttackerTeam)
     {
@@ -121,22 +126,36 @@ AFighterPawn* UGridBattleManager::GetActiveFighter() const
 
 void UGridBattleManager::RegisterFighter(AFighterPawn* Fighter, bool bAsAttacker)
 {
-    if (!Fighter) return;
+    if (!Fighter)
+    {
+        return;
+    }
+
+    Fighter->bIsAttacker = bAsAttacker;
+    Fighter->ResetActivationState();
+
     if (!InitiativeOrder.Contains(Fighter))
     {
         InitiativeOrder.Add(Fighter);
     }
-    Fighter->bIsAttacker = bAsAttacker;
 }
 
 void UGridBattleManager::UnregisterFighter(AFighterPawn* Fighter)
 {
+    if (!Fighter)
+    {
+        return;
+    }
+
+    const bool bWasAttacker = Fighter->bIsAttacker;
     InitiativeOrder.Remove(Fighter);
     if (ActiveFighter == Fighter)
     {
         ActiveFighter = nullptr;
         OnActiveFighterChanged.Broadcast(nullptr);
     }
+
+    EvaluateRoundProgress(bWasAttacker);
 }
 
 TArray<FFighterDefinition> UGridBattleManager::GetFightersForFaction(ESkaldFaction Faction) const
@@ -155,163 +174,268 @@ TArray<FFighterDefinition> UGridBattleManager::GetFightersForFaction(ESkaldFacti
 
 void UGridBattleManager::RollInitiative()
 {
-    struct FInitiativeEntry { AFighterPawn* Fighter; int32 Roll; };
-
-    TArray<FInitiativeEntry> Rolls;
-    Rolls.Reserve(InitiativeOrder.Num());
-    for (AFighterPawn* Fighter : InitiativeOrder)
+    if (bBattleConcluded)
     {
-        if (!Fighter) continue;
-        Rolls.Add({ Fighter, Rng.RandRange(1, 20) });
+        return;
     }
 
-    Rolls.Sort([](const FInitiativeEntry& A, const FInitiativeEntry& B)
-    {
-        return A.Roll > B.Roll;
-    });
+    const bool bAttackersPresent = HasLivingFighters(true);
+    const bool bDefendersPresent = HasLivingFighters(false);
 
-    InitiativeOrder.Empty(Rolls.Num());
-    for (const FInitiativeEntry& Entry : Rolls)
+    if (!bAttackersPresent && !bDefendersPresent)
     {
-        InitiativeOrder.Add(Entry.Fighter);
+        InitiativeWinnerFaction = ESkaldFaction::None;
+        bIsAttackerTurn = true;
+        return;
     }
 
-    CurrentTurn = 0;
-    ActiveFighter = InitiativeOrder.Num() > 0 ? InitiativeOrder[0] : nullptr;
-    OnActiveFighterChanged.Broadcast(ActiveFighter);
-    if (ActiveFighter)
+    if (!bAttackersPresent)
     {
-        ActiveFighter->BeginActivation();
+        InitiativeWinnerFaction = DefenderTeam.Num() > 0 ? DefenderTeam[0].Faction : ESkaldFaction::None;
+        bIsAttackerTurn = false;
+        return;
+    }
+
+    if (!bDefendersPresent)
+    {
+        InitiativeWinnerFaction = AttackerTeam.Num() > 0 ? AttackerTeam[0].Faction : ESkaldFaction::None;
+        bIsAttackerTurn = true;
+        return;
+    }
+
+    int32 AttackerRoll = 0;
+    int32 DefenderRoll = 0;
+    int32 Attempts = 0;
+    const int32 MaxAttempts = 10;
+    do
+    {
+        AttackerRoll = Rng.RandRange(1, 20);
+        DefenderRoll = Rng.RandRange(1, 20);
+        ++Attempts;
+    }
+    while (AttackerRoll == DefenderRoll && Attempts < MaxAttempts);
+
+    if (AttackerRoll == DefenderRoll)
+    {
+        // As a fallback, bias ties in favour of the attacker to avoid stalling the round start.
+        ++AttackerRoll;
+    }
+
+    if (AttackerRoll >= DefenderRoll)
+    {
+        bIsAttackerTurn = true;
+        InitiativeWinnerFaction = AttackerTeam.Num() > 0 ? AttackerTeam[0].Faction : ESkaldFaction::None;
+    }
+    else
+    {
+        bIsAttackerTurn = false;
+        InitiativeWinnerFaction = DefenderTeam.Num() > 0 ? DefenderTeam[0].Faction : ESkaldFaction::None;
     }
 }
 
 void UGridBattleManager::StartRound()
-{
-    const int32 EdgeRange = 3;
-
-    if (!bTeamsAssigned)
-    {
-        bTeamsAssigned = true;
-    }
-
-    for (AFighterPawn* Fighter : InitiativeOrder)
-    {
-        if (!Fighter) continue;
-
-        bool bPlaced = false;
-        for (int32 tries = 0; tries < 50 && !bPlaced; ++tries)
-        {
-            FIntPoint Cell;
-            Cell.Y = Rng.RandRange(0, GridSize - 1);
-            Cell.X = Fighter->bIsAttacker
-                ? Rng.RandRange(0, EdgeRange - 1)
-                : Rng.RandRange(GridSize - EdgeRange, GridSize - 1);
-
-            if (UGridOverlayComponent* Grid = Fighter->GetGrid())
-            {
-                if (!Grid->IsOccupied(Cell) && !Grid->IsObscured(Cell))
-                {
-                    Fighter->MoveToCell(Cell);
-                    bPlaced = true;
-                }
-            }
-            else
-            {
-                Fighter->MoveToCell(Cell);
-                bPlaced = true;
-            }
-        }
-
-        Fighter->ActionsRemaining = 0;
-    }
-
-    CurrentTurn = 0;
-    ActiveFighter = InitiativeOrder.Num() > 0 ? InitiativeOrder[0] : nullptr;
-    OnActiveFighterChanged.Broadcast(ActiveFighter);
-    if (ActiveFighter)
-    {
-        ActiveFighter->BeginActivation();
-    }
-}
-
-void UGridBattleManager::AdvanceTurn()
 {
     if (bBattleConcluded)
     {
         return;
     }
 
-    if (ActiveFighter && ActiveFighter->IsAlive() && ActiveFighter->ActionsRemaining > 0)
+    bTeamsAssigned = true;
+
+    ClearInactiveFighters();
+
+    if (!HasLivingFighters(true) || !HasLivingFighters(false))
+    {
+        EndBattle();
+        return;
+    }
+
+    ++CurrentRound;
+
+    for (AFighterPawn* Fighter : InitiativeOrder)
+    {
+        if (Fighter && Fighter->IsAlive())
+        {
+            Fighter->ResetActivationState();
+        }
+    }
+
+    ActiveFighter = nullptr;
+    CurrentTurn = 0;
+    OnActiveFighterChanged.Broadcast(nullptr);
+
+    RollInitiative();
+
+    OnRoundStarted.Broadcast(CurrentRound, InitiativeWinnerFaction);
+}
+
+void UGridBattleManager::AdvanceTurn()
+{
+    FinishActivation(ActiveFighter);
+}
+
+bool UGridBattleManager::CanActivateFighter(AFighterPawn* Fighter) const
+{
+    if (bBattleConcluded || !Fighter)
+    {
+        return false;
+    }
+
+    if (!Fighter->IsAlive() || !InitiativeOrder.Contains(Fighter))
+    {
+        return false;
+    }
+
+    if (ActiveFighter && ActiveFighter != Fighter)
+    {
+        return false;
+    }
+
+    if (Fighter->HasActivatedThisRound())
+    {
+        return false;
+    }
+
+    if (Fighter->bIsAttacker != bIsAttackerTurn)
+    {
+        return false;
+    }
+
+    return true;
+}
+
+bool UGridBattleManager::ActivateFighter(AFighterPawn* Fighter)
+{
+    if (!CanActivateFighter(Fighter))
+    {
+        return false;
+    }
+
+    ActiveFighter = Fighter;
+    CurrentTurn = InitiativeOrder.IndexOfByKey(Fighter);
+    if (ActiveFighter)
+    {
+        ActiveFighter->BeginActivation();
+    }
+    OnActiveFighterChanged.Broadcast(ActiveFighter);
+    return ActiveFighter != nullptr;
+}
+
+void UGridBattleManager::FinishActivation(AFighterPawn* Fighter)
+{
+    if (bBattleConcluded)
     {
         return;
     }
 
-    InitiativeOrder.RemoveAll([](AFighterPawn* Fighter)
+    AFighterPawn* FighterToFinish = Fighter ? Fighter : ActiveFighter;
+    if (!FighterToFinish)
     {
-        return !Fighter || !Fighter->IsAlive();
-    });
+        return;
+    }
 
-    bool bAttackerAlive = false;
-    bool bDefenderAlive = false;
+    const bool bWasAttacker = FighterToFinish->bIsAttacker;
+
+    if (ActiveFighter == FighterToFinish)
+    {
+        ActiveFighter->FinishActivation();
+        ActiveFighter = nullptr;
+        OnActiveFighterChanged.Broadcast(nullptr);
+    }
+    else if (InitiativeOrder.Contains(FighterToFinish))
+    {
+        FighterToFinish->FinishActivation();
+    }
+
+    EvaluateRoundProgress(bWasAttacker);
+}
+
+bool UGridBattleManager::HasLivingFighters(bool bForAttackers) const
+{
+    for (AFighterPawn* Fighter : InitiativeOrder)
+    {
+        if (Fighter && Fighter->IsAlive() && Fighter->bIsAttacker == bForAttackers)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool UGridBattleManager::HasAvailableFighters(bool bForAttackers) const
+{
     for (AFighterPawn* Fighter : InitiativeOrder)
     {
         if (!Fighter)
         {
             continue;
         }
-        if (Fighter->bIsAttacker)
+
+        if (!Fighter->IsAlive() || Fighter->bIsAttacker != bForAttackers)
         {
-            bAttackerAlive = true;
-        }
-        else
-        {
-            bDefenderAlive = true;
+            continue;
         }
 
-        if (bAttackerAlive && bDefenderAlive)
+        if (!Fighter->HasActivatedThisRound())
         {
-            break;
+            return true;
         }
     }
+    return false;
+}
 
-    if (!bBattleConcluded && (!bAttackerAlive || !bDefenderAlive || InitiativeOrder.Num() == 0))
+void UGridBattleManager::EvaluateRoundProgress(bool bPreviousWasAttacker)
+{
+    if (bBattleConcluded)
+    {
+        return;
+    }
+
+    if (CurrentRound <= 0)
+    {
+        ClearInactiveFighters();
+        return;
+    }
+
+    ClearInactiveFighters();
+
+    if (!HasLivingFighters(true) || !HasLivingFighters(false))
     {
         EndBattle();
         return;
     }
 
-    const int32 NumFighters = InitiativeOrder.Num();
-    if (NumFighters == 0)
+    const bool bOpponentsRemain = HasAvailableFighters(!bPreviousWasAttacker);
+    const bool bCurrentRemain = HasAvailableFighters(bPreviousWasAttacker);
+
+    if (bOpponentsRemain)
     {
-        ActiveFighter = nullptr;
-        OnActiveFighterChanged.Broadcast(ActiveFighter);
+        bIsAttackerTurn = !bPreviousWasAttacker;
         return;
     }
 
-    int32 NextTurnIndex = INDEX_NONE;
-    if (ActiveFighter)
+    if (bCurrentRemain)
     {
-        const int32 ActiveIndex = InitiativeOrder.IndexOfByKey(ActiveFighter);
-        if (ActiveIndex != INDEX_NONE)
-        {
-            NextTurnIndex = (ActiveIndex + 1) % NumFighters;
-        }
+        bIsAttackerTurn = bPreviousWasAttacker;
+        return;
     }
 
-    if (NextTurnIndex == INDEX_NONE)
-    {
-        CurrentTurn = CurrentTurn % NumFighters;
-    }
-    else
-    {
-        CurrentTurn = NextTurnIndex;
-    }
+    StartRound();
+}
 
-    ActiveFighter = InitiativeOrder[CurrentTurn];
-    OnActiveFighterChanged.Broadcast(ActiveFighter);
-    if (ActiveFighter)
+void UGridBattleManager::ClearInactiveFighters()
+{
+    const bool bActiveInvalid = ActiveFighter && (!ActiveFighter->IsAlive() || !InitiativeOrder.Contains(ActiveFighter));
+
+    InitiativeOrder.RemoveAll([](AFighterPawn* Fighter)
     {
-        ActiveFighter->BeginActivation();
+        return !Fighter || !Fighter->IsAlive();
+    });
+
+    if (bActiveInvalid || (ActiveFighter && !InitiativeOrder.Contains(ActiveFighter)))
+    {
+        ActiveFighter = nullptr;
+        OnActiveFighterChanged.Broadcast(nullptr);
     }
 }
 

@@ -11,6 +11,11 @@
 #include "Skald_GameInstance.h"
 #include "TimerManager.h"
 
+namespace
+{
+constexpr int32 ActionsPerActivation = 2;
+}
+
 AFighterPawn::AFighterPawn() {
   PrimaryActorTick.bCanEverTick = false;
 
@@ -34,6 +39,8 @@ AFighterPawn::AFighterPawn() {
   HealthWidget->SetupAttachment(DisplayMesh);
 
   ActionsRemaining = 0;
+  bHasActivatedThisRound = false;
+  bIsCurrentlyActive = false;
   CurrentCell = FIntPoint::ZeroValue;
 
   UpdateMeshOffset();
@@ -46,6 +53,8 @@ void AFighterPawn::GetLifetimeReplicatedProps(
   DOREPLIFETIME(AFighterPawn, Stats);
   DOREPLIFETIME(AFighterPawn, bIsAttacker);
   DOREPLIFETIME(AFighterPawn, ActionsRemaining);
+  DOREPLIFETIME(AFighterPawn, bHasActivatedThisRound);
+  DOREPLIFETIME(AFighterPawn, bIsCurrentlyActive);
 }
 
 void AFighterPawn::OnConstruction(const FTransform &Transform) {
@@ -83,7 +92,26 @@ void AFighterPawn::BeginPlay() {
   }
 }
 
-void AFighterPawn::BeginActivation() { ActionsRemaining = Stats.Movement; }
+void AFighterPawn::BeginActivation() {
+  if (!IsAlive()) {
+    return;
+  }
+
+  ActionsRemaining = ActionsPerActivation;
+  bIsCurrentlyActive = true;
+  bHasActivatedThisRound = true;
+}
+
+void AFighterPawn::ResetActivationState() {
+  ActionsRemaining = 0;
+  bHasActivatedThisRound = false;
+  bIsCurrentlyActive = false;
+}
+
+void AFighterPawn::FinishActivation() {
+  ActionsRemaining = 0;
+  bIsCurrentlyActive = false;
+}
 
 UGridOverlayComponent *AFighterPawn::GetGrid() {
   if (!CachedGrid) {
@@ -118,9 +146,12 @@ UUserWidget *AFighterPawn::GetDamageWidgetFromPool() {
 }
 
 void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
-  int32 Distance = FMath::Abs(TargetCell.X - CurrentCell.X) +
-                   FMath::Abs(TargetCell.Y - CurrentCell.Y);
-  if (Distance > ActionsRemaining) {
+  if (!bIsCurrentlyActive || ActionsRemaining <= 0) {
+    return;
+  }
+  const int32 Distance = FMath::Abs(TargetCell.X - CurrentCell.X) +
+                         FMath::Abs(TargetCell.Y - CurrentCell.Y);
+  if (Distance > Stats.Movement) {
     return;
   }
   UGridOverlayComponent *Grid = GetGrid();
@@ -139,18 +170,7 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
     NewLocation.Z += GetSimpleCollisionHalfHeight();
   }
   SetActorLocation(NewLocation);
-  ActionsRemaining -= Distance;
-
-  if (ActionsRemaining <= 0) {
-    if (UWorld *World = GetWorld()) {
-      if (USkaldGameInstance *GI =
-              Cast<USkaldGameInstance>(World->GetGameInstance())) {
-        if (GI->GridBattleManager) {
-          GI->GridBattleManager->AdvanceTurn();
-        }
-      }
-    }
-  }
+  ActionsRemaining = FMath::Max(0, ActionsRemaining - 1);
 
   if (Grid) {
     Grid->SetOccupied(TargetCell, true);
@@ -159,7 +179,8 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
 }
 
 void AFighterPawn::PerformAttack(AFighterPawn *Target) {
-  if (!Target || ActionsRemaining <= 0 || !Target->IsAlive()) {
+  if (!bIsCurrentlyActive || ActionsRemaining <= 0 || !Target ||
+      !Target->IsAlive()) {
     return;
   }
 
@@ -226,18 +247,7 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
   if (!Target->IsAlive()) {
     Target->Destroy();
   }
-  --ActionsRemaining;
-
-  if (ActionsRemaining <= 0) {
-    if (UWorld *World = GetWorld()) {
-      if (USkaldGameInstance *GI =
-              Cast<USkaldGameInstance>(World->GetGameInstance())) {
-        if (GI->GridBattleManager) {
-          GI->GridBattleManager->AdvanceTurn();
-        }
-      }
-    }
-  }
+  ActionsRemaining = FMath::Max(0, ActionsRemaining - 1);
 
   if (Grid) {
     Grid->ClearHighlights();
@@ -266,6 +276,7 @@ void AFighterPawn::UpdateHealthDisplay(int32 NewHealth) {
 }
 
 void AFighterPawn::Destroyed() {
+  FinishActivation();
   if (UGridOverlayComponent *Grid = GetGrid()) {
     Grid->SetOccupied(CurrentCell, false);
   }

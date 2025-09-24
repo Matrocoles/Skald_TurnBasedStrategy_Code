@@ -29,6 +29,14 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Fighter")
   void BeginActivation();
 
+  /** Clear round-based activation flags. */
+  UFUNCTION(BlueprintCallable, Category = "Fighter")
+  void ResetActivationState();
+
+  /** Mark this fighter's turn as complete. */
+  UFUNCTION(BlueprintCallable, Category = "Fighter")
+  void FinishActivation();
+
   /** Move to the specified grid cell if actions remain. */
   UFUNCTION(BlueprintCallable, Category = "Fighter")
   void MoveToCell(FIntPoint TargetCell);
@@ -57,6 +65,14 @@ public:
   /** Actions remaining for the current activation. */
   UPROPERTY(BlueprintReadOnly, Replicated, Category = "Fighter")
   int32 ActionsRemaining;
+
+  /** True once the fighter has activated during the current round. */
+  UPROPERTY(BlueprintReadOnly, Replicated, Category = "Fighter")
+  bool bHasActivatedThisRound;
+
+  /** True while this fighter is currently taking its activation. */
+  UPROPERTY(BlueprintReadOnly, Replicated, Category = "Fighter")
+  bool bIsCurrentlyActive;
 
   /** Mesh used to display the fighter. */
   UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
@@ -111,4 +127,8 @@ private:
 
   /** Cached grid overlay component. */
   UGridOverlayComponent *CachedGrid = nullptr;
+
+public:
+  /** Returns true if the fighter has already activated this round. */
+  bool HasActivatedThisRound() const { return bHasActivatedThisRound; }
 };
