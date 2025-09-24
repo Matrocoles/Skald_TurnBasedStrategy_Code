@@ -197,6 +197,15 @@ protected:
   UFUNCTION()
   void HandleGridClick();
 
+  UFUNCTION()
+  void HandleActivatePressed();
+
+  UFUNCTION()
+  void HandleEndTurnPressed();
+
+  UFUNCTION()
+  void HandleRightClick();
+
 public:
   /** Handle HUD attack submissions.
    *  Bound to USkaldMainHUDWidget::OnAttackRequested in the HUD.
@@ -267,6 +276,9 @@ public:
 
   UFUNCTION()
   void HandleActiveFighterChanged(AFighterPawn *NewFighter);
+
+  UFUNCTION()
+  void HandleRoundStarted(int32 RoundNumber, ESkaldFaction InitiativeWinner);
 
   /** Server-side processing of an attack request. */
   UFUNCTION(Server, Reliable)
@@ -383,4 +395,22 @@ private:
   /** Create the fighter selection widget if we are on a battle map and it is
    * not already shown. */
   void InitializeFighterSelectionIfNeeded();
+
+  void CancelCommandMode();
+  void SetSelectedFighter(AFighterPawn *Fighter, bool bForce = false);
+  void ClearSelectedFighter();
+  void UpdateBattleHUDSelection();
+  void UpdateBattleHUDButtons();
+  void UpdateBattleRoundDisplay(int32 RoundNumber, ESkaldFaction InitiativeWinner);
+  bool IsFriendlyFighter(const AFighterPawn *Fighter) const;
+  void DetermineControlledBattleSide();
+
+  UPROPERTY()
+  TObjectPtr<AFighterPawn> SelectedFighter;
+
+  UPROPERTY()
+  TObjectPtr<AFighterPawn> LockedActiveFighter;
+
+  bool bControlsAttackerSide = false;
+  bool bControlsDefenderSide = false;
 };

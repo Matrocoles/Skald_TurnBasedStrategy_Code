@@ -13,6 +13,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
     FOnBattleEnded, ESkaldFaction, WinningFaction, int32, AttackerCasualties, int32, DefenderCasualties);
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnActiveFighterChanged, AFighterPawn*, NewFighter);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnRoundStarted, int32, RoundNumber, ESkaldFaction, InitiativeWinner);
 
 /** Statistics for a fighter in grid battle mode. */
 USTRUCT(BlueprintType)
@@ -125,7 +126,7 @@ public:
     UFUNCTION(BlueprintCallable, Category="Battle")
     static bool ResolveAttack(FFighter& Attacker, FFighter& Defender, int32& OutDamage, UPARAM(ref) FRandomStream& RandomStream);
 
-    /** Roll initiative for all fighters participating in the battle. */
+    /** Roll initiative for the next round, determining which side acts first. */
     UFUNCTION(BlueprintCallable, Category="Skald|Battle")
     void RollInitiative();
 
@@ -133,9 +134,21 @@ public:
     UFUNCTION(BlueprintCallable, Category="Skald|Battle")
     void StartRound();
 
-    /** Advance to the next fighter in the initiative order. */
+    /** Finish the currently active fighter's turn and swap sides. */
     UFUNCTION(BlueprintCallable, Category="Battle")
     void AdvanceTurn();
+
+    /** Check whether the specified fighter can activate on the current side. */
+    UFUNCTION(BlueprintCallable, Category="Battle")
+    bool CanActivateFighter(AFighterPawn* Fighter) const;
+
+    /** Attempt to activate the specified fighter for the current side. */
+    UFUNCTION(BlueprintCallable, Category="Battle")
+    bool ActivateFighter(AFighterPawn* Fighter);
+
+    /** Complete the active fighter's activation and rotate the turn. */
+    UFUNCTION(BlueprintCallable, Category="Battle")
+    void FinishActivation(AFighterPawn* Fighter);
 
     /** Conclude the battle and broadcast the results. */
     UFUNCTION(BlueprintCallable, Category="Battle")
@@ -169,6 +182,18 @@ public:
       UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
       AFighterPawn* GetActiveFighter() const;
 
+    /** Return the faction that won the current round's initiative. */
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
+    ESkaldFaction GetInitiativeWinner() const { return InitiativeWinnerFaction; }
+
+    /** True when the attacking side is allowed to activate a fighter. */
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
+    bool IsAttackerTurn() const { return bIsAttackerTurn; }
+
+    /** Current round number, starting at 1 when combat begins. */
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
+    int32 GetCurrentRound() const { return CurrentRound; }
+
     /** Get fighter definitions for the specified faction. */
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
     TArray<FFighterDefinition> GetFightersForFaction(ESkaldFaction Faction) const;
@@ -180,6 +205,10 @@ public:
     /** Fired whenever the active fighter changes (including nullptr). */
     UPROPERTY(BlueprintAssignable, Category="Battle|Events")
     FOnActiveFighterChanged OnActiveFighterChanged;
+
+    /** Fired whenever a new round begins. */
+    UPROPERTY(BlueprintAssignable, Category="Battle|Events")
+    FOnRoundStarted OnRoundStarted;
 
     UFUNCTION(BlueprintCallable, Category="Battle")
     void RegisterFighter(AFighterPawn* Fighter, bool bAsAttacker);
@@ -223,7 +252,20 @@ protected:
     UPROPERTY(BlueprintReadOnly, Category="Battle")
     int32 CurrentTurn = 0;
 
+    /** Faction that won the latest initiative roll. */
+    UPROPERTY(BlueprintReadOnly, Category="Battle")
+    ESkaldFaction InitiativeWinnerFaction = ESkaldFaction::None;
+
+    /** True when the attacking side is currently allowed to activate. */
+    UPROPERTY(BlueprintReadOnly, Category="Battle")
+    bool bIsAttackerTurn = true;
+
 private:
+    bool HasLivingFighters(bool bForAttackers) const;
+    bool HasAvailableFighters(bool bForAttackers) const;
+    void EvaluateRoundProgress(bool bPreviousWasAttacker);
+    void ClearInactiveFighters();
+
     // Track both counts and costs separately
     int32 AttackerSurvivorUnitCount = 0;
     int32 DefenderSurvivorUnitCount = 0;

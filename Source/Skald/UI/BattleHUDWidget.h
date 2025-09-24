@@ -36,6 +36,16 @@ public:
   UPROPERTY(BlueprintAssignable, Category = "Skald|Battle|Events")
   FOnAttackPressed OnAttackPressed;
 
+  /** Delegate fired when the Activate button is pressed. */
+  DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnActivatePressed);
+  UPROPERTY(BlueprintAssignable, Category = "Skald|Battle|Events")
+  FOnActivatePressed OnActivatePressed;
+
+  /** Delegate fired when the End Turn button is pressed. */
+  DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnEndTurnPressed);
+  UPROPERTY(BlueprintAssignable, Category = "Skald|Battle|Events")
+  FOnEndTurnPressed OnEndTurnPressed;
+
   /** Move action button bound from the blueprint. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
   UButton *MoveButton;
@@ -43,6 +53,14 @@ public:
   /** Attack action button bound from the blueprint. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
   UButton *AttackButton;
+
+  /** Activate action button bound from the blueprint. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UButton *ActivateButton;
+
+  /** End turn button bound from the blueprint. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UButton *EndTurnButton;
 
   /** Text displaying current health. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
@@ -72,6 +90,36 @@ public:
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
   UTextBlock *AttackDiceText;
 
+  /** Text displaying the fighter's name. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UTextBlock *FighterNameText;
+
+  /** Text displaying the current round. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UTextBlock *RoundText;
+
+  /** Text displaying initiative winner. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UTextBlock *InitiativeText;
+
+  /** Update the round and initiative labels. */
+  void SetRoundInfo(const FText &RoundLabel, const FText &InitiativeLabel);
+
+  /** Update the fighter name label. */
+  void SetSelectedFighterName(const FText &Name);
+
+  /** Enable or disable the Activate button. */
+  void SetActivateEnabled(bool bEnabled);
+
+  /** Enable or disable the End Turn button. */
+  void SetEndTurnEnabled(bool bEnabled);
+
+  /** Toggle visibility for the End Turn button. */
+  void SetEndTurnVisibility(bool bVisible);
+
+  /** Clear any preview highlights tracked by the widget. */
+  void ClearCommandPreviews();
+
 private:
   /** Callback when MoveButton is pressed. */
   UFUNCTION()
@@ -80,6 +128,14 @@ private:
   /** Callback when AttackButton is pressed. */
   UFUNCTION()
   void HandleAttackPressed();
+
+  /** Callback when ActivateButton is pressed. */
+  UFUNCTION()
+  void HandleActivatePressed();
+
+  /** Callback when EndTurnButton is pressed. */
+  UFUNCTION()
+  void HandleEndTurnPressed();
 
   /** Update all stat text panels from the bound fighter. */
   void UpdateStatPanel();

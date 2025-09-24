@@ -1061,7 +1061,6 @@ void ASkald_BattleGameMode::TryLaunchBattle() {
   SpawnFighterSide(AttackerDefs, /*bAsAttacker=*/true);
   SpawnFighterSide(DefenderDefs, /*bAsAttacker=*/false);
 
-  GI->GridBattleManager->RollInitiative();
   GI->GridBattleManager->StartRound();
 
   UE_LOG(LogSkald, Log, TEXT("BattleGM TryLaunchBattle: Battle initialised and round started"));

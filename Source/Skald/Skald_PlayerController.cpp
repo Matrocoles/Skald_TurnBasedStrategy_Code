@@ -11,6 +11,7 @@
 #include "GridBattleManager.h"
 #include "GridOverlayComponent.h"
 #include "InputCoreTypes.h"
+#include "Internationalization/Text.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/EngineVersionComparison.h"
 #include "Skald.h"
@@ -616,6 +617,13 @@ void ASkaldPlayerController::InitializeBattleHUD() {
           this, &ASkaldPlayerController::BeginMoveMode);
       BattleHudWidget->OnAttackPressed.AddDynamic(
           this, &ASkaldPlayerController::BeginAttackMode);
+      BattleHudWidget->OnActivatePressed.AddDynamic(
+          this, &ASkaldPlayerController::HandleActivatePressed);
+      BattleHudWidget->OnEndTurnPressed.AddDynamic(
+          this, &ASkaldPlayerController::HandleEndTurnPressed);
+      BattleHudWidget->SetEndTurnVisibility(false);
+      BattleHudWidget->SetActivateEnabled(false);
+      BattleHudWidget->SetEndTurnEnabled(false);
     }
   }
 
@@ -631,13 +639,23 @@ void ASkaldPlayerController::InitializeBattleHUD() {
     GI->GridBattleManager->OnActiveFighterChanged.RemoveAll(this);
     GI->GridBattleManager->OnActiveFighterChanged.AddDynamic(
         this, &ASkaldPlayerController::HandleActiveFighterChanged);
+    GI->GridBattleManager->OnRoundStarted.RemoveAll(this);
+    GI->GridBattleManager->OnRoundStarted.AddDynamic(
+        this, &ASkaldPlayerController::HandleRoundStarted);
     GI->GridBattleManager->OnBattleEnded.RemoveDynamic(
         this, &ASkaldPlayerController::HandleBattleEnded);
     GI->GridBattleManager->OnBattleEnded.AddDynamic(
         this, &ASkaldPlayerController::HandleBattleEnded);
     ActiveFighter = GI->GridBattleManager->GetActiveFighter();
+
+    const int32 CurrentRound = GI->GridBattleManager->GetCurrentRound();
+    if (CurrentRound > 0) {
+      UpdateBattleRoundDisplay(CurrentRound,
+                               GI->GridBattleManager->GetInitiativeWinner());
+    }
   }
 
+  DetermineControlledBattleSide();
   HandleActiveFighterChanged(ActiveFighter);
 }
 
@@ -705,17 +723,21 @@ UGridOverlayComponent *ASkaldPlayerController::FindGridOverlay() const {
 
 void ASkaldPlayerController::HandleActiveFighterChanged(
     AFighterPawn *NewFighter) {
-  if (BattleHudWidget) {
-    BattleHudWidget->BindToFighter(NewFighter);
+  if (NewFighter && NewFighter->IsAlive()) {
+    LockedActiveFighter = NewFighter;
+    SetSelectedFighter(NewFighter, true);
+    if (bBattleHUDReadyToShow && !bBattleHUDVisible) {
+      EnsureBattleHUDVisible();
+    }
+  } else {
+    LockedActiveFighter = nullptr;
   }
-  if (NewFighter && bBattleHUDReadyToShow && !bBattleHUDVisible) {
-    EnsureBattleHUDVisible();
+
+  CancelCommandMode();
+  UpdateBattleHUDButtons();
+  if (!NewFighter) {
+    UpdateBattleHUDSelection();
   }
-  // Clear previous highlights when the turn swaps
-  if (UGridOverlayComponent *Grid = FindGridOverlay()) {
-    Grid->ClearHighlights();
-  }
-  CurrentCommandMode = EBattleCommandMode::None;
 }
 
 void ASkaldPlayerController::DetectBattleMap() {
@@ -1540,6 +1562,11 @@ void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
   // updates even if no pawn has been selected yet.
   InitializeBattleHUD();
 
+  SelectedFighter = nullptr;
+  LockedActiveFighter = nullptr;
+  CancelCommandMode();
+  UpdateBattleHUDButtons();
+
   UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
       this, nullptr, EMouseLockMode::DoNotLock, false);
   bShowMouseCursor = true;
@@ -1567,28 +1594,26 @@ void ASkaldPlayerController::SetupInputComponent() {
   if (InputComponent) {
     InputComponent->BindKey(EKeys::LeftMouseButton, IE_Pressed, this,
                             &ASkaldPlayerController::HandleGridClick);
+    InputComponent->BindKey(EKeys::RightMouseButton, IE_Pressed, this,
+                            &ASkaldPlayerController::HandleRightClick);
   }
 }
 
 void ASkaldPlayerController::BeginMoveMode() {
+  if (!LockedActiveFighter)
+    return;
   CurrentCommandMode = EBattleCommandMode::Move;
   if (UGridOverlayComponent *Grid = FindGridOverlay()) {
-    if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
-      if (GI->GridBattleManager && GI->GridBattleManager->GetActiveFighter()) {
-        Grid->HighlightMovement(GI->GridBattleManager->GetActiveFighter());
-      }
-    }
+    Grid->HighlightMovement(LockedActiveFighter);
   }
 }
 
 void ASkaldPlayerController::BeginAttackMode() {
+  if (!LockedActiveFighter)
+    return;
   CurrentCommandMode = EBattleCommandMode::Attack;
   if (UGridOverlayComponent *Grid = FindGridOverlay()) {
-    if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
-      if (GI->GridBattleManager && GI->GridBattleManager->GetActiveFighter()) {
-        Grid->HighlightAttack(GI->GridBattleManager->GetActiveFighter());
-      }
-    }
+    Grid->HighlightAttack(LockedActiveFighter);
   }
 }
 
@@ -1609,16 +1634,6 @@ void ASkaldPlayerController::HandleGridClick() {
   }
 
   // Get active fighter
-  AFighterPawn *Active = nullptr;
-  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
-    if (GI->GridBattleManager) {
-      Active = GI->GridBattleManager->GetActiveFighter();
-    }
-  }
-  if (!Active || !Active->IsAlive())
-    return;
-
-  // Trace under cursor
   GetHitResultUnderCursor(ECC_Visibility, /*bTraceComplex*/ false, Hit);
 
   UGridOverlayComponent *Grid = FindGridOverlay();
@@ -1627,50 +1642,261 @@ void ASkaldPlayerController::HandleGridClick() {
 
   switch (CurrentCommandMode) {
   case EBattleCommandMode::Move: {
+    if (!LockedActiveFighter) {
+      CancelCommandMode();
+      break;
+    }
     const FVector Impact =
         Hit.bBlockingHit ? Hit.ImpactPoint : FVector::ZeroVector;
     const FIntPoint Cell = Grid->WorldToGrid(Impact);
-    Active->MoveToCell(Cell);
-    Grid->ClearHighlights();
-    if (Active->ActionsRemaining <= 0) {
-      CurrentCommandMode = EBattleCommandMode::None;
-      if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
-        if (GI->GridBattleManager) {
-          GI->GridBattleManager->AdvanceTurn();
-        }
-      }
-    }
+    LockedActiveFighter->MoveToCell(Cell);
+    CancelCommandMode();
+    UpdateBattleHUDButtons();
     break;
   }
   case EBattleCommandMode::Attack: {
+    if (!LockedActiveFighter) {
+      CancelCommandMode();
+      break;
+    }
     AFighterPawn *TargetPawn = Cast<AFighterPawn>(Hit.GetActor());
-    if (!TargetPawn && Hit.bBlockingHit) {
-      // No pawn? For now require clicking on a pawn to attack.
+    if (TargetPawn && TargetPawn != LockedActiveFighter && TargetPawn->IsAlive() &&
+        !IsFriendlyFighter(TargetPawn)) {
+      LockedActiveFighter->PerformAttack(TargetPawn);
     }
-    if (TargetPawn && TargetPawn != Active && TargetPawn->IsAlive()) {
-      if (TargetPawn->bIsAttacker != Active->bIsAttacker) {
-        Active->PerformAttack(TargetPawn);
-      }
-    }
-    Grid->ClearHighlights();
-    if (Active->ActionsRemaining <= 0) {
-      CurrentCommandMode = EBattleCommandMode::None;
-      if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
-        if (GI->GridBattleManager) {
-          GI->GridBattleManager->AdvanceTurn();
-        }
-      }
-    }
+    CancelCommandMode();
+    UpdateBattleHUDButtons();
     break;
   }
   default:
     break;
+  }
+
+  if (CurrentCommandMode != EBattleCommandMode::None) {
+    return;
+  }
+
+  AFighterPawn *ClickedPawn = Cast<AFighterPawn>(Hit.GetActor());
+  if (ClickedPawn && ClickedPawn->IsAlive()) {
+    if (LockedActiveFighter && LockedActiveFighter != ClickedPawn) {
+      return;
+    }
+
+    if (IsFriendlyFighter(ClickedPawn)) {
+      SetSelectedFighter(ClickedPawn);
+      UpdateBattleHUDButtons();
+    } else if (!LockedActiveFighter) {
+      ClearSelectedFighter();
+    }
+    return;
+  }
+
+  if (!LockedActiveFighter) {
+    ClearSelectedFighter();
+  }
+}
+
+void ASkaldPlayerController::HandleActivatePressed() {
+  if (!IsLocalController() || !SelectedFighter)
+    return;
+
+  if (SelectedFighter->HasActivatedThisRound()) {
+    NotifyActionError(FString(TEXT("Fighter Already Activated.")));
+    return;
+  }
+
+  if (!IsFriendlyFighter(SelectedFighter)) {
+    NotifyActionError(FString(TEXT("Cannot activate enemy fighter.")));
+    return;
+  }
+
+  if (LockedActiveFighter && LockedActiveFighter != SelectedFighter) {
+    NotifyActionError(FString(TEXT("Another fighter is already active.")));
+    return;
+  }
+
+  if (!CachedGameInstance) {
+    CachedGameInstance = GetGameInstance<USkaldGameInstance>();
+  }
+  if (!CachedGameInstance || !CachedGameInstance->GridBattleManager)
+    return;
+
+  if (!CachedGameInstance->GridBattleManager->CanActivateFighter(SelectedFighter)) {
+    NotifyActionError(FString(TEXT("Cannot activate this fighter right now.")));
+    return;
+  }
+
+  if (CachedGameInstance->GridBattleManager->ActivateFighter(SelectedFighter)) {
+    LockedActiveFighter = SelectedFighter;
+    if (bBattleHUDReadyToShow && !bBattleHUDVisible) {
+      EnsureBattleHUDVisible();
+    }
+    UpdateBattleHUDButtons();
+  }
+}
+
+void ASkaldPlayerController::HandleEndTurnPressed() {
+  if (!LockedActiveFighter)
+    return;
+
+  if (!CachedGameInstance) {
+    CachedGameInstance = GetGameInstance<USkaldGameInstance>();
+  }
+  if (!CachedGameInstance || !CachedGameInstance->GridBattleManager)
+    return;
+
+  CachedGameInstance->GridBattleManager->FinishActivation(LockedActiveFighter);
+  LockedActiveFighter = nullptr;
+  UpdateBattleHUDButtons();
+  CancelCommandMode();
+}
+
+void ASkaldPlayerController::HandleRightClick() {
+  if (!IsLocalController())
+    return;
+
+  if (!bIsBattleMap)
+    return;
+
+  CancelCommandMode();
+  UpdateBattleHUDButtons();
+}
+
+void ASkaldPlayerController::HandleRoundStarted(int32 RoundNumber,
+                                                ESkaldFaction InitiativeWinner) {
+  LockedActiveFighter = nullptr;
+  CancelCommandMode();
+  UpdateBattleRoundDisplay(RoundNumber, InitiativeWinner);
+  UpdateBattleHUDSelection();
+  UpdateBattleHUDButtons();
+}
+
+void ASkaldPlayerController::CancelCommandMode() {
+  CurrentCommandMode = EBattleCommandMode::None;
+  if (UGridOverlayComponent *Grid = FindGridOverlay()) {
+    Grid->ClearHighlights();
+  }
+  if (BattleHudWidget) {
+    BattleHudWidget->ClearCommandPreviews();
+  }
+}
+
+void ASkaldPlayerController::SetSelectedFighter(AFighterPawn *Fighter,
+                                                bool bForce) {
+  if (!bForce && SelectedFighter == Fighter)
+    return;
+
+  SelectedFighter = Fighter;
+  UpdateBattleHUDSelection();
+  UpdateBattleHUDButtons();
+}
+
+void ASkaldPlayerController::ClearSelectedFighter() {
+  if (!SelectedFighter)
+    return;
+
+  SelectedFighter = nullptr;
+  UpdateBattleHUDSelection();
+  UpdateBattleHUDButtons();
+}
+
+void ASkaldPlayerController::UpdateBattleHUDSelection() {
+  if (!BattleHudWidget)
+    return;
+
+  BattleHudWidget->BindToFighter(SelectedFighter);
+  if (SelectedFighter) {
+    BattleHudWidget->SetSelectedFighterName(
+        FText::FromString(SelectedFighter->GetHumanReadableName()));
+  } else {
+    BattleHudWidget->SetSelectedFighterName(FText::GetEmpty());
+  }
+}
+
+void ASkaldPlayerController::UpdateBattleHUDButtons() {
+  if (!BattleHudWidget)
+    return;
+
+  bool bCanActivate = false;
+  if (SelectedFighter && !LockedActiveFighter && IsFriendlyFighter(SelectedFighter)) {
+    if (!CachedGameInstance) {
+      CachedGameInstance = GetGameInstance<USkaldGameInstance>();
+    }
+    if (CachedGameInstance && CachedGameInstance->GridBattleManager) {
+      bCanActivate =
+          CachedGameInstance->GridBattleManager->CanActivateFighter(SelectedFighter);
+    }
+  }
+
+  BattleHudWidget->SetActivateEnabled(bCanActivate);
+  const bool bEndTurnVisible = LockedActiveFighter != nullptr;
+  BattleHudWidget->SetEndTurnVisibility(bEndTurnVisible);
+  BattleHudWidget->SetEndTurnEnabled(bEndTurnVisible);
+}
+
+void ASkaldPlayerController::UpdateBattleRoundDisplay(
+    int32 RoundNumber, ESkaldFaction InitiativeWinner) {
+  if (!BattleHudWidget)
+    return;
+
+  const FText RoundText = FText::Format(
+      NSLOCTEXT("Skald", "BattleRound", "Round {0}"), FText::AsNumber(RoundNumber));
+
+  FText InitiativeText = NSLOCTEXT("Skald", "BattleInitiativeNone",
+                                   "Initiative: None");
+  if (InitiativeWinner != ESkaldFaction::None) {
+    if (const UEnum *FactionEnum = StaticEnum<ESkaldFaction>()) {
+      const FText WinnerText =
+          FactionEnum->GetDisplayNameTextByValue(static_cast<int64>(InitiativeWinner));
+      InitiativeText = FText::Format(
+          NSLOCTEXT("Skald", "BattleInitiative", "Initiative: {0}"),
+          WinnerText);
+    }
+  }
+
+  BattleHudWidget->SetRoundInfo(RoundText, InitiativeText);
+}
+
+bool ASkaldPlayerController::IsFriendlyFighter(const AFighterPawn *Fighter) const {
+  if (!Fighter)
+    return false;
+
+  return Fighter->bIsAttacker ? bControlsAttackerSide : bControlsDefenderSide;
+}
+
+void ASkaldPlayerController::DetermineControlledBattleSide() {
+  bControlsAttackerSide = false;
+  bControlsDefenderSide = false;
+
+  const ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
+  if (!PS)
+    return;
+
+  if (!CachedGameInstance) {
+    CachedGameInstance = GetGameInstance<USkaldGameInstance>();
+  }
+  if (!CachedGameInstance)
+    return;
+
+  const FS_BattlePayload &Battle = CachedGameInstance->PendingBattle;
+  const int32 PlayerID = PS->GetPlayerId();
+  if (PlayerID == Battle.AttackerPlayerID) {
+    bControlsAttackerSide = true;
+  }
+  if (PlayerID == Battle.DefenderPlayerID) {
+    bControlsDefenderSide = true;
   }
 }
 
 void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,
                                                int32 AttackerCasualties,
                                                int32 DefenderCasualties) {
+  CancelCommandMode();
+  SelectedFighter = nullptr;
+  LockedActiveFighter = nullptr;
+  bControlsAttackerSide = false;
+  bControlsDefenderSide = false;
+
   if (BattleHudWidget) {
     BattleHudWidget->RemoveFromParent();
     BattleHudWidget = nullptr;
