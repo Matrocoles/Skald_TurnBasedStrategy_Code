@@ -46,15 +46,14 @@ private:
                                  const AFighterPawn *A,
                                  const AFighterPawn *B) const;
 
-  UFUNCTION()
-  void HandleActiveFighterChanged(AFighterPawn *NewFighter);
+  virtual void HandleActiveFighterChanged(AFighterPawn *NewFighter) override;
 
-  UFUNCTION()
-  void HandleRoundStarted(int32 RoundNumber, ESkaldFaction InitiativeWinner);
+  virtual void HandleRoundStarted(int32 RoundNumber,
+                                  ESkaldFaction InitiativeWinner) override;
 
-  UFUNCTION()
-  void HandleBattleEnded(ESkaldFaction WinningFaction, int32 AttackerCasualties,
-                         int32 DefenderCasualties);
+  virtual void HandleBattleEnded(ESkaldFaction WinningFaction,
+                                 int32 AttackerCasualties,
+                                 int32 DefenderCasualties) override;
 
   /** Cached reference to the battle manager when grid combat is active. */
   TWeakObjectPtr<UGridBattleManager> CachedBattleManager;
