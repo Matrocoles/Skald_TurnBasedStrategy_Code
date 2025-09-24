@@ -33,6 +33,7 @@ class SKALD_API ASkaldGameMode : public AGameModeBase {
   // Allow automation tests to drive protected game flow entry points.
   friend class FArmyPlacementInitiativeOrderTest;
   friend class FAIArmyPlacementAutoAdvanceTest;
+  friend class FInitializeWorldSingleInitiativeRollTest;
 #endif // WITH_AUTOMATION_TESTS
 
 public:
