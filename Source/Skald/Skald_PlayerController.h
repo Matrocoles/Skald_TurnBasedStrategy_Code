@@ -271,14 +271,16 @@ public:
 
   /** React to the end of a battle. */
   UFUNCTION()
-  void HandleBattleEnded(ESkaldFaction WinningFaction, int32 AttackerCasualties,
-                         int32 DefenderCasualties);
+  virtual void HandleBattleEnded(ESkaldFaction WinningFaction,
+                                 int32 AttackerCasualties,
+                                 int32 DefenderCasualties);
 
   UFUNCTION()
-  void HandleActiveFighterChanged(AFighterPawn *NewFighter);
+  virtual void HandleActiveFighterChanged(AFighterPawn *NewFighter);
 
   UFUNCTION()
-  void HandleRoundStarted(int32 RoundNumber, ESkaldFaction InitiativeWinner);
+  virtual void HandleRoundStarted(int32 RoundNumber,
+                                  ESkaldFaction InitiativeWinner);
 
   /** Server-side processing of an attack request. */
   UFUNCTION(Server, Reliable)
