@@ -1742,17 +1742,33 @@ void ASkaldPlayerController::HandleActivatePressed() {
   if (!IsLocalController() || !SelectedFighter)
     return;
 
+  UE_LOG(LogSkaldBattle, Log,
+         TEXT("[BattleHUD] Activate pressed for %s. Locked=%s"),
+         *SelectedFighter->GetHumanReadableName(),
+         LockedActiveFighter ? *LockedActiveFighter->GetHumanReadableName()
+                             : TEXT("<None>"));
+
   if (SelectedFighter->HasActivatedThisRound()) {
+    UE_LOG(LogSkaldBattle, Verbose,
+           TEXT("[BattleHUD] Activate ignored: %s already acted this round."),
+           *SelectedFighter->GetHumanReadableName());
     NotifyActionError(FString(TEXT("Fighter Already Activated.")));
     return;
   }
 
   if (!IsFriendlyFighter(SelectedFighter)) {
+    UE_LOG(LogSkaldBattle, Verbose,
+           TEXT("[BattleHUD] Activate ignored: %s is not friendly."),
+           *SelectedFighter->GetHumanReadableName());
     NotifyActionError(FString(TEXT("Cannot activate enemy fighter.")));
     return;
   }
 
   if (LockedActiveFighter && LockedActiveFighter != SelectedFighter) {
+    UE_LOG(LogSkaldBattle, Verbose,
+           TEXT("[BattleHUD] Activate ignored: Locked fighter %s differs from %s."),
+           *LockedActiveFighter->GetHumanReadableName(),
+           *SelectedFighter->GetHumanReadableName());
     NotifyActionError(FString(TEXT("Another fighter is already active.")));
     return;
   }
@@ -1760,15 +1776,28 @@ void ASkaldPlayerController::HandleActivatePressed() {
   if (!CachedGameInstance) {
     CachedGameInstance = GetGameInstance<USkaldGameInstance>();
   }
-  if (!CachedGameInstance || !CachedGameInstance->GridBattleManager)
+  if (!CachedGameInstance || !CachedGameInstance->GridBattleManager) {
+    UE_LOG(LogSkaldBattle, Warning,
+           TEXT("[BattleHUD] Activate failed: Missing GridBattleManager."));
     return;
+  }
 
   if (!CachedGameInstance->GridBattleManager->CanActivateFighter(SelectedFighter)) {
+    UE_LOG(LogSkaldBattle, Log,
+           TEXT("[BattleHUD] Activation rejected for %s (Round=%d, AttackerTurn=%s)"),
+           *SelectedFighter->GetHumanReadableName(),
+           CachedGameInstance->GridBattleManager->GetCurrentRound(),
+           CachedGameInstance->GridBattleManager->IsAttackerTurn()
+               ? TEXT("true")
+               : TEXT("false"));
     NotifyActionError(FString(TEXT("Cannot activate this fighter right now.")));
     return;
   }
 
   if (CachedGameInstance->GridBattleManager->ActivateFighter(SelectedFighter)) {
+    UE_LOG(LogSkaldBattle, Log,
+           TEXT("[BattleHUD] Activation succeeded for %s"),
+           *SelectedFighter->GetHumanReadableName());
     LockedActiveFighter = SelectedFighter;
     if (bBattleHUDReadyToShow && !bBattleHUDVisible) {
       EnsureBattleHUDVisible();
@@ -1778,18 +1807,38 @@ void ASkaldPlayerController::HandleActivatePressed() {
 }
 
 void ASkaldPlayerController::HandleEndTurnPressed() {
-  if (!LockedActiveFighter)
+  UE_LOG(LogSkaldBattle, Log,
+         TEXT("[BattleHUD] End Turn pressed. Locked=%s"),
+         LockedActiveFighter ? *LockedActiveFighter->GetHumanReadableName()
+                             : TEXT("<None>"));
+  if (!LockedActiveFighter) {
+    UE_LOG(LogSkaldBattle, Verbose,
+           TEXT("[BattleHUD] End Turn ignored: No fighter locked."));
     return;
+  }
 
-  if (!IsFriendlyFighter(LockedActiveFighter))
+  if (!IsFriendlyFighter(LockedActiveFighter)) {
+    UE_LOG(LogSkaldBattle, Verbose,
+           TEXT("[BattleHUD] End Turn ignored: Fighter %s is not friendly."),
+           *LockedActiveFighter->GetHumanReadableName());
     return;
+  }
 
   if (!CachedGameInstance) {
     CachedGameInstance = GetGameInstance<USkaldGameInstance>();
   }
-  if (!CachedGameInstance || !CachedGameInstance->GridBattleManager)
+  if (!CachedGameInstance || !CachedGameInstance->GridBattleManager) {
+    UE_LOG(LogSkaldBattle, Warning,
+           TEXT("[BattleHUD] End Turn failed: Missing GridBattleManager."));
     return;
+  }
 
+  const int32 RoundNumber = CachedGameInstance->GridBattleManager->GetCurrentRound();
+  const bool bAttackerTurn = CachedGameInstance->GridBattleManager->IsAttackerTurn();
+  UE_LOG(LogSkaldBattle, Log,
+         TEXT("[BattleHUD] Finishing activation for %s (Round=%d, AttackerTurn=%s)"),
+         *LockedActiveFighter->GetHumanReadableName(), RoundNumber,
+         bAttackerTurn ? TEXT("true") : TEXT("false"));
   CachedGameInstance->GridBattleManager->FinishActivation(LockedActiveFighter);
   LockedActiveFighter = nullptr;
   UpdateBattleHUDButtons();
