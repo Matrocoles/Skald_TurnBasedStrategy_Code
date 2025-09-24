@@ -2,6 +2,52 @@
 #include "Engine/DataTable.h"
 #include "FighterPawn.h"
 #include "GridOverlayComponent.h"
+#include "SkaldLogging.h"
+#include "UObject/UnrealType.h"
+
+namespace
+{
+FString DescribeFighter(const AFighterPawn* Fighter)
+{
+    if (!Fighter)
+    {
+        return TEXT("<None>");
+    }
+
+    const FString DisplayName = Fighter->GetHumanReadableName();
+    return FString::Printf(TEXT("%s (%s | Attacker=%s | Activated=%s | Alive=%s)"),
+        *GetNameSafe(Fighter),
+        DisplayName.IsEmpty() ? TEXT("Unnamed") : *DisplayName,
+        Fighter->bIsAttacker ? TEXT("true") : TEXT("false"),
+        Fighter->HasActivatedThisRound() ? TEXT("true") : TEXT("false"),
+        Fighter->IsAlive() ? TEXT("true") : TEXT("false"));
+}
+
+int32 CountFighters(const TArray<AFighterPawn*>& Fighters, bool bAttackerOnly)
+{
+    int32 Count = 0;
+    for (const AFighterPawn* Fighter : Fighters)
+    {
+        if (!Fighter)
+        {
+            continue;
+        }
+
+        if (!Fighter->IsAlive())
+        {
+            continue;
+        }
+
+        if (Fighter->bIsAttacker != bAttackerOnly)
+        {
+            continue;
+        }
+
+        ++Count;
+    }
+    return Count;
+}
+} // namespace
 
 UGridBattleManager::UGridBattleManager()
 {
@@ -47,6 +93,8 @@ void UGridBattleManager::InitBattle(const TArray<FFighter>& Attackers, const TAr
     DefenderSurvivorArmyCost = 0;
     bTeamsAssigned = false;
     bBattleConcluded = false;
+
+    UE_LOG(LogSkaldBattle, Log, TEXT("[Battle] Initialised battle: Attackers=%d, Defenders=%d"), AttackerTeam.Num(), DefenderTeam.Num());
 }
 
 bool UGridBattleManager::ResolveAttack(FFighter& Attacker, FFighter& Defender, int32& OutDamage, FRandomStream& RandomStream)
@@ -252,6 +300,10 @@ void UGridBattleManager::StartRound()
 
     ++CurrentRound;
 
+    const int32 LivingAttackers = CountFighters(InitiativeOrder, true);
+    const int32 LivingDefenders = CountFighters(InitiativeOrder, false);
+    UE_LOG(LogSkaldBattle, Log, TEXT("[Battle] Starting round %d (Attackers=%d, Defenders=%d)"), CurrentRound, LivingAttackers, LivingDefenders);
+
     for (AFighterPawn* Fighter : InitiativeOrder)
     {
         if (Fighter && Fighter->IsAlive())
@@ -266,11 +318,15 @@ void UGridBattleManager::StartRound()
 
     RollInitiative();
 
+    UE_LOG(LogSkaldBattle, Log, TEXT("[Battle] Round %d initiative winner: %s"), CurrentRound,
+        *UEnum::GetValueAsString(InitiativeWinnerFaction));
+
     OnRoundStarted.Broadcast(CurrentRound, InitiativeWinnerFaction);
 }
 
 void UGridBattleManager::AdvanceTurn()
 {
+    UE_LOG(LogSkaldBattle, Verbose, TEXT("[Battle] AdvanceTurn called. Active fighter: %s"), *DescribeFighter(ActiveFighter));
     FinishActivation(ActiveFighter);
 }
 
@@ -278,26 +334,37 @@ bool UGridBattleManager::CanActivateFighter(AFighterPawn* Fighter) const
 {
     if (bBattleConcluded || !Fighter)
     {
+        UE_LOG(LogSkaldBattle, Verbose, TEXT("[Battle] CanActivateFighter rejected (BattleConcluded=%s, Fighter=%s)"),
+            bBattleConcluded ? TEXT("true") : TEXT("false"), *DescribeFighter(Fighter));
         return false;
     }
 
     if (!Fighter->IsAlive() || !InitiativeOrder.Contains(Fighter))
     {
+        UE_LOG(LogSkaldBattle, Verbose, TEXT("[Battle] CanActivateFighter rejected (Alive=%s, InOrder=%s) -> %s"),
+            Fighter->IsAlive() ? TEXT("true") : TEXT("false"),
+            InitiativeOrder.Contains(Fighter) ? TEXT("true") : TEXT("false"), *DescribeFighter(Fighter));
         return false;
     }
 
     if (ActiveFighter && ActiveFighter != Fighter)
     {
+        UE_LOG(LogSkaldBattle, Verbose, TEXT("[Battle] CanActivateFighter rejected (Another active fighter %s)"),
+            *DescribeFighter(ActiveFighter));
         return false;
     }
 
     if (Fighter->HasActivatedThisRound())
     {
+        UE_LOG(LogSkaldBattle, Verbose, TEXT("[Battle] CanActivateFighter rejected (Already activated this round) -> %s"),
+            *DescribeFighter(Fighter));
         return false;
     }
 
     if (Fighter->bIsAttacker != bIsAttackerTurn)
     {
+        UE_LOG(LogSkaldBattle, Verbose, TEXT("[Battle] CanActivateFighter rejected (Wrong side. bIsAttackerTurn=%s) -> %s"),
+            bIsAttackerTurn ? TEXT("true") : TEXT("false"), *DescribeFighter(Fighter));
         return false;
     }
 
@@ -308,6 +375,7 @@ bool UGridBattleManager::ActivateFighter(AFighterPawn* Fighter)
 {
     if (!CanActivateFighter(Fighter))
     {
+        UE_LOG(LogSkaldBattle, Warning, TEXT("[Battle] ActivateFighter failed for %s"), *DescribeFighter(Fighter));
         return false;
     }
 
@@ -318,6 +386,8 @@ bool UGridBattleManager::ActivateFighter(AFighterPawn* Fighter)
         ActiveFighter->BeginActivation();
     }
     OnActiveFighterChanged.Broadcast(ActiveFighter);
+    UE_LOG(LogSkaldBattle, Log, TEXT("[Battle] Fighter activated: %s (Round=%d, TurnIndex=%d, AttackerTurn=%s)"),
+        *DescribeFighter(ActiveFighter), CurrentRound, CurrentTurn, bIsAttackerTurn ? TEXT("true") : TEXT("false"));
     return ActiveFighter != nullptr;
 }
 
@@ -325,12 +395,14 @@ void UGridBattleManager::FinishActivation(AFighterPawn* Fighter)
 {
     if (bBattleConcluded)
     {
+        UE_LOG(LogSkaldBattle, Verbose, TEXT("[Battle] FinishActivation ignored because battle concluded"));
         return;
     }
 
     AFighterPawn* FighterToFinish = Fighter ? Fighter : ActiveFighter;
     if (!FighterToFinish)
     {
+        UE_LOG(LogSkaldBattle, Verbose, TEXT("[Battle] FinishActivation aborted (No fighter)"));
         return;
     }
 
@@ -341,10 +413,12 @@ void UGridBattleManager::FinishActivation(AFighterPawn* Fighter)
         ActiveFighter->FinishActivation();
         ActiveFighter = nullptr;
         OnActiveFighterChanged.Broadcast(nullptr);
+        UE_LOG(LogSkaldBattle, Log, TEXT("[Battle] Fighter finished activation: %s"), *DescribeFighter(FighterToFinish));
     }
     else if (InitiativeOrder.Contains(FighterToFinish))
     {
         FighterToFinish->FinishActivation();
+        UE_LOG(LogSkaldBattle, Log, TEXT("[Battle] Manually finished activation for non-active fighter: %s"), *DescribeFighter(FighterToFinish));
     }
 
     EvaluateRoundProgress(bWasAttacker);
@@ -408,18 +482,26 @@ void UGridBattleManager::EvaluateRoundProgress(bool bPreviousWasAttacker)
     const bool bOpponentsRemain = HasAvailableFighters(!bPreviousWasAttacker);
     const bool bCurrentRemain = HasAvailableFighters(bPreviousWasAttacker);
 
+    UE_LOG(LogSkaldBattle, Log, TEXT("[Battle] EvaluateRoundProgress: PreviousWasAttacker=%s, CurrentRemain=%s, OpponentsRemain=%s"),
+        bPreviousWasAttacker ? TEXT("true") : TEXT("false"),
+        bCurrentRemain ? TEXT("true") : TEXT("false"),
+        bOpponentsRemain ? TEXT("true") : TEXT("false"));
+
     if (bOpponentsRemain)
     {
         bIsAttackerTurn = !bPreviousWasAttacker;
+        UE_LOG(LogSkaldBattle, Log, TEXT("[Battle] Switching turn to %s"), bIsAttackerTurn ? TEXT("Attackers") : TEXT("Defenders"));
         return;
     }
 
     if (bCurrentRemain)
     {
         bIsAttackerTurn = bPreviousWasAttacker;
+        UE_LOG(LogSkaldBattle, Log, TEXT("[Battle] Keeping turn with %s"), bIsAttackerTurn ? TEXT("Attackers") : TEXT("Defenders"));
         return;
     }
 
+    UE_LOG(LogSkaldBattle, Log, TEXT("[Battle] No fighters remain with actions. Advancing to next round."));
     StartRound();
 }
 
@@ -427,15 +509,22 @@ void UGridBattleManager::ClearInactiveFighters()
 {
     const bool bActiveInvalid = ActiveFighter && (!ActiveFighter->IsAlive() || !InitiativeOrder.Contains(ActiveFighter));
 
+    const int32 BeforeCount = InitiativeOrder.Num();
     InitiativeOrder.RemoveAll([](AFighterPawn* Fighter)
     {
         return !Fighter || !Fighter->IsAlive();
     });
+    const int32 Removed = BeforeCount - InitiativeOrder.Num();
 
     if (bActiveInvalid || (ActiveFighter && !InitiativeOrder.Contains(ActiveFighter)))
     {
         ActiveFighter = nullptr;
         OnActiveFighterChanged.Broadcast(nullptr);
+    }
+
+    if (Removed > 0)
+    {
+        UE_LOG(LogSkaldBattle, Log, TEXT("[Battle] Cleared %d inactive fighters from initiative order"), Removed);
     }
 }
 
@@ -484,6 +573,8 @@ void UGridBattleManager::EndBattle()
 
     ActiveFighter = nullptr;
     OnActiveFighterChanged.Broadcast(nullptr);
+    UE_LOG(LogSkaldBattle, Log, TEXT("[Battle] Battle ended. Winner=%s, AttackerCasualties=%d, DefenderCasualties=%d"),
+        *UEnum::GetValueAsString(Winner), AttackerCasualties, DefenderCasualties);
     OnBattleEnded.Broadcast(Winner, AttackerCasualties, DefenderCasualties);
 }
 
