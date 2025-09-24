@@ -789,7 +789,6 @@ void ASkaldPlayerController::DetectBattleMap() {
   if (bIsBattleMap) {
     HideOverworldHUDForBattle();
     if (CachedGameInstance && CachedGameInstance->GridBattleManager &&
-        CachedGameInstance->GridBattleManager->GetActiveFighter() &&
         bBattleHUDReadyToShow) {
       EnsureBattleHUDVisible();
     }
@@ -1581,10 +1580,7 @@ void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
   }
   if (CachedGameInstance && CachedGameInstance->GridBattleManager &&
       !bBattleHUDVisible) {
-    if (AFighterPawn *ActiveFighter =
-            CachedGameInstance->GridBattleManager->GetActiveFighter()) {
-      EnsureBattleHUDVisible();
-    }
+    EnsureBattleHUDVisible();
   }
 }
 
