@@ -37,6 +37,8 @@ class SKALD_API ASkaldPlayerController : public APlayerController {
 
   /** Allow the game mode to trigger binding once the world map exists. */
   friend class ASkaldGameMode;
+  /** Allow the player state to notify us when its player ID changes. */
+  friend class ASkaldPlayerState;
 
 public:
   ASkaldPlayerController();
