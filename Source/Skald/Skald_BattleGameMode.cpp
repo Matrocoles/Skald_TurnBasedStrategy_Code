@@ -964,10 +964,16 @@ void ASkald_BattleGameMode::SpawnFighterSide(const TArray<FFighterDefinition> &R
     AFighterPawn *Pawn = GetWorld()->SpawnActor<AFighterPawn>(
         DesiredClass, SpawnLoc, FRotator::ZeroRotator, Params);
     if (Pawn) {
-      if (Grid) {
-        FVector AdjustedLocation = BaseSpawnLoc;
-        AdjustedLocation.Z += Pawn->GetSimpleCollisionHalfHeight();
-        Pawn->SetActorLocation(AdjustedLocation);
+      const float RequestedHalfHeight = SpawnLoc.Z - BaseSpawnLoc.Z;
+      const float ActualHalfHeight = Pawn->GetSimpleCollisionHalfHeight();
+
+      if (!FMath::IsNearlyEqual(ActualHalfHeight, RequestedHalfHeight,
+                                KINDA_SMALL_NUMBER)) {
+        FVector AdjustedLocation = Pawn->GetActorLocation();
+        AdjustedLocation.Z += ActualHalfHeight - RequestedHalfHeight;
+
+        FHitResult HitResult;
+        Pawn->SetActorLocation(AdjustedLocation, /*bSweep*/ true, &HitResult);
       }
       Pawn->Stats = Def.Stats;
       Pawn->bIsAttacker = bAsAttacker;
