@@ -1739,6 +1739,9 @@ void ASkaldPlayerController::HandleEndTurnPressed() {
   if (!LockedActiveFighter)
     return;
 
+  if (!IsFriendlyFighter(LockedActiveFighter))
+    return;
+
   if (!CachedGameInstance) {
     CachedGameInstance = GetGameInstance<USkaldGameInstance>();
   }
@@ -1829,9 +1832,11 @@ void ASkaldPlayerController::UpdateBattleHUDButtons() {
   }
 
   BattleHudWidget->SetActivateEnabled(bCanActivate);
-  const bool bEndTurnVisible = LockedActiveFighter != nullptr;
-  BattleHudWidget->SetEndTurnVisibility(bEndTurnVisible);
-  BattleHudWidget->SetEndTurnEnabled(bEndTurnVisible);
+  const bool bHasActiveFighter = LockedActiveFighter != nullptr;
+  const bool bHasFriendlyActive =
+      LockedActiveFighter && IsFriendlyFighter(LockedActiveFighter);
+  BattleHudWidget->SetEndTurnVisibility(bHasActiveFighter);
+  BattleHudWidget->SetEndTurnEnabled(bHasFriendlyActive);
 }
 
 void ASkaldPlayerController::UpdateBattleRoundDisplay(
