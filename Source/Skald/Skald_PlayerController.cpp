@@ -874,6 +874,31 @@ void ASkaldPlayerController::HandleEndPhaseInternal() {
     return;
   }
 
+  if (HasAuthority()) {
+    ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
+    if (!PS) {
+      UE_LOG(LogSkald, Warning,
+             TEXT("HandleEndPhaseInternal: %s has no PlayerState; rejecting."),
+             *GetName());
+      return;
+    }
+
+    if (ASkaldGameState *GS = GetWorld()->GetGameState<ASkaldGameState>()) {
+      const int32 MyIndex = GS->PlayerArray.IndexOfByKey(PS);
+      if (MyIndex == INDEX_NONE || GS->CurrentTurnIndex != MyIndex) {
+        UE_LOG(LogSkald, Warning,
+               TEXT("HandleEndPhaseInternal: %s attempted to end phase out of turn."),
+               *GetName());
+        return;
+      }
+    } else {
+      UE_LOG(LogSkald, Warning,
+             TEXT("HandleEndPhaseInternal: %s missing GameState; rejecting."),
+             *GetName());
+      return;
+    }
+  }
+
   ETurnPhase Phase = TurnManager->GetCurrentPhase();
   if (Phase == ETurnPhase::ArmyPlacement) {
     if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
