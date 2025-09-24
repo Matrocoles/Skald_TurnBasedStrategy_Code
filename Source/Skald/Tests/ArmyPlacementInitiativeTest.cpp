@@ -244,3 +244,95 @@ bool FAIArmyPlacementAutoAdvanceTest::RunTest(const FString &Parameters) {
 
   return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FInitializeWorldSingleInitiativeRollTest,
+                                 "Skald.Turn.ArmyPlacement.SingleInitiativeRoll",
+                                 EAutomationTestFlags::EditorContext |
+                                     EAutomationTestFlags::EngineFilter)
+
+bool FInitializeWorldSingleInitiativeRollTest::RunTest(const FString &Parameters) {
+  UWorld *World = FAutomationEditorCommonUtils::CreateNewMap();
+  TestNotNull(TEXT("World created"), World);
+  if (!World) {
+    return false;
+  }
+
+  ASkaldGameMode *GameMode = World->SpawnActor<ASkaldGameMode>();
+  AWorldMap *Map = World->SpawnActor<AWorldMap>();
+  ATurnManager *TurnManager = World->SpawnActor<ATurnManager>();
+  ATerritory *TerritoryA = World->SpawnActor<ATerritory>();
+  ATerritory *TerritoryB = World->SpawnActor<ATerritory>();
+  ASkaldPlayerController *ControllerA = World->SpawnActor<ASkaldPlayerController>();
+  ASkaldPlayerController *ControllerB = World->SpawnActor<ASkaldPlayerController>();
+  ASkaldPlayerState *StateA = World->SpawnActor<ASkaldPlayerState>();
+  ASkaldPlayerState *StateB = World->SpawnActor<ASkaldPlayerState>();
+
+  TestNotNull(TEXT("GameMode"), GameMode);
+  TestNotNull(TEXT("WorldMap"), Map);
+  TestNotNull(TEXT("TurnManager"), TurnManager);
+  TestNotNull(TEXT("TerritoryA"), TerritoryA);
+  TestNotNull(TEXT("TerritoryB"), TerritoryB);
+  TestNotNull(TEXT("ControllerA"), ControllerA);
+  TestNotNull(TEXT("ControllerB"), ControllerB);
+  TestNotNull(TEXT("StateA"), StateA);
+  TestNotNull(TEXT("StateB"), StateB);
+  if (!GameMode || !Map || !TurnManager || !TerritoryA || !TerritoryB ||
+      !ControllerA || !ControllerB || !StateA || !StateB) {
+    return false;
+  }
+
+  AttachGameModeToWorld(World, GameMode);
+  GameMode->InitGameState();
+  ASkaldGameState *GameState = GameMode->GetGameState<ASkaldGameState>();
+  TestNotNull(TEXT("GameState initialised"), GameState);
+  if (!GameState) {
+    return false;
+  }
+
+  ConfigureController(ControllerA, StateA, 1, TEXT("PlayerA"), 0);
+  ConfigureController(ControllerB, StateB, 2, TEXT("PlayerB"), 0);
+  GameState->AddPlayerState(StateA);
+  GameState->AddPlayerState(StateB);
+
+  TerritoryA->TerritoryID = 1;
+  TerritoryB->TerritoryID = 2;
+  Map->Territories = {TerritoryA, TerritoryB};
+
+  SetObjectProperty(GameMode, TEXT("TurnManager"), TurnManager);
+  SetObjectProperty(GameMode, TEXT("WorldMap"), Map);
+  SetObjectProperty(TurnManager, TEXT("CachedWorldMap"), Map);
+
+  const bool bFirstInit = GameMode->InitializeWorld();
+  TestTrue(TEXT("Initial world initialisation succeeded"), bFirstInit);
+  if (!bFirstInit) {
+    return false;
+  }
+
+  TMap<ASkaldPlayerState *, int32> InitialRolls;
+  for (APlayerState *PSBase : GameState->PlayerArray) {
+    if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
+      TestTrue(TEXT("Initial initiative roll assigned"), PS->InitiativeRoll > 0);
+      InitialRolls.Add(PS, PS->InitiativeRoll);
+    }
+  }
+  TestTrue(TEXT("Captured initiative rolls for all players"),
+           InitialRolls.Num() == GameState->PlayerArray.Num());
+  if (InitialRolls.Num() != GameState->PlayerArray.Num()) {
+    return false;
+  }
+
+  const bool bSecondInit = GameMode->InitializeWorld();
+  TestTrue(TEXT("Second world initialisation succeeded"), bSecondInit);
+  if (!bSecondInit) {
+    return false;
+  }
+
+  for (const auto &Pair : InitialRolls) {
+    ASkaldPlayerState *PS = Pair.Key;
+    const int32 ExpectedRoll = Pair.Value;
+    TestEqual(TEXT("Initiative roll preserved"), PS->InitiativeRoll,
+              ExpectedRoll);
+  }
+
+  return true;
+}

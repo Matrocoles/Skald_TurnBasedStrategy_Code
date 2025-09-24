@@ -1321,9 +1321,16 @@ bool ASkaldGameMode::InitializeWorld() {
   // Shuffle territories before assignment
   Algo::RandomShuffle(WorldMap->Territories);
 
-  // Roll initiative and sort players accordingly
+  // Roll initiative and sort players accordingly. Preserve existing rolls so
+  // the initiative winner from the initial match start remains the leader even
+  // if InitializeWorld is triggered again (for example due to late HUD
+  // initialisation callbacks).
   for (APlayerState *PSBase : GS->PlayerArray) {
     if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
+      if (PS->InitiativeRoll > 0) {
+        continue;
+      }
+
       if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
         PS->InitiativeRoll = GI->CombatRandomStream.RandRange(1, 6);
       } else {
