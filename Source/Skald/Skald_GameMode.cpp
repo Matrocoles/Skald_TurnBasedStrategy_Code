@@ -878,6 +878,18 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
   }
 
   if (!bWorldInitialized && bReadyToStart) {
+    // New matches may reuse existing player states carrying initiative rolls
+    // from the previous session. Clear any stored values so InitializeWorld can
+    // assign fresh rolls for the upcoming match while still preserving rerolls
+    // within the same initialization sequence.
+    for (APlayerState *PSBase : GS->PlayerArray) {
+      if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
+        if (PS->InitiativeRoll > 0) {
+          PS->InitiativeRoll = 0;
+        }
+      }
+    }
+
     UE_LOG(LogSkald, Log,
            TEXT("TryInitializeWorldAndStart: Initializing world"));
     if (InitializeWorld()) {
