@@ -27,7 +27,6 @@
 #include "TimerManager.h"
 #include "UI/BattleHUDWidget.h"
 #include "UI/BattleResultWidget.h"
-#include "UI/DeployWidget.h"
 #include "UI/FighterSelectionWidget.h"
 #include "UI/SkaldMainHUDWidget.h"
 #include "UI/SkaldUIHelpers.h"
@@ -204,18 +203,12 @@ void ASkaldPlayerController::BeginPlay() {
 
   DetectBattleMap();
 
-  if (ASkaldGameState* SGS = GetWorld() ? GetWorld()->GetGameState<ASkaldGameState>() : nullptr)
-  {
-    if (SGS->BattlePhase == EBattlePhase::Deploy)
-    {
-      if (HasAuthority())
-      {
-        Client_ShowDeployUI();
-      }
-      else
-      {
-        ShowDeployUIInternal();
-      }
+  if (ASkaldGameState *SGS =
+          GetWorld() ? GetWorld()->GetGameState<ASkaldGameState>() : nullptr) {
+    if (SGS->BattlePhase == EBattlePhase::Deploy) {
+      UE_LOG(LogSkaldBattle, Verbose,
+             TEXT("PlayerController %s detected Deploy phase at BeginPlay"),
+             *GetName());
     }
   }
 
@@ -486,27 +479,9 @@ void ASkaldPlayerController::ShowFighterSelectionUI(int32 MaxBudget,
   bEnableMouseOverEvents = true;
 }
 
-void ASkaldPlayerController::ShowDeployUIInternal() {
-  if (!IsLocalController() || bDeployWidgetShown) {
-    return;
-  }
-
-  bDeployWidgetShown = true;
-
-  if (UDeployWidget *DeployWidget =
-          CreateWidget<UDeployWidget>(this, UDeployWidget::StaticClass())) {
-    DeployWidget->AddToViewport(1000);
-  }
-}
-
 void ASkaldPlayerController::Client_ShowFighterSelection_Implementation(
     int32 MaxBudget, ESkaldFaction Faction) {
   ShowFighterSelectionUI(MaxBudget, Faction);
-}
-
-void ASkaldPlayerController::Client_ShowDeployUI_Implementation() {
-  UE_LOG(LogSkaldBattle, Log, TEXT("Client_ShowDeployUI on %s"), *GetName());
-  ShowDeployUIInternal();
 }
 
 void ASkaldPlayerController::Server_LockInSelection_Implementation(
@@ -555,16 +530,10 @@ void ASkaldPlayerController::HandleBattlePhaseChanged() {
   if (const ASkaldGameState *SGS =
           GetWorld() ? GetWorld()->GetGameState<ASkaldGameState>() : nullptr) {
     if (SGS->BattlePhase == EBattlePhase::Deploy) {
-      if (HasAuthority()) {
-        if (const ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
-          if (PS->bIsAI) {
-            return;
-          }
-        }
-        Client_ShowDeployUI();
-      } else {
-        ShowDeployUIInternal();
-      }
+      UE_LOG(LogSkaldBattle, Log,
+             TEXT("PlayerController %s entering Deploy phase; fighters will be"
+                  " spawned automatically."),
+             *GetName());
     }
   }
 }
