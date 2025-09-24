@@ -67,9 +67,17 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Grid")
   void HighlightAttack(AFighterPawn *Fighter);
 
+  /** Highlight only the cell currently occupied by the fighter. */
+  UFUNCTION(BlueprintCallable, Category = "Grid")
+  void HighlightSelection(AFighterPawn *Fighter);
+
   /** Remove any persistent highlights. */
   UFUNCTION(BlueprintCallable, Category = "Grid")
   void ClearHighlights();
+
+  /** Rebuild the persistent grid overlay instances. */
+  UFUNCTION(BlueprintCallable, Category = "Grid")
+  void RebuildGridVisuals();
 
     /** Register an obstacle component so it can affect grid behaviour. */
     UFUNCTION(BlueprintCallable, Category = "Grid")
@@ -99,6 +107,50 @@ public:
   /** Vertical offset applied to highlight instances. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Highlight")
   float HighlightHeightOffset = 2.f;
+
+  /** Mesh used for the persistent grid overlay. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Grid|Display")
+  UStaticMesh *GridMesh = nullptr;
+
+  /** Material applied to the persistent grid overlay. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Grid|Display")
+  UMaterialInterface *GridMaterial = nullptr;
+
+  /** Whether the base grid should be rendered at runtime. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Display")
+  bool bDrawBaseGrid = true;
+
+  /** Vertical offset applied to the persistent grid overlay. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Display")
+  float GridHeightOffset = 0.f;
+
+  /** Default tint applied to traversable cells. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Display")
+  FLinearColor DefaultCellColor = FLinearColor(0.1f, 0.1f, 0.1f, 0.35f);
+
+  /** Tint applied to cells blocked by obstacles. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Display")
+  FLinearColor BlockedCellColor = FLinearColor(0.6f, 0.0f, 0.0f, 0.55f);
+
+  /** Tint applied to cells that block line of sight. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Display")
+  FLinearColor ObscuredCellColor = FLinearColor(0.3f, 0.3f, 0.3f, 0.5f);
+
+  /** Tint applied to cells currently occupied by a fighter. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Display")
+  FLinearColor OccupiedCellColor = FLinearColor(0.1f, 0.3f, 0.8f, 0.65f);
+
+  /** Tint applied when a fighter is selected. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Highlight")
+  FLinearColor SelectionHighlightColor = FLinearColor(1.f, 1.f, 0.25f, 0.85f);
+
+  /** Tint applied to reachable movement cells. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Highlight")
+  FLinearColor MovementHighlightColor = FLinearColor(0.0f, 1.f, 0.3f, 0.85f);
+
+  /** Tint applied to reachable attack cells. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Highlight")
+  FLinearColor AttackHighlightColor = FLinearColor(1.f, 0.1f, 0.1f, 0.85f);
 
 protected:
   /** Width of the grid in cells. */
@@ -132,9 +184,32 @@ protected:
   UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Grid|Highlight")
   UInstancedStaticMeshComponent *HighlightMeshComponent = nullptr;
 
+  /** Instanced mesh component used to render the persistent grid. */
+  UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Grid|Display")
+  UInstancedStaticMeshComponent *BaseGridMeshComponent = nullptr;
+
   /** Map grid coordinates to highlight instance indices for updates. */
   UPROPERTY(Transient)
   TMap<FIntPoint, int32> HighlightedInstances;
+
+  /** Mapping of grid cell index to persistent grid instance index. */
+  UPROPERTY(Transient)
+  TArray<int32> BaseGridInstanceIndices;
+
+  /** Tracks cells currently occupied by dynamic actors. */
+  UPROPERTY(Transient)
+  TArray<bool> DynamicOccupiedCells;
+
+  /** Obstacles awaiting registration until the grid has initialised. */
+  UPROPERTY(Transient)
+  TArray<TWeakObjectPtr<UGridObstacleComponent>> PendingObstacles;
+
+  /** Occupancy updates received before the grid initialises. */
+  UPROPERTY(Transient)
+  TArray<TPair<FIntPoint, bool>> PendingOccupancyUpdates;
+
+  /** Whether the grid has completed its initial world sampling. */
+  bool bHasInitializedGrid = false;
 
   /** Get linear array index for a grid coordinate. */
   int32 Index(const FIntPoint &GridCoord) const;
@@ -155,4 +230,34 @@ protected:
 
   /** Apply highlight color as per-instance custom data. */
   void ApplyHighlightColor(int32 InstanceIndex, const FLinearColor &Color);
+
+  /** Ensure the instanced highlight component exists and belongs to the owner. */
+  bool EnsureHighlightMeshComponentExists();
+
+  /** Ensure the persistent grid component exists and belongs to the owner. */
+  bool EnsureBaseGridMeshComponentExists();
+
+  /** Shared setup for dynamically created instanced mesh components. */
+  bool EnsureInstancedMeshComponent(UInstancedStaticMeshComponent *&Component,
+                                    FName ComponentName);
+
+  /** Apply common configuration to an instanced mesh component. */
+  void ConfigureInstancedComponent(UInstancedStaticMeshComponent *Component,
+                                   UStaticMesh *Mesh,
+                                   UMaterialInterface *Material);
+
+  /** Ensure the persistent grid component is configured for rendering. */
+  bool EnsureBaseGridComponentSetup();
+
+  /** Build or rebuild the persistent grid instances. */
+  void RebuildBaseGridInstances();
+
+  /** Apply colour data to the persistent grid instance for a cell. */
+  void UpdateBaseGridVisual(const FIntPoint &GridCoord);
+
+  /** Apply colour data to an instance of the persistent grid overlay. */
+  void ApplyBaseGridColor(int32 InstanceIndex, const FLinearColor &Color);
+
+  /** Resolve which colour should be used for a given grid cell. */
+  FLinearColor GetBaseGridColor(int32 CellIndex) const;
 };

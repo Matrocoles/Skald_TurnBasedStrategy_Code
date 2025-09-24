@@ -10,62 +10,113 @@
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/SceneComponent.h"
 #include "GameFramework/Actor.h"
+#include "UObject/UObjectGlobals.h"
 
 UGridOverlayComponent::UGridOverlayComponent() {
   PrimaryComponentTick.bCanEverTick = false;
+}
 
-  HighlightMeshComponent =
-      CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("HighlightMesh"));
-  if (HighlightMeshComponent) {
-    HighlightMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    HighlightMeshComponent->SetGenerateOverlapEvents(false);
-    HighlightMeshComponent->SetCastShadow(false);
-    HighlightMeshComponent->bSelectable = false;
-    HighlightMeshComponent->SetCanEverAffectNavigation(false);
-    HighlightMeshComponent->NumCustomDataFloats = 4;
+bool UGridOverlayComponent::EnsureInstancedMeshComponent(
+    UInstancedStaticMeshComponent *&Component, FName ComponentName) {
+  AActor *Owner = GetOwner();
+  if (!Owner) {
+    return false;
+  }
+
+  bool bNeedsRegistration = false;
+
+  if (!Component) {
+    Component = NewObject<UInstancedStaticMeshComponent>(Owner, ComponentName);
+    if (!Component) {
+      return false;
+    }
+    Component->CreationMethod = EComponentCreationMethod::Instance;
+    Owner->AddOwnedComponent(Component);
+    bNeedsRegistration = true;
+  } else if (Component->GetOwner() != Owner) {
+    Component->Rename(nullptr, Owner);
+    Component->CreationMethod = EComponentCreationMethod::Instance;
+    Owner->AddOwnedComponent(Component);
+    bNeedsRegistration = true;
+  }
+
+  if (bNeedsRegistration) {
+    Owner->AddInstanceComponent(Component);
+  }
+
+  if (USceneComponent *Root = Owner->GetRootComponent()) {
+    if (Component->GetAttachParent() != Root) {
+      Component->AttachToComponent(Root,
+                                   FAttachmentTransformRules::KeepRelativeTransform);
+    }
+  }
+
+  Component->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+  Component->SetGenerateOverlapEvents(false);
+  Component->SetCastShadow(false);
+  Component->bSelectable = false;
+  Component->SetCanEverAffectNavigation(false);
+  Component->SetRelativeTransform(FTransform::Identity);
+
+  if (Component->NumCustomDataFloats < 4) {
+    Component->NumCustomDataFloats = 4;
+  }
+
+  if (!Component->IsRegistered()) {
+    Component->RegisterComponent();
+  }
+
+  return true;
+}
+
+bool UGridOverlayComponent::EnsureHighlightMeshComponentExists() {
+  return EnsureInstancedMeshComponent(HighlightMeshComponent, TEXT("HighlightMesh"));
+}
+
+bool UGridOverlayComponent::EnsureBaseGridMeshComponentExists() {
+  return EnsureInstancedMeshComponent(BaseGridMeshComponent, TEXT("GridMesh"));
+}
+
+void UGridOverlayComponent::ConfigureInstancedComponent(
+    UInstancedStaticMeshComponent *Component, UStaticMesh *Mesh,
+    UMaterialInterface *Material) {
+  if (!Component) {
+    return;
+  }
+
+  if (Mesh && Component->GetStaticMesh() != Mesh) {
+    Component->SetStaticMesh(Mesh);
+  }
+
+  if (Material && Component->GetMaterial(0) != Material) {
+    Component->SetMaterial(0, Material);
   }
 }
 
 void UGridOverlayComponent::OnRegister() {
   Super::OnRegister();
 
-  if (!HighlightMeshComponent) {
-    return;
-  }
-
-  if (HighlightMesh && HighlightMeshComponent->GetStaticMesh() != HighlightMesh) {
-    HighlightMeshComponent->SetStaticMesh(HighlightMesh);
-  }
-
-  if (HighlightMaterial && HighlightMeshComponent->GetMaterial(0) != HighlightMaterial) {
-    HighlightMeshComponent->SetMaterial(0, HighlightMaterial);
-  }
-
   if (AActor *Owner = GetOwner()) {
-    if (USceneComponent *Root = Owner->GetRootComponent()) {
-      HighlightMeshComponent->AttachToComponent(
-          Root, FAttachmentTransformRules::KeepRelativeTransform);
-    }
+    Origin = Owner->GetActorLocation();
   }
 
-  HighlightMeshComponent->SetRelativeTransform(FTransform::Identity);
-
-  if (!HighlightMeshComponent->IsRegistered()) {
-    HighlightMeshComponent->RegisterComponent();
-  }
+  EnsureBaseGridComponentSetup();
+  EnsureHighlightComponentSetup();
 }
 
 void UGridOverlayComponent::BeginPlay() {
   Super::BeginPlay();
 
-  Cells.Init(false, Width * Height);
-  ObscuredCells.Init(false, Width * Height);
-
   if (AActor *Owner = GetOwner()) {
     Origin = Owner->GetActorLocation();
   }
 
-  CellHeights.Init(Origin.Z, Width * Height);
+  const int32 TotalCells = Width * Height;
+  Cells.Init(false, TotalCells);
+  ObscuredCells.Init(false, TotalCells);
+  DynamicOccupiedCells.Init(false, TotalCells);
+  CellHeights.Init(Origin.Z, TotalCells);
+  BaseGridInstanceIndices.Init(INDEX_NONE, TotalCells);
 
   if (UWorld *World = GetWorld()) {
     for (int32 Y = 0; Y < Height; ++Y) {
@@ -84,6 +135,31 @@ void UGridOverlayComponent::BeginPlay() {
           CellHeights[Idx] = Origin.Z;
         }
       }
+    }
+  }
+
+  bHasInitializedGrid = true;
+
+  if (PendingObstacles.Num() > 0) {
+    const TArray<TWeakObjectPtr<UGridObstacleComponent>> ObstaclesToProcess =
+        PendingObstacles;
+    PendingObstacles.Empty();
+    for (const TWeakObjectPtr<UGridObstacleComponent> &WeakObstacle :
+         ObstaclesToProcess) {
+      if (WeakObstacle.IsValid()) {
+        RegisterObstacle(WeakObstacle.Get());
+      }
+    }
+  }
+
+  RebuildBaseGridInstances();
+
+  if (PendingOccupancyUpdates.Num() > 0) {
+    const TArray<TPair<FIntPoint, bool>> OccupancyToApply =
+        PendingOccupancyUpdates;
+    PendingOccupancyUpdates.Empty();
+    for (const TPair<FIntPoint, bool> &Update : OccupancyToApply) {
+      SetOccupied(Update.Key, Update.Value);
     }
   }
 }
@@ -116,14 +192,19 @@ bool UGridOverlayComponent::IsOccupied(const FIntPoint &GridCoord) const {
   if (!IsValidGrid(GridCoord)) {
     return false;
   }
-  return Cells[Index(GridCoord)];
+  const int32 Idx = Index(GridCoord);
+  const bool bBlocked = Cells.IsValidIndex(Idx) ? Cells[Idx] : false;
+  const bool bDynamic =
+      DynamicOccupiedCells.IsValidIndex(Idx) ? DynamicOccupiedCells[Idx] : false;
+  return bBlocked || bDynamic;
 }
 
 bool UGridOverlayComponent::IsObscured(const FIntPoint &GridCoord) const {
   if (!IsValidGrid(GridCoord)) {
     return false;
   }
-  return ObscuredCells[Index(GridCoord)];
+  const int32 Idx = Index(GridCoord);
+  return ObscuredCells.IsValidIndex(Idx) ? ObscuredCells[Idx] : false;
 }
 
 bool UGridOverlayComponent::HasLineOfSight(const FIntPoint &Start,
@@ -161,7 +242,8 @@ float UGridOverlayComponent::GetCellHeight(const FIntPoint &GridCoord) const {
   if (!IsValidGrid(GridCoord)) {
     return Origin.Z;
   }
-  return CellHeights[Index(GridCoord)];
+  const int32 Idx = Index(GridCoord);
+  return CellHeights.IsValidIndex(Idx) ? CellHeights[Idx] : Origin.Z;
 }
 
 void UGridOverlayComponent::SetOccupied(const FIntPoint &GridCoord,
@@ -169,49 +251,58 @@ void UGridOverlayComponent::SetOccupied(const FIntPoint &GridCoord,
   if (!IsValidGrid(GridCoord)) {
     return;
   }
-  Cells[Index(GridCoord)] = bOccupied;
+  if (!bHasInitializedGrid) {
+    for (TPair<FIntPoint, bool> &Pending : PendingOccupancyUpdates) {
+      if (Pending.Key == GridCoord) {
+        Pending.Value = bOccupied;
+        return;
+      }
+    }
+    PendingOccupancyUpdates.Add(TPair<FIntPoint, bool>(GridCoord, bOccupied));
+    return;
+  }
+
+  const int32 Idx = Index(GridCoord);
+  if (!DynamicOccupiedCells.IsValidIndex(Idx)) {
+    return;
+  }
+
+  DynamicOccupiedCells[Idx] = bOccupied;
+  UpdateBaseGridVisual(GridCoord);
 }
 
 bool UGridOverlayComponent::EnsureHighlightComponentSetup() {
-  if (!HighlightMeshComponent) {
+  if (!EnsureHighlightMeshComponentExists()) {
     return false;
   }
 
-  HighlightMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-  HighlightMeshComponent->SetGenerateOverlapEvents(false);
-  HighlightMeshComponent->SetCastShadow(false);
-  HighlightMeshComponent->bSelectable = false;
-  HighlightMeshComponent->SetCanEverAffectNavigation(false);
+  UStaticMesh *MeshToUse = HighlightMesh ? HighlightMesh : GridMesh;
+  UMaterialInterface *MaterialToUse =
+      HighlightMaterial ? HighlightMaterial : GridMaterial;
 
-  if (HighlightMeshComponent->NumCustomDataFloats < 4) {
-    HighlightMeshComponent->NumCustomDataFloats = 4;
-  }
-
-  if (!HighlightMeshComponent->IsRegistered()) {
-    HighlightMeshComponent->RegisterComponent();
-  }
-
-  if (AActor *Owner = GetOwner()) {
-    if (USceneComponent *Root = Owner->GetRootComponent()) {
-      if (HighlightMeshComponent->GetAttachParent() != Root) {
-        HighlightMeshComponent->AttachToComponent(
-            Root, FAttachmentTransformRules::KeepRelativeTransform);
-      }
-    }
-  }
-
-  HighlightMeshComponent->SetRelativeTransform(FTransform::Identity);
-
-  if (HighlightMesh && HighlightMeshComponent->GetStaticMesh() != HighlightMesh) {
-    HighlightMeshComponent->SetStaticMesh(HighlightMesh);
-  }
-
-  if (HighlightMaterial &&
-      HighlightMeshComponent->GetMaterial(0) != HighlightMaterial) {
-    HighlightMeshComponent->SetMaterial(0, HighlightMaterial);
-  }
+  ConfigureInstancedComponent(HighlightMeshComponent, MeshToUse, MaterialToUse);
 
   return HighlightMeshComponent->GetStaticMesh() != nullptr;
+}
+
+bool UGridOverlayComponent::EnsureBaseGridComponentSetup() {
+  if (!bDrawBaseGrid) {
+    return false;
+  }
+
+  if (!EnsureBaseGridMeshComponentExists()) {
+    return false;
+  }
+
+  UStaticMesh *MeshToUse = GridMesh ? GridMesh : HighlightMesh;
+  if (!MeshToUse) {
+    return false;
+  }
+
+  UMaterialInterface *MaterialToUse = GridMaterial ? GridMaterial : HighlightMaterial;
+  ConfigureInstancedComponent(BaseGridMeshComponent, MeshToUse, MaterialToUse);
+
+  return BaseGridMeshComponent->GetStaticMesh() != nullptr;
 }
 
 void UGridOverlayComponent::ApplyHighlightColor(int32 InstanceIndex,
@@ -226,6 +317,106 @@ void UGridOverlayComponent::ApplyHighlightColor(int32 InstanceIndex,
   HighlightMeshComponent->SetCustomDataValue(InstanceIndex, 2, Color.B, false);
   HighlightMeshComponent->SetCustomDataValue(InstanceIndex, 3, Color.A, true);
 }
+
+void UGridOverlayComponent::ApplyBaseGridColor(int32 InstanceIndex,
+                                               const FLinearColor &Color) {
+  if (!BaseGridMeshComponent || BaseGridMeshComponent->NumCustomDataFloats < 4 ||
+      InstanceIndex == INDEX_NONE) {
+    return;
+  }
+
+  BaseGridMeshComponent->SetCustomDataValue(InstanceIndex, 0, Color.R, false);
+  BaseGridMeshComponent->SetCustomDataValue(InstanceIndex, 1, Color.G, false);
+  BaseGridMeshComponent->SetCustomDataValue(InstanceIndex, 2, Color.B, false);
+  BaseGridMeshComponent->SetCustomDataValue(InstanceIndex, 3, Color.A, true);
+}
+
+FLinearColor UGridOverlayComponent::GetBaseGridColor(int32 CellIndex) const {
+  if (CellIndex < 0) {
+    return DefaultCellColor;
+  }
+
+  if (DynamicOccupiedCells.IsValidIndex(CellIndex) &&
+      DynamicOccupiedCells[CellIndex]) {
+    return OccupiedCellColor;
+  }
+
+  if (Cells.IsValidIndex(CellIndex) && Cells[CellIndex]) {
+    return BlockedCellColor;
+  }
+
+  if (ObscuredCells.IsValidIndex(CellIndex) && ObscuredCells[CellIndex]) {
+    return ObscuredCellColor;
+  }
+
+  return DefaultCellColor;
+}
+
+void UGridOverlayComponent::UpdateBaseGridVisual(const FIntPoint &GridCoord) {
+  if (!BaseGridMeshComponent || !IsValidGrid(GridCoord)) {
+    return;
+  }
+
+  const int32 ArrayIndex = Index(GridCoord);
+  if (!BaseGridInstanceIndices.IsValidIndex(ArrayIndex)) {
+    return;
+  }
+
+  const int32 InstanceIndex = BaseGridInstanceIndices[ArrayIndex];
+  if (InstanceIndex == INDEX_NONE) {
+    return;
+  }
+
+  ApplyBaseGridColor(InstanceIndex, GetBaseGridColor(ArrayIndex));
+}
+
+void UGridOverlayComponent::RebuildBaseGridInstances() {
+  if (!bDrawBaseGrid) {
+    if (BaseGridMeshComponent) {
+      BaseGridMeshComponent->ClearInstances();
+    }
+    BaseGridInstanceIndices.Empty();
+    return;
+  }
+
+  if (!EnsureBaseGridComponentSetup()) {
+    return;
+  }
+
+  const int32 TotalCells = Width * Height;
+  if (TotalCells <= 0) {
+    BaseGridMeshComponent->ClearInstances();
+    BaseGridInstanceIndices.Empty();
+    return;
+  }
+
+  BaseGridMeshComponent->ClearInstances();
+  BaseGridInstanceIndices.Init(INDEX_NONE, TotalCells);
+
+  const FTransform ComponentTransform = BaseGridMeshComponent->GetComponentTransform();
+  const float EffectiveCellSize = FMath::Max(CellSize, KINDA_SMALL_NUMBER);
+  const FVector InstanceScale(EffectiveCellSize / 100.f, EffectiveCellSize / 100.f, 1.f);
+
+  for (int32 Y = 0; Y < Height; ++Y) {
+    for (int32 X = 0; X < Width; ++X) {
+      const FIntPoint Cell(X, Y);
+      const FVector WorldCenter =
+          GridToWorld(Cell) + FVector(0.f, 0.f, GridHeightOffset);
+      const FTransform WorldTransform(FQuat::Identity, WorldCenter, InstanceScale);
+      const FTransform RelativeTransform =
+          WorldTransform.GetRelativeTransform(ComponentTransform);
+
+      const int32 InstanceIndex = BaseGridMeshComponent->AddInstance(RelativeTransform);
+      const int32 ArrayIndex = Index(Cell);
+      if (BaseGridInstanceIndices.IsValidIndex(ArrayIndex)) {
+        BaseGridInstanceIndices[ArrayIndex] = InstanceIndex;
+        ApplyBaseGridColor(InstanceIndex, GetBaseGridColor(ArrayIndex));
+      }
+    }
+  }
+}
+
+void UGridOverlayComponent::RebuildGridVisuals() { RebuildBaseGridInstances(); }
 
 void UGridOverlayComponent::HighlightCell(const FIntPoint &GridCoord,
                                           const FColor &Color, float /*Duration*/,
@@ -264,6 +455,15 @@ void UGridOverlayComponent::HighlightCell(const FIntPoint &GridCoord,
   ApplyHighlightColor(InstanceIndex, FLinearColor(Color));
 }
 
+void UGridOverlayComponent::HighlightSelection(AFighterPawn *Fighter) {
+  if (!Fighter) {
+    return;
+  }
+
+  const FIntPoint Cell = WorldToGrid(Fighter->GetActorLocation());
+  HighlightCell(Cell, SelectionHighlightColor.ToFColor(true), 0.f, false);
+}
+
 void UGridOverlayComponent::ClearHighlights() {
   HighlightedInstances.Empty();
   if (HighlightMeshComponent) {
@@ -281,7 +481,12 @@ void UGridOverlayComponent::RegisterObstacle(UGridObstacleComponent *Obstacle) {
   if (!Obstacle) {
     return;
   }
-  Obstacles.Add(Obstacle);
+  if (!bHasInitializedGrid) {
+    PendingObstacles.AddUnique(Obstacle);
+    return;
+  }
+
+  Obstacles.AddUnique(Obstacle);
   if (AActor *Owner = Obstacle->GetOwner()) {
     const FBox Bounds = Owner->GetComponentsBoundingBox(true);
     const FIntPoint Min = WorldToGrid(Bounds.Min);
@@ -293,6 +498,9 @@ void UGridOverlayComponent::RegisterObstacle(UGridObstacleComponent *Obstacle) {
           continue;
         }
         const int32 Idx = Index(Cell);
+        if (!Cells.IsValidIndex(Idx) || !ObscuredCells.IsValidIndex(Idx)) {
+          continue;
+        }
         if (Obstacle->bClimbable) {
           CellHeights[Idx] = Bounds.Max.Z;
           Cells[Idx] = false;
@@ -305,6 +513,7 @@ void UGridOverlayComponent::RegisterObstacle(UGridObstacleComponent *Obstacle) {
             ObscuredCells[Idx] = true;
           }
         }
+        UpdateBaseGridVisual(Cell);
       }
     }
   }
@@ -320,8 +529,13 @@ void UGridOverlayComponent::HandleLandscapeHit(const FHitResult &Hit,
   const float Slope = FMath::RadiansToDegrees(
       FMath::Acos(FVector::DotProduct(Normal, FVector::UpVector)));
   if (Slope >= LandscapeSlopeThreshold) {
-    Cells[CellIndex] = true;
-    ObscuredCells[CellIndex] = true;
+    if (Cells.IsValidIndex(CellIndex)) {
+      Cells[CellIndex] = true;
+    }
+    if (ObscuredCells.IsValidIndex(CellIndex)) {
+      ObscuredCells[CellIndex] = true;
+    }
+    UpdateBaseGridVisual(Cell);
   }
 }
 
@@ -332,8 +546,13 @@ void UGridOverlayComponent::HighlightMovement(AFighterPawn *Fighter) {
 
   ClearHighlights();
 
-  FIntPoint StartCell = WorldToGrid(Fighter->GetActorLocation());
+  const FIntPoint StartCell = WorldToGrid(Fighter->GetActorLocation());
   const int32 Range = Fighter->Stats.Movement;
+
+  const FColor SelectionColor = SelectionHighlightColor.ToFColor(true);
+  const FColor MovementColor = MovementHighlightColor.ToFColor(true);
+
+  HighlightCell(StartCell, SelectionColor, 0.f, false);
 
   TSet<FIntPoint> Visited;
   TQueue<TPair<FIntPoint, int32>> Frontier;
@@ -347,7 +566,7 @@ void UGridOverlayComponent::HighlightMovement(AFighterPawn *Fighter) {
     const int32 Distance = Node.Value;
 
     if (Distance > 0) {
-      HighlightCell(Cell, FColor::Green, 0.f, false);
+      HighlightCell(Cell, MovementColor, 0.f, false);
     }
 
     if (Distance >= Range) {
@@ -376,8 +595,13 @@ void UGridOverlayComponent::HighlightAttack(AFighterPawn *Fighter) {
 
   ClearHighlights();
 
-  FIntPoint StartCell = WorldToGrid(Fighter->GetActorLocation());
+  const FIntPoint StartCell = WorldToGrid(Fighter->GetActorLocation());
   const int32 Range = Fighter->Stats.AttackRange;
+
+  const FColor SelectionColor = SelectionHighlightColor.ToFColor(true);
+  const FColor AttackColor = AttackHighlightColor.ToFColor(true);
+
+  HighlightCell(StartCell, SelectionColor, 0.f, false);
 
   for (int32 Dy = -Range; Dy <= Range; ++Dy) {
     for (int32 Dx = -Range; Dx <= Range; ++Dx) {
@@ -390,7 +614,7 @@ void UGridOverlayComponent::HighlightAttack(AFighterPawn *Fighter) {
       }
 
       if (HasLineOfSight(StartCell, Target)) {
-        HighlightCell(Target, FColor::Red, 0.f, false);
+        HighlightCell(Target, AttackColor, 0.f, false);
       }
     }
   }
