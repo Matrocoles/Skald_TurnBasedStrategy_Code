@@ -58,6 +58,10 @@ public:
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Grid")
   bool IsObscured(const FIntPoint &GridCoord) const;
 
+  /** Check whether a grid coordinate is within the valid bounds of the grid. */
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Grid")
+  bool IsCellInBounds(const FIntPoint &GridCoord) const;
+
   /** Check if there is line of sight between two grid cells. */
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Grid")
   bool HasLineOfSight(const FIntPoint &Start, const FIntPoint &End) const;

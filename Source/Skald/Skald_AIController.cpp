@@ -293,7 +293,7 @@ int32 ASkaldAIController::ComputeManhattanDistance(UGridOverlayComponent *Grid,
 
   const FIntPoint CellA = Grid->WorldToGrid(A->GetActorLocation());
   const FIntPoint CellB = Grid->WorldToGrid(B->GetActorLocation());
-  if (!Grid->IsValidGrid(CellA) || !Grid->IsValidGrid(CellB)) {
+  if (!Grid->IsCellInBounds(CellA) || !Grid->IsCellInBounds(CellB)) {
     return TNumericLimits<int32>::Max();
   }
 
@@ -319,7 +319,7 @@ AFighterPawn *ASkaldAIController::FindNearestEnemy(AFighterPawn *Fighter) const 
   int32 BestDistance = TNumericLimits<int32>::Max();
 
   const FIntPoint StartCell = Grid->WorldToGrid(Fighter->GetActorLocation());
-  if (!Grid->IsValidGrid(StartCell)) {
+  if (!Grid->IsCellInBounds(StartCell)) {
     return nullptr;
   }
 
@@ -392,7 +392,7 @@ bool ASkaldAIController::TryAttackNearestEnemy(AFighterPawn *Fighter) {
 
   const FIntPoint SelfCell = Grid->WorldToGrid(Fighter->GetActorLocation());
   const FIntPoint TargetCell = Grid->WorldToGrid(Target->GetActorLocation());
-  if (!Grid->IsValidGrid(SelfCell) || !Grid->IsValidGrid(TargetCell)) {
+  if (!Grid->IsCellInBounds(SelfCell) || !Grid->IsCellInBounds(TargetCell)) {
     return false;
   }
 
@@ -428,7 +428,7 @@ bool ASkaldAIController::TryMoveTowardsNearestEnemy(AFighterPawn *Fighter) {
 
   const FIntPoint StartCell = Grid->WorldToGrid(Fighter->GetActorLocation());
   const FIntPoint EnemyCell = Grid->WorldToGrid(Enemy->GetActorLocation());
-  if (!Grid->IsValidGrid(StartCell) || !Grid->IsValidGrid(EnemyCell)) {
+  if (!Grid->IsCellInBounds(StartCell) || !Grid->IsCellInBounds(EnemyCell)) {
     return false;
   }
 
@@ -453,7 +453,7 @@ bool ASkaldAIController::TryMoveTowardsNearestEnemy(AFighterPawn *Fighter) {
     bool bMovedThisStep = false;
     for (const FIntPoint &Dir : Directions) {
       const FIntPoint Candidate = Current + Dir;
-      if (!Grid->IsValidGrid(Candidate) || Grid->IsOccupied(Candidate) ||
+      if (!Grid->IsCellInBounds(Candidate) || Grid->IsOccupied(Candidate) ||
           Grid->IsObscured(Candidate)) {
         continue;
       }
