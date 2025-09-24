@@ -1600,7 +1600,7 @@ void ASkaldPlayerController::SetupInputComponent() {
 }
 
 void ASkaldPlayerController::BeginMoveMode() {
-  if (!LockedActiveFighter)
+  if (!LockedActiveFighter || !IsFriendlyFighter(LockedActiveFighter))
     return;
   CurrentCommandMode = EBattleCommandMode::Move;
   if (UGridOverlayComponent *Grid = FindGridOverlay()) {
@@ -1609,7 +1609,7 @@ void ASkaldPlayerController::BeginMoveMode() {
 }
 
 void ASkaldPlayerController::BeginAttackMode() {
-  if (!LockedActiveFighter)
+  if (!LockedActiveFighter || !IsFriendlyFighter(LockedActiveFighter))
     return;
   CurrentCommandMode = EBattleCommandMode::Attack;
   if (UGridOverlayComponent *Grid = FindGridOverlay()) {
@@ -1646,6 +1646,10 @@ void ASkaldPlayerController::HandleGridClick() {
       CancelCommandMode();
       break;
     }
+    if (!IsFriendlyFighter(LockedActiveFighter)) {
+      CancelCommandMode();
+      break;
+    }
     const FVector Impact =
         Hit.bBlockingHit ? Hit.ImpactPoint : FVector::ZeroVector;
     const FIntPoint Cell = Grid->WorldToGrid(Impact);
@@ -1656,6 +1660,10 @@ void ASkaldPlayerController::HandleGridClick() {
   }
   case EBattleCommandMode::Attack: {
     if (!LockedActiveFighter) {
+      CancelCommandMode();
+      break;
+    }
+    if (!IsFriendlyFighter(LockedActiveFighter)) {
       CancelCommandMode();
       break;
     }
