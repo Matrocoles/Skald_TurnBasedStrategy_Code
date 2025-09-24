@@ -155,11 +155,11 @@ void UGridOverlayComponent::BeginPlay() {
   RebuildBaseGridInstances();
 
   if (PendingOccupancyUpdates.Num() > 0) {
-    const TArray<TPair<FIntPoint, bool>> OccupancyToApply =
+    const TArray<FPendingGridOccupancyUpdate> OccupancyToApply =
         PendingOccupancyUpdates;
     PendingOccupancyUpdates.Empty();
-    for (const TPair<FIntPoint, bool> &Update : OccupancyToApply) {
-      SetOccupied(Update.Key, Update.Value);
+    for (const FPendingGridOccupancyUpdate &Update : OccupancyToApply) {
+      SetOccupied(Update.GridCoord, Update.bOccupied);
     }
   }
 }
@@ -252,13 +252,13 @@ void UGridOverlayComponent::SetOccupied(const FIntPoint &GridCoord,
     return;
   }
   if (!bHasInitializedGrid) {
-    for (TPair<FIntPoint, bool> &Pending : PendingOccupancyUpdates) {
-      if (Pending.Key == GridCoord) {
-        Pending.Value = bOccupied;
+    for (FPendingGridOccupancyUpdate &Pending : PendingOccupancyUpdates) {
+      if (Pending.GridCoord == GridCoord) {
+        Pending.bOccupied = bOccupied;
         return;
       }
     }
-    PendingOccupancyUpdates.Add(TPair<FIntPoint, bool>(GridCoord, bOccupied));
+    PendingOccupancyUpdates.Add(FPendingGridOccupancyUpdate(GridCoord, bOccupied));
     return;
   }
 

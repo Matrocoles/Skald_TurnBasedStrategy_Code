@@ -3,7 +3,6 @@
 #include "Components/ActorComponent.h"
 #include "CoreMinimal.h"
 #include "GridBattleManager.h"
-#include "Templates/Pair.h"
 #include "GridOverlayComponent.generated.h"
 
 class AFighterPawn;
@@ -12,6 +11,22 @@ struct FHitResult;
 class UInstancedStaticMeshComponent;
 class UMaterialInterface;
 class UStaticMesh;
+
+USTRUCT()
+struct FPendingGridOccupancyUpdate {
+  GENERATED_BODY()
+
+  FPendingGridOccupancyUpdate() = default;
+
+  FPendingGridOccupancyUpdate(const FIntPoint &InGridCoord, bool bInOccupied)
+      : GridCoord(InGridCoord), bOccupied(bInOccupied) {}
+
+  UPROPERTY()
+  FIntPoint GridCoord = FIntPoint::ZeroValue;
+
+  UPROPERTY()
+  bool bOccupied = false;
+};
 
 /**
  * Component that tracks grid cell occupancy and provides world/grid conversion.
@@ -207,7 +222,7 @@ protected:
 
   /** Occupancy updates received before the grid initialises. */
   UPROPERTY(Transient)
-  TArray<TPair<FIntPoint, bool>> PendingOccupancyUpdates;
+  TArray<FPendingGridOccupancyUpdate> PendingOccupancyUpdates;
 
   /** Whether the grid has completed its initial world sampling. */
   bool bHasInitializedGrid = false;
