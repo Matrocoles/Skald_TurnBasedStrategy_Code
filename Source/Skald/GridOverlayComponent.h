@@ -3,6 +3,7 @@
 #include "Components/ActorComponent.h"
 #include "CoreMinimal.h"
 #include "GridBattleManager.h"
+#include "Templates/Pair.h"
 #include "GridOverlayComponent.generated.h"
 
 class AFighterPawn;
