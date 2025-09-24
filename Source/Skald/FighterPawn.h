@@ -8,6 +8,7 @@
 #include "FighterPawn.generated.h"
 
 class UGridOverlayComponent;
+class UCapsuleComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHealthChanged, int32, NewHealth);
 
@@ -19,6 +20,7 @@ class SKALD_API AFighterPawn : public APawn {
 public:
   AFighterPawn();
 
+  virtual void OnConstruction(const FTransform &Transform) override;
   virtual void BeginPlay() override;
   virtual void GetLifetimeReplicatedProps(
       TArray<FLifetimeProperty> &OutLifetimeProps) const override;
@@ -60,6 +62,11 @@ public:
   UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
   UStaticMeshComponent *DisplayMesh;
 
+  /** Collision capsule used for movement and placement. */
+  UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter",
+            meta = (AllowPrivateAccess = "true"))
+  UCapsuleComponent *CollisionComponent;
+
   /** Widget displaying the current health. */
   UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|UI")
   UWidgetComponent *HealthWidget;
@@ -91,6 +98,9 @@ private:
 
   /** Retrieve or create a damage widget from the pool. */
   UUserWidget *GetDamageWidgetFromPool();
+
+  /** Align the visible mesh with the collision capsule. */
+  void UpdateMeshOffset();
 
   /** Pool of reusable damage widgets to avoid repeated allocations. */
   UPROPERTY()
