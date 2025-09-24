@@ -8,6 +8,9 @@
 class AFighterPawn;
 class UGridObstacleComponent;
 struct FHitResult;
+class UInstancedStaticMeshComponent;
+class UMaterialInterface;
+class UStaticMesh;
 
 /**
  * Component that tracks grid cell occupancy and provides world/grid conversion.
@@ -20,6 +23,7 @@ class SKALD_API UGridOverlayComponent : public UActorComponent {
 public:
   UGridOverlayComponent();
 
+  virtual void OnRegister() override;
   virtual void BeginPlay() override;
 
   /** Convert a world location to grid coordinates. */
@@ -53,7 +57,7 @@ public:
   /** Draw a debug highlight box for a grid cell. */
   UFUNCTION(BlueprintCallable, Category = "Grid")
   void HighlightCell(const FIntPoint &GridCoord, const FColor &Color,
-                     float Duration = 0.f, bool bPersistent = false) const;
+                     float Duration = 0.f, bool bPersistent = false);
 
   /** Highlight all reachable movement cells for the fighter. */
   UFUNCTION(BlueprintCallable, Category = "Grid")
@@ -65,7 +69,7 @@ public:
 
   /** Remove any persistent highlights. */
   UFUNCTION(BlueprintCallable, Category = "Grid")
-    void ClearHighlights() const;
+  void ClearHighlights();
 
     /** Register an obstacle component so it can affect grid behaviour. */
     UFUNCTION(BlueprintCallable, Category = "Grid")
@@ -83,6 +87,18 @@ public:
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Landscape",
             meta = (EditCondition = "bTreatLandscapeAsObstacle"))
   float LandscapeSlopeThreshold = 45.f;
+
+  /** Mesh used for highlighting grid cells. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Grid|Highlight")
+  UStaticMesh *HighlightMesh = nullptr;
+
+  /** Material applied to the highlight mesh instances. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Grid|Highlight")
+  UMaterialInterface *HighlightMaterial = nullptr;
+
+  /** Vertical offset applied to highlight instances. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Highlight")
+  float HighlightHeightOffset = 2.f;
 
 protected:
   /** Width of the grid in cells. */
@@ -112,17 +128,31 @@ protected:
   UPROPERTY()
   TArray<float> CellHeights;
 
+  /** Instanced mesh component used to render highlight quads. */
+  UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Grid|Highlight")
+  UInstancedStaticMeshComponent *HighlightMeshComponent = nullptr;
+
+  /** Map grid coordinates to highlight instance indices for updates. */
+  UPROPERTY(Transient)
+  TMap<FIntPoint, int32> HighlightedInstances;
+
   /** Get linear array index for a grid coordinate. */
   int32 Index(const FIntPoint &GridCoord) const;
 
   /** Check whether grid coordinate is inside bounds. */
-    bool IsValidGrid(const FIntPoint &GridCoord) const;
+  bool IsValidGrid(const FIntPoint &GridCoord) const;
 
-    /** Obstacles currently registered with this grid. */
-    UPROPERTY()
-    TArray<UGridObstacleComponent *> Obstacles;
+  /** Obstacles currently registered with this grid. */
+  UPROPERTY()
+  TArray<UGridObstacleComponent *> Obstacles;
 
-    /** Process a landscape hit to potentially flag a cell as blocked. */
-    void HandleLandscapeHit(const FHitResult &Hit, const FIntPoint &Cell,
-                            int32 CellIndex);
+  /** Process a landscape hit to potentially flag a cell as blocked. */
+  void HandleLandscapeHit(const FHitResult &Hit, const FIntPoint &Cell,
+                          int32 CellIndex);
+
+  /** Ensure the instanced highlight component is ready for use. */
+  bool EnsureHighlightComponentSetup();
+
+  /** Apply highlight color as per-instance custom data. */
+  void ApplyHighlightColor(int32 InstanceIndex, const FLinearColor &Color);
 };
