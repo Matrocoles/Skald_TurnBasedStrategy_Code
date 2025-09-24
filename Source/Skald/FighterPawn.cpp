@@ -1,7 +1,9 @@
 #include "FighterPawn.h"
 #include "Blueprint/UserWidget.h"
+#include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextBlock.h"
+#include "Engine/CollisionProfile.h"
 #include "EngineUtils.h"
 #include "GridBattleManager.h"
 #include "GridOverlayComponent.h"
@@ -15,15 +17,26 @@ AFighterPawn::AFighterPawn() {
   bReplicates = true;
   SetReplicateMovement(true);
 
+  CollisionComponent =
+      CreateDefaultSubobject<UCapsuleComponent>(TEXT("CollisionComponent"));
+  CollisionComponent->InitCapsuleSize(40.f, 88.f);
+  CollisionComponent->SetCollisionProfileName(
+      UCollisionProfile::Pawn_ProfileName);
+  CollisionComponent->SetCanEverAffectNavigation(false);
+  RootComponent = CollisionComponent;
+
   DisplayMesh =
       CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DisplayMesh"));
-  RootComponent = DisplayMesh;
+  DisplayMesh->SetupAttachment(CollisionComponent);
+  DisplayMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
   HealthWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthWidget"));
   HealthWidget->SetupAttachment(DisplayMesh);
 
   ActionsRemaining = 0;
   CurrentCell = FIntPoint::ZeroValue;
+
+  UpdateMeshOffset();
 }
 
 void AFighterPawn::GetLifetimeReplicatedProps(
@@ -33,6 +46,11 @@ void AFighterPawn::GetLifetimeReplicatedProps(
   DOREPLIFETIME(AFighterPawn, Stats);
   DOREPLIFETIME(AFighterPawn, bIsAttacker);
   DOREPLIFETIME(AFighterPawn, ActionsRemaining);
+}
+
+void AFighterPawn::OnConstruction(const FTransform &Transform) {
+  Super::OnConstruction(Transform);
+  UpdateMeshOffset();
 }
 
 void AFighterPawn::BeginPlay() {
@@ -45,8 +63,13 @@ void AFighterPawn::BeginPlay() {
   OnHealthChanged.AddDynamic(this, &AFighterPawn::UpdateHealthDisplay);
   OnHealthChanged.Broadcast(Stats.Health);
 
+  UpdateMeshOffset();
+
   if (UGridOverlayComponent *Grid = GetGrid()) {
     CurrentCell = Grid->WorldToGrid(GetActorLocation());
+    FVector AlignedLocation = Grid->GridToWorld(CurrentCell);
+    AlignedLocation.Z += GetSimpleCollisionHalfHeight();
+    SetActorLocation(AlignedLocation);
     Grid->SetOccupied(CurrentCell, true);
   }
 
@@ -113,7 +136,7 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
   FVector NewLocation = GetActorLocation();
   if (Grid) {
     NewLocation = Grid->GridToWorld(TargetCell);
-    NewLocation.Z = Grid->GetCellHeight(TargetCell);
+    NewLocation.Z += GetSimpleCollisionHalfHeight();
   }
   SetActorLocation(NewLocation);
   ActionsRemaining -= Distance;
@@ -218,6 +241,13 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
 
   if (Grid) {
     Grid->ClearHighlights();
+  }
+}
+
+void AFighterPawn::UpdateMeshOffset() {
+  if (DisplayMesh && CollisionComponent) {
+    const float HalfHeight = CollisionComponent->GetUnscaledCapsuleHalfHeight();
+    DisplayMesh->SetRelativeLocation(FVector(0.f, 0.f, -HalfHeight));
   }
 }
 

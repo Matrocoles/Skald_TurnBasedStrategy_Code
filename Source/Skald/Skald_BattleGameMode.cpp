@@ -938,11 +938,6 @@ void ASkald_BattleGameMode::SpawnFighterSide(const TArray<FFighterDefinition> &R
     Cell.X = bAsAttacker ? GI->CombatRandomStream.RandRange(0, Edge - 1)
                          : GI->CombatRandomStream.RandRange(MaxX - (Edge - 1), MaxX);
 
-    const FVector SpawnLoc = Grid ? Grid->GridToWorld(Cell) : FVector::ZeroVector;
-    FActorSpawnParameters Params;
-    Params.SpawnCollisionHandlingOverride =
-        ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-
     UClass *DesiredClass = AFighterPawn::StaticClass();
     if (UClass *SelectedClass = Def.MeshClass.Get()) {
       if (SelectedClass->IsChildOf(AFighterPawn::StaticClass())) {
@@ -955,9 +950,25 @@ void ASkald_BattleGameMode::SpawnFighterSide(const TArray<FFighterDefinition> &R
       }
     }
 
+    const FVector BaseSpawnLoc =
+        Grid ? Grid->GridToWorld(Cell) : FVector::ZeroVector;
+    FVector SpawnLoc = BaseSpawnLoc;
+    if (const AFighterPawn *DefaultPawn =
+            DesiredClass->GetDefaultObject<AFighterPawn>()) {
+      SpawnLoc.Z += DefaultPawn->GetSimpleCollisionHalfHeight();
+    }
+    FActorSpawnParameters Params;
+    Params.SpawnCollisionHandlingOverride =
+        ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+
     AFighterPawn *Pawn = GetWorld()->SpawnActor<AFighterPawn>(
         DesiredClass, SpawnLoc, FRotator::ZeroRotator, Params);
     if (Pawn) {
+      if (Grid) {
+        FVector AdjustedLocation = BaseSpawnLoc;
+        AdjustedLocation.Z += Pawn->GetSimpleCollisionHalfHeight();
+        Pawn->SetActorLocation(AdjustedLocation);
+      }
       Pawn->Stats = Def.Stats;
       Pawn->bIsAttacker = bAsAttacker;
       BattleManager->RegisterFighter(Pawn, bAsAttacker);
