@@ -1,7 +1,6 @@
 #include "UI/DeployWidget.h"
 #include "Components/Button.h"
 #include "Components/SpinBox.h"
-#include "Skald_GameMode.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
 #include "SkaldTypes.h"
@@ -68,20 +67,6 @@ void UDeployWidget::HandleAccept() {
     const int32 Remaining = PlayerState->DeployableUnits - Selected;
     if (Remaining <= 0 && OwningHUD->DeployButton) {
       OwningHUD->DeployButton->SetVisibility(ESlateVisibility::Collapsed);
-      bool bHandled = false;
-      if (ASkaldGameMode *GM =
-              OwningHUD->GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
-        if (TurnManager &&
-            TurnManager->GetCurrentPhase() == ETurnPhase::ArmyPlacement) {
-          GM->AdvanceArmyPlacement();
-          bHandled = true;
-        }
-      }
-      if (!bHandled) {
-        if (TurnManager) {
-          TurnManager->AdvancePhase();
-        }
-      }
     }
   }
 
