@@ -61,7 +61,12 @@ void ASkaldGameState::RemovePlayerState(APlayerState* PlayerState)
 
 ASkaldPlayerState* ASkaldGameState::GetCurrentPlayer() const
 {
-    return Players.IsValidIndex(CurrentTurnIndex) ? Players[CurrentTurnIndex] : nullptr;
+    if (!PlayerArray.IsValidIndex(CurrentTurnIndex))
+    {
+        return nullptr;
+    }
+
+    return Cast<ASkaldPlayerState>(PlayerArray[CurrentTurnIndex]);
 }
 
 ASkaldPlayerState* ASkaldGameState::GetPlayerById(int32 PlayerID) const
@@ -106,14 +111,16 @@ void ASkaldGameState::OnRep_BattleSummary()
 
 void ASkaldGameState::ClampTurnIndex()
 {
-    if (Players.Num() == 0)
+    const int32 PlayerCount = PlayerArray.Num();
+    if (PlayerCount == 0)
     {
         CurrentTurnIndex = 0;
         return;
     }
-    if (CurrentTurnIndex < 0 || CurrentTurnIndex >= Players.Num())
+
+    if (CurrentTurnIndex < 0 || CurrentTurnIndex >= PlayerCount)
     {
-        CurrentTurnIndex = FMath::Clamp(CurrentTurnIndex, 0, FMath::Max(0, Players.Num() - 1));
+        CurrentTurnIndex = FMath::Clamp(CurrentTurnIndex, 0, FMath::Max(0, PlayerCount - 1));
     }
 }
 

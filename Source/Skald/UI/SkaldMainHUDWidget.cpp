@@ -675,7 +675,7 @@ void USkaldMainHUDWidget::HandleTurnIndexChanged(int32 /*NewTurnIndex*/) {
       NewPlayerID = PS->GetPlayerId();
     }
 
-    const int32 PlayerCount = GameState->Players.Num();
+    const int32 PlayerCount = GameState->PlayerArray.Num();
     if (PlayerCount > 0) {
       NewTurnNumber = GameState->CurrentTurnIndex / PlayerCount + 1;
     }
