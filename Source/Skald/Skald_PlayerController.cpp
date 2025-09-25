@@ -1813,7 +1813,6 @@ void ASkaldPlayerController::HandleGridClick() {
 
     if (IsValidEnemyTarget(TargetPawn)) {
       CellFighter = TargetPawn;
-      Cell = TargetCell;
       LockedActiveFighter->PerformAttack(TargetPawn);
     }
     CancelCommandMode();
