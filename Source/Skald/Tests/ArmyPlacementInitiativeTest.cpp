@@ -10,6 +10,20 @@
 #include "UObject/UnrealType.h"
 #include "WorldMap.h"
 
+struct FSkaldGameModeAutomationAccessor {
+  static void BeginArmyPlacementPhase(ASkaldGameMode *GameMode) {
+    if (GameMode) {
+      GameMode->BeginArmyPlacementPhase();
+    }
+  }
+
+  static void HandleArmyPlacementFailsafe(ASkaldGameMode *GameMode) {
+    if (GameMode) {
+      GameMode->HandleArmyPlacementFailsafe();
+    }
+  }
+};
+
 namespace {
 void SetObjectProperty(UObject *Target, const TCHAR *PropertyName, UObject *Value) {
   if (!Target) {
@@ -120,7 +134,7 @@ bool FArmyPlacementInitiativeOrderTest::RunTest(const FString &Parameters) {
   TurnManager->RegisterController(ControllerA);
   TurnManager->RegisterController(ControllerB);
 
-  GameMode->BeginArmyPlacementPhase();
+  FSkaldGameModeAutomationAccessor::BeginArmyPlacementPhase(GameMode);
 
   const int32 IndexA = GameState->PlayerArray.IndexOfByKey(StateA);
   const int32 IndexB = GameState->PlayerArray.IndexOfByKey(StateB);
@@ -220,7 +234,7 @@ bool FAIArmyPlacementAutoAdvanceTest::RunTest(const FString &Parameters) {
   TurnManager->RegisterController(AIController);
   TurnManager->RegisterController(HumanController);
 
-  GameMode->BeginArmyPlacementPhase();
+  FSkaldGameModeAutomationAccessor::BeginArmyPlacementPhase(GameMode);
 
   const int32 HumanIndex = GameState->PlayerArray.IndexOfByKey(HumanState);
   TestTrue(TEXT("Human player index valid"), HumanIndex != INDEX_NONE);
@@ -314,7 +328,7 @@ bool FAIArmyPlacementFailsafeRespectsHumanTest::RunTest(
   TurnManager->RegisterController(AIController);
   TurnManager->RegisterController(HumanController);
 
-  GameMode->BeginArmyPlacementPhase();
+  FSkaldGameModeAutomationAccessor::BeginArmyPlacementPhase(GameMode);
 
   const int32 HumanIndex = GameState->PlayerArray.IndexOfByKey(HumanState);
   TestTrue(TEXT("Human player index valid"), HumanIndex != INDEX_NONE);
@@ -323,7 +337,7 @@ bool FAIArmyPlacementFailsafeRespectsHumanTest::RunTest(
   TestEqual(TEXT("Army placement phase active"), TurnManager->GetCurrentPhase(),
             ETurnPhase::ArmyPlacement);
 
-  GameMode->HandleArmyPlacementFailsafe();
+  FSkaldGameModeAutomationAccessor::HandleArmyPlacementFailsafe(GameMode);
 
   TestEqual(TEXT("Failsafe does not skip human"), GameState->CurrentTurnIndex,
             HumanIndex);
