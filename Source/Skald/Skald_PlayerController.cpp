@@ -1839,7 +1839,8 @@ void ASkaldPlayerController::HandleEndTurnPressed() {
          TEXT("[BattleHUD] Finishing activation for %s (Round=%d, AttackerTurn=%s)"),
          *LockedActiveFighter->GetHumanReadableName(), RoundNumber,
          bAttackerTurn ? TEXT("true") : TEXT("false"));
-  CachedGameInstance->GridBattleManager->FinishActivation(LockedActiveFighter);
+  CachedGameInstance->GridBattleManager->FinishActivation(
+      LockedActiveFighter, EGridActivationFinishReason::Manual);
   LockedActiveFighter = nullptr;
   UpdateBattleHUDButtons();
   CancelCommandMode();

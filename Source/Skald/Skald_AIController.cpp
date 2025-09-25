@@ -507,7 +507,7 @@ void ASkaldAIController::ExecuteActivationForFighter(AFighterPawn *Fighter) {
   }
 
   if (CachedBattleManager.IsValid()) {
-    CachedBattleManager->FinishActivation(Fighter);
+    CachedBattleManager->FinishActivation(Fighter, EGridActivationFinishReason::Auto);
   }
 }
 

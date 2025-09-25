@@ -104,7 +104,14 @@ struct FFighter
  * described in the design. It focuses on dice rolling and turn order
  * logic, leaving visuals and detailed rules to Blueprints or future
  * work.
- */
+*/
+UENUM()
+enum class EGridActivationFinishReason : uint8
+{
+    Manual,
+    Auto
+};
+
 UCLASS(Blueprintable)
 class SKALD_API UGridBattleManager : public UObject
 {
@@ -148,7 +155,7 @@ public:
 
     /** Complete the active fighter's activation and rotate the turn. */
     UFUNCTION(BlueprintCallable, Category="Battle")
-    void FinishActivation(AFighterPawn* Fighter);
+    void FinishActivation(AFighterPawn* Fighter, EGridActivationFinishReason Reason = EGridActivationFinishReason::Auto);
 
     /** Conclude the battle and broadcast the results. */
     UFUNCTION(BlueprintCallable, Category="Battle")
@@ -263,6 +270,7 @@ protected:
 private:
     bool HasLivingFighters(bool bForAttackers) const;
     bool HasAvailableFighters(bool bForAttackers) const;
+    bool IsSideAIControlled(bool bForAttackers) const;
     void EvaluateRoundProgress(bool bPreviousWasAttacker);
     void ClearInactiveFighters();
 
