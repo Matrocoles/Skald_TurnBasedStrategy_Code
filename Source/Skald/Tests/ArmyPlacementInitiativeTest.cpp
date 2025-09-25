@@ -245,6 +245,102 @@ bool FAIArmyPlacementAutoAdvanceTest::RunTest(const FString &Parameters) {
   return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAIArmyPlacementFailsafeRespectsHumanTest,
+                                 "Skald.Turn.ArmyPlacement.FailsafeRespectsHuman",
+                                 EAutomationTestFlags::EditorContext |
+                                     EAutomationTestFlags::EngineFilter)
+
+bool FAIArmyPlacementFailsafeRespectsHumanTest::RunTest(
+    const FString &Parameters) {
+  UWorld *World = FAutomationEditorCommonUtils::CreateNewMap();
+  TestNotNull(TEXT("World created"), World);
+  if (!World) {
+    return false;
+  }
+
+  ASkaldGameMode *GameMode = World->SpawnActor<ASkaldGameMode>();
+  ATurnManager *TurnManager = World->SpawnActor<ATurnManager>();
+  AWorldMap *Map = World->SpawnActor<AWorldMap>();
+  ATerritory *TerritoryAI = World->SpawnActor<ATerritory>();
+  ATerritory *TerritoryHuman = World->SpawnActor<ATerritory>();
+  ASkaldAIController *AIController = World->SpawnActor<ASkaldAIController>();
+  ASkaldPlayerController *HumanController =
+      World->SpawnActor<ASkaldPlayerController>();
+  ASkaldPlayerState *AIState = World->SpawnActor<ASkaldPlayerState>();
+  ASkaldPlayerState *HumanState = World->SpawnActor<ASkaldPlayerState>();
+
+  TestNotNull(TEXT("GameMode"), GameMode);
+  TestNotNull(TEXT("TurnManager"), TurnManager);
+  TestNotNull(TEXT("WorldMap"), Map);
+  TestNotNull(TEXT("AI Territory"), TerritoryAI);
+  TestNotNull(TEXT("Human Territory"), TerritoryHuman);
+  TestNotNull(TEXT("AI Controller"), AIController);
+  TestNotNull(TEXT("Human Controller"), HumanController);
+  TestNotNull(TEXT("AI State"), AIState);
+  TestNotNull(TEXT("Human State"), HumanState);
+  if (!GameMode || !TurnManager || !Map || !TerritoryAI || !TerritoryHuman ||
+      !AIController || !HumanController || !AIState || !HumanState) {
+    return false;
+  }
+
+  AttachGameModeToWorld(World, GameMode);
+  GameMode->InitGameState();
+  ASkaldGameState *GameState = GameMode->GetGameState<ASkaldGameState>();
+  TestNotNull(TEXT("GameState initialised"), GameState);
+  if (!GameState) {
+    return false;
+  }
+
+  ConfigureController(AIController, AIState, 1, TEXT("AI"), 6);
+  ConfigureController(HumanController, HumanState, 2, TEXT("Human"), 3);
+  AIState->bIsAI = true;
+  GameState->AddPlayerState(AIState);
+  GameState->AddPlayerState(HumanState);
+
+  TerritoryAI->TerritoryID = 1;
+  TerritoryAI->OwningPlayer = AIState;
+  TerritoryAI->ArmyUnits = 1;
+  TerritoryHuman->TerritoryID = 2;
+  TerritoryHuman->OwningPlayer = HumanState;
+  TerritoryHuman->ArmyUnits = 1;
+  Map->Territories = {TerritoryAI, TerritoryHuman};
+
+  SetObjectProperty(GameMode, TEXT("TurnManager"), TurnManager);
+  SetObjectProperty(GameMode, TEXT("WorldMap"), Map);
+  SetObjectProperty(TurnManager, TEXT("CachedWorldMap"), Map);
+  SetObjectProperty(AIController, TEXT("CachedGameMode"), GameMode);
+  SetObjectProperty(HumanController, TEXT("CachedGameMode"), GameMode);
+
+  TurnManager->RegisterController(AIController);
+  TurnManager->RegisterController(HumanController);
+
+  GameMode->BeginArmyPlacementPhase();
+
+  const int32 HumanIndex = GameState->PlayerArray.IndexOfByKey(HumanState);
+  TestTrue(TEXT("Human player index valid"), HumanIndex != INDEX_NONE);
+  TestEqual(TEXT("Human receives placement turn"), GameState->CurrentTurnIndex,
+            HumanIndex);
+  TestEqual(TEXT("Army placement phase active"), TurnManager->GetCurrentPhase(),
+            ETurnPhase::ArmyPlacement);
+
+  GameMode->HandleArmyPlacementFailsafe();
+
+  TestEqual(TEXT("Failsafe does not skip human"), GameState->CurrentTurnIndex,
+            HumanIndex);
+  TestEqual(TEXT("Phase unchanged after failsafe"),
+            TurnManager->GetCurrentPhase(), ETurnPhase::ArmyPlacement);
+  TestEqual(TEXT("Human still has units to place"), HumanState->DeployableUnits,
+            1);
+
+  HumanController->ServerDeployUnits(TerritoryHuman->TerritoryID, 1);
+  HumanController->EndPhase();
+
+  TestEqual(TEXT("Turns advance after human finishes"),
+            TurnManager->GetCurrentPhase(), ETurnPhase::Reinforcement);
+
+  return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FInitializeWorldSingleInitiativeRollTest,
                                  "Skald.Turn.ArmyPlacement.SingleInitiativeRoll",
                                  EAutomationTestFlags::EditorContext |
