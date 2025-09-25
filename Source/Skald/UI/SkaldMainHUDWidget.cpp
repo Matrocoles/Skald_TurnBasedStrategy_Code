@@ -210,8 +210,13 @@ void USkaldMainHUDWidget::UpdateTerritoryInfo(const FString &TerritoryName,
   BP_SetTerritoryPanel(TerritoryName, OwnerName, ArmyCount);
 
   // Keep Deploy button visibility in sync with current selection ownership.
-  const bool bIsMyTurn = (CurrentPlayerID != -1 &&
-                          LocalPlayerID != -1 &&
+  if (LocalPlayerID == -1) {
+    const int32 ResolvedLocalId = ResolveLocalPlayerId();
+    if (ResolvedLocalId != -1) {
+      LocalPlayerID = ResolvedLocalId;
+    }
+  }
+  const bool bIsMyTurn = (CurrentPlayerID != -1 && LocalPlayerID != -1 &&
                           CurrentPlayerID == LocalPlayerID);
 
   if (DeployButton && (CurrentPhase == ETurnPhase::Reinforcement ||
@@ -584,8 +589,16 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
              CurrentPhase == ETurnPhase::ArmyPlacement) {
     SelectedSourceID = Territory->TerritoryID;
     if (DeployButton) {
-      const bool bIsMyTurn = (CurrentPlayerID != -1 && LocalPlayerID != -1 &&
-                              CurrentPlayerID == LocalPlayerID);
+      int32 EffectiveLocalPlayerId = LocalPlayerID;
+      if (EffectiveLocalPlayerId == -1) {
+        EffectiveLocalPlayerId = ResolveLocalPlayerId();
+        if (EffectiveLocalPlayerId != -1) {
+          LocalPlayerID = EffectiveLocalPlayerId;
+        }
+      }
+      const bool bIsMyTurn =
+          (CurrentPlayerID != -1 && EffectiveLocalPlayerId != -1 &&
+           CurrentPlayerID == EffectiveLocalPlayerId);
       const bool bShouldShowDeploy = bIsMyTurn && bOwnedByLocal;
       DeployButton->SetVisibility(
           bShouldShowDeploy ? ESlateVisibility::Visible
