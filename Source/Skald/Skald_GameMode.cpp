@@ -1202,6 +1202,20 @@ void ASkaldGameMode::HandleArmyPlacementFailsafe() {
     return;
   }
 
+  // If a human player is currently placing armies, allow them to finish rather
+  // than force-advancing into the main turn sequence. The failsafe should only
+  // trip when an AI controller stalls during placement.
+  if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
+    if (GS->PlayerArray.IsValidIndex(GS->CurrentTurnIndex)) {
+      if (ASkaldPlayerState *ActivePS =
+              Cast<ASkaldPlayerState>(GS->PlayerArray[GS->CurrentTurnIndex])) {
+        if (!ActivePS->bIsAI) {
+          return;
+        }
+      }
+    }
+  }
+
   if (!bArmyPlacementFailsafeTriggered) {
     UE_LOG(LogSkald, Warning,
            TEXT("Army placement failsafe triggered; forcing EndCurrentPhase"));

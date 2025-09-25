@@ -28,13 +28,6 @@ constexpr int32 MaxAIIterations = 100;
 void ASkaldAIController::BeginPlay() {
   Super::BeginPlay();
 
-  if (UWorld *World = GetWorld()) {
-    if (ASkald_BattleGameMode *BattleGM =
-            World->GetAuthGameMode<ASkald_BattleGameMode>()) {
-      BattleGM->OnControllerReady(this);
-    }
-  }
-
   SetupBattleAutomation();
 }
 
@@ -62,6 +55,7 @@ void ASkaldAIController::MakeAIDecision() {
   ETurnPhase Phase = TurnManager->GetCurrentPhase();
   int32 IterationCount = 0;
   while (Phase != ETurnPhase::Revolt && IterationCount++ < MaxAIIterations) {
+    bool bAwaitingBattleTransition = false;
     const ETurnPhase PrevPhase = Phase;
 
     if (Phase == ETurnPhase::ArmyPlacement) {
@@ -115,9 +109,17 @@ void ASkaldAIController::MakeAIDecision() {
         const int32 ArmySent = BestSource->ArmyUnits - 1;
         HandleAttackRequested(BestSource->TerritoryID, BestTarget->TerritoryID,
                               ArmySent, false);
+
+        if (const USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+          if (GI->bTravelPending) {
+            bAwaitingBattleTransition = true;
+          }
+        }
       }
 
-      TurnManager->AdvancePhase();
+      if (!bAwaitingBattleTransition) {
+        TurnManager->AdvancePhase();
+      }
     } else if (Phase == ETurnPhase::Engineering ||
                Phase == ETurnPhase::Treasure) {
       TurnManager->AdvancePhase();
@@ -162,6 +164,12 @@ void ASkaldAIController::MakeAIDecision() {
     }
 
     Phase = TurnManager->GetCurrentPhase();
+
+    if (bAwaitingBattleTransition) {
+      UE_LOG(LogSkald, Log,
+             TEXT("MakeAIDecision deferring while battle travel is pending"));
+      break;
+    }
     if (Phase == PrevPhase) {
       UE_LOG(LogSkald, Warning,
              TEXT("MakeAIDecision phase %s did not advance; breaking"),
