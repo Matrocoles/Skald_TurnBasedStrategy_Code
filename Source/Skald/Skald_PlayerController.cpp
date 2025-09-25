@@ -718,6 +718,19 @@ UGridOverlayComponent *ASkaldPlayerController::FindGridOverlay() const {
   return nullptr;
 }
 
+AFighterPawn *ASkaldPlayerController::FindFighterAtCell(
+    const FIntPoint &Cell) const {
+  if (UWorld *World = GetWorld()) {
+    for (TActorIterator<AFighterPawn> It(World); It; ++It) {
+      AFighterPawn *Fighter = *It;
+      if (Fighter && Fighter->GetCurrentCell() == Cell) {
+        return Fighter;
+      }
+    }
+  }
+  return nullptr;
+}
+
 void ASkaldPlayerController::HandleActiveFighterChanged(
     AFighterPawn *NewFighter) {
   if (NewFighter && NewFighter->IsAlive()) {
@@ -1653,6 +1666,10 @@ void ASkaldPlayerController::HandleGridClick() {
   if (!IsLocalController())
     return;
 
+  if (UWidgetBlueprintLibrary::IsCursorOverInteractableWidget()) {
+    return;
+  }
+
   // Non-battle map handling
   FHitResult Hit;
   if (!bIsBattleMap) {
@@ -1666,11 +1683,21 @@ void ASkaldPlayerController::HandleGridClick() {
   }
 
   // Get active fighter
-  GetHitResultUnderCursor(ECC_Visibility, /*bTraceComplex*/ false, Hit);
+  if (!GetHitResultUnderCursor(ECC_Visibility, /*bTraceComplex*/ false, Hit)) {
+    return;
+  }
 
   UGridOverlayComponent *Grid = FindGridOverlay();
   if (!Grid)
     return;
+
+  const FVector WorldLocation = Hit.bBlockingHit ? Hit.ImpactPoint : Hit.Location;
+  const FIntPoint Cell = Grid->WorldToGrid(WorldLocation);
+  if (!Grid->IsCellInBounds(Cell)) {
+    return;
+  }
+
+  AFighterPawn *CellFighter = FindFighterAtCell(Cell);
 
   switch (CurrentCommandMode) {
   case EBattleCommandMode::Move: {
@@ -1682,9 +1709,6 @@ void ASkaldPlayerController::HandleGridClick() {
       CancelCommandMode();
       break;
     }
-    const FVector Impact =
-        Hit.bBlockingHit ? Hit.ImpactPoint : FVector::ZeroVector;
-    const FIntPoint Cell = Grid->WorldToGrid(Impact);
     LockedActiveFighter->MoveToCell(Cell);
     CancelCommandMode();
     UpdateBattleHUDButtons();
@@ -1699,7 +1723,7 @@ void ASkaldPlayerController::HandleGridClick() {
       CancelCommandMode();
       break;
     }
-    AFighterPawn *TargetPawn = Cast<AFighterPawn>(Hit.GetActor());
+    AFighterPawn *TargetPawn = CellFighter;
     if (TargetPawn && TargetPawn != LockedActiveFighter && TargetPawn->IsAlive() &&
         !IsFriendlyFighter(TargetPawn)) {
       LockedActiveFighter->PerformAttack(TargetPawn);
@@ -1716,14 +1740,13 @@ void ASkaldPlayerController::HandleGridClick() {
     return;
   }
 
-  AFighterPawn *ClickedPawn = Cast<AFighterPawn>(Hit.GetActor());
-  if (ClickedPawn && ClickedPawn->IsAlive()) {
-    if (LockedActiveFighter && LockedActiveFighter != ClickedPawn) {
+  if (CellFighter && CellFighter->IsAlive()) {
+    if (LockedActiveFighter && LockedActiveFighter != CellFighter) {
       return;
     }
 
-    if (IsFriendlyFighter(ClickedPawn)) {
-      SetSelectedFighter(ClickedPawn);
+    if (IsFriendlyFighter(CellFighter)) {
+      SetSelectedFighter(CellFighter);
       UpdateBattleHUDButtons();
     } else if (!LockedActiveFighter) {
       ClearSelectedFighter();

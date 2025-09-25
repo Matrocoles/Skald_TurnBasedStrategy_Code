@@ -152,6 +152,8 @@ UGridOverlayComponent *AFighterPawn::GetGrid() {
   return CachedGrid;
 }
 
+FIntPoint AFighterPawn::GetCurrentCell() const { return CurrentCell; }
+
 UUserWidget *AFighterPawn::GetDamageWidgetFromPool() {
   for (UUserWidget *Widget : DamageWidgetPool) {
     if (Widget && !Widget->IsInViewport()) {

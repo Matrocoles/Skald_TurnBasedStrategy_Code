@@ -54,6 +54,9 @@ public:
   /** Get the grid overlay component, caching the result. */
   UGridOverlayComponent *GetGrid();
 
+  /** Retrieve the grid cell currently occupied by this fighter. */
+  FIntPoint GetCurrentCell() const;
+
   /** Statistics describing this fighter. */
   UPROPERTY(BlueprintReadWrite, EditAnywhere, ReplicatedUsing = OnRep_Stats,
             Category = "Fighter")
