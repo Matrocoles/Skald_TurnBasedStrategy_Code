@@ -10,6 +10,7 @@
 #include "Net/UnrealNetwork.h"
 #include "Skald_GameInstance.h"
 #include "TimerManager.h"
+#include "UObject/ConstructorHelpers.h"
 
 namespace
 {
@@ -37,6 +38,19 @@ AFighterPawn::AFighterPawn() {
 
   HealthWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthWidget"));
   HealthWidget->SetupAttachment(DisplayMesh);
+  HealthWidget->SetTwoSided(true);
+
+  static ConstructorHelpers::FClassFinder<UUserWidget> HealthWidgetFinder(
+      TEXT("/Game/Blueprints/UI/WBP_FighterHealth"));
+  if (HealthWidgetFinder.Succeeded()) {
+    HealthWidgetTemplate = HealthWidgetFinder.Class;
+  }
+
+  static ConstructorHelpers::FClassFinder<UUserWidget> DamageWidgetFinder(
+      TEXT("/Game/Blueprints/UI/WBP_DamageFloat"));
+  if (DamageWidgetFinder.Succeeded()) {
+    DamageFloatWidgetTemplate = DamageWidgetFinder.Class;
+  }
 
   ActionsRemaining = 0;
   bHasActivatedThisRound = false;
