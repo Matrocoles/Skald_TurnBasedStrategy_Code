@@ -583,8 +583,14 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
   } else if (CurrentPhase == ETurnPhase::Reinforcement ||
              CurrentPhase == ETurnPhase::ArmyPlacement) {
     SelectedSourceID = Territory->TerritoryID;
-    if (bOwnedByLocal && DeployButton) {
-      DeployButton->SetVisibility(ESlateVisibility::Visible);
+    if (DeployButton) {
+      const bool bIsMyTurn = (CurrentPlayerID != -1 && LocalPlayerID != -1 &&
+                              CurrentPlayerID == LocalPlayerID);
+      const bool bShouldShowDeploy = bIsMyTurn && bOwnedByLocal;
+      DeployButton->SetVisibility(
+          bShouldShowDeploy ? ESlateVisibility::Visible
+                            : ESlateVisibility::Collapsed);
+      DeployButton->SetIsEnabled(bShouldShowDeploy);
     }
   } else if (CurrentPhase == ETurnPhase::Engineering && bOwnedByLocal &&
              Territory->bIsCapital) {
