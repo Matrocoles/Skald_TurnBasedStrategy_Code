@@ -30,6 +30,10 @@ void UFighterEntryWidget::NativeConstruct() {
     SelectButton->OnClicked.AddDynamic(this,
                                        &UFighterEntryWidget::HandleClicked);
   }
+  if (RemoveButton) {
+    RemoveButton->OnClicked.AddDynamic(this,
+                                       &UFighterEntryWidget::HandleRemoveClicked);
+  }
 }
 
 void UFighterEntryWidget::Init(const FFighterDefinition &InFighter,
@@ -75,6 +79,12 @@ void UFighterEntryWidget::Init(const FFighterDefinition &InFighter,
 void UFighterEntryWidget::HandleClicked() {
   if (Owner) {
     Owner->ChooseFighter(Fighter);
+  }
+}
+
+void UFighterEntryWidget::HandleRemoveClicked() {
+  if (Owner) {
+    Owner->RemoveFighter(Fighter);
   }
 }
 
@@ -134,6 +144,11 @@ void UFighterSelectionWidget::PopulateFighterList() {
     UE_LOG(LogSkaldUI, Warning, TEXT("[FighterSelection] AvailableFighters is EMPTY."));
   }
 
+  AvailableFighters.Sort([](const FFighterDefinition& A, const FFighterDefinition& B)
+  {
+    return A.Stats.ArmyCost < B.Stats.ArmyCost;
+  });
+
   int32 Added = 0;
   for (const FFighterDefinition &Fighter : AvailableFighters) {
     if (UFighterEntryWidget *Entry =
@@ -160,6 +175,27 @@ bool UFighterSelectionWidget::ChooseFighter(const FFighterDefinition &Fighter) {
   CurrentCost += Fighter.Stats.ArmyCost;
   OnFighterChosen.Broadcast(Fighter);
   UpdateCostDisplay();
+  RefreshEntryAffordability();
+  return true;
+}
+
+bool UFighterSelectionWidget::RemoveFighter(const FFighterDefinition &Fighter)
+{
+  const int32 Index = ChosenFighters.IndexOfByPredicate(
+      [&Fighter](const FFighterDefinition& Candidate)
+      {
+        return Candidate.Id == Fighter.Id;
+      });
+
+  if (Index == INDEX_NONE)
+  {
+    return false;
+  }
+
+  CurrentCost -= ChosenFighters[Index].Stats.ArmyCost;
+  ChosenFighters.RemoveAt(Index);
+  UpdateCostDisplay();
+  RefreshEntryAffordability();
   return true;
 }
 
@@ -211,5 +247,25 @@ void UFighterSelectionWidget::UpdateCostDisplay() {
     Args.Add(TEXT("Max"), MaxCost);
     CostDisplayText->SetText(
         FText::Format(FText::FromString("{Cur} / {Max}"), Args));
+  }
+}
+
+void UFighterSelectionWidget::RefreshEntryAffordability()
+{
+  if (!FighterList)
+  {
+    return;
+  }
+
+  const int32 NumChildren = FighterList->GetChildrenCount();
+  for (int32 ChildIdx = 0; ChildIdx < NumChildren; ++ChildIdx)
+  {
+    if (UFighterEntryWidget* Entry = Cast<UFighterEntryWidget>(FighterList->GetChildAt(ChildIdx)))
+    {
+      if (Entry->SelectButton)
+      {
+        Entry->SelectButton->SetIsEnabled(CanAfford(Entry->Fighter));
+      }
+    }
   }
 }

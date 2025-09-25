@@ -29,6 +29,10 @@ public:
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UButton *SelectButton;
 
+  /** Button bound from the blueprint used to remove this fighter. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UButton *RemoveButton;
+
   /** Name text bound from the blueprint. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *NameText;
@@ -73,6 +77,10 @@ private:
   /** Callback for SelectButton. */
   UFUNCTION()
   void HandleClicked();
+
+  /** Callback for RemoveButton. */
+  UFUNCTION()
+  void HandleRemoveClicked();
 
   /** Owning selection widget. */
   UPROPERTY()
@@ -144,6 +152,10 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Skald|Fighter")
   bool ChooseFighter(const FFighterDefinition &Fighter);
 
+  /** Attempt to remove a fighter, returns true if removed. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Fighter")
+  bool RemoveFighter(const FFighterDefinition &Fighter);
+
   /** Lock in the current selection. */
   UFUNCTION(BlueprintCallable, Category = "Skald|Fighter")
   void LockIn();
@@ -178,4 +190,6 @@ private:
   void HandleLockInClicked();
 
   void GatherSelectedFighters(TArray<FFighterDefinition> &OutFighters) const;
+
+  void RefreshEntryAffordability();
 };
