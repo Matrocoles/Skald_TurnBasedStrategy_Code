@@ -18,6 +18,7 @@ class USkaldSaveGame;
 class FArmyPlacementInitiativeOrderTest;
 class FAIArmyPlacementAutoAdvanceTest;
 #endif // WITH_AUTOMATION_TESTS
+struct FSkaldGameModeAutomationAccessor;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSkaldGameOver, ASkaldPlayerState *,
                                             Winner);
@@ -35,6 +36,7 @@ class SKALD_API ASkaldGameMode : public AGameModeBase {
   friend class FAIArmyPlacementAutoAdvanceTest;
   friend class FInitializeWorldSingleInitiativeRollTest;
 #endif // WITH_AUTOMATION_TESTS
+  friend struct FSkaldGameModeAutomationAccessor;
 
 public:
   ASkaldGameMode();
