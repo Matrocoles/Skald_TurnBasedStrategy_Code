@@ -813,6 +813,13 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
       if (PlayerDataArray.IsValidIndex(i)) {
         PlayerDataArray[i].PlayerID = NewPlayerId;
       }
+      if (ASkaldPlayerController *OwningController =
+              Cast<ASkaldPlayerController>(PS->GetOwner())) {
+        if (USkaldMainHUDWidget *HUD = OwningController->GetHUDWidget()) {
+          HUD->LocalPlayerID = NewPlayerId;
+          HUD->SyncPhaseButtons(HUD->CurrentPlayerID == HUD->LocalPlayerID);
+        }
+      }
     }
   }
 
