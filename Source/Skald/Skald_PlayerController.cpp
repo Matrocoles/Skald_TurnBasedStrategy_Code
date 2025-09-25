@@ -13,10 +13,8 @@
 #include "InputCoreTypes.h"
 #include "Internationalization/Text.h"
 #include "Kismet/GameplayStatics.h"
-#include "Misc/EngineVersionComparison.h"
 #include "Skald.h"
 #include "SkaldTypes.h"
-#include "Skald_AIController.h"
 #include "Skald_GameInstance.h"
 #include "Skald_GameMode.h"
 #include "Skald_BattleGameMode.h"
@@ -129,7 +127,6 @@ void ASkaldPlayerController::InitializeHUDWidget() {
   }
 
   HUDRef = MainHUD;
-  MainHUD->AddToViewport();
   MainHUD->AddToViewport(10);
   MainHUD->SetIsFocusable(true);
   MainHUD->SetVisibility(ESlateVisibility::Hidden);
