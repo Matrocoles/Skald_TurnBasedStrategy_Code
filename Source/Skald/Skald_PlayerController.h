@@ -206,6 +206,9 @@ protected:
   UFUNCTION()
   void HandleGridClick();
 
+  /** Find a fighter occupying the specified grid cell. */
+  AFighterPawn *FindFighterAtCell(const FIntPoint &Cell) const;
+
   UFUNCTION()
   void HandleActivatePressed();
 
