@@ -3,6 +3,7 @@
 #include "FighterPawn.h"
 #include "GridOverlayComponent.h"
 #include "SkaldLogging.h"
+#include "Skald_GameInstance.h"
 #include "UObject/UnrealType.h"
 
 namespace
@@ -327,7 +328,7 @@ void UGridBattleManager::StartRound()
 void UGridBattleManager::AdvanceTurn()
 {
     UE_LOG(LogSkaldBattle, Verbose, TEXT("[Battle] AdvanceTurn called. Active fighter: %s"), *DescribeFighter(ActiveFighter));
-    FinishActivation(ActiveFighter);
+    FinishActivation(ActiveFighter, EGridActivationFinishReason::Auto);
 }
 
 bool UGridBattleManager::CanActivateFighter(AFighterPawn* Fighter) const
@@ -391,7 +392,7 @@ bool UGridBattleManager::ActivateFighter(AFighterPawn* Fighter)
     return ActiveFighter != nullptr;
 }
 
-void UGridBattleManager::FinishActivation(AFighterPawn* Fighter)
+void UGridBattleManager::FinishActivation(AFighterPawn* Fighter, EGridActivationFinishReason Reason)
 {
     if (bBattleConcluded)
     {
@@ -407,6 +408,13 @@ void UGridBattleManager::FinishActivation(AFighterPawn* Fighter)
     }
 
     const bool bWasAttacker = FighterToFinish->bIsAttacker;
+
+    if (Reason == EGridActivationFinishReason::Auto && !IsSideAIControlled(bWasAttacker))
+    {
+        UE_LOG(LogSkaldBattle, Verbose, TEXT("[Battle] Ignoring automatic FinishActivation for human-controlled %s"),
+            bWasAttacker ? TEXT("attackers") : TEXT("defenders"));
+        return;
+    }
 
     if (ActiveFighter == FighterToFinish)
     {
@@ -526,6 +534,19 @@ void UGridBattleManager::ClearInactiveFighters()
     {
         UE_LOG(LogSkaldBattle, Log, TEXT("[Battle] Cleared %d inactive fighters from initiative order"), Removed);
     }
+}
+
+bool UGridBattleManager::IsSideAIControlled(bool bForAttackers) const
+{
+    if (const UWorld* World = GetWorld())
+    {
+        if (const USkaldGameInstance* GameInstance = World->GetGameInstance<USkaldGameInstance>())
+        {
+            const FS_BattlePayload& Battle = GameInstance->PendingBattle;
+            return bForAttackers ? Battle.bAttackerIsAI : Battle.bDefenderIsAI;
+        }
+    }
+    return false;
 }
 
 void UGridBattleManager::EndBattle()
