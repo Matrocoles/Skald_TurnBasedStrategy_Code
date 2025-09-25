@@ -74,6 +74,10 @@ public:
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
   UTextBlock *MoveText;
 
+  /** Text displaying remaining actions. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UTextBlock *ActionsText;
+
   /** Text displaying strength value. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
   UTextBlock *StrengthText;
@@ -150,6 +154,10 @@ private:
   /** Respond to health changes from the fighter. */
   UFUNCTION()
   void HandleHealthChanged(int32 NewHealth);
+
+  /** Respond to action count changes from the fighter. */
+  UFUNCTION()
+  void HandleActionsChanged(int32 NewActions);
 
   /** Find the grid overlay component in the world. */
   UGridOverlayComponent *FindGridOverlay() const;

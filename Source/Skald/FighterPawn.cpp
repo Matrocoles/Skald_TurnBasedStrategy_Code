@@ -89,6 +89,8 @@ void AFighterPawn::BeginPlay() {
   OnHealthChanged.AddDynamic(this, &AFighterPawn::UpdateHealthDisplay);
   OnHealthChanged.Broadcast(Stats.Health);
 
+  BroadcastActionsRemaining();
+
   UpdateMeshOffset();
 
   if (UGridOverlayComponent *Grid = GetGrid()) {
@@ -117,17 +119,23 @@ void AFighterPawn::BeginActivation() {
   ActionsRemaining = ActionsPerActivation;
   bIsCurrentlyActive = true;
   bHasActivatedThisRound = true;
+
+  BroadcastActionsRemaining();
 }
 
 void AFighterPawn::ResetActivationState() {
   ActionsRemaining = 0;
   bHasActivatedThisRound = false;
   bIsCurrentlyActive = false;
+
+  BroadcastActionsRemaining();
 }
 
 void AFighterPawn::FinishActivation() {
   ActionsRemaining = 0;
   bIsCurrentlyActive = false;
+
+  BroadcastActionsRemaining();
 }
 
 UGridOverlayComponent *AFighterPawn::GetGrid() {
@@ -189,6 +197,8 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
   SetActorLocation(NewLocation);
   ActionsRemaining = FMath::Max(0, ActionsRemaining - 1);
 
+  BroadcastActionsRemaining();
+
   if (Grid) {
     Grid->SetOccupied(TargetCell, true);
     Grid->ClearHighlights();
@@ -238,6 +248,13 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
       DamageThisDie = Stats.AttackDamage;
     }
 
+    const bool bHit = DamageThisDie > 0;
+    if (USkaldGameInstance *GI = Cast<USkaldGameInstance>(GetGameInstance())) {
+      if (UGridBattleManager *BattleManager = GI->GridBattleManager) {
+        BattleManager->ReportAttackRoll(this, Target, Roll, bHit, DamageThisDie);
+      }
+    }
+
     if (DamageThisDie > 0) {
       Target->Stats.Health =
           FMath::Max(0, Target->Stats.Health - DamageThisDie);
@@ -265,6 +282,8 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
     Target->Destroy();
   }
   ActionsRemaining = FMath::Max(0, ActionsRemaining - 1);
+
+  BroadcastActionsRemaining();
 
   if (Grid) {
     Grid->ClearHighlights();
@@ -319,4 +338,10 @@ void AFighterPawn::OnRep_Stats(const FFighterStats &OldStats) {
   } else if (!OnHealthChanged.IsBound()) {
     UpdateHealthDisplay(Stats.Health);
   }
+}
+
+void AFighterPawn::OnRep_ActionsRemaining() { BroadcastActionsRemaining(); }
+
+void AFighterPawn::BroadcastActionsRemaining() {
+  OnActionsChanged.Broadcast(ActionsRemaining);
 }

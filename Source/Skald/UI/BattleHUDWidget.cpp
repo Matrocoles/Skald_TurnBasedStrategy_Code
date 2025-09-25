@@ -33,11 +33,15 @@ void UBattleHUDWidget::BindToFighter(AFighterPawn *Fighter) {
   if (BoundFighter) {
     BoundFighter->OnHealthChanged.RemoveDynamic(
         this, &UBattleHUDWidget::HandleHealthChanged);
+    BoundFighter->OnActionsChanged.RemoveDynamic(
+        this, &UBattleHUDWidget::HandleActionsChanged);
   }
   BoundFighter = Fighter;
   if (BoundFighter) {
     BoundFighter->OnHealthChanged.AddDynamic(
         this, &UBattleHUDWidget::HandleHealthChanged);
+    BoundFighter->OnActionsChanged.AddDynamic(
+        this, &UBattleHUDWidget::HandleActionsChanged);
     UpdateStatPanel();
     if (FighterNameText) {
       FighterNameText->SetText(
@@ -52,6 +56,9 @@ void UBattleHUDWidget::BindToFighter(AFighterPawn *Fighter) {
     }
     if (MoveText) {
       MoveText->SetText(FText::GetEmpty());
+    }
+    if (ActionsText) {
+      ActionsText->SetText(FText::GetEmpty());
     }
     if (StrengthText) {
       StrengthText->SetText(FText::GetEmpty());
@@ -121,6 +128,12 @@ void UBattleHUDWidget::HandleHealthChanged(int32 NewHealth) {
   }
 }
 
+void UBattleHUDWidget::HandleActionsChanged(int32 NewActions) {
+  if (ActionsText) {
+    ActionsText->SetText(FText::AsNumber(NewActions));
+  }
+}
+
 void UBattleHUDWidget::UpdateStatPanel() {
   if (!BoundFighter) {
     return;
@@ -133,6 +146,9 @@ void UBattleHUDWidget::UpdateStatPanel() {
   }
   if (MoveText) {
     MoveText->SetText(FText::AsNumber(BoundFighter->Stats.Movement));
+  }
+  if (ActionsText) {
+    ActionsText->SetText(FText::AsNumber(BoundFighter->ActionsRemaining));
   }
   if (StrengthText) {
     StrengthText->SetText(FText::AsNumber(BoundFighter->Stats.Strength));
