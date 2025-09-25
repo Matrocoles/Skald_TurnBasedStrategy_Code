@@ -8,6 +8,7 @@
 #include "Skald_BattleGameMode.generated.h"
 
 class AAIController;
+class ASkaldAIController;
 class AController;
 
 /** GameMode dedicated to resolving grid-based battles. */
