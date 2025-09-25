@@ -338,4 +338,6 @@ protected:
   /** GS -> HUD: react to turn index changes (client + server). */
   UFUNCTION()
   void HandleTurnIndexChanged(int32 NewTurnIndex);
+
+  int32 ResolveLocalPlayerId() const;
 };
