@@ -32,6 +32,11 @@
 #include "UObject/ConstructorHelpers.h"
 #include "WorldMap.h"
 
+#include "Framework/Application/SlateApplication.h"
+#include "Layout/WidgetPath.h"
+#include "Widgets/SWidget.h"
+#include "Widgets/SWindow.h"
+
 // Portable include for FCoreUObjectDelegates across UE versions
 #if __has_include("UObject/CoreUObjectDelegates.h")
     #include "UObject/CoreUObjectDelegates.h"
@@ -51,6 +56,32 @@ FString ResolvePlayerName(const ASkaldPlayerState *PlayerState,
   }
 
   return PlayerState->GetResolvedPlayerName(Context);
+}
+
+bool IsCursorOverInteractableSlateWidget() {
+  if (!FSlateApplication::IsInitialized()) {
+    return false;
+  }
+
+  FSlateApplication &SlateApp = FSlateApplication::Get();
+  const FVector2D CursorPos = SlateApp.GetCursorPos();
+
+  TArray<TSharedRef<SWindow>> Windows = SlateApp.GetInteractiveTopLevelWindows();
+  if (Windows.Num() == 0) {
+    return false;
+  }
+
+  const FWidgetPath WidgetPath =
+      SlateApp.LocateWindowUnderMouse(CursorPos, Windows);
+
+  for (int32 Index = WidgetPath.Widgets.Num() - 1; Index >= 0; --Index) {
+    const FArrangedWidget &ArrangedWidget = WidgetPath.Widgets[Index];
+    if (ArrangedWidget.Widget->IsInteractable()) {
+      return true;
+    }
+  }
+
+  return false;
 }
 }
 
@@ -1666,7 +1697,7 @@ void ASkaldPlayerController::HandleGridClick() {
   if (!IsLocalController())
     return;
 
-  if (UWidgetBlueprintLibrary::IsCursorOverInteractableWidget()) {
+  if (IsCursorOverInteractableSlateWidget()) {
     return;
   }
 
