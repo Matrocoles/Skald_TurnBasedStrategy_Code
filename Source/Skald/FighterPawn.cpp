@@ -238,6 +238,13 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
       DamageThisDie = Stats.AttackDamage;
     }
 
+    const bool bHit = DamageThisDie > 0;
+    if (USkaldGameInstance *GI = Cast<USkaldGameInstance>(GetGameInstance())) {
+      if (UGridBattleManager *BattleManager = GI->GridBattleManager) {
+        BattleManager->ReportAttackRoll(this, Target, Roll, bHit, DamageThisDie);
+      }
+    }
+
     if (DamageThisDie > 0) {
       Target->Stats.Health =
           FMath::Max(0, Target->Stats.Health - DamageThisDie);
