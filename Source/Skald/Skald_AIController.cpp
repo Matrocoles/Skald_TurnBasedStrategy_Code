@@ -545,6 +545,7 @@ void ASkaldAIController::TryActivateNextFighter() {
   const bool bAttackerTurn = CachedBattleManager->IsAttackerTurn();
   AFighterPawn *NextFighter = FindNextFriendlyFighter(bAttackerTurn);
   if (!NextFighter) {
+    CachedBattleManager->AdvanceTurn();
     return;
   }
 

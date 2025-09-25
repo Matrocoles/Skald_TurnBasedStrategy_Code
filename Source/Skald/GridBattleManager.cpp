@@ -329,7 +329,28 @@ void UGridBattleManager::StartRound()
 void UGridBattleManager::AdvanceTurn()
 {
     UE_LOG(LogSkaldBattle, Verbose, TEXT("[Battle] AdvanceTurn called. Active fighter: %s"), *DescribeFighter(ActiveFighter));
-    FinishActivation(ActiveFighter, EGridActivationFinishReason::Auto);
+    if (ActiveFighter)
+    {
+        FinishActivation(ActiveFighter, EGridActivationFinishReason::Auto);
+        return;
+    }
+
+    const bool bPreviousWasAttacker = bIsAttackerTurn;
+    EvaluateRoundProgress(bPreviousWasAttacker);
+    OnActiveFighterChanged.Broadcast(nullptr);
+}
+
+void UGridBattleManager::ReportAttackRoll(AFighterPawn* Attacker, AFighterPawn* Defender, int32 Roll, bool bHit, int32 Damage)
+{
+    if (!Attacker || !Defender)
+    {
+        return;
+    }
+
+    UE_LOG(LogSkaldBattle, Log, TEXT("[Battle] Attack roll: %s -> %s | Roll=%d Result=%s Damage=%d"),
+        *DescribeFighter(Attacker), *DescribeFighter(Defender), Roll, bHit ? TEXT("Hit") : TEXT("Miss"), Damage);
+
+    OnAttackResolved.Broadcast(Attacker, Defender, Roll, bHit, Damage);
 }
 
 bool UGridBattleManager::CanActivateFighter(AFighterPawn* Fighter) const

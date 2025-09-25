@@ -11,6 +11,8 @@ class AFighterPawn; // MUST be before the delegates
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
     FOnBattleEnded, ESkaldFaction, WinningFaction, int32, AttackerCasualties, int32, DefenderCasualties);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(
+    FOnAttackResolved, AFighterPawn*, Attacker, AFighterPawn*, Defender, int32, Roll, bool, bHit, int32, Damage);
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnActiveFighterChanged, AFighterPawn*, NewFighter);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnRoundStarted, int32, RoundNumber, ESkaldFaction, InitiativeWinner);
@@ -209,6 +211,10 @@ public:
     UPROPERTY(BlueprintAssignable, Category="Battle|Events")
     FOnBattleEnded OnBattleEnded;
 
+    /** Fired whenever an individual attack roll resolves. */
+    UPROPERTY(BlueprintAssignable, Category="Battle|Events")
+    FOnAttackResolved OnAttackResolved;
+
     /** Fired whenever the active fighter changes (including nullptr). */
     UPROPERTY(BlueprintAssignable, Category="Battle|Events")
     FOnActiveFighterChanged OnActiveFighterChanged;
@@ -222,6 +228,8 @@ public:
 
     UFUNCTION(BlueprintCallable, Category="Battle")
     void UnregisterFighter(AFighterPawn* Fighter);
+
+    void ReportAttackRoll(AFighterPawn* Attacker, AFighterPawn* Defender, int32 Roll, bool bHit, int32 Damage);
 
     /** Table containing fighter definitions. */
     UPROPERTY(EditDefaultsOnly, Category="Data")
