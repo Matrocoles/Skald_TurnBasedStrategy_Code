@@ -72,6 +72,7 @@ void AFighterPawn::GetLifetimeReplicatedProps(
   DOREPLIFETIME(AFighterPawn, ActionsRemaining);
   DOREPLIFETIME(AFighterPawn, bHasActivatedThisRound);
   DOREPLIFETIME(AFighterPawn, bIsCurrentlyActive);
+  DOREPLIFETIME(AFighterPawn, CurrentCell);
 }
 
 void AFighterPawn::OnConstruction(const FTransform &Transform) {
