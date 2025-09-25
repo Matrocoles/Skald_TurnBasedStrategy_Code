@@ -78,6 +78,11 @@ void USkaldMainHUDWidget::NativeConstruct() {
            TEXT("SkaldMainHUDWidget could not find GameInstance."));
   }
 
+  const int32 ResolvedLocalId = ResolveLocalPlayerId();
+  if (ResolvedLocalId != -1) {
+    LocalPlayerID = ResolvedLocalId;
+  }
+
   if (AttackButton) {
     AttackButton->OnClicked.AddDynamic(
         this, &USkaldMainHUDWidget::BeginAttackSelection);
@@ -593,16 +598,25 @@ void USkaldMainHUDWidget::SetUseSiegeForNextAttack(bool bEnable) {
   bUseSiegeForNextAttack = bEnable;
 }
 
+int32 USkaldMainHUDWidget::ResolveLocalPlayerId() const {
+  if (const APlayerController *PC = GetOwningPlayer()) {
+    if (const ASkaldPlayerState *LocalPS =
+            PC->GetPlayerState<ASkaldPlayerState>()) {
+      return LocalPS->GetPlayerId();
+    }
+  }
+  return -1;
+}
+
 void USkaldMainHUDWidget::HandlePlayersUpdated() {
   if (!GameState) {
     return;
   }
 
   int32 NewLocalPlayerId = LocalPlayerID;
-  if (APlayerController *PC = GetOwningPlayer()) {
-    if (ASkaldPlayerState *LocalPS = PC->GetPlayerState<ASkaldPlayerState>()) {
-      NewLocalPlayerId = LocalPS->GetPlayerId();
-    }
+  const int32 ResolvedLocalId = ResolveLocalPlayerId();
+  if (ResolvedLocalId != -1) {
+    NewLocalPlayerId = ResolvedLocalId;
   }
 
   TArray<FS_PlayerData> Players;
@@ -650,6 +664,12 @@ void USkaldMainHUDWidget::HandleTurnIndexChanged(int32 /*NewTurnIndex*/) {
   BP_SetTurnText(TurnNumber, CurrentPlayerID);
 
   // Update buttons for the new player and show a brief turn message.
+  if (LocalPlayerID == -1) {
+    const int32 ResolvedLocalId = ResolveLocalPlayerId();
+    if (ResolvedLocalId != -1) {
+      LocalPlayerID = ResolvedLocalId;
+    }
+  }
   const bool bIsMyTurn = (CurrentPlayerID == LocalPlayerID);
   SyncPhaseButtons(bIsMyTurn);
   ShowTurnMessage(bIsMyTurn);
