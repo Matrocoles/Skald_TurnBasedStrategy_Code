@@ -1093,7 +1093,7 @@ void ASkald_BattleGameMode::PostLogin(APlayerController *NewPlayer) {
   OnControllerReady(NewPlayer);
 }
 
-void ASkald_BattleGameMode::OnAIControllerReady(AAIController *Controller) {
+void ASkald_BattleGameMode::OnAIControllerReady(ASkaldAIController *Controller) {
   OnControllerReady(Controller);
 }
 

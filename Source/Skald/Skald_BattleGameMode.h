@@ -38,7 +38,7 @@ protected:
 
 public:
   // Called by the AI controller when it’s ready (BeginPlay)
-  void OnAIControllerReady(AAIController *Controller);
+  void OnAIControllerReady(class ASkaldAIController *Controller);
 
   UFUNCTION(BlueprintCallable)
   void OnControllerReady(AController *Controller);
