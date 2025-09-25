@@ -315,7 +315,6 @@ void UGridBattleManager::StartRound()
 
     ActiveFighter = nullptr;
     CurrentTurn = 0;
-    OnActiveFighterChanged.Broadcast(nullptr);
 
     RollInitiative();
 
@@ -323,6 +322,8 @@ void UGridBattleManager::StartRound()
         *UEnum::GetValueAsString(InitiativeWinnerFaction));
 
     OnRoundStarted.Broadcast(CurrentRound, InitiativeWinnerFaction);
+
+    OnActiveFighterChanged.Broadcast(nullptr);
 }
 
 void UGridBattleManager::AdvanceTurn()
