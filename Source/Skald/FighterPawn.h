@@ -138,6 +138,7 @@ private:
   TArray<UUserWidget *> DamageWidgetPool;
 
   /** Current cell occupied by the fighter. */
+  UPROPERTY(Replicated)
   FIntPoint CurrentCell;
 
   /** Cached grid overlay component. */
