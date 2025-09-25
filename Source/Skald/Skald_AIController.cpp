@@ -29,6 +29,15 @@ void ASkaldAIController::BeginPlay() {
   Super::BeginPlay();
 
   SetupBattleAutomation();
+
+  if (HasAuthority()) {
+    if (UWorld *World = GetWorld()) {
+      if (ASkald_BattleGameMode *BattleGameMode =
+              World->GetAuthGameMode<ASkald_BattleGameMode>()) {
+        BattleGameMode->OnAIControllerReady(this);
+      }
+    }
+  }
 }
 
 void ASkaldAIController::StartTurn() { MakeAIDecision(); }
