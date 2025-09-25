@@ -3,6 +3,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Containers/Map.h"
 #include "Containers/Queue.h"
+#include "Containers/Set.h"
 #include "Engine/Engine.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
@@ -55,6 +56,7 @@ bool AWorldMap::GenerateTerritoriesFromTable() {
   }
 
   Territories.Empty();
+  SpawnedLocations.Reset();
 
   ATerritory *DefaultTerritory = TerritoryClass->GetDefaultObject<ATerritory>();
   UStaticMeshComponent *MeshComp =
@@ -124,18 +126,29 @@ bool AWorldMap::GenerateTerritoriesFromTable() {
     }
   }
 
-  // Spawn territories defined in the data table at random locations.
+  // Spawn territories defined in the data table.
   TArray<FTerritorySpawnData *> Rows;
   TerritoryTable->GetAllRows(TEXT("TerritoryTable"), Rows);
+  TMap<int32, ATerritory *> TerritoriesById;
+  TMap<int32, const FTerritorySpawnData *> SpawnDataById;
+  TerritoriesById.Reserve(Rows.Num());
+  SpawnDataById.Reserve(Rows.Num());
+
   for (const FTerritorySpawnData *Data : Rows) {
     if (!Data) {
       continue;
     }
 
-    const float RandX = FMath::FRandRange(SpawnAreaMin.X, SpawnAreaMax.X);
-    const float RandY = FMath::FRandRange(SpawnAreaMin.Y, SpawnAreaMax.Y);
-    const FVector SpawnLocation =
-        GetActorLocation() + FVector(RandX, RandY, 0.f);
+    FVector LocalSpawnOffset;
+    if (Data->bUseDataTableLocation) {
+      LocalSpawnOffset = Data->Location;
+    } else {
+      const float RandX = FMath::FRandRange(SpawnAreaMin.X, SpawnAreaMax.X);
+      const float RandY = FMath::FRandRange(SpawnAreaMin.Y, SpawnAreaMax.Y);
+      LocalSpawnOffset = FVector(RandX, RandY, 0.f);
+    }
+
+    const FVector SpawnLocation = GetActorLocation() + LocalSpawnOffset;
 
     FActorSpawnParameters Params;
     Params.Owner = this;
@@ -146,11 +159,64 @@ bool AWorldMap::GenerateTerritoriesFromTable() {
       Territory->TerritoryName = Data->TerritoryName;
       Territory->bIsCapital = Data->bIsCapital;
       Territory->ContinentID = Data->ContinentID;
+      Territory->AdjacentTerritories.Reset();
       RegisterTerritory(Territory);
 
-      SpawnedLocations.Add(Data->TerritoryID, SpawnLocation);
+      SpawnedLocations.Add(Data->TerritoryID, Territory->GetActorLocation());
+      TerritoriesById.Add(Data->TerritoryID, Territory);
+      SpawnDataById.Add(Data->TerritoryID, Data);
     }
   }
+
+  auto AddAdjacency = [](ATerritory *A, ATerritory *B) {
+    if (!A || !B) {
+      return;
+    }
+    if (!A->AdjacentTerritories.Contains(B)) {
+      A->AdjacentTerritories.Add(B);
+    }
+  };
+
+  // Apply table-authored adjacency first so designers have deterministic
+  // control when requested.
+  TSet<int32> MissingAdjacencyIds;
+  for (const TPair<int32, ATerritory *> &Pair : TerritoriesById) {
+    ATerritory *Territory = Pair.Value;
+    const FTerritorySpawnData *const *SpawnDataPtr =
+        SpawnDataById.Find(Pair.Key);
+    if (!Territory || !SpawnDataPtr || !*SpawnDataPtr) {
+      continue;
+    }
+
+    const FTerritorySpawnData *SpawnData = *SpawnDataPtr;
+    if (!SpawnData->bOverrideAdjacency ||
+        SpawnData->AdjacentTerritoryIDs.Num() == 0) {
+      continue;
+    }
+
+    for (int32 NeighborId : SpawnData->AdjacentTerritoryIDs) {
+      if (ATerritory *const *NeighborPtr = TerritoriesById.Find(NeighborId)) {
+        ATerritory *Neighbor = *NeighborPtr;
+        AddAdjacency(Territory, Neighbor);
+        AddAdjacency(Neighbor, Territory);
+      } else if (!MissingAdjacencyIds.Contains(NeighborId)) {
+        MissingAdjacencyIds.Add(NeighborId);
+        UE_LOG(LogSkald, Warning,
+               TEXT("WorldMap %s adjacency references unknown territory id %d"),
+               *GetName(), NeighborId);
+      }
+    }
+  }
+
+  auto HasManualAdjacency =
+      [&SpawnDataById](const ATerritory *Territory) -> bool {
+    if (!Territory) {
+      return false;
+    }
+    const FTerritorySpawnData *const *SpawnDataPtr =
+        SpawnDataById.Find(Territory->TerritoryID);
+    return SpawnDataPtr && *SpawnDataPtr && (*SpawnDataPtr)->bOverrideAdjacency;
+  };
 
   // Build adjacency by distance.
   for (int32 i = 0; i < Territories.Num(); ++i) {
@@ -158,20 +224,20 @@ bool AWorldMap::GenerateTerritoriesFromTable() {
     if (!A) {
       continue;
     }
+    const bool bAManual = HasManualAdjacency(A);
     for (int32 j = i + 1; j < Territories.Num(); ++j) {
       ATerritory *B = Territories[j];
       if (!B) {
         continue;
       }
+      if (bAManual || HasManualAdjacency(B)) {
+        continue;
+      }
       const float Dist =
           FVector::Dist(A->GetActorLocation(), B->GetActorLocation());
       if (Dist <= AdjacencyDistance) {
-        if (!A->AdjacentTerritories.Contains(B)) {
-          A->AdjacentTerritories.Add(B);
-        }
-        if (!B->AdjacentTerritories.Contains(A)) {
-          B->AdjacentTerritories.Add(A);
-        }
+        AddAdjacency(A, B);
+        AddAdjacency(B, A);
       }
     }
   }

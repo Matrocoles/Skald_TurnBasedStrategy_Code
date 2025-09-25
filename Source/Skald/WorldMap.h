@@ -20,14 +20,20 @@ struct FTerritorySpawnData : public FTableRowBase {
 
   FTerritorySpawnData()
       : TerritoryID(0), TerritoryName(TEXT("")), bIsCapital(false),
-        ContinentID(0), Location(FVector::ZeroVector), AdjacentTerritoryIDs() {}
+        ContinentID(0), Location(FVector::ZeroVector),
+        bUseDataTableLocation(false), bOverrideAdjacency(false),
+        AdjacentTerritoryIDs() {}
 
   FTerritorySpawnData(int32 InID, const FString &InName, bool bCapital = false,
                       int32 InContinent = 0,
                       FVector InLocation = FVector::ZeroVector,
-                      const TArray<int32> &InAdjacents = {})
+                      const TArray<int32> &InAdjacents = {},
+                      bool bUseLocation = false,
+                      bool bOverrideAdjacencyIn = false)
       : TerritoryID(InID), TerritoryName(InName), bIsCapital(bCapital),
         ContinentID(InContinent), Location(InLocation),
+        bUseDataTableLocation(bUseLocation),
+        bOverrideAdjacency(bOverrideAdjacencyIn),
         AdjacentTerritoryIDs(InAdjacents) {}
 
   UPROPERTY(EditAnywhere, BlueprintReadOnly)
@@ -45,6 +51,17 @@ struct FTerritorySpawnData : public FTableRowBase {
   /** Location for spawning this territory relative to the world map actor. */
   UPROPERTY(EditAnywhere, BlueprintReadOnly)
   FVector Location;
+
+  /** When true, the authored Location will be used instead of a random point. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly)
+  bool bUseDataTableLocation;
+
+  /**
+   * When true, AdjacentTerritoryIDs is treated as the source of truth and
+   * procedural adjacency generation will be skipped for this territory.
+   */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly)
+  bool bOverrideAdjacency;
 
   /** IDs of territories adjacent to this one. */
   UPROPERTY(EditAnywhere, BlueprintReadOnly)
