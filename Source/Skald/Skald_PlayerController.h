@@ -416,6 +416,7 @@ private:
   void UpdateBattleHUDSelection();
   void UpdateBattleHUDButtons();
   void UpdateBattleRoundDisplay(int32 RoundNumber, ESkaldFaction InitiativeWinner);
+  void UpdateBattlePlayersTurnDisplay();
   bool IsFriendlyFighter(const AFighterPawn *Fighter) const;
   void DetermineControlledBattleSide();
 

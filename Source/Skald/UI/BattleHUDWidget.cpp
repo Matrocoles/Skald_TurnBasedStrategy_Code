@@ -158,6 +158,12 @@ void UBattleHUDWidget::SetRoundInfo(const FText &RoundLabel,
   }
 }
 
+void UBattleHUDWidget::SetPlayersTurnLabel(const FText &PlayerLabel) {
+  if (PlayersTurnText) {
+    PlayersTurnText->SetText(PlayerLabel);
+  }
+}
+
 void UBattleHUDWidget::SetSelectedFighterName(const FText &Name) {
   if (FighterNameText) {
     FighterNameText->SetText(Name);

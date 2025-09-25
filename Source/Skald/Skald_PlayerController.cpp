@@ -735,6 +735,7 @@ void ASkaldPlayerController::HandleActiveFighterChanged(
 
   CancelCommandMode();
   UpdateBattleHUDButtons();
+  UpdateBattlePlayersTurnDisplay();
   if (!NewFighter) {
     UpdateBattleHUDSelection();
   }
@@ -1862,6 +1863,7 @@ void ASkaldPlayerController::HandleRoundStarted(int32 RoundNumber,
   LockedActiveFighter = nullptr;
   CancelCommandMode();
   UpdateBattleRoundDisplay(RoundNumber, InitiativeWinner);
+  UpdateBattlePlayersTurnDisplay();
   UpdateBattleHUDSelection();
   UpdateBattleHUDButtons();
 }
@@ -1952,6 +1954,61 @@ void ASkaldPlayerController::UpdateBattleRoundDisplay(
   }
 
   BattleHudWidget->SetRoundInfo(RoundText, InitiativeText);
+}
+
+void ASkaldPlayerController::UpdateBattlePlayersTurnDisplay() {
+  if (!BattleHudWidget)
+    return;
+
+  USkaldGameInstance *GI = CachedGameInstance;
+  if (!GI) {
+    GI = GetGameInstance<USkaldGameInstance>();
+    CachedGameInstance = GI;
+  }
+
+  if (!GI) {
+    BattleHudWidget->SetPlayersTurnLabel(FText::GetEmpty());
+    return;
+  }
+
+  bool bAttackerTurn = true;
+  if (GI->GridBattleManager) {
+    bAttackerTurn = GI->GridBattleManager->IsAttackerTurn();
+  } else if (LockedActiveFighter) {
+    bAttackerTurn = LockedActiveFighter->bIsAttacker;
+  }
+
+  const FS_BattlePayload &Battle = GI->PendingBattle;
+  FString PlayerName =
+      bAttackerTurn ? Battle.AttackerDisplayName : Battle.DefenderDisplayName;
+  const int32 PlayerId =
+      bAttackerTurn ? Battle.AttackerPlayerID : Battle.DefenderPlayerID;
+
+  if (PlayerName.IsEmpty()) {
+    ASkaldGameState *GameState = CachedGameState;
+    if (!GameState && GetWorld()) {
+      GameState = GetWorld()->GetGameState<ASkaldGameState>();
+      CachedGameState = GameState;
+    }
+    if (GameState) {
+      if (ASkaldPlayerState *PS = GameState->GetPlayerById(PlayerId)) {
+        PlayerName =
+            ResolvePlayerName(PS, TEXT("BattleHUD_PlayerTurnDisplay"));
+      }
+    }
+  }
+
+  if (PlayerName.IsEmpty()) {
+    PlayerName = bAttackerTurn ? TEXT("Attackers") : TEXT("Defenders");
+  }
+
+  const FText Label = PlayerName.IsEmpty()
+                           ? FText::GetEmpty()
+                           : FText::Format(
+                                 NSLOCTEXT("Skald", "BattlePlayersTurnLabel",
+                                           "{0}'s Turn"),
+                                 FText::FromString(PlayerName));
+  BattleHudWidget->SetPlayersTurnLabel(Label);
 }
 
 bool ASkaldPlayerController::IsFriendlyFighter(const AFighterPawn *Fighter) const {
