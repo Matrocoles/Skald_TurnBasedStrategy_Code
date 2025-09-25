@@ -10,7 +10,6 @@
 #include "UObject/UnrealType.h"
 #include "WorldMap.h"
 
-namespace {
 struct FSkaldGameModeAutomationAccessor {
   static void BeginArmyPlacementPhase(ASkaldGameMode *GameMode) {
     if (GameMode) {
@@ -25,6 +24,7 @@ struct FSkaldGameModeAutomationAccessor {
   }
 };
 
+namespace {
 void SetObjectProperty(UObject *Target, const TCHAR *PropertyName, UObject *Value) {
   if (!Target) {
     return;
