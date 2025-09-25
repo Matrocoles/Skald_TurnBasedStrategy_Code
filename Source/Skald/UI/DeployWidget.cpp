@@ -4,6 +4,7 @@
 #include "Skald_GameMode.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
+#include "SkaldTypes.h"
 #include "Skald_TurnManager.h"
 #include "Territory.h"
 #include "UI/SkaldMainHUDWidget.h"
@@ -53,11 +54,13 @@ void UDeployWidget::HandleAccept() {
                                              PlayerState->DeployableUnits)
                               : 0;
   if (Selected > 0) {
+    ATurnManager *TurnManager = nullptr;
     if (APlayerController *PC = OwningHUD->GetOwningPlayer()) {
       if (ASkaldPlayerController *SKPC = Cast<ASkaldPlayerController>(PC)) {
         SKPC->ServerDeployUnits(Territory->TerritoryID, Selected);
-        if (ATurnManager *TM = SKPC->GetTurnManager()) {
-          TM->BroadcastDeployableUnits(PlayerState);
+        TurnManager = SKPC->GetTurnManager();
+        if (TurnManager) {
+          TurnManager->BroadcastDeployableUnits(PlayerState);
         }
       }
     }
@@ -68,18 +71,15 @@ void UDeployWidget::HandleAccept() {
       bool bHandled = false;
       if (ASkaldGameMode *GM =
               OwningHUD->GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
-        if (!GM->HasMatchStarted()) {
+        if (TurnManager &&
+            TurnManager->GetCurrentPhase() == ETurnPhase::ArmyPlacement) {
           GM->AdvanceArmyPlacement();
           bHandled = true;
         }
       }
       if (!bHandled) {
-        if (APlayerController *PC = OwningHUD->GetOwningPlayer()) {
-          if (ASkaldPlayerController *SKPC = Cast<ASkaldPlayerController>(PC)) {
-            if (ATurnManager *TM = SKPC->GetTurnManager()) {
-              TM->AdvancePhase();
-            }
-          }
+        if (TurnManager) {
+          TurnManager->AdvancePhase();
         }
       }
     }
