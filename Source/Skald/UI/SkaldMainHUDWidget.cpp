@@ -210,6 +210,10 @@ void USkaldMainHUDWidget::UpdateTerritoryInfo(const FString &TerritoryName,
   BP_SetTerritoryPanel(TerritoryName, OwnerName, ArmyCount);
 
   // Keep Deploy button visibility in sync with current selection ownership.
+  const bool bIsMyTurn = (CurrentPlayerID != -1 &&
+                          LocalPlayerID != -1 &&
+                          CurrentPlayerID == LocalPlayerID);
+
   if (DeployButton && (CurrentPhase == ETurnPhase::Reinforcement ||
                        CurrentPhase == ETurnPhase::ArmyPlacement)) {
     bool bOwnedByLocal = false;
@@ -225,8 +229,10 @@ void USkaldMainHUDWidget::UpdateTerritoryInfo(const FString &TerritoryName,
         }
       }
     }
-    DeployButton->SetVisibility(bOwnedByLocal ? ESlateVisibility::Visible
-                                              : ESlateVisibility::Collapsed);
+    const bool bShouldShowDeploy = bIsMyTurn && bOwnedByLocal;
+    DeployButton->SetVisibility(bShouldShowDeploy ? ESlateVisibility::Visible
+                                                  : ESlateVisibility::Collapsed);
+    DeployButton->SetIsEnabled(bShouldShowDeploy);
   }
 }
 
@@ -680,40 +686,37 @@ void USkaldMainHUDWidget::HandleTurnIndexChanged(int32 /*NewTurnIndex*/) {
 void USkaldMainHUDWidget::SyncPhaseButtons(bool bIsMyTurn) {
   BP_SetPhaseButtons(CurrentPhase, bIsMyTurn);
 
-  if (AttackButton) {
-    const ESlateVisibility DesiredVisibility =
-        (bIsMyTurn && CurrentPhase == ETurnPhase::Attack)
-            ? ESlateVisibility::Visible
-            : ESlateVisibility::Collapsed;
-    AttackButton->SetVisibility(DesiredVisibility);
-  }
+  auto SetButtonState = [](UButton *Button, bool bShouldShow,
+                           bool bShouldEnable) {
+    if (!Button) {
+      return;
+    }
 
-  if (MoveButton) {
-    const ESlateVisibility DesiredVisibility =
-        (bIsMyTurn && CurrentPhase == ETurnPhase::Movement)
-            ? ESlateVisibility::Visible
-            : ESlateVisibility::Collapsed;
-    MoveButton->SetVisibility(DesiredVisibility);
-  }
+    Button->SetVisibility(bShouldShow ? ESlateVisibility::Visible
+                                      : ESlateVisibility::Collapsed);
+    Button->SetIsEnabled(bShouldEnable && bShouldShow);
+  };
 
-  if (DeployButton) {
-    const ESlateVisibility DesiredVisibility =
-        (bIsMyTurn && (CurrentPhase == ETurnPhase::Reinforcement ||
-                       CurrentPhase == ETurnPhase::ArmyPlacement))
-            ? ESlateVisibility::Visible
-            : ESlateVisibility::Collapsed;
-    DeployButton->SetVisibility(DesiredVisibility);
-  }
+  const bool bShowAttackButton = bIsMyTurn && CurrentPhase == ETurnPhase::Attack;
+  SetButtonState(AttackButton, bShowAttackButton, bShowAttackButton);
 
-  if (EndPhaseButton) {
-    EndPhaseButton->SetVisibility(ESlateVisibility::Visible);
-    EndPhaseButton->SetIsEnabled(bIsMyTurn);
-  }
+  const bool bShowMoveButton =
+      bIsMyTurn && CurrentPhase == ETurnPhase::Movement;
+  SetButtonState(MoveButton, bShowMoveButton, bShowMoveButton);
 
-  if (EndTurnButton) {
-    EndTurnButton->SetVisibility(ESlateVisibility::Visible);
-    EndTurnButton->SetIsEnabled(bIsMyTurn);
-  }
+  const bool bShowDeployButton =
+      bIsMyTurn &&
+      (CurrentPhase == ETurnPhase::Reinforcement ||
+       CurrentPhase == ETurnPhase::ArmyPlacement);
+  SetButtonState(DeployButton, bShowDeployButton, bShowDeployButton);
+
+  const bool bShowEndPhaseButton =
+      bIsMyTurn && CurrentPhase != ETurnPhase::EndTurn;
+  SetButtonState(EndPhaseButton, bShowEndPhaseButton, bShowEndPhaseButton);
+
+  const bool bShowEndTurnButton =
+      bIsMyTurn && CurrentPhase == ETurnPhase::EndTurn;
+  SetButtonState(EndTurnButton, bShowEndTurnButton, bShowEndTurnButton);
 }
 
 void USkaldMainHUDWidget::HandleAttackApproved() {
