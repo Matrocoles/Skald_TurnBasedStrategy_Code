@@ -5,6 +5,7 @@
 #include "ChoosePlayerWidget.h"
 #include "Components/InputComponent.h"
 #include "Engine/Engine.h"
+#include "Engine/EngineTypes.h"
 #include "EngineUtils.h"
 #include "FighterDataLibrary.h"
 #include "FighterPawn.h"
@@ -1754,9 +1755,65 @@ void ASkaldPlayerController::HandleGridClick() {
       CancelCommandMode();
       break;
     }
+    const auto IsValidEnemyTarget = [&](AFighterPawn *Candidate) {
+      return Candidate && Candidate != LockedActiveFighter &&
+             Candidate->IsAlive() && !IsFriendlyFighter(Candidate);
+    };
+
     AFighterPawn *TargetPawn = CellFighter;
-    if (TargetPawn && TargetPawn != LockedActiveFighter && TargetPawn->IsAlive() &&
-        !IsFriendlyFighter(TargetPawn)) {
+    FIntPoint TargetCell = Cell;
+
+    if (!IsValidEnemyTarget(TargetPawn)) {
+      TargetPawn = nullptr;
+
+      FVector TraceStart = Hit.TraceStart;
+      FVector TraceEnd = Hit.TraceEnd;
+
+      if (TraceStart == TraceEnd) {
+        FVector MouseWorldLocation, MouseWorldDirection;
+        if (DeprojectMousePositionToWorld(MouseWorldLocation, MouseWorldDirection)) {
+          if (APlayerCameraManager *CameraManager = PlayerCameraManager) {
+            TraceStart = CameraManager->GetCameraLocation();
+          } else {
+            TraceStart = MouseWorldLocation;
+          }
+          TraceEnd = TraceStart + MouseWorldDirection * 100000.f;
+        }
+      }
+
+      if (UWorld *World = GetWorld()) {
+        TArray<FHitResult> AdditionalHits;
+        FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(HandleGridClickAttack),
+                                          /*bTraceComplex*/ false);
+        if (LockedActiveFighter) {
+          QueryParams.AddIgnoredActor(LockedActiveFighter);
+        }
+
+        if (World->LineTraceMultiByChannel(AdditionalHits, TraceStart, TraceEnd,
+                                           ECC_Visibility, QueryParams)) {
+          for (const FHitResult &CandidateHit : AdditionalHits) {
+            AFighterPawn *CandidatePawn =
+                Cast<AFighterPawn>(CandidateHit.GetActor());
+            if (!IsValidEnemyTarget(CandidatePawn)) {
+              continue;
+            }
+
+            const FIntPoint CandidateCell = CandidatePawn->GetCurrentCell();
+            if (!Grid->IsCellInBounds(CandidateCell)) {
+              continue;
+            }
+
+            TargetPawn = CandidatePawn;
+            TargetCell = CandidateCell;
+            break;
+          }
+        }
+      }
+    }
+
+    if (IsValidEnemyTarget(TargetPawn)) {
+      CellFighter = TargetPawn;
+      Cell = TargetCell;
       LockedActiveFighter->PerformAttack(TargetPawn);
     }
     CancelCommandMode();
