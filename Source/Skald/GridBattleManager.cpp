@@ -416,11 +416,12 @@ void UGridBattleManager::FinishActivation(AFighterPawn* Fighter, EGridActivation
         return;
     }
 
-    if (ActiveFighter == FighterToFinish)
+    const bool bWasActiveFighter = ActiveFighter == FighterToFinish;
+
+    if (bWasActiveFighter)
     {
         ActiveFighter->FinishActivation();
         ActiveFighter = nullptr;
-        OnActiveFighterChanged.Broadcast(nullptr);
         UE_LOG(LogSkaldBattle, Log, TEXT("[Battle] Fighter finished activation: %s"), *DescribeFighter(FighterToFinish));
     }
     else if (InitiativeOrder.Contains(FighterToFinish))
@@ -430,6 +431,11 @@ void UGridBattleManager::FinishActivation(AFighterPawn* Fighter, EGridActivation
     }
 
     EvaluateRoundProgress(bWasAttacker);
+
+    if (bWasActiveFighter)
+    {
+        OnActiveFighterChanged.Broadcast(nullptr);
+    }
 }
 
 bool UGridBattleManager::HasLivingFighters(bool bForAttackers) const
