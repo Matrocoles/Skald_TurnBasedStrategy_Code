@@ -11,6 +11,8 @@ class UGridOverlayComponent;
 class UCapsuleComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHealthChanged, int32, NewHealth);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnActionsChanged, int32,
+                                            NewActionsRemaining);
 
 /** Pawn representing a fighter in grid battles. */
 UCLASS()
@@ -63,7 +65,8 @@ public:
   bool bIsAttacker = false;
 
   /** Actions remaining for the current activation. */
-  UPROPERTY(BlueprintReadOnly, Replicated, Category = "Fighter")
+  UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_ActionsRemaining,
+            Category = "Fighter")
   int32 ActionsRemaining;
 
   /** True once the fighter has activated during the current round. */
@@ -99,6 +102,10 @@ public:
   UPROPERTY(BlueprintAssignable, Category = "Fighter|Events")
   FOnHealthChanged OnHealthChanged;
 
+  /** Event broadcast when actions remaining changes. */
+  UPROPERTY(BlueprintAssignable, Category = "Fighter|Events")
+  FOnActionsChanged OnActionsChanged;
+
 protected:
   /** Clear grid occupancy when the fighter is destroyed. */
   virtual void Destroyed() override;
@@ -111,12 +118,17 @@ private:
   /** Respond when the fighter stats replicate to clients. */
   UFUNCTION()
   void OnRep_Stats(const FFighterStats &OldStats);
+  UFUNCTION()
+  void OnRep_ActionsRemaining();
 
   /** Retrieve or create a damage widget from the pool. */
   UUserWidget *GetDamageWidgetFromPool();
 
   /** Align the visible mesh with the collision capsule. */
   void UpdateMeshOffset();
+
+  /** Helper to broadcast the current actions remaining value. */
+  void BroadcastActionsRemaining();
 
   /** Pool of reusable damage widgets to avoid repeated allocations. */
   UPROPERTY()
