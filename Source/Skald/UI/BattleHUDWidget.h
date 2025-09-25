@@ -102,8 +102,15 @@ public:
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *InitiativeText;
 
+  /** Text displaying whose turn is currently active. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UTextBlock *PlayersTurnText;
+
   /** Update the round and initiative labels. */
   void SetRoundInfo(const FText &RoundLabel, const FText &InitiativeLabel);
+
+  /** Update the label that shows whose turn is active. */
+  void SetPlayersTurnLabel(const FText &PlayerLabel);
 
   /** Update the fighter name label. */
   void SetSelectedFighterName(const FText &Name);
