@@ -39,6 +39,9 @@ AFighterPawn::AFighterPawn() {
   HealthWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthWidget"));
   HealthWidget->SetupAttachment(DisplayMesh);
   HealthWidget->SetTwoSided(true);
+  HealthWidget->SetRelativeLocation(FVector(0.f, 0.f, 400.f));
+  HealthWidget->SetRelativeRotation(FRotator(0.f, 90.f, 0.f));
+  HealthWidget->SetRelativeScale3D(FVector(1.f));
 
   static ConstructorHelpers::FClassFinder<UUserWidget> HealthWidgetFinder(
       TEXT("/Game/Blueprints/UI/WBP_FighterHealth"));
