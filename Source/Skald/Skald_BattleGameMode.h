@@ -44,6 +44,9 @@ public:
   UFUNCTION(BlueprintCallable)
   void OnControllerReady(AController *Controller);
 
+  /** Move controller pawns near the active battle grid, if available. */
+  bool RelocateControllersNearBattleGrid(const TArray<AController *> &Controllers) const;
+
 private:
   void SetupPendingBattle();
   void AutoCommitAIArmy(ASkaldPlayerState *PlayerState, int32 Budget) const;

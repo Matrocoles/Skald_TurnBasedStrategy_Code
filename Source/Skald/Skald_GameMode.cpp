@@ -10,6 +10,7 @@
 #include "SkaldLogging.h"
 #include "SkaldSaveGame.h"
 #include "Skald_AIController.h"
+#include "Skald_BattleGameMode.h"
 #include "Skald_GameInstance.h"
 #include "Skald_GameState.h"
 #include "Skald_PlayerCharacter.h"
@@ -421,6 +422,14 @@ void ASkaldGameMode::PopulateAIPlayers() {
               DefaultPawnClass, FVector::ZeroVector, FRotator::ZeroRotator,
               PawnParams)) {
         AIController->Possess(Pawn);
+      }
+    }
+
+    if (ASkald_BattleGameMode *BattleGM = Cast<ASkald_BattleGameMode>(this)) {
+      if (AIController->GetPawn()) {
+        TArray<AController *> ControllersToRelocate;
+        ControllersToRelocate.Add(AIController);
+        BattleGM->RelocateControllersNearBattleGrid(ControllersToRelocate);
       }
     }
   }

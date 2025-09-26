@@ -18,6 +18,7 @@
 #include "GameFramework/Controller.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/Pawn.h"
 #include "GridOverlayComponent.h"
 #include "Territory.h"
 #include "TimerManager.h"
@@ -860,6 +861,96 @@ void ASkald_BattleGameMode::PollBattleBootstrap() {
   }
 }
 
+bool ASkald_BattleGameMode::RelocateControllersNearBattleGrid(
+    const TArray<AController *> &Controllers) const {
+  if (Controllers.Num() == 0) {
+    return false;
+  }
+
+  UWorld *World = GetWorld();
+  if (!World) {
+    return false;
+  }
+
+  UGridOverlayComponent *Grid = nullptr;
+  for (TActorIterator<AActor> It(World); It; ++It) {
+    if (UGridOverlayComponent *Found =
+            It->FindComponentByClass<UGridOverlayComponent>()) {
+      Grid = Found;
+      break;
+    }
+  }
+
+  FVector BaseLocation = FVector::ZeroVector;
+  bool bHasLocation = false;
+
+  if (Grid) {
+    const int32 Width = Grid->GetWidth();
+    const int32 Height = Grid->GetHeight();
+    const float CellSize = Grid->GetCellSize();
+
+    BaseLocation = Grid->GetOrigin();
+
+    if (Width > 0 && Height > 0 && CellSize > KINDA_SMALL_NUMBER) {
+      BaseLocation.X += (static_cast<float>(Width) * CellSize) * 0.5f;
+      BaseLocation.Y += (static_cast<float>(Height) * CellSize) * 0.5f;
+      bHasLocation = true;
+    } else if (AActor *Owner = Grid->GetOwner()) {
+      BaseLocation = Owner->GetActorLocation();
+      bHasLocation = true;
+    }
+  }
+
+  if (!bHasLocation && Grid && Grid->GetOwner()) {
+    BaseLocation = Grid->GetOwner()->GetActorLocation();
+    bHasLocation = true;
+  }
+
+  if (!bHasLocation) {
+    for (AController *Controller : Controllers) {
+      if (Controller) {
+        if (APawn *Pawn = Controller->GetPawn()) {
+          BaseLocation = Pawn->GetActorLocation();
+          bHasLocation = true;
+          break;
+        }
+      }
+    }
+  }
+
+  if (!bHasLocation) {
+    UE_LOG(LogSkaldBattle, Verbose,
+           TEXT("RelocateControllersNearBattleGrid: Unable to determine base location"));
+    return false;
+  }
+
+  BaseLocation.Z += 100.f;
+  const float YSpacing = 150.f;
+
+  for (int32 Index = 0; Index < Controllers.Num(); ++Index) {
+    AController *Controller = Controllers[Index];
+    if (!Controller) {
+      continue;
+    }
+
+    APawn *Pawn = Controller->GetPawn();
+    if (!Pawn) {
+      continue;
+    }
+
+    FVector TargetLocation = BaseLocation;
+    if (Controllers.Num() > 1) {
+      const float OffsetIndex = static_cast<float>(Index) -
+                                0.5f * static_cast<float>(Controllers.Num() - 1);
+      TargetLocation.Y += OffsetIndex * YSpacing;
+    }
+
+    Pawn->SetActorLocation(TargetLocation, false);
+  }
+
+  return true;
+}
+
 void ASkald_BattleGameMode::AutoCommitAIArmy(ASkaldPlayerState *PlayerState,
                                              int32 Budget) const {
   if (!PlayerState || !PlayerState->bIsAI || !BattleManager) {
@@ -1029,6 +1120,22 @@ void ASkald_BattleGameMode::TryLaunchBattle() {
     return;
   }
 
+  TArray<AController *> ControllersToRelocate;
+  if (AttackerPS) {
+    if (AController *Owner = Cast<AController>(AttackerPS->GetOwner())) {
+      ControllersToRelocate.AddUnique(Owner);
+    }
+  }
+  if (DefenderPS) {
+    if (AController *Owner = Cast<AController>(DefenderPS->GetOwner())) {
+      ControllersToRelocate.AddUnique(Owner);
+    }
+  }
+
+  if (ControllersToRelocate.Num() > 0) {
+    RelocateControllersNearBattleGrid(ControllersToRelocate);
+  }
+
   TArray<FFighterDefinition> AttackerDefs =
       AttackerPS ? AttackerPS->PendingArmy : TArray<FFighterDefinition>();
   TArray<FFighterDefinition> DefenderDefs =
@@ -1155,6 +1262,13 @@ void ASkald_BattleGameMode::OnControllerReady(AController *Controller) {
   }
 
   AssignControllerSlot(Controller);
+
+  if (Controller) {
+    TArray<AController *> SingleController;
+    SingleController.Add(Controller);
+    RelocateControllersNearBattleGrid(SingleController);
+  }
+
   TrySetupBattleWhenReady();
 
   TryStartBattle();
