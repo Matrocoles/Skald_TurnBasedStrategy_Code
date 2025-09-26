@@ -28,6 +28,22 @@ struct FPendingGridOccupancyUpdate {
   bool bOccupied = false;
 };
 
+USTRUCT(BlueprintType)
+struct FGridPlacementBounds {
+  GENERATED_BODY()
+
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Placement")
+  FVector2D Min = FVector2D::ZeroVector;
+
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Placement")
+  FVector2D Max = FVector2D::ZeroVector;
+
+  bool HasArea() const {
+    return (FMath::Abs(Max.X - Min.X) > KINDA_SMALL_NUMBER) ||
+           (FMath::Abs(Max.Y - Min.Y) > KINDA_SMALL_NUMBER);
+  }
+};
+
 /**
  * Component that tracks grid cell occupancy and provides world/grid conversion.
  * Designed to be attached to the battle map floor actor.
@@ -41,6 +57,21 @@ public:
 
   virtual void OnRegister() override;
   virtual void BeginPlay() override;
+
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Grid")
+  int32 GetWidth() const;
+
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Grid")
+  int32 GetHeight() const;
+
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Grid")
+  float GetCellSize() const;
+
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Grid")
+  FVector GetOrigin() const;
+
+  UFUNCTION(BlueprintCallable, Category = "Grid")
+  void ApplyRandomizedOrigin();
 
   /** Convert a world location to grid coordinates. */
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Grid")
@@ -173,6 +204,25 @@ public:
   FLinearColor AttackHighlightColor = FLinearColor(1.f, 0.1f, 0.1f, 0.85f);
 
 protected:
+  /** Randomise the placement of the grid around the actor's starting point. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Placement")
+  bool bRandomizePlacement = false;
+
+  /** Bounds in local XY around the actor used for placement randomisation. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Placement",
+            meta = (EditCondition = "bRandomizePlacement"))
+  FGridPlacementBounds RandomPlacementBounds;
+
+  /** Fallback placement radius when bounds are not provided. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Placement",
+            meta = (EditCondition = "bRandomizePlacement", ClampMin = "0.0"))
+  float RandomPlacementRadius = 0.f;
+
+  /** Height of the placement trace used to find the ground. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Placement",
+            meta = (EditCondition = "bRandomizePlacement", ClampMin = "0.0"))
+  float PlacementTraceHeight = 0.f;
+
   /** Width of the grid in cells. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid")
   int32 Width = UGridBattleManager::GridSize;
@@ -199,6 +249,9 @@ protected:
   /** Cached world-space Z for each grid cell. */
   UPROPERTY()
   TArray<float> CellHeights;
+
+  /** Guard to ensure placement randomisation is only applied once. */
+  bool bHasRandomizedPlacement = false;
 
   /** Instanced mesh component used to render highlight quads. */
   UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Grid|Highlight")

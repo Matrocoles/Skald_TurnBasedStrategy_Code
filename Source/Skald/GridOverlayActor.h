@@ -18,6 +18,8 @@ public:
   AGridOverlayActor();
 
 protected:
+  virtual void BeginPlay() override;
+
   /** Root component used to anchor the grid overlay. */
   UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Grid")
   USceneComponent *SceneRoot = nullptr;

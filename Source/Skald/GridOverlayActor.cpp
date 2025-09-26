@@ -11,3 +11,11 @@ AGridOverlayActor::AGridOverlayActor() {
   GridComponent = CreateDefaultSubobject<UGridOverlayComponent>(TEXT("GridOverlay"));
 }
 
+void AGridOverlayActor::BeginPlay() {
+  if (GridComponent) {
+    GridComponent->ApplyRandomizedOrigin();
+  }
+
+  Super::BeginPlay();
+}
+
