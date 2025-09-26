@@ -6,6 +6,8 @@
 #include "Engine/World.h"
 #include "FighterPawn.h"
 #include "GridObstacleComponent.h"
+#include "Components/DecalComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/SceneComponent.h"
 #include "GameFramework/Actor.h"
@@ -173,7 +175,9 @@ void UGridOverlayComponent::OnRegister() {
   RefreshOriginFromOwner();
 
   EnsureBaseGridComponentSetup();
-  EnsureHighlightComponentSetup();
+  if (!bUseDecalHighlights) {
+    EnsureHighlightComponentSetup();
+  }
 }
 
 void UGridOverlayComponent::BeginPlay() {
@@ -449,6 +453,109 @@ void UGridOverlayComponent::ApplyHighlightColor(int32 InstanceIndex,
   HighlightMeshComponent->SetCustomDataValue(InstanceIndex, 3, Color.A, true);
 }
 
+UMaterialInterface *UGridOverlayComponent::GetHighlightDecalMaterial() const {
+  if (HighlightDecalMaterial) {
+    return HighlightDecalMaterial;
+  }
+
+  return HighlightMaterial;
+}
+
+void UGridOverlayComponent::HighlightCellWithDecal(const FIntPoint &GridCoord,
+                                                   const FColor &Color) {
+  AActor *Owner = GetOwner();
+  if (!Owner) {
+    return;
+  }
+
+  UMaterialInterface *BaseMaterial = GetHighlightDecalMaterial();
+  if (!BaseMaterial) {
+    return;
+  }
+
+  UDecalComponent *Decal = nullptr;
+  if (TWeakObjectPtr<UDecalComponent> *Existing = HighlightedDecals.Find(GridCoord)) {
+    Decal = Existing->Get();
+    if (!Decal) {
+      HighlightedDecals.Remove(GridCoord);
+      HighlightedDecalMaterials.Remove(GridCoord);
+    }
+  }
+
+  if (!Decal) {
+    Decal = NewObject<UDecalComponent>(Owner);
+    if (!Decal) {
+      return;
+    }
+
+    Decal->CreationMethod = EComponentCreationMethod::Instance;
+    Decal->SetMobility(EComponentMobility::Movable);
+    Decal->FadeScreenSize = HighlightDecalFadeScreenSize;
+    Owner->AddOwnedComponent(Decal);
+    Owner->AddInstanceComponent(Decal);
+
+    if (USceneComponent *Root = Owner->GetRootComponent()) {
+      Decal->AttachToComponent(Root, FAttachmentTransformRules::KeepWorldTransform);
+    }
+
+    Decal->RegisterComponent();
+    HighlightedDecals.Add(GridCoord, Decal);
+  }
+
+  UMaterialInstanceDynamic *DynamicMaterial = nullptr;
+  if (TWeakObjectPtr<UMaterialInstanceDynamic> *ExistingMaterial =
+          HighlightedDecalMaterials.Find(GridCoord)) {
+    DynamicMaterial = ExistingMaterial->Get();
+    if (!DynamicMaterial) {
+      HighlightedDecalMaterials.Remove(GridCoord);
+    }
+  }
+
+  if (!DynamicMaterial) {
+    DynamicMaterial = UMaterialInstanceDynamic::Create(BaseMaterial, this);
+
+    if (DynamicMaterial) {
+      HighlightedDecalMaterials.Add(GridCoord, DynamicMaterial);
+    }
+  }
+
+  if (DynamicMaterial) {
+    Decal->SetDecalMaterial(DynamicMaterial);
+  } else {
+    Decal->SetDecalMaterial(BaseMaterial);
+  }
+
+  const int32 ArrayIndex = Index(GridCoord);
+  const FQuat CellRotation =
+      CellRotations.IsValidIndex(ArrayIndex) ? CellRotations[ArrayIndex]
+                                             : FQuat::Identity;
+  const FVector CellNormal = CellRotation.RotateVector(FVector::UpVector).GetSafeNormal();
+  const FVector CellTangent =
+      CellRotation.RotateVector(FVector::ForwardVector).GetSafeNormal();
+  const FVector WorldCenter = GridToWorld(GridCoord);
+  FVector DecalLocation =
+      WorldCenter + CellNormal * (HighlightHeightOffset + HighlightDecalProjectionDepth * 0.5f);
+  const FRotationMatrix DecalBasis = FRotationMatrix::MakeFromXZ(-CellNormal, CellTangent);
+  const FRotator DecalRotation = DecalBasis.Rotator();
+
+  const float EffectiveCellSize = FMath::Max(CellSize, KINDA_SMALL_NUMBER);
+  const float HalfSize = 0.5f * EffectiveCellSize * HighlightDecalSizeMultiplier;
+  Decal->DecalSize = FVector(HighlightDecalProjectionDepth, HalfSize, HalfSize);
+  Decal->FadeScreenSize = HighlightDecalFadeScreenSize;
+  Decal->SetWorldLocationAndRotation(DecalLocation, DecalRotation);
+
+  if (HighlightDecalLifeSpan > 0.f && HighlightDecalFadeDuration > 0.f) {
+    Decal->SetFadeOut(HighlightDecalLifeSpan, HighlightDecalFadeDuration, true);
+  } else {
+    Decal->ResetFade();
+  }
+
+  if (DynamicMaterial) {
+    DynamicMaterial->SetVectorParameterValue(HighlightDecalColorParameter,
+                                             FLinearColor(Color));
+  }
+}
+
 void UGridOverlayComponent::ApplyBaseGridColor(int32 InstanceIndex,
                                                const FLinearColor &Color) {
   if (!BaseGridMeshComponent || BaseGridMeshComponent->NumCustomDataFloats < 4 ||
@@ -559,6 +666,11 @@ void UGridOverlayComponent::HighlightCell(const FIntPoint &GridCoord,
     return;
   }
 
+  if (bUseDecalHighlights) {
+    HighlightCellWithDecal(GridCoord, Color);
+    return;
+  }
+
   if (!EnsureHighlightComponentSetup()) {
     return;
   }
@@ -607,6 +719,16 @@ void UGridOverlayComponent::ClearHighlights() {
   if (HighlightMeshComponent) {
     HighlightMeshComponent->ClearInstances();
   }
+
+  if (HighlightedDecals.Num() > 0) {
+    for (auto It = HighlightedDecals.CreateIterator(); It; ++It) {
+      if (UDecalComponent *Decal = It.Value().Get()) {
+        Decal->DestroyComponent();
+      }
+    }
+    HighlightedDecals.Empty();
+  }
+  HighlightedDecalMaterials.Empty();
 
 #if WITH_EDITOR
   if (GetWorld() && bFlushAllPersistentOnClear) {
