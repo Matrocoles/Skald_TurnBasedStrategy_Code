@@ -598,7 +598,7 @@ void UGridOverlayComponent::HighlightCellWithDecal(const FIntPoint &GridCoord,
   const FVector WorldCenter = GridToWorld(GridCoord);
   FVector DecalLocation =
       WorldCenter + CellNormal * (HighlightHeightOffset + HighlightDecalProjectionDepth * 0.5f);
-  const FRotationMatrix DecalBasis = FRotationMatrix::MakeFromXZ(-CellNormal, CellTangent);
+  const FMatrix DecalBasis = FRotationMatrix::MakeFromXZ(-CellNormal, CellTangent);
   const FRotator DecalRotation = DecalBasis.Rotator();
 
   const float EffectiveCellSize = FMath::Max(CellSize, KINDA_SMALL_NUMBER);
@@ -611,7 +611,7 @@ void UGridOverlayComponent::HighlightCellWithDecal(const FIntPoint &GridCoord,
     Decal->SetFadeOut(HighlightDecalLifeSpan, HighlightDecalFadeDuration, false);
     ScheduleDecalRemoval(GridCoord, Decal);
   } else {
-    Decal->ResetFade();
+    Decal->SetFadeOut(0.f, 0.f, false);
     ClearDecalRemovalTimer(GridCoord);
   }
 
