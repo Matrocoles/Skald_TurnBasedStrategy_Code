@@ -14,6 +14,7 @@
 #include "Landscape.h"
 #include "LandscapeComponent.h"
 #include "Math/RotationMatrix.h"
+#include "Math/Quat.h"
 #include "UObject/UObjectGlobals.h"
 #include "TimerManager.h"
 
@@ -598,8 +599,10 @@ void UGridOverlayComponent::HighlightCellWithDecal(const FIntPoint &GridCoord,
   const FVector WorldCenter = GridToWorld(GridCoord);
   FVector DecalLocation =
       WorldCenter + CellNormal * (HighlightHeightOffset + HighlightDecalProjectionDepth * 0.5f);
-  const FMatrix DecalBasis = FRotationMatrix::MakeFromXZ(-CellNormal, CellTangent);
-  const FRotator DecalRotation = DecalBasis.Rotator();
+  const auto DecalBasis =
+      UE::Math::TRotationMatrix<double>::MakeFromXZ(-CellNormal, CellTangent);
+  const FQuat DecalQuat = UE::Math::TQuat<double>::MakeFromRotationMatrix(DecalBasis);
+  const FRotator DecalRotation = DecalQuat.Rotator();
 
   const float EffectiveCellSize = FMath::Max(CellSize, KINDA_SMALL_NUMBER);
   const float HalfSize = 0.5f * EffectiveCellSize * HighlightDecalSizeMultiplier;
@@ -607,12 +610,12 @@ void UGridOverlayComponent::HighlightCellWithDecal(const FIntPoint &GridCoord,
   Decal->FadeScreenSize = HighlightDecalFadeScreenSize;
   Decal->SetWorldLocationAndRotation(DecalLocation, DecalRotation);
 
+  ClearDecalRemovalTimer(GridCoord);
+  Decal->SetFadeOut(0.f, 0.f, false);
+
   if (HighlightDecalLifeSpan > 0.f && HighlightDecalFadeDuration > 0.f) {
     Decal->SetFadeOut(HighlightDecalLifeSpan, HighlightDecalFadeDuration, false);
     ScheduleDecalRemoval(GridCoord, Decal);
-  } else {
-    Decal->SetFadeOut(0.f, 0.f, false);
-    ClearDecalRemovalTimer(GridCoord);
   }
 
   if (DynamicMaterial) {
