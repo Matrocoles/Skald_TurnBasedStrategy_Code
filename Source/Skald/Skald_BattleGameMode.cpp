@@ -895,8 +895,8 @@ bool ASkald_BattleGameMode::RelocateControllersNearBattleGrid(
       BaseLocation.X += (static_cast<float>(Width) * CellSize) * 0.5f;
       BaseLocation.Y += (static_cast<float>(Height) * CellSize) * 0.5f;
       bHasLocation = true;
-    } else if (AActor *Owner = Grid->GetOwner()) {
-      BaseLocation = Owner->GetActorLocation();
+    } else if (AActor *OwnerActor = Grid->GetOwner()) {
+      BaseLocation = OwnerActor->GetActorLocation();
       bHasLocation = true;
     }
   }
@@ -1122,13 +1122,15 @@ void ASkald_BattleGameMode::TryLaunchBattle() {
 
   TArray<AController *> ControllersToRelocate;
   if (AttackerPS) {
-    if (AController *Owner = Cast<AController>(AttackerPS->GetOwner())) {
-      ControllersToRelocate.AddUnique(Owner);
+    if (AController *OwnerController =
+            Cast<AController>(AttackerPS->GetOwner())) {
+      ControllersToRelocate.AddUnique(OwnerController);
     }
   }
   if (DefenderPS) {
-    if (AController *Owner = Cast<AController>(DefenderPS->GetOwner())) {
-      ControllersToRelocate.AddUnique(Owner);
+    if (AController *OwnerController =
+            Cast<AController>(DefenderPS->GetOwner())) {
+      ControllersToRelocate.AddUnique(OwnerController);
     }
   }
 
