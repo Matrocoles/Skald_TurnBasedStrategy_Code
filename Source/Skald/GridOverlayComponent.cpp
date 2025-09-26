@@ -584,6 +584,23 @@ void UGridOverlayComponent::RegisterObstacle(UGridObstacleComponent *Obstacle) {
   }
 }
 
+void UGridOverlayComponent::ClearStaticObstacleAtCell(
+    const FIntPoint &GridCoord) {
+  if (!bHasInitializedGrid || !IsValidGrid(GridCoord)) {
+    return;
+  }
+
+  const int32 Idx = Index(GridCoord);
+  if (Cells.IsValidIndex(Idx)) {
+    Cells[Idx] = false;
+  }
+  if (ObscuredCells.IsValidIndex(Idx)) {
+    ObscuredCells[Idx] = false;
+  }
+
+  UpdateBaseGridVisual(GridCoord);
+}
+
 void UGridOverlayComponent::HandleLandscapeHit(const FHitResult &Hit,
                                                const FIntPoint &Cell,
                                                int32 CellIndex) {

@@ -160,6 +160,12 @@ void AGridOverlayActor::SpawnRandomObstacles() {
 }
 
 void AGridOverlayActor::ClearSpawnedObstacles() {
+  if (GridComponent && SpawnedObstacleCells.Num() > 0) {
+    for (const FIntPoint &Cell : SpawnedObstacleCells) {
+      GridComponent->ClearStaticObstacleAtCell(Cell);
+    }
+  }
+
   for (const TWeakObjectPtr<AGridObstacleActor> &ObstaclePtr : SpawnedObstacleActors) {
     if (ObstaclePtr.IsValid()) {
       AGridObstacleActor *Obstacle = ObstaclePtr.Get();

@@ -134,9 +134,12 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Grid")
   void RebuildGridVisuals();
 
-    /** Register an obstacle component so it can affect grid behaviour. */
-    UFUNCTION(BlueprintCallable, Category = "Grid")
-    void RegisterObstacle(UGridObstacleComponent *Obstacle);
+  /** Register an obstacle component so it can affect grid behaviour. */
+  UFUNCTION(BlueprintCallable, Category = "Grid")
+  void RegisterObstacle(UGridObstacleComponent *Obstacle);
+
+  /** Clear any static obstacle state associated with the given cell. */
+  void ClearStaticObstacleAtCell(const FIntPoint &GridCoord);
 
   /** If true, ClearHighlights() will FlushPersistentDebugLines for the entire world. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grid|Debug")
