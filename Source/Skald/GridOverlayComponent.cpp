@@ -67,8 +67,16 @@ void UGridOverlayComponent::ApplyRandomizedOrigin() {
   }
 
   Owner->SetActorLocation(TargetLocation, false, nullptr, ETeleportType::TeleportPhysics);
-  Origin = TargetLocation;
-  bHasRandomizedPlacement = true;
+  RefreshOriginFromOwner(true);
+}
+
+void UGridOverlayComponent::RefreshOriginFromOwner(bool bMarkPlacementRandomized) {
+  if (AActor *Owner = GetOwner()) {
+    Origin = Owner->GetActorLocation();
+    if (bMarkPlacementRandomized && bRandomizePlacement) {
+      bHasRandomizedPlacement = true;
+    }
+  }
 }
 
 bool UGridOverlayComponent::EnsureInstancedMeshComponent(
@@ -151,9 +159,7 @@ void UGridOverlayComponent::ConfigureInstancedComponent(
 void UGridOverlayComponent::OnRegister() {
   Super::OnRegister();
 
-  if (AActor *Owner = GetOwner()) {
-    Origin = Owner->GetActorLocation();
-  }
+  RefreshOriginFromOwner();
 
   EnsureBaseGridComponentSetup();
   EnsureHighlightComponentSetup();

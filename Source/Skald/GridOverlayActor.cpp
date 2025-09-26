@@ -12,11 +12,21 @@ constexpr float kSmallHeightEpsilon = 0.01f;
 
 AGridOverlayActor::AGridOverlayActor() {
   PrimaryActorTick.bCanEverTick = false;
+  bReplicates = true;
+  SetReplicateMovement(true);
 
   SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
   SetRootComponent(SceneRoot);
 
   GridComponent = CreateDefaultSubobject<UGridOverlayComponent>(TEXT("GridOverlay"));
+}
+
+void AGridOverlayActor::OnRep_ReplicatedMovement() {
+  Super::OnRep_ReplicatedMovement();
+
+  if (GridComponent) {
+    GridComponent->RefreshOriginFromOwner(true);
+  }
 }
 
 void AGridOverlayActor::BeginPlay() {

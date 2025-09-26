@@ -29,6 +29,8 @@ public:
 protected:
   virtual void BeginPlay() override;
 
+  virtual void OnRep_ReplicatedMovement() override;
+
   /** Root component used to anchor the grid overlay. */
   UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Grid")
   USceneComponent *SceneRoot = nullptr;

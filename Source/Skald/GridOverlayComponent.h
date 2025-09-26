@@ -73,6 +73,10 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Grid")
   void ApplyRandomizedOrigin();
 
+  /** Update the cached origin from the owning actor's transform. */
+  UFUNCTION(BlueprintCallable, Category = "Grid")
+  void RefreshOriginFromOwner(bool bMarkPlacementRandomized = false);
+
   /** Convert a world location to grid coordinates. */
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Grid")
   FIntPoint WorldToGrid(const FVector &WorldLocation) const;
