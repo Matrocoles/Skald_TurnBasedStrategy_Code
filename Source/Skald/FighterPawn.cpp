@@ -438,7 +438,7 @@ void AFighterPawn::FinalizeQueuedAttack() {
     if (!bPendingAttackTargetDied && !bHasProcessedPendingRoll) {
       Target->OnHealthChanged.Broadcast(Target->Stats.Health);
     }
-    if (!Target->IsAlive() && !Target->IsPendingKill()) {
+    if (!Target->IsAlive() && !Target->IsActorBeingDestroyed()) {
       Target->Destroy();
     }
   }

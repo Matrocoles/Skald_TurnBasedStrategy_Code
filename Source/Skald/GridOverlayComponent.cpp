@@ -601,7 +601,7 @@ void UGridOverlayComponent::HighlightCellWithDecal(const FIntPoint &GridCoord,
       WorldCenter + CellNormal * (HighlightHeightOffset + HighlightDecalProjectionDepth * 0.5f);
   const auto DecalBasis =
       UE::Math::TRotationMatrix<double>::MakeFromXZ(-CellNormal, CellTangent);
-  const FQuat DecalQuat = UE::Math::TQuat<double>::MakeFromRotationMatrix(DecalBasis);
+  const FQuat DecalQuat = DecalBasis.ToQuat();
   const FRotator DecalRotation = DecalQuat.Rotator();
 
   const float EffectiveCellSize = FMath::Max(CellSize, KINDA_SMALL_NUMBER);
