@@ -5,6 +5,7 @@
 #include "Engine/DataTable.h"
 #include "GameFramework/Actor.h"
 #include "SkaldTypes.h"
+#include "Engine/Texture2D.h"
 #include "GridBattleManager.generated.h"
 
 class AFighterPawn; // MUST be before the delegates
@@ -68,6 +69,7 @@ struct FFighterDefinition : public FTableRowBase
         , MeshClass(nullptr)
         , Faction(ESkaldFaction::None)
         , Stats()
+        , Portrait(nullptr)
     {
     }
 
@@ -82,6 +84,9 @@ struct FFighterDefinition : public FTableRowBase
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Fighter")
     FFighterStats Stats;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Fighter")
+    TSoftObjectPtr<UTexture2D> Portrait;
 };
 
 USTRUCT(BlueprintType)

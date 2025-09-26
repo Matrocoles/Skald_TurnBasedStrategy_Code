@@ -5,6 +5,8 @@
 #include "FighterSelectionWidget.generated.h"
 
 class UButton;
+class UTexture2D;
+class UImage;
 class UScrollBox;
 class UTextBlock;
 class UFighterSelectionWidget; // forward declare for entry widget
@@ -36,6 +38,10 @@ public:
   /** Name text bound from the blueprint. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *NameText;
+
+  /** Portrait image bound from the blueprint. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UImage *PortraitImage;
 
   /** Strength display text. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
@@ -72,6 +78,10 @@ public:
   /** Fighter definition represented by this entry. */
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Fighter")
   FFighterDefinition Fighter;
+
+  /** Returns the portrait texture for this fighter, if loaded. */
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Skald|Fighter")
+  UTexture2D *GetPortraitTexture() const;
 
 private:
   /** Callback for SelectButton. */
