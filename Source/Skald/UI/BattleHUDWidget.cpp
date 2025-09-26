@@ -1,10 +1,13 @@
 #include "UI/BattleHUDWidget.h"
 #include "Components/Button.h"
+#include "Components/Image.h"
 #include "Components/TextBlock.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "FighterPawn.h"
 #include "GridOverlayComponent.h"
+#include "TimerManager.h"
+#include "Engine/Texture2D.h"
 
 void UBattleHUDWidget::NativeConstruct() {
   Super::NativeConstruct();
@@ -24,6 +27,10 @@ void UBattleHUDWidget::NativeConstruct() {
   if (EndTurnButton) {
     EndTurnButton->OnClicked.AddDynamic(
         this, &UBattleHUDWidget::HandleEndTurnPressed);
+  }
+
+  if (DiceRollerImage) {
+    DiceRollerImage->SetVisibility(ESlateVisibility::Collapsed);
   }
 }
 
@@ -205,6 +212,32 @@ void UBattleHUDWidget::SetEndTurnVisibility(bool bVisible) {
   }
 }
 
+void UBattleHUDWidget::ShowDiceRoll(int32 RollValue) {
+  if (!DiceRollerImage) {
+    return;
+  }
+
+  UTexture2D *Texture = nullptr;
+  const int32 Index = RollValue - 1;
+  if (DiceFaceTextures.IsValidIndex(Index)) {
+    Texture = DiceFaceTextures[Index];
+  }
+
+  if (Texture) {
+    DiceRollerImage->SetBrushFromTexture(Texture, true);
+    DiceRollerImage->SetVisibility(ESlateVisibility::HitTestInvisible);
+  } else {
+    DiceRollerImage->SetVisibility(ESlateVisibility::Collapsed);
+  }
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(DiceRollerHideTimer);
+    World->GetTimerManager().SetTimer(
+        DiceRollerHideTimer, this, &UBattleHUDWidget::HideDiceRoller, 1.f,
+        false);
+  }
+}
+
 void UBattleHUDWidget::ClearCommandPreviews() {
   bMoveSelected = false;
   bAttackSelected = false;
@@ -223,4 +256,11 @@ UGridOverlayComponent *UBattleHUDWidget::FindGridOverlay() const {
     }
   }
   return nullptr;
+}
+
+void UBattleHUDWidget::HideDiceRoller() {
+  if (!DiceRollerImage) {
+    return;
+  }
+  DiceRollerImage->SetVisibility(ESlateVisibility::Collapsed);
 }

@@ -55,6 +55,12 @@ AFighterPawn::AFighterPawn() {
     DamageFloatWidgetTemplate = DamageWidgetFinder.Class;
   }
 
+  static ConstructorHelpers::FClassFinder<UUserWidget> MissWidgetFinder(
+      TEXT("/Game/Blueprints/UI/WBP_Misses"));
+  if (MissWidgetFinder.Succeeded()) {
+    MissWidgetTemplate = MissWidgetFinder.Class;
+  }
+
   ActionsRemaining = 0;
   bHasActivatedThisRound = false;
   bIsCurrentlyActive = false;
@@ -173,6 +179,24 @@ UUserWidget *AFighterPawn::GetDamageWidgetFromPool() {
   return nullptr;
 }
 
+UUserWidget *AFighterPawn::GetMissWidgetFromPool() {
+  for (UUserWidget *Widget : MissWidgetPool) {
+    if (Widget && !Widget->IsInViewport()) {
+      return Widget;
+    }
+  }
+  if (MissWidgetTemplate) {
+    if (UWorld *World = GetWorld()) {
+      if (UUserWidget *NewWidget =
+              CreateWidget<UUserWidget>(World, MissWidgetTemplate)) {
+        MissWidgetPool.Add(NewWidget);
+        return NewWidget;
+      }
+    }
+  }
+  return nullptr;
+}
+
 void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
   if (!bIsCurrentlyActive || ActionsRemaining <= 0) {
     return;
@@ -214,6 +238,21 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
     return;
   }
 
+  if (PendingAttackTarget.IsValid() || PendingAttackRolls.Num() > 0) {
+    if (UWorld *World = GetWorld()) {
+      if (USkaldGameInstance *GameInstance =
+              Cast<USkaldGameInstance>(World->GetGameInstance())) {
+        if (UGridBattleManager *BattleManager =
+                GameInstance->GridBattleManager) {
+          BattleManager->ReportAttackRejected(
+              this, Target,
+              NSLOCTEXT("SkaldBattle", "AttackInProgress", "Attack in progress."));
+        }
+      }
+    }
+    return;
+  }
+
   const int32 Distance = FMath::Abs(Target->CurrentCell.X - CurrentCell.X) +
                          FMath::Abs(Target->CurrentCell.Y - CurrentCell.Y);
   if (Distance > Stats.AttackRange) {
@@ -241,7 +280,11 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
           ? 3
           : (Stats.Strength < Target->Stats.Defence ? 5 : 4);
 
-  for (int32 i = 0; i < Stats.AttackDice && Target->IsAlive(); ++i) {
+  TArray<FQueuedAttackRoll> QueuedRolls;
+  QueuedRolls.Reserve(Stats.AttackDice);
+
+  int32 SimulatedHealth = Target->Stats.Health;
+  for (int32 i = 0; i < Stats.AttackDice && SimulatedHealth > 0; ++i) {
     const int32 Roll = RandomStream->RandRange(1, 6);
     int32 DamageThisDie = 0;
 
@@ -251,39 +294,18 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
       DamageThisDie = Stats.AttackDamage;
     }
 
-    const bool bHit = DamageThisDie > 0;
-    if (USkaldGameInstance *GI = Cast<USkaldGameInstance>(GetGameInstance())) {
-      if (UGridBattleManager *BattleManager = GI->GridBattleManager) {
-        BattleManager->ReportAttackRoll(this, Target, Roll, bHit, DamageThisDie);
-      }
-    }
-
     if (DamageThisDie > 0) {
-      Target->Stats.Health =
-          FMath::Max(0, Target->Stats.Health - DamageThisDie);
-
-      if (UUserWidget *DamageWidget = GetDamageWidgetFromPool()) {
-        if (UTextBlock *Text = Cast<UTextBlock>(
-                DamageWidget->GetWidgetFromName(TEXT("DamageText")))) {
-          Text->SetText(FText::AsNumber(DamageThisDie));
-        }
-        DamageWidget->AddToViewport();
-        if (UWorld *World = GetWorld()) {
-          FTimerHandle Timer;
-          World->GetTimerManager().SetTimer(
-              Timer, FTimerDelegate::CreateLambda([DamageWidget]() {
-                DamageWidget->RemoveFromParent();
-              }),
-              1.f, false);
-        }
-      }
+      SimulatedHealth = FMath::Max(0, SimulatedHealth - DamageThisDie);
     }
+
+    FQueuedAttackRoll &NewRoll = QueuedRolls.Emplace_GetRef();
+    NewRoll.RollValue = Roll;
+    NewRoll.Damage = DamageThisDie;
+    NewRoll.bHit = DamageThisDie > 0;
   }
 
-  Target->OnHealthChanged.Broadcast(Target->Stats.Health);
-  if (!Target->IsAlive()) {
-    Target->Destroy();
-  }
+  StartQueuedAttack(Target, MoveTemp(QueuedRolls));
+
   ActionsRemaining = FMath::Max(0, ActionsRemaining - 1);
 
   BroadcastActionsRemaining();
@@ -291,6 +313,141 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
   if (Grid) {
     Grid->ClearHighlights();
   }
+}
+
+void AFighterPawn::StartQueuedAttack(AFighterPawn *Target,
+                                     TArray<FQueuedAttackRoll> &&Rolls) {
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(AttackRollTimerHandle);
+  }
+
+  PendingAttackRolls = MoveTemp(Rolls);
+  PendingAttackRollIndex = 0;
+  PendingAttackTarget = Target;
+  bPendingAttackTargetDied = false;
+  bHasProcessedPendingRoll = false;
+
+  if (PendingAttackRolls.Num() == 0) {
+    FinalizeQueuedAttack();
+    return;
+  }
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().SetTimer(AttackRollTimerHandle, this,
+                                      &AFighterPawn::ResolveNextAttackRoll, 1.f,
+                                      false);
+  } else {
+    ResolveNextAttackRoll();
+  }
+}
+
+void AFighterPawn::ResolveNextAttackRoll() {
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(AttackRollTimerHandle);
+  }
+
+  if (!PendingAttackRolls.IsValidIndex(PendingAttackRollIndex)) {
+    FinalizeQueuedAttack();
+    return;
+  }
+
+  AFighterPawn *Target = PendingAttackTarget.Get();
+  if (!Target) {
+    FinalizeQueuedAttack();
+    return;
+  }
+
+  const FQueuedAttackRoll Roll = PendingAttackRolls[PendingAttackRollIndex];
+  bHasProcessedPendingRoll = true;
+
+  if (USkaldGameInstance *GI = Cast<USkaldGameInstance>(GetGameInstance())) {
+    if (UGridBattleManager *BattleManager = GI->GridBattleManager) {
+      BattleManager->ReportAttackRoll(this, Target, Roll.RollValue, Roll.bHit,
+                                      Roll.Damage);
+    }
+  }
+
+  if (Roll.bHit) {
+    Target->Stats.Health =
+        FMath::Max(0, Target->Stats.Health - Roll.Damage);
+    if (Target->Stats.Health <= 0) {
+      bPendingAttackTargetDied = true;
+    }
+
+    if (UUserWidget *DamageWidget = GetDamageWidgetFromPool()) {
+      if (UTextBlock *Text = Cast<UTextBlock>(
+              DamageWidget->GetWidgetFromName(TEXT("DamageText")))) {
+        Text->SetText(FText::AsNumber(Roll.Damage));
+      }
+      DamageWidget->AddToViewport();
+      if (UWorld *WorldPtr = GetWorld()) {
+        FTimerHandle Timer;
+        WorldPtr->GetTimerManager().SetTimer(
+            Timer, FTimerDelegate::CreateLambda([DamageWidget]() {
+              DamageWidget->RemoveFromParent();
+            }),
+            1.f, false);
+      }
+    }
+  } else {
+    if (UUserWidget *MissWidget = GetMissWidgetFromPool()) {
+      if (UTextBlock *MissText =
+              Cast<UTextBlock>(MissWidget->GetWidgetFromName(TEXT("Missed")))) {
+        MissText->SetText(NSLOCTEXT("Skald", "BattleAttackMiss", "Missed"));
+      }
+      MissWidget->AddToViewport();
+      if (UWorld *WorldPtr = GetWorld()) {
+        FTimerHandle Timer;
+        WorldPtr->GetTimerManager().SetTimer(
+            Timer, FTimerDelegate::CreateLambda([MissWidget]() {
+              MissWidget->RemoveFromParent();
+            }),
+            1.f, false);
+      }
+    }
+  }
+
+  Target->OnHealthChanged.Broadcast(Target->Stats.Health);
+
+  ++PendingAttackRollIndex;
+
+  const bool bHasMoreRolls =
+      PendingAttackRolls.IsValidIndex(PendingAttackRollIndex);
+  const bool bTargetAlive = Target->IsAlive();
+
+  if (bHasMoreRolls && bTargetAlive) {
+    if (UWorld *WorldPtr = GetWorld()) {
+      WorldPtr->GetTimerManager().SetTimer(
+          AttackRollTimerHandle, this, &AFighterPawn::ResolveNextAttackRoll,
+          1.f, false);
+    } else {
+      ResolveNextAttackRoll();
+    }
+  } else {
+    FinalizeQueuedAttack();
+  }
+}
+
+void AFighterPawn::FinalizeQueuedAttack() {
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(AttackRollTimerHandle);
+  }
+
+  AFighterPawn *Target = PendingAttackTarget.Get();
+  if (Target) {
+    if (!bPendingAttackTargetDied && !bHasProcessedPendingRoll) {
+      Target->OnHealthChanged.Broadcast(Target->Stats.Health);
+    }
+    if (!Target->IsAlive() && !Target->IsPendingKill()) {
+      Target->Destroy();
+    }
+  }
+
+  PendingAttackRolls.Reset();
+  PendingAttackRollIndex = 0;
+  PendingAttackTarget = nullptr;
+  bPendingAttackTargetDied = false;
+  bHasProcessedPendingRoll = false;
 }
 
 void AFighterPawn::UpdateMeshOffset() {

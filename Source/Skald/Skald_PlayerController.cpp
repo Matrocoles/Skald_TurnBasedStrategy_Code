@@ -675,6 +675,12 @@ void ASkaldPlayerController::InitializeBattleHUD() {
         this, &ASkaldPlayerController::HandleBattleEnded);
     GI->GridBattleManager->OnBattleEnded.AddDynamic(
         this, &ASkaldPlayerController::HandleBattleEnded);
+    GI->GridBattleManager->OnAttackResolved.RemoveAll(this);
+    GI->GridBattleManager->OnAttackResolved.AddDynamic(
+        this, &ASkaldPlayerController::HandleAttackResolved);
+    GI->GridBattleManager->OnAttackRejected.RemoveAll(this);
+    GI->GridBattleManager->OnAttackRejected.AddDynamic(
+        this, &ASkaldPlayerController::HandleAttackRejected);
     ActiveFighter = GI->GridBattleManager->GetActiveFighter();
 
     const int32 CurrentRound = GI->GridBattleManager->GetCurrentRound();
@@ -2140,6 +2146,32 @@ void ASkaldPlayerController::UpdateBattlePlayersTurnDisplay() {
                                            "{0}'s Turn"),
                                  FText::FromString(PlayerName));
   BattleHudWidget->SetPlayersTurnLabel(Label);
+}
+
+void ASkaldPlayerController::HandleAttackResolved(AFighterPawn *Attacker,
+                                                  AFighterPawn *Defender,
+                                                  int32 Roll, bool bHit,
+                                                  int32 Damage) {
+  if (!BattleHudWidget) {
+    return;
+  }
+
+  BattleHudWidget->ShowDiceRoll(Roll);
+}
+
+void ASkaldPlayerController::HandleAttackRejected(AFighterPawn *Attacker,
+                                                  AFighterPawn *Defender,
+                                                  const FText &Reason) {
+  if (!IsFriendlyFighter(Attacker)) {
+    return;
+  }
+
+  const FString ReasonString = Reason.ToString();
+  if (ReasonString.IsEmpty()) {
+    return;
+  }
+
+  NotifyActionError(ReasonString);
 }
 
 bool ASkaldPlayerController::IsFriendlyFighter(const AFighterPawn *Fighter) const {

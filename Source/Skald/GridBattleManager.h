@@ -14,6 +14,8 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
     FOnBattleEnded, ESkaldFaction, WinningFaction, int32, AttackerCasualties, int32, DefenderCasualties);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(
     FOnAttackResolved, AFighterPawn*, Attacker, AFighterPawn*, Defender, int32, Roll, bool, bHit, int32, Damage);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
+    FOnAttackRejected, AFighterPawn*, Attacker, AFighterPawn*, Defender, const FText&, Reason);
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnActiveFighterChanged, AFighterPawn*, NewFighter);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnRoundStarted, int32, RoundNumber, ESkaldFaction, InitiativeWinner);
@@ -220,6 +222,10 @@ public:
     UPROPERTY(BlueprintAssignable, Category="Battle|Events")
     FOnAttackResolved OnAttackResolved;
 
+    /** Fired when an attack command is rejected. */
+    UPROPERTY(BlueprintAssignable, Category="Battle|Events")
+    FOnAttackRejected OnAttackRejected;
+
     /** Fired whenever the active fighter changes (including nullptr). */
     UPROPERTY(BlueprintAssignable, Category="Battle|Events")
     FOnActiveFighterChanged OnActiveFighterChanged;
@@ -235,6 +241,7 @@ public:
     void UnregisterFighter(AFighterPawn* Fighter);
 
     void ReportAttackRoll(AFighterPawn* Attacker, AFighterPawn* Defender, int32 Roll, bool bHit, int32 Damage);
+    void ReportAttackRejected(AFighterPawn* Attacker, AFighterPawn* Defender, const FText& Reason);
 
     /** Table containing fighter definitions. */
     UPROPERTY(EditDefaultsOnly, Category="Data")
