@@ -125,6 +125,8 @@ void AFighterPawn::BeginActivation() {
 }
 
 void AFighterPawn::ResetActivationState() {
+  CleanupPendingAttack();
+
   ActionsRemaining = 0;
   bHasActivatedThisRound = false;
   bIsCurrentlyActive = false;
@@ -133,6 +135,8 @@ void AFighterPawn::ResetActivationState() {
 }
 
 void AFighterPawn::FinishActivation() {
+  CleanupPendingAttack();
+
   ActionsRemaining = 0;
   bIsCurrentlyActive = false;
 
@@ -209,8 +213,8 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
 }
 
 void AFighterPawn::PerformAttack(AFighterPawn *Target) {
-  if (!bIsCurrentlyActive || ActionsRemaining <= 0 || !Target ||
-      !Target->IsAlive()) {
+  if (bAttackSequenceInProgress || !bIsCurrentlyActive || ActionsRemaining <= 0 ||
+      !Target || !Target->IsAlive()) {
     return;
   }
 
@@ -225,72 +229,116 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
     return;
   }
 
-  FRandomStream *RandomStream = nullptr;
-  if (UWorld *World = GetWorld()) {
-    if (USkaldGameInstance *GameInstance =
-            Cast<USkaldGameInstance>(World->GetGameInstance())) {
-      RandomStream = &GameInstance->CombatRandomStream;
-    }
-  }
-  if (!RandomStream) {
-    return;
-  }
-
   const int32 RequiredRoll =
       Stats.Strength > Target->Stats.Defence
           ? 3
           : (Stats.Strength < Target->Stats.Defence ? 5 : 4);
 
-  for (int32 i = 0; i < Stats.AttackDice && Target->IsAlive(); ++i) {
-    const int32 Roll = RandomStream->RandRange(1, 6);
-    int32 DamageThisDie = 0;
+  PendingAttackTarget = Target;
+  PendingAttackRequiredRoll = RequiredRoll;
+  PendingAttackDiceRemaining = FMath::Max(Stats.AttackDice, 0);
+  bAttackSequenceInProgress = PendingAttackDiceRemaining > 0;
 
-    if (Roll == 6) {
-      DamageThisDie = Stats.AttackDamage + 3; // crit
-    } else if (Roll >= RequiredRoll) {
-      DamageThisDie = Stats.AttackDamage;
-    }
+  if (!bAttackSequenceInProgress) {
+    FinalizePendingAttack(Target);
+    return;
+  }
 
-    const bool bHit = DamageThisDie > 0;
-    if (USkaldGameInstance *GI = Cast<USkaldGameInstance>(GetGameInstance())) {
-      if (UGridBattleManager *BattleManager = GI->GridBattleManager) {
-        BattleManager->ReportAttackRoll(this, Target, Roll, bHit, DamageThisDie);
+  ResolvePendingAttackRoll();
+}
+
+void AFighterPawn::ResolvePendingAttackRoll() {
+  UWorld *World = GetWorld();
+  if (!World) {
+    CleanupPendingAttack();
+    return;
+  }
+
+  AFighterPawn *Target = PendingAttackTarget.Get();
+  if (!Target || !Target->IsAlive()) {
+    FinalizePendingAttack(Target);
+    return;
+  }
+
+  USkaldGameInstance *GameInstance =
+      Cast<USkaldGameInstance>(World->GetGameInstance());
+  if (!GameInstance) {
+    CleanupPendingAttack();
+    return;
+  }
+
+  const int32 Roll = GameInstance->CombatRandomStream.RandRange(1, 6);
+  int32 DamageThisDie = 0;
+
+  if (Roll == 6) {
+    DamageThisDie = Stats.AttackDamage + 3; // crit
+  } else if (Roll >= PendingAttackRequiredRoll) {
+    DamageThisDie = Stats.AttackDamage;
+  }
+
+  const bool bHit = DamageThisDie > 0;
+  if (UGridBattleManager *BattleManager = GameInstance->GridBattleManager) {
+    BattleManager->ReportAttackRoll(this, Target, Roll, bHit, DamageThisDie);
+  }
+
+  if (DamageThisDie > 0) {
+    Target->Stats.Health =
+        FMath::Max(0, Target->Stats.Health - DamageThisDie);
+
+    if (UUserWidget *DamageWidget = GetDamageWidgetFromPool()) {
+      if (UTextBlock *Text = Cast<UTextBlock>(
+              DamageWidget->GetWidgetFromName(TEXT("DamageText")))) {
+        Text->SetText(FText::AsNumber(DamageThisDie));
       }
-    }
-
-    if (DamageThisDie > 0) {
-      Target->Stats.Health =
-          FMath::Max(0, Target->Stats.Health - DamageThisDie);
-
-      if (UUserWidget *DamageWidget = GetDamageWidgetFromPool()) {
-        if (UTextBlock *Text = Cast<UTextBlock>(
-                DamageWidget->GetWidgetFromName(TEXT("DamageText")))) {
-          Text->SetText(FText::AsNumber(DamageThisDie));
-        }
-        DamageWidget->AddToViewport();
-        if (UWorld *World = GetWorld()) {
-          FTimerHandle Timer;
-          World->GetTimerManager().SetTimer(
-              Timer, FTimerDelegate::CreateLambda([DamageWidget]() {
-                DamageWidget->RemoveFromParent();
-              }),
-              1.f, false);
-        }
-      }
+      DamageWidget->AddToViewport();
+      FTimerHandle LocalTimer;
+      World->GetTimerManager().SetTimer(
+          LocalTimer, FTimerDelegate::CreateLambda([DamageWidget]() {
+            DamageWidget->RemoveFromParent();
+          }),
+          1.f, false);
     }
   }
 
-  Target->OnHealthChanged.Broadcast(Target->Stats.Health);
-  if (!Target->IsAlive()) {
-    Target->Destroy();
+  --PendingAttackDiceRemaining;
+
+  if (PendingAttackDiceRemaining > 0 && Target->IsAlive()) {
+    World->GetTimerManager().SetTimer(AttackRollTimerHandle, this,
+                                      &AFighterPawn::ResolvePendingAttackRoll,
+                                      1.f, false);
+  } else {
+    FinalizePendingAttack(Target);
   }
+}
+
+void AFighterPawn::FinalizePendingAttack(AFighterPawn *Target) {
+  if (Target) {
+    Target->OnHealthChanged.Broadcast(Target->Stats.Health);
+    if (!Target->IsAlive()) {
+      Target->Destroy();
+    }
+  }
+
   ActionsRemaining = FMath::Max(0, ActionsRemaining - 1);
 
   BroadcastActionsRemaining();
 
-  if (Grid) {
+  if (UGridOverlayComponent *Grid = GetGrid()) {
     Grid->ClearHighlights();
   }
+
+  CleanupPendingAttack();
+}
+
+void AFighterPawn::CleanupPendingAttack() {
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(AttackRollTimerHandle);
+  }
+
+  PendingAttackTarget = nullptr;
+  PendingAttackDiceRemaining = 0;
+  PendingAttackRequiredRoll = 0;
+  bAttackSequenceInProgress = false;
 }
 
 void AFighterPawn::UpdateMeshOffset() {

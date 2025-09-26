@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Blueprint/UserWidget.h"
+#include "TimerManager.h"
 #include "BattleHUDWidget.generated.h"
 
 class UButton;
@@ -110,6 +111,10 @@ public:
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *PlayersTurnText;
 
+  /** Text displaying the most recent attack roll result. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UTextBlock *AttackRollResultText;
+
   /** Update the round and initiative labels. */
   void SetRoundInfo(const FText &RoundLabel, const FText &InitiativeLabel);
 
@@ -130,6 +135,9 @@ public:
 
   /** Clear any preview highlights tracked by the widget. */
   void ClearCommandPreviews();
+
+  /** Display the outcome of an attack roll for a short duration. */
+  void ShowAttackRollResult(bool bHit, int32 Damage);
 
 private:
   /** Callback when MoveButton is pressed. */
@@ -162,6 +170,10 @@ private:
   /** Find the grid overlay component in the world. */
   UGridOverlayComponent *FindGridOverlay() const;
 
+  /** Clear the current attack roll indicator. */
+  UFUNCTION()
+  void ClearAttackRollResult();
+
   /** Whether movement preview is currently shown. */
   bool bMoveSelected = false;
 
@@ -171,5 +183,8 @@ private:
   /** Fighter currently bound to the HUD. */
   UPROPERTY()
   AFighterPawn *BoundFighter;
+
+  /** Timer used to hide the attack roll indicator after a delay. */
+  FTimerHandle AttackResultTimerHandle;
 };
 

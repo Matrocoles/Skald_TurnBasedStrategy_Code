@@ -675,6 +675,10 @@ void ASkaldPlayerController::InitializeBattleHUD() {
         this, &ASkaldPlayerController::HandleBattleEnded);
     GI->GridBattleManager->OnBattleEnded.AddDynamic(
         this, &ASkaldPlayerController::HandleBattleEnded);
+    GI->GridBattleManager->OnAttackResolved.RemoveDynamic(
+        this, &ASkaldPlayerController::HandleAttackResolved);
+    GI->GridBattleManager->OnAttackResolved.AddDynamic(
+        this, &ASkaldPlayerController::HandleAttackResolved);
     ActiveFighter = GI->GridBattleManager->GetActiveFighter();
 
     const int32 CurrentRound = GI->GridBattleManager->GetCurrentRound();
@@ -1949,6 +1953,21 @@ void ASkaldPlayerController::HandleEndTurnPressed() {
   LockedActiveFighter = nullptr;
   UpdateBattleHUDButtons();
   CancelCommandMode();
+}
+
+void ASkaldPlayerController::HandleAttackResolved(AFighterPawn *Attacker,
+                                                  AFighterPawn *Defender,
+                                                  int32 Roll, bool bHit,
+                                                  int32 Damage) {
+  if (!IsLocalController() || !BattleHudWidget) {
+    return;
+  }
+
+  if (!Attacker || !Defender) {
+    return;
+  }
+
+  BattleHudWidget->ShowAttackRollResult(bHit, Damage);
 }
 
 void ASkaldPlayerController::HandleRightClick() {

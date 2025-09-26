@@ -5,6 +5,7 @@
 #include "EngineUtils.h"
 #include "FighterPawn.h"
 #include "GridOverlayComponent.h"
+#include "Styling/SlateColor.h"
 
 void UBattleHUDWidget::NativeConstruct() {
   Super::NativeConstruct();
@@ -25,6 +26,8 @@ void UBattleHUDWidget::NativeConstruct() {
     EndTurnButton->OnClicked.AddDynamic(
         this, &UBattleHUDWidget::HandleEndTurnPressed);
   }
+
+  ClearAttackRollResult();
 }
 
 void UBattleHUDWidget::RefreshStats() { UpdateStatPanel(); }
@@ -210,6 +213,42 @@ void UBattleHUDWidget::ClearCommandPreviews() {
   bAttackSelected = false;
   if (UGridOverlayComponent *Grid = FindGridOverlay()) {
     Grid->ClearHighlights();
+  }
+}
+
+void UBattleHUDWidget::ShowAttackRollResult(bool bHit, int32 Damage) {
+  if (!AttackRollResultText) {
+    return;
+  }
+
+  const bool bValidHit = bHit && Damage > 0;
+  const FText DisplayText =
+      bValidHit ? FText::AsNumber(Damage)
+                : NSLOCTEXT("Skald", "BattleAttackMiss", "Miss");
+  const FSlateColor DisplayColor = bValidHit
+                                        ? FSlateColor(FLinearColor(0.85f, 0.1f, 0.1f))
+                                        : FSlateColor(FLinearColor(0.6f, 0.6f, 0.6f));
+
+  AttackRollResultText->SetText(DisplayText);
+  AttackRollResultText->SetColorAndOpacity(DisplayColor);
+  AttackRollResultText->SetVisibility(ESlateVisibility::HitTestInvisible);
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(AttackResultTimerHandle);
+    World->GetTimerManager().SetTimer(AttackResultTimerHandle, this,
+                                      &UBattleHUDWidget::ClearAttackRollResult,
+                                      1.f, false);
+  }
+}
+
+void UBattleHUDWidget::ClearAttackRollResult() {
+  if (AttackRollResultText) {
+    AttackRollResultText->SetText(FText::GetEmpty());
+    AttackRollResultText->SetVisibility(ESlateVisibility::Collapsed);
+  }
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(AttackResultTimerHandle);
   }
 }
 

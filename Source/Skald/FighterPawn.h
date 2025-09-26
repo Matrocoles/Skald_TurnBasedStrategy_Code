@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Pawn.h"
 #include "GridBattleManager.h"
+#include "TimerManager.h"
 #include "FighterPawn.generated.h"
 
 class UGridOverlayComponent;
@@ -127,6 +128,15 @@ private:
   /** Retrieve or create a damage widget from the pool. */
   UUserWidget *GetDamageWidgetFromPool();
 
+  /** Resolve the next pending attack roll when sequencing dice. */
+  void ResolvePendingAttackRoll();
+
+  /** Finalize an attack once all dice have been processed. */
+  void FinalizePendingAttack(AFighterPawn *Target);
+
+  /** Clear any in-progress attack sequencing state. */
+  void CleanupPendingAttack();
+
   /** Align the visible mesh with the collision capsule. */
   void UpdateMeshOffset();
 
@@ -136,6 +146,21 @@ private:
   /** Pool of reusable damage widgets to avoid repeated allocations. */
   UPROPERTY()
   TArray<UUserWidget *> DamageWidgetPool;
+
+  /** Timer used to delay sequential attack dice rolls. */
+  FTimerHandle AttackRollTimerHandle;
+
+  /** Target currently being attacked while sequencing dice. */
+  TWeakObjectPtr<AFighterPawn> PendingAttackTarget;
+
+  /** Remaining dice to resolve for the pending attack. */
+  int32 PendingAttackDiceRemaining = 0;
+
+  /** Required roll threshold cached for the pending attack. */
+  int32 PendingAttackRequiredRoll = 0;
+
+  /** True while the fighter is sequencing attack dice rolls. */
+  bool bAttackSequenceInProgress = false;
 
   /** Current cell occupied by the fighter. */
   UPROPERTY(Replicated)
