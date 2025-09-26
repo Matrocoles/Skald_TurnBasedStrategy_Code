@@ -9,8 +9,10 @@ class AFighterPawn;
 class UGridObstacleComponent;
 struct FHitResult;
 class UInstancedStaticMeshComponent;
+class UDecalComponent;
 class UMaterialInterface;
 class UStaticMesh;
+class UMaterialInstanceDynamic;
 
 USTRUCT()
 struct FPendingGridOccupancyUpdate {
@@ -162,6 +164,43 @@ public:
   UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Grid|Highlight")
   UMaterialInterface *HighlightMaterial = nullptr;
 
+  /** If true, highlights will spawn decals instead of instanced meshes. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Highlight|Decal")
+  bool bUseDecalHighlights = false;
+
+  /** Material applied to highlight decals (must use the Deferred Decal domain). */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Grid|Highlight|Decal")
+  UMaterialInterface *HighlightDecalMaterial = nullptr;
+
+  /** Name of the vector parameter driven by highlight colours on the decal material. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Grid|Highlight|Decal")
+  FName HighlightDecalColorParameter = TEXT("TintColor");
+
+  /** Depth of the decal projection along the surface normal. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Highlight|Decal",
+            meta = (ClampMin = "0.0"))
+  float HighlightDecalProjectionDepth = 32.f;
+
+  /** Multiplier applied to the XY footprint of the decal relative to the cell size. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Highlight|Decal",
+            meta = (ClampMin = "0.01"))
+  float HighlightDecalSizeMultiplier = 1.0f;
+
+  /** Screen size threshold at which decals begin to fade out. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Highlight|Decal",
+            meta = (ClampMin = "0.0"))
+  float HighlightDecalFadeScreenSize = 0.01f;
+
+  /** Delay before decals automatically fade out (0 to disable automatic fade). */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Highlight|Decal",
+            meta = (ClampMin = "0.0"))
+  float HighlightDecalLifeSpan = 0.f;
+
+  /** Duration of the fade once it begins (used when LifeSpan is greater than zero). */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Highlight|Decal",
+            meta = (ClampMin = "0.0"))
+  float HighlightDecalFadeDuration = 0.25f;
+
   /** Vertical offset applied to highlight instances. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Highlight")
   float HighlightHeightOffset = 2.f;
@@ -276,6 +315,14 @@ protected:
   UPROPERTY(Transient)
   TMap<FIntPoint, int32> HighlightedInstances;
 
+  /** Map grid coordinates to spawned highlight decals when decal mode is active. */
+  UPROPERTY(Transient)
+  TMap<FIntPoint, TWeakObjectPtr<UDecalComponent>> HighlightedDecals;
+
+  /** Dynamic materials created for active decal highlights. */
+  UPROPERTY(Transient)
+  TMap<FIntPoint, TWeakObjectPtr<UMaterialInstanceDynamic>> HighlightedDecalMaterials;
+
   /** Mapping of grid cell index to persistent grid instance index. */
   UPROPERTY(Transient)
   TArray<int32> BaseGridInstanceIndices;
@@ -323,6 +370,12 @@ protected:
 
   /** Apply highlight color as per-instance custom data. */
   void ApplyHighlightColor(int32 InstanceIndex, const FLinearColor &Color);
+
+  /** Highlight a cell using a spawned decal component. */
+  void HighlightCellWithDecal(const FIntPoint &GridCoord, const FColor &Color);
+
+  /** Resolve the material that should be used for decal highlights. */
+  UMaterialInterface *GetHighlightDecalMaterial() const;
 
   /** Ensure the instanced highlight component exists and belongs to the owner. */
   bool EnsureHighlightMeshComponentExists();
