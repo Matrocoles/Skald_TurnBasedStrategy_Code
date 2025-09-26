@@ -110,7 +110,7 @@ bool UGridBattleManager::ResolveAttack(FFighter& Attacker, FFighter& Defender, i
         int32 Roll = RandomStream.RandRange(1, 6);
         if (Roll == 6)
         {
-            int32 Damage = Attacker.Stats.AttackDamage + 3;
+            int32 Damage = Attacker.Stats.AttackDamage + Attacker.Stats.CriticalBonusDamage;
             Defender.Stats.Health -= Damage;
             Defender.Stats.Health = FMath::Max(Defender.Stats.Health, 0);
             OutDamage += Damage;

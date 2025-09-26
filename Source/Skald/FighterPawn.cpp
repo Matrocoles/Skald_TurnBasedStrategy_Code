@@ -289,7 +289,7 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
     int32 DamageThisDie = 0;
 
     if (Roll == 6) {
-      DamageThisDie = Stats.AttackDamage + 3; // crit
+      DamageThisDie = Stats.AttackDamage + Stats.CriticalBonusDamage; // crit
     } else if (Roll >= RequiredRoll) {
       DamageThisDie = Stats.AttackDamage;
     }
