@@ -47,13 +47,13 @@ struct FFighterStats
     UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Stats")
     int32 Movement = 1;
 
-    /** Sides of the damage dice rolled on a successful hit. */
-    UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Stats")
-    int32 DamageDie = 6;
-
     /** Damage dealt on a successful hit. */
     UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Stats")
     int32 AttackDamage = 1;
+
+    /** Additional damage dealt when scoring a critical hit. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Stats")
+    int32 CriticalBonusDamage = 3;
 
     /** Cost to include this fighter in an army. */
     UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Stats")
