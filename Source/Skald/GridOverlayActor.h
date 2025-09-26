@@ -31,6 +31,9 @@ protected:
 
   virtual void OnRep_ReplicatedMovement() override;
 
+  virtual void GetLifetimeReplicatedProps(
+      TArray<FLifetimeProperty> &OutLifetimeProps) const override;
+
   /** Root component used to anchor the grid overlay. */
   UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Grid")
   USceneComponent *SceneRoot = nullptr;
@@ -85,5 +88,12 @@ private:
 
   /** True once random obstacles have been spawned at runtime. */
   bool bObstaclesSpawned = false;
+
+  /** Authoritative grid origin applied after randomisation and shared with clients. */
+  UPROPERTY(ReplicatedUsing = OnRep_RandomizedGridOrigin)
+  FVector_NetQuantize ReplicatedGridOrigin = FVector::ZeroVector;
+
+  UFUNCTION()
+  void OnRep_RandomizedGridOrigin();
 };
 

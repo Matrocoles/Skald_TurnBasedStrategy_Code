@@ -5,6 +5,7 @@
 #include "GridObstacleActor.h"
 #include "GridOverlayComponent.h"
 #include "CollisionQueryParams.h"
+#include "Net/UnrealNetwork.h"
 
 namespace {
 constexpr float kSmallHeightEpsilon = 0.01f;
@@ -21,6 +22,20 @@ AGridOverlayActor::AGridOverlayActor() {
   GridComponent = CreateDefaultSubobject<UGridOverlayComponent>(TEXT("GridOverlay"));
 }
 
+void AGridOverlayActor::BeginPlay() {
+  if (HasAuthority()) {
+    if (GridComponent) {
+      GridComponent->ApplyRandomizedOrigin();
+    }
+
+    ReplicatedGridOrigin = GetActorLocation();
+  }
+
+  SpawnRandomObstacles();
+
+  Super::BeginPlay();
+}
+
 void AGridOverlayActor::OnRep_ReplicatedMovement() {
   Super::OnRep_ReplicatedMovement();
 
@@ -29,14 +44,20 @@ void AGridOverlayActor::OnRep_ReplicatedMovement() {
   }
 }
 
-void AGridOverlayActor::BeginPlay() {
+void AGridOverlayActor::GetLifetimeReplicatedProps(
+    TArray<FLifetimeProperty> &OutLifetimeProps) const {
+  Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+  DOREPLIFETIME(AGridOverlayActor, ReplicatedGridOrigin);
+}
+
+void AGridOverlayActor::OnRep_RandomizedGridOrigin() {
+  SetActorLocation(ReplicatedGridOrigin, false, nullptr,
+                   ETeleportType::TeleportPhysics);
+
   if (GridComponent) {
-    GridComponent->ApplyRandomizedOrigin();
+    GridComponent->RefreshOriginFromOwner(true);
   }
-
-  SpawnRandomObstacles();
-
-  Super::BeginPlay();
 }
 
 void AGridOverlayActor::SpawnRandomObstacles() {
