@@ -78,7 +78,7 @@ protected:
 
 private:
   /** Track obstacle actors spawned by this overlay. */
-  UPROPERTY(Transient, Category = "Grid|Obstacles", meta = (AllowPrivateAccess = "true"))
+  UPROPERTY(Transient, meta = (AllowPrivateAccess = "true"))
   TArray<TObjectPtr<AGridObstacleActor>> SpawnedObstacleActors;
 
   /** Grid cells that currently contain spawned obstacles. */
