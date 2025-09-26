@@ -1,8 +1,10 @@
 #include "UI/FighterSelectionWidget.h"
 
 #include "Components/Button.h"
+#include "Components/Image.h"
 #include "Components/ScrollBox.h"
 #include "Components/TextBlock.h"
+#include "Engine/Texture2D.h"
 #include "SkaldLogging.h"
 #include "Skald_PlayerController.h"
 
@@ -68,6 +70,28 @@ void UFighterEntryWidget::Init(const FFighterDefinition &InFighter,
     CostText->SetText(FText::AsNumber(Fighter.Stats.ArmyCost));
   }
 
+  if (PortraitImage)
+  {
+      UTexture2D* PortraitTexture = nullptr;
+      if (Fighter.Portrait.IsValid())
+      {
+          PortraitTexture = Fighter.Portrait.Get();
+      }
+      else if (!Fighter.Portrait.IsNull())
+      {
+          PortraitTexture = Fighter.Portrait.LoadSynchronous();
+      }
+
+      if (PortraitTexture)
+      {
+          PortraitImage->SetBrushFromTexture(PortraitTexture);
+      }
+      else
+      {
+          PortraitImage->SetBrushFromTexture(nullptr);
+      }
+  }
+
   // Disable selection if fighter cannot be afforded.
   if (SelectButton && Owner)
   {
@@ -86,6 +110,16 @@ void UFighterEntryWidget::HandleRemoveClicked() {
   if (Owner) {
     Owner->RemoveFighter(Fighter);
   }
+}
+
+UTexture2D* UFighterEntryWidget::GetPortraitTexture() const
+{
+    if (Fighter.Portrait.IsValid())
+    {
+        return Fighter.Portrait.Get();
+    }
+
+    return nullptr;
 }
 
 void UFighterSelectionWidget::SetAvailableFighters(const TArray<FFighterDefinition>& InFighters)
