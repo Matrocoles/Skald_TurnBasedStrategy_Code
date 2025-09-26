@@ -31,7 +31,12 @@ void UGridOverlayComponent::ApplyRandomizedOrigin() {
   }
 
   AActor *Owner = GetOwner();
-  if (!Owner || !Owner->HasAuthority()) {
+  if (!Owner) {
+    return;
+  }
+
+  if (!Owner->HasAuthority()) {
+    RefreshOriginFromOwner(true);
     return;
   }
 
