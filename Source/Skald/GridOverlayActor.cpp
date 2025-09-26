@@ -5,6 +5,7 @@
 #include "GridObstacleActor.h"
 #include "GridOverlayComponent.h"
 #include "CollisionQueryParams.h"
+#include "Engine/HitResult.h"
 
 namespace {
 constexpr float kSmallHeightEpsilon = 0.01f;
