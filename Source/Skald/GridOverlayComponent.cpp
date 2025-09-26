@@ -1,4 +1,5 @@
 #include "GridOverlayComponent.h"
+#include "CollisionQueryParams.h"
 #include "Containers/Queue.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/EngineTypes.h"
@@ -14,6 +15,60 @@
 
 UGridOverlayComponent::UGridOverlayComponent() {
   PrimaryComponentTick.bCanEverTick = false;
+}
+
+int32 UGridOverlayComponent::GetWidth() const { return Width; }
+
+int32 UGridOverlayComponent::GetHeight() const { return Height; }
+
+float UGridOverlayComponent::GetCellSize() const { return CellSize; }
+
+FVector UGridOverlayComponent::GetOrigin() const { return Origin; }
+
+void UGridOverlayComponent::ApplyRandomizedOrigin() {
+  if (bHasRandomizedPlacement || !bRandomizePlacement) {
+    return;
+  }
+
+  AActor *Owner = GetOwner();
+  if (!Owner || !Owner->HasAuthority()) {
+    return;
+  }
+
+  const FVector BaseLocation = Owner->GetActorLocation();
+  FVector TargetLocation = BaseLocation;
+
+  if (RandomPlacementBounds.HasArea()) {
+    const float MinX = FMath::Min(RandomPlacementBounds.Min.X, RandomPlacementBounds.Max.X);
+    const float MaxX = FMath::Max(RandomPlacementBounds.Min.X, RandomPlacementBounds.Max.X);
+    const float MinY = FMath::Min(RandomPlacementBounds.Min.Y, RandomPlacementBounds.Max.Y);
+    const float MaxY = FMath::Max(RandomPlacementBounds.Min.Y, RandomPlacementBounds.Max.Y);
+    const float RandomX = FMath::FRandRange(MinX, MaxX);
+    const float RandomY = FMath::FRandRange(MinY, MaxY);
+    TargetLocation.X = BaseLocation.X + RandomX;
+    TargetLocation.Y = BaseLocation.Y + RandomY;
+  } else if (RandomPlacementRadius > KINDA_SMALL_NUMBER) {
+    const float Angle = FMath::FRandRange(0.f, 2.f * PI);
+    const float Distance = RandomPlacementRadius * FMath::Sqrt(FMath::FRand());
+    TargetLocation.X = BaseLocation.X + FMath::Cos(Angle) * Distance;
+    TargetLocation.Y = BaseLocation.Y + FMath::Sin(Angle) * Distance;
+  }
+
+  if (PlacementTraceHeight > KINDA_SMALL_NUMBER) {
+    if (UWorld *World = GetWorld()) {
+      const FVector Start = TargetLocation + FVector(0.f, 0.f, PlacementTraceHeight);
+      const FVector End = TargetLocation - FVector(0.f, 0.f, PlacementTraceHeight);
+      FHitResult Hit;
+      FCollisionQueryParams Params(SCENE_QUERY_STAT(GridOverlayPlacementTrace), false, Owner);
+      if (World->LineTraceSingleByChannel(Hit, Start, End, ECC_WorldStatic, Params)) {
+        TargetLocation.Z = Hit.Location.Z;
+      }
+    }
+  }
+
+  Owner->SetActorLocation(TargetLocation, false, nullptr, ETeleportType::TeleportPhysics);
+  Origin = TargetLocation;
+  bHasRandomizedPlacement = true;
 }
 
 bool UGridOverlayComponent::EnsureInstancedMeshComponent(
