@@ -13,6 +13,7 @@ class UDecalComponent;
 class UMaterialInterface;
 class UStaticMesh;
 class UMaterialInstanceDynamic;
+struct FTimerHandle;
 
 USTRUCT()
 struct FPendingGridOccupancyUpdate {
@@ -323,6 +324,9 @@ protected:
   UPROPERTY(Transient)
   TMap<FIntPoint, TWeakObjectPtr<UMaterialInstanceDynamic>> HighlightedDecalMaterials;
 
+  /** Timers that remove decal components once their fade completes. */
+  TMap<FIntPoint, FTimerHandle> HighlightedDecalRemovalTimers;
+
   /** Mapping of grid cell index to persistent grid instance index. */
   UPROPERTY(Transient)
   TArray<int32> BaseGridInstanceIndices;
@@ -376,6 +380,16 @@ protected:
 
   /** Resolve the material that should be used for decal highlights. */
   UMaterialInterface *GetHighlightDecalMaterial() const;
+
+  /** Schedule destruction of a decal component after it finishes fading. */
+  void ScheduleDecalRemoval(const FIntPoint &GridCoord, UDecalComponent *Decal);
+
+  /** Cancel any pending decal removal timer for the provided grid cell. */
+  void ClearDecalRemovalTimer(const FIntPoint &GridCoord);
+
+  /** Handle the completion of a decal fade-out to destroy the component. */
+  void OnHighlightDecalFadeFinished(FIntPoint GridCoord,
+                                    TWeakObjectPtr<UDecalComponent> DecalWeak);
 
   /** Ensure the instanced highlight component exists and belongs to the owner. */
   bool EnsureHighlightMeshComponentExists();
