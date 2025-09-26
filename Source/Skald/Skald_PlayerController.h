@@ -421,6 +421,9 @@ private:
   void UpdateBattleHUDButtons();
   void UpdateBattleRoundDisplay(int32 RoundNumber, ESkaldFaction InitiativeWinner);
   void UpdateBattlePlayersTurnDisplay();
+  UFUNCTION()
+  void HandleAttackResolved(AFighterPawn *Attacker, AFighterPawn *Defender,
+                            int32 Roll, bool bHit, int32 Damage);
   bool IsFriendlyFighter(const AFighterPawn *Fighter) const;
   void DetermineControlledBattleSide();
 

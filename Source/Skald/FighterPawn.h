@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Pawn.h"
 #include "GridBattleManager.h"
+#include "TimerManager.h"
 #include "FighterPawn.generated.h"
 
 class UGridOverlayComponent;
@@ -101,6 +102,10 @@ public:
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Fighter|UI")
   TSubclassOf<UUserWidget> DamageFloatWidgetTemplate;
 
+  /** Widget class used for optional miss indicators. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Fighter|UI")
+  TSubclassOf<UUserWidget> MissWidgetTemplate;
+
   /** Event broadcast when health changes. */
   UPROPERTY(BlueprintAssignable, Category = "Fighter|Events")
   FOnHealthChanged OnHealthChanged;
@@ -127,15 +132,57 @@ private:
   /** Retrieve or create a damage widget from the pool. */
   UUserWidget *GetDamageWidgetFromPool();
 
+  /** Retrieve or create a miss widget from the pool. */
+  UUserWidget *GetMissWidgetFromPool();
+
   /** Align the visible mesh with the collision capsule. */
   void UpdateMeshOffset();
 
   /** Helper to broadcast the current actions remaining value. */
   void BroadcastActionsRemaining();
 
+  /** Data describing a single queued attack roll. */
+  struct FQueuedAttackRoll {
+    int32 RollValue = 1;
+    int32 Damage = 0;
+    bool bHit = false;
+  };
+
+  /** Begin resolving queued attack rolls with a delay between each. */
+  void StartQueuedAttack(AFighterPawn *Target,
+                         TArray<FQueuedAttackRoll> &&Rolls);
+
+  /** Apply the next queued attack roll, showing the appropriate widget. */
+  void ResolveNextAttackRoll();
+
+  /** Finalise any pending attack resolution and clean up timers/state. */
+  void FinalizeQueuedAttack();
+
   /** Pool of reusable damage widgets to avoid repeated allocations. */
   UPROPERTY()
   TArray<UUserWidget *> DamageWidgetPool;
+
+  /** Pool of reusable miss widgets to avoid repeated allocations. */
+  UPROPERTY()
+  TArray<UUserWidget *> MissWidgetPool;
+
+  /** Pending attack rolls awaiting delayed resolution. */
+  TArray<FQueuedAttackRoll> PendingAttackRolls;
+
+  /** Index of the next pending attack roll to resolve. */
+  int32 PendingAttackRollIndex = 0;
+
+  /** Target currently receiving delayed attack rolls. */
+  TWeakObjectPtr<AFighterPawn> PendingAttackTarget;
+
+  /** Whether the pending attack target has been reduced to zero health. */
+  bool bPendingAttackTargetDied = false;
+
+  /** Timer driving delayed attack roll resolution. */
+  FTimerHandle AttackRollTimerHandle;
+
+  /** Tracks whether any pending attack roll has been processed. */
+  bool bHasProcessedPendingRoll = false;
 
   /** Current cell occupied by the fighter. */
   UPROPERTY(Replicated)

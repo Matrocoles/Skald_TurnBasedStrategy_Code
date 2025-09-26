@@ -1,12 +1,15 @@
 #pragma once
 
 #include "Blueprint/UserWidget.h"
+#include "TimerManager.h"
 #include "BattleHUDWidget.generated.h"
 
 class UButton;
+class UImage;
 class UTextBlock;
 class AFighterPawn;
 class UGridOverlayComponent;
+class UTexture2D;
 
 /**
  * HUD widget displayed during grid battles.
@@ -110,6 +113,17 @@ public:
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *PlayersTurnText;
 
+  /** Image used to display a temporary dice roll result. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UImage *DiceRollerImage;
+
+  /** Textures representing dice faces, indexed from 1 to 6. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skald|Battle|Dice")
+  TArray<TObjectPtr<UTexture2D>> DiceFaceTextures;
+
+  /** Display a dice face corresponding to the supplied roll value. */
+  void ShowDiceRoll(int32 RollValue);
+
   /** Update the round and initiative labels. */
   void SetRoundInfo(const FText &RoundLabel, const FText &InitiativeLabel);
 
@@ -162,6 +176,9 @@ private:
   /** Find the grid overlay component in the world. */
   UGridOverlayComponent *FindGridOverlay() const;
 
+  /** Hide the dice roller image after the timer elapses. */
+  void HideDiceRoller();
+
   /** Whether movement preview is currently shown. */
   bool bMoveSelected = false;
 
@@ -171,5 +188,8 @@ private:
   /** Fighter currently bound to the HUD. */
   UPROPERTY()
   AFighterPawn *BoundFighter;
+
+  /** Timer managing dice roll visibility. */
+  FTimerHandle DiceRollerHideTimer;
 };
 
