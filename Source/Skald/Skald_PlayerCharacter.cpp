@@ -12,7 +12,9 @@
 #include "Skald_GameState.h"
 #include "Skald_GameInstance.h"
 #include "Camera/CameraComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "Math/RotationMatrix.h"
 #include "TimerManager.h"
 
 // Sets default values
@@ -33,6 +35,14 @@ ASkald_PlayerCharacter::ASkald_PlayerCharacter()
         FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
         FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
         FollowCamera->bUsePawnControlRotation = false;
+
+        if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+        {
+                MovementComponent->SetMovementMode(MOVE_Flying);
+                MovementComponent->bOrientRotationToMovement = false;
+                MovementComponent->GravityScale = 0.0f;
+                MovementComponent->BrakingDecelerationFlying = MovementComponent->BrakingDecelerationWalking;
+        }
 }
 
 // Called when the game starts or when spawned
@@ -96,18 +106,28 @@ void ASkald_PlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerIn
 
 void ASkald_PlayerCharacter::MoveForward(float Value)
 {
-        if (!FMath::IsNearlyZero(Value))
+        if (FMath::IsNearlyZero(Value) || !Controller)
         {
-                AddMovementInput(GetActorForwardVector(), Value);
+                return;
         }
+
+        const FRotator ControlRotation = Controller->GetControlRotation();
+        const FRotationMatrix ControlRotMatrix(FRotator(0.f, ControlRotation.Yaw, 0.f));
+        const FVector ForwardVector = ControlRotMatrix.GetUnitAxis(EAxis::X);
+        AddMovementInput(ForwardVector, Value);
 }
 
 void ASkald_PlayerCharacter::MoveRight(float Value)
 {
-        if (!FMath::IsNearlyZero(Value))
+        if (FMath::IsNearlyZero(Value) || !Controller)
         {
-                AddMovementInput(GetActorRightVector(), Value);
+                return;
         }
+
+        const FRotator ControlRotation = Controller->GetControlRotation();
+        const FRotationMatrix ControlRotMatrix(FRotator(0.f, ControlRotation.Yaw, 0.f));
+        const FVector RightVector = ControlRotMatrix.GetUnitAxis(EAxis::Y);
+        AddMovementInput(RightVector, Value);
 }
 
 void ASkald_PlayerCharacter::MoveUp(float Value)
