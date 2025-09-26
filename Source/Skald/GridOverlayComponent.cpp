@@ -6,11 +6,12 @@
 #include "Engine/World.h"
 #include "FighterPawn.h"
 #include "GridObstacleComponent.h"
-#include "Landscape.h"
-#include "LandscapeComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/SceneComponent.h"
 #include "GameFramework/Actor.h"
+#include "Landscape.h"
+#include "LandscapeComponent.h"
+#include "Math/RotationMatrix.h"
 #include "UObject/UObjectGlobals.h"
 
 UGridOverlayComponent::UGridOverlayComponent() {
@@ -185,6 +186,7 @@ void UGridOverlayComponent::BeginPlay() {
   ObscuredCells.Init(false, TotalCells);
   DynamicOccupiedCells.Init(false, TotalCells);
   CellHeights.Init(Origin.Z, TotalCells);
+  CellRotations.Init(FQuat::Identity, TotalCells);
   BaseGridInstanceIndices.Init(INDEX_NONE, TotalCells);
 
   SampleEnvironmentAtOrigin();
@@ -221,6 +223,7 @@ void UGridOverlayComponent::RefreshGridDataFromOrigin() {
     Cells.Empty();
     ObscuredCells.Empty();
     CellHeights.Empty();
+    CellRotations.Empty();
     DynamicOccupiedCells.Empty();
     RebuildBaseGridInstances();
     return;
@@ -229,6 +232,7 @@ void UGridOverlayComponent::RefreshGridDataFromOrigin() {
   Cells.Init(false, TotalCells);
   ObscuredCells.Init(false, TotalCells);
   CellHeights.Init(Origin.Z, TotalCells);
+  CellRotations.Init(FQuat::Identity, TotalCells);
 
   DynamicOccupiedCells.Init(false, TotalCells);
 
@@ -265,12 +269,23 @@ void UGridOverlayComponent::SampleEnvironmentAtOrigin() {
       FVector End = Start - FVector(0.f, 0.f, 20000.f);
       FHitResult Hit;
       if (World->LineTraceSingleByChannel(Hit, Start, End, ECC_WorldStatic)) {
-        CellHeights[Idx] = Hit.Location.Z;
+        if (CellHeights.IsValidIndex(Idx)) {
+          CellHeights[Idx] = Hit.Location.Z;
+        }
+        if (CellRotations.IsValidIndex(Idx)) {
+          CellRotations[Idx] =
+              FRotationMatrix::MakeFromZ(Hit.Normal.GetSafeNormal()).ToQuat();
+        }
         if (Cast<ULandscapeComponent>(Hit.GetComponent())) {
           HandleLandscapeHit(Hit, FIntPoint(X, Y), Idx);
         }
       } else {
-        CellHeights[Idx] = Origin.Z;
+        if (CellHeights.IsValidIndex(Idx)) {
+          CellHeights[Idx] = Origin.Z;
+        }
+        if (CellRotations.IsValidIndex(Idx)) {
+          CellRotations[Idx] = FQuat::Identity;
+        }
       }
     }
   }
@@ -518,12 +533,15 @@ void UGridOverlayComponent::RebuildBaseGridInstances() {
       const FIntPoint Cell(X, Y);
       const FVector WorldCenter =
           GridToWorld(Cell) + FVector(0.f, 0.f, GridHeightOffset);
-      const FTransform WorldTransform(FQuat::Identity, WorldCenter, InstanceScale);
+      const int32 ArrayIndex = Index(Cell);
+      const FQuat CellRotation =
+          CellRotations.IsValidIndex(ArrayIndex) ? CellRotations[ArrayIndex]
+                                                 : FQuat::Identity;
+      const FTransform WorldTransform(CellRotation, WorldCenter, InstanceScale);
       const FTransform RelativeTransform =
           WorldTransform.GetRelativeTransform(ComponentTransform);
 
       const int32 InstanceIndex = BaseGridMeshComponent->AddInstance(RelativeTransform);
-      const int32 ArrayIndex = Index(Cell);
       if (BaseGridInstanceIndices.IsValidIndex(ArrayIndex)) {
         BaseGridInstanceIndices[ArrayIndex] = InstanceIndex;
         ApplyBaseGridColor(InstanceIndex, GetBaseGridColor(ArrayIndex));
@@ -550,7 +568,11 @@ void UGridOverlayComponent::HighlightCell(const FIntPoint &GridCoord,
   const float EffectiveCellSize = FMath::Max(CellSize, KINDA_SMALL_NUMBER);
   const FVector InstanceScale(EffectiveCellSize / 100.f,
                               EffectiveCellSize / 100.f, 1.f);
-  const FTransform WorldTransform(FQuat::Identity, WorldCenter, InstanceScale);
+  const int32 ArrayIndex = Index(GridCoord);
+  const FQuat CellRotation =
+      CellRotations.IsValidIndex(ArrayIndex) ? CellRotations[ArrayIndex]
+                                             : FQuat::Identity;
+  const FTransform WorldTransform(CellRotation, WorldCenter, InstanceScale);
   const FTransform ComponentTransform = HighlightMeshComponent->GetComponentTransform();
   const FTransform RelativeTransform =
       WorldTransform.GetRelativeTransform(ComponentTransform);
