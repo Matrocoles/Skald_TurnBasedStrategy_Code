@@ -230,9 +230,7 @@ void UGridOverlayComponent::RefreshGridDataFromOrigin() {
   ObscuredCells.Init(false, TotalCells);
   CellHeights.Init(Origin.Z, TotalCells);
 
-  if (DynamicOccupiedCells.Num() != TotalCells) {
-    DynamicOccupiedCells.SetNum(TotalCells);
-  }
+  DynamicOccupiedCells.Init(false, TotalCells);
 
   SampleEnvironmentAtOrigin();
 
