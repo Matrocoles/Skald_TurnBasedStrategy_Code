@@ -305,6 +305,15 @@ protected:
   void HandleLandscapeHit(const FHitResult &Hit, const FIntPoint &Cell,
                           int32 CellIndex);
 
+  /** Resample height/occupancy information around the current origin. */
+  void RefreshGridDataFromOrigin();
+
+  /** Trace the world to populate per-cell height and slope information. */
+  void SampleEnvironmentAtOrigin();
+
+  /** Apply a registered obstacle's footprint to the cached grid data. */
+  void ApplyObstacleToGrid(class UGridObstacleComponent *Obstacle);
+
   /** Ensure the instanced highlight component is ready for use. */
   bool EnsureHighlightComponentSetup();
 

@@ -21,6 +21,15 @@ AGridOverlayActor::AGridOverlayActor() {
   GridComponent = CreateDefaultSubobject<UGridOverlayComponent>(TEXT("GridOverlay"));
 }
 
+void AGridOverlayActor::OnConstruction(const FTransform &Transform) {
+  Super::OnConstruction(Transform);
+
+  if (GridComponent) {
+    GridComponent->ApplyRandomizedOrigin();
+    GridComponent->RefreshOriginFromOwner(true);
+  }
+}
+
 void AGridOverlayActor::OnRep_ReplicatedMovement() {
   Super::OnRep_ReplicatedMovement();
 
@@ -30,10 +39,6 @@ void AGridOverlayActor::OnRep_ReplicatedMovement() {
 }
 
 void AGridOverlayActor::BeginPlay() {
-  if (GridComponent) {
-    GridComponent->ApplyRandomizedOrigin();
-  }
-
   SpawnRandomObstacles();
 
   Super::BeginPlay();

@@ -77,9 +77,14 @@ void UGridOverlayComponent::ApplyRandomizedOrigin() {
 
 void UGridOverlayComponent::RefreshOriginFromOwner(bool bMarkPlacementRandomized) {
   if (AActor *Owner = GetOwner()) {
-    Origin = Owner->GetActorLocation();
+    const FVector NewOrigin = Owner->GetActorLocation();
+    const bool bOriginChanged = !Origin.Equals(NewOrigin, KINDA_SMALL_NUMBER);
+    Origin = NewOrigin;
     if (bMarkPlacementRandomized && bRandomizePlacement) {
       bHasRandomizedPlacement = true;
+    }
+    if (bHasInitializedGrid && bOriginChanged) {
+      RefreshGridDataFromOrigin();
     }
   }
 }
@@ -173,9 +178,7 @@ void UGridOverlayComponent::OnRegister() {
 void UGridOverlayComponent::BeginPlay() {
   Super::BeginPlay();
 
-  if (AActor *Owner = GetOwner()) {
-    Origin = Owner->GetActorLocation();
-  }
+  RefreshOriginFromOwner(false);
 
   const int32 TotalCells = Width * Height;
   Cells.Init(false, TotalCells);
@@ -184,25 +187,7 @@ void UGridOverlayComponent::BeginPlay() {
   CellHeights.Init(Origin.Z, TotalCells);
   BaseGridInstanceIndices.Init(INDEX_NONE, TotalCells);
 
-  if (UWorld *World = GetWorld()) {
-    for (int32 Y = 0; Y < Height; ++Y) {
-      for (int32 X = 0; X < Width; ++X) {
-        const int32 Idx = Index(FIntPoint(X, Y));
-        FVector Start = Origin + FVector((X + 0.5f) * CellSize,
-                                         (Y + 0.5f) * CellSize, 10000.f);
-        FVector End = Start - FVector(0.f, 0.f, 20000.f);
-        FHitResult Hit;
-        if (World->LineTraceSingleByChannel(Hit, Start, End, ECC_WorldStatic)) {
-          CellHeights[Idx] = Hit.Location.Z;
-          if (Cast<ULandscapeComponent>(Hit.GetComponent())) {
-            HandleLandscapeHit(Hit, FIntPoint(X, Y), Idx);
-          }
-        } else {
-          CellHeights[Idx] = Origin.Z;
-        }
-      }
-    }
-  }
+  SampleEnvironmentAtOrigin();
 
   bHasInitializedGrid = true;
 
@@ -226,6 +211,69 @@ void UGridOverlayComponent::BeginPlay() {
     PendingOccupancyUpdates.Empty();
     for (const FPendingGridOccupancyUpdate &Update : OccupancyToApply) {
       SetOccupied(Update.GridCoord, Update.bOccupied);
+    }
+  }
+}
+
+void UGridOverlayComponent::RefreshGridDataFromOrigin() {
+  const int32 TotalCells = Width * Height;
+  if (TotalCells <= 0) {
+    Cells.Empty();
+    ObscuredCells.Empty();
+    CellHeights.Empty();
+    DynamicOccupiedCells.Empty();
+    RebuildBaseGridInstances();
+    return;
+  }
+
+  Cells.Init(false, TotalCells);
+  ObscuredCells.Init(false, TotalCells);
+  CellHeights.Init(Origin.Z, TotalCells);
+
+  if (DynamicOccupiedCells.Num() != TotalCells) {
+    DynamicOccupiedCells.SetNum(TotalCells);
+  }
+
+  SampleEnvironmentAtOrigin();
+
+  for (int32 Index = Obstacles.Num() - 1; Index >= 0; --Index) {
+    UGridObstacleComponent *Obstacle = Obstacles[Index];
+    if (!IsValid(Obstacle)) {
+      Obstacles.RemoveAtSwap(Index);
+      continue;
+    }
+
+    ApplyObstacleToGrid(Obstacle);
+  }
+
+  RebuildBaseGridInstances();
+}
+
+void UGridOverlayComponent::SampleEnvironmentAtOrigin() {
+  if (Width <= 0 || Height <= 0) {
+    return;
+  }
+
+  UWorld *World = GetWorld();
+  if (!World) {
+    return;
+  }
+
+  for (int32 Y = 0; Y < Height; ++Y) {
+    for (int32 X = 0; X < Width; ++X) {
+      const int32 Idx = Index(FIntPoint(X, Y));
+      FVector Start = Origin +
+                      FVector((X + 0.5f) * CellSize, (Y + 0.5f) * CellSize, 10000.f);
+      FVector End = Start - FVector(0.f, 0.f, 20000.f);
+      FHitResult Hit;
+      if (World->LineTraceSingleByChannel(Hit, Start, End, ECC_WorldStatic)) {
+        CellHeights[Idx] = Hit.Location.Z;
+        if (Cast<ULandscapeComponent>(Hit.GetComponent())) {
+          HandleLandscapeHit(Hit, FIntPoint(X, Y), Idx);
+        }
+      } else {
+        CellHeights[Idx] = Origin.Z;
+      }
     }
   }
 }
@@ -557,6 +605,14 @@ void UGridOverlayComponent::RegisterObstacle(UGridObstacleComponent *Obstacle) {
   }
 
   Obstacles.AddUnique(Obstacle);
+  ApplyObstacleToGrid(Obstacle);
+}
+
+void UGridOverlayComponent::ApplyObstacleToGrid(UGridObstacleComponent *Obstacle) {
+  if (!Obstacle || !bHasInitializedGrid) {
+    return;
+  }
+
   if (AActor *Owner = Obstacle->GetOwner()) {
     const FBox Bounds = Owner->GetComponentsBoundingBox(true);
     const FIntPoint Min = WorldToGrid(Bounds.Min);
