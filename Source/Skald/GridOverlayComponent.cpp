@@ -71,6 +71,15 @@ void UGridOverlayComponent::ApplyRandomizedOrigin() {
   bHasRandomizedPlacement = true;
 }
 
+void UGridOverlayComponent::RefreshOriginFromOwner() {
+  if (AActor *Owner = GetOwner()) {
+    Origin = Owner->GetActorLocation();
+    if (bRandomizePlacement) {
+      bHasRandomizedPlacement = true;
+    }
+  }
+}
+
 bool UGridOverlayComponent::EnsureInstancedMeshComponent(
     UInstancedStaticMeshComponent *&Component, FName ComponentName) {
   AActor *Owner = GetOwner();

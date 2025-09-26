@@ -12,6 +12,8 @@ constexpr float kSmallHeightEpsilon = 0.01f;
 
 AGridOverlayActor::AGridOverlayActor() {
   PrimaryActorTick.bCanEverTick = false;
+  bReplicates = true;
+  SetReplicateMovement(true);
 
   SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
   SetRootComponent(SceneRoot);
@@ -22,11 +24,24 @@ AGridOverlayActor::AGridOverlayActor() {
 void AGridOverlayActor::BeginPlay() {
   if (GridComponent) {
     GridComponent->ApplyRandomizedOrigin();
+    SyncGridOriginWithActorTransform();
   }
 
   SpawnRandomObstacles();
 
   Super::BeginPlay();
+}
+
+void AGridOverlayActor::OnRep_ReplicatedMovement() {
+  Super::OnRep_ReplicatedMovement();
+
+  SyncGridOriginWithActorTransform();
+}
+
+void AGridOverlayActor::SyncGridOriginWithActorTransform() {
+  if (GridComponent) {
+    GridComponent->RefreshOriginFromOwner();
+  }
 }
 
 void AGridOverlayActor::SpawnRandomObstacles() {

@@ -73,6 +73,9 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Grid")
   void ApplyRandomizedOrigin();
 
+  UFUNCTION(BlueprintCallable, Category = "Grid")
+  void RefreshOriginFromOwner();
+
   /** Convert a world location to grid coordinates. */
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Grid")
   FIntPoint WorldToGrid(const FVector &WorldLocation) const;
