@@ -15,6 +15,7 @@
 #include "LandscapeComponent.h"
 #include "Math/RotationMatrix.h"
 #include "UObject/UObjectGlobals.h"
+#include "TimerManager.h"
 
 UGridOverlayComponent::UGridOverlayComponent() {
   PrimaryComponentTick.bCanEverTick = false;
@@ -461,6 +462,67 @@ UMaterialInterface *UGridOverlayComponent::GetHighlightDecalMaterial() const {
   return HighlightMaterial;
 }
 
+void UGridOverlayComponent::ScheduleDecalRemoval(const FIntPoint &GridCoord,
+                                                 UDecalComponent *Decal) {
+  if (!Decal) {
+    return;
+  }
+
+  UWorld *World = GetWorld();
+  if (!World) {
+    return;
+  }
+
+  ClearDecalRemovalTimer(GridCoord);
+
+  FTimerDelegate Delegate;
+  Delegate.BindUObject(this, &UGridOverlayComponent::OnHighlightDecalFadeFinished,
+                       GridCoord, TWeakObjectPtr<UDecalComponent>(Decal));
+
+  FTimerHandle &Handle = HighlightedDecalRemovalTimers.FindOrAdd(GridCoord);
+  const float ExpirationDelay = HighlightDecalLifeSpan + HighlightDecalFadeDuration;
+  World->GetTimerManager().SetTimer(Handle, Delegate, ExpirationDelay, false);
+}
+
+void UGridOverlayComponent::ClearDecalRemovalTimer(const FIntPoint &GridCoord) {
+  if (HighlightedDecalRemovalTimers.Num() == 0) {
+    return;
+  }
+
+  FTimerHandle *ExistingHandle = HighlightedDecalRemovalTimers.Find(GridCoord);
+  if (!ExistingHandle) {
+    return;
+  }
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(*ExistingHandle);
+  }
+
+  HighlightedDecalRemovalTimers.Remove(GridCoord);
+}
+
+void UGridOverlayComponent::OnHighlightDecalFadeFinished(
+    FIntPoint GridCoord, TWeakObjectPtr<UDecalComponent> DecalWeak) {
+  HighlightedDecalRemovalTimers.Remove(GridCoord);
+
+  bool bRemovedDecalEntry = false;
+  if (TWeakObjectPtr<UDecalComponent> *ExistingDecal =
+          HighlightedDecals.Find(GridCoord)) {
+    if (ExistingDecal->Get() == DecalWeak.Get()) {
+      HighlightedDecals.Remove(GridCoord);
+      bRemovedDecalEntry = true;
+    }
+  }
+
+  if (bRemovedDecalEntry) {
+    HighlightedDecalMaterials.Remove(GridCoord);
+  }
+
+  if (UDecalComponent *Decal = DecalWeak.Get()) {
+    Decal->DestroyComponent();
+  }
+}
+
 void UGridOverlayComponent::HighlightCellWithDecal(const FIntPoint &GridCoord,
                                                    const FColor &Color) {
   AActor *Owner = GetOwner();
@@ -479,6 +541,7 @@ void UGridOverlayComponent::HighlightCellWithDecal(const FIntPoint &GridCoord,
     if (!Decal) {
       HighlightedDecals.Remove(GridCoord);
       HighlightedDecalMaterials.Remove(GridCoord);
+      ClearDecalRemovalTimer(GridCoord);
     }
   }
 
@@ -545,9 +608,11 @@ void UGridOverlayComponent::HighlightCellWithDecal(const FIntPoint &GridCoord,
   Decal->SetWorldLocationAndRotation(DecalLocation, DecalRotation);
 
   if (HighlightDecalLifeSpan > 0.f && HighlightDecalFadeDuration > 0.f) {
-    Decal->SetFadeOut(HighlightDecalLifeSpan, HighlightDecalFadeDuration, true);
+    Decal->SetFadeOut(HighlightDecalLifeSpan, HighlightDecalFadeDuration, false);
+    ScheduleDecalRemoval(GridCoord, Decal);
   } else {
     Decal->ResetFade();
+    ClearDecalRemovalTimer(GridCoord);
   }
 
   if (DynamicMaterial) {
@@ -722,6 +787,7 @@ void UGridOverlayComponent::ClearHighlights() {
 
   if (HighlightedDecals.Num() > 0) {
     for (auto It = HighlightedDecals.CreateIterator(); It; ++It) {
+      ClearDecalRemovalTimer(It.Key());
       if (UDecalComponent *Decal = It.Value().Get()) {
         Decal->DestroyComponent();
       }
@@ -729,6 +795,16 @@ void UGridOverlayComponent::ClearHighlights() {
     HighlightedDecals.Empty();
   }
   HighlightedDecalMaterials.Empty();
+
+  if (HighlightedDecalRemovalTimers.Num() > 0) {
+    if (UWorld *World = GetWorld()) {
+      FTimerManager &TimerManager = World->GetTimerManager();
+      for (auto &TimerPair : HighlightedDecalRemovalTimers) {
+        TimerManager.ClearTimer(TimerPair.Value);
+      }
+    }
+    HighlightedDecalRemovalTimers.Empty();
+  }
 
 #if WITH_EDITOR
   if (GetWorld() && bFlushAllPersistentOnClear) {
