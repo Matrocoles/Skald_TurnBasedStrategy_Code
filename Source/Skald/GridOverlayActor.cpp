@@ -171,10 +171,9 @@ void AGridOverlayActor::ClearSpawnedObstacles() {
     }
   }
 
-  for (const TWeakObjectPtr<AGridObstacleActor> &ObstaclePtr : SpawnedObstacleActors) {
-    if (ObstaclePtr.IsValid()) {
-      AGridObstacleActor *Obstacle = ObstaclePtr.Get();
-      if (Obstacle && Obstacle->IsValidLowLevelFast()) {
+  for (const TObjectPtr<AGridObstacleActor> &ObstaclePtr : SpawnedObstacleActors) {
+    if (AGridObstacleActor *Obstacle = ObstaclePtr.Get()) {
+      if (Obstacle->IsValidLowLevelFast()) {
         Obstacle->Destroy();
       }
     }
