@@ -215,6 +215,10 @@ protected:
   UFUNCTION()
   void HandleEndTurnPressed();
 
+  UFUNCTION()
+  void HandleAttackResolved(AFighterPawn *Attacker, AFighterPawn *Defender,
+                            int32 Roll, bool bHit, int32 Damage);
+
   /** Respond when our PlayerState receives an updated PlayerId. */
   void HandlePlayerIdUpdated();
 
