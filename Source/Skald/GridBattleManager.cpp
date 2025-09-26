@@ -353,6 +353,20 @@ void UGridBattleManager::ReportAttackRoll(AFighterPawn* Attacker, AFighterPawn* 
     OnAttackResolved.Broadcast(Attacker, Defender, Roll, bHit, Damage);
 }
 
+void UGridBattleManager::ReportAttackRejected(AFighterPawn* Attacker, AFighterPawn* Defender, const FText& Reason)
+{
+    if (!Attacker)
+    {
+        return;
+    }
+
+    const FString ReasonString = Reason.ToString();
+    UE_LOG(LogSkaldBattle, Verbose, TEXT("[Battle] Attack rejected: %s -> %s | %s"),
+        *DescribeFighter(Attacker), *DescribeFighter(Defender), ReasonString.IsEmpty() ? TEXT("<No Reason>") : *ReasonString);
+
+    OnAttackRejected.Broadcast(Attacker, Defender, Reason);
+}
+
 bool UGridBattleManager::CanActivateFighter(AFighterPawn* Fighter) const
 {
     if (bBattleConcluded || !Fighter)

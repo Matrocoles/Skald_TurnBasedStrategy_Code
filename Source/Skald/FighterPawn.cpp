@@ -238,6 +238,21 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
     return;
   }
 
+  if (PendingAttackTarget.IsValid() || PendingAttackRolls.Num() > 0) {
+    if (UWorld *World = GetWorld()) {
+      if (USkaldGameInstance *GameInstance =
+              Cast<USkaldGameInstance>(World->GetGameInstance())) {
+        if (UGridBattleManager *BattleManager =
+                GameInstance->GridBattleManager) {
+          BattleManager->ReportAttackRejected(
+              this, Target,
+              NSLOCTEXT("SkaldBattle", "AttackInProgress", "Attack in progress."));
+        }
+      }
+    }
+    return;
+  }
+
   const int32 Distance = FMath::Abs(Target->CurrentCell.X - CurrentCell.X) +
                          FMath::Abs(Target->CurrentCell.Y - CurrentCell.Y);
   if (Distance > Stats.AttackRange) {

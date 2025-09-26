@@ -424,6 +424,9 @@ private:
   UFUNCTION()
   void HandleAttackResolved(AFighterPawn *Attacker, AFighterPawn *Defender,
                             int32 Roll, bool bHit, int32 Damage);
+  UFUNCTION()
+  void HandleAttackRejected(AFighterPawn *Attacker, AFighterPawn *Defender,
+                            const FText &Reason);
   bool IsFriendlyFighter(const AFighterPawn *Fighter) const;
   void DetermineControlledBattleSide();
 
