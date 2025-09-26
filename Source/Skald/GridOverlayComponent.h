@@ -257,6 +257,10 @@ protected:
   UPROPERTY()
   TArray<float> CellHeights;
 
+  /** Cached world-space rotation for each grid cell. */
+  UPROPERTY()
+  TArray<FQuat> CellRotations;
+
   /** Guard to ensure placement randomisation is only applied once. */
   bool bHasRandomizedPlacement = false;
 
