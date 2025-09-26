@@ -1823,6 +1823,8 @@ void ASkaldPlayerController::HandleGridClick() {
     break;
   }
 
+  HighlightClickedCell(Grid, Cell);
+
   if (CurrentCommandMode != EBattleCommandMode::None) {
     return;
   }
@@ -1832,12 +1834,7 @@ void ASkaldPlayerController::HandleGridClick() {
       return;
     }
 
-    if (IsFriendlyFighter(CellFighter)) {
-      SetSelectedFighter(CellFighter);
-      UpdateBattleHUDButtons();
-    } else if (!LockedActiveFighter) {
-      ClearSelectedFighter();
-    }
+    SetSelectedFighter(CellFighter);
     return;
   }
 
@@ -1983,6 +1980,33 @@ void ASkaldPlayerController::CancelCommandMode() {
   if (BattleHudWidget) {
     BattleHudWidget->ClearCommandPreviews();
   }
+}
+
+void ASkaldPlayerController::HighlightClickedCell(UGridOverlayComponent *Grid,
+                                                  const FIntPoint &Cell) {
+  if (!Grid || !Grid->IsCellInBounds(Cell)) {
+    return;
+  }
+
+  bool bRestoredCommandHighlights = false;
+  if (CurrentCommandMode == EBattleCommandMode::Move) {
+    if (LockedActiveFighter && IsFriendlyFighter(LockedActiveFighter)) {
+      Grid->HighlightMovement(LockedActiveFighter);
+      bRestoredCommandHighlights = true;
+    }
+  } else if (CurrentCommandMode == EBattleCommandMode::Attack) {
+    if (LockedActiveFighter && IsFriendlyFighter(LockedActiveFighter)) {
+      Grid->HighlightAttack(LockedActiveFighter);
+      bRestoredCommandHighlights = true;
+    }
+  }
+
+  if (!bRestoredCommandHighlights) {
+    Grid->ClearHighlights();
+  }
+
+  Grid->HighlightCell(Cell, Grid->SelectionHighlightColor.ToFColor(true), 0.f,
+                      false);
 }
 
 void ASkaldPlayerController::SetSelectedFighter(AFighterPawn *Fighter,

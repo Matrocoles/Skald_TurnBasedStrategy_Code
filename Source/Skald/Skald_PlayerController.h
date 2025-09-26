@@ -414,6 +414,7 @@ private:
   void InitializeFighterSelectionIfNeeded();
 
   void CancelCommandMode();
+  void HighlightClickedCell(UGridOverlayComponent *Grid, const FIntPoint &Cell);
   void SetSelectedFighter(AFighterPawn *Fighter, bool bForce = false);
   void ClearSelectedFighter();
   void UpdateBattleHUDSelection();
