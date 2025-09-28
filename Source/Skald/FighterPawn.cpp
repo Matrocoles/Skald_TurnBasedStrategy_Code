@@ -128,6 +128,10 @@ void AFighterPawn::BeginActivation() {
   bHasActivatedThisRound = true;
 
   BroadcastActionsRemaining();
+
+  if (UGridOverlayComponent *Grid = GetGrid()) {
+    Grid->HighlightSelection(this);
+  }
 }
 
 void AFighterPawn::ResetActivationState() {
@@ -143,6 +147,10 @@ void AFighterPawn::FinishActivation() {
   bIsCurrentlyActive = false;
 
   BroadcastActionsRemaining();
+
+  if (UGridOverlayComponent *Grid = GetGrid()) {
+    Grid->ClearSelectionHighlight();
+  }
 }
 
 UGridOverlayComponent *AFighterPawn::GetGrid() {
