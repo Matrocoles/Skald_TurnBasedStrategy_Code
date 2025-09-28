@@ -221,6 +221,7 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
     NewLocation = Grid->GridToWorld(TargetCell);
     NewLocation.Z += GetSimpleCollisionHalfHeight();
   }
+  FaceTowardsLocation(NewLocation);
   SetActorLocation(NewLocation);
   ActionsRemaining = FMath::Max(0, ActionsRemaining - 1);
 
@@ -309,6 +310,8 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
   ActionsRemaining = FMath::Max(0, ActionsRemaining - 1);
 
   BroadcastActionsRemaining();
+
+  FaceTowardsLocation(Target->GetActorLocation());
 
   if (Grid) {
     Grid->ClearHighlights();
@@ -504,4 +507,13 @@ void AFighterPawn::OnRep_ActionsRemaining() { BroadcastActionsRemaining(); }
 
 void AFighterPawn::BroadcastActionsRemaining() {
   OnActionsChanged.Broadcast(ActionsRemaining);
+}
+
+void AFighterPawn::FaceTowardsLocation(const FVector &TargetLocation) {
+  FVector Direction = TargetLocation - GetActorLocation();
+  Direction.Z = 0.f;
+  if (!Direction.IsNearlyZero()) {
+    const FRotator LookRotation = Direction.Rotation();
+    SetActorRotation(FRotator(0.f, LookRotation.Yaw, 0.f));
+  }
 }
