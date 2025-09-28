@@ -117,6 +117,10 @@ public:
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UImage *DiceRollerImage;
 
+  /** Background image shown behind the dice roller when active. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UImage *DiceBoardImage;
+
   /** Textures representing dice faces, indexed from 1 to 6. */
   UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skald|Battle|Dice")
   TArray<TObjectPtr<UTexture2D>> DiceFaceTextures;

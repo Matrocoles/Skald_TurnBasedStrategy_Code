@@ -226,8 +226,14 @@ void UBattleHUDWidget::ShowDiceRoll(int32 RollValue) {
   if (Texture) {
     DiceRollerImage->SetBrushFromTexture(Texture, true);
     DiceRollerImage->SetVisibility(ESlateVisibility::HitTestInvisible);
+    if (DiceBoardImage) {
+      DiceBoardImage->SetVisibility(ESlateVisibility::HitTestInvisible);
+    }
   } else {
     DiceRollerImage->SetVisibility(ESlateVisibility::Collapsed);
+    if (DiceBoardImage) {
+      DiceBoardImage->SetVisibility(ESlateVisibility::Collapsed);
+    }
   }
 
   if (UWorld *World = GetWorld()) {
@@ -263,4 +269,7 @@ void UBattleHUDWidget::HideDiceRoller() {
     return;
   }
   DiceRollerImage->SetVisibility(ESlateVisibility::Collapsed);
+  if (DiceBoardImage) {
+    DiceBoardImage->SetVisibility(ESlateVisibility::Collapsed);
+  }
 }
