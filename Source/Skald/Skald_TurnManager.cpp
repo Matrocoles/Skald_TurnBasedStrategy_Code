@@ -101,8 +101,32 @@ void ATurnManager::HandleGridBattleEnded(ESkaldFaction /*WinningFaction*/, int32
   }
 
   if (UWorld *World = GetWorld()) {
-    // Travel back to the overworld after the tactical battle ends
-    World->ServerTravel(ReturnMapName);
+    const ENetMode NetMode = World->GetNetMode();
+
+    switch (NetMode) {
+    case NM_Standalone: {
+      const FName LevelName(*ReturnMapName);
+      UGameplayStatics::OpenLevel(World, LevelName, /*bAbsolute=*/true);
+      break;
+    }
+    case NM_DedicatedServer:
+    case NM_ListenServer: {
+      FString ListenTarget = ReturnMapName;
+      if (!ListenTarget.Contains(TEXT("?listen"))) {
+        ListenTarget.Append(TEXT("?listen"));
+      }
+      World->ServerTravel(ListenTarget);
+      break;
+    }
+    case NM_Client:
+      // Clients should wait for the server's travel notification instead of
+      // loading the map locally with an incomplete URL. The pending server
+      // travel initiated above will automatically move connected clients.
+      break;
+    default:
+      World->ServerTravel(ReturnMapName);
+      break;
+    }
   }
 }
 

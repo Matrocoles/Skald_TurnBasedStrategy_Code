@@ -141,6 +141,9 @@ private:
   /** Helper to broadcast the current actions remaining value. */
   void BroadcastActionsRemaining();
 
+  /** Rotate the fighter to face a world-space location. */
+  void FaceTowardsLocation(const FVector &TargetLocation);
+
   /** Data describing a single queued attack roll. */
   struct FQueuedAttackRoll {
     int32 RollValue = 1;
