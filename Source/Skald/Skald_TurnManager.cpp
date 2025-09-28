@@ -118,15 +118,11 @@ void ATurnManager::HandleGridBattleEnded(ESkaldFaction /*WinningFaction*/, int32
       World->ServerTravel(ListenTarget);
       break;
     }
-    case NM_Client: {
-      if (APlayerController *PC = World->GetFirstPlayerController()) {
-        PC->ClientTravel(ReturnMapName, TRAVEL_Absolute);
-      } else {
-        const FName LevelName(*ReturnMapName);
-        UGameplayStatics::OpenLevel(World, LevelName, /*bAbsolute=*/true);
-      }
+    case NM_Client:
+      // Clients should wait for the server's travel notification instead of
+      // loading the map locally with an incomplete URL. The pending server
+      // travel initiated above will automatically move connected clients.
       break;
-    }
     default:
       World->ServerTravel(ReturnMapName);
       break;
