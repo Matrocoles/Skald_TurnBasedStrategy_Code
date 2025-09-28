@@ -218,6 +218,33 @@ public:
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Display")
   bool bDrawBaseGrid = true;
 
+  /** If true, the persistent grid will spawn decals instead of instanced meshes. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Display|Decal")
+  bool bUseDecalBaseGrid = false;
+
+  /** Material applied to base grid decals (must use the Deferred Decal domain). */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Grid|Display|Decal")
+  UMaterialInterface *BaseGridDecalMaterial = nullptr;
+
+  /** Name of the vector parameter driven by base grid colours on the decal material. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Grid|Display|Decal")
+  FName BaseGridDecalColorParameter = TEXT("TintColor");
+
+  /** Depth of the decal projection along the surface normal for the base grid. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Display|Decal",
+            meta = (ClampMin = "0.0"))
+  float BaseGridDecalProjectionDepth = 32.f;
+
+  /** Multiplier applied to the XY footprint of base grid decals relative to the cell size. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Display|Decal",
+            meta = (ClampMin = "0.01"))
+  float BaseGridDecalSizeMultiplier = 1.0f;
+
+  /** Screen size threshold at which base grid decals begin to fade out. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Display|Decal",
+            meta = (ClampMin = "0.0"))
+  float BaseGridDecalFadeScreenSize = 0.01f;
+
   /** Vertical offset applied to the persistent grid overlay. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Display")
   float GridHeightOffset = 0.f;
@@ -312,6 +339,14 @@ protected:
   UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Grid|Display")
   UInstancedStaticMeshComponent *BaseGridMeshComponent = nullptr;
 
+  /** Spawned decal components used when the base grid renders as decals. */
+  UPROPERTY(Transient)
+  TArray<TWeakObjectPtr<UDecalComponent>> BaseGridDecalComponents;
+
+  /** Dynamic materials created for base grid decals to support colour changes. */
+  UPROPERTY(Transient)
+  TArray<TWeakObjectPtr<UMaterialInstanceDynamic>> BaseGridDecalMaterials;
+
   /** Map grid coordinates to highlight instance indices for updates. */
   UPROPERTY(Transient)
   TMap<FIntPoint, int32> HighlightedInstances;
@@ -377,6 +412,15 @@ protected:
 
   /** Highlight a cell using a spawned decal component. */
   void HighlightCellWithDecal(const FIntPoint &GridCoord, const FColor &Color);
+
+  /** Resolve the material that should be used for base grid decals. */
+  UMaterialInterface *GetBaseGridDecalMaterial() const;
+
+  /** Destroy any existing base grid decals and clear cached references. */
+  void ClearBaseGridDecals();
+
+  /** Apply colour data to a base grid decal material instance. */
+  void ApplyBaseGridDecalColor(int32 CellIndex, const FLinearColor &Color);
 
   /** Resolve the material that should be used for decal highlights. */
   UMaterialInterface *GetHighlightDecalMaterial() const;
