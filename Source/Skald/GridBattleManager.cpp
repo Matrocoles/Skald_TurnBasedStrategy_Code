@@ -4,6 +4,8 @@
 #include "GridOverlayComponent.h"
 #include "SkaldLogging.h"
 #include "Skald_GameInstance.h"
+#include "Skald_PlayerState.h"
+#include "GameFramework/GameStateBase.h"
 #include "UObject/UnrealType.h"
 
 namespace
@@ -580,15 +582,52 @@ void UGridBattleManager::ClearInactiveFighters()
 
 bool UGridBattleManager::IsSideAIControlled(bool bForAttackers) const
 {
-    if (const UWorld* World = GetWorld())
+    const UWorld* World = GetWorld();
+    if (!World)
     {
-        if (const USkaldGameInstance* GameInstance = World->GetGameInstance<USkaldGameInstance>())
+        return false;
+    }
+
+    const USkaldGameInstance* GameInstance = World->GetGameInstance<USkaldGameInstance>();
+    int32 TargetPlayerId = INDEX_NONE;
+    bool bPendingBattleAIFlag = false;
+
+    if (GameInstance)
+    {
+        const FS_BattlePayload& Battle = GameInstance->PendingBattle;
+        TargetPlayerId = bForAttackers ? Battle.AttackerPlayerID : Battle.DefenderPlayerID;
+        bPendingBattleAIFlag = bForAttackers ? Battle.bAttackerIsAI : Battle.bDefenderIsAI;
+
+        if (bPendingBattleAIFlag)
         {
-            const FS_BattlePayload& Battle = GameInstance->PendingBattle;
-            return bForAttackers ? Battle.bAttackerIsAI : Battle.bDefenderIsAI;
+            return true;
         }
     }
-    return false;
+
+    bool bMatchedPlayerState = false;
+    if (const AGameStateBase* GameState = World->GetGameState())
+    {
+        for (APlayerState* PlayerState : GameState->PlayerArray)
+        {
+            if (const ASkaldPlayerState* SkaldPlayerState = Cast<ASkaldPlayerState>(PlayerState))
+            {
+                if (TargetPlayerId > 0 && SkaldPlayerState->GetPlayerId() == TargetPlayerId)
+                {
+                    bMatchedPlayerState = true;
+                    return SkaldPlayerState->bIsAI;
+                }
+            }
+        }
+    }
+
+    if (!bMatchedPlayerState)
+    {
+        UE_LOG(LogSkaldBattle, Warning, TEXT("[Battle] Unable to resolve controller for %s; defaulting to AI automation."),
+            bForAttackers ? TEXT("attackers") : TEXT("defenders"));
+        return true;
+    }
+
+    return bPendingBattleAIFlag;
 }
 
 void UGridBattleManager::EndBattle()
