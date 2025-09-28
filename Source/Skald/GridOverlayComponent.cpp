@@ -176,7 +176,11 @@ void UGridOverlayComponent::OnRegister() {
 
   RefreshOriginFromOwner();
 
-  EnsureBaseGridComponentSetup();
+  if (bUseDecalBaseGrid) {
+    ClearBaseGridDecals();
+  } else {
+    EnsureBaseGridComponentSetup();
+  }
   if (!bUseDecalHighlights) {
     EnsureHighlightComponentSetup();
   }
@@ -193,7 +197,12 @@ void UGridOverlayComponent::BeginPlay() {
   DynamicOccupiedCells.Init(false, TotalCells);
   CellHeights.Init(Origin.Z, TotalCells);
   CellRotations.Init(FQuat::Identity, TotalCells);
-  BaseGridInstanceIndices.Init(INDEX_NONE, TotalCells);
+  if (bUseDecalBaseGrid) {
+    BaseGridInstanceIndices.Empty();
+    ClearBaseGridDecals();
+  } else {
+    BaseGridInstanceIndices.Init(INDEX_NONE, TotalCells);
+  }
 
   SampleEnvironmentAtOrigin();
 
@@ -423,6 +432,10 @@ bool UGridOverlayComponent::EnsureHighlightComponentSetup() {
 }
 
 bool UGridOverlayComponent::EnsureBaseGridComponentSetup() {
+  if (bUseDecalBaseGrid) {
+    return false;
+  }
+
   if (!bDrawBaseGrid) {
     return false;
   }
@@ -624,6 +637,41 @@ void UGridOverlayComponent::HighlightCellWithDecal(const FIntPoint &GridCoord,
   }
 }
 
+UMaterialInterface *UGridOverlayComponent::GetBaseGridDecalMaterial() const {
+  if (BaseGridDecalMaterial) {
+    return BaseGridDecalMaterial;
+  }
+
+  if (HighlightDecalMaterial) {
+    return HighlightDecalMaterial;
+  }
+
+  return nullptr;
+}
+
+void UGridOverlayComponent::ClearBaseGridDecals() {
+  for (TWeakObjectPtr<UDecalComponent> &DecalPtr : BaseGridDecalComponents) {
+    if (UDecalComponent *Decal = DecalPtr.Get()) {
+      Decal->DestroyComponent();
+    }
+  }
+
+  BaseGridDecalComponents.Empty();
+  BaseGridDecalMaterials.Empty();
+}
+
+void UGridOverlayComponent::ApplyBaseGridDecalColor(int32 CellIndex,
+                                                    const FLinearColor &Color) {
+  if (!BaseGridDecalMaterials.IsValidIndex(CellIndex)) {
+    return;
+  }
+
+  if (UMaterialInstanceDynamic *DynamicMaterial =
+          BaseGridDecalMaterials[CellIndex].Get()) {
+    DynamicMaterial->SetVectorParameterValue(BaseGridDecalColorParameter, Color);
+  }
+}
+
 void UGridOverlayComponent::ApplyBaseGridColor(int32 InstanceIndex,
                                                const FLinearColor &Color) {
   if (!BaseGridMeshComponent || BaseGridMeshComponent->NumCustomDataFloats < 4 ||
@@ -659,12 +707,17 @@ FLinearColor UGridOverlayComponent::GetBaseGridColor(int32 CellIndex) const {
 }
 
 void UGridOverlayComponent::UpdateBaseGridVisual(const FIntPoint &GridCoord) {
-  if (!BaseGridMeshComponent || !IsValidGrid(GridCoord)) {
+  if (!IsValidGrid(GridCoord)) {
     return;
   }
 
   const int32 ArrayIndex = Index(GridCoord);
-  if (!BaseGridInstanceIndices.IsValidIndex(ArrayIndex)) {
+  if (bUseDecalBaseGrid) {
+    ApplyBaseGridDecalColor(ArrayIndex, GetBaseGridColor(ArrayIndex));
+    return;
+  }
+
+  if (!BaseGridMeshComponent || !BaseGridInstanceIndices.IsValidIndex(ArrayIndex)) {
     return;
   }
 
@@ -678,21 +731,129 @@ void UGridOverlayComponent::UpdateBaseGridVisual(const FIntPoint &GridCoord) {
 
 void UGridOverlayComponent::RebuildBaseGridInstances() {
   if (!bDrawBaseGrid) {
-    if (BaseGridMeshComponent) {
+    if (bUseDecalBaseGrid) {
+      ClearBaseGridDecals();
+    } else if (BaseGridMeshComponent) {
       BaseGridMeshComponent->ClearInstances();
     }
     BaseGridInstanceIndices.Empty();
     return;
   }
 
-  if (!EnsureBaseGridComponentSetup()) {
+  const int32 TotalCells = Width * Height;
+  if (TotalCells <= 0) {
+    if (bUseDecalBaseGrid) {
+      ClearBaseGridDecals();
+    } else if (BaseGridMeshComponent) {
+      BaseGridMeshComponent->ClearInstances();
+    }
+    BaseGridInstanceIndices.Empty();
     return;
   }
 
-  const int32 TotalCells = Width * Height;
-  if (TotalCells <= 0) {
-    BaseGridMeshComponent->ClearInstances();
-    BaseGridInstanceIndices.Empty();
+  if (bUseDecalBaseGrid) {
+    UMaterialInterface *DecalMaterial = GetBaseGridDecalMaterial();
+    if (!DecalMaterial) {
+      UE_LOG(LogTemp, Warning,
+             TEXT("GridOverlayComponent %s is configured to use decal base grid but no decal material is set."),
+             *GetNameSafe(GetOwner()));
+      ClearBaseGridDecals();
+      return;
+    }
+
+    ClearBaseGridDecals();
+    BaseGridDecalComponents.SetNum(TotalCells);
+    BaseGridDecalMaterials.SetNum(TotalCells);
+
+    AActor *Owner = GetOwner();
+    if (!Owner) {
+      return;
+    }
+
+    USceneComponent *Root = Owner->GetRootComponent();
+    const float EffectiveCellSize = FMath::Max(CellSize, KINDA_SMALL_NUMBER);
+    const float HalfSize = 0.5f * EffectiveCellSize * BaseGridDecalSizeMultiplier;
+
+    for (int32 Y = 0; Y < Height; ++Y) {
+      for (int32 X = 0; X < Width; ++X) {
+        const FIntPoint Cell(X, Y);
+        const int32 ArrayIndex = Index(Cell);
+
+        UDecalComponent *Decal = nullptr;
+        if (BaseGridDecalComponents.IsValidIndex(ArrayIndex)) {
+          Decal = BaseGridDecalComponents[ArrayIndex].Get();
+        }
+
+        if (!Decal) {
+          Decal = NewObject<UDecalComponent>(Owner);
+          if (!Decal) {
+            continue;
+          }
+
+          Decal->CreationMethod = EComponentCreationMethod::Instance;
+          Decal->SetMobility(EComponentMobility::Movable);
+          Decal->FadeScreenSize = BaseGridDecalFadeScreenSize;
+          Owner->AddOwnedComponent(Decal);
+          Owner->AddInstanceComponent(Decal);
+
+          if (Root) {
+            Decal->AttachToComponent(Root, FAttachmentTransformRules::KeepWorldTransform);
+          }
+
+          Decal->RegisterComponent();
+          BaseGridDecalComponents[ArrayIndex] = Decal;
+        }
+
+        UMaterialInstanceDynamic *DynamicMaterial = nullptr;
+        if (BaseGridDecalMaterials.IsValidIndex(ArrayIndex)) {
+          DynamicMaterial = BaseGridDecalMaterials[ArrayIndex].Get();
+        }
+
+        if (!DynamicMaterial) {
+          DynamicMaterial = UMaterialInstanceDynamic::Create(DecalMaterial, this);
+          if (DynamicMaterial) {
+            BaseGridDecalMaterials[ArrayIndex] = DynamicMaterial;
+          }
+        }
+
+        if (DynamicMaterial) {
+          Decal->SetDecalMaterial(DynamicMaterial);
+        } else {
+          Decal->SetDecalMaterial(DecalMaterial);
+        }
+
+        const FQuat CellRotation =
+            CellRotations.IsValidIndex(ArrayIndex) ? CellRotations[ArrayIndex]
+                                                   : FQuat::Identity;
+        const FVector CellNormal =
+            CellRotation.RotateVector(FVector::UpVector).GetSafeNormal();
+        const FVector CellTangent =
+            CellRotation.RotateVector(FVector::ForwardVector).GetSafeNormal();
+        const FVector WorldCenter = GridToWorld(Cell);
+        const FVector DecalLocation =
+            WorldCenter +
+            CellNormal * (GridHeightOffset + BaseGridDecalProjectionDepth * 0.5f);
+        const auto DecalBasis =
+            UE::Math::TRotationMatrix<double>::MakeFromXZ(-CellNormal, CellTangent);
+        const FQuat DecalQuat = DecalBasis.ToQuat();
+        const FRotator DecalRotation = DecalQuat.Rotator();
+
+        Decal->DecalSize =
+            FVector(BaseGridDecalProjectionDepth, HalfSize, HalfSize);
+        Decal->FadeScreenSize = BaseGridDecalFadeScreenSize;
+        Decal->SetWorldLocationAndRotation(DecalLocation, DecalRotation);
+        Decal->SetFadeOut(0.f, 0.f, false);
+
+        ApplyBaseGridDecalColor(ArrayIndex, GetBaseGridColor(ArrayIndex));
+      }
+    }
+
+    return;
+  }
+
+  ClearBaseGridDecals();
+
+  if (!EnsureBaseGridComponentSetup()) {
     return;
   }
 
