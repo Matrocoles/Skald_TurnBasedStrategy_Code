@@ -787,6 +787,14 @@ void ASkaldPlayerController::HandleActiveFighterChanged(
   if (!NewFighter) {
     UpdateBattleHUDSelection();
   }
+
+  if (UGridOverlayComponent *Grid = FindGridOverlay()) {
+    if (NewFighter && NewFighter->IsAlive()) {
+      Grid->HighlightSelection(NewFighter);
+    } else {
+      Grid->ClearSelectionHighlight();
+    }
+  }
 }
 
 void ASkaldPlayerController::DetectBattleMap() {

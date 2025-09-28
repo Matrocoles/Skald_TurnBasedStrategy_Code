@@ -936,14 +936,20 @@ void UGridOverlayComponent::HighlightCell(const FIntPoint &GridCoord,
 
 void UGridOverlayComponent::HighlightSelection(AFighterPawn *Fighter) {
   if (!Fighter) {
+    ClearSelectionHighlight();
     return;
   }
 
-  const FIntPoint Cell = WorldToGrid(Fighter->GetActorLocation());
-  HighlightCell(Cell, SelectionHighlightColor.ToFColor(true), 0.f, false);
+  PersistentlyHighlightedFighter = Fighter;
+  ClearHighlights(true);
 }
 
-void UGridOverlayComponent::ClearHighlights() {
+void UGridOverlayComponent::ClearSelectionHighlight() {
+  PersistentlyHighlightedFighter.Reset();
+  ClearHighlights(false);
+}
+
+void UGridOverlayComponent::ClearHighlights(bool bMaintainPersistentSelection) {
   HighlightedInstances.Empty();
   if (HighlightMeshComponent) {
     HighlightMeshComponent->ClearInstances();
@@ -970,11 +976,34 @@ void UGridOverlayComponent::ClearHighlights() {
     HighlightedDecalRemovalTimers.Empty();
   }
 
+  if (!bMaintainPersistentSelection) {
+    PersistentlyHighlightedFighter.Reset();
+  }
+
 #if WITH_EDITOR
   if (GetWorld() && bFlushAllPersistentOnClear) {
     FlushPersistentDebugLines(GetWorld());
   }
 #endif
+
+  if (bMaintainPersistentSelection) {
+    RefreshPersistentSelectionHighlight();
+  }
+}
+
+void UGridOverlayComponent::RefreshPersistentSelectionHighlight() {
+  if (!PersistentlyHighlightedFighter.IsValid()) {
+    return;
+  }
+
+  AFighterPawn *Fighter = PersistentlyHighlightedFighter.Get();
+  if (!Fighter) {
+    PersistentlyHighlightedFighter.Reset();
+    return;
+  }
+
+  const FIntPoint Cell = WorldToGrid(Fighter->GetActorLocation());
+  HighlightCell(Cell, SelectionHighlightColor.ToFColor(true), 0.f, false);
 }
 
 void UGridOverlayComponent::RegisterObstacle(UGridObstacleComponent *Obstacle) {

@@ -129,9 +129,13 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Grid")
   void HighlightSelection(AFighterPawn *Fighter);
 
+  /** Clear any selection highlight that should persist across commands. */
+  UFUNCTION(BlueprintCallable, Category = "Grid")
+  void ClearSelectionHighlight();
+
   /** Remove any persistent highlights. */
   UFUNCTION(BlueprintCallable, Category = "Grid")
-  void ClearHighlights();
+  void ClearHighlights(bool bMaintainPersistentSelection = true);
 
   /** Rebuild the persistent grid overlay instances. */
   UFUNCTION(BlueprintCallable, Category = "Grid")
@@ -359,6 +363,10 @@ protected:
   UPROPERTY(Transient)
   TMap<FIntPoint, TWeakObjectPtr<UMaterialInstanceDynamic>> HighlightedDecalMaterials;
 
+  /** Fighter whose current cell should remain highlighted until cleared. */
+  UPROPERTY(Transient)
+  TWeakObjectPtr<AFighterPawn> PersistentlyHighlightedFighter;
+
   /** Timers that remove decal components once their fade completes. */
   TMap<FIntPoint, FTimerHandle> HighlightedDecalRemovalTimers;
 
@@ -409,6 +417,9 @@ protected:
 
   /** Apply highlight color as per-instance custom data. */
   void ApplyHighlightColor(int32 InstanceIndex, const FLinearColor &Color);
+
+  /** Reapply the persistent selection highlight if one is set. */
+  void RefreshPersistentSelectionHighlight();
 
   /** Highlight a cell using a spawned decal component. */
   void HighlightCellWithDecal(const FIntPoint &GridCoord, const FColor &Color);
