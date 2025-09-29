@@ -15,8 +15,6 @@ public:
     virtual void ShowErrorMessage(const FString& Message) override;
 };
 
-#endif // WITH_AUTOMATION_TESTS
-
 UCLASS()
 class ATestPlayerController : public ASkaldPlayerController
 {
@@ -24,4 +22,6 @@ class ATestPlayerController : public ASkaldPlayerController
 public:
     void SetHUD(USkaldMainHUDWidget* InHUD);
 };
+
+#endif // WITH_AUTOMATION_TESTS
 
