@@ -15,6 +15,7 @@
 #include "Territory.h"
 #include "UI/SkaldMainHUDWidget.h"
 #include "WorldMap.h"
+#include "Misc/PackageName.h"
 
 namespace {
 FString GetResolvedPlayerName(const ASkaldPlayerState *PlayerState,
@@ -24,6 +25,41 @@ FString GetResolvedPlayerName(const ASkaldPlayerState *PlayerState,
   }
 
   return PlayerState->GetResolvedPlayerName(Context);
+}
+
+FString NormalizeMapName(UWorld *World, FString Candidate) {
+  FString Result = MoveTemp(Candidate);
+
+  if (Result.IsEmpty() && World) {
+    Result = World->URL.Map;
+  }
+
+  if (!Result.IsEmpty()) {
+    int32 OptionsIndex = INDEX_NONE;
+    if (Result.FindChar(TEXT('?'), OptionsIndex)) {
+      Result.LeftInline(OptionsIndex, /*bAllowShrinking=*/false);
+    }
+
+    if (World && !World->StreamingLevelsPrefix.IsEmpty() &&
+        Result.StartsWith(World->StreamingLevelsPrefix)) {
+      Result.RightChopInline(World->StreamingLevelsPrefix.Len(),
+                             /*bAllowShrinking=*/false);
+    }
+
+    FString LongPackageName;
+    if (FPackageName::IsShortPackageName(Result)) {
+      if (FPackageName::SearchForPackageOnDisk(Result, &LongPackageName)) {
+        Result = MoveTemp(LongPackageName);
+      }
+    } else if (!FPackageName::IsValidLongPackageName(Result)) {
+      if (FPackageName::TryConvertFilenameToLongPackageName(Result,
+                                                           LongPackageName)) {
+        Result = MoveTemp(LongPackageName);
+      }
+    }
+  }
+
+  return Result;
 }
 } // namespace
 
@@ -83,11 +119,20 @@ void ATurnManager::BeginPlay() {
 }
 
 void ATurnManager::HandleGridBattleEnded(ESkaldFaction /*WinningFaction*/, int32 /*AttackerCasualties*/, int32 /*DefenderCasualties*/) {
+  UWorld *World = GetWorld();
+
   FString ReturnMapName;
   if (!PendingBattle.ReturnMap.IsEmpty()) {
     ReturnMapName = PendingBattle.ReturnMap;
   } else if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
     ReturnMapName = GI->PendingBattle.ReturnMap;
+  }
+
+  ReturnMapName = NormalizeMapName(World, MoveTemp(ReturnMapName));
+
+  if (ReturnMapName.IsEmpty() && World) {
+    ReturnMapName = NormalizeMapName(
+        World, UGameplayStatics::GetCurrentLevelName(World, true));
   }
 
   if (ReturnMapName.IsEmpty()) {
@@ -100,7 +145,11 @@ void ATurnManager::HandleGridBattleEnded(ESkaldFaction /*WinningFaction*/, int32
     GI->SetTravelPending(true);
   }
 
-  if (UWorld *World = GetWorld()) {
+  if (!World) {
+    World = GetWorld();
+  }
+
+  if (World) {
     const ENetMode NetMode = World->GetNetMode();
 
     switch (NetMode) {
@@ -418,7 +467,12 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
   FS_BattlePayload SeededBattle = Battle;
   SeededBattle.RandomSeed = FMath::Rand();
   if (UWorld *World = GetWorld()) {
-    SeededBattle.ReturnMap = UGameplayStatics::GetCurrentLevelName(World, true);
+    FString ReturnMap = NormalizeMapName(World, FString());
+    if (ReturnMap.IsEmpty()) {
+      ReturnMap = NormalizeMapName(
+          World, UGameplayStatics::GetCurrentLevelName(World, true));
+    }
+    SeededBattle.ReturnMap = MoveTemp(ReturnMap);
     if (ASkaldGameMode *GameMode = World->GetAuthGameMode<ASkaldGameMode>()) {
       GameMode->CacheWorldMapSnapshot();
     }
