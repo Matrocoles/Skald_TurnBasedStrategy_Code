@@ -18,7 +18,8 @@ constexpr int32 ActionsPerActivation = 2;
 }
 
 AFighterPawn::AFighterPawn() {
-  PrimaryActorTick.bCanEverTick = false;
+  PrimaryActorTick.bCanEverTick = true;
+  PrimaryActorTick.bStartWithTickEnabled = true;
 
   bReplicates = true;
   SetReplicateMovement(true);
@@ -108,6 +109,8 @@ void AFighterPawn::BeginPlay() {
     Grid->SetOccupied(CurrentCell, true);
   }
 
+  MovementTargetLocation = GetActorLocation();
+
   if (UWorld *World = GetWorld()) {
     if (USkaldGameInstance *GI =
             Cast<USkaldGameInstance>(World->GetGameInstance())) {
@@ -115,6 +118,30 @@ void AFighterPawn::BeginPlay() {
         GI->GridBattleManager->RegisterFighter(this, bIsAttacker);
       }
     }
+  }
+}
+
+void AFighterPawn::Tick(float DeltaSeconds) {
+  Super::Tick(DeltaSeconds);
+
+  if (!bIsMoving) {
+    return;
+  }
+
+  const FVector CurrentLocation = GetActorLocation();
+  const float EffectiveSpeed = FMath::Max(MovementSpeed, KINDA_SMALL_NUMBER);
+  const FVector NextLocation =
+      FMath::VInterpConstantTo(CurrentLocation, MovementTargetLocation, DeltaSeconds,
+                               EffectiveSpeed);
+  SetActorLocation(NextLocation);
+
+  const float EffectiveTolerance =
+      FMath::Max(MovementStopTolerance, KINDA_SMALL_NUMBER);
+  if (FVector::DistSquared(NextLocation, MovementTargetLocation) <=
+      FMath::Square(EffectiveTolerance)) {
+    SetActorLocation(MovementTargetLocation);
+    bIsMoving = false;
+    MovementTargetLocation = GetActorLocation();
   }
 }
 
@@ -231,9 +258,22 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
     NewLocation = Grid->GridToWorld(TargetCell);
     NewLocation.Z += GetSimpleCollisionHalfHeight();
   }
+  MovementTargetLocation = NewLocation;
   FaceTowardsCells(PreviousCell, TargetCell);
   FaceTowardsLocation(NewLocation);
-  SetActorLocation(NewLocation);
+
+  const float EffectiveTolerance =
+      FMath::Max(MovementStopTolerance, KINDA_SMALL_NUMBER);
+  const bool bAlreadyAtTarget =
+      GetActorLocation().Equals(MovementTargetLocation, EffectiveTolerance);
+
+  if (MovementSpeed <= KINDA_SMALL_NUMBER || bAlreadyAtTarget) {
+    SetActorLocation(MovementTargetLocation);
+    bIsMoving = false;
+    MovementTargetLocation = GetActorLocation();
+  } else {
+    bIsMoving = true;
+  }
   ActionsRemaining = FMath::Max(0, ActionsRemaining - 1);
 
   BroadcastActionsRemaining();
