@@ -195,6 +195,10 @@ bool AWorldMap::GenerateTerritoriesFromTable() {
     }
 
     for (int32 NeighborId : SpawnData->AdjacentTerritoryIDs) {
+      if (NeighborId <= 0) {
+        continue;
+      }
+
       if (ATerritory *const *NeighborPtr = TerritoriesById.Find(NeighborId)) {
         ATerritory *Neighbor = *NeighborPtr;
         AddAdjacency(Territory, Neighbor);
