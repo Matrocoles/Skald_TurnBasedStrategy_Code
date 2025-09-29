@@ -761,7 +761,7 @@ AFighterPawn *ASkaldPlayerController::FindFighterAtCell(
   if (UWorld *World = GetWorld()) {
     for (TActorIterator<AFighterPawn> It(World); It; ++It) {
       AFighterPawn *Fighter = *It;
-      if (Fighter && Fighter->GetCurrentCell() == Cell) {
+      if (Fighter && Fighter->OccupiesCell(Cell)) {
         return Fighter;
       }
     }

@@ -11,6 +11,12 @@
 class UGridOverlayComponent;
 class UCapsuleComponent;
 
+UENUM(BlueprintType)
+enum class EFighterPawnFootprint : uint8 {
+  SingleCell UMETA(DisplayName = "1 Cell"),
+  FourCells UMETA(DisplayName = "4 Cells")
+};
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHealthChanged, int32, NewHealth);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnActionsChanged, int32,
                                             NewActionsRemaining);
@@ -64,15 +70,47 @@ public:
   bool IsAlive() const;
 
   /** Get the grid overlay component, caching the result. */
-  UGridOverlayComponent *GetGrid();
+  UGridOverlayComponent *GetGrid() const;
 
   /** Retrieve the grid cell currently occupied by this fighter. */
   FIntPoint GetCurrentCell() const;
+
+  /** Cells occupied by this fighter given an anchor grid coordinate. */
+  TArray<FIntPoint> GetOccupiedCells(const FIntPoint &Anchor) const;
+
+  /** Cells currently occupied by this fighter. */
+  TArray<FIntPoint> GetOccupiedCells() const { return GetOccupiedCells(CurrentCell); }
+
+  /** Returns true if the fighter's footprint overlaps the specified cell. */
+  bool OccupiesCell(const FIntPoint &Cell) const;
+
+  /** Manhattan distance from the fighter's footprint to a specific cell. */
+  int32 GetFootprintDistanceToCell(const FIntPoint &Cell,
+                                   FIntPoint *OutClosestCell = nullptr) const;
+
+  /** Manhattan distance between this fighter's footprint and another's. */
+  int32 GetFootprintDistanceToFighter(
+      const AFighterPawn *Other, FIntPoint *OutSelfCell = nullptr,
+      FIntPoint *OutOtherCell = nullptr) const;
+
+  /** Determine if any occupied cells have line of sight within range. */
+  bool HasLineOfSightToFighter(const AFighterPawn *Other, int32 Range,
+                               UGridOverlayComponent *Grid,
+                               FIntPoint *OutSelfCell = nullptr,
+                               FIntPoint *OutOtherCell = nullptr) const;
+
+  /** Size of the fighter footprint measured in cells per side. */
+  int32 GetFootprintSideLength() const;
 
   /** Statistics describing this fighter. */
   UPROPERTY(BlueprintReadWrite, EditAnywhere, ReplicatedUsing = OnRep_Stats,
             Category = "Fighter")
   FFighterStats Stats;
+
+  /** Number of grid cells occupied by this fighter (1 or 4). */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite,
+            ReplicatedUsing = OnRep_GridFootprint, Category = "Fighter|Grid")
+  EFighterPawnFootprint GridFootprint = EFighterPawnFootprint::SingleCell;
 
   /** True if this fighter belongs to the attacking side. */
   UPROPERTY(BlueprintReadWrite, EditAnywhere, Replicated,
@@ -139,6 +177,8 @@ private:
   void OnRep_Stats(const FFighterStats &OldStats);
   UFUNCTION()
   void OnRep_ActionsRemaining();
+  UFUNCTION()
+  void OnRep_GridFootprint();
 
   /** Retrieve or create a damage widget from the pool. */
   UUserWidget *GetDamageWidgetFromPool();
@@ -148,6 +188,15 @@ private:
 
   /** Align the visible mesh with the collision capsule. */
   void UpdateMeshOffset();
+
+  /** Apply scale changes based on the footprint size. */
+  void ApplyFootprintScale();
+
+  /** Align the fighter's world position with its occupied cells. */
+  void AlignToCurrentCell();
+
+  /** Calculate the aligned world location for a given anchor cell. */
+  FVector GetAlignedWorldLocation(const FIntPoint &Anchor) const;
 
   /** Helper to broadcast the current actions remaining value. */
   void BroadcastActionsRemaining();
@@ -206,7 +255,7 @@ private:
   FIntPoint CurrentCell;
 
   /** Cached grid overlay component. */
-  UGridOverlayComponent *CachedGrid = nullptr;
+  mutable UGridOverlayComponent *CachedGrid = nullptr;
 
   /** True while the fighter is interpolating towards a grid cell. */
   bool bIsMoving = false;
