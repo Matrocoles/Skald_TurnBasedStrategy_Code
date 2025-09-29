@@ -1166,14 +1166,16 @@ void ASkaldPlayerController::HandleMoveRequested(int32 FromID, int32 ToID,
     return;
   }
 
-  if (!Source->IsAdjacentTo(Target)) {
-    NotifyActionError(TEXT("Territories must be adjacent"));
-    return;
-  }
-
   const int32 MaxMovable = Source->ArmyUnits - 1;
   if (Troops <= 0 || Troops > MaxMovable) {
     NotifyActionError(TEXT("Invalid troop count for movement"));
+    return;
+  }
+
+  TArray<ATerritory *> Path;
+  if (!WorldMap->FindPath(Source, Target, Path) || Path.Num() < 2) {
+    NotifyActionError(
+        TEXT("Selected territories must be connected by a friendly path"));
     return;
   }
 
