@@ -328,6 +328,11 @@ protected:
   UPROPERTY()
   TArray<ATerritory *> HighlightedTerritories;
 
+  void ClearTerritoryHighlights();
+  void ShowSelectionPromptMessage(const FString &Message,
+                                  bool bShow = true);
+  void ShowSelectionErrorMessage(const FString &Message);
+
   virtual void NativeConstruct() override;
   virtual void NativeDestruct() override;
 

@@ -10,9 +10,9 @@ class ASkaldPlayerState;
 class USkaldMainHUDWidget;
 
 /**
- * Simple widget allowing the player to choose how many units to deploy to a
- * territory.
-*/
+ * Simple widget allowing the player to choose how many units to deploy or
+ * transfer between territories.
+ */
 UCLASS(BlueprintType, Blueprintable)
 class SKALD_API UDeployWidget : public UUserWidget {
   GENERATED_BODY()
@@ -20,10 +20,15 @@ class SKALD_API UDeployWidget : public UUserWidget {
 public:
   virtual void NativeConstruct() override;
 
-  /** Configure the widget for the given territory and player state. */
+  /** Configure the widget for deploying reinforcements to a territory. */
   UFUNCTION(BlueprintCallable, Category = "Skald|Deploy")
-  void Setup(ATerritory *InTerritory, ASkaldPlayerState *InPlayerState,
-             USkaldMainHUDWidget *InHUD, int32 MaxAmount);
+  void SetupDeployment(ATerritory *InTerritory, ASkaldPlayerState *InPlayerState,
+                       USkaldMainHUDWidget *InHUD, int32 MaxAmount);
+
+  /** Configure the widget for transferring troops between territories. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Deploy")
+  void SetupTransfer(ATerritory *InSource, ATerritory *InTarget,
+                     USkaldMainHUDWidget *InHUD, int32 MaxAmount);
 
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
   USpinBox *AmountSelector;
@@ -41,13 +46,22 @@ private:
   UFUNCTION(BlueprintCallable, Category = "Skald|Deploy")
   void HandleDecline();
 
-  UPROPERTY()
-  ATerritory *Territory;
+  enum class EDeployWidgetMode : uint8 { Deployment, Transfer };
 
   UPROPERTY()
-  ASkaldPlayerState *PlayerState;
+  ATerritory *SourceTerritory = nullptr;
+
+  UPROPERTY()
+  ATerritory *TargetTerritory = nullptr;
+
+  UPROPERTY()
+  ASkaldPlayerState *PlayerState = nullptr;
 
   UPROPERTY()
   TWeakObjectPtr<USkaldMainHUDWidget> OwningHUD;
+
+  EDeployWidgetMode Mode = EDeployWidgetMode::Deployment;
+
+  int32 MaxSelectableAmount = 0;
 };
 
