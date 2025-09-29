@@ -704,6 +704,14 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
   }
 
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+  if (GI && (GI->bResumeTurns || GI->SavedTurnIndex != 0 ||
+             GI->SavedTurnPhase != ETurnPhase::Reinforcement)) {
+    bWorldInitialized = true;
+    bTurnsStarted = true;
+    GetWorldTimerManager().ClearTimer(RetryInitTimerHandle);
+    return;
+  }
+
   if (GI && !GI->bIsMultiplayer) {
     TArray<ASkaldPlayerState *> AutoLockPlayers;
     for (APlayerState *PSBase : GS->PlayerArray) {
