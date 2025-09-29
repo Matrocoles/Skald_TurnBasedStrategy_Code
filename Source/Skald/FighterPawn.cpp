@@ -167,7 +167,7 @@ void AFighterPawn::BeginActivation() {
 }
 
 void AFighterPawn::ResetActivationState() {
-  ActionsRemaining = 0;
+  ActionsRemaining = ActionsPerActivation;
   bHasActivatedThisRound = false;
   bIsCurrentlyActive = false;
 
