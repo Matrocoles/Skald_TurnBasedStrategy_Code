@@ -1,5 +1,6 @@
 #pragma once
 
+#if WITH_AUTOMATION_TESTS
 #include "CoreMinimal.h"
 #include "Skald_PlayerController.h"
 #include "UI/SkaldMainHUDWidget.h"
@@ -13,6 +14,8 @@ public:
     int32 LastUnits = -1;
     virtual void UpdateDeployableUnits(int32 UnitsRemaining) override { LastUnits = UnitsRemaining; }
 };
+
+#endif // WITH_AUTOMATION_TESTS
 
 /** Player controller with accessible HUD setter for tests. */
 UCLASS()

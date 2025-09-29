@@ -1,3 +1,4 @@
+#if WITH_AUTOMATION_TESTS
 #include "BattleResolutionSyncTest.h"
 
 #include "Misc/AutomationTest.h"
@@ -61,3 +62,4 @@ bool FSkaldBattleResolutionSyncTest::RunTest(const FString& Parameters) {
 
   return true;
 }
+#endif // WITH_AUTOMATION_TESTS

@@ -1,3 +1,4 @@
+#if WITH_AUTOMATION_TESTS
 #include "TerritorySelectionTest.h"
 
 #include "Engine/GameInstance.h"
@@ -61,3 +62,4 @@ bool FTerritorySelectionFlowTest::RunTest(const FString &Parameters) {
   World->GetGameInstance()->RemoveLocalPlayer(LocalPlayer);
   return true;
 }
+#endif // WITH_AUTOMATION_TESTS

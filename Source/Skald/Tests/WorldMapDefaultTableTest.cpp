@@ -1,3 +1,4 @@
+#if WITH_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
 #include "WorldMap.h"
 #include "Tests/AutomationEditorCommon.h"
@@ -24,3 +25,4 @@ bool FWorldMapDefaultTableTest::RunTest(const FString& Parameters)
     TestNull(TEXT("TerritoryTable should be unset"), Map->TerritoryTable);
     return true;
 }
+#endif // WITH_AUTOMATION_TESTS

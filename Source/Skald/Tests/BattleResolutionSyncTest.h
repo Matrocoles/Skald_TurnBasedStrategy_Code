@@ -1,5 +1,6 @@
 #pragma once
 
+#if WITH_AUTOMATION_TESTS
 #include "CoreMinimal.h"
 #include "BattleResolutionSyncTest.generated.h"
 
@@ -20,4 +21,6 @@ public:
         bBroadcasted = true;
     }
 };
+
+#endif // WITH_AUTOMATION_TESTS
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#if WITH_AUTOMATION_TESTS
 #include "CoreMinimal.h"
 #include "Skald_PlayerController.h"
 #include "TerritorySelectionTest.generated.h"
@@ -15,4 +16,6 @@ public:
         Super::ServerSelectTerritory_Implementation(TerritoryID);
     }
 };
+
+#endif // WITH_AUTOMATION_TESTS
 
