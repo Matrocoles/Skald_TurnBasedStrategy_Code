@@ -225,6 +225,134 @@ bool AFighterPawn::OccupiesCell(const FIntPoint &Cell) const {
   return OccupiedCells.Contains(Cell);
 }
 
+int32 AFighterPawn::GetFootprintDistanceToCell(const FIntPoint &Cell,
+                                               FIntPoint *OutClosestCell) const {
+  const TArray<FIntPoint> OccupiedCells = GetOccupiedCells();
+  int32 BestDistance = TNumericLimits<int32>::Max();
+  FIntPoint BestCell = CurrentCell;
+
+  for (const FIntPoint &SelfCell : OccupiedCells) {
+    const int32 Distance = FMath::Abs(SelfCell.X - Cell.X) +
+                           FMath::Abs(SelfCell.Y - Cell.Y);
+    if (Distance < BestDistance) {
+      BestDistance = Distance;
+      BestCell = SelfCell;
+      if (Distance == 0) {
+        break;
+      }
+    }
+  }
+
+  if (OutClosestCell) {
+    *OutClosestCell = BestCell;
+  }
+
+  return BestDistance;
+}
+
+int32 AFighterPawn::GetFootprintDistanceToFighter(
+    const AFighterPawn *Other, FIntPoint *OutSelfCell,
+    FIntPoint *OutOtherCell) const {
+  if (!Other) {
+    if (OutSelfCell) {
+      *OutSelfCell = CurrentCell;
+    }
+    if (OutOtherCell) {
+      *OutOtherCell = FIntPoint::ZeroValue;
+    }
+    return TNumericLimits<int32>::Max();
+  }
+
+  const TArray<FIntPoint> SelfCells = GetOccupiedCells();
+  const TArray<FIntPoint> OtherCells = Other->GetOccupiedCells();
+
+  int32 BestDistance = TNumericLimits<int32>::Max();
+  FIntPoint BestSelf = CurrentCell;
+  FIntPoint BestOther = Other->GetCurrentCell();
+
+  for (const FIntPoint &SelfCell : SelfCells) {
+    for (const FIntPoint &OtherCell : OtherCells) {
+      const int32 Distance = FMath::Abs(SelfCell.X - OtherCell.X) +
+                             FMath::Abs(SelfCell.Y - OtherCell.Y);
+      if (Distance < BestDistance) {
+        BestDistance = Distance;
+        BestSelf = SelfCell;
+        BestOther = OtherCell;
+        if (Distance == 0) {
+          break;
+        }
+      }
+    }
+    if (BestDistance == 0) {
+      break;
+    }
+  }
+
+  if (OutSelfCell) {
+    *OutSelfCell = BestSelf;
+  }
+  if (OutOtherCell) {
+    *OutOtherCell = BestOther;
+  }
+
+  return BestDistance;
+}
+
+bool AFighterPawn::HasLineOfSightToFighter(
+    const AFighterPawn *Other, int32 Range, UGridOverlayComponent *Grid,
+    FIntPoint *OutSelfCell, FIntPoint *OutOtherCell) const {
+  if (!Grid || !Other) {
+    return false;
+  }
+
+  const TArray<FIntPoint> SelfCells = GetOccupiedCells();
+  const TArray<FIntPoint> OtherCells = Other->GetOccupiedCells();
+
+  bool bFoundLine = false;
+  int32 BestDistance = TNumericLimits<int32>::Max();
+  FIntPoint BestSelf = CurrentCell;
+  FIntPoint BestOther = Other->GetCurrentCell();
+
+  for (const FIntPoint &SelfCell : SelfCells) {
+    for (const FIntPoint &OtherCell : OtherCells) {
+      const int32 Distance = FMath::Abs(SelfCell.X - OtherCell.X) +
+                             FMath::Abs(SelfCell.Y - OtherCell.Y);
+      if (Distance > Range) {
+        continue;
+      }
+      if (!Grid->HasLineOfSight(SelfCell, OtherCell)) {
+        continue;
+      }
+
+      if (!bFoundLine || Distance < BestDistance) {
+        BestDistance = Distance;
+        BestSelf = SelfCell;
+        BestOther = OtherCell;
+        bFoundLine = true;
+        if (BestDistance == 0) {
+          break;
+        }
+      }
+    }
+    if (BestDistance == 0) {
+      break;
+    }
+  }
+
+  if (!bFoundLine) {
+    return false;
+  }
+
+  if (OutSelfCell) {
+    *OutSelfCell = BestSelf;
+  }
+  if (OutOtherCell) {
+    *OutOtherCell = BestOther;
+  }
+
+  return true;
+}
+
 void AFighterPawn::ApplyFootprintScale() {
   if (DisplayMesh) {
     const float Scale =
@@ -391,14 +519,18 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
     return;
   }
 
-  const int32 Distance = FMath::Abs(Target->CurrentCell.X - CurrentCell.X) +
-                         FMath::Abs(Target->CurrentCell.Y - CurrentCell.Y);
+  FIntPoint ClosestSelfCell = CurrentCell;
+  FIntPoint ClosestTargetCell = Target->GetCurrentCell();
+  const int32 Distance =
+      GetFootprintDistanceToFighter(Target, &ClosestSelfCell, &ClosestTargetCell);
   if (Distance > Stats.AttackRange) {
     return;
   }
 
   UGridOverlayComponent *Grid = GetGrid();
-  if (Grid && !Grid->HasLineOfSight(CurrentCell, Target->CurrentCell)) {
+  if (Grid &&
+      !HasLineOfSightToFighter(Target, Stats.AttackRange, Grid, &ClosestSelfCell,
+                               &ClosestTargetCell)) {
     return;
   }
 

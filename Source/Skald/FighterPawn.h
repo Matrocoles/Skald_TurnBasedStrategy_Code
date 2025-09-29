@@ -84,6 +84,21 @@ public:
   /** Returns true if the fighter's footprint overlaps the specified cell. */
   bool OccupiesCell(const FIntPoint &Cell) const;
 
+  /** Manhattan distance from the fighter's footprint to a specific cell. */
+  int32 GetFootprintDistanceToCell(const FIntPoint &Cell,
+                                   FIntPoint *OutClosestCell = nullptr) const;
+
+  /** Manhattan distance between this fighter's footprint and another's. */
+  int32 GetFootprintDistanceToFighter(
+      const AFighterPawn *Other, FIntPoint *OutSelfCell = nullptr,
+      FIntPoint *OutOtherCell = nullptr) const;
+
+  /** Determine if any occupied cells have line of sight within range. */
+  bool HasLineOfSightToFighter(const AFighterPawn *Other, int32 Range,
+                               UGridOverlayComponent *Grid,
+                               FIntPoint *OutSelfCell = nullptr,
+                               FIntPoint *OutOtherCell = nullptr) const;
+
   /** Size of the fighter footprint measured in cells per side. */
   int32 GetFootprintSideLength() const;
 

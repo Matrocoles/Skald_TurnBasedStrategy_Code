@@ -301,20 +301,14 @@ bool ASkaldAIController::IsMyTurn() const {
          (!bAttackerTurn && bAIControlsDefenderSide);
 }
 
-int32 ASkaldAIController::ComputeManhattanDistance(UGridOverlayComponent *Grid,
+int32 ASkaldAIController::ComputeManhattanDistance(UGridOverlayComponent * /*Grid*/,
                                                    const AFighterPawn *A,
                                                    const AFighterPawn *B) const {
-  if (!Grid || !A || !B) {
+  if (!A || !B) {
     return TNumericLimits<int32>::Max();
   }
 
-  const FIntPoint CellA = A->GetCurrentCell();
-  const FIntPoint CellB = B->GetCurrentCell();
-  if (!Grid->IsCellInBounds(CellA) || !Grid->IsCellInBounds(CellB)) {
-    return TNumericLimits<int32>::Max();
-  }
-
-  return FMath::Abs(CellA.X - CellB.X) + FMath::Abs(CellA.Y - CellB.Y);
+  return A->GetFootprintDistanceToFighter(B);
 }
 
 AFighterPawn *ASkaldAIController::FindNearestEnemy(AFighterPawn *Fighter) const {
@@ -407,19 +401,13 @@ bool ASkaldAIController::TryAttackNearestEnemy(AFighterPawn *Fighter) {
     return false;
   }
 
-  const FIntPoint SelfCell = Fighter->GetCurrentCell();
-  const FIntPoint TargetCell = Target->GetCurrentCell();
-  if (!Grid->IsCellInBounds(SelfCell) || !Grid->IsCellInBounds(TargetCell)) {
-    return false;
-  }
-
-  const int32 Distance = FMath::Abs(SelfCell.X - TargetCell.X) +
-                         FMath::Abs(SelfCell.Y - TargetCell.Y);
+  const int32 Distance = Fighter->GetFootprintDistanceToFighter(Target);
   if (Distance > Fighter->Stats.AttackRange) {
     return false;
   }
 
-  if (!Grid->HasLineOfSight(SelfCell, TargetCell)) {
+  if (Grid &&
+      !Fighter->HasLineOfSightToFighter(Target, Fighter->Stats.AttackRange, Grid)) {
     return false;
   }
 
@@ -449,9 +437,31 @@ bool ASkaldAIController::TryMoveTowardsNearestEnemy(AFighterPawn *Fighter) {
     return false;
   }
 
+  const TArray<FIntPoint> EnemyFootprint = Enemy->GetOccupiedCells();
+
+  auto ComputeDistanceFromAnchor = [&](const FIntPoint &Anchor) {
+    const TArray<FIntPoint> CandidateCells = Fighter->GetOccupiedCells(Anchor);
+    int32 BestDistance = TNumericLimits<int32>::Max();
+    for (const FIntPoint &SelfCell : CandidateCells) {
+      for (const FIntPoint &EnemyCellCoord : EnemyFootprint) {
+        const int32 Distance = FMath::Abs(SelfCell.X - EnemyCellCoord.X) +
+                               FMath::Abs(SelfCell.Y - EnemyCellCoord.Y);
+        if (Distance < BestDistance) {
+          BestDistance = Distance;
+          if (BestDistance == 0) {
+            break;
+          }
+        }
+      }
+      if (BestDistance == 0) {
+        break;
+      }
+    }
+    return BestDistance;
+  };
+
   FIntPoint Current = StartCell;
-  int32 CurrentDistance = FMath::Abs(EnemyCell.X - Current.X) +
-                          FMath::Abs(EnemyCell.Y - Current.Y);
+  int32 CurrentDistance = ComputeDistanceFromAnchor(Current);
 
   const int32 MaxSteps = Fighter->Stats.Movement;
 
@@ -478,12 +488,8 @@ bool ASkaldAIController::TryMoveTowardsNearestEnemy(AFighterPawn *Fighter) {
     TArray<FIntPoint> Directions = {FIntPoint(1, 0), FIntPoint(-1, 0),
                                     FIntPoint(0, 1), FIntPoint(0, -1)};
     Directions.Sort([&](const FIntPoint &A, const FIntPoint &B) {
-      const FIntPoint PosA = Current + A;
-      const FIntPoint PosB = Current + B;
-      const int32 DistA =
-          FMath::Abs(EnemyCell.X - PosA.X) + FMath::Abs(EnemyCell.Y - PosA.Y);
-      const int32 DistB =
-          FMath::Abs(EnemyCell.X - PosB.X) + FMath::Abs(EnemyCell.Y - PosB.Y);
+      const int32 DistA = ComputeDistanceFromAnchor(Current + A);
+      const int32 DistB = ComputeDistanceFromAnchor(Current + B);
       return DistA < DistB;
     });
 
@@ -494,8 +500,7 @@ bool ASkaldAIController::TryMoveTowardsNearestEnemy(AFighterPawn *Fighter) {
         continue;
       }
 
-      const int32 CandidateDistance = FMath::Abs(EnemyCell.X - Candidate.X) +
-                                      FMath::Abs(EnemyCell.Y - Candidate.Y);
+      const int32 CandidateDistance = ComputeDistanceFromAnchor(Candidate);
       if (CandidateDistance >= CurrentDistance) {
         continue;
       }

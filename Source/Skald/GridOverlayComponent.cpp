@@ -1185,26 +1185,37 @@ void UGridOverlayComponent::HighlightAttack(AFighterPawn *Fighter) {
   const FColor SelectionColor = SelectionHighlightColor.ToFColor(true);
   const FColor AttackColor = AttackHighlightColor.ToFColor(true);
 
-  auto HighlightFootprint = [&](const FIntPoint &Anchor, const FColor &Color) {
-    const TArray<FIntPoint> Footprint = Fighter->GetOccupiedCells(Anchor);
-    for (const FIntPoint &Cell : Footprint) {
-      HighlightCell(Cell, Color, 0.f, false);
-    }
-  };
+  const TArray<FIntPoint> Footprint = Fighter->GetOccupiedCells(StartCell);
+  TSet<FIntPoint> Occupied;
+  for (const FIntPoint &Cell : Footprint) {
+    Occupied.Add(Cell);
+    HighlightCell(Cell, SelectionColor, 0.f, false);
+  }
 
-  HighlightFootprint(StartCell, SelectionColor);
+  const int32 Width = GetWidth();
+  const int32 Height = GetHeight();
 
-  for (int32 Dy = -Range; Dy <= Range; ++Dy) {
-    for (int32 Dx = -Range; Dx <= Range; ++Dx) {
-      if (FMath::Abs(Dx) + FMath::Abs(Dy) > Range) {
+  for (int32 Y = 0; Y < Height; ++Y) {
+    for (int32 X = 0; X < Width; ++X) {
+      const FIntPoint Target(X, Y);
+      if (Occupied.Contains(Target)) {
         continue;
       }
-      const FIntPoint Target = StartCell + FIntPoint(Dx, Dy);
-      if (!IsValidGrid(Target) || Target == StartCell) {
-        continue;
+
+      bool bWithinRange = false;
+      for (const FIntPoint &SelfCell : Footprint) {
+        const int32 Distance =
+            FMath::Abs(SelfCell.X - Target.X) + FMath::Abs(SelfCell.Y - Target.Y);
+        if (Distance > Range) {
+          continue;
+        }
+        if (HasLineOfSight(SelfCell, Target)) {
+          bWithinRange = true;
+          break;
+        }
       }
 
-      if (HasLineOfSight(StartCell, Target)) {
+      if (bWithinRange) {
         HighlightCell(Target, AttackColor, 0.f, false);
       }
     }
