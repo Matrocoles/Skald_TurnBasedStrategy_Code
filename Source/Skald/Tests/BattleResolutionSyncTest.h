@@ -1,6 +1,5 @@
 #pragma once
 
-#if WITH_AUTOMATION_TESTS
 #include "CoreMinimal.h"
 #include "BattleResolutionSyncTest.generated.h"
 
@@ -13,6 +12,7 @@ class SKALD_API UWorldStateChangedListener : public UObject
     GENERATED_BODY()
 
 public:
+    /** Whether the delegate broadcast has been observed. */
     bool bBroadcasted = false;
 
     UFUNCTION()
@@ -21,6 +21,4 @@ public:
         bBroadcasted = true;
     }
 };
-
-#endif // WITH_AUTOMATION_TESTS
 

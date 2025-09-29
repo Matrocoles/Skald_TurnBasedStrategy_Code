@@ -1,6 +1,5 @@
 #pragma once
 
-#if WITH_AUTOMATION_TESTS
 #include "CoreMinimal.h"
 #include "Skald_PlayerController.h"
 #include "UI/SkaldMainHUDWidget.h"
@@ -8,19 +7,20 @@
 
 /** HUD widget capturing the last deployable units value for tests. */
 UCLASS()
-class UDeployTestHUDWidget : public USkaldMainHUDWidget {
+class SKALD_API UDeployTestHUDWidget : public USkaldMainHUDWidget {
     GENERATED_BODY()
+
 public:
     int32 LastUnits = -1;
+
     virtual void UpdateDeployableUnits(int32 UnitsRemaining) override { LastUnits = UnitsRemaining; }
 };
 
-#endif // WITH_AUTOMATION_TESTS
-
 /** Player controller with accessible HUD setter for tests. */
 UCLASS()
-class ADeployTestPlayerController : public ASkaldPlayerController {
+class SKALD_API ADeployTestPlayerController : public ASkaldPlayerController {
     GENERATED_BODY()
+
 public:
     void SetHUD(USkaldMainHUDWidget* InHUD) { MainHUD = InHUD; }
 };
