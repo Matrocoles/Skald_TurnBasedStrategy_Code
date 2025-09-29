@@ -57,7 +57,7 @@ AFighterPawn::AFighterPawn() {
   }
 
   static ConstructorHelpers::FClassFinder<UUserWidget> MissWidgetFinder(
-      TEXT("/Game/Blueprints/UI/WBP_Misses"));
+      TEXT("/Game/Blueprints/UI/WBP_MissWidget"));
   if (MissWidgetFinder.Succeeded()) {
     MissWidgetTemplate = MissWidgetFinder.Class;
   }
