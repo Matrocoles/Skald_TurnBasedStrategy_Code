@@ -1,3 +1,4 @@
+#if WITH_AUTOMATION_TESTS
 #include "DeployUnitsReplicationTest.h"
 
 #include "Misc/AutomationTest.h"
@@ -68,4 +69,4 @@ bool FSkaldDeployReplicationTest::RunTest(const FString& Parameters)
 
     return true;
 }
-
+#endif // WITH_AUTOMATION_TESTS

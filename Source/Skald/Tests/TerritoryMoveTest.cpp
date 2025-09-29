@@ -1,3 +1,4 @@
+#if WITH_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
 #include "Tests/AutomationEditorCommon.h"
 #include "Territory.h"
@@ -115,3 +116,4 @@ bool FSkaldTerritoryMoveInvalidTest::RunTest(const FString& Parameters)
 
     return true;
 }
+#endif // WITH_AUTOMATION_TESTS

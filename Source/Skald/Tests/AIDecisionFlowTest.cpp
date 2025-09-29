@@ -1,3 +1,4 @@
+#if WITH_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
 #include "Tests/AutomationEditorCommon.h"
 #include "Engine/World.h"
@@ -81,3 +82,4 @@ bool FSkaldAIDecisionFlowTest::RunTest(const FString& Parameters)
 
     return true;
 }
+#endif // WITH_AUTOMATION_TESTS

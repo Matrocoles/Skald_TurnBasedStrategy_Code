@@ -1,5 +1,6 @@
 #pragma once
 
+#if WITH_AUTOMATION_TESTS
 #include "CoreMinimal.h"
 #include "Skald_PlayerController.h"
 #include "UI/SkaldMainHUDWidget.h"
@@ -13,6 +14,8 @@ public:
     FString LastError;
     virtual void ShowErrorMessage(const FString& Message) override;
 };
+
+#endif // WITH_AUTOMATION_TESTS
 
 UCLASS()
 class ATestPlayerController : public ASkaldPlayerController

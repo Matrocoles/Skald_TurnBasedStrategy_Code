@@ -1,3 +1,4 @@
+#if WITH_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
 #include "SkaldTypes.h"
 
@@ -10,3 +11,4 @@ bool FSkaldCapitalAttackRequirementTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Capital attack meeting requirement is valid"), SkaldHelpers::MeetsCapitalAttackRequirement(true, SkaldConstants::CapitalAttackArmyRequirement));
     return true;
 }
+#endif // WITH_AUTOMATION_TESTS

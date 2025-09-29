@@ -1,3 +1,4 @@
+#if WITH_AUTOMATION_TESTS
 #include "ChoosePlayerWidget.h"
 #include "Misc/AutomationTest.h"
 #include "Skald_PlayerController.h"
@@ -44,4 +45,4 @@ bool FSkaldPlayerControllerLockInMovementTest::RunTest(const FString &)
 
     return true;
 }
-
+#endif // WITH_AUTOMATION_TESTS

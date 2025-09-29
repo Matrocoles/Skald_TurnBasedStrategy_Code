@@ -1,3 +1,4 @@
+#if WITH_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
 #include "Skald_AIController.h"
 #include "Skald_GameMode.h"
@@ -446,3 +447,4 @@ bool FInitializeWorldSingleInitiativeRollTest::RunTest(const FString &Parameters
 
   return true;
 }
+#endif // WITH_AUTOMATION_TESTS

@@ -1,3 +1,4 @@
+#if WITH_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
 #include "GridBattleManager.h"
 
@@ -18,3 +19,4 @@ bool FSkaldResolveAttackClampTest::RunTest(const FString& Parameters) {
   TestEqual(TEXT("Defender health clamped"), Defender.Stats.Health, 0);
   return true;
 }
+#endif // WITH_AUTOMATION_TESTS
