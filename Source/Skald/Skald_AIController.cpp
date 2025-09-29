@@ -308,8 +308,8 @@ int32 ASkaldAIController::ComputeManhattanDistance(UGridOverlayComponent *Grid,
     return TNumericLimits<int32>::Max();
   }
 
-  const FIntPoint CellA = Grid->WorldToGrid(A->GetActorLocation());
-  const FIntPoint CellB = Grid->WorldToGrid(B->GetActorLocation());
+  const FIntPoint CellA = A->GetCurrentCell();
+  const FIntPoint CellB = B->GetCurrentCell();
   if (!Grid->IsCellInBounds(CellA) || !Grid->IsCellInBounds(CellB)) {
     return TNumericLimits<int32>::Max();
   }
@@ -335,7 +335,7 @@ AFighterPawn *ASkaldAIController::FindNearestEnemy(AFighterPawn *Fighter) const 
   AFighterPawn *BestEnemy = nullptr;
   int32 BestDistance = TNumericLimits<int32>::Max();
 
-  const FIntPoint StartCell = Grid->WorldToGrid(Fighter->GetActorLocation());
+  const FIntPoint StartCell = Fighter->GetCurrentCell();
   if (!Grid->IsCellInBounds(StartCell)) {
     return nullptr;
   }
@@ -407,8 +407,8 @@ bool ASkaldAIController::TryAttackNearestEnemy(AFighterPawn *Fighter) {
     return false;
   }
 
-  const FIntPoint SelfCell = Grid->WorldToGrid(Fighter->GetActorLocation());
-  const FIntPoint TargetCell = Grid->WorldToGrid(Target->GetActorLocation());
+  const FIntPoint SelfCell = Fighter->GetCurrentCell();
+  const FIntPoint TargetCell = Target->GetCurrentCell();
   if (!Grid->IsCellInBounds(SelfCell) || !Grid->IsCellInBounds(TargetCell)) {
     return false;
   }
@@ -443,8 +443,8 @@ bool ASkaldAIController::TryMoveTowardsNearestEnemy(AFighterPawn *Fighter) {
     return false;
   }
 
-  const FIntPoint StartCell = Grid->WorldToGrid(Fighter->GetActorLocation());
-  const FIntPoint EnemyCell = Grid->WorldToGrid(Enemy->GetActorLocation());
+  const FIntPoint StartCell = Fighter->GetCurrentCell();
+  const FIntPoint EnemyCell = Enemy->GetCurrentCell();
   if (!Grid->IsCellInBounds(StartCell) || !Grid->IsCellInBounds(EnemyCell)) {
     return false;
   }
@@ -454,6 +454,26 @@ bool ASkaldAIController::TryMoveTowardsNearestEnemy(AFighterPawn *Fighter) {
                           FMath::Abs(EnemyCell.Y - Current.Y);
 
   const int32 MaxSteps = Fighter->Stats.Movement;
+
+  TSet<FIntPoint> IgnoredCells;
+  const TArray<FIntPoint> CurrentFootprint = Fighter->GetOccupiedCells();
+  for (const FIntPoint &Cell : CurrentFootprint) {
+    IgnoredCells.Add(Cell);
+  }
+
+  auto CanOccupyAnchor = [&](const FIntPoint &Anchor) {
+    const TArray<FIntPoint> CandidateCells = Fighter->GetOccupiedCells(Anchor);
+    for (const FIntPoint &Cell : CandidateCells) {
+      if (!Grid->IsCellInBounds(Cell) || Grid->IsObscured(Cell)) {
+        return false;
+      }
+      if (Grid->IsOccupied(Cell) && !IgnoredCells.Contains(Cell)) {
+        return false;
+      }
+    }
+    return true;
+  };
+
   for (int32 Step = 0; Step < MaxSteps; ++Step) {
     TArray<FIntPoint> Directions = {FIntPoint(1, 0), FIntPoint(-1, 0),
                                     FIntPoint(0, 1), FIntPoint(0, -1)};
@@ -470,8 +490,7 @@ bool ASkaldAIController::TryMoveTowardsNearestEnemy(AFighterPawn *Fighter) {
     bool bMovedThisStep = false;
     for (const FIntPoint &Dir : Directions) {
       const FIntPoint Candidate = Current + Dir;
-      if (!Grid->IsCellInBounds(Candidate) || Grid->IsOccupied(Candidate) ||
-          Grid->IsObscured(Candidate)) {
+      if (!CanOccupyAnchor(Candidate)) {
         continue;
       }
 

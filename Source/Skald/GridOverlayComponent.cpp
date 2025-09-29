@@ -1002,8 +1002,10 @@ void UGridOverlayComponent::RefreshPersistentSelectionHighlight() {
     return;
   }
 
-  const FIntPoint Cell = WorldToGrid(Fighter->GetActorLocation());
-  HighlightCell(Cell, SelectionHighlightColor.ToFColor(true), 0.f, false);
+  const FColor SelectionColor = SelectionHighlightColor.ToFColor(true);
+  for (const FIntPoint &Cell : Fighter->GetOccupiedCells()) {
+    HighlightCell(Cell, SelectionColor, 0.f, false);
+  }
 }
 
 void UGridOverlayComponent::RegisterObstacle(UGridObstacleComponent *Obstacle) {
@@ -1100,18 +1102,44 @@ void UGridOverlayComponent::HighlightMovement(AFighterPawn *Fighter) {
 
   ClearHighlights();
 
-  const FIntPoint StartCell = WorldToGrid(Fighter->GetActorLocation());
+  const FIntPoint StartCell = Fighter->GetCurrentCell();
   const int32 Range = Fighter->Stats.Movement;
 
   const FColor SelectionColor = SelectionHighlightColor.ToFColor(true);
   const FColor MovementColor = MovementHighlightColor.ToFColor(true);
 
-  HighlightCell(StartCell, SelectionColor, 0.f, false);
+  auto HighlightFootprint = [&](const FIntPoint &Anchor, const FColor &Color) {
+    const TArray<FIntPoint> Footprint = Fighter->GetOccupiedCells(Anchor);
+    for (const FIntPoint &Cell : Footprint) {
+      HighlightCell(Cell, Color, 0.f, false);
+    }
+  };
+
+  HighlightFootprint(StartCell, SelectionColor);
 
   TSet<FIntPoint> Visited;
   TQueue<TPair<FIntPoint, int32>> Frontier;
   Visited.Add(StartCell);
   Frontier.Enqueue(TPair<FIntPoint, int32>(StartCell, 0));
+
+  TSet<FIntPoint> IgnoredCells;
+  const TArray<FIntPoint> CurrentFootprint = Fighter->GetOccupiedCells();
+  for (const FIntPoint &Cell : CurrentFootprint) {
+    IgnoredCells.Add(Cell);
+  }
+
+  auto CanOccupyAnchor = [&](const FIntPoint &Anchor) {
+    const TArray<FIntPoint> CandidateCells = Fighter->GetOccupiedCells(Anchor);
+    for (const FIntPoint &Cell : CandidateCells) {
+      if (!IsCellInBounds(Cell) || IsObscured(Cell)) {
+        return false;
+      }
+      if (IsOccupied(Cell) && !IgnoredCells.Contains(Cell)) {
+        return false;
+      }
+    }
+    return true;
+  };
 
   while (!Frontier.IsEmpty()) {
     TPair<FIntPoint, int32> Node;
@@ -1120,7 +1148,7 @@ void UGridOverlayComponent::HighlightMovement(AFighterPawn *Fighter) {
     const int32 Distance = Node.Value;
 
     if (Distance > 0) {
-      HighlightCell(Cell, MovementColor, 0.f, false);
+      HighlightFootprint(Cell, MovementColor);
     }
 
     if (Distance >= Range) {
@@ -1132,8 +1160,10 @@ void UGridOverlayComponent::HighlightMovement(AFighterPawn *Fighter) {
 
     for (const FIntPoint &Dir : Directions) {
       const FIntPoint Next = Cell + Dir;
-      if (!IsValidGrid(Next) || IsOccupied(Next) || IsObscured(Next) ||
-          Visited.Contains(Next)) {
+      if (Visited.Contains(Next)) {
+        continue;
+      }
+      if (!CanOccupyAnchor(Next)) {
         continue;
       }
       Visited.Add(Next);
@@ -1149,13 +1179,20 @@ void UGridOverlayComponent::HighlightAttack(AFighterPawn *Fighter) {
 
   ClearHighlights();
 
-  const FIntPoint StartCell = WorldToGrid(Fighter->GetActorLocation());
+  const FIntPoint StartCell = Fighter->GetCurrentCell();
   const int32 Range = Fighter->Stats.AttackRange;
 
   const FColor SelectionColor = SelectionHighlightColor.ToFColor(true);
   const FColor AttackColor = AttackHighlightColor.ToFColor(true);
 
-  HighlightCell(StartCell, SelectionColor, 0.f, false);
+  auto HighlightFootprint = [&](const FIntPoint &Anchor, const FColor &Color) {
+    const TArray<FIntPoint> Footprint = Fighter->GetOccupiedCells(Anchor);
+    for (const FIntPoint &Cell : Footprint) {
+      HighlightCell(Cell, Color, 0.f, false);
+    }
+  };
+
+  HighlightFootprint(StartCell, SelectionColor);
 
   for (int32 Dy = -Range; Dy <= Range; ++Dy) {
     for (int32 Dx = -Range; Dx <= Range; ++Dx) {

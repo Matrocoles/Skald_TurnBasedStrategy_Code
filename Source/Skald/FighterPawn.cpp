@@ -67,6 +67,7 @@ AFighterPawn::AFighterPawn() {
   bIsCurrentlyActive = false;
   CurrentCell = FIntPoint::ZeroValue;
 
+  ApplyFootprintScale();
   UpdateMeshOffset();
 }
 
@@ -79,12 +80,15 @@ void AFighterPawn::GetLifetimeReplicatedProps(
   DOREPLIFETIME(AFighterPawn, ActionsRemaining);
   DOREPLIFETIME(AFighterPawn, bHasActivatedThisRound);
   DOREPLIFETIME(AFighterPawn, bIsCurrentlyActive);
+  DOREPLIFETIME(AFighterPawn, GridFootprint);
   DOREPLIFETIME(AFighterPawn, CurrentCell);
 }
 
 void AFighterPawn::OnConstruction(const FTransform &Transform) {
   Super::OnConstruction(Transform);
+  ApplyFootprintScale();
   UpdateMeshOffset();
+  AlignToCurrentCell();
 }
 
 void AFighterPawn::BeginPlay() {
@@ -103,10 +107,12 @@ void AFighterPawn::BeginPlay() {
 
   if (UGridOverlayComponent *Grid = GetGrid()) {
     CurrentCell = Grid->WorldToGrid(GetActorLocation());
-    FVector AlignedLocation = Grid->GridToWorld(CurrentCell);
-    AlignedLocation.Z += GetSimpleCollisionHalfHeight();
-    SetActorLocation(AlignedLocation);
-    Grid->SetOccupied(CurrentCell, true);
+    AlignToCurrentCell();
+
+    const TArray<FIntPoint> OccupiedCells = GetOccupiedCells();
+    for (const FIntPoint &Cell : OccupiedCells) {
+      Grid->SetOccupied(Cell, true);
+    }
   }
 
   MovementTargetLocation = GetActorLocation();
@@ -180,7 +186,7 @@ void AFighterPawn::FinishActivation() {
   }
 }
 
-UGridOverlayComponent *AFighterPawn::GetGrid() {
+UGridOverlayComponent *AFighterPawn::GetGrid() const {
   if (!CachedGrid) {
     if (UWorld *World = GetWorld()) {
       for (TActorIterator<AActor> It(World); It; ++It) {
@@ -195,6 +201,66 @@ UGridOverlayComponent *AFighterPawn::GetGrid() {
 }
 
 FIntPoint AFighterPawn::GetCurrentCell() const { return CurrentCell; }
+
+int32 AFighterPawn::GetFootprintSideLength() const {
+  return GridFootprint == EFighterPawnFootprint::FourCells ? 2 : 1;
+}
+
+TArray<FIntPoint> AFighterPawn::GetOccupiedCells(const FIntPoint &Anchor) const {
+  const int32 SideLength = GetFootprintSideLength();
+  TArray<FIntPoint> Cells;
+  Cells.Reserve(SideLength * SideLength);
+
+  for (int32 Y = 0; Y < SideLength; ++Y) {
+    for (int32 X = 0; X < SideLength; ++X) {
+      Cells.Add(Anchor + FIntPoint(X, Y));
+    }
+  }
+
+  return Cells;
+}
+
+bool AFighterPawn::OccupiesCell(const FIntPoint &Cell) const {
+  const TArray<FIntPoint> OccupiedCells = GetOccupiedCells();
+  return OccupiedCells.Contains(Cell);
+}
+
+void AFighterPawn::ApplyFootprintScale() {
+  if (DisplayMesh) {
+    const float Scale =
+        GridFootprint == EFighterPawnFootprint::FourCells ? 2.f : 1.f;
+    DisplayMesh->SetRelativeScale3D(FVector(Scale));
+  }
+}
+
+FVector AFighterPawn::GetAlignedWorldLocation(const FIntPoint &Anchor) const {
+  if (UGridOverlayComponent *Grid = GetGrid()) {
+    const TArray<FIntPoint> Cells = GetOccupiedCells(Anchor);
+    FVector AccumulatedLocation = FVector::ZeroVector;
+    int32 CellCount = 0;
+
+    for (const FIntPoint &Cell : Cells) {
+      AccumulatedLocation += Grid->GridToWorld(Cell);
+      ++CellCount;
+    }
+
+    if (CellCount > 0) {
+      AccumulatedLocation /= static_cast<float>(CellCount);
+      AccumulatedLocation.Z += GetSimpleCollisionHalfHeight();
+      return AccumulatedLocation;
+    }
+  }
+
+  return GetActorLocation();
+}
+
+void AFighterPawn::AlignToCurrentCell() {
+  if (UGridOverlayComponent *Grid = GetGrid()) {
+    const FVector AlignedLocation = GetAlignedWorldLocation(CurrentCell);
+    SetActorLocation(AlignedLocation);
+    MovementTargetLocation = AlignedLocation;
+  }
+}
 
 UUserWidget *AFighterPawn::GetDamageWidgetFromPool() {
   for (UUserWidget *Widget : DamageWidgetPool) {
@@ -242,22 +308,40 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
     return;
   }
   UGridOverlayComponent *Grid = GetGrid();
-  if (Grid && Grid->IsObscured(TargetCell)) {
-    return;
-  }
-
   const FIntPoint PreviousCell = CurrentCell;
 
+  TArray<FIntPoint> PreviousCells;
+  TArray<FIntPoint> TargetCells;
+
   if (Grid) {
-    Grid->SetOccupied(CurrentCell, false);
+    PreviousCells = GetOccupiedCells();
+    TargetCells = GetOccupiedCells(TargetCell);
+
+    bool bCanOccupyTarget = true;
+    for (const FIntPoint &Cell : TargetCells) {
+      if (!Grid->IsCellInBounds(Cell) || Grid->IsObscured(Cell)) {
+        bCanOccupyTarget = false;
+        break;
+      }
+      const bool bCellPreviouslyOccupied = PreviousCells.Contains(Cell);
+      if (!bCellPreviouslyOccupied && Grid->IsOccupied(Cell)) {
+        bCanOccupyTarget = false;
+        break;
+      }
+    }
+
+    if (!bCanOccupyTarget) {
+      return;
+    }
+
+    for (const FIntPoint &Cell : PreviousCells) {
+      Grid->SetOccupied(Cell, false);
+    }
   }
 
   CurrentCell = TargetCell;
-  FVector NewLocation = GetActorLocation();
-  if (Grid) {
-    NewLocation = Grid->GridToWorld(TargetCell);
-    NewLocation.Z += GetSimpleCollisionHalfHeight();
-  }
+  FVector NewLocation = Grid ? GetAlignedWorldLocation(TargetCell)
+                             : GetActorLocation();
   MovementTargetLocation = NewLocation;
   FaceTowardsCells(PreviousCell, TargetCell);
   FaceTowardsLocation(NewLocation);
@@ -279,7 +363,9 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
   BroadcastActionsRemaining();
 
   if (Grid) {
-    Grid->SetOccupied(TargetCell, true);
+    for (const FIntPoint &Cell : TargetCells) {
+      Grid->SetOccupied(Cell, true);
+    }
     Grid->ClearHighlights();
   }
 }
@@ -529,7 +615,10 @@ void AFighterPawn::UpdateHealthDisplay(int32 NewHealth) {
 void AFighterPawn::Destroyed() {
   FinishActivation();
   if (UGridOverlayComponent *Grid = GetGrid()) {
-    Grid->SetOccupied(CurrentCell, false);
+    const TArray<FIntPoint> OccupiedCells = GetOccupiedCells();
+    for (const FIntPoint &Cell : OccupiedCells) {
+      Grid->SetOccupied(Cell, false);
+    }
   }
   if (UWorld *World = GetWorld()) {
     if (USkaldGameInstance *GI =
@@ -557,6 +646,12 @@ void AFighterPawn::OnRep_Stats(const FFighterStats &OldStats) {
 
 void AFighterPawn::OnRep_ActionsRemaining() { BroadcastActionsRemaining(); }
 
+void AFighterPawn::OnRep_GridFootprint() {
+  ApplyFootprintScale();
+  UpdateMeshOffset();
+  AlignToCurrentCell();
+}
+
 void AFighterPawn::BroadcastActionsRemaining() {
   OnActionsChanged.Broadcast(ActionsRemaining);
 }
@@ -576,15 +671,8 @@ void AFighterPawn::FaceTowardsCells(const FIntPoint &FromCell,
     return;
   }
 
-  FVector FromLocation(static_cast<double>(FromCell.X),
-                       static_cast<double>(FromCell.Y), 0.0);
-  FVector TargetLocation(static_cast<double>(ToCell.X),
-                         static_cast<double>(ToCell.Y), 0.0);
-
-  if (UGridOverlayComponent *Grid = GetGrid()) {
-    FromLocation = Grid->GridToWorld(FromCell);
-    TargetLocation = Grid->GridToWorld(ToCell);
-  }
+  FVector FromLocation = GetAlignedWorldLocation(FromCell);
+  FVector TargetLocation = GetAlignedWorldLocation(ToCell);
 
   FVector Direction = TargetLocation - FromLocation;
   Direction.Z = 0.f;
