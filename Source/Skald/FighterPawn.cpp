@@ -88,7 +88,6 @@ void AFighterPawn::OnConstruction(const FTransform &Transform) {
   Super::OnConstruction(Transform);
   ApplyFootprintScale();
   UpdateMeshOffset();
-  AlignToCurrentCell();
 }
 
 void AFighterPawn::BeginPlay() {
@@ -384,6 +383,11 @@ FVector AFighterPawn::GetAlignedWorldLocation(const FIntPoint &Anchor) const {
 
 void AFighterPawn::AlignToCurrentCell() {
   if (UGridOverlayComponent *Grid = GetGrid()) {
+    const FIntPoint DerivedCell = Grid->WorldToGrid(GetActorLocation());
+    if (DerivedCell != CurrentCell) {
+      return;
+    }
+
     const FVector AlignedLocation = GetAlignedWorldLocation(CurrentCell);
     SetActorLocation(AlignedLocation);
     MovementTargetLocation = AlignedLocation;
