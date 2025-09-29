@@ -1155,13 +1155,24 @@ void ASkaldPlayerController::HandleMoveRequested(int32 FromID, int32 ToID,
     return;
   }
 
-  TArray<ATerritory *> Path;
-  if (!WorldMap->FindPath(Source, Target, Path)) {
-    NotifyActionError(TEXT("No valid path for movement"));
+  ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
+  if (!PS) {
+    NotifyActionError(TEXT("Missing player state"));
     return;
   }
 
-  if (Troops <= 0 || Troops >= Source->ArmyUnits) {
+  if (Source->OwningPlayer != PS || Target->OwningPlayer != PS) {
+    NotifyActionError(TEXT("You may only move between your territories"));
+    return;
+  }
+
+  if (!Source->IsAdjacentTo(Target)) {
+    NotifyActionError(TEXT("Territories must be adjacent"));
+    return;
+  }
+
+  const int32 MaxMovable = Source->ArmyUnits - 1;
+  if (Troops <= 0 || Troops > MaxMovable) {
     NotifyActionError(TEXT("Invalid troop count for movement"));
     return;
   }

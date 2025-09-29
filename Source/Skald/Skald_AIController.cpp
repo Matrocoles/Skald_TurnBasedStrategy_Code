@@ -133,33 +133,75 @@ void ASkaldAIController::MakeAIDecision() {
                Phase == ETurnPhase::Treasure) {
       TurnManager->AdvancePhase();
     } else if (Phase == ETurnPhase::Movement) {
+      auto CountEnemyNeighbors = [PS](ATerritory *Territory) {
+        int32 Count = 0;
+        if (!Territory) {
+          return Count;
+        }
+        for (ATerritory *Neighbor : Territory->AdjacentTerritories) {
+          if (Neighbor && Neighbor->OwningPlayer != PS) {
+            ++Count;
+          }
+        }
+        return Count;
+      };
+
       ATerritory *BestSource = nullptr;
       ATerritory *BestTarget = nullptr;
-      int32 WeakestStrength = std::numeric_limits<int32>::max();
+      int32 BestSourcePressure = 0;
+      int32 BestTargetPressure = 0;
+      float BestScore = std::numeric_limits<float>::lowest();
 
       for (ATerritory *Source : WorldMap->Territories) {
         if (!Source || Source->OwningPlayer != PS || Source->ArmyUnits <= 1) {
           continue;
         }
 
+        const int32 SourcePressure = CountEnemyNeighbors(Source);
+
         for (ATerritory *Neighbor : Source->AdjacentTerritories) {
           if (!Neighbor || Neighbor->OwningPlayer != PS) {
             continue;
           }
 
-          if (Neighbor->ArmyUnits < WeakestStrength) {
+          const int32 TargetPressure = CountEnemyNeighbors(Neighbor);
+          const int32 PressureDiff = TargetPressure - SourcePressure;
+          const int32 SourceUnits = Source->ArmyUnits;
+          const int32 TargetUnits = Neighbor->ArmyUnits;
+
+          if (PressureDiff <= 0 && SourceUnits <= TargetUnits + 1) {
+            continue;
+          }
+
+          const int32 StrengthDiff = SourceUnits - TargetUnits;
+          const float Score = PressureDiff * 10.f + StrengthDiff;
+
+          if (Score > BestScore && Score > 0.f) {
+            BestScore = Score;
             BestSource = Source;
             BestTarget = Neighbor;
-            WeakestStrength = Neighbor->ArmyUnits;
+            BestSourcePressure = SourcePressure;
+            BestTargetPressure = TargetPressure;
           }
         }
       }
 
       if (BestSource && BestTarget) {
-        int32 TroopsToMove = BestSource->ArmyUnits / 2;
-        TroopsToMove = FMath::Clamp(TroopsToMove, 1, BestSource->ArmyUnits - 1);
-        HandleMoveRequested(BestSource->TerritoryID, BestTarget->TerritoryID,
-                            TroopsToMove);
+        const int32 SourceUnits = BestSource->ArmyUnits;
+        const int32 TargetUnits = BestTarget->ArmyUnits;
+        const int32 MaxMovable = SourceUnits - 1;
+        if (MaxMovable > 0) {
+          int32 Surplus = SourceUnits - TargetUnits;
+          Surplus = FMath::Max(Surplus, 0);
+          int32 TroopsToMove = FMath::Clamp(Surplus / 2, 1, MaxMovable);
+          if (BestTargetPressure > BestSourcePressure) {
+            const int32 PressureGap = BestTargetPressure - BestSourcePressure;
+            TroopsToMove = FMath::Clamp(FMath::Max(TroopsToMove, PressureGap), 1,
+                                        MaxMovable);
+          }
+          HandleMoveRequested(BestSource->TerritoryID, BestTarget->TerritoryID,
+                              TroopsToMove);
+        }
       }
 
       TurnManager->AdvancePhase();

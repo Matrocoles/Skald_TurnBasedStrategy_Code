@@ -385,11 +385,20 @@ void USkaldMainHUDWidget::ShowErrorMessage(const FString &Message) {
   BP_ShowErrorMessage(Message);
 }
 
-void USkaldMainHUDWidget::BeginAttackSelection() {
-  bSelectingForAttack = true;
-  bSelectingForMove = false;
-  SelectedSourceID = -1;
-  SelectedTargetID = -1;
+void USkaldMainHUDWidget::ClearTerritoryHighlights() {
+  if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+          GetWorld(), AWorldMap::StaticClass()))) {
+    if (SelectedSourceID != -1) {
+      if (ATerritory *Source = WorldMap->GetTerritoryById(SelectedSourceID)) {
+        Source->Deselect();
+      }
+    }
+    if (SelectedTargetID != -1) {
+      if (ATerritory *Target = WorldMap->GetTerritoryById(SelectedTargetID)) {
+        Target->Deselect();
+      }
+    }
+  }
 
   for (ATerritory *Terr : HighlightedTerritories) {
     if (Terr) {
@@ -397,6 +406,30 @@ void USkaldMainHUDWidget::BeginAttackSelection() {
     }
   }
   HighlightedTerritories.Empty();
+}
+
+void USkaldMainHUDWidget::ShowSelectionPromptMessage(const FString &Message,
+                                                     bool bShow) {
+  if (!SelectionPrompt) {
+    return;
+  }
+
+  SelectionPrompt->SetText(FText::FromString(Message));
+  SelectionPrompt->SetVisibility(bShow ? ESlateVisibility::Visible
+                                       : ESlateVisibility::Collapsed);
+}
+
+void USkaldMainHUDWidget::ShowSelectionErrorMessage(const FString &Message) {
+  ShowSelectionPromptMessage(Message);
+  ShowErrorMessage(Message);
+}
+
+void USkaldMainHUDWidget::BeginAttackSelection() {
+  ClearTerritoryHighlights();
+  bSelectingForAttack = true;
+  bSelectingForMove = false;
+  SelectedSourceID = -1;
+  SelectedTargetID = -1;
 
   if (ActiveConfirmWidget) {
     ActiveConfirmWidget->RemoveFromParent();
@@ -417,55 +450,39 @@ void USkaldMainHUDWidget::SubmitAttack(int32 FromID, int32 ToID, int32 ArmySent,
 }
 
 void USkaldMainHUDWidget::CancelAttackSelection() {
-  if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
-          GetWorld(), AWorldMap::StaticClass()))) {
-    if (SelectedSourceID != -1) {
-      if (ATerritory *Source = WorldMap->GetTerritoryById(SelectedSourceID)) {
-        Source->Deselect();
-      }
-    }
-    if (SelectedTargetID != -1) {
-      if (ATerritory *Target = WorldMap->GetTerritoryById(SelectedTargetID)) {
-        Target->Deselect();
-      }
-    }
-    for (ATerritory *Terr : HighlightedTerritories) {
-      if (Terr) {
-        Terr->Deselect();
-      }
-    }
-  }
-  HighlightedTerritories.Empty();
+  ClearTerritoryHighlights();
   if (ActiveConfirmWidget) {
     ActiveConfirmWidget->RemoveFromParent();
     ActiveConfirmWidget = nullptr;
   }
-  if (SelectionPrompt) {
-    SelectionPrompt->SetVisibility(ESlateVisibility::Visible);
-  }
+  ShowSelectionPromptMessage(TEXT("Choose owned territory."));
   bSelectingForAttack = false;
   SelectedSourceID = -1;
   SelectedTargetID = -1;
 }
 
 void USkaldMainHUDWidget::BeginMoveSelection() {
+  ClearTerritoryHighlights();
   bSelectingForMove = true;
   bSelectingForAttack = false;
   SelectedSourceID = -1;
   SelectedTargetID = -1;
+  ShowSelectionPromptMessage(TEXT("Select a territory to move troops from."));
 }
 
 void USkaldMainHUDWidget::SubmitMove(int32 FromID, int32 ToID, int32 Troops) {
   OnMoveRequested.Broadcast(FromID, ToID, Troops);
-  bSelectingForMove = false;
-  SelectedSourceID = -1;
-  SelectedTargetID = -1;
+  CancelMoveSelection();
+  ShowSelectionPromptMessage(
+      TEXT("Troops moved. Use End Phase to finish movement."));
 }
 
 void USkaldMainHUDWidget::CancelMoveSelection() {
+  ClearTerritoryHighlights();
   bSelectingForMove = false;
   SelectedSourceID = -1;
   SelectedTargetID = -1;
+  ShowSelectionPromptMessage(TEXT(""), false);
 }
 
 void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
@@ -576,15 +593,106 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
     }
     return;
   } else if (bSelectingForMove) {
-    if (SelectedSourceID == -1) {
-      if (bOwnedByLocal) {
-        SelectedSourceID = Territory->TerritoryID;
-      }
-    } else if (SelectedTargetID == -1) {
-      if (bOwnedByLocal) {
-        SelectedTargetID = Territory->TerritoryID;
-      }
+    if (!bOwnedByLocal) {
+      ShowSelectionErrorMessage(
+          TEXT("You may only move between your own territories."));
+      return;
     }
+
+    if (SelectedSourceID == -1 || Territory->TerritoryID == SelectedSourceID) {
+      if (Territory->ArmyUnits <= 1) {
+        ShowSelectionErrorMessage(
+            TEXT("Need more than one unit to move troops."));
+        return;
+      }
+
+      ClearTerritoryHighlights();
+      SelectedSourceID = Territory->TerritoryID;
+      SelectedTargetID = -1;
+      Territory->Select();
+
+      HighlightedTerritories.Empty();
+      for (ATerritory *Neighbor : Territory->AdjacentTerritories) {
+        if (Neighbor && Neighbor->OwningPlayer == Territory->OwningPlayer) {
+          Neighbor->Select();
+          HighlightedTerritories.Add(Neighbor);
+        }
+      }
+
+      if (HighlightedTerritories.Num() == 0) {
+        ShowSelectionErrorMessage(
+            TEXT("No adjacent friendly territory to move into."));
+        SelectedSourceID = -1;
+        Territory->Deselect();
+        return;
+      }
+
+      ShowSelectionPromptMessage(
+          TEXT("Select an adjacent territory to receive troops."));
+      return;
+    }
+
+    const bool bIsHighlighted = HighlightedTerritories.ContainsByPredicate(
+        [Territory](ATerritory *T) {
+          return T && T->TerritoryID == Territory->TerritoryID;
+        });
+
+    if (!bIsHighlighted) {
+      ShowSelectionErrorMessage(TEXT("Target not valid for movement."));
+      return;
+    }
+
+    SelectedTargetID = Territory->TerritoryID;
+
+    AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+        GetWorld(), AWorldMap::StaticClass()));
+    if (!WorldMap) {
+      ShowSelectionErrorMessage(TEXT("World map not found."));
+      CancelMoveSelection();
+      return;
+    }
+
+    ATerritory *Source = WorldMap->GetTerritoryById(SelectedSourceID);
+    ATerritory *Target = WorldMap->GetTerritoryById(SelectedTargetID);
+    if (!Source || !Target) {
+      ShowSelectionErrorMessage(TEXT("Invalid territory selection."));
+      CancelMoveSelection();
+      return;
+    }
+
+    const int32 MaxMovable = Source->ArmyUnits - 1;
+    if (MaxMovable <= 0) {
+      ShowSelectionErrorMessage(TEXT("No troops available to move."));
+      CancelMoveSelection();
+      return;
+    }
+
+    if (!DeployWidgetClass) {
+      ShowSelectionErrorMessage(TEXT("Deploy widget unavailable."));
+      CancelMoveSelection();
+      return;
+    }
+
+    if (ActiveDeployWidget && ActiveDeployWidget->IsInViewport()) {
+      ActiveDeployWidget->RemoveFromParent();
+      ActiveDeployWidget = nullptr;
+    }
+
+    ActiveDeployWidget =
+        CreateWidget<UDeployWidget>(GetWorld(), DeployWidgetClass);
+    if (!ActiveDeployWidget) {
+      ShowSelectionErrorMessage(TEXT("Could not open deploy UI."));
+      CancelMoveSelection();
+      return;
+    }
+
+    ActiveDeployWidget->SetupTransfer(Source, Target, this, MaxMovable);
+    ActiveDeployWidget->AddToViewport();
+    if (APlayerController *FocusPC = GetOwningPlayer()) {
+      FocusWidgetUIOnly(FocusPC, ActiveDeployWidget);
+    }
+
+    ShowSelectionPromptMessage(TEXT("Choose how many troops to move."));
   } else if (CurrentPhase == ETurnPhase::Reinforcement ||
              CurrentPhase == ETurnPhase::ArmyPlacement) {
     SelectedSourceID = Territory->TerritoryID;
@@ -882,7 +990,8 @@ void USkaldMainHUDWidget::HandleDeployClicked() {
   ActiveDeployWidget =
       CreateWidget<UDeployWidget>(GetWorld(), DeployWidgetClass);
   if (ActiveDeployWidget) {
-    ActiveDeployWidget->Setup(Territory, PS, this, PS->DeployableUnits);
+    ActiveDeployWidget->SetupDeployment(Territory, PS, this,
+                                        PS->DeployableUnits);
     ActiveDeployWidget->AddToViewport();
     if (APlayerController *FocusPC = GetOwningPlayer()) {
       FocusWidgetUIOnly(FocusPC, ActiveDeployWidget);
