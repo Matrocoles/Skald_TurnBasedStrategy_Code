@@ -432,7 +432,7 @@ bool UGridBattleManager::ActivateFighter(AFighterPawn* Fighter)
     {
         ActivatedFighter->BeginActivation();
     }
-    OnActiveFighterChanged.Broadcast(ActivatedFighter);
+    OnActiveFighterChanged.Broadcast(ActiveFighter);
     UE_LOG(LogSkaldBattle, Log, TEXT("[Battle] Fighter activated: %s (Round=%d, TurnIndex=%d, AttackerTurn=%s)"),
         *DescribeFighter(ActivatedFighter), CurrentRound, CurrentTurn, bIsAttackerTurn ? TEXT("true") : TEXT("false"));
     return ActivatedFighter != nullptr;
