@@ -144,6 +144,9 @@ private:
   /** Rotate the fighter to face a world-space location. */
   void FaceTowardsLocation(const FVector &TargetLocation);
 
+  /** Rotate the fighter to face from one grid cell towards another. */
+  void FaceTowardsCells(const FIntPoint &FromCell, const FIntPoint &ToCell);
+
   /** Data describing a single queued attack roll. */
   struct FQueuedAttackRoll {
     int32 RollValue = 1;
