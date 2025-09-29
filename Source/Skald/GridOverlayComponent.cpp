@@ -1192,11 +1192,11 @@ void UGridOverlayComponent::HighlightAttack(AFighterPawn *Fighter) {
     HighlightCell(Cell, SelectionColor, 0.f, false);
   }
 
-  const int32 Width = GetWidth();
-  const int32 Height = GetHeight();
+  const int32 GridWidth = GetWidth();
+  const int32 GridHeight = GetHeight();
 
-  for (int32 Y = 0; Y < Height; ++Y) {
-    for (int32 X = 0; X < Width; ++X) {
+  for (int32 Y = 0; Y < GridHeight; ++Y) {
+    for (int32 X = 0; X < GridWidth; ++X) {
       const FIntPoint Target(X, Y);
       if (Occupied.Contains(Target)) {
         continue;
