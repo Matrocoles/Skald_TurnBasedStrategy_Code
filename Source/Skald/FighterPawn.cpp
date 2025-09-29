@@ -219,6 +219,8 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
     return;
   }
 
+  const FIntPoint PreviousCell = CurrentCell;
+
   if (Grid) {
     Grid->SetOccupied(CurrentCell, false);
   }
@@ -229,6 +231,7 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
     NewLocation = Grid->GridToWorld(TargetCell);
     NewLocation.Z += GetSimpleCollisionHalfHeight();
   }
+  FaceTowardsCells(PreviousCell, TargetCell);
   FaceTowardsLocation(NewLocation);
   SetActorLocation(NewLocation);
   ActionsRemaining = FMath::Max(0, ActionsRemaining - 1);
@@ -319,6 +322,7 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
 
   BroadcastActionsRemaining();
 
+  FaceTowardsCells(CurrentCell, Target->CurrentCell);
   FaceTowardsLocation(Target->GetActorLocation());
 
   if (Grid) {
@@ -519,6 +523,30 @@ void AFighterPawn::BroadcastActionsRemaining() {
 
 void AFighterPawn::FaceTowardsLocation(const FVector &TargetLocation) {
   FVector Direction = TargetLocation - GetActorLocation();
+  Direction.Z = 0.f;
+  if (!Direction.IsNearlyZero()) {
+    const FRotator LookRotation = Direction.Rotation();
+    SetActorRotation(FRotator(0.f, LookRotation.Yaw, 0.f));
+  }
+}
+
+void AFighterPawn::FaceTowardsCells(const FIntPoint &FromCell,
+                                    const FIntPoint &ToCell) {
+  if (FromCell == ToCell) {
+    return;
+  }
+
+  FVector FromLocation(static_cast<double>(FromCell.X),
+                       static_cast<double>(FromCell.Y), 0.0);
+  FVector TargetLocation(static_cast<double>(ToCell.X),
+                         static_cast<double>(ToCell.Y), 0.0);
+
+  if (UGridOverlayComponent *Grid = GetGrid()) {
+    FromLocation = Grid->GridToWorld(FromCell);
+    TargetLocation = Grid->GridToWorld(ToCell);
+  }
+
+  FVector Direction = TargetLocation - FromLocation;
   Direction.Z = 0.f;
   if (!Direction.IsNearlyZero()) {
     const FRotator LookRotation = Direction.Rotation();
