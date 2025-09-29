@@ -23,6 +23,7 @@ class SKALD_API AFighterPawn : public APawn {
 public:
   AFighterPawn();
 
+  virtual void Tick(float DeltaSeconds) override;
   virtual void OnConstruction(const FTransform &Transform) override;
   virtual void BeginPlay() override;
   virtual void GetLifetimeReplicatedProps(
@@ -43,6 +44,16 @@ public:
   /** Move to the specified grid cell if actions remain. */
   UFUNCTION(BlueprintCallable, Category = "Fighter")
   void MoveToCell(FIntPoint TargetCell);
+
+  /** Units per second used when travelling between grid cells. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Movement",
+            meta = (ClampMin = "0.0"))
+  float MovementSpeed = 600.f;
+
+  /** Distance threshold for snapping to the target cell during movement. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Movement",
+            meta = (ClampMin = "0.0"))
+  float MovementStopTolerance = 1.f;
 
   /** Perform an attack against another fighter. */
   UFUNCTION(BlueprintCallable, Category = "Fighter")
@@ -196,6 +207,12 @@ private:
 
   /** Cached grid overlay component. */
   UGridOverlayComponent *CachedGrid = nullptr;
+
+  /** True while the fighter is interpolating towards a grid cell. */
+  bool bIsMoving = false;
+
+  /** World-space destination for the current interpolated move. */
+  FVector MovementTargetLocation = FVector::ZeroVector;
 
 public:
   /** Returns true if the fighter has already activated this round. */
