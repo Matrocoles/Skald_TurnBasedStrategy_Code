@@ -189,7 +189,7 @@ void ATurnManager::RegisterController(ASkaldPlayerController *Controller) {
 void ATurnManager::StartArmyPlacementPhase() {
   if (const UWorld *W = GetWorld()) {
     if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
-      if (GI->bTravelPending) {
+      if (GI->bTravelPending || GI->bResumeTurns) {
         return;
       }
     }
