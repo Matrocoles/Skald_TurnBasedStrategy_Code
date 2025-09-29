@@ -4,16 +4,6 @@
 #include "Misc/AutomationTest.h"
 #include "Tests/AutomationEditorCommon.h"
 
-void UTestHUDWidget::ShowErrorMessage(const FString& Message)
-{
-    LastError = Message;
-}
-
-void ATestPlayerController::SetHUD(USkaldMainHUDWidget* InHUD)
-{
-    MainHUD = InHUD;
-}
-
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldPlayerControllerValidationFeedbackTest,
                                  "Skald.PlayerController.ValidationFeedback",
                                  EAutomationTestFlags::EditorContext |
