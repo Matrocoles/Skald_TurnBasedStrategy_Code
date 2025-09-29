@@ -386,8 +386,15 @@ bool UGridBattleManager::CanActivateFighter(AFighterPawn* Fighter) const
         return false;
     }
 
-    if (ActiveFighter && ActiveFighter != Fighter)
+    if (ActiveFighter)
     {
+        if (ActiveFighter == Fighter)
+        {
+            UE_LOG(LogSkaldBattle, Verbose, TEXT("[Battle] CanActivateFighter rejected (Fighter already active) -> %s"),
+                *DescribeFighter(Fighter));
+            return false;
+        }
+
         UE_LOG(LogSkaldBattle, Verbose, TEXT("[Battle] CanActivateFighter rejected (Another active fighter %s)"),
             *DescribeFighter(ActiveFighter));
         return false;

@@ -616,6 +616,14 @@ void ASkaldAIController::TryActivateNextFighter() {
   }
 
   if (!CachedBattleManager->CanActivateFighter(NextFighter)) {
+    const FString FighterName = NextFighter
+                                    ? NextFighter->GetHumanReadableName()
+                                    : FString(TEXT("<None>"));
+    UE_LOG(LogSkaldBattle, Verbose,
+           TEXT("[AI] Skipping activation for %s; advancing turn."),
+           FighterName.IsEmpty() ? TEXT("<Unnamed Fighter>")
+                                 : *FighterName);
+    CachedBattleManager->AdvanceTurn();
     return;
   }
 
