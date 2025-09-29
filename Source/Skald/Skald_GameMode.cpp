@@ -704,12 +704,19 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
   }
 
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
-  if (GI && (GI->bResumeTurns || GI->SavedTurnIndex != 0 ||
-             GI->SavedTurnPhase != ETurnPhase::Reinforcement)) {
-    bWorldInitialized = true;
-    bTurnsStarted = true;
-    GetWorldTimerManager().ClearTimer(RetryInitTimerHandle);
-    return;
+  if (GI) {
+    if (GI->bResumeTurns) {
+      bWorldInitialized = true;
+      bTurnsStarted = true;
+      GetWorldTimerManager().ClearTimer(RetryInitTimerHandle);
+      return;
+    }
+
+    if (GI->SavedTurnIndex != 0 ||
+        GI->SavedTurnPhase != ETurnPhase::Reinforcement) {
+      GI->SavedTurnIndex = 0;
+      GI->SavedTurnPhase = ETurnPhase::Reinforcement;
+    }
   }
 
   if (GI && !GI->bIsMultiplayer) {
