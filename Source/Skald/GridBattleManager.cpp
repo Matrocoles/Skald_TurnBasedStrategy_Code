@@ -427,14 +427,15 @@ bool UGridBattleManager::ActivateFighter(AFighterPawn* Fighter)
 
     ActiveFighter = Fighter;
     CurrentTurn = InitiativeOrder.IndexOfByKey(Fighter);
-    if (ActiveFighter)
+    AFighterPawn* const ActivatedFighter = ActiveFighter;
+    if (ActivatedFighter)
     {
-        ActiveFighter->BeginActivation();
+        ActivatedFighter->BeginActivation();
     }
     OnActiveFighterChanged.Broadcast(ActiveFighter);
     UE_LOG(LogSkaldBattle, Log, TEXT("[Battle] Fighter activated: %s (Round=%d, TurnIndex=%d, AttackerTurn=%s)"),
-        *DescribeFighter(ActiveFighter), CurrentRound, CurrentTurn, bIsAttackerTurn ? TEXT("true") : TEXT("false"));
-    return ActiveFighter != nullptr;
+        *DescribeFighter(ActivatedFighter), CurrentRound, CurrentTurn, bIsAttackerTurn ? TEXT("true") : TEXT("false"));
+    return ActivatedFighter != nullptr;
 }
 
 void UGridBattleManager::FinishActivation(AFighterPawn* Fighter, EGridActivationFinishReason Reason)
