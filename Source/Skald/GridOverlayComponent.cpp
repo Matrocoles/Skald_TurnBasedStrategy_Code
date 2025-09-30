@@ -82,8 +82,15 @@ void UGridOverlayComponent::ApplyRandomizedOrigin() {
 
 void UGridOverlayComponent::RefreshOriginFromOwner(bool bMarkPlacementRandomized) {
   if (AActor *Owner = GetOwner()) {
-    const FVector NewOrigin = Owner->GetActorLocation();
+    const FTransform NewTransform = Owner->GetActorTransform();
+    const FVector NewOrigin = NewTransform.GetLocation();
     const bool bOriginChanged = !Origin.Equals(NewOrigin, KINDA_SMALL_NUMBER);
+
+    if (!CachedGridTransform.Equals(NewTransform, KINDA_SMALL_NUMBER)) {
+      CachedGridTransform = NewTransform;
+      CachedGridInverseTransform = CachedGridTransform.Inverse();
+    }
+
     Origin = NewOrigin;
     if (bMarkPlacementRandomized && bRandomizePlacement) {
       bHasRandomizedPlacement = true;
@@ -308,15 +315,18 @@ void UGridOverlayComponent::SampleEnvironmentAtOrigin() {
 
 FIntPoint
 UGridOverlayComponent::WorldToGrid(const FVector &WorldLocation) const {
-  FVector Local = WorldLocation - Origin;
+  const FVector Local =
+      CachedGridInverseTransform.TransformPosition(WorldLocation);
   int32 X = FMath::FloorToInt(Local.X / CellSize);
   int32 Y = FMath::FloorToInt(Local.Y / CellSize);
   return FIntPoint(X, Y);
 }
 
 FVector UGridOverlayComponent::GridToWorld(const FIntPoint &GridCoord) const {
-  FVector World = Origin + FVector((GridCoord.X + 0.5f) * CellSize,
-                                   (GridCoord.Y + 0.5f) * CellSize, 0.f);
+  const FVector LocalCenter =
+      FVector((GridCoord.X + 0.5f) * CellSize, (GridCoord.Y + 0.5f) * CellSize,
+              0.f);
+  FVector World = CachedGridTransform.TransformPosition(LocalCenter);
   World.Z = GetCellHeight(GridCoord);
   return World;
 }

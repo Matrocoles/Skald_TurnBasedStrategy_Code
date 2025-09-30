@@ -316,6 +316,12 @@ protected:
   /** World origin of the grid (cell 0,0). */
   FVector Origin = FVector::ZeroVector;
 
+  /** Cached transform of the grid in world space (matches owning actor). */
+  FTransform CachedGridTransform = FTransform::Identity;
+
+  /** Cached inverse transform used for world/local grid conversions. */
+  FTransform CachedGridInverseTransform = FTransform::Identity;
+
   /** Occupancy array; true if the cell is occupied. */
   UPROPERTY()
   TArray<bool> Cells;
