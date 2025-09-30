@@ -44,6 +44,10 @@ FString NormalizeMapName(UWorld *World, FString Candidate) {
         Result.StartsWith(World->StreamingLevelsPrefix)) {
       Result.RightChopInline(World->StreamingLevelsPrefix.Len(),
                              /*bAllowShrinking=*/false);
+
+      if (Result.StartsWith(TEXT("_"))) {
+        Result.RightChopInline(1, /*bAllowShrinking=*/false);
+      }
     }
 
     FString LongPackageName;
