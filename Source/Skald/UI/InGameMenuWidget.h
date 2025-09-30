@@ -2,6 +2,8 @@
 
 #include "Blueprint/UserWidget.h"
 #include "CoreMinimal.h"
+#include "Runtime/Launch/Resources/Version.h"
+
 #include "InGameMenuWidget.generated.h"
 
 class UButton;

@@ -4,7 +4,9 @@
 #include "EngineUtils.h"
 #include "GridBattleManager.h"
 #include "Kismet/GameplayStatics.h"
+#include "Misc/PackageName.h"
 #include "Net/UnrealNetwork.h"
+#include "Runtime/Launch/Resources/Version.h"
 #include "Skald.h"
 #include "SkaldLogging.h"
 #include "Skald_GameInstance.h"
@@ -15,7 +17,6 @@
 #include "Territory.h"
 #include "UI/SkaldMainHUDWidget.h"
 #include "WorldMap.h"
-#include "Misc/PackageName.h"
 
 namespace {
 FString GetResolvedPlayerName(const ASkaldPlayerState *PlayerState,
