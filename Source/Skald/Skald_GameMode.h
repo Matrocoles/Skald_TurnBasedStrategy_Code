@@ -198,4 +198,7 @@ private:
 
   /** Callback fired by the failsafe timer if the AI does not advance. */
   void HandleArmyPlacementFailsafe();
+
+  /** Attempt to restore the overworld from the cached travel snapshot. */
+  bool RestoreWorldFromSnapshot();
 };
