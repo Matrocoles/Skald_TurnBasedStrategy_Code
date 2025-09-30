@@ -40,7 +40,7 @@ public:
 protected:
     virtual void NativeConstruct() override;
     virtual void NativeDestruct() override;
-    virtual void NativeOnVisibilityChanged(const ESlateVisibility InVisibility) override;
+    virtual void NativeOnVisibilityChanged(ESlateVisibility InVisibility) override;
 
 private:
     void EnsureLayout();
