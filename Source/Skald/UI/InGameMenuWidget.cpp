@@ -1,7 +1,6 @@
 #include "UI/InGameMenuWidget.h"
 
 #include "Blueprint/WidgetBlueprintLibrary.h"
-#include "Runtime/Launch/Resources/Version.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
@@ -127,21 +126,23 @@ void UInGameMenuWidget::NativeDestruct()
     Super::NativeDestruct();
 }
 
-#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5)
-void UInGameMenuWidget::NativeOnVisibilityChanged(const UE::Slate::FVisibilityChangedEvent& VisibilityChangedEvent)
+void UInGameMenuWidget::OnVisibilityChanged(ESlateVisibility InVisibility)
 {
-    Super::NativeOnVisibilityChanged(VisibilityChangedEvent);
+    Super::OnVisibilityChanged(InVisibility);
 
-    HandleVisibilityChanged(GetVisibility());
-}
-#else
-void UInGameMenuWidget::NativeOnVisibilityChanged(ESlateVisibility InVisibility)
-{
-    Super::NativeOnVisibilityChanged(InVisibility);
+    const bool bIsVisible = InVisibility == ESlateVisibility::Visible ||
+                            InVisibility == ESlateVisibility::HitTestInvisible ||
+                            InVisibility == ESlateVisibility::SelfHitTestInvisible;
 
-    HandleVisibilityChanged(InVisibility);
+    if (bIsVisible)
+    {
+        HandleVisibilityChanged(InVisibility);
+    }
+    else if (ActiveChildWidget.IsValid() && !ActiveChildWidget->IsInViewport())
+    {
+        ActiveChildWidget.Reset();
+    }
 }
-#endif
 
 void UInGameMenuWidget::HandleVisibilityChanged(ESlateVisibility NewVisibility)
 {
