@@ -161,6 +161,14 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
   void ShowTurnMessage(bool bIsMyTurn);
 
+  /** Show an in-progress enemy turn message without auto-hiding. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
+  void ShowEnemyTurnInProgress(const FString &Message);
+
+  /** Hide the in-progress enemy turn message. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
+  void HideEnemyTurnInProgress();
+
   /** Display a message that a player has ended their turn. */
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
   void ShowTurnEnded(const FString &PlayerName);

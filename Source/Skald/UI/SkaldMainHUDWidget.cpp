@@ -336,6 +336,24 @@ void USkaldMainHUDWidget::ShowTurnMessage(bool bIsMyTurn) {
   }
 }
 
+void USkaldMainHUDWidget::ShowEnemyTurnInProgress(const FString &Message) {
+  if (EndingTurnText) {
+    EndingTurnText->SetText(FText::FromString(Message));
+    EndingTurnText->SetVisibility(ESlateVisibility::Visible);
+  }
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(TurnMessageTimerHandle);
+  }
+  SyncPhaseButtons(false);
+}
+
+void USkaldMainHUDWidget::HideEnemyTurnInProgress() {
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(TurnMessageTimerHandle);
+  }
+  HideEndingTurn();
+}
+
 void USkaldMainHUDWidget::UpdateInitiativeText(const FString &Message) {
   if (InitiativeText) {
     InitiativeText->SetText(FText::FromString(Message));

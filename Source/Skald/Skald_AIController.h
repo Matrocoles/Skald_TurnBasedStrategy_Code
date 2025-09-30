@@ -19,6 +19,7 @@ class SKALD_API ASkaldAIController : public ASkaldPlayerController {
 public:
   virtual void BeginPlay() override;
   virtual void StartTurn() override;
+  virtual void EndTurn() override;
 
   /** Execute the AI's decision making for the current turn. */
   UFUNCTION(BlueprintCallable, Category = "Turn")
@@ -28,6 +29,13 @@ protected:
   virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
+  void ProcessCurrentPhase();
+  void ScheduleNextDecisionStep(float DelaySeconds);
+  void ClearDecisionTimers();
+  void BroadcastEnemyTurnStatus(const FString &Message);
+  void ClearEnemyTurnStatus();
+  bool ShouldPauseForBattleTransition() const;
+
   void SetupBattleAutomation();
   void TeardownBattleAutomation();
 
@@ -64,6 +72,23 @@ private:
 
   /** Prevents recursive handling when resolving an activation. */
   bool bProcessingActivation = false;
+
+  /** Tracks whether the AI is waiting for a battle travel transition. */
+  bool bAwaitingBattleTransition = false;
+
+  /** Tracks the number of decision steps processed this turn. */
+  int32 DecisionIterationCount = 0;
+
+  /** Time between AI phase processing steps on the world map. */
+  UPROPERTY(EditAnywhere, Category = "Turn|AI", meta = (ClampMin = "0.0"))
+  float EnemyTurnStepDelay = 0.75f;
+
+  /** Time between polls while waiting for a battle travel transition. */
+  UPROPERTY(EditAnywhere, Category = "Turn|AI", meta = (ClampMin = "0.0"))
+  float EnemyBattleTransitionPollDelay = 1.0f;
+
+  /** Timer driving world-map decision pacing. */
+  FTimerHandle EnemyTurnStepTimerHandle;
 
   /** Timer used to retry battle automation binding while the manager spawns. */
   FTimerHandle BattleAutomationPollHandle;
