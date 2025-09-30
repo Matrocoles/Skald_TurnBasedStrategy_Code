@@ -49,7 +49,7 @@ public:
   virtual void StartTurn();
 
   UFUNCTION(BlueprintCallable, Category = "Turn")
-  void EndTurn();
+  virtual void EndTurn();
 
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void EndPhase();
