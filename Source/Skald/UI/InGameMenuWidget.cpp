@@ -127,7 +127,7 @@ void UInGameMenuWidget::NativeDestruct()
     Super::NativeDestruct();
 }
 
-#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 6)
+#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5)
 void UInGameMenuWidget::NativeOnVisibilityChanged(const FVisibilityChangedEvent& VisibilityChangedEvent)
 {
     Super::NativeOnVisibilityChanged(VisibilityChangedEvent);
