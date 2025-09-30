@@ -12,6 +12,7 @@
 #include "SkaldLogging.h"
 #include "Skald_BattleGameMode.h"
 #include "Skald_GameInstance.h"
+#include "Skald_GameUserSettings.h"
 #include "Skald_GameMode.h"
 #include "Skald_PlayerState.h"
 #include "Skald_TurnManager.h"
@@ -32,6 +33,12 @@ constexpr TCHAR EnemyBattleTransitionMessage[] =
 
 void ASkaldAIController::BeginPlay() {
   Super::BeginPlay();
+
+  if (const USkaldGameUserSettings *Settings =
+          USkaldGameUserSettings::GetSkaldGameUserSettings()) {
+    EnemyTurnStepDelay = Settings->GetEnemyTurnStepDelay();
+    BattleActionDelay = Settings->GetBattleActionDelay();
+  }
 
   SetupBattleAutomation();
 
