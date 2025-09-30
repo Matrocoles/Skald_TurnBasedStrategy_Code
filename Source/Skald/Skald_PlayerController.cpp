@@ -1776,7 +1776,9 @@ void ASkaldPlayerController::HandleGridClick() {
       const TArray<FIntPoint> PreviousCells = LockedActiveFighter->GetOccupiedCells();
 
       int32 BestDistanceToStart = MAX_int32;
+      int32 BestDistanceToClicked = MAX_int32;
       bool bFoundValidAnchor = false;
+      bool bBestAnchorMoves = false;
 
       for (int32 Dy = 0; Dy < FootprintSize; ++Dy) {
         for (int32 Dx = 0; Dx < FootprintSize; ++Dx) {
@@ -1816,21 +1818,29 @@ void ASkaldPlayerController::HandleGridClick() {
             continue;
           }
 
-          if (DistanceToStart < BestDistanceToStart) {
-            BestDistanceToStart = DistanceToStart;
-            TargetAnchor = CandidateAnchor;
-            bFoundValidAnchor = true;
-          } else if (DistanceToStart == BestDistanceToStart) {
-            const int32 CurrentAnchorDistance =
-                FMath::Abs(TargetAnchor.X - Cell.X) +
-                FMath::Abs(TargetAnchor.Y - Cell.Y);
-            const int32 CandidateAnchorDistance =
-                FMath::Abs(CandidateAnchor.X - Cell.X) +
-                FMath::Abs(CandidateAnchor.Y - Cell.Y);
+          const bool bCandidateMoves = DistanceToStart > 0;
+          const int32 CandidateAnchorDistance =
+              FMath::Abs(CandidateAnchor.X - Cell.X) +
+              FMath::Abs(CandidateAnchor.Y - Cell.Y);
 
-            if (CandidateAnchorDistance < CurrentAnchorDistance) {
-              TargetAnchor = CandidateAnchor;
-            }
+          bool bUseCandidate = false;
+          if (!bFoundValidAnchor) {
+            bUseCandidate = true;
+          } else if (bCandidateMoves != bBestAnchorMoves) {
+            bUseCandidate = bCandidateMoves && !bBestAnchorMoves;
+          } else if (DistanceToStart < BestDistanceToStart) {
+            bUseCandidate = true;
+          } else if (DistanceToStart == BestDistanceToStart &&
+                     CandidateAnchorDistance < BestDistanceToClicked) {
+            bUseCandidate = true;
+          }
+
+          if (bUseCandidate) {
+            BestDistanceToStart = DistanceToStart;
+            BestDistanceToClicked = CandidateAnchorDistance;
+            TargetAnchor = CandidateAnchor;
+            bBestAnchorMoves = bCandidateMoves;
+            bFoundValidAnchor = true;
           }
         }
       }
