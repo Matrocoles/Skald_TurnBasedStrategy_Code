@@ -1,6 +1,7 @@
 #include "UI/InGameMenuWidget.h"
 
 #include "Blueprint/WidgetBlueprintLibrary.h"
+#include "Runtime/Launch/Resources/Version.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
