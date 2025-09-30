@@ -1768,7 +1768,79 @@ void ASkaldPlayerController::HandleGridClick() {
       CancelCommandMode();
       break;
     }
-    LockedActiveFighter->MoveToCell(Cell);
+    FIntPoint TargetAnchor = Cell;
+    if (Grid) {
+      const int32 FootprintSize = LockedActiveFighter->GetFootprintSideLength();
+      const FIntPoint StartCell = LockedActiveFighter->GetCurrentCell();
+      const int32 MovementRange = LockedActiveFighter->Stats.Movement;
+      const TArray<FIntPoint> PreviousCells = LockedActiveFighter->GetOccupiedCells();
+
+      int32 BestDistanceToStart = MAX_int32;
+      bool bFoundValidAnchor = false;
+
+      for (int32 Dy = 0; Dy < FootprintSize; ++Dy) {
+        for (int32 Dx = 0; Dx < FootprintSize; ++Dx) {
+          const FIntPoint CandidateAnchor = Cell - FIntPoint(Dx, Dy);
+
+          if (!Grid->IsCellInBounds(CandidateAnchor)) {
+            continue;
+          }
+
+          const int32 DistanceToStart =
+              FMath::Abs(CandidateAnchor.X - StartCell.X) +
+              FMath::Abs(CandidateAnchor.Y - StartCell.Y);
+          if (DistanceToStart > MovementRange) {
+            continue;
+          }
+
+          const TArray<FIntPoint> CandidateCells =
+              LockedActiveFighter->GetOccupiedCells(CandidateAnchor);
+
+          bool bCanOccupyCandidate = true;
+          for (const FIntPoint &CandidateCell : CandidateCells) {
+            if (!Grid->IsCellInBounds(CandidateCell) ||
+                Grid->IsObscured(CandidateCell)) {
+              bCanOccupyCandidate = false;
+              break;
+            }
+
+            const bool bCellPreviouslyOccupied =
+                PreviousCells.Contains(CandidateCell);
+            if (!bCellPreviouslyOccupied && Grid->IsOccupied(CandidateCell)) {
+              bCanOccupyCandidate = false;
+              break;
+            }
+          }
+
+          if (!bCanOccupyCandidate) {
+            continue;
+          }
+
+          if (DistanceToStart < BestDistanceToStart) {
+            BestDistanceToStart = DistanceToStart;
+            TargetAnchor = CandidateAnchor;
+            bFoundValidAnchor = true;
+          } else if (DistanceToStart == BestDistanceToStart) {
+            const int32 CurrentAnchorDistance =
+                FMath::Abs(TargetAnchor.X - Cell.X) +
+                FMath::Abs(TargetAnchor.Y - Cell.Y);
+            const int32 CandidateAnchorDistance =
+                FMath::Abs(CandidateAnchor.X - Cell.X) +
+                FMath::Abs(CandidateAnchor.Y - Cell.Y);
+
+            if (CandidateAnchorDistance < CurrentAnchorDistance) {
+              TargetAnchor = CandidateAnchor;
+            }
+          }
+        }
+      }
+
+      if (!bFoundValidAnchor) {
+        TargetAnchor = Cell;
+      }
+    }
+
+    LockedActiveFighter->MoveToCell(TargetAnchor);
     CancelCommandMode();
     UpdateBattleHUDButtons();
     break;
