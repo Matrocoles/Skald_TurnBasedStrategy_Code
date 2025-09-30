@@ -220,6 +220,9 @@ private:
   /** Helper to broadcast the current actions remaining value. */
   void BroadcastActionsRemaining();
 
+  /** Apply the mesh's yaw offset when orienting the fighter. */
+  void ApplyFacingYaw(float TargetYaw);
+
   /** Rotate the fighter to face a world-space location. */
   void FaceTowardsLocation(const FVector &TargetLocation);
 
