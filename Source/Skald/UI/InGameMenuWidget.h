@@ -11,7 +11,7 @@ class UUserWidget;
 class USaveGameWidget;
 class ULoadGameWidget;
 class USettingsWidget;
-#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 6)
+#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5)
 struct FVisibilityChangedEvent;
 #endif
 
