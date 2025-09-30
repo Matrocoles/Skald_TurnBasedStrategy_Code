@@ -5,6 +5,7 @@
 #include "SettingsWidget.generated.h"
 
 class ULobbyMenuWidget;
+class UUserWidget;
 class UButton;
 class UComboBoxString;
 class USlider;
@@ -54,6 +55,9 @@ public:
     UFUNCTION(BlueprintCallable, Category="Skald|Widgets")
     void SetLobbyMenu(ULobbyMenuWidget* InMenu);
 
+    UFUNCTION(BlueprintCallable, Category="Skald|Widgets")
+    void SetOwningMenu(UUserWidget* InMenu);
+
 protected:
     virtual void NativeConstruct() override;
 
@@ -80,7 +84,7 @@ protected:
 
 private:
     UPROPERTY()
-    TWeakObjectPtr<ULobbyMenuWidget> LobbyMenu;
+    TWeakObjectPtr<UUserWidget> OwningMenu;
 
     TMap<FString, FIntPoint> ResolutionMap;
     TMap<FString, int32> QualityMap;

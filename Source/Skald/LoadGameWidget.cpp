@@ -3,16 +3,21 @@
 #include "SkaldLogging.h"
 #include "Components/Button.h"
 #include "Kismet/GameplayStatics.h"
-#include "LobbyMenuWidget.h"
 #include "SlotNameConstants.h"
 #include "GameFramework/PlayerController.h"
 #include "SkaldSaveGame.h"
 #include "Skald_GameInstance.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
+#include "UI/InGameMenuWidget.h"
 
 void ULoadGameWidget::SetLobbyMenu(ULobbyMenuWidget* InMenu)
 {
-    LobbyMenu = InMenu;
+    SetOwningMenu(InMenu);
+}
+
+void ULoadGameWidget::SetOwningMenu(UUserWidget* InMenu)
+{
+    OwningMenu = InMenu;
 }
 
 void ULoadGameWidget::NativeConstruct()
@@ -67,16 +72,20 @@ void ULoadGameWidget::OnMainMenu()
     UWidgetBlueprintLibrary::GetAllWidgetsOfClass(this, Widgets, UUserWidget::StaticClass(), /*TopLevelOnly*/ true);
     for (UUserWidget* Widget : Widgets)
     {
-        if (Widget && Widget != LobbyMenu.Get())
+        if (Widget && Widget != OwningMenu.Get())
         {
             Widget->RemoveFromParent();
         }
     }
 
-    if (LobbyMenu.IsValid())
+    if (OwningMenu.IsValid())
     {
-        // Re-enable the lobby once the load-game widget closes
-        LobbyMenu->SetVisibility(ESlateVisibility::Visible);
+        if (UInGameMenuWidget* Menu = Cast<UInGameMenuWidget>(OwningMenu.Get()))
+        {
+            Menu->HandleSubMenuClosed(this);
+        }
+        // Re-enable the menu once the load-game widget closes
+        OwningMenu->SetVisibility(ESlateVisibility::Visible);
     }
 }
 

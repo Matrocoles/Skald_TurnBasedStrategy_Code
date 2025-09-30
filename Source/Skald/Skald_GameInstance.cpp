@@ -113,7 +113,25 @@ void USkaldGameInstance::HandleNetworkFailure(
   bIsMultiplayer = false;
   bIsHost = false;
 
-  // Clear any per-session state so a fresh lobby is created after reconnecting.
+  ResetSessionState();
+
+  if (World) {
+    const FName LobbyMap(TEXT("/Game/Blueprints/Maps/Skald_Lobby"));
+    UGameplayStatics::OpenLevel(World, LobbyMap);
+  }
+}
+
+void USkaldGameInstance::ReturnToMainMenu() {
+  ResetSessionState();
+
+  if (UWorld *World = GetWorld()) {
+    const FName LobbyMap(TEXT("/Game/Blueprints/Maps/Skald_Lobby"));
+    UGameplayStatics::OpenLevel(World, LobbyMap);
+  }
+}
+
+void USkaldGameInstance::ResetSessionState() {
+  // Clear any per-session state so a fresh lobby is created.
   JoinAddress.Empty();
   AIPlayersToSpawn = 1;
   TakenFactions.Empty();
@@ -121,16 +139,24 @@ void USkaldGameInstance::HandleNetworkFailure(
     TakenFactions.Add(Faction);
   }
   OnFactionsUpdated.Broadcast();
+
   PendingBattle = FS_BattlePayload();
   PendingBattleResolution = FGridBattleResolution();
   bPendingBattleResolution = false;
   GridBattleManager = nullptr;
+  bIsInBattleMap = false;
+  bTravelPending = false;
+  CachedWorldMapTerritories.Empty();
+  TravelState = FSkaldTravelState();
+
   SeedCombatRandomStream(FMath::Rand());
   SavedTurnIndex = 0;
   SavedTurnPhase = ETurnPhase::Reinforcement;
   bResumeTurns = false;
   LoadedSaveGame = nullptr;
 
-  const FName LobbyMap(TEXT("/Game/Blueprints/Maps/Skald_Lobby"));
-  UGameplayStatics::OpenLevel(World, LobbyMap);
+  if (DeployWidget) {
+    DeployWidget->RemoveFromParent();
+    DeployWidget = nullptr;
+  }
 }
