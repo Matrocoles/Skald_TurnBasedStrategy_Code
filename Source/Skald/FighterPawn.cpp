@@ -725,6 +725,8 @@ void AFighterPawn::FinalizeQueuedAttack() {
   PendingAttackTarget = nullptr;
   bPendingAttackTargetDied = false;
   bHasProcessedPendingRoll = false;
+
+  OnQueuedAttackFinalized.Broadcast();
 }
 
 void AFighterPawn::UpdateMeshOffset() {

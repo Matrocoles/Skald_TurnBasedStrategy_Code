@@ -20,6 +20,7 @@ enum class EFighterPawnFootprint : uint8 {
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHealthChanged, int32, NewHealth);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnActionsChanged, int32,
                                             NewActionsRemaining);
+DECLARE_MULTICAST_DELEGATE(FOnQueuedAttackFinalized);
 
 /** Pawn representing a fighter in grid battles. */
 UCLASS()
@@ -64,6 +65,9 @@ public:
   /** Perform an attack against another fighter. */
   UFUNCTION(BlueprintCallable, Category = "Fighter")
   void PerformAttack(AFighterPawn *Target);
+
+  /** Event fired after any queued attack finishes resolving. */
+  FOnQueuedAttackFinalized OnQueuedAttackFinalized;
 
   /** Check whether this fighter is still alive. */
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Fighter")
