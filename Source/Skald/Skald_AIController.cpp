@@ -18,11 +18,16 @@
 #include "SkaldTypes.h"
 #include "Territory.h"
 #include "TimerManager.h"
+#include "UI/SkaldMainHUDWidget.h"
 #include "WorldMap.h"
 #include <limits>
 
 namespace {
 constexpr int32 MaxAIIterations = 100;
+constexpr TCHAR EnemyPlanningMessage[] =
+    TEXT("Enemy is planning their next move...");
+constexpr TCHAR EnemyBattleTransitionMessage[] =
+    TEXT("Enemy is preparing for battle...");
 }
 
 void ASkaldAIController::BeginPlay() {
@@ -40,16 +45,53 @@ void ASkaldAIController::BeginPlay() {
   }
 }
 
-void ASkaldAIController::StartTurn() { MakeAIDecision(); }
+void ASkaldAIController::StartTurn() {
+  DecisionIterationCount = 0;
+  bAwaitingBattleTransition = false;
+  ClearDecisionTimers();
+  MakeAIDecision();
+}
 
-void ASkaldAIController::MakeAIDecision() {
+void ASkaldAIController::EndTurn() {
+  ClearDecisionTimers();
+  bAwaitingBattleTransition = false;
+  ClearEnemyTurnStatus();
+  Super::EndTurn();
+}
+
+void ASkaldAIController::MakeAIDecision() { ProcessCurrentPhase(); }
+
+void ASkaldAIController::ProcessCurrentPhase() {
   if (!TurnManager) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("ProcessCurrentPhase called without a valid TurnManager"));
     EndTurn();
     return;
   }
 
+  if (bAwaitingBattleTransition) {
+    if (ShouldPauseForBattleTransition()) {
+      BroadcastEnemyTurnStatus(FString(EnemyBattleTransitionMessage));
+      ScheduleNextDecisionStep(EnemyBattleTransitionPollDelay);
+      return;
+    }
+
+    bAwaitingBattleTransition = false;
+  }
+
+  if (DecisionIterationCount >= MaxAIIterations) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("AI decision hit iteration limit (%d)"), MaxAIIterations);
+    EndTurn();
+    return;
+  }
+
+  ++DecisionIterationCount;
+
   ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
   if (!PS) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("ProcessCurrentPhase missing PlayerState; ending turn"));
     EndTurn();
     return;
   }
@@ -57,190 +99,261 @@ void ASkaldAIController::MakeAIDecision() {
   AWorldMap *WorldMap = Cast<AWorldMap>(
       UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
   if (!WorldMap) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("ProcessCurrentPhase missing world map; ending turn"));
     EndTurn();
     return;
   }
 
-  ETurnPhase Phase = TurnManager->GetCurrentPhase();
-  int32 IterationCount = 0;
-  while (Phase != ETurnPhase::Revolt && IterationCount++ < MaxAIIterations) {
-    bool bAwaitingBattleTransition = false;
-    const ETurnPhase PrevPhase = Phase;
+  const ETurnPhase Phase = TurnManager->GetCurrentPhase();
+  if (Phase == ETurnPhase::Revolt) {
+    UE_LOG(LogSkald, Log,
+           TEXT("AI decision encountered Revolt phase; ending turn"));
+    EndTurn();
+    return;
+  }
 
-    if (Phase == ETurnPhase::ArmyPlacement) {
-      return;
-    } else if (Phase == ETurnPhase::Reinforcement) {
-      TArray<ATerritory *> OwnedTerritories;
-      for (ATerritory *Territory : WorldMap->Territories) {
-        if (Territory && Territory->OwningPlayer == PS) {
-          OwnedTerritories.Add(Territory);
-        }
+  const ETurnPhase PrevPhase = Phase;
+
+  if (Phase == ETurnPhase::ArmyPlacement) {
+    ClearEnemyTurnStatus();
+    return;
+  } else if (Phase == ETurnPhase::Reinforcement) {
+    TArray<ATerritory *> OwnedTerritories;
+    for (ATerritory *Territory : WorldMap->Territories) {
+      if (Territory && Territory->OwningPlayer == PS) {
+        OwnedTerritories.Add(Territory);
+      }
+    }
+
+    int32 SpreadIndex = 0;
+    while (PS->DeployableUnits > 0 && OwnedTerritories.Num() > 0) {
+      ATerritory *TargetTerritory =
+          OwnedTerritories[SpreadIndex % OwnedTerritories.Num()];
+      ++TargetTerritory->ArmyUnits;
+      TargetTerritory->RefreshAppearance();
+      --PS->DeployableUnits;
+      --PS->Resources;
+      ++SpreadIndex;
+    }
+    TurnManager->BroadcastDeployableUnits(PS);
+    TurnManager->BroadcastResources(PS);
+
+    TurnManager->AdvancePhase();
+  } else if (Phase == ETurnPhase::Attack) {
+    ATerritory *BestSource = nullptr;
+    ATerritory *BestTarget = nullptr;
+    int32 WeakestStrength = std::numeric_limits<int32>::max();
+
+    for (ATerritory *Source : WorldMap->Territories) {
+      if (!Source || Source->OwningPlayer != PS || Source->ArmyUnits <= 1) {
+        continue;
       }
 
-      int32 SpreadIndex = 0;
-      while (PS->DeployableUnits > 0 && OwnedTerritories.Num() > 0) {
-        ATerritory *TargetTerritory =
-            OwnedTerritories[SpreadIndex % OwnedTerritories.Num()];
-        ++TargetTerritory->ArmyUnits;
-        TargetTerritory->RefreshAppearance();
-        --PS->DeployableUnits;
-        --PS->Resources;
-        ++SpreadIndex;
-      }
-      TurnManager->BroadcastDeployableUnits(PS);
-      TurnManager->BroadcastResources(PS);
-
-      TurnManager->AdvancePhase();
-    } else if (Phase == ETurnPhase::Attack) {
-      ATerritory *BestSource = nullptr;
-      ATerritory *BestTarget = nullptr;
-      int32 WeakestStrength = std::numeric_limits<int32>::max();
-
-      for (ATerritory *Source : WorldMap->Territories) {
-        if (!Source || Source->OwningPlayer != PS || Source->ArmyUnits <= 1) {
+      for (ATerritory *Neighbor : Source->AdjacentTerritories) {
+        if (!Neighbor || Neighbor->OwningPlayer == PS) {
           continue;
         }
 
-        for (ATerritory *Neighbor : Source->AdjacentTerritories) {
-          if (!Neighbor || Neighbor->OwningPlayer == PS) {
-            continue;
-          }
-
-          if (Neighbor->ArmyUnits < WeakestStrength) {
-            BestSource = Source;
-            BestTarget = Neighbor;
-            WeakestStrength = Neighbor->ArmyUnits;
-          }
+        if (Neighbor->ArmyUnits < WeakestStrength) {
+          BestSource = Source;
+          BestTarget = Neighbor;
+          WeakestStrength = Neighbor->ArmyUnits;
         }
       }
+    }
 
-      if (BestSource && BestTarget && BestSource->ArmyUnits > 1) {
-        const int32 ArmySent = BestSource->ArmyUnits - 1;
-        HandleAttackRequested(BestSource->TerritoryID, BestTarget->TerritoryID,
-                              ArmySent, false);
+    if (BestSource && BestTarget && BestSource->ArmyUnits > 1) {
+      const int32 ArmySent = BestSource->ArmyUnits - 1;
+      HandleAttackRequested(BestSource->TerritoryID, BestTarget->TerritoryID,
+                            ArmySent, false);
 
-        if (const USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
-          if (GI->bTravelPending) {
-            bAwaitingBattleTransition = true;
-          }
+      if (const USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+        if (GI->bTravelPending) {
+          bAwaitingBattleTransition = true;
         }
       }
+    }
 
-      if (!bAwaitingBattleTransition) {
-        TurnManager->AdvancePhase();
-      }
-    } else if (Phase == ETurnPhase::Engineering ||
-               Phase == ETurnPhase::Treasure) {
+    if (!bAwaitingBattleTransition) {
       TurnManager->AdvancePhase();
-    } else if (Phase == ETurnPhase::Movement) {
-      auto CountEnemyNeighbors = [PS](ATerritory *Territory) {
-        int32 Count = 0;
-        if (!Territory) {
-          return Count;
-        }
-        for (ATerritory *Neighbor : Territory->AdjacentTerritories) {
-          if (Neighbor && Neighbor->OwningPlayer != PS) {
-            ++Count;
-          }
-        }
+    }
+  } else if (Phase == ETurnPhase::Engineering ||
+             Phase == ETurnPhase::Treasure) {
+    TurnManager->AdvancePhase();
+  } else if (Phase == ETurnPhase::Movement) {
+    auto CountEnemyNeighbors = [PS](ATerritory *Territory) {
+      int32 Count = 0;
+      if (!Territory) {
         return Count;
-      };
+      }
+      for (ATerritory *Neighbor : Territory->AdjacentTerritories) {
+        if (Neighbor && Neighbor->OwningPlayer != PS) {
+          ++Count;
+        }
+      }
+      return Count;
+    };
 
-      ATerritory *BestSource = nullptr;
-      ATerritory *BestTarget = nullptr;
-      int32 BestSourcePressure = 0;
-      int32 BestTargetPressure = 0;
-      float BestScore = std::numeric_limits<float>::lowest();
+    ATerritory *BestSource = nullptr;
+    ATerritory *BestTarget = nullptr;
+    int32 BestSourcePressure = 0;
+    int32 BestTargetPressure = 0;
+    float BestScore = std::numeric_limits<float>::lowest();
 
-      for (ATerritory *Source : WorldMap->Territories) {
-        if (!Source || Source->OwningPlayer != PS || Source->ArmyUnits <= 1) {
+    for (ATerritory *Source : WorldMap->Territories) {
+      if (!Source || Source->OwningPlayer != PS || Source->ArmyUnits <= 1) {
+        continue;
+      }
+
+      const int32 SourcePressure = CountEnemyNeighbors(Source);
+
+      for (ATerritory *Neighbor : Source->AdjacentTerritories) {
+        if (!Neighbor || Neighbor->OwningPlayer != PS) {
           continue;
         }
 
-        const int32 SourcePressure = CountEnemyNeighbors(Source);
+        const int32 TargetPressure = CountEnemyNeighbors(Neighbor);
+        const int32 PressureDiff = TargetPressure - SourcePressure;
+        const int32 SourceUnits = Source->ArmyUnits;
+        const int32 TargetUnits = Neighbor->ArmyUnits;
 
-        for (ATerritory *Neighbor : Source->AdjacentTerritories) {
-          if (!Neighbor || Neighbor->OwningPlayer != PS) {
-            continue;
-          }
+        if (PressureDiff <= 0 && SourceUnits <= TargetUnits + 1) {
+          continue;
+        }
 
-          const int32 TargetPressure = CountEnemyNeighbors(Neighbor);
-          const int32 PressureDiff = TargetPressure - SourcePressure;
-          const int32 SourceUnits = Source->ArmyUnits;
-          const int32 TargetUnits = Neighbor->ArmyUnits;
+        const int32 StrengthDiff = SourceUnits - TargetUnits;
+        const float Score = PressureDiff * 10.f + StrengthDiff;
 
-          if (PressureDiff <= 0 && SourceUnits <= TargetUnits + 1) {
-            continue;
-          }
-
-          const int32 StrengthDiff = SourceUnits - TargetUnits;
-          const float Score = PressureDiff * 10.f + StrengthDiff;
-
-          if (Score > BestScore && Score > 0.f) {
-            BestScore = Score;
-            BestSource = Source;
-            BestTarget = Neighbor;
-            BestSourcePressure = SourcePressure;
-            BestTargetPressure = TargetPressure;
-          }
+        if (Score > BestScore && Score > 0.f) {
+          BestScore = Score;
+          BestSource = Source;
+          BestTarget = Neighbor;
+          BestSourcePressure = SourcePressure;
+          BestTargetPressure = TargetPressure;
         }
       }
+    }
 
-      if (BestSource && BestTarget) {
-        const int32 SourceUnits = BestSource->ArmyUnits;
-        const int32 TargetUnits = BestTarget->ArmyUnits;
-        const int32 MaxMovable = SourceUnits - 1;
-        if (MaxMovable > 0) {
-          int32 Surplus = SourceUnits - TargetUnits;
-          Surplus = FMath::Max(Surplus, 0);
-          int32 TroopsToMove = FMath::Clamp(Surplus / 2, 1, MaxMovable);
-          if (BestTargetPressure > BestSourcePressure) {
-            const int32 PressureGap = BestTargetPressure - BestSourcePressure;
-            TroopsToMove = FMath::Clamp(FMath::Max(TroopsToMove, PressureGap), 1,
-                                        MaxMovable);
-          }
-          HandleMoveRequested(BestSource->TerritoryID, BestTarget->TerritoryID,
-                              TroopsToMove);
+    if (BestSource && BestTarget) {
+      const int32 SourceUnits = BestSource->ArmyUnits;
+      const int32 TargetUnits = BestTarget->ArmyUnits;
+      const int32 MaxMovable = SourceUnits - 1;
+      if (MaxMovable > 0) {
+        int32 Surplus = SourceUnits - TargetUnits;
+        Surplus = FMath::Max(Surplus, 0);
+        int32 TroopsToMove = FMath::Clamp(Surplus / 2, 1, MaxMovable);
+        if (BestTargetPressure > BestSourcePressure) {
+          const int32 PressureGap = BestTargetPressure - BestSourcePressure;
+          TroopsToMove = FMath::Clamp(FMath::Max(TroopsToMove, PressureGap), 1,
+                                      MaxMovable);
         }
+        HandleMoveRequested(BestSource->TerritoryID, BestTarget->TerritoryID,
+                            TroopsToMove);
       }
-
-      TurnManager->AdvancePhase();
-    } else if (Phase == ETurnPhase::EndTurn) {
-      TurnManager->AdvancePhase();
-    } else {
-      UE_LOG(LogSkald, Warning,
-             TEXT("MakeAIDecision encountered unexpected phase %s"),
-             *UEnum::GetValueAsString(Phase));
-      break;
     }
 
-    Phase = TurnManager->GetCurrentPhase();
-
-    if (bAwaitingBattleTransition) {
-      UE_LOG(LogSkald, Log,
-             TEXT("MakeAIDecision deferring while battle travel is pending"));
-      break;
-    }
-    if (Phase == PrevPhase) {
-      UE_LOG(LogSkald, Warning,
-             TEXT("MakeAIDecision phase %s did not advance; breaking"),
-             *UEnum::GetValueAsString(Phase));
-      break;
-    }
-  }
-
-  if (IterationCount >= MaxAIIterations) {
-    UE_LOG(LogSkald, Warning, TEXT("MakeAIDecision hit iteration limit (%d)"),
-           MaxAIIterations);
+    TurnManager->AdvancePhase();
+  } else if (Phase == ETurnPhase::EndTurn) {
+    TurnManager->AdvancePhase();
   } else {
-    UE_LOG(LogSkald, Log, TEXT("MakeAIDecision completed in %d iterations"),
-           IterationCount);
+    UE_LOG(LogSkald, Warning,
+           TEXT("ProcessCurrentPhase encountered unexpected phase %s"),
+           *UEnum::GetValueAsString(Phase));
+    EndTurn();
+    return;
   }
 
-  EndTurn();
+  const ETurnPhase CurrentPhase = TurnManager->GetCurrentPhase();
+
+  if (bAwaitingBattleTransition) {
+    BroadcastEnemyTurnStatus(FString(EnemyBattleTransitionMessage));
+    ScheduleNextDecisionStep(EnemyBattleTransitionPollDelay);
+    return;
+  }
+
+  if (CurrentPhase == ETurnPhase::Revolt) {
+    UE_LOG(LogSkald, Log, TEXT("AI decision completed in %d steps"),
+           DecisionIterationCount);
+    EndTurn();
+    return;
+  }
+
+  if (CurrentPhase == PrevPhase) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("ProcessCurrentPhase phase %s did not advance; ending turn"),
+           *UEnum::GetValueAsString(CurrentPhase));
+    EndTurn();
+    return;
+  }
+
+  BroadcastEnemyTurnStatus(FString(EnemyPlanningMessage));
+  ScheduleNextDecisionStep(EnemyTurnStepDelay);
+}
+
+void ASkaldAIController::ScheduleNextDecisionStep(float DelaySeconds) {
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(EnemyTurnStepTimerHandle);
+    World->GetTimerManager().SetTimer(EnemyTurnStepTimerHandle, this,
+                                      &ASkaldAIController::ProcessCurrentPhase,
+                                      FMath::Max(DelaySeconds, 0.f), false);
+  }
+}
+
+void ASkaldAIController::ClearDecisionTimers() {
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(EnemyTurnStepTimerHandle);
+  }
+}
+
+void ASkaldAIController::BroadcastEnemyTurnStatus(const FString &Message) {
+  if (!TurnManager) {
+    return;
+  }
+
+  for (ASkaldPlayerController *Controller : TurnManager->GetControllers()) {
+    if (!Controller) {
+      continue;
+    }
+
+    if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
+      HUD->ShowEnemyTurnInProgress(Message);
+    }
+  }
+}
+
+void ASkaldAIController::ClearEnemyTurnStatus() {
+  if (!TurnManager) {
+    return;
+  }
+
+  for (ASkaldPlayerController *Controller : TurnManager->GetControllers()) {
+    if (!Controller) {
+      continue;
+    }
+
+    if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
+      HUD->HideEnemyTurnInProgress();
+    }
+  }
+}
+
+bool ASkaldAIController::ShouldPauseForBattleTransition() const {
+  if (!bAwaitingBattleTransition) {
+    return false;
+  }
+
+  if (const USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+    return GI->bTravelPending;
+  }
+
+  return false;
 }
 
 void ASkaldAIController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
+  ClearDecisionTimers();
+  ClearEnemyTurnStatus();
+  bAwaitingBattleTransition = false;
   TeardownBattleAutomation();
   Super::EndPlay(EndPlayReason);
 }
