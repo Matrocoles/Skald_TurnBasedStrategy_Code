@@ -28,6 +28,7 @@
 #include "UI/BattleHUDWidget.h"
 #include "UI/BattleResultWidget.h"
 #include "UI/FighterSelectionWidget.h"
+#include "UI/InGameMenuWidget.h"
 #include "UI/SkaldMainHUDWidget.h"
 #include "UI/SkaldUIHelpers.h"
 #include "UObject/ConstructorHelpers.h"
@@ -106,6 +107,7 @@ ASkaldPlayerController::ASkaldPlayerController() {
   BattleHUDWidgetClass = UBattleHUDWidget::StaticClass();
   FighterSelectionWidgetClass = UFighterSelectionWidget::StaticClass();
   VictoryWidgetClass = UBattleResultWidget::StaticClass();
+  InGameMenuWidgetClass = UInGameMenuWidget::StaticClass();
   bBattleHUDVisible = false;
   bBattleHUDReadyToShow = false;
 
@@ -304,6 +306,11 @@ void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
     BattleResultWidget = nullptr;
   }
 
+  if (InGameMenuWidget) {
+    InGameMenuWidget->RemoveFromParent();
+    InGameMenuWidget = nullptr;
+  }
+
   Super::EndPlay(EndPlayReason);
 }
 
@@ -324,6 +331,68 @@ void ASkaldPlayerController::HideMainHUD() {
     UWidgetBlueprintLibrary::SetInputMode_GameOnly(this);
     bShowMouseCursor = false;
   }
+}
+
+void ASkaldPlayerController::ToggleInGameMenu() {
+  if (!IsLocalController()) {
+    return;
+  }
+
+  if (InGameMenuWidget &&
+      InGameMenuWidget->GetVisibility() != ESlateVisibility::Hidden &&
+      InGameMenuWidget->GetVisibility() != ESlateVisibility::Collapsed) {
+    HideInGameMenu();
+  } else {
+    ShowInGameMenu();
+  }
+}
+
+void ASkaldPlayerController::ShowInGameMenu() {
+  if (!IsLocalController()) {
+    return;
+  }
+
+  if (!InGameMenuWidget) {
+    if (!InGameMenuWidgetClass) {
+      InGameMenuWidgetClass = UInGameMenuWidget::StaticClass();
+    }
+
+    if (InGameMenuWidgetClass) {
+      InGameMenuWidget = CreateWidget<UInGameMenuWidget>(this, InGameMenuWidgetClass);
+      if (InGameMenuWidget) {
+        InGameMenuWidget->SetVisibility(ESlateVisibility::Hidden);
+        InGameMenuWidget->AddToViewport(90);
+      }
+    }
+  }
+
+  if (!InGameMenuWidget) {
+    return;
+  }
+
+  if (!InGameMenuWidget->IsInViewport()) {
+    InGameMenuWidget->AddToViewport(90);
+  }
+
+  InGameMenuWidget->SetVisibility(ESlateVisibility::Visible);
+  UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
+      this, InGameMenuWidget, EMouseLockMode::DoNotLock, /*bHideCursorDuringCapture*/ false);
+  bShowMouseCursor = true;
+}
+
+void ASkaldPlayerController::HideInGameMenu() {
+  if (!IsLocalController()) {
+    return;
+  }
+
+  if (!InGameMenuWidget) {
+    return;
+  }
+
+  InGameMenuWidget->SetVisibility(ESlateVisibility::Hidden);
+  UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
+      this, nullptr, EMouseLockMode::DoNotLock, /*bHideCursorDuringCapture*/ false);
+  bShowMouseCursor = true;
 }
 
 void ASkaldPlayerController::TryBindWorldMap() {
@@ -1700,6 +1769,8 @@ void ASkaldPlayerController::SetupInputComponent() {
                             &ASkaldPlayerController::HandleGridClick);
     InputComponent->BindKey(EKeys::RightMouseButton, IE_Pressed, this,
                             &ASkaldPlayerController::HandleRightClick);
+    InputComponent->BindKey(EKeys::O, IE_Pressed, this,
+                            &ASkaldPlayerController::ToggleInGameMenu);
   }
 }
 

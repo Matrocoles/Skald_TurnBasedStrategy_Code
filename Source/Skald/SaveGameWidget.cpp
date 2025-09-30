@@ -1,16 +1,22 @@
 #include "SaveGameWidget.h"
 #include "Components/Button.h"
 #include "Kismet/GameplayStatics.h"
-#include "LobbyMenuWidget.h"
+#include "Blueprint/UserWidget.h"
 #include "Skald.h"
 #include "SkaldLogging.h"
 #include "SkaldSaveGame.h"
 #include "Skald_GameMode.h"
 #include "SlotNameConstants.h"
+#include "UI/InGameMenuWidget.h"
 
 void USaveGameWidget::SetLobbyMenu(ULobbyMenuWidget* InMenu)
 {
-  LobbyMenu = InMenu;
+  SetOwningMenu(InMenu);
+}
+
+void USaveGameWidget::SetOwningMenu(UUserWidget* InMenu)
+{
+  OwningMenu = InMenu;
 }
 
 void USaveGameWidget::NativeConstruct() {
@@ -61,8 +67,12 @@ void USaveGameWidget::OnSaveSlot2() { HandleSaveSlot(2); }
 
 void USaveGameWidget::OnMainMenu() {
   RemoveFromParent();
-  if (LobbyMenu.IsValid()) {
-    LobbyMenu->SetVisibility(ESlateVisibility::Visible);
+  if (OwningMenu.IsValid()) {
+    if (UInGameMenuWidget* Menu = Cast<UInGameMenuWidget>(OwningMenu.Get()))
+    {
+      Menu->HandleSubMenuClosed(this);
+    }
+    OwningMenu->SetVisibility(ESlateVisibility::Visible);
   }
 }
 
@@ -77,8 +87,12 @@ void USaveGameWidget::HandleSaveSlot(int32 SlotIndex) {
                             SaveGameObject, SlotNames[SlotIndex], 0)) {
     // After saving, transition back to main menu
     RemoveFromParent();
-    if (LobbyMenu.IsValid()) {
-      LobbyMenu->SetVisibility(ESlateVisibility::Visible);
+    if (OwningMenu.IsValid()) {
+      if (UInGameMenuWidget* Menu = Cast<UInGameMenuWidget>(OwningMenu.Get()))
+      {
+        Menu->HandleSubMenuClosed(this);
+      }
+      OwningMenu->SetVisibility(ESlateVisibility::Visible);
     }
   } else {
     UE_LOG(LogSkald, Error, TEXT("Failed to save slot %s"),

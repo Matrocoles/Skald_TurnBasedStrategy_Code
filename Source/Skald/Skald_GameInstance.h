@@ -158,6 +158,10 @@ public:
                             ENetworkFailure::Type FailureType,
                             const FString &ErrorString);
 
+  /** Return to the main menu and clear any in-progress session data. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Menu")
+  void ReturnToMainMenu();
+
   /** Save game loaded when transitioning from the main menu. */
   UPROPERTY(BlueprintReadWrite, Category = "SaveGame")
   USkaldSaveGame *LoadedSaveGame = nullptr;
@@ -165,4 +169,6 @@ public:
 private:
   UPROPERTY()
   FSkaldTravelState TravelState;
+
+  void ResetSessionState();
 };

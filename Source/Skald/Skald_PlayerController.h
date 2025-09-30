@@ -14,6 +14,7 @@ class UUserWidget;
 class USkaldMainHUDWidget;
 class UChoosePlayerWidget;
 class UBattleHUDWidget;
+class UInGameMenuWidget;
 class ATerritory;
 class ASkaldGameMode;
 class ASkaldGameState;
@@ -81,6 +82,15 @@ public:
   UFUNCTION(BlueprintCallable)
   void HideMainHUD();
 
+  UFUNCTION(BlueprintCallable, Category = "UI")
+  void ToggleInGameMenu();
+
+  UFUNCTION(BlueprintCallable, Category = "UI")
+  void ShowInGameMenu();
+
+  UFUNCTION(BlueprintCallable, Category = "UI")
+  void HideInGameMenu();
+
   /** Retrieve the turn manager controlling this player. */
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Turn")
   ATurnManager *GetTurnManager() const { return TurnManager; }
@@ -115,6 +125,10 @@ protected:
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "UI")
   TSubclassOf<UBattleHUDWidget> BattleHUDWidgetClass;
 
+  /** Widget class providing the in-game menu overlay. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "UI")
+  TSubclassOf<UInGameMenuWidget> InGameMenuWidgetClass;
+
   /** Widget class used for the fighter selection flow before battles. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "UI")
   TSubclassOf<UFighterSelectionWidget> FighterSelectionWidgetClass;
@@ -141,6 +155,10 @@ protected:
   UPROPERTY(BlueprintReadOnly, Category = "UI",
             meta = (AllowPrivateAccess = "true"))
   TObjectPtr<UBattleHUDWidget> BattleHudWidget;
+
+  UPROPERTY(BlueprintReadOnly, Category = "UI",
+            meta = (AllowPrivateAccess = "true"))
+  TObjectPtr<UInGameMenuWidget> InGameMenuWidget;
 
   /** Battle result widget displayed after combat resolves. */
   UPROPERTY(BlueprintReadOnly, Category = "UI",

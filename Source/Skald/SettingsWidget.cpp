@@ -5,14 +5,19 @@
 #include "GameFramework/GameUserSettings.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/Engine.h"
-#include "LobbyMenuWidget.h"
 #include "Sound/SoundClass.h"
 #include "Sound/SoundMix.h"
 #include "Skald_GameUserSettings.h"
+#include "UI/InGameMenuWidget.h"
 
 void USettingsWidget::SetLobbyMenu(ULobbyMenuWidget* InMenu)
 {
-    LobbyMenu = InMenu;
+    SetOwningMenu(InMenu);
+}
+
+void USettingsWidget::SetOwningMenu(UUserWidget* InMenu)
+{
+    OwningMenu = InMenu;
 }
 
 void USettingsWidget::NativeConstruct()
@@ -165,9 +170,13 @@ void USettingsWidget::OnMainMenu()
     SetVisibility(ESlateVisibility::Hidden);
     RemoveFromParent();
 
-    if (LobbyMenu.IsValid())
+    if (OwningMenu.IsValid())
     {
-        LobbyMenu->SetVisibility(ESlateVisibility::Visible);
+        if (UInGameMenuWidget* Menu = Cast<UInGameMenuWidget>(OwningMenu.Get()))
+        {
+            Menu->HandleSubMenuClosed(this);
+        }
+        OwningMenu->SetVisibility(ESlateVisibility::Visible);
     }
 }
 

@@ -6,6 +6,7 @@
 
 class UButton;
 class ULobbyMenuWidget;
+class UUserWidget;
 /**
  * Simple save game menu listing a few save slots.
  */
@@ -30,6 +31,9 @@ public:
     UFUNCTION(BlueprintCallable, Category="Skald|Widgets")
     void SetLobbyMenu(ULobbyMenuWidget* InMenu);
 
+    UFUNCTION(BlueprintCallable, Category="Skald|Widgets")
+    void SetOwningMenu(UUserWidget* InMenu);
+
 protected:
     virtual void NativeConstruct() override;
     virtual void NativeDestruct() override;
@@ -51,6 +55,6 @@ private:
     void HandleSaveSlot(int32 SlotIndex);
 
     UPROPERTY()
-    TWeakObjectPtr<ULobbyMenuWidget> LobbyMenu;
+    TWeakObjectPtr<UUserWidget> OwningMenu;
 };
 
