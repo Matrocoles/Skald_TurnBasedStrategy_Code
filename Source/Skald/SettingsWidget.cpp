@@ -95,16 +95,16 @@ void USettingsWidget::NativeConstruct()
         BattleActionDelaySlider->SetValue(PendingBattleActionDelay);
     }
 
-    if (UGameUserSettings* Settings = USkaldGameUserSettings::GetSkaldGameUserSettings())
+    if (UGameUserSettings* SkaldSettings = USkaldGameUserSettings::GetSkaldGameUserSettings())
     {
-        PendingResolution = Settings->GetScreenResolution();
+        PendingResolution = SkaldSettings->GetScreenResolution();
         const FString CurrentRes = FString::Printf(TEXT("%dx%d"), PendingResolution.X, PendingResolution.Y);
         if (DisplaySizeCombo)
         {
             DisplaySizeCombo->SetSelectedOption(CurrentRes);
         }
 
-        PendingQuality = Settings->GetOverallScalabilityLevel();
+        PendingQuality = SkaldSettings->GetOverallScalabilityLevel();
         if (GraphicsQualityCombo)
         {
             if (const FString* Quality = QualityMap.FindKey(PendingQuality))
@@ -113,16 +113,16 @@ void USettingsWidget::NativeConstruct()
             }
         }
     }
-    else if (UGameUserSettings* Settings = GEngine->GetGameUserSettings())
+    else if (UGameUserSettings* EngineSettings = GEngine->GetGameUserSettings())
     {
-        PendingResolution = Settings->GetScreenResolution();
+        PendingResolution = EngineSettings->GetScreenResolution();
         const FString CurrentRes = FString::Printf(TEXT("%dx%d"), PendingResolution.X, PendingResolution.Y);
         if (DisplaySizeCombo)
         {
             DisplaySizeCombo->SetSelectedOption(CurrentRes);
         }
 
-        PendingQuality = Settings->GetOverallScalabilityLevel();
+        PendingQuality = EngineSettings->GetOverallScalabilityLevel();
         if (GraphicsQualityCombo)
         {
             if (const FString* Quality = QualityMap.FindKey(PendingQuality))
@@ -135,21 +135,21 @@ void USettingsWidget::NativeConstruct()
 
 void USettingsWidget::OnApply()
 {
-    if (USkaldGameUserSettings* Settings = USkaldGameUserSettings::GetSkaldGameUserSettings())
+    if (USkaldGameUserSettings* SkaldSettings = USkaldGameUserSettings::GetSkaldGameUserSettings())
     {
-        Settings->SetScreenResolution(PendingResolution);
-        Settings->SetOverallScalabilityLevel(PendingQuality);
-        Settings->SetEnemyTurnStepDelay(PendingEnemyTurnDelay);
-        Settings->SetBattleActionDelay(PendingBattleActionDelay);
-        Settings->ApplySettings(false);
-        Settings->SaveSettings();
+        SkaldSettings->SetScreenResolution(PendingResolution);
+        SkaldSettings->SetOverallScalabilityLevel(PendingQuality);
+        SkaldSettings->SetEnemyTurnStepDelay(PendingEnemyTurnDelay);
+        SkaldSettings->SetBattleActionDelay(PendingBattleActionDelay);
+        SkaldSettings->ApplySettings(false);
+        SkaldSettings->SaveSettings();
     }
-    else if (UGameUserSettings* Settings = GEngine->GetGameUserSettings())
+    else if (UGameUserSettings* EngineSettings = GEngine->GetGameUserSettings())
     {
-        Settings->SetScreenResolution(PendingResolution);
-        Settings->SetOverallScalabilityLevel(PendingQuality);
-        Settings->ApplySettings(false);
-        Settings->SaveSettings();
+        EngineSettings->SetScreenResolution(PendingResolution);
+        EngineSettings->SetOverallScalabilityLevel(PendingQuality);
+        EngineSettings->ApplySettings(false);
+        EngineSettings->SaveSettings();
     }
 
     if (MasterSoundMix && MasterSoundClass)
