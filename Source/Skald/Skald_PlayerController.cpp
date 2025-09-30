@@ -2144,7 +2144,7 @@ void ASkaldPlayerController::UpdateBattleHUDSelection() {
   BattleHudWidget->BindToFighter(SelectedFighter);
   if (SelectedFighter) {
     BattleHudWidget->SetSelectedFighterName(
-        FText::FromString(SelectedFighter->GetHumanReadableName()));
+        FText::FromName(SelectedFighter->GetFighterId()));
   } else {
     BattleHudWidget->SetSelectedFighterName(FText::GetEmpty());
   }

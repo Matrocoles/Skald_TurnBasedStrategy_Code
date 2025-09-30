@@ -10,6 +10,7 @@
 
 class UGridOverlayComponent;
 class UCapsuleComponent;
+class UTexture2D;
 
 UENUM(BlueprintType)
 enum class EFighterPawnFootprint : uint8 {
@@ -111,6 +112,14 @@ public:
             Category = "Fighter")
   FFighterStats Stats;
 
+  /** Identifier of the fighter definition used to spawn this pawn. */
+  UPROPERTY(BlueprintReadOnly, Replicated, Category = "Fighter")
+  FName FighterId;
+
+  /** Portrait associated with this fighter definition. */
+  UPROPERTY(BlueprintReadOnly, Replicated, Category = "Fighter|UI")
+  TSoftObjectPtr<UTexture2D> FighterPortrait;
+
   /** Number of grid cells occupied by this fighter (1 or 4). */
   UPROPERTY(EditAnywhere, BlueprintReadWrite,
             ReplicatedUsing = OnRep_GridFootprint, Category = "Fighter|Grid")
@@ -166,6 +175,12 @@ public:
   /** Event broadcast when actions remaining changes. */
   UPROPERTY(BlueprintAssignable, Category = "Fighter|Events")
   FOnActionsChanged OnActionsChanged;
+
+  /** Retrieve the identifier associated with this fighter. */
+  FName GetFighterId() const { return FighterId; }
+
+  /** Resolve the portrait texture for this fighter if available. */
+  UTexture2D *GetPortraitTexture() const;
 
 protected:
   /** Clear grid occupancy when the fighter is destroyed. */

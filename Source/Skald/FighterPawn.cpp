@@ -4,6 +4,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextBlock.h"
 #include "Engine/CollisionProfile.h"
+#include "Engine/Texture2D.h"
 #include "EngineUtils.h"
 #include "GridBattleManager.h"
 #include "GridOverlayComponent.h"
@@ -66,6 +67,7 @@ AFighterPawn::AFighterPawn() {
   bHasActivatedThisRound = false;
   bIsCurrentlyActive = false;
   CurrentCell = FIntPoint::ZeroValue;
+  FighterId = NAME_None;
 
   ApplyFootprintScale();
   UpdateMeshOffset();
@@ -76,6 +78,8 @@ void AFighterPawn::GetLifetimeReplicatedProps(
   Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
   DOREPLIFETIME(AFighterPawn, Stats);
+  DOREPLIFETIME(AFighterPawn, FighterId);
+  DOREPLIFETIME(AFighterPawn, FighterPortrait);
   DOREPLIFETIME(AFighterPawn, bIsAttacker);
   DOREPLIFETIME(AFighterPawn, ActionsRemaining);
   DOREPLIFETIME(AFighterPawn, bHasActivatedThisRound);
@@ -124,6 +128,18 @@ void AFighterPawn::BeginPlay() {
       }
     }
   }
+}
+
+UTexture2D *AFighterPawn::GetPortraitTexture() const {
+  if (FighterPortrait.IsValid()) {
+    return FighterPortrait.Get();
+  }
+
+  if (!FighterPortrait.IsNull()) {
+    return FighterPortrait.LoadSynchronous();
+  }
+
+  return nullptr;
 }
 
 void AFighterPawn::Tick(float DeltaSeconds) {

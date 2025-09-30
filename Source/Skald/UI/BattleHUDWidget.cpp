@@ -51,8 +51,16 @@ void UBattleHUDWidget::BindToFighter(AFighterPawn *Fighter) {
         this, &UBattleHUDWidget::HandleActionsChanged);
     UpdateStatPanel();
     if (FighterNameText) {
-      FighterNameText->SetText(
-          FText::FromString(BoundFighter->GetHumanReadableName()));
+      FighterNameText->SetText(FText::FromName(BoundFighter->GetFighterId()));
+    }
+    if (FighterImage) {
+      if (UTexture2D *PortraitTexture = BoundFighter->GetPortraitTexture()) {
+        FighterImage->SetBrushFromTexture(PortraitTexture);
+        FighterImage->SetVisibility(ESlateVisibility::HitTestInvisible);
+      } else {
+        FighterImage->SetBrushFromTexture(nullptr);
+        FighterImage->SetVisibility(ESlateVisibility::Collapsed);
+      }
     }
   } else {
     if (HealthText) {
@@ -81,6 +89,10 @@ void UBattleHUDWidget::BindToFighter(AFighterPawn *Fighter) {
     }
     if (FighterNameText) {
       FighterNameText->SetText(FText::GetEmpty());
+    }
+    if (FighterImage) {
+      FighterImage->SetBrushFromTexture(nullptr);
+      FighterImage->SetVisibility(ESlateVisibility::Collapsed);
     }
   }
 }
@@ -190,6 +202,17 @@ void UBattleHUDWidget::SetPlayersTurnLabel(const FText &PlayerLabel) {
 void UBattleHUDWidget::SetSelectedFighterName(const FText &Name) {
   if (FighterNameText) {
     FighterNameText->SetText(Name);
+  }
+  if (FighterImage) {
+    UTexture2D *PortraitTexture =
+        BoundFighter ? BoundFighter->GetPortraitTexture() : nullptr;
+    if (PortraitTexture) {
+      FighterImage->SetBrushFromTexture(PortraitTexture);
+      FighterImage->SetVisibility(ESlateVisibility::HitTestInvisible);
+    } else {
+      FighterImage->SetBrushFromTexture(nullptr);
+      FighterImage->SetVisibility(ESlateVisibility::Collapsed);
+    }
   }
 }
 

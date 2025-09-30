@@ -97,9 +97,13 @@ public:
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
   UTextBlock *AttackDiceText;
 
-  /** Text displaying the fighter's name. */
+  /** Text displaying the fighter's identifier. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *FighterNameText;
+
+  /** Image displaying the fighter's portrait. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UImage *FighterImage;
 
   /** Text displaying the current round. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
@@ -134,7 +138,7 @@ public:
   /** Update the label that shows whose turn is active. */
   void SetPlayersTurnLabel(const FText &PlayerLabel);
 
-  /** Update the fighter name label. */
+  /** Update the fighter identifier label and portrait. */
   void SetSelectedFighterName(const FText &Name);
 
   /** Enable or disable the Activate button. */

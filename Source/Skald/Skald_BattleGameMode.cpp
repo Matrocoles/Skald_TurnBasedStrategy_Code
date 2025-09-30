@@ -1067,6 +1067,8 @@ void ASkald_BattleGameMode::SpawnFighterSide(const TArray<FFighterDefinition> &R
         Pawn->SetActorLocation(AdjustedLocation, /*bSweep*/ true, &HitResult);
       }
       Pawn->Stats = Def.Stats;
+      Pawn->FighterId = Def.Id;
+      Pawn->FighterPortrait = Def.Portrait;
       Pawn->bIsAttacker = bAsAttacker;
       BattleManager->RegisterFighter(Pawn, bAsAttacker);
     }
