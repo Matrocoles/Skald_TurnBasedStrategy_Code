@@ -810,12 +810,20 @@ void AFighterPawn::BroadcastActionsRemaining() {
   OnActionsChanged.Broadcast(ActionsRemaining);
 }
 
+void AFighterPawn::ApplyFacingYaw(float TargetYaw) {
+  const float MeshYawOffset =
+      DisplayMesh ? DisplayMesh->GetRelativeRotation().Yaw : 0.f;
+  const float AdjustedYaw =
+      FRotator::NormalizeAxis(TargetYaw - MeshYawOffset);
+  SetActorRotation(FRotator(0.f, AdjustedYaw, 0.f));
+}
+
 void AFighterPawn::FaceTowardsLocation(const FVector &TargetLocation) {
   FVector Direction = TargetLocation - GetActorLocation();
   Direction.Z = 0.f;
   if (!Direction.IsNearlyZero()) {
     const FRotator LookRotation = Direction.Rotation();
-    SetActorRotation(FRotator(0.f, LookRotation.Yaw, 0.f));
+    ApplyFacingYaw(LookRotation.Yaw);
   }
 }
 
@@ -832,6 +840,6 @@ void AFighterPawn::FaceTowardsCells(const FIntPoint &FromCell,
   Direction.Z = 0.f;
   if (!Direction.IsNearlyZero()) {
     const FRotator LookRotation = Direction.Rotation();
-    SetActorRotation(FRotator(0.f, LookRotation.Yaw, 0.f));
+    ApplyFacingYaw(LookRotation.Yaw);
   }
 }
