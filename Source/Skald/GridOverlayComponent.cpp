@@ -283,12 +283,19 @@ void UGridOverlayComponent::SampleEnvironmentAtOrigin() {
     return;
   }
 
+  const FTransform TraceTransform(CachedGridTransform.GetRotation(),
+                                  CachedGridTransform.GetLocation(),
+                                  FVector::OneVector);
+
   for (int32 Y = 0; Y < Height; ++Y) {
     for (int32 X = 0; X < Width; ++X) {
       const int32 Idx = Index(FIntPoint(X, Y));
-      FVector Start = Origin +
-                      FVector((X + 0.5f) * CellSize, (Y + 0.5f) * CellSize, 10000.f);
-      FVector End = Start - FVector(0.f, 0.f, 20000.f);
+      const FVector LocalCenter =
+          FVector((X + 0.5f) * CellSize, (Y + 0.5f) * CellSize, 0.f);
+      const FVector WorldCenter =
+          TraceTransform.TransformPositionNoScale(LocalCenter);
+      const FVector Start = WorldCenter + FVector(0.f, 0.f, 10000.f);
+      const FVector End = WorldCenter - FVector(0.f, 0.f, 10000.f);
       FHitResult Hit;
       if (World->LineTraceSingleByChannel(Hit, Start, End, ECC_WorldStatic)) {
         if (CellHeights.IsValidIndex(Idx)) {
@@ -303,7 +310,7 @@ void UGridOverlayComponent::SampleEnvironmentAtOrigin() {
         }
       } else {
         if (CellHeights.IsValidIndex(Idx)) {
-          CellHeights[Idx] = Origin.Z;
+          CellHeights[Idx] = WorldCenter.Z;
         }
         if (CellRotations.IsValidIndex(Idx)) {
           CellRotations[Idx] = FQuat::Identity;
