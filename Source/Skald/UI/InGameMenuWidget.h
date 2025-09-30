@@ -9,6 +9,9 @@ class UUserWidget;
 class USaveGameWidget;
 class ULoadGameWidget;
 class USettingsWidget;
+#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5)
+struct FVisibilityChangedEvent;
+#endif
 
 /**
  * Lightweight in-game pause/menu widget surfaced from the player controller.
@@ -40,10 +43,15 @@ public:
 protected:
     virtual void NativeConstruct() override;
     virtual void NativeDestruct() override;
+#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5)
+    virtual void NativeOnVisibilityChanged(const FVisibilityChangedEvent& VisibilityChangedEvent) override;
+#else
     virtual void NativeOnVisibilityChanged(ESlateVisibility InVisibility) override;
+#endif
 
 private:
     void EnsureLayout();
+    void HandleVisibilityChanged(ESlateVisibility NewVisibility);
 
     UFUNCTION()
     void HandleSaveGameClicked();

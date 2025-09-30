@@ -37,16 +37,29 @@ FString NormalizeMapName(UWorld *World, FString Candidate) {
   if (!Result.IsEmpty()) {
     int32 OptionsIndex = INDEX_NONE;
     if (Result.FindChar(TEXT('?'), OptionsIndex)) {
+#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5)
+      Result.LeftInline(OptionsIndex, EAllowShrinking::No);
+#else
       Result.LeftInline(OptionsIndex, /*bAllowShrinking=*/false);
+#endif
     }
 
     if (World && !World->StreamingLevelsPrefix.IsEmpty() &&
         Result.StartsWith(World->StreamingLevelsPrefix)) {
       Result.RightChopInline(World->StreamingLevelsPrefix.Len(),
+#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5)
+                             EAllowShrinking::No);
+#else
                              /*bAllowShrinking=*/false);
+#endif
 
       if (Result.StartsWith(TEXT("_"))) {
-        Result.RightChopInline(1, /*bAllowShrinking=*/false);
+        Result.RightChopInline(1,
+#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5)
+                              EAllowShrinking::No);
+#else
+                              /*bAllowShrinking=*/false);
+#endif
       }
     }
 

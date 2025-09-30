@@ -126,12 +126,26 @@ void UInGameMenuWidget::NativeDestruct()
     Super::NativeDestruct();
 }
 
+#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5)
+void UInGameMenuWidget::NativeOnVisibilityChanged(const FVisibilityChangedEvent& VisibilityChangedEvent)
+{
+    Super::NativeOnVisibilityChanged(VisibilityChangedEvent);
+
+    HandleVisibilityChanged(GetVisibility());
+}
+#else
 void UInGameMenuWidget::NativeOnVisibilityChanged(ESlateVisibility InVisibility)
 {
     Super::NativeOnVisibilityChanged(InVisibility);
 
-    if (InVisibility != ESlateVisibility::Visible && InVisibility != ESlateVisibility::HitTestInvisible &&
-        InVisibility != ESlateVisibility::SelfHitTestInvisible)
+    HandleVisibilityChanged(InVisibility);
+}
+#endif
+
+void UInGameMenuWidget::HandleVisibilityChanged(ESlateVisibility NewVisibility)
+{
+    if (NewVisibility != ESlateVisibility::Visible && NewVisibility != ESlateVisibility::HitTestInvisible &&
+        NewVisibility != ESlateVisibility::SelfHitTestInvisible)
     {
         return;
     }
