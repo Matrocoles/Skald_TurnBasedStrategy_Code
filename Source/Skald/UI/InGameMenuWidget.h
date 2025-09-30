@@ -11,7 +11,7 @@ class UUserWidget;
 class USaveGameWidget;
 class ULoadGameWidget;
 class USettingsWidget;
-#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5)
+#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 6)
 struct FVisibilityChangedEvent;
 #endif
 
@@ -45,7 +45,7 @@ public:
 protected:
     virtual void NativeConstruct() override;
     virtual void NativeDestruct() override;
-#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5)
+#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 6)
     virtual void NativeOnVisibilityChanged(const FVisibilityChangedEvent& VisibilityChangedEvent) override;
 #else
     virtual void NativeOnVisibilityChanged(ESlateVisibility InVisibility) override;
