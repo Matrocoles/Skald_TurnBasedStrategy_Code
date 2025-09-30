@@ -704,19 +704,12 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
   }
 
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
-  if (GI) {
-    if (GI->bResumeTurns) {
-      bWorldInitialized = true;
-      bTurnsStarted = true;
-      GetWorldTimerManager().ClearTimer(RetryInitTimerHandle);
-      return;
-    }
-
-    if (GI->SavedTurnIndex != 0 ||
-        GI->SavedTurnPhase != ETurnPhase::Reinforcement) {
-      GI->SavedTurnIndex = 0;
-      GI->SavedTurnPhase = ETurnPhase::Reinforcement;
-    }
+  const bool bWantsResume = GI && GI->bResumeTurns;
+  if (GI && !bWantsResume &&
+      (GI->SavedTurnIndex != 0 ||
+       GI->SavedTurnPhase != ETurnPhase::Reinforcement)) {
+    GI->SavedTurnIndex = 0;
+    GI->SavedTurnPhase = ETurnPhase::Reinforcement;
   }
 
   if (GI && !GI->bIsMultiplayer) {
@@ -824,6 +817,25 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
                                     RetryInitDelay, false);
     GetWorldTimerManager().SetTimer(RetryInitTimerHandle, RetryInit, 0.f,
                                     false);
+    return;
+  }
+
+  if (bWantsResume) {
+    const bool bResumed =
+        TurnManager && TurnManager->AttemptResumeSavedTurnState();
+    if (!bResumed) {
+      FTimerDelegate RetryInit = FTimerDelegate::CreateUObject(
+          this, &ASkaldGameMode::TryInitializeWorldAndStart);
+      GetWorldTimerManager().ClearTimer(RetryInitTimerHandle);
+      GetWorldTimerManager().SetTimer(RetryInitTimerHandle, RetryInit,
+                                      RetryInitDelay, false);
+      GetWorldTimerManager().SetTimerForNextTick(RetryInit);
+      return;
+    }
+
+    bWorldInitialized = true;
+    bTurnsStarted = true;
+    GetWorldTimerManager().ClearTimer(RetryInitTimerHandle);
     return;
   }
 

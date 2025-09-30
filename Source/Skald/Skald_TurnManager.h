@@ -9,6 +9,7 @@ class ASkaldPlayerController;
 class ASkaldPlayerState;
 class AWorldMap;
 class UWorld;
+class USkaldGameInstance;
 
 // Broadcast whenever the overall world state changes so HUDs can refresh.
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSkaldWorldStateChanged);
@@ -30,6 +31,9 @@ public:
 
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void RegisterController(ASkaldPlayerController *Controller);
+
+  /** Attempt to resume the saved turn state captured before travelling. */
+  bool AttemptResumeSavedTurnState();
 
   /** Begin the pre-game army placement phase. */
   UFUNCTION(BlueprintCallable, Category = "Turn")
@@ -131,4 +135,7 @@ protected:
 
   /** Internal: set GameState.CurrentTurnIndex (and broadcast) to match CurrentIndex. */
   void SyncGameStateTurnIndex();
+
+  /** Attempt to restore a saved turn state captured before travelling. */
+  bool TryResumeSavedTurnState(USkaldGameInstance *GameInstance = nullptr);
 };
