@@ -8,6 +8,7 @@
 #include "LobbyMenuWidget.h"
 #include "Sound/SoundClass.h"
 #include "Sound/SoundMix.h"
+#include "Skald_GameUserSettings.h"
 
 void USettingsWidget::SetLobbyMenu(ULobbyMenuWidget* InMenu)
 {
@@ -17,6 +18,11 @@ void USettingsWidget::SetLobbyMenu(ULobbyMenuWidget* InMenu)
 void USettingsWidget::NativeConstruct()
 {
     Super::NativeConstruct();
+
+    PendingResolution = FIntPoint::ZeroValue;
+    PendingQuality = 0;
+    PendingEnemyTurnDelay = 0.75f;
+    PendingBattleActionDelay = 0.5f;
 
     if (ApplyButton)
     {
@@ -71,7 +77,43 @@ void USettingsWidget::NativeConstruct()
         }
     }
 
-    if (UGameUserSettings* Settings = GEngine->GetGameUserSettings())
+    if (USkaldGameUserSettings* SkaldSettings = USkaldGameUserSettings::GetSkaldGameUserSettings())
+    {
+        PendingEnemyTurnDelay = SkaldSettings->GetEnemyTurnStepDelay();
+        PendingBattleActionDelay = SkaldSettings->GetBattleActionDelay();
+    }
+
+    if (EnemyTurnDelaySlider)
+    {
+        EnemyTurnDelaySlider->OnValueChanged.AddDynamic(this, &USettingsWidget::HandleEnemyTurnDelayChanged);
+        EnemyTurnDelaySlider->SetValue(PendingEnemyTurnDelay);
+    }
+
+    if (BattleActionDelaySlider)
+    {
+        BattleActionDelaySlider->OnValueChanged.AddDynamic(this, &USettingsWidget::HandleBattleActionDelayChanged);
+        BattleActionDelaySlider->SetValue(PendingBattleActionDelay);
+    }
+
+    if (UGameUserSettings* Settings = USkaldGameUserSettings::GetSkaldGameUserSettings())
+    {
+        PendingResolution = Settings->GetScreenResolution();
+        const FString CurrentRes = FString::Printf(TEXT("%dx%d"), PendingResolution.X, PendingResolution.Y);
+        if (DisplaySizeCombo)
+        {
+            DisplaySizeCombo->SetSelectedOption(CurrentRes);
+        }
+
+        PendingQuality = Settings->GetOverallScalabilityLevel();
+        if (GraphicsQualityCombo)
+        {
+            if (const FString* Quality = QualityMap.FindKey(PendingQuality))
+            {
+                GraphicsQualityCombo->SetSelectedOption(*Quality);
+            }
+        }
+    }
+    else if (UGameUserSettings* Settings = GEngine->GetGameUserSettings())
     {
         PendingResolution = Settings->GetScreenResolution();
         const FString CurrentRes = FString::Printf(TEXT("%dx%d"), PendingResolution.X, PendingResolution.Y);
@@ -93,11 +135,21 @@ void USettingsWidget::NativeConstruct()
 
 void USettingsWidget::OnApply()
 {
-    if (UGameUserSettings* Settings = GEngine->GetGameUserSettings())
+    if (USkaldGameUserSettings* Settings = USkaldGameUserSettings::GetSkaldGameUserSettings())
+    {
+        Settings->SetScreenResolution(PendingResolution);
+        Settings->SetOverallScalabilityLevel(PendingQuality);
+        Settings->SetEnemyTurnStepDelay(PendingEnemyTurnDelay);
+        Settings->SetBattleActionDelay(PendingBattleActionDelay);
+        Settings->ApplySettings(false);
+        Settings->SaveSettings();
+    }
+    else if (UGameUserSettings* Settings = GEngine->GetGameUserSettings())
     {
         Settings->SetScreenResolution(PendingResolution);
         Settings->SetOverallScalabilityLevel(PendingQuality);
         Settings->ApplySettings(false);
+        Settings->SaveSettings();
     }
 
     if (MasterSoundMix && MasterSoundClass)
@@ -142,5 +194,15 @@ void USettingsWidget::HandleAudioChanged(float Value)
     {
         MasterSoundClass->Properties.Volume = Value;
     }
+}
+
+void USettingsWidget::HandleEnemyTurnDelayChanged(float Value)
+{
+    PendingEnemyTurnDelay = FMath::Max(0.0f, Value);
+}
+
+void USettingsWidget::HandleBattleActionDelayChanged(float Value)
+{
+    PendingBattleActionDelay = FMath::Max(0.0f, Value);
 }
 

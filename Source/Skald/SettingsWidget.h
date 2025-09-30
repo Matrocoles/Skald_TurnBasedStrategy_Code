@@ -10,6 +10,7 @@ class UComboBoxString;
 class USlider;
 class USoundClass;
 class USoundMix;
+class USkaldGameUserSettings;
 namespace ESelectInfo
 {
     enum Type;
@@ -38,6 +39,12 @@ public:
     UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta = (BindWidgetOptional))
     USlider* AudioSlider;
 
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta = (BindWidgetOptional))
+    USlider* EnemyTurnDelaySlider;
+
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta = (BindWidgetOptional))
+    USlider* BattleActionDelaySlider;
+
     UPROPERTY(EditAnywhere, Category="Skald|Audio")
     USoundMix* MasterSoundMix;
 
@@ -65,6 +72,12 @@ protected:
     UFUNCTION(BlueprintCallable, Category="Skald|Widgets")
     void HandleAudioChanged(float Value);
 
+    UFUNCTION(BlueprintCallable, Category="Skald|Widgets")
+    void HandleEnemyTurnDelayChanged(float Value);
+
+    UFUNCTION(BlueprintCallable, Category="Skald|Widgets")
+    void HandleBattleActionDelayChanged(float Value);
+
 private:
     UPROPERTY()
     TWeakObjectPtr<ULobbyMenuWidget> LobbyMenu;
@@ -75,5 +88,7 @@ private:
     FIntPoint PendingResolution;
     int32 PendingQuality;
     float PendingAudioVolume;
+    float PendingEnemyTurnDelay;
+    float PendingBattleActionDelay;
 };
 
