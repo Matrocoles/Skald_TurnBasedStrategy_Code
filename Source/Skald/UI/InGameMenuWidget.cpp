@@ -126,7 +126,7 @@ void UInGameMenuWidget::NativeDestruct()
     Super::NativeDestruct();
 }
 
-void UInGameMenuWidget::NativeOnVisibilityChanged(const ESlateVisibility InVisibility)
+void UInGameMenuWidget::NativeOnVisibilityChanged(ESlateVisibility InVisibility)
 {
     Super::NativeOnVisibilityChanged(InVisibility);
 

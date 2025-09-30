@@ -9,6 +9,7 @@
 #include "Skald_GameInstance.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "UI/InGameMenuWidget.h"
+#include "LobbyMenuWidget.h"
 
 void ULoadGameWidget::SetLobbyMenu(ULobbyMenuWidget* InMenu)
 {

@@ -9,6 +9,7 @@
 #include "Sound/SoundMix.h"
 #include "Skald_GameUserSettings.h"
 #include "UI/InGameMenuWidget.h"
+#include "LobbyMenuWidget.h"
 
 void USettingsWidget::SetLobbyMenu(ULobbyMenuWidget* InMenu)
 {

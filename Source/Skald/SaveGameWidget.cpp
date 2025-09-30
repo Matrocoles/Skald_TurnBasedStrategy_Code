@@ -8,6 +8,7 @@
 #include "Skald_GameMode.h"
 #include "SlotNameConstants.h"
 #include "UI/InGameMenuWidget.h"
+#include "LobbyMenuWidget.h"
 
 void USaveGameWidget::SetLobbyMenu(ULobbyMenuWidget* InMenu)
 {
