@@ -96,19 +96,7 @@ void ATurnManager::BeginPlay() {
           this, &ATurnManager::HandleGridBattleEnded);
     }
 
-    if (GI->bResumeTurns) {
-      CurrentIndex = GI->SavedTurnIndex;
-      CurrentPhase = GI->SavedTurnPhase;
-      GI->bResumeTurns = false;
-
-      if (Controllers.IsValidIndex(CurrentIndex)) {
-        if (ASkaldPlayerController *Controller =
-                Controllers[CurrentIndex].Get()) {
-          Controller->StartTurn();
-          BroadcastCurrentPhase();
-        }
-      }
-    }
+    TryResumeSavedTurnState(GI);
   }
 
   if (ASkaldGameMode *GM = GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
@@ -186,6 +174,10 @@ void ATurnManager::RegisterController(ASkaldPlayerController *Controller) {
   }
 }
 
+bool ATurnManager::AttemptResumeSavedTurnState() {
+  return TryResumeSavedTurnState();
+}
+
 void ATurnManager::StartArmyPlacementPhase() {
   if (const UWorld *W = GetWorld()) {
     if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
@@ -255,6 +247,34 @@ void ATurnManager::SyncGameStateTurnIndex() {
     GS->CurrentTurnIndex = NewIndex;
     GS->OnTurnIndexChanged.Broadcast(NewIndex);
   }
+}
+
+bool ATurnManager::TryResumeSavedTurnState(USkaldGameInstance *GameInstance) {
+  USkaldGameInstance *GI =
+      GameInstance ? GameInstance : GetGameInstance<USkaldGameInstance>();
+  if (!GI || !GI->bResumeTurns) {
+    return false;
+  }
+
+  const int32 SavedIndex = GI->SavedTurnIndex;
+  if (!Controllers.IsValidIndex(SavedIndex) || !Controllers[SavedIndex].IsValid()) {
+    return false;
+  }
+
+  ASkaldPlayerController *Controller = Controllers[SavedIndex].Get();
+  if (!Controller) {
+    return false;
+  }
+
+  CurrentIndex = SavedIndex;
+  CurrentPhase = GI->SavedTurnPhase;
+  GI->bResumeTurns = false;
+
+  SyncGameStateTurnIndex();
+  Controller->StartTurn();
+  BroadcastCurrentPhase();
+
+  return true;
 }
 
 void ATurnManager::StartTurns(ASkaldPlayerController *StartingController) {
@@ -777,20 +797,7 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
   GI->PendingBattleResolution = FGridBattleResolution();
 
   // Resume the saved turn sequence now that the battle has been resolved.
-  if (GI->bResumeTurns) {
-    CurrentIndex = GI->SavedTurnIndex;
-    CurrentPhase = GI->SavedTurnPhase;
-    GI->bResumeTurns = false;
-
-    if (Controllers.IsValidIndex(CurrentIndex)) {
-      if (ASkaldPlayerController *Controller =
-              Controllers[CurrentIndex].Get()) {
-        SyncGameStateTurnIndex();
-        Controller->StartTurn();
-        BroadcastCurrentPhase();
-      }
-    }
-  }
+  TryResumeSavedTurnState(GI);
 
   if (ASkaldGameMode *GM = GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
     GM->CheckVictoryConditions();

@@ -706,6 +706,17 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
   if (GI) {
     if (GI->bResumeTurns) {
+      const bool bResumed = TurnManager && TurnManager->AttemptResumeSavedTurnState();
+      if (!bResumed) {
+        FTimerDelegate RetryInit = FTimerDelegate::CreateUObject(
+            this, &ASkaldGameMode::TryInitializeWorldAndStart);
+        GetWorldTimerManager().ClearTimer(RetryInitTimerHandle);
+        GetWorldTimerManager().SetTimer(RetryInitTimerHandle, RetryInit,
+                                        RetryInitDelay, false);
+        GetWorldTimerManager().SetTimerForNextTick(RetryInit);
+        return;
+      }
+
       bWorldInitialized = true;
       bTurnsStarted = true;
       GetWorldTimerManager().ClearTimer(RetryInitTimerHandle);
