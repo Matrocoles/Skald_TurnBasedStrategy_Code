@@ -2,10 +2,7 @@
 
 #include "Blueprint/UserWidget.h"
 #include "CoreMinimal.h"
-#include "Runtime/Launch/Resources/Version.h"
-#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5)
-#include "Widgets/SWidget.h"
-#endif
+#include "Components/SlateWrapperTypes.h"
 
 #include "InGameMenuWidget.generated.h"
 
@@ -44,11 +41,7 @@ public:
 protected:
     virtual void NativeConstruct() override;
     virtual void NativeDestruct() override;
-#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5)
-    virtual void NativeOnVisibilityChanged(const UE::Slate::FVisibilityChangedEvent& VisibilityChangedEvent) override;
-#else
-    virtual void NativeOnVisibilityChanged(ESlateVisibility InVisibility) override;
-#endif
+    virtual void OnVisibilityChanged(ESlateVisibility InVisibility) override;
 
 private:
     void EnsureLayout();
