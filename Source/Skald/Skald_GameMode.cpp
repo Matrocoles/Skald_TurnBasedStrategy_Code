@@ -635,6 +635,14 @@ bool ASkaldGameMode::RestoreWorldFromSnapshot() {
   }
 
   TMap<int32, FS_PlayerData *> PlayerDataById;
+  TMap<int32, ASkaldPlayerState *> PlayerStateById;
+
+  for (APlayerState *PSBase : GS->PlayerArray) {
+    if (ASkaldPlayerState *SkaldPS = Cast<ASkaldPlayerState>(PSBase)) {
+      PlayerStateById.Add(SkaldPS->GetPlayerId(), SkaldPS);
+    }
+  }
+
   for (FS_PlayerData &PlayerData : PlayerDataArray) {
     PlayerDataById.Add(PlayerData.PlayerID, &PlayerData);
     PlayerData.IsEliminated = true;
@@ -688,6 +696,32 @@ bool ASkaldGameMode::RestoreWorldFromSnapshot() {
     UE_LOG(LogSkald, Warning,
            TEXT("RestoreWorldFromSnapshot: Cached snapshot contained no valid territories."));
     return false;
+  }
+
+  for (TPair<int32, ASkaldPlayerState *> &Entry : PlayerStateById) {
+    ASkaldPlayerState *PlayerState = Entry.Value;
+    if (!PlayerState) {
+      continue;
+    }
+
+    const FS_PlayerData *const *PlayerDataPtr = PlayerDataById.Find(Entry.Key);
+    const bool bShouldBeEliminated =
+        !(PlayerDataPtr && *PlayerDataPtr) || (*PlayerDataPtr)->IsEliminated;
+
+    bool bStateChanged = false;
+    if (PlayerState->IsEliminated != bShouldBeEliminated) {
+      PlayerState->IsEliminated = bShouldBeEliminated;
+      bStateChanged = true;
+    }
+
+    if (bShouldBeEliminated && PlayerState->bHasLockedIn) {
+      PlayerState->bHasLockedIn = false;
+      bStateChanged = true;
+    }
+
+    if (bStateChanged) {
+      PlayerState->ForceNetUpdate();
+    }
   }
 
   WorldMap->SpawnedLocations.Reset();
