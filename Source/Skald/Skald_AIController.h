@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Containers/Queue.h"
 #include "Skald_PlayerController.h"
 #include "TimerManager.h"
 #include "Skald_AIController.generated.h"
@@ -29,6 +30,8 @@ protected:
   virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
+  enum class EAIBattleActivationIntent : uint8 { Attack, Move };
+
   void ProcessCurrentPhase();
   void ScheduleNextDecisionStep(float DelaySeconds);
   void ClearDecisionTimers();
@@ -49,6 +52,15 @@ private:
   bool TryMoveTowardsNearestEnemy(AFighterPawn *Fighter);
   void ExecuteActivationForFighter(AFighterPawn *Fighter);
   void TryActivateNextFighter();
+  void QueueActivationIntent(AFighterPawn *Fighter,
+                             EAIBattleActivationIntent Intent);
+  void ProcessQueuedActivationIntent();
+  void HandleQueuedAttackFinalized();
+  void ClearActivationTimers();
+  void ScheduleNextActivationAttempt();
+  void ScheduleTryActivateNextFighter();
+  bool ShouldContinueActivation(const AFighterPawn *Fighter) const;
+  void CompleteFighterActivation();
 
   int32 ComputeManhattanDistance(UGridOverlayComponent *Grid,
                                  const AFighterPawn *A,
@@ -87,10 +99,36 @@ private:
   UPROPERTY(EditAnywhere, Category = "Turn|AI", meta = (ClampMin = "0.0"))
   float EnemyBattleTransitionPollDelay = 1.0f;
 
+  /** Delay between individual AI-controlled actions during grid battles. */
+  UPROPERTY(EditAnywhere, Category = "Battle|AI", meta = (ClampMin = "0.0"))
+  float BattleActionDelay = 0.5f;
+
+  /** Delay applied between fighter activations to provide pacing. */
+  UPROPERTY(EditAnywhere, Category = "Battle|AI", meta = (ClampMin = "0.0"))
+  float ActivationGapDelay = 0.5f;
+
   /** Timer driving world-map decision pacing. */
   FTimerHandle EnemyTurnStepTimerHandle;
 
   /** Timer used to retry battle automation binding while the manager spawns. */
   FTimerHandle BattleAutomationPollHandle;
+
+  /** Timer driving queued fighter actions. */
+  FTimerHandle FighterActionTimerHandle;
+
+  /** Timer enforcing a short delay before the next activation. */
+  FTimerHandle ActivationGapTimerHandle;
+
+  /** Fighter currently being processed by the AI. */
+  TWeakObjectPtr<AFighterPawn> PendingActivationFighter;
+
+  /** Ordered list of intents to process for the pending fighter. */
+  TQueue<EAIBattleActivationIntent> PendingActivationIntents;
+
+  /** True while waiting for an async attack sequence to resolve. */
+  bool bAwaitingQueuedAttackResolution = false;
+
+  /** Safety counter preventing infinite activation loops. */
+  int32 ActivationIntentIterationCount = 0;
 };
 

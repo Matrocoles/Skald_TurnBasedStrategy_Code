@@ -392,7 +392,7 @@ void ASkaldAIController::SetupBattleAutomation() {
       this, &ASkaldAIController::HandleBattleEnded);
 
   DetermineControlledBattleSide();
-  TryActivateNextFighter();
+  ScheduleTryActivateNextFighter();
 }
 
 void ASkaldAIController::TeardownBattleAutomation() {
@@ -680,34 +680,175 @@ bool ASkaldAIController::TryMoveTowardsNearestEnemy(AFighterPawn *Fighter) {
   return Fighter->ActionsRemaining < ActionsBefore;
 }
 
-void ASkaldAIController::ExecuteActivationForFighter(AFighterPawn *Fighter) {
-  if (!Fighter || !CachedBattleManager.IsValid()) {
+void ASkaldAIController::QueueActivationIntent(
+    AFighterPawn *Fighter, EAIBattleActivationIntent Intent) {
+  if (!Fighter) {
     return;
   }
 
-  int32 SafetyCounter = 0;
-  while (Fighter->IsAlive() && Fighter->bIsCurrentlyActive &&
-         Fighter->ActionsRemaining > 0 && SafetyCounter < 8) {
-    bool bActionTaken = false;
-    if (TryAttackNearestEnemy(Fighter)) {
-      bActionTaken = true;
-    } else if (TryMoveTowardsNearestEnemy(Fighter)) {
-      bActionTaken = true;
-    }
-
-    if (!bActionTaken) {
-      break;
-    }
-
-    ++SafetyCounter;
+  if (PendingActivationFighter != Fighter) {
+    PendingActivationFighter = Fighter;
   }
 
-  if (CachedBattleManager.IsValid()) {
-    CachedBattleManager->FinishActivation(Fighter, EGridActivationFinishReason::Auto);
+  PendingActivationIntents.Enqueue(Intent);
+}
+
+bool ASkaldAIController::ShouldContinueActivation(
+    const AFighterPawn *Fighter) const {
+  return Fighter && Fighter->IsAlive() && Fighter->bIsCurrentlyActive &&
+         Fighter->ActionsRemaining > 0 && ActivationIntentIterationCount < 8;
+}
+
+void ASkaldAIController::ScheduleNextActivationAttempt() {
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(FighterActionTimerHandle);
+    World->GetTimerManager().SetTimer(
+        FighterActionTimerHandle, this,
+        &ASkaldAIController::ProcessQueuedActivationIntent, BattleActionDelay,
+        false);
   }
 }
 
+void ASkaldAIController::ProcessQueuedActivationIntent() {
+  if (bAwaitingQueuedAttackResolution) {
+    return;
+  }
+
+  AFighterPawn *Fighter = PendingActivationFighter.Get();
+  if (!ShouldContinueActivation(Fighter)) {
+    CompleteFighterActivation();
+    return;
+  }
+
+  EAIBattleActivationIntent Intent;
+  if (!PendingActivationIntents.Dequeue(Intent)) {
+    QueueActivationIntent(Fighter, EAIBattleActivationIntent::Attack);
+    if (!PendingActivationIntents.Dequeue(Intent)) {
+      return;
+    }
+  }
+
+  bool bActionTaken = false;
+  bool bRequiresAttackResolution = false;
+
+  switch (Intent) {
+  case EAIBattleActivationIntent::Attack:
+    bActionTaken = TryAttackNearestEnemy(Fighter);
+    bRequiresAttackResolution = bActionTaken;
+    if (!bActionTaken && ShouldContinueActivation(Fighter)) {
+      QueueActivationIntent(Fighter, EAIBattleActivationIntent::Move);
+      ScheduleNextActivationAttempt();
+      return;
+    }
+    break;
+  case EAIBattleActivationIntent::Move:
+    bActionTaken = TryMoveTowardsNearestEnemy(Fighter);
+    break;
+  }
+
+  if (!bActionTaken) {
+    CompleteFighterActivation();
+    return;
+  }
+
+  ++ActivationIntentIterationCount;
+
+  if (!ShouldContinueActivation(Fighter)) {
+    if (bRequiresAttackResolution) {
+      bAwaitingQueuedAttackResolution = true;
+    } else {
+      CompleteFighterActivation();
+    }
+    return;
+  }
+
+  if (bRequiresAttackResolution) {
+    bAwaitingQueuedAttackResolution = true;
+    return;
+  }
+
+  QueueActivationIntent(Fighter, EAIBattleActivationIntent::Attack);
+  ScheduleNextActivationAttempt();
+}
+
+void ASkaldAIController::HandleQueuedAttackFinalized() {
+  if (!bAwaitingQueuedAttackResolution) {
+    return;
+  }
+
+  bAwaitingQueuedAttackResolution = false;
+
+  AFighterPawn *Fighter = PendingActivationFighter.Get();
+  if (!ShouldContinueActivation(Fighter)) {
+    CompleteFighterActivation();
+    return;
+  }
+
+  QueueActivationIntent(Fighter, EAIBattleActivationIntent::Attack);
+  ScheduleNextActivationAttempt();
+}
+
+void ASkaldAIController::ClearActivationTimers() {
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(FighterActionTimerHandle);
+    World->GetTimerManager().ClearTimer(ActivationGapTimerHandle);
+  }
+
+  PendingActivationIntents.Empty();
+  bAwaitingQueuedAttackResolution = false;
+}
+
+void ASkaldAIController::CompleteFighterActivation() {
+  ClearActivationTimers();
+
+  AFighterPawn *Fighter = PendingActivationFighter.Get();
+  if (Fighter) {
+    Fighter->OnQueuedAttackFinalized.RemoveAll(this);
+  }
+
+  bProcessingActivation = false;
+  ActivationIntentIterationCount = 0;
+
+  if (CachedBattleManager.IsValid() && Fighter) {
+    CachedBattleManager->FinishActivation(Fighter, EGridActivationFinishReason::Auto);
+  }
+
+  PendingActivationFighter = nullptr;
+}
+
+void ASkaldAIController::ScheduleTryActivateNextFighter() {
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(ActivationGapTimerHandle);
+    World->GetTimerManager().SetTimer(
+        ActivationGapTimerHandle, this, &ASkaldAIController::TryActivateNextFighter,
+        ActivationGapDelay, false);
+  }
+}
+
+void ASkaldAIController::ExecuteActivationForFighter(AFighterPawn *Fighter) {
+  if (!Fighter || !CachedBattleManager.IsValid()) {
+    bProcessingActivation = false;
+    return;
+  }
+
+  ClearActivationTimers();
+  ActivationIntentIterationCount = 0;
+  PendingActivationFighter = Fighter;
+  bAwaitingQueuedAttackResolution = false;
+
+  Fighter->OnQueuedAttackFinalized.RemoveAll(this);
+  Fighter->OnQueuedAttackFinalized.AddUObject(
+      this, &ASkaldAIController::HandleQueuedAttackFinalized);
+
+  QueueActivationIntent(Fighter, EAIBattleActivationIntent::Attack);
+  ScheduleNextActivationAttempt();
+}
+
 void ASkaldAIController::TryActivateNextFighter() {
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(ActivationGapTimerHandle);
+  }
+
   if (!CachedBattleManager.IsValid()) {
     SetupBattleAutomation();
     return;
@@ -744,8 +885,8 @@ void ASkaldAIController::TryActivateNextFighter() {
 }
 
 void ASkaldAIController::HandleActiveFighterChanged(AFighterPawn *NewFighter) {
-  if (bProcessingActivation) {
-    return;
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(ActivationGapTimerHandle);
   }
 
   if (NewFighter) {
@@ -755,23 +896,33 @@ void ASkaldAIController::HandleActiveFighterChanged(AFighterPawn *NewFighter) {
 
     bProcessingActivation = true;
     ExecuteActivationForFighter(NewFighter);
-    bProcessingActivation = false;
-    TryActivateNextFighter();
     return;
   }
 
-  TryActivateNextFighter();
+  if (bProcessingActivation) {
+    return;
+  }
+
+  ScheduleTryActivateNextFighter();
 }
 
 void ASkaldAIController::HandleRoundStarted(int32 /*RoundNumber*/,
                                             ESkaldFaction /*InitiativeWinner*/) {
   DetermineControlledBattleSide();
-  TryActivateNextFighter();
+  ScheduleTryActivateNextFighter();
 }
 
 void ASkaldAIController::HandleBattleEnded(ESkaldFaction /*WinningFaction*/,
                                            int32 /*AttackerCasualties*/,
                                            int32 /*DefenderCasualties*/) {
+  ClearActivationTimers();
+  if (AFighterPawn *Fighter = PendingActivationFighter.Get()) {
+    Fighter->OnQueuedAttackFinalized.RemoveAll(this);
+  }
+  PendingActivationFighter = nullptr;
+  bProcessingActivation = false;
+  bAwaitingQueuedAttackResolution = false;
+  ActivationIntentIterationCount = 0;
   TeardownBattleAutomation();
 }
 
