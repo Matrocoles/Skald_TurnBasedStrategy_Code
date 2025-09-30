@@ -899,6 +899,12 @@ void ASkaldAIController::HandleActiveFighterChanged(AFighterPawn *NewFighter) {
     return;
   }
 
+  const bool bPendingFighterInvalid = !PendingActivationFighter.IsValid();
+  if (bProcessingActivation &&
+      (bAwaitingQueuedAttackResolution || bPendingFighterInvalid)) {
+    CompleteFighterActivation();
+  }
+
   if (bProcessingActivation) {
     return;
   }
