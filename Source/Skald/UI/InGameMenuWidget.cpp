@@ -100,7 +100,6 @@ void UInGameMenuWidget::NativeConstruct()
 
     CachedVisibility = GetVisibility();
     HandleVisibilityChange(CachedVisibility);
-    SetCanTick(true);
 }
 
 void UInGameMenuWidget::NativeDestruct()
@@ -126,21 +125,15 @@ void UInGameMenuWidget::NativeDestruct()
     }
 
     ActiveChildWidget.Reset();
-
-    SetCanTick(false);
     Super::NativeDestruct();
 }
 
-void UInGameMenuWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+void UInGameMenuWidget::OnVisibilityChanged(ESlateVisibility InVisibility)
 {
-    Super::NativeTick(MyGeometry, InDeltaTime);
+    Super::OnVisibilityChanged(InVisibility);
 
-    const ESlateVisibility Current = GetVisibility();
-    if (Current != CachedVisibility)
-    {
-        CachedVisibility = Current;
-        HandleVisibilityChange(Current);
-    }
+    CachedVisibility = InVisibility;
+    HandleVisibilityChange(InVisibility);
 }
 
 void UInGameMenuWidget::HandleVisibilityChange(ESlateVisibility NewVisibility)
@@ -193,9 +186,9 @@ void UInGameMenuWidget::EnsureLayout()
             {
                 if (Button)
                 {
-                    if (UVerticalBoxSlot* Slot = Root->AddChildToVerticalBox(Button))
+                    if (UVerticalBoxSlot* ButtonSlot = Root->AddChildToVerticalBox(Button))
                     {
-                        Slot->SetPadding(FMargin(8.0f));
+                        ButtonSlot->SetPadding(FMargin(8.0f));
                     }
                 }
             }
