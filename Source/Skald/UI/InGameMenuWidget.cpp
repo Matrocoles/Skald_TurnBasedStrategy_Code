@@ -128,14 +128,6 @@ void UInGameMenuWidget::NativeDestruct()
     Super::NativeDestruct();
 }
 
-void UInGameMenuWidget::OnVisibilityChanged(ESlateVisibility InVisibility)
-{
-    Super::OnVisibilityChanged(InVisibility);
-
-    CachedVisibility = InVisibility;
-    HandleVisibilityChange(InVisibility);
-}
-
 void UInGameMenuWidget::HandleVisibilityChange(ESlateVisibility NewVisibility)
 {
     if (NewVisibility == ESlateVisibility::Visible)
@@ -164,6 +156,18 @@ void UInGameMenuWidget::HandleSubMenuClosed(UUserWidget* ClosedWidget)
     if (ActiveChildWidget.Get() == ClosedWidget)
     {
         ActiveChildWidget.Reset();
+    }
+}
+
+void UInGameMenuWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+{
+    Super::NativeTick(MyGeometry, InDeltaTime);
+
+    const ESlateVisibility Current = GetVisibility();
+    if (Current != CachedVisibility)
+    {
+        CachedVisibility = Current;
+        HandleVisibilityChange(Current);
     }
 }
 
@@ -265,9 +269,10 @@ void UInGameMenuWidget::ShowChildWidget(TSubclassOf<UUserWidget> WidgetClass)
             ActiveChildWidget = Child;
 
             SetVisibility(ESlateVisibility::Hidden);
+            HandleVisibilityChange(ESlateVisibility::Hidden);
 
             FInputModeGameAndUI Mode;
-            Mode.SetWidgetToFocus(Child->TakeWidget());
+            Mode.SetWidgetToFocus(Child);
             Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
             Mode.SetHideCursorDuringCapture(false);
             PC->SetInputMode(Mode);
