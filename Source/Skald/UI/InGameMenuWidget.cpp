@@ -1,6 +1,5 @@
 #include "UI/InGameMenuWidget.h"
 
-#include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
@@ -129,9 +128,9 @@ void UInGameMenuWidget::NativeDestruct()
     Super::NativeDestruct();
 }
 
-void UInGameMenuWidget::NativeOnVisibilityChanged(ESlateVisibility InVisibility)
+void UInGameMenuWidget::OnVisibilityChanged(ESlateVisibility InVisibility)
 {
-    Super::NativeOnVisibilityChanged(InVisibility);
+    Super::OnVisibilityChanged(InVisibility);
 
     CachedVisibility = InVisibility;
     HandleVisibilityChange(InVisibility);
@@ -216,14 +215,14 @@ void UInGameMenuWidget::HandleMainMenuClicked()
 {
     if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(GetOwningPlayer()))
     {
-        FInputModeGameAndUI InputMode;
-        InputMode.SetWidgetToFocus(TSharedPtr<SWidget>());
-        InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-        InputMode.SetHideCursorDuringCapture(false);
-        PC->SetInputMode(InputMode);
+        FInputModeGameAndUI Mode;
+        Mode.SetWidgetToFocus(nullptr);
+        Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+        Mode.SetHideCursorDuringCapture(false);
+        PC->SetInputMode(Mode);
     }
 
-    if (const UWorld* World = GetWorld())
+    if (UWorld* World = GetWorld())
     {
         if (USkaldGameInstance* GI = World->GetGameInstance<USkaldGameInstance>())
         {
@@ -267,11 +266,11 @@ void UInGameMenuWidget::ShowChildWidget(TSubclassOf<UUserWidget> WidgetClass)
 
             SetVisibility(ESlateVisibility::Hidden);
 
-            FInputModeGameAndUI InputMode;
-            InputMode.SetWidgetToFocus(Child->GetCachedWidget());
-            InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-            InputMode.SetHideCursorDuringCapture(false);
-            PC->SetInputMode(InputMode);
+            FInputModeGameAndUI Mode;
+            Mode.SetWidgetToFocus(Child->TakeWidget());
+            Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+            Mode.SetHideCursorDuringCapture(false);
+            PC->SetInputMode(Mode);
             PC->bShowMouseCursor = true;
         }
     }
