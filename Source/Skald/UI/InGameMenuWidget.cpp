@@ -97,6 +97,10 @@ void UInGameMenuWidget::NativeConstruct()
     }
 
     SetIsFocusable(true);
+
+    CachedVisibility = GetVisibility();
+    HandleVisibilityChange(CachedVisibility);
+    SetCanTick(true);
 }
 
 void UInGameMenuWidget::NativeDestruct()
@@ -123,39 +127,42 @@ void UInGameMenuWidget::NativeDestruct()
 
     ActiveChildWidget.Reset();
 
+    SetCanTick(false);
     Super::NativeDestruct();
 }
 
-void UInGameMenuWidget::OnVisibilityChanged(ESlateVisibility InVisibility)
+void UInGameMenuWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
-    Super::OnVisibilityChanged(InVisibility);
+    Super::NativeTick(MyGeometry, InDeltaTime);
 
-    const bool bIsVisible = InVisibility == ESlateVisibility::Visible ||
-                            InVisibility == ESlateVisibility::HitTestInvisible ||
-                            InVisibility == ESlateVisibility::SelfHitTestInvisible;
-
-    if (bIsVisible)
+    const ESlateVisibility Current = GetVisibility();
+    if (Current != CachedVisibility)
     {
-        HandleVisibilityChanged(InVisibility);
-    }
-    else if (ActiveChildWidget.IsValid() && !ActiveChildWidget->IsInViewport())
-    {
-        ActiveChildWidget.Reset();
+        CachedVisibility = Current;
+        HandleVisibilityChange(Current);
     }
 }
 
-void UInGameMenuWidget::HandleVisibilityChanged(ESlateVisibility NewVisibility)
+void UInGameMenuWidget::HandleVisibilityChange(ESlateVisibility NewVisibility)
 {
-    if (NewVisibility != ESlateVisibility::Visible && NewVisibility != ESlateVisibility::HitTestInvisible &&
-        NewVisibility != ESlateVisibility::SelfHitTestInvisible)
+    if (NewVisibility == ESlateVisibility::Visible)
     {
-        return;
-    }
+        // became visible -> setup (play animations, refresh data, bind delegates, etc.)
 
-    if (ActiveChildWidget.IsValid())
+        if (ActiveChildWidget.IsValid())
+        {
+            ActiveChildWidget->RemoveFromParent();
+            ActiveChildWidget.Reset();
+        }
+    }
+    else
     {
-        ActiveChildWidget->RemoveFromParent();
-        ActiveChildWidget.Reset();
+        // became hidden/collapsed -> cleanup (stop timers, unbind, pause, etc.)
+
+        if (ActiveChildWidget.IsValid() && !ActiveChildWidget->IsInViewport())
+        {
+            ActiveChildWidget.Reset();
+        }
     }
 }
 

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Blueprint/UserWidget.h"
 #include "CoreMinimal.h"
+#include "Blueprint/UserWidget.h"
 #include "Components/SlateWrapperTypes.h"
 
 #include "InGameMenuWidget.generated.h"
@@ -41,11 +41,12 @@ public:
 protected:
     virtual void NativeConstruct() override;
     virtual void NativeDestruct() override;
-    virtual void OnVisibilityChanged(ESlateVisibility InVisibility) override;
+    virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 private:
+    ESlateVisibility CachedVisibility = ESlateVisibility::Collapsed;
     void EnsureLayout();
-    void HandleVisibilityChanged(ESlateVisibility NewVisibility);
+    void HandleVisibilityChange(ESlateVisibility NewVisibility);
 
     UFUNCTION()
     void HandleSaveGameClicked();
