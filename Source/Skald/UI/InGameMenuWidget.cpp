@@ -129,9 +129,9 @@ void UInGameMenuWidget::NativeDestruct()
     Super::NativeDestruct();
 }
 
-void UInGameMenuWidget::OnVisibilityChanged(ESlateVisibility InVisibility)
+void UInGameMenuWidget::NativeOnVisibilityChanged(ESlateVisibility InVisibility)
 {
-    Super::OnVisibilityChanged(InVisibility);
+    Super::NativeOnVisibilityChanged(InVisibility);
 
     CachedVisibility = InVisibility;
     HandleVisibilityChange(InVisibility);
@@ -216,7 +216,7 @@ void UInGameMenuWidget::HandleMainMenuClicked()
 {
     if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(GetOwningPlayer()))
     {
-        FInputModeGameAndUIEx InputMode;
+        FInputModeGameAndUI InputMode;
         InputMode.SetWidgetToFocus(TSharedPtr<SWidget>());
         InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
         InputMode.SetHideCursorDuringCapture(false);
@@ -267,7 +267,7 @@ void UInGameMenuWidget::ShowChildWidget(TSubclassOf<UUserWidget> WidgetClass)
 
             SetVisibility(ESlateVisibility::Hidden);
 
-            FInputModeGameAndUIEx InputMode;
+            FInputModeGameAndUI InputMode;
             InputMode.SetWidgetToFocus(Child->GetCachedWidget());
             InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
             InputMode.SetHideCursorDuringCapture(false);
