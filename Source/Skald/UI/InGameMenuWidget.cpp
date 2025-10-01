@@ -143,7 +143,7 @@ void UInGameMenuWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTim
     }
 }
 
-void UInGameMenuWidget::HandleVisibilityChanged(ESlateVisibility NewVisibility)
+void UInGameMenuWidget::HandleVisibilityChange(ESlateVisibility NewVisibility)
 {
     if (NewVisibility == ESlateVisibility::Visible)
     {

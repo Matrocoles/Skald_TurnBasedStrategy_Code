@@ -46,7 +46,7 @@ protected:
 private:
     ESlateVisibility CachedVisibility = ESlateVisibility::Collapsed;
     void EnsureLayout();
-    void HandleVisibilityChanged(ESlateVisibility NewVisibility);
+    void HandleVisibilityChange(ESlateVisibility NewVisibility);
 
     UFUNCTION()
     void HandleSaveGameClicked();
