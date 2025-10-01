@@ -41,7 +41,7 @@ public:
 protected:
     virtual void NativeConstruct() override;
     virtual void NativeDestruct() override;
-    virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
+    virtual void NativeOnVisibilityChanged(ESlateVisibility InVisibility) override;
 
 private:
     ESlateVisibility CachedVisibility = ESlateVisibility::Collapsed;
