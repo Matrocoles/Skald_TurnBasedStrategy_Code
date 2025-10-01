@@ -15,6 +15,7 @@ public class Skald : ModuleRules
                         "Engine",
                         "InputCore",
                         "AIModule",
+                        // Required for runtime widget construction/input helpers
                         "UMG",
                         "Slate",
                         "SlateCore",
