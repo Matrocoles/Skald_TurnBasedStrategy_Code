@@ -12,6 +12,7 @@
 #include "Skald_GameInstance.h"
 #include "Skald_PlayerController.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Widgets/SWidget.h"
 
 namespace
 {
@@ -128,9 +129,9 @@ void UInGameMenuWidget::NativeDestruct()
     Super::NativeDestruct();
 }
 
-void UInGameMenuWidget::NativeOnVisibilityChanged(ESlateVisibility InVisibility)
+void UInGameMenuWidget::OnVisibilityChanged(ESlateVisibility InVisibility)
 {
-    Super::NativeOnVisibilityChanged(InVisibility);
+    Super::OnVisibilityChanged(InVisibility);
 
     CachedVisibility = InVisibility;
     HandleVisibilityChange(InVisibility);
@@ -213,14 +214,21 @@ void UInGameMenuWidget::HandleSettingsClicked()
 
 void UInGameMenuWidget::HandleMainMenuClicked()
 {
-    if (ASkaldPlayerController* PC = GetOwningPlayer<ASkaldPlayerController>())
+    if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(GetOwningPlayer()))
     {
-        UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(PC, nullptr, EMouseLockMode::DoNotLock, false);
+        FInputModeGameAndUIEx InputMode;
+        InputMode.SetWidgetToFocus(TSharedPtr<SWidget>());
+        InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+        InputMode.SetHideCursorDuringCapture(false);
+        PC->SetInputMode(InputMode);
     }
 
-    if (USkaldGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance<USkaldGameInstance>() : nullptr)
+    if (const UWorld* World = GetWorld())
     {
-        GI->ReturnToMainMenu();
+        if (USkaldGameInstance* GI = World->GetGameInstance<USkaldGameInstance>())
+        {
+            GI->ReturnToMainMenu();
+        }
     }
 }
 
@@ -237,29 +245,33 @@ void UInGameMenuWidget::ShowChildWidget(TSubclassOf<UUserWidget> WidgetClass)
         ActiveChildWidget.Reset();
     }
 
-    if (UUserWidget* Child = CreateWidget<UUserWidget>(GetOwningPlayer(), WidgetClass))
+    if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(GetOwningPlayer()))
     {
-        if (USaveGameWidget* SaveWidget = Cast<USaveGameWidget>(Child))
+        if (UUserWidget* Child = CreateWidget<UUserWidget>(PC, WidgetClass))
         {
-            SaveWidget->SetOwningMenu(this);
-        }
-        else if (ULoadGameWidget* LoadWidget = Cast<ULoadGameWidget>(Child))
-        {
-            LoadWidget->SetOwningMenu(this);
-        }
-        else if (USettingsWidget* Settings = Cast<USettingsWidget>(Child))
-        {
-            Settings->SetOwningMenu(this);
-        }
+            if (USaveGameWidget* SaveWidget = Cast<USaveGameWidget>(Child))
+            {
+                SaveWidget->SetOwningMenu(this);
+            }
+            else if (ULoadGameWidget* LoadWidget = Cast<ULoadGameWidget>(Child))
+            {
+                LoadWidget->SetOwningMenu(this);
+            }
+            else if (USettingsWidget* Settings = Cast<USettingsWidget>(Child))
+            {
+                Settings->SetOwningMenu(this);
+            }
 
-        Child->AddToViewport(100);
-        ActiveChildWidget = Child;
+            Child->AddToViewport(100);
+            ActiveChildWidget = Child;
 
-        SetVisibility(ESlateVisibility::Hidden);
+            SetVisibility(ESlateVisibility::Hidden);
 
-        if (ASkaldPlayerController* PC = GetOwningPlayer<ASkaldPlayerController>())
-        {
-            UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(PC, Child, EMouseLockMode::DoNotLock, false);
+            FInputModeGameAndUIEx InputMode;
+            InputMode.SetWidgetToFocus(Child->GetCachedWidget());
+            InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+            InputMode.SetHideCursorDuringCapture(false);
+            PC->SetInputMode(InputMode);
             PC->bShowMouseCursor = true;
         }
     }
