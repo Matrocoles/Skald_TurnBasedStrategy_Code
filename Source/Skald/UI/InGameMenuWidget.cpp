@@ -220,7 +220,8 @@ void UInGameMenuWidget::HandleMainMenuClicked()
     if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(GetOwningPlayer()))
     {
         FInputModeGameAndUI Mode;
-        Mode.SetWidgetToFocus(nullptr);
+        // Clear focus explicitly with an empty shared ptr (safer than nullptr on some UE builds)
+        Mode.SetWidgetToFocus(TSharedPtr<SWidget>());
         Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
         Mode.SetHideCursorDuringCapture(false);
         PC->SetInputMode(Mode);
@@ -272,7 +273,8 @@ void UInGameMenuWidget::ShowChildWidget(TSubclassOf<UUserWidget> WidgetClass)
             HandleVisibilityChange(ESlateVisibility::Hidden);
 
             FInputModeGameAndUI Mode;
-            Mode.SetWidgetToFocus(Child);
+            // Focus the Slate widget produced by the UUserWidget
+            Mode.SetWidgetToFocus(Child->TakeWidget());
             Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
             Mode.SetHideCursorDuringCapture(false);
             PC->SetInputMode(Mode);
