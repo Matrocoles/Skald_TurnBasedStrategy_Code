@@ -143,6 +143,10 @@ public:
   UPROPERTY(BlueprintReadOnly, Replicated, Category = "Fighter")
   bool bIsCurrentlyActive;
 
+  /** Desired world yaw to apply at spawn while preserving mesh offsets. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Appearance")
+  float SpawnFacingYaw = 0.f;
+
   /** Mesh used to display the fighter. */
   UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
   UStaticMeshComponent *DisplayMesh;

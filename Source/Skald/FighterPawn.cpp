@@ -92,6 +92,7 @@ void AFighterPawn::OnConstruction(const FTransform &Transform) {
   Super::OnConstruction(Transform);
   ApplyFootprintScale();
   UpdateMeshOffset();
+  ApplyFacingYaw(SpawnFacingYaw);
 }
 
 void AFighterPawn::BeginPlay() {
@@ -119,6 +120,10 @@ void AFighterPawn::BeginPlay() {
   }
 
   MovementTargetLocation = GetActorLocation();
+
+  // Ensure the requested spawn facing is applied on all clients while
+  // respecting the display mesh's relative rotation.
+  ApplyFacingYaw(SpawnFacingYaw);
 
   if (UWorld *World = GetWorld()) {
     if (USkaldGameInstance *GI =
