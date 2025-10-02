@@ -119,7 +119,9 @@ void ATurnManager::BeginPlay() {
           this, &ATurnManager::HandleGridBattleEnded);
     }
 
-    TryResumeSavedTurnState(GI);
+    if (bOnWorldMap) {
+      TryResumeSavedTurnState(GI);
+    }
   }
 
   if (ASkaldGameMode *GM = GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
