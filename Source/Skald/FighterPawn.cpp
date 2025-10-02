@@ -92,6 +92,7 @@ void AFighterPawn::OnConstruction(const FTransform &Transform) {
   Super::OnConstruction(Transform);
   ApplyFootprintScale();
   UpdateMeshOffset();
+  RefreshDisplayMeshYawOffset();
   const float IncomingSpawnYaw = Transform.GetRotation().Rotator().Yaw;
   const float DesiredYaw =
       ShouldOverrideSpawnFacingYaw() ? SpawnFacingYaw : IncomingSpawnYaw;
@@ -111,6 +112,7 @@ void AFighterPawn::BeginPlay() {
   BroadcastActionsRemaining();
 
   UpdateMeshOffset();
+  RefreshDisplayMeshYawOffset();
 
   if (UGridOverlayComponent *Grid = GetGrid()) {
     CurrentCell = Grid->WorldToGrid(GetActorLocation());
@@ -387,6 +389,15 @@ void AFighterPawn::ApplyFootprintScale() {
   }
 }
 
+void AFighterPawn::RefreshDisplayMeshYawOffset() {
+  if (DisplayMesh) {
+    DisplayMeshYawOffset =
+        FRotator::NormalizeAxis(DisplayMesh->GetRelativeRotation().Yaw);
+  } else {
+    DisplayMeshYawOffset = 0.f;
+  }
+}
+
 FVector AFighterPawn::GetAlignedWorldLocation(const FIntPoint &Anchor) const {
   if (UGridOverlayComponent *Grid = GetGrid()) {
     const TArray<FIntPoint> Cells = GetOccupiedCells(Anchor);
@@ -502,6 +513,7 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
   FVector NewLocation = Grid ? GetAlignedWorldLocation(TargetCell)
                              : GetActorLocation();
   MovementTargetLocation = NewLocation;
+  RefreshDisplayMeshYawOffset();
   FaceTowardsCells(PreviousCell, TargetCell);
   FaceTowardsLocation(NewLocation);
 
@@ -611,6 +623,7 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
 
   BroadcastActionsRemaining();
 
+  RefreshDisplayMeshYawOffset();
   FaceTowardsCells(CurrentCell, Target->CurrentCell);
   FaceTowardsLocation(Target->GetActorLocation());
 
@@ -830,16 +843,12 @@ bool AFighterPawn::ShouldOverrideSpawnFacingYaw() const {
 }
 
 float AFighterPawn::GetCurrentWorldFacingYaw() const {
-  const float MeshYawOffset =
-      DisplayMesh ? DisplayMesh->GetRelativeRotation().Yaw : 0.f;
-  return FRotator::NormalizeAxis(GetActorRotation().Yaw + MeshYawOffset);
+  return FRotator::NormalizeAxis(GetActorRotation().Yaw + DisplayMeshYawOffset);
 }
 
 void AFighterPawn::ApplyFacingYaw(float TargetYaw) {
-  const float MeshYawOffset =
-      DisplayMesh ? DisplayMesh->GetRelativeRotation().Yaw : 0.f;
   const float AdjustedYaw =
-      FRotator::NormalizeAxis(TargetYaw - MeshYawOffset);
+      FRotator::NormalizeAxis(TargetYaw - DisplayMeshYawOffset);
   SetActorRotation(FRotator(0.f, AdjustedYaw, 0.f));
 }
 
