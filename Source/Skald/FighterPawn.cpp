@@ -92,7 +92,10 @@ void AFighterPawn::OnConstruction(const FTransform &Transform) {
   Super::OnConstruction(Transform);
   ApplyFootprintScale();
   UpdateMeshOffset();
-  ApplyFacingYaw(SpawnFacingYaw);
+  const float IncomingSpawnYaw = Transform.GetRotation().Rotator().Yaw;
+  const float DesiredYaw =
+      ShouldOverrideSpawnFacingYaw() ? SpawnFacingYaw : IncomingSpawnYaw;
+  ApplyFacingYaw(DesiredYaw);
 }
 
 void AFighterPawn::BeginPlay() {
@@ -121,9 +124,12 @@ void AFighterPawn::BeginPlay() {
 
   MovementTargetLocation = GetActorLocation();
 
-  // Ensure the requested spawn facing is applied on all clients while
+  // Ensure the configured spawn facing is applied on all clients while
   // respecting the display mesh's relative rotation.
-  ApplyFacingYaw(SpawnFacingYaw);
+  const float DesiredYaw = ShouldOverrideSpawnFacingYaw()
+                              ? SpawnFacingYaw
+                              : GetCurrentWorldFacingYaw();
+  ApplyFacingYaw(DesiredYaw);
 
   if (UWorld *World = GetWorld()) {
     if (USkaldGameInstance *GI =
@@ -813,6 +819,20 @@ void AFighterPawn::OnRep_GridFootprint() {
 
 void AFighterPawn::BroadcastActionsRemaining() {
   OnActionsChanged.Broadcast(ActionsRemaining);
+}
+
+bool AFighterPawn::ShouldOverrideSpawnFacingYaw() const {
+  const AFighterPawn *NativeDefaults =
+      AFighterPawn::StaticClass()->GetDefaultObject<AFighterPawn>();
+  return bOverrideSpawnFacingYaw ||
+         !FMath::IsNearlyEqual(SpawnFacingYaw, NativeDefaults->SpawnFacingYaw,
+                               KINDA_SMALL_NUMBER);
+}
+
+float AFighterPawn::GetCurrentWorldFacingYaw() const {
+  const float MeshYawOffset =
+      DisplayMesh ? DisplayMesh->GetRelativeRotation().Yaw : 0.f;
+  return FRotator::NormalizeAxis(GetActorRotation().Yaw + MeshYawOffset);
 }
 
 void AFighterPawn::ApplyFacingYaw(float TargetYaw) {
