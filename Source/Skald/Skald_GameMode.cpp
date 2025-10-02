@@ -13,6 +13,7 @@
 #include "Skald_BattleGameMode.h"
 #include "Skald_GameInstance.h"
 #include "Skald_GameState.h"
+#include "Skald_PropertyAccess.h"
 #include "Skald_PlayerCharacter.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
@@ -29,57 +30,12 @@ constexpr int32 StartingResources = 100;
 constexpr float RetryInitDelay = 0.01f;
 // Instance variables moved into ASkaldGameMode to avoid cross-instance
 // interference; see header for declarations.
-
-int32 ReadIntProperty(UObject *Object, const FName PropertyName,
-                      int32 DefaultValue = 0) {
-  if (!Object) {
-    return DefaultValue;
-  }
-
-  if (const FIntProperty *Property =
-          FindFProperty<FIntProperty>(Object->GetClass(), PropertyName)) {
-    return Property->GetPropertyValue_InContainer(Object);
-  }
-
-  return DefaultValue;
-}
-
-bool ReadBoolProperty(UObject *Object, const FName PropertyName,
-                      bool bDefaultValue = false) {
-  if (!Object) {
-    return bDefaultValue;
-  }
-
-  if (const FBoolProperty *Property =
-          FindFProperty<FBoolProperty>(Object->GetClass(), PropertyName)) {
-    return Property->GetPropertyValue_InContainer(Object);
-  }
-
-  return bDefaultValue;
-}
-
-void WriteIntProperty(UObject *Object, const FName PropertyName, int32 Value) {
-  if (!Object) {
-    return;
-  }
-
-  if (FIntProperty *Property =
-          FindFProperty<FIntProperty>(Object->GetClass(), PropertyName)) {
-    Property->SetPropertyValue_InContainer(Object, Value);
-  }
-}
-
-void WriteBoolProperty(UObject *Object, const FName PropertyName, bool bValue) {
-  if (!Object) {
-    return;
-  }
-
-  if (FBoolProperty *Property =
-          FindFProperty<FBoolProperty>(Object->GetClass(), PropertyName)) {
-    Property->SetPropertyValue_InContainer(Object, bValue);
-  }
-}
 } // namespace
+
+using Skald::PropertyAccess::ReadBoolProperty;
+using Skald::PropertyAccess::ReadIntProperty;
+using Skald::PropertyAccess::WriteBoolProperty;
+using Skald::PropertyAccess::WriteIntProperty;
 
 ASkaldGameMode::ASkaldGameMode() {
   GameStateClass = ASkaldGameState::StaticClass();

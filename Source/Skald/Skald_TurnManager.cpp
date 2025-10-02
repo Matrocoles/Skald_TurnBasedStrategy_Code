@@ -12,6 +12,7 @@
 #include "Skald_GameInstance.h"
 #include "Skald_GameMode.h"
 #include "Skald_GameState.h"
+#include "Skald_PropertyAccess.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
 #include "Territory.h"
@@ -27,34 +28,6 @@ FString GetResolvedPlayerName(const ASkaldPlayerState *PlayerState,
   }
 
   return PlayerState->GetResolvedPlayerName(Context);
-}
-
-int32 ReadIntProperty(UObject *Object, const FName PropertyName,
-                      int32 DefaultValue = 0) {
-  if (!Object) {
-    return DefaultValue;
-  }
-
-  if (const FIntProperty *Property =
-          FindFProperty<FIntProperty>(Object->GetClass(), PropertyName)) {
-    return Property->GetPropertyValue_InContainer(Object);
-  }
-
-  return DefaultValue;
-}
-
-bool ReadBoolProperty(UObject *Object, const FName PropertyName,
-                      bool bDefaultValue = false) {
-  if (!Object) {
-    return bDefaultValue;
-  }
-
-  if (const FBoolProperty *Property =
-          FindFProperty<FBoolProperty>(Object->GetClass(), PropertyName)) {
-    return Property->GetPropertyValue_InContainer(Object);
-  }
-
-  return bDefaultValue;
 }
 
 FString NormalizeMapName(UWorld *World, FString Candidate) {
@@ -109,6 +82,9 @@ FString NormalizeMapName(UWorld *World, FString Candidate) {
   return Result;
 }
 } // namespace
+
+using Skald::PropertyAccess::ReadBoolProperty;
+using Skald::PropertyAccess::ReadIntProperty;
 
 ATurnManager::ATurnManager() {
   PrimaryActorTick.bCanEverTick = false;
