@@ -16,6 +16,7 @@
 #include "Skald_PlayerState.h"
 #include "Territory.h"
 #include "UI/SkaldMainHUDWidget.h"
+#include "UObject/UnrealType.h"
 #include "WorldMap.h"
 
 namespace {
@@ -26,6 +27,34 @@ FString GetResolvedPlayerName(const ASkaldPlayerState *PlayerState,
   }
 
   return PlayerState->GetResolvedPlayerName(Context);
+}
+
+int32 ReadIntProperty(UObject *Object, const FName PropertyName,
+                      int32 DefaultValue = 0) {
+  if (!Object) {
+    return DefaultValue;
+  }
+
+  if (const FIntProperty *Property =
+          FindFProperty<FIntProperty>(Object->GetClass(), PropertyName)) {
+    return Property->GetPropertyValue_InContainer(Object);
+  }
+
+  return DefaultValue;
+}
+
+bool ReadBoolProperty(UObject *Object, const FName PropertyName,
+                      bool bDefaultValue = false) {
+  if (!Object) {
+    return bDefaultValue;
+  }
+
+  if (const FBoolProperty *Property =
+          FindFProperty<FBoolProperty>(Object->GetClass(), PropertyName)) {
+    return Property->GetPropertyValue_InContainer(Object);
+  }
+
+  return bDefaultValue;
 }
 
 FString NormalizeMapName(UWorld *World, FString Candidate) {
@@ -586,7 +615,18 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
         Snapshot.ContinentID = Territory->ContinentID;
         Snapshot.Location = Territory->GetActorLocation();
         Snapshot.HasTreasure = Territory->bHasTreasure;
+        Snapshot.TreasureAttachedUnitID =
+            ReadIntProperty(Territory, TEXT("TreasureAttachedUnitID"));
+        Snapshot.FortificationLevel =
+            ReadIntProperty(Territory, TEXT("FortificationLevel"));
+        Snapshot.Moat = ReadBoolProperty(Territory, TEXT("Moat"));
+        Snapshot.WallHealth =
+            ReadIntProperty(Territory, TEXT("WallHealth"));
         Snapshot.BuiltSiegeID = Territory->BuiltSiegeID;
+        Snapshot.ConqueredTurn =
+            ReadIntProperty(Territory, TEXT("ConqueredTurn"));
+        Snapshot.IsNeutralSpawn =
+            ReadBoolProperty(Territory, TEXT("IsNeutralSpawn"));
         Snapshot.AdjacentIDs.Reset();
         for (ATerritory *Adjacent : Territory->AdjacentTerritories) {
           if (Adjacent) {

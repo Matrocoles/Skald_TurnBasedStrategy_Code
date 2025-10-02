@@ -1197,6 +1197,22 @@ void ASkald_BattleGameMode::TryInitializeWorldAndStart() {
   GetWorldTimerManager().ClearTimer(RetryInitTimerHandle);
 }
 
+void ASkald_BattleGameMode::HandleSeamlessTravelPlayer(AController *&C) {
+  UE_LOG(LogSkaldBattle, Log,
+         TEXT("HandleSeamlessTravelPlayer: %s (HasAuthority=%d)"),
+         *GetNameSafe(C), HasAuthority() ? 1 : 0);
+
+  Super::HandleSeamlessTravelPlayer(C);
+
+  if (!HasAuthority()) {
+    return;
+  }
+
+  if (AController *Controller = C) {
+    OnControllerReady(Controller);
+  }
+}
+
 void ASkald_BattleGameMode::PostLogin(APlayerController *NewPlayer) {
   Super::PostLogin(NewPlayer);
 
