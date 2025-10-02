@@ -35,6 +35,7 @@ protected:
                         FString &Error) override;
   virtual void BeginPlay() override;
   virtual void PostLogin(APlayerController *NewPlayer) override;
+  virtual void HandleSeamlessTravelPlayer(AController *&C) override;
   virtual void TryInitializeWorldAndStart() override;
 
 public:
