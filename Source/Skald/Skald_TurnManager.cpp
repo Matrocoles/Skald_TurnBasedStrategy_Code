@@ -571,6 +571,7 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
     };
 
     TArray<FS_Territory> TerritorySnapshots;
+    bool bUsedCachedFallback = false;
     if (CachedWorldMap) {
       TerritorySnapshots.Reserve(CachedWorldMap->Territories.Num());
       for (ATerritory *Territory : CachedWorldMap->Territories) {
@@ -613,6 +614,7 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
         TerritorySnapshots.Add(MoveTemp(Snapshot));
       }
     } else if (GI && GI->CachedWorldMapTerritories.Num() > 0) {
+      bUsedCachedFallback = true;
       TerritorySnapshots = GI->CachedWorldMapTerritories;
       for (const FS_Territory &Snapshot : TerritorySnapshots) {
         if (Snapshot.OwnerPlayerID > 0 && GS) {
@@ -621,6 +623,16 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
           }
         }
       }
+    }
+
+    if (TerritorySnapshots.Num() == 0) {
+      UE_LOG(LogSkald, Warning,
+             TEXT("TriggerGridBattle could not capture a territory snapshot (fallbackUsed=%d)"),
+             bUsedCachedFallback ? 1 : 0);
+    } else {
+      UE_LOG(LogSkald, Verbose,
+             TEXT("TriggerGridBattle captured %d territory snapshots (fallbackUsed=%d)"),
+             TerritorySnapshots.Num(), bUsedCachedFallback ? 1 : 0);
     }
 
     TravelState.CachedTerritories = MoveTemp(TerritorySnapshots);

@@ -561,10 +561,12 @@ void ASkaldGameMode::CacheWorldMapSnapshot() {
         GetWorld(), AWorldMap::StaticClass()));
   }
 
+  const int32 PreviousSnapshotCount = GI->CachedWorldMapTerritories.Num();
+
   if (!WorldMap) {
     UE_LOG(LogSkald, Warning,
-           TEXT("CacheWorldMapSnapshot failed: WorldMap not found"));
-    GI->CachedWorldMapTerritories.Reset();
+           TEXT("CacheWorldMapSnapshot failed: WorldMap not found (keeping previous %d territories)"),
+           PreviousSnapshotCount);
     return;
   }
 
@@ -609,10 +611,18 @@ void ASkaldGameMode::CacheWorldMapSnapshot() {
     TerritorySnapshots.Add(MoveTemp(TerrData));
   }
 
+  if (TerritorySnapshots.Num() == 0) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("CacheWorldMapSnapshot produced an empty snapshot; keeping previous %d territories"),
+           PreviousSnapshotCount);
+    return;
+  }
+
   GI->CachedWorldMapTerritories = MoveTemp(TerritorySnapshots);
 
-  UE_LOG(LogSkald, Verbose, TEXT("CacheWorldMapSnapshot captured %d territories"),
-         GI->CachedWorldMapTerritories.Num());
+  UE_LOG(LogSkald, Verbose,
+         TEXT("CacheWorldMapSnapshot captured %d territories (previously %d)"),
+         GI->CachedWorldMapTerritories.Num(), PreviousSnapshotCount);
 }
 
 bool ASkaldGameMode::RestoreWorldFromSnapshot() {
