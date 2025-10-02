@@ -392,6 +392,9 @@ private:
   /** Attempt to locate the world map and bind to its selection event. */
   void TryBindWorldMap();
 
+  /** Cached pointer to the active world map to manage delegate bindings safely. */
+  TWeakObjectPtr<AWorldMap> CachedWorldMap;
+
   /** Timer used to poll for the world map actor until it exists. */
   FTimerHandle WorldMapSearchHandle;
 

@@ -311,6 +311,19 @@ void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
     InGameMenuWidget = nullptr;
   }
 
+  if (AWorldMap *WorldMap = CachedWorldMap.Get()) {
+    if (WorldMap->OnTerritorySelected.IsAlreadyBound(
+            this, &ASkaldPlayerController::HandleTerritorySelected)) {
+      WorldMap->OnTerritorySelected.RemoveDynamic(
+          this, &ASkaldPlayerController::HandleTerritorySelected);
+    }
+  }
+  CachedWorldMap.Reset();
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(WorldMapSearchHandle);
+  }
+
   Super::EndPlay(EndPlayReason);
 }
 
@@ -396,21 +409,33 @@ void ASkaldPlayerController::HideInGameMenu() {
 }
 
 void ASkaldPlayerController::TryBindWorldMap() {
-  if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
-          GetWorld(), AWorldMap::StaticClass()))) {
-    if (!WorldMap->OnTerritorySelected.IsAlreadyBound(
+  UWorld *World = GetWorld();
+  if (!World) {
+    return;
+  }
+
+  if (CachedWorldMap.IsValid()) {
+    World->GetTimerManager().ClearTimer(WorldMapSearchHandle);
+    return;
+  }
+  CachedWorldMap.Reset();
+
+  if (AWorldMap *FoundWorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+          World, AWorldMap::StaticClass()))) {
+    CachedWorldMap = FoundWorldMap;
+    if (!FoundWorldMap->OnTerritorySelected.IsAlreadyBound(
             this, &ASkaldPlayerController::HandleTerritorySelected)) {
-      WorldMap->OnTerritorySelected.AddDynamic(
+      FoundWorldMap->OnTerritorySelected.AddDynamic(
           this, &ASkaldPlayerController::HandleTerritorySelected);
-      ensureMsgf(WorldMap->OnTerritorySelected.IsAlreadyBound(
+      ensureMsgf(FoundWorldMap->OnTerritorySelected.IsAlreadyBound(
                      this, &ASkaldPlayerController::HandleTerritorySelected),
                  TEXT("Failed to bind HandleTerritorySelected to WorldMap."));
     }
-    GetWorldTimerManager().ClearTimer(WorldMapSearchHandle);
+    World->GetTimerManager().ClearTimer(WorldMapSearchHandle);
   } else {
-    GetWorldTimerManager().SetTimer(WorldMapSearchHandle, this,
-                                    &ASkaldPlayerController::TryBindWorldMap,
-                                    0.5f, false);
+    World->GetTimerManager().SetTimer(WorldMapSearchHandle, this,
+                                      &ASkaldPlayerController::TryBindWorldMap,
+                                      0.5f, false);
   }
 }
 
