@@ -833,6 +833,67 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
   Source->RefreshAppearance();
   Target->RefreshAppearance();
 
+  bool bUpdatedSnapshot = false;
+  if (ASkaldGameMode *GM = GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
+    GM->CacheWorldMapSnapshot();
+    bUpdatedSnapshot = true;
+  } else if (GI) {
+    TArray<FS_Territory> TerritorySnapshots;
+    TerritorySnapshots.Reserve(CachedWorldMap->Territories.Num());
+
+    auto CaptureSnapshot = [&](ATerritory *Territory) {
+      FS_Territory Snapshot;
+      Snapshot.TerritoryID = Territory->TerritoryID;
+      Snapshot.TerritoryName = Territory->TerritoryName;
+      Snapshot.OwnerPlayerID =
+          Territory->OwningPlayer ? Territory->OwningPlayer->GetPlayerId() : 0;
+      Snapshot.IsCapital = Territory->bIsCapital;
+      Snapshot.CapitalOwner = Snapshot.OwnerPlayerID;
+      Snapshot.ArmyUnits = Territory->ArmyUnits;
+      Snapshot.ContinentID = Territory->ContinentID;
+      Snapshot.Location = Territory->GetActorLocation();
+      Snapshot.HasTreasure = Territory->bHasTreasure;
+      Snapshot.TreasureAttachedUnitID =
+          ReadIntProperty(Territory, TEXT("TreasureAttachedUnitID"));
+      Snapshot.FortificationLevel =
+          ReadIntProperty(Territory, TEXT("FortificationLevel"));
+      Snapshot.Moat = ReadBoolProperty(Territory, TEXT("Moat"));
+      Snapshot.WallHealth = ReadIntProperty(Territory, TEXT("WallHealth"));
+      Snapshot.BuiltSiegeID = Territory->BuiltSiegeID;
+      Snapshot.ConqueredTurn =
+          ReadIntProperty(Territory, TEXT("ConqueredTurn"));
+      Snapshot.IsNeutralSpawn =
+          ReadBoolProperty(Territory, TEXT("IsNeutralSpawn"));
+      Snapshot.AdjacentIDs.Reset();
+      for (ATerritory *Adj : Territory->AdjacentTerritories) {
+        if (Adj) {
+          Snapshot.AdjacentIDs.Add(Adj->TerritoryID);
+        }
+      }
+      return Snapshot;
+    };
+
+    for (ATerritory *Territory : CachedWorldMap->Territories) {
+      if (!Territory) {
+        continue;
+      }
+      TerritorySnapshots.Add(CaptureSnapshot(Territory));
+    }
+
+    if (TerritorySnapshots.Num() > 0) {
+      GI->CachedWorldMapTerritories = MoveTemp(TerritorySnapshots);
+      bUpdatedSnapshot = true;
+    }
+  }
+
+  if (bUpdatedSnapshot && GI) {
+    FSkaldTravelState UpdatedTravelState = GI->GetTravelState();
+    if (UpdatedTravelState.bValid) {
+      UpdatedTravelState.CachedTerritories = GI->CachedWorldMapTerritories;
+      GI->SetTravelState(UpdatedTravelState);
+    }
+  }
+
   GI->PendingBattle = FS_BattlePayload();
   PendingBattle = FS_BattlePayload();
 
