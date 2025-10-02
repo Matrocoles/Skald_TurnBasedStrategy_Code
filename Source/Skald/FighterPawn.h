@@ -143,6 +143,16 @@ public:
   UPROPERTY(BlueprintReadOnly, Replicated, Category = "Fighter")
   bool bIsCurrentlyActive;
 
+  /** True to override the incoming spawn rotation with SpawnFacingYaw. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Appearance")
+  bool bOverrideSpawnFacingYaw = false;
+
+  /** Desired world yaw to apply at spawn while preserving mesh offsets when
+      overriding the spawn rotation. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Appearance",
+            meta = (EditCondition = "bOverrideSpawnFacingYaw"))
+  float SpawnFacingYaw = 0.f;
+
   /** Mesh used to display the fighter. */
   UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
   UStaticMeshComponent *DisplayMesh;
@@ -187,6 +197,9 @@ protected:
   virtual void Destroyed() override;
 
 private:
+  bool ShouldOverrideSpawnFacingYaw() const;
+  float GetCurrentWorldFacingYaw() const;
+
   /** Update the health widget with a new value. */
   UFUNCTION()
   void UpdateHealthDisplay(int32 NewHealth);
