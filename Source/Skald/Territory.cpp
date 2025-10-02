@@ -275,14 +275,17 @@ void ATerritory::OnRep_IsCapital() { RefreshAppearance(); }
 void ATerritory::OnRep_ArmyUnits() { UpdateLabel(); }
 
 void ATerritory::UpdateTerritoryColor() {
-  if (DynamicMaterial) {
-    FLinearColor NewColor = DefaultColor;
-    if (OwningPlayer) {
-      NewColor = GetFactionColor(OwningPlayer->Faction);
-    }
-    DynamicMaterial->SetVectorParameterValue(FName("Color"), NewColor);
-    DefaultColor = NewColor;
+  if (!DynamicMaterial) {
+    return;
   }
+
+  FLinearColor NewColor = DefaultColor;
+  if (IsValid(OwningPlayer)) {
+    NewColor = GetFactionColor(OwningPlayer->Faction);
+  }
+
+  DynamicMaterial->SetVectorParameterValue(FName("Color"), NewColor);
+  DefaultColor = NewColor;
 }
 
 void ATerritory::UpdateLabel() {
@@ -290,10 +293,11 @@ void ATerritory::UpdateLabel() {
     return;
   }
 
-  const FString OwnerName = OwningPlayer
-                               ? OwningPlayer->GetResolvedPlayerName(
-                                     TEXT("Territory::UpdateLabel"))
-                               : TEXT("Neutral");
+  const ASkaldPlayerState *OwnerPS = IsValid(OwningPlayer) ? OwningPlayer : nullptr;
+  const FString OwnerName = OwnerPS
+                                ? OwnerPS->GetResolvedPlayerName(
+                                      TEXT("Territory::UpdateLabel"))
+                                : TEXT("Neutral");
   const FString Text = FString::Printf(TEXT("%s\nOwner: %s\nUnits: %d"),
                                        *TerritoryName, *OwnerName, ArmyUnits);
   LabelComponent->SetText(FText::FromString(Text));
