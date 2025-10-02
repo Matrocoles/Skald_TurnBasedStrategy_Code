@@ -201,4 +201,7 @@ private:
 
   /** Attempt to restore the overworld from the cached travel snapshot. */
   bool RestoreWorldFromSnapshot();
+
+  /** Timer used to retry snapshot capture when no territories are present yet. */
+  FTimerHandle TerritorySnapshotRetryHandle;
 };

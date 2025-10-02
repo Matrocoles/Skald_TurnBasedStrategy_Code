@@ -529,9 +529,17 @@ void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
 
       if (TerritorySnapshots.Num() > 0) {
         GI->CachedWorldMapTerritories = MoveTemp(TerritorySnapshots);
+        GetWorldTimerManager().ClearTimer(TerritorySnapshotRetryHandle);
       } else {
         UE_LOG(LogSkald, Warning,
                TEXT("HandlePlayerLockedIn: Skipping empty territory snapshot capture."));
+
+        if (!GetWorldTimerManager().IsTimerActive(TerritorySnapshotRetryHandle)) {
+          FTimerDelegate RetryDelegate = FTimerDelegate::CreateUObject(
+              this, &ASkaldGameMode::CacheWorldMapSnapshot);
+          GetWorldTimerManager().SetTimer(TerritorySnapshotRetryHandle, RetryDelegate,
+                                          RetryInitDelay, false);
+        }
       }
     }
   }
@@ -625,9 +633,16 @@ void ASkaldGameMode::CacheWorldMapSnapshot() {
     UE_LOG(LogSkald, Warning,
            TEXT("CacheWorldMapSnapshot produced an empty snapshot; keeping previous %d territories"),
            PreviousSnapshotCount);
+    if (!GetWorldTimerManager().IsTimerActive(TerritorySnapshotRetryHandle)) {
+      FTimerDelegate RetryDelegate = FTimerDelegate::CreateUObject(
+          this, &ASkaldGameMode::CacheWorldMapSnapshot);
+      GetWorldTimerManager().SetTimer(TerritorySnapshotRetryHandle, RetryDelegate,
+                                      RetryInitDelay, false);
+    }
     return;
   }
 
+  GetWorldTimerManager().ClearTimer(TerritorySnapshotRetryHandle);
   GI->CachedWorldMapTerritories = MoveTemp(TerritorySnapshots);
 
   UE_LOG(LogSkald, Verbose,
