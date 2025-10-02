@@ -230,6 +230,9 @@ private:
   /** Calculate the aligned world location for a given anchor cell. */
   FVector GetAlignedWorldLocation(const FIntPoint &Anchor) const;
 
+  /** Capture the display mesh's yaw offset for use when orienting the pawn. */
+  void RefreshDisplayMeshYawOffset();
+
   /** Helper to broadcast the current actions remaining value. */
   void BroadcastActionsRemaining();
 
@@ -297,6 +300,9 @@ private:
 
   /** World-space destination for the current interpolated move. */
   FVector MovementTargetLocation = FVector::ZeroVector;
+
+  /** Cached yaw offset derived from the display mesh's relative rotation. */
+  float DisplayMeshYawOffset = 0.f;
 
 public:
   /** Returns true if the fighter has already activated this round. */
