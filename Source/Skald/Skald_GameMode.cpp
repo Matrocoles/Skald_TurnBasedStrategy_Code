@@ -483,47 +483,57 @@ void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
   }
 
   if (WorldMap && GI && !bIsBattleMap) {
-    TArray<FS_Territory> TerritorySnapshots;
-    TerritorySnapshots.Reserve(WorldMap->Territories.Num());
-    for (ATerritory *Territory : WorldMap->Territories) {
-      if (!Territory) {
-        continue;
-      }
-
-      FS_Territory TerrData;
-      TerrData.TerritoryID = Territory->TerritoryID;
-      TerrData.TerritoryName = Territory->TerritoryName;
-      TerrData.OwnerPlayerID =
-          Territory->OwningPlayer ? Territory->OwningPlayer->GetPlayerId() : 0;
-      TerrData.IsCapital = Territory->bIsCapital;
-      TerrData.CapitalOwner = TerrData.OwnerPlayerID;
-      TerrData.ArmyUnits = Territory->ArmyUnits;
-      TerrData.ContinentID = Territory->ContinentID;
-      TerrData.AdjacentIDs.Reset();
-      for (ATerritory *Adj : Territory->AdjacentTerritories) {
-        if (Adj) {
-          TerrData.AdjacentIDs.Add(Adj->TerritoryID);
+    if (GI->bResumeTurns) {
+      UE_LOG(LogSkald, Verbose,
+             TEXT("HandlePlayerLockedIn: Skipping snapshot capture while travel state is pending resume."));
+    } else {
+      TArray<FS_Territory> TerritorySnapshots;
+      TerritorySnapshots.Reserve(WorldMap->Territories.Num());
+      for (ATerritory *Territory : WorldMap->Territories) {
+        if (!Territory) {
+          continue;
         }
+
+        FS_Territory TerrData;
+        TerrData.TerritoryID = Territory->TerritoryID;
+        TerrData.TerritoryName = Territory->TerritoryName;
+        TerrData.OwnerPlayerID =
+            Territory->OwningPlayer ? Territory->OwningPlayer->GetPlayerId() : 0;
+        TerrData.IsCapital = Territory->bIsCapital;
+        TerrData.CapitalOwner = TerrData.OwnerPlayerID;
+        TerrData.ArmyUnits = Territory->ArmyUnits;
+        TerrData.ContinentID = Territory->ContinentID;
+        TerrData.AdjacentIDs.Reset();
+        for (ATerritory *Adj : Territory->AdjacentTerritories) {
+          if (Adj) {
+            TerrData.AdjacentIDs.Add(Adj->TerritoryID);
+          }
+        }
+        TerrData.Location = Territory->GetActorLocation();
+        TerrData.HasTreasure = Territory->bHasTreasure;
+        TerrData.TreasureAttachedUnitID =
+            ReadIntProperty(Territory, TEXT("TreasureAttachedUnitID"));
+        TerrData.FortificationLevel =
+            ReadIntProperty(Territory, TEXT("FortificationLevel"));
+        TerrData.Moat = ReadBoolProperty(Territory, TEXT("Moat"));
+        TerrData.WallHealth =
+            ReadIntProperty(Territory, TEXT("WallHealth"));
+        TerrData.BuiltSiegeID = Territory->BuiltSiegeID;
+        TerrData.ConqueredTurn =
+            ReadIntProperty(Territory, TEXT("ConqueredTurn"));
+        TerrData.IsNeutralSpawn =
+            ReadBoolProperty(Territory, TEXT("IsNeutralSpawn"));
+
+        TerritorySnapshots.Add(MoveTemp(TerrData));
       }
-      TerrData.Location = Territory->GetActorLocation();
-      TerrData.HasTreasure = Territory->bHasTreasure;
-      TerrData.TreasureAttachedUnitID =
-          ReadIntProperty(Territory, TEXT("TreasureAttachedUnitID"));
-      TerrData.FortificationLevel =
-          ReadIntProperty(Territory, TEXT("FortificationLevel"));
-      TerrData.Moat = ReadBoolProperty(Territory, TEXT("Moat"));
-      TerrData.WallHealth =
-          ReadIntProperty(Territory, TEXT("WallHealth"));
-      TerrData.BuiltSiegeID = Territory->BuiltSiegeID;
-      TerrData.ConqueredTurn =
-          ReadIntProperty(Territory, TEXT("ConqueredTurn"));
-      TerrData.IsNeutralSpawn =
-          ReadBoolProperty(Territory, TEXT("IsNeutralSpawn"));
 
-      TerritorySnapshots.Add(MoveTemp(TerrData));
+      if (TerritorySnapshots.Num() > 0) {
+        GI->CachedWorldMapTerritories = MoveTemp(TerritorySnapshots);
+      } else {
+        UE_LOG(LogSkald, Warning,
+               TEXT("HandlePlayerLockedIn: Skipping empty territory snapshot capture."));
+      }
     }
-
-    GI->CachedWorldMapTerritories = MoveTemp(TerritorySnapshots);
   }
 
   if (!TurnManager) {
