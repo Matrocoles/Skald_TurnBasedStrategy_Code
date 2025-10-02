@@ -20,6 +20,7 @@
 #include "Territory.h"
 #include "TimerManager.h"
 #include "UI/SkaldMainHUDWidget.h"
+#include "UObject/UnrealType.h"
 #include "WorldMap.h"
 
 namespace {
@@ -28,6 +29,56 @@ constexpr int32 StartingResources = 100;
 constexpr float RetryInitDelay = 0.01f;
 // Instance variables moved into ASkaldGameMode to avoid cross-instance
 // interference; see header for declarations.
+
+int32 ReadIntProperty(UObject *Object, const FName PropertyName,
+                      int32 DefaultValue = 0) {
+  if (!Object) {
+    return DefaultValue;
+  }
+
+  if (const FIntProperty *Property =
+          FindFProperty<FIntProperty>(Object->GetClass(), PropertyName)) {
+    return Property->GetPropertyValue_InContainer(Object);
+  }
+
+  return DefaultValue;
+}
+
+bool ReadBoolProperty(UObject *Object, const FName PropertyName,
+                      bool bDefaultValue = false) {
+  if (!Object) {
+    return bDefaultValue;
+  }
+
+  if (const FBoolProperty *Property =
+          FindFProperty<FBoolProperty>(Object->GetClass(), PropertyName)) {
+    return Property->GetPropertyValue_InContainer(Object);
+  }
+
+  return bDefaultValue;
+}
+
+void WriteIntProperty(UObject *Object, const FName PropertyName, int32 Value) {
+  if (!Object) {
+    return;
+  }
+
+  if (FIntProperty *Property =
+          FindFProperty<FIntProperty>(Object->GetClass(), PropertyName)) {
+    Property->SetPropertyValue_InContainer(Object, Value);
+  }
+}
+
+void WriteBoolProperty(UObject *Object, const FName PropertyName, bool bValue) {
+  if (!Object) {
+    return;
+  }
+
+  if (FBoolProperty *Property =
+          FindFProperty<FBoolProperty>(Object->GetClass(), PropertyName)) {
+    Property->SetPropertyValue_InContainer(Object, bValue);
+  }
+}
 } // namespace
 
 ASkaldGameMode::ASkaldGameMode() {
@@ -500,7 +551,18 @@ void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
       }
       TerrData.Location = Territory->GetActorLocation();
       TerrData.HasTreasure = Territory->bHasTreasure;
+      TerrData.TreasureAttachedUnitID =
+          ReadIntProperty(Territory, TEXT("TreasureAttachedUnitID"));
+      TerrData.FortificationLevel =
+          ReadIntProperty(Territory, TEXT("FortificationLevel"));
+      TerrData.Moat = ReadBoolProperty(Territory, TEXT("Moat"));
+      TerrData.WallHealth =
+          ReadIntProperty(Territory, TEXT("WallHealth"));
       TerrData.BuiltSiegeID = Territory->BuiltSiegeID;
+      TerrData.ConqueredTurn =
+          ReadIntProperty(Territory, TEXT("ConqueredTurn"));
+      TerrData.IsNeutralSpawn =
+          ReadBoolProperty(Territory, TEXT("IsNeutralSpawn"));
 
       TerritorySnapshots.Add(MoveTemp(TerrData));
     }
@@ -575,7 +637,18 @@ void ASkaldGameMode::CacheWorldMapSnapshot() {
     }
     TerrData.Location = Territory->GetActorLocation();
     TerrData.HasTreasure = Territory->bHasTreasure;
+    TerrData.TreasureAttachedUnitID =
+        ReadIntProperty(Territory, TEXT("TreasureAttachedUnitID"));
+    TerrData.FortificationLevel =
+        ReadIntProperty(Territory, TEXT("FortificationLevel"));
+    TerrData.Moat = ReadBoolProperty(Territory, TEXT("Moat"));
+    TerrData.WallHealth =
+        ReadIntProperty(Territory, TEXT("WallHealth"));
     TerrData.BuiltSiegeID = Territory->BuiltSiegeID;
+    TerrData.ConqueredTurn =
+        ReadIntProperty(Territory, TEXT("ConqueredTurn"));
+    TerrData.IsNeutralSpawn =
+        ReadBoolProperty(Territory, TEXT("IsNeutralSpawn"));
 
     TerritorySnapshots.Add(MoveTemp(TerrData));
   }
@@ -653,6 +726,9 @@ bool ASkaldGameMode::RestoreWorldFromSnapshot() {
   }
 
   int32 RestoredCount = 0;
+  FS_Territory SampleSnapshot;
+  ATerritory *SampleActor = nullptr;
+  bool bRecordedSample = false;
   for (const FS_Territory &Snapshot : GI->CachedWorldMapTerritories) {
     ATerritory *const *FoundTerritory = TerritoryById.Find(Snapshot.TerritoryID);
     if (!FoundTerritory || !*FoundTerritory) {
@@ -664,7 +740,17 @@ bool ASkaldGameMode::RestoreWorldFromSnapshot() {
     Territory->ArmyUnits = Snapshot.ArmyUnits;
     Territory->bIsCapital = Snapshot.IsCapital;
     Territory->bHasTreasure = Snapshot.HasTreasure;
+    WriteIntProperty(Territory, TEXT("TreasureAttachedUnitID"),
+                     Snapshot.TreasureAttachedUnitID);
+    WriteIntProperty(Territory, TEXT("FortificationLevel"),
+                     Snapshot.FortificationLevel);
+    WriteBoolProperty(Territory, TEXT("Moat"), Snapshot.Moat);
+    WriteIntProperty(Territory, TEXT("WallHealth"), Snapshot.WallHealth);
     Territory->BuiltSiegeID = Snapshot.BuiltSiegeID;
+    WriteIntProperty(Territory, TEXT("ConqueredTurn"),
+                     Snapshot.ConqueredTurn);
+    WriteBoolProperty(Territory, TEXT("IsNeutralSpawn"),
+                      Snapshot.IsNeutralSpawn);
     Territory->SetActorLocation(Snapshot.Location);
     Territory->OwningPlayer =
         (Snapshot.OwnerPlayerID > 0) ? GS->GetPlayerById(Snapshot.OwnerPlayerID) : nullptr;
@@ -690,6 +776,12 @@ bool ASkaldGameMode::RestoreWorldFromSnapshot() {
     }
 
     ++RestoredCount;
+
+    if (!bRecordedSample) {
+      SampleSnapshot = Snapshot;
+      SampleActor = Territory;
+      bRecordedSample = true;
+    }
   }
 
   if (RestoredCount == 0) {
@@ -736,6 +828,30 @@ bool ASkaldGameMode::RestoreWorldFromSnapshot() {
 
   GS->OnPlayersUpdated.Broadcast();
   RefreshHUDs();
+
+  if (bRecordedSample && SampleActor) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("RestoreWorldFromSnapshot sample (before): Id=%d Owner=%d Army=%d "
+                "TreasureCarrier=%d Fort=%d Moat=%d Wall=%d Conquered=%d Neutral=%d"),
+           SampleSnapshot.TerritoryID, SampleSnapshot.OwnerPlayerID,
+           SampleSnapshot.ArmyUnits, SampleSnapshot.TreasureAttachedUnitID,
+           SampleSnapshot.FortificationLevel, SampleSnapshot.Moat ? 1 : 0,
+           SampleSnapshot.WallHealth, SampleSnapshot.ConqueredTurn,
+           SampleSnapshot.IsNeutralSpawn ? 1 : 0);
+
+    const int32 PostOwnerId =
+        SampleActor->OwningPlayer ? SampleActor->OwningPlayer->GetPlayerId() : 0;
+    UE_LOG(LogSkald, Verbose,
+           TEXT("RestoreWorldFromSnapshot sample (after): Id=%d Owner=%d Army=%d "
+                "TreasureCarrier=%d Fort=%d Moat=%d Wall=%d Conquered=%d Neutral=%d"),
+           SampleActor->TerritoryID, PostOwnerId, SampleActor->ArmyUnits,
+           ReadIntProperty(SampleActor, TEXT("TreasureAttachedUnitID")),
+           ReadIntProperty(SampleActor, TEXT("FortificationLevel")),
+           ReadBoolProperty(SampleActor, TEXT("Moat")) ? 1 : 0,
+           ReadIntProperty(SampleActor, TEXT("WallHealth")),
+           ReadIntProperty(SampleActor, TEXT("ConqueredTurn")),
+           ReadBoolProperty(SampleActor, TEXT("IsNeutralSpawn")) ? 1 : 0);
+  }
 
   UE_LOG(LogSkald, Log,
          TEXT("RestoreWorldFromSnapshot: Restored %d territories from cached data."),
@@ -1205,8 +1321,18 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
     Territory->OwningPlayer = TerritoryOwner;
     Territory->ArmyUnits = TerrData.ArmyUnits;
     Territory->bIsCapital = TerrData.IsCapital;
+    Territory->bHasTreasure = TerrData.HasTreasure;
+    WriteIntProperty(Territory, TEXT("TreasureAttachedUnitID"),
+                     TerrData.TreasureAttachedUnitID);
+    WriteIntProperty(Territory, TEXT("FortificationLevel"),
+                     TerrData.FortificationLevel);
+    WriteBoolProperty(Territory, TEXT("Moat"), TerrData.Moat);
+    WriteIntProperty(Territory, TEXT("WallHealth"), TerrData.WallHealth);
     Territory->ContinentID = TerrData.ContinentID;
     Territory->BuiltSiegeID = TerrData.BuiltSiegeID;
+    WriteIntProperty(Territory, TEXT("ConqueredTurn"), TerrData.ConqueredTurn);
+    WriteBoolProperty(Territory, TEXT("IsNeutralSpawn"),
+                      TerrData.IsNeutralSpawn);
     Territory->SetActorLocation(TerrData.Location);
     Territory->RefreshAppearance();
   }
@@ -1766,7 +1892,19 @@ void ASkaldGameMode::FillSaveGame(USkaldSaveGame *SaveGameObject) const {
         }
       }
       TerrData.Location = Territory->GetActorLocation();
+      TerrData.HasTreasure = Territory->bHasTreasure;
+      TerrData.TreasureAttachedUnitID =
+          ReadIntProperty(Territory, TEXT("TreasureAttachedUnitID"));
+      TerrData.FortificationLevel =
+          ReadIntProperty(Territory, TEXT("FortificationLevel"));
+      TerrData.Moat = ReadBoolProperty(Territory, TEXT("Moat"));
+      TerrData.WallHealth =
+          ReadIntProperty(Territory, TEXT("WallHealth"));
       TerrData.BuiltSiegeID = Territory->BuiltSiegeID;
+      TerrData.ConqueredTurn =
+          ReadIntProperty(Territory, TEXT("ConqueredTurn"));
+      TerrData.IsNeutralSpawn =
+          ReadBoolProperty(Territory, TEXT("IsNeutralSpawn"));
       SaveGameObject->Territories.Add(TerrData);
     }
   }
