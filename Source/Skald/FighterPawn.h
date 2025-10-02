@@ -153,6 +153,11 @@ public:
             meta = (EditCondition = "bOverrideSpawnFacingYaw"))
   float SpawnFacingYaw = 0.f;
 
+  /** Offset applied to locally computed facings to preserve the desired spawn
+      orientation when overriding incoming rotations. */
+  UPROPERTY(Replicated)
+  float SpawnFacingYawDelta = 0.f;
+
   /** Mesh used to display the fighter. */
   UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
   UStaticMeshComponent *DisplayMesh;
@@ -199,7 +204,6 @@ protected:
 private:
   bool ShouldOverrideSpawnFacingYaw() const;
   float GetCurrentWorldFacingYaw() const;
-  float SpawnFacingYawDelta = 0.f;
 
   /** Update the health widget with a new value. */
   UFUNCTION()

@@ -86,6 +86,7 @@ void AFighterPawn::GetLifetimeReplicatedProps(
   DOREPLIFETIME(AFighterPawn, bIsCurrentlyActive);
   DOREPLIFETIME(AFighterPawn, GridFootprint);
   DOREPLIFETIME(AFighterPawn, CurrentCell);
+  DOREPLIFETIME(AFighterPawn, SpawnFacingYawDelta);
 }
 
 void AFighterPawn::OnConstruction(const FTransform &Transform) {
