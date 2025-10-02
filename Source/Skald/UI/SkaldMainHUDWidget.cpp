@@ -514,7 +514,7 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
   }
 
   const bool bOwnedByLocal =
-      LocalPS && Territory->OwningPlayer &&
+      LocalPS && IsValid(Territory->OwningPlayer) &&
       Territory->OwningPlayer->GetPlayerId() == LocalPS->GetPlayerId();
 
   if (bSelectingForAttack) {
@@ -920,14 +920,12 @@ void USkaldMainHUDWidget::HandleAttackApproved() {
                 Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
                     GetWorld(), AWorldMap::StaticClass()))) {
           if (ATerritory *Source = WorldMap->GetTerritoryById(SourceID)) {
-            if (Source->OwningPlayer) {
+            if (IsValid(Source->OwningPlayer)) {
               Battle.AttackerPlayerID = Source->OwningPlayer->GetPlayerId();
               Battle.AttackerFaction = Source->OwningPlayer->Faction;
-              Battle.AttackerDisplayName = Source->OwningPlayer
-                                                 ? Source->OwningPlayer
-                                                       ->GetResolvedPlayerName(
-                                                           TEXT("HUD_Attack_Attacker"))
-                                                 : TEXT("Neutral");
+              Battle.AttackerDisplayName =
+                  Source->OwningPlayer->GetResolvedPlayerName(
+                      TEXT("HUD_Attack_Attacker"));
               Battle.bAttackerIsAI = Source->OwningPlayer->bIsAI;
             }
             if (bUseSiege && Source->BuiltSiegeID > 0) {
@@ -936,14 +934,12 @@ void USkaldMainHUDWidget::HandleAttackApproved() {
             }
           }
           if (ATerritory *Target = WorldMap->GetTerritoryById(TargetID)) {
-            if (Target->OwningPlayer) {
+            if (IsValid(Target->OwningPlayer)) {
               Battle.DefenderPlayerID = Target->OwningPlayer->GetPlayerId();
               Battle.DefenderFaction = Target->OwningPlayer->Faction;
-              Battle.DefenderDisplayName = Target->OwningPlayer
-                                                 ? Target->OwningPlayer
-                                                       ->GetResolvedPlayerName(
-                                                           TEXT("HUD_Attack_Defender"))
-                                                 : TEXT("Neutral");
+              Battle.DefenderDisplayName =
+                  Target->OwningPlayer->GetResolvedPlayerName(
+                      TEXT("HUD_Attack_Defender"));
               Battle.bDefenderIsAI = Target->OwningPlayer->bIsAI;
             }
             Battle.IsCapitalAttack = Target->bIsCapital;

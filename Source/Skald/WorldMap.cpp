@@ -503,7 +503,7 @@ bool AWorldMap::AreTerritoriesAdjacent(const ATerritory *A,
 
 bool AWorldMap::IsOwnedBy(const ATerritory *Territory,
                           const ASkaldPlayerState *Player) const {
-  if (!Territory || !Player || !Territory->OwningPlayer) {
+  if (!Territory || !Player || !IsValid(Territory->OwningPlayer)) {
     return false;
   }
   return Territory->OwningPlayer->GetPlayerId() == Player->GetPlayerId();
