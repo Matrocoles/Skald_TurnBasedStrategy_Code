@@ -94,8 +94,12 @@ void AFighterPawn::OnConstruction(const FTransform &Transform) {
   UpdateMeshOffset();
   RefreshDisplayMeshYawOffset();
   const float IncomingSpawnYaw = Transform.GetRotation().Rotator().Yaw;
-  const float DesiredYaw =
-      ShouldOverrideSpawnFacingYaw() ? SpawnFacingYaw : IncomingSpawnYaw;
+  const bool bShouldOverride = ShouldOverrideSpawnFacingYaw();
+  SpawnFacingYawDelta =
+      bShouldOverride
+          ? FRotator::NormalizeAxis(SpawnFacingYaw - IncomingSpawnYaw)
+          : 0.f;
+  const float DesiredYaw = bShouldOverride ? SpawnFacingYaw : IncomingSpawnYaw;
   ApplyFacingYaw(DesiredYaw);
 }
 
@@ -128,9 +132,16 @@ void AFighterPawn::BeginPlay() {
 
   // Ensure the configured spawn facing is applied on all clients while
   // respecting the display mesh's relative rotation.
-  const float DesiredYaw = ShouldOverrideSpawnFacingYaw()
-                              ? SpawnFacingYaw
-                              : GetCurrentWorldFacingYaw();
+  const bool bShouldOverride = ShouldOverrideSpawnFacingYaw();
+  if (!bShouldOverride) {
+    SpawnFacingYawDelta = 0.f;
+  } else if (!HasAuthority() &&
+             FMath::IsNearlyZero(SpawnFacingYawDelta, KINDA_SMALL_NUMBER)) {
+    const float IncomingSpawnYaw = GetCurrentWorldFacingYaw();
+    SpawnFacingYawDelta = FRotator::NormalizeAxis(SpawnFacingYaw - IncomingSpawnYaw);
+  }
+  const float DesiredYaw =
+      bShouldOverride ? SpawnFacingYaw : GetCurrentWorldFacingYaw();
   ApplyFacingYaw(DesiredYaw);
 
   if (UWorld *World = GetWorld()) {
@@ -857,7 +868,7 @@ void AFighterPawn::FaceTowardsLocation(const FVector &TargetLocation) {
   Direction.Z = 0.f;
   if (!Direction.IsNearlyZero()) {
     const FRotator LookRotation = Direction.Rotation();
-    ApplyFacingYaw(LookRotation.Yaw);
+    ApplyFacingYaw(LookRotation.Yaw + SpawnFacingYawDelta);
   }
 }
 
@@ -874,6 +885,6 @@ void AFighterPawn::FaceTowardsCells(const FIntPoint &FromCell,
   Direction.Z = 0.f;
   if (!Direction.IsNearlyZero()) {
     const FRotator LookRotation = Direction.Rotation();
-    ApplyFacingYaw(LookRotation.Yaw);
+    ApplyFacingYaw(LookRotation.Yaw + SpawnFacingYawDelta);
   }
 }

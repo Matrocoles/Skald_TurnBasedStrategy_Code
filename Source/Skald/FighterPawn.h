@@ -199,6 +199,7 @@ protected:
 private:
   bool ShouldOverrideSpawnFacingYaw() const;
   float GetCurrentWorldFacingYaw() const;
+  float SpawnFacingYawDelta = 0.f;
 
   /** Update the health widget with a new value. */
   UFUNCTION()
