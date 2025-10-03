@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "SkaldTypes.h"
+#include "TimerManager.h"
 #include "Skald_TurnManager.generated.h"
 
 class ASkaldPlayerController;
@@ -119,6 +120,9 @@ protected:
 
   UPROPERTY()
   AWorldMap *CachedWorldMap;
+
+  /** Retry handle used when deferring battle resolution until the world map has been restored. */
+  FTimerHandle PendingBattleResolutionRetryHandle;
 
   UFUNCTION()
   void HandleGridBattleEnded(ESkaldFaction WinningFaction, int32 AttackerCasualties, int32 DefenderCasualties);
