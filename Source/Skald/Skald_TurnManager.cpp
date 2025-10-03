@@ -792,6 +792,25 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
     return;
   }
 
+  ASkaldGameMode *GameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
+  if (GameMode && !GameMode->IsWorldInitialized()) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("ResolveGridBattleResult: World not yet initialised; retrying after snapshot restoration."));
+
+    if (!GetWorld()->GetTimerManager().IsTimerActive(
+            PendingBattleResolutionRetryHandle)) {
+      FTimerDelegate RetryDelegate = FTimerDelegate::CreateUObject(
+          this, &ATurnManager::ResolveGridBattleResult);
+      constexpr float RetryDelaySeconds = 0.05f;
+      GetWorld()->GetTimerManager().SetTimer(PendingBattleResolutionRetryHandle,
+                                             RetryDelegate, RetryDelaySeconds,
+                                             false);
+    }
+    return;
+  }
+
+  GetWorld()->GetTimerManager().ClearTimer(PendingBattleResolutionRetryHandle);
+
   if (!CachedWorldMap) {
     return;
   }
