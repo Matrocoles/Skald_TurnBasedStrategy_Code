@@ -214,9 +214,18 @@ ASkaldPlayerState *EnsureBattleParticipant(ASkaldGameState *GameState, UWorld *W
       GameState->Players.RemoveAll([](const ASkaldPlayerState* Player) {
         return Player == nullptr;
       });
-      GameState->Players.Sort([](const ASkaldPlayerState& A,
-                                 const ASkaldPlayerState& B) {
-        return A.GetPlayerId() < B.GetPlayerId();
+      GameState->Players.Sort([](ASkaldPlayerState* const& A,
+                                 ASkaldPlayerState* const& B) {
+        if (A == B) {
+          return false;
+        }
+        if (!A) {
+          return false;
+        }
+        if (!B) {
+          return true;
+        }
+        return A->GetPlayerId() < B->GetPlayerId();
       });
       bAddedToList = true;
     }
