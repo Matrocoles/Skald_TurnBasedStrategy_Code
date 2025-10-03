@@ -577,6 +577,9 @@ void ASkaldGameMode::CacheWorldMapSnapshot() {
   if (!WorldMap) {
     WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
         GetWorld(), AWorldMap::StaticClass()));
+    if (!WorldMap && TurnManager) {
+      WorldMap = TurnManager->GetCachedWorldMapActor();
+    }
   }
 
   const int32 PreviousSnapshotCount = GI->CachedWorldMapTerritories.Num();
