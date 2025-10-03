@@ -4,10 +4,12 @@
 #include "Engine/EngineBaseTypes.h"
 #include "Engine/GameInstance.h"
 #include "SkaldTypes.h"
+#include "Templates/SharedPointer.h"
 #include "Skald_GameInstance.generated.h"
 
-class UGridBattleManager;
 class SWidget;
+
+class UGridBattleManager;
 class UUserWidget;
 class USkaldSaveGame;
 class UNetDriver;
@@ -169,6 +171,9 @@ public:
 private:
   UPROPERTY()
   FSkaldTravelState TravelState;
+
+  /** Loading overlay displayed while travelling between maps. */
+  TSharedPtr<SWidget> TravelLoadingOverlay;
 
   void ResetSessionState();
 };

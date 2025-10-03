@@ -789,11 +789,13 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
   }
 
   if (!GI->bPendingBattleResolution || !GI->PendingBattleResolution.bValid) {
+    GI->SetTravelPending(false);
     return;
   }
 
   ASkaldGameMode *GameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
   if (GameMode && !GameMode->IsWorldInitialized()) {
+    GI->SetTravelPending(true);
     UE_LOG(LogSkald, Verbose,
            TEXT("ResolveGridBattleResult: World not yet initialised; retrying after snapshot restoration."));
 
@@ -809,9 +811,33 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
     return;
   }
 
-  GetWorld()->GetTimerManager().ClearTimer(PendingBattleResolutionRetryHandle);
+  auto DeferResolution = [&](const TCHAR *Reason) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("ResolveGridBattleResult: %s; retrying."), Reason);
+    GI->SetTravelPending(true);
+    if (!GetWorld()->GetTimerManager().IsTimerActive(
+            PendingBattleResolutionRetryHandle)) {
+      FTimerDelegate RetryDelegate = FTimerDelegate::CreateUObject(
+          this, &ATurnManager::ResolveGridBattleResult);
+      constexpr float RetryDelaySeconds = 0.05f;
+      GetWorld()->GetTimerManager().SetTimer(
+          PendingBattleResolutionRetryHandle, RetryDelegate,
+          RetryDelaySeconds, false);
+    }
+  };
 
-  if (!CachedWorldMap) {
+  if (!IsValid(CachedWorldMap)) {
+    CachedWorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+        GetWorld(), AWorldMap::StaticClass()));
+  }
+
+  if (!IsValid(CachedWorldMap)) {
+    DeferResolution(TEXT("World map unavailable"));
+    return;
+  }
+
+  if (CachedWorldMap->Territories.Num() == 0) {
+    DeferResolution(TEXT("World map territories not yet generated"));
     return;
   }
 
@@ -820,8 +846,12 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
   ATerritory *Target =
       CachedWorldMap->GetTerritoryById(Battle.TargetTerritoryID);
   if (!Source || !Target) {
+    DeferResolution(TEXT("Battle territories pending restoration"));
     return;
   }
+
+  GetWorld()->GetTimerManager().ClearTimer(
+      PendingBattleResolutionRetryHandle);
 
   FGridBattleResolution Resolution = GI->PendingBattleResolution;
 
@@ -920,6 +950,7 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
 
   GI->bPendingBattleResolution = false;
   GI->PendingBattleResolution = FGridBattleResolution();
+  GI->SetTravelPending(false);
 
   // Resume the saved turn sequence now that the battle has been resolved.
   TryResumeSavedTurnState(GI);

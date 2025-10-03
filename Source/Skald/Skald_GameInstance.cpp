@@ -1,12 +1,18 @@
 #include "Skald_GameInstance.h"
 
+#include "Blueprint/UserWidget.h"
 #include "Engine/Engine.h"
+#include "Engine/GameViewportClient.h"
 #include "Kismet/GameplayStatics.h"
 #include "Skald.h"
 #include "SkaldLogging.h"
-#include "Blueprint/UserWidget.h"
 #include "Skald_PlayerController.h"
+#include "Styling/CoreStyle.h"
 #include "UI/SkaldUIHelpers.h"
+#include "Widgets/Images/SImage.h"
+#include "Widgets/Layout/SBorder.h"
+#include "Widgets/SOverlay.h"
+#include "Widgets/Text/STextBlock.h"
 
 void USkaldGameInstance::Init() {
   Super::Init();
@@ -52,6 +58,42 @@ void USkaldGameInstance::SetTravelPending(bool bInPending) {
   bTravelPending = bInPending;
   UE_LOG(LogSkald, Log, TEXT("GameInstance travel pending set: %s"),
          bTravelPending ? TEXT("true") : TEXT("false"));
+
+  UGameViewportClient *Viewport = GetGameViewportClient();
+  if (!Viewport) {
+    if (!bTravelPending) {
+      TravelLoadingOverlay.Reset();
+    }
+    return;
+  }
+
+  if (bTravelPending) {
+    if (!TravelLoadingOverlay.IsValid()) {
+      TSharedRef<SOverlay> Overlay = SNew(SOverlay)
+          + SOverlay::Slot()
+                .HAlign(HAlign_Fill)
+                .VAlign(VAlign_Fill)[SNew(SImage).ColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.7f))]
+          + SOverlay::Slot()
+                .HAlign(HAlign_Center)
+                .VAlign(VAlign_Center)[SNew(SBorder)
+                                           .Padding(FMargin(40.f))
+                                           .BorderBackgroundColor(FLinearColor(0.f, 0.f, 0.f, 0.85f))
+                                           .HAlign(HAlign_Center)
+                                           .VAlign(VAlign_Center)[SNew(STextBlock)
+                                                                     .Justification(ETextJustify::Center)
+                                                                     .Text(NSLOCTEXT("Skald", "TravelLoadingText", "Loading overworld..."))
+                                                                     .Font(FCoreStyle::Get().GetDefaultFontStyle("Bold", 32))
+                                                                     .ColorAndOpacity(FLinearColor::White)]];
+
+      TravelLoadingOverlay = Overlay;
+      Viewport->AddViewportWidgetContent(Overlay, 100);
+    }
+  } else {
+    if (TravelLoadingOverlay.IsValid()) {
+      Viewport->RemoveViewportWidgetContent(TravelLoadingOverlay.ToSharedRef());
+      TravelLoadingOverlay.Reset();
+    }
+  }
 }
 
 void USkaldGameInstance::SeedCombatRandomStream(int32 Seed) {
