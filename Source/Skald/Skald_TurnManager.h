@@ -89,6 +89,10 @@ public:
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Turn")
   TArray<ASkaldPlayerController *> GetControllers() const;
 
+  /** Retrieve the cached world map actor, if one is available. */
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Turn")
+  AWorldMap *GetCachedWorldMapActor() const { return CachedWorldMap; }
+
   /** Return the number of registered controllers. */
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Turn")
   int32 GetControllerCount() const { return Controllers.Num(); }
