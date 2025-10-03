@@ -680,6 +680,40 @@ bool ASkaldGameMode::RestoreWorldFromSnapshot() {
     return false;
   }
 
+  // Ensure all player IDs referenced by the snapshot are registered before we
+  // mutate any world state. When the world is still reinitialising the AI
+  // controller may not have joined yet, which would leave the territories
+  // assigned to a null owner for the rest of the session. Defer restoration
+  // until those PlayerStates exist so ownership is correctly restored.
+  TSet<int32> RequiredPlayerIds;
+  for (const FS_Territory &Snapshot : GI->CachedWorldMapTerritories) {
+    if (Snapshot.OwnerPlayerID > 0) {
+      RequiredPlayerIds.Add(Snapshot.OwnerPlayerID);
+    }
+  }
+
+  TArray<int32> MissingPlayerIds;
+  for (int32 PlayerId : RequiredPlayerIds) {
+    if (!GS->GetPlayerById(PlayerId)) {
+      MissingPlayerIds.Add(PlayerId);
+    }
+  }
+
+  if (MissingPlayerIds.Num() > 0) {
+    FString MissingList;
+    for (int32 Index = 0; Index < MissingPlayerIds.Num(); ++Index) {
+      if (Index > 0) {
+        MissingList += TEXT(", ");
+      }
+      MissingList += FString::FromInt(MissingPlayerIds[Index]);
+    }
+
+    UE_LOG(LogSkald, Verbose,
+           TEXT("RestoreWorldFromSnapshot: Deferring until PlayerStates registered for IDs [%s]"),
+           *MissingList);
+    return false;
+  }
+
   if (WorldMap->Territories.Num() == 0) {
     if (!WorldMap->GenerateTerritoriesFromTable()) {
       UE_LOG(LogSkald, Error,
