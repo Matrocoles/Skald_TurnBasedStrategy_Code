@@ -130,28 +130,30 @@ void ASkaldGameState::SortAndDedupPlayers()
     // while PlayerStates are re-initialising. Attempting to dereference them
     // during the sort would otherwise cause access violations when returning
     // to the world map after a battle.
-    Players.RemoveAll([](const ASkaldPlayerState* Player)
+    Players.RemoveAll([](const TObjectPtr<ASkaldPlayerState>& Player)
     {
-        return Player == nullptr;
+        return Player.Get() == nullptr;
     });
 
     // Stable order by PlayerId for deterministic turns/HUD lists. Null entries
     // have been filtered out above so it is now safe to dereference.
-    Players.Sort([](ASkaldPlayerState* const& A, ASkaldPlayerState* const& B)
+    Players.Sort([](const TObjectPtr<ASkaldPlayerState>& A, const TObjectPtr<ASkaldPlayerState>& B)
     {
-        if (A == B)
+        ASkaldPlayerState* const PlayerA = A.Get();
+        ASkaldPlayerState* const PlayerB = B.Get();
+        if (PlayerA == PlayerB)
         {
             return false;
         }
-        if (!A)
+        if (!PlayerA)
         {
             return false;
         }
-        if (!B)
+        if (!PlayerB)
         {
             return true;
         }
-        return A->GetPlayerId() < B->GetPlayerId();
+        return PlayerA->GetPlayerId() < PlayerB->GetPlayerId();
     });
 
     // Dedup in case the engine calls AddPlayerState twice for the same actor
