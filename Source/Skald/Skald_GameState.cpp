@@ -137,21 +137,13 @@ void ASkaldGameState::SortAndDedupPlayers()
 
     // Stable order by PlayerId for deterministic turns/HUD lists. Null entries
     // have been filtered out above so it is now safe to dereference.
-    Players.Sort([](ASkaldPlayerState* const& A, ASkaldPlayerState* const& B)
+    Players.Sort([](const ASkaldPlayerState& A, const ASkaldPlayerState& B)
     {
-        if (A == B)
+        if (&A == &B)
         {
             return false;
         }
-        if (A == nullptr)
-        {
-            return false;
-        }
-        if (B == nullptr)
-        {
-            return true;
-        }
-        return A->GetPlayerId() < B->GetPlayerId();
+        return A.GetPlayerId() < B.GetPlayerId();
     });
 
     // Dedup in case the engine calls AddPlayerState twice for the same actor
