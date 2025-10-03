@@ -508,6 +508,10 @@ TArray<ASkaldPlayerController *> ATurnManager::GetControllers() const {
 void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
   FS_BattlePayload SeededBattle = Battle;
   SeededBattle.RandomSeed = FMath::Rand();
+
+  USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+  bool bGameModeHasSnapshotAfterCall = GI && GI->CachedWorldMapTerritories.Num() > 0;
+
   if (UWorld *World = GetWorld()) {
     FString ReturnMap = NormalizeMapName(World, FString());
     if (ReturnMap.IsEmpty()) {
@@ -515,13 +519,25 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
           World, UGameplayStatics::GetCurrentLevelName(World, true));
     }
     SeededBattle.ReturnMap = MoveTemp(ReturnMap);
+
+    if (!IsValid(CachedWorldMap)) {
+      CachedWorldMap = Cast<AWorldMap>(
+          UGameplayStatics::GetActorOfClass(World, AWorldMap::StaticClass()));
+    }
+
     if (ASkaldGameMode *GameMode = World->GetAuthGameMode<ASkaldGameMode>()) {
       GameMode->CacheWorldMapSnapshot();
+      if (GI) {
+        bGameModeHasSnapshotAfterCall =
+            (GI->CachedWorldMapTerritories.Num() > 0);
+      } else {
+        bGameModeHasSnapshotAfterCall = false;
+      }
     }
   }
   PendingBattle = SeededBattle;
 
-  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+  if (GI) {
     GI->SeedCombatRandomStream(SeededBattle.RandomSeed);
     GI->PendingBattleResolution = FGridBattleResolution();
     GI->bPendingBattleResolution = false;
@@ -531,7 +547,7 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
   }
 
   // Save the current turn state so it can be restored after travelling.
-  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+  if (GI) {
     GI->SavedTurnIndex = CurrentIndex;
     GI->SavedTurnPhase = CurrentPhase;
     GI->bResumeTurns = true;
@@ -549,8 +565,10 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
       }
     }
 
-    USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
-    ASkaldGameState *GS = World->GetGameState<ASkaldGameState>();
+      if (!GI) {
+        GI = GetGameInstance<USkaldGameInstance>();
+      }
+      ASkaldGameState *GS = World->GetGameState<ASkaldGameState>();
 
     FSkaldTravelState TravelState;
     int32 ValidControllers = 0;
@@ -571,6 +589,7 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
 
     TArray<FS_Territory> TerritorySnapshots;
     bool bUsedCachedFallback = false;
+    bool bCapturedFromLiveWorld = false;
     if (CachedWorldMap) {
       TerritorySnapshots.Reserve(CachedWorldMap->Territories.Num());
       for (ATerritory *Territory : CachedWorldMap->Territories) {
@@ -612,6 +631,7 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
 
         TerritorySnapshots.Add(MoveTemp(Snapshot));
       }
+      bCapturedFromLiveWorld = TerritorySnapshots.Num() > 0;
     } else if (GI && GI->CachedWorldMapTerritories.Num() > 0) {
       bUsedCachedFallback = true;
       TerritorySnapshots = GI->CachedWorldMapTerritories;
@@ -634,7 +654,20 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
              TerritorySnapshots.Num(), bUsedCachedFallback ? 1 : 0);
     }
 
-    TravelState.CachedTerritories = MoveTemp(TerritorySnapshots);
+    TArray<FS_Territory> TravelSnapshots = TerritorySnapshots;
+    if (bCapturedFromLiveWorld && GI) {
+      const int32 NewSnapshotCount = TerritorySnapshots.Num();
+      if (!bGameModeHasSnapshotAfterCall && NewSnapshotCount > 0) {
+        UE_LOG(LogSkald, Warning,
+               TEXT("TriggerGridBattle captured world snapshot on turn manager after GameMode capture failed (%d territories)"),
+               NewSnapshotCount);
+      }
+      GI->CachedWorldMapTerritories = MoveTemp(TerritorySnapshots);
+    } else {
+      TerritorySnapshots.Reset();
+    }
+
+    TravelState.CachedTerritories = MoveTemp(TravelSnapshots);
 
     FS_BattlePayload PendingPayload = SeededBattle;
     PendingPayload.FromTerritoryID = SeededBattle.FromTerritoryID;
