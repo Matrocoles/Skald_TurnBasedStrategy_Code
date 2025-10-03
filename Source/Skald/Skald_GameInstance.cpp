@@ -82,7 +82,7 @@ void USkaldGameInstance::SetTravelPending(bool bInPending) {
                                            .VAlign(VAlign_Center)[SNew(STextBlock)
                                                                      .Justification(ETextJustify::Center)
                                                                      .Text(NSLOCTEXT("Skald", "TravelLoadingText", "Loading overworld..."))
-                                                                     .Font(FCoreStyle::Get().GetDefaultFontStyle("Bold", 32))
+                                                                     .Font(FCoreStyle::GetDefaultFontStyle("Bold", 32))
                                                                      .ColorAndOpacity(FLinearColor::White)]];
 
       TravelLoadingOverlay = Overlay;
