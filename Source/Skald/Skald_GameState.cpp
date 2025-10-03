@@ -126,12 +126,36 @@ void ASkaldGameState::ClampTurnIndex()
 
 void ASkaldGameState::SortAndDedupPlayers()
 {
-    // Stable order by PlayerId for deterministic turns/HUD lists
-    Players.Sort([](const ASkaldPlayerState& A, const ASkaldPlayerState& B)
+    // Remove any null entries that can occur temporarily during level travel
+    // while PlayerStates are re-initialising. Attempting to dereference them
+    // during the sort would otherwise cause access violations when returning
+    // to the world map after a battle.
+    Players.RemoveAll([](const ASkaldPlayerState* Player)
     {
-        return A.GetPlayerId() < B.GetPlayerId();
+        return Player == nullptr;
     });
-    // Dedup in case engine calls AddPlayerState twice for same actor (defensive)
+
+    // Stable order by PlayerId for deterministic turns/HUD lists. Null entries
+    // have been filtered out above so it is now safe to dereference.
+    Players.Sort([](ASkaldPlayerState* const& A, ASkaldPlayerState* const& B)
+    {
+        if (A == B)
+        {
+            return false;
+        }
+        if (A == nullptr)
+        {
+            return false;
+        }
+        if (B == nullptr)
+        {
+            return true;
+        }
+        return A->GetPlayerId() < B->GetPlayerId();
+    });
+
+    // Dedup in case the engine calls AddPlayerState twice for the same actor
+    // (defensive)
     for (int32 i = Players.Num() - 1; i > 0; --i)
     {
         if (Players[i] == Players[i - 1])
