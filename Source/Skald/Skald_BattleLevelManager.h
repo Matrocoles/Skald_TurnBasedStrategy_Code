@@ -7,6 +7,8 @@
 
 class ULevelStreamingDynamic;
 class USkaldGameInstance;
+class ULevel;
+class UWorld;
 
 /**
  * Helper object responsible for loading and unloading tactical battle levels
@@ -34,11 +36,14 @@ public:
 private:
   void HandleLevelLoaded();
   void HandleLevelUnloaded();
+  void HandleLevelAddedToWorld(ULevel *InLevel, UWorld *InWorld);
+  void HandleLevelRemovedFromWorld(ULevel *InLevel, UWorld *InWorld);
+  bool DoesEventMatchActiveLevel(ULevel *InLevel, UWorld *InWorld) const;
 
   TWeakObjectPtr<USkaldGameInstance> OwningInstance;
   TWeakObjectPtr<ULevelStreamingDynamic> ActiveStreamingLevel;
   TSoftObjectPtr<UWorld> RequestedBattleLevel;
-  FDelegateHandle LevelLoadedHandle;
-  FDelegateHandle LevelUnloadedHandle;
+  FDelegateHandle LevelAddedToWorldHandle;
+  FDelegateHandle LevelRemovedFromWorldHandle;
   FS_BattlePayload PendingPayload;
 };
