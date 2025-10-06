@@ -10,6 +10,7 @@
 class SWidget;
 
 class UGridBattleManager;
+class USkaldBattleLevelManager;
 class UUserWidget;
 class USkaldSaveGame;
 class UNetDriver;
@@ -98,6 +99,10 @@ public:
   UPROPERTY(BlueprintReadWrite, Category = "Battle")
   class UGridBattleManager *GridBattleManager = nullptr;
 
+  /** Runtime helper responsible for streaming battle levels into the overworld. */
+  UPROPERTY(Transient)
+  TObjectPtr<USkaldBattleLevelManager> BattleLevelStreamingManager = nullptr;
+
   /** True when the game has travelled to a dedicated battle map. */
   UPROPERTY(BlueprintReadWrite, Category = "Battle")
   bool bIsInBattleMap = false;
@@ -140,6 +145,8 @@ public:
   /** Toggle the travel pending guard and log the change. */
   UFUNCTION(BlueprintCallable)
   void SetTravelPending(bool bInPending);
+
+  USkaldBattleLevelManager *GetBattleLevelManager() const { return BattleLevelStreamingManager; }
 
   UFUNCTION(BlueprintCallable, BlueprintPure)
   const FSkaldTravelState &GetTravelState() const { return TravelState; }

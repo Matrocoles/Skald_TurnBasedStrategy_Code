@@ -10,6 +10,7 @@
 #include "Skald.h"
 #include "SkaldLogging.h"
 #include "Skald_GameInstance.h"
+#include "Skald_BattleLevelManager.h"
 #include "Skald_GameMode.h"
 #include "Skald_GameState.h"
 #include "Skald_PropertyAccess.h"
@@ -18,6 +19,7 @@
 #include "Territory.h"
 #include "UI/SkaldMainHUDWidget.h"
 #include "UObject/UnrealType.h"
+#include "UObject/SoftObjectPath.h"
 #include "WorldMap.h"
 
 namespace {
@@ -561,20 +563,27 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
 
   // Load a battle map where the grid based combat takes place.
   if (UWorld *World = GetWorld()) {
-    FString MapToLoad = TEXT("BattleMap");
-    if (BattleMaps.Num() > 0) {
-      const int32 Index = FMath::RandRange(0, BattleMaps.Num() - 1);
-      const FString Selected =
-          BattleMaps[Index].ToSoftObjectPath().GetLongPackageName();
-      if (!Selected.IsEmpty()) {
-        MapToLoad = Selected;
-      }
+    if (!GI) {
+      GI = GetGameInstance<USkaldGameInstance>();
     }
 
-      if (!GI) {
-        GI = GetGameInstance<USkaldGameInstance>();
-      }
-      ASkaldGameState *GS = World->GetGameState<ASkaldGameState>();
+    TSoftObjectPtr<UWorld> SelectedBattleMap;
+    if (BattleMaps.Num() > 0) {
+      const int32 Index = FMath::RandRange(0, BattleMaps.Num() - 1);
+      SelectedBattleMap = BattleMaps[Index];
+    }
+    if (SelectedBattleMap.IsNull()) {
+      SelectedBattleMap = TSoftObjectPtr<UWorld>(
+          FSoftObjectPath(TEXT("/Game/Blueprints/Maps/BattleMap.BattleMap")));
+    }
+
+    FString MapToLoad =
+        SelectedBattleMap.ToSoftObjectPath().GetLongPackageName();
+    if (MapToLoad.IsEmpty()) {
+      MapToLoad = TEXT("/Game/Blueprints/Maps/BattleMap");
+    }
+
+    ASkaldGameState *GS = World->GetGameState<ASkaldGameState>();
 
     FSkaldTravelState TravelState;
     int32 ValidControllers = 0;
@@ -741,10 +750,20 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
     }
 
     PendingBattle = PendingPayload;
+    bool bStreamingBattle = false;
     if (GI) {
       GI->SetTravelState(TravelState);
       GI->PendingBattle = PendingPayload;
-      GI->SetTravelPending(true);
+
+      if (USkaldBattleLevelManager *BattleLevelManager =
+              GI->GetBattleLevelManager()) {
+        bStreamingBattle = BattleLevelManager->RequestBattleLevel(
+            World, SelectedBattleMap, PendingPayload);
+      }
+
+      if (!bStreamingBattle) {
+        GI->SetTravelPending(true);
+      }
       GI->bIsInBattleMap = true;
     }
 
@@ -757,15 +776,18 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
            TravelState.HumanOwnedTerritories.Num(),
            TravelState.CachedTerritories.Num());
 
-    if (IsRunningDedicatedServer() || World->GetNetMode() != NM_Standalone) {
-      FString ListenMap = MapToLoad;
-      if (!ListenMap.Contains(TEXT("?"))) {
-        ListenMap.Append(TEXT("?listen"));
+    if (!bStreamingBattle) {
+      if (IsRunningDedicatedServer() ||
+          World->GetNetMode() != NM_Standalone) {
+        FString ListenMap = MapToLoad;
+        if (!ListenMap.Contains(TEXT("?"))) {
+          ListenMap.Append(TEXT("?listen"));
+        }
+        World->ServerTravel(ListenMap);
+      } else {
+        const FName LevelName = FName(*MapToLoad);
+        UGameplayStatics::OpenLevel(World, LevelName, /*bAbsolute=*/true);
       }
-      World->ServerTravel(ListenMap);
-    } else {
-      const FName LevelName = FName(*MapToLoad);
-      UGameplayStatics::OpenLevel(World, LevelName, /*bAbsolute=*/true);
     }
   }
 }
@@ -777,6 +799,10 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
   }
 
   GI->bIsInBattleMap = false;
+  if (USkaldBattleLevelManager *BattleLevelManager =
+          GI->GetBattleLevelManager()) {
+    BattleLevelManager->ReleaseBattleLevel();
+  }
 
   // Always mirror the pending payload locally for reference.
   PendingBattle = GI->PendingBattle;
