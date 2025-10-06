@@ -108,8 +108,14 @@ void ATurnManager::BeginPlay() {
   const bool bOnWorldMap = (CachedWorldMap != nullptr);
 
   if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
-    // Only resolve results when we are back on the world map
-    if (bOnWorldMap && (GI->GridBattleManager || GI->bPendingBattleResolution)) {
+    const bool bHasPendingResolution =
+        GI->bPendingBattleResolution || GI->PendingBattleResolution.bValid;
+
+    // If a battle finished while we were away, make sure we resolve it even if
+    // the world map actors are still streaming in. ResolveGridBattleResult
+    // already handles deferring until the map is ready, so we only need to
+    // trigger it here when we know a resolution is pending.
+    if (bHasPendingResolution) {
       ResolveGridBattleResult();
     }
 
