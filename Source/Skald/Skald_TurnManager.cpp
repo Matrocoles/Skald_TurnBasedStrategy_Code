@@ -632,7 +632,12 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
         TerritorySnapshots.Add(MoveTemp(Snapshot));
       }
       bCapturedFromLiveWorld = TerritorySnapshots.Num() > 0;
-    } else if (GI && GI->CachedWorldMapTerritories.Num() > 0) {
+    }
+
+    const bool bHasFallbackSnapshot =
+        GI && GI->CachedWorldMapTerritories.Num() > 0;
+
+    if (!bCapturedFromLiveWorld && bHasFallbackSnapshot) {
       bUsedCachedFallback = true;
       TerritorySnapshots = GI->CachedWorldMapTerritories;
       for (const FS_Territory &Snapshot : TerritorySnapshots) {
@@ -642,6 +647,7 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
           }
         }
       }
+      bCapturedFromLiveWorld = false;
     }
 
     if (TerritorySnapshots.Num() == 0) {
