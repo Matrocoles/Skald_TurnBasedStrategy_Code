@@ -6,6 +6,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Skald.h"
 #include "SkaldLogging.h"
+#include "Skald_BattleLevelManager.h"
 #include "Skald_PlayerController.h"
 #include "Styling/CoreStyle.h"
 #include "UI/SkaldUIHelpers.h"
@@ -25,6 +26,11 @@ void USkaldGameInstance::Init() {
   PendingBattle = FS_BattlePayload();
   PendingBattleResolution = FGridBattleResolution();
   bPendingBattleResolution = false;
+
+  if (!BattleLevelStreamingManager) {
+    BattleLevelStreamingManager = NewObject<USkaldBattleLevelManager>(this);
+    BattleLevelStreamingManager->Initialise(this);
+  }
 
   if (GEngine) {
     GEngine->OnNetworkFailure().AddUObject(
@@ -186,6 +192,9 @@ void USkaldGameInstance::ResetSessionState() {
   PendingBattleResolution = FGridBattleResolution();
   bPendingBattleResolution = false;
   GridBattleManager = nullptr;
+  if (BattleLevelStreamingManager) {
+    BattleLevelStreamingManager->ReleaseBattleLevel();
+  }
   bIsInBattleMap = false;
   bTravelPending = false;
   CachedWorldMapTerritories.Empty();
