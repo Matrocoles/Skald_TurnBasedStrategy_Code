@@ -1288,6 +1288,10 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
   bWorldInitialized = true;
   bTurnsStarted = true;
 
+  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+    GI->CachedWorldMapTerritories = LoadedGame->Territories;
+  }
+
   ASkaldGameState *GS = GetGameState<ASkaldGameState>();
   if (GS) {
     GS->Players.Empty();
@@ -1315,13 +1319,51 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
     Data.PlayerName = PlayerSave.PlayerName;
     Data.Faction = PlayerSave.Faction;
     Data.Resources = PlayerSave.Resources;
-    Data.CapitalTerritoryIDs = PlayerSave.CapitalTerritoryIDs;
-    Data.IsEliminated = PlayerSave.IsEliminated;
+    Data.IsEliminated = true;
+    Data.IsHuman = !PS->bIsAI;
+    Data.IsAI = PS->bIsAI;
+    Data.IsAlive = false;
+    Data.CapitalsOwned = 0;
+    Data.TroopsCount = 0;
     PlayerDataArray.Add(Data);
 
     if (TurnManager) {
       TurnManager->BroadcastResources(PS);
     }
+  }
+
+  TMap<int32, FS_PlayerData *> PlayerDataById;
+  for (FS_PlayerData &Data : PlayerDataArray) {
+    PlayerDataById.Add(Data.PlayerID, &Data);
+  }
+
+  if (WorldMap && WorldMap->Territories.Num() == 0) {
+    if (!WorldMap->GenerateTerritoriesFromTable()) {
+      UE_LOG(LogSkald, Error,
+             TEXT("ApplyLoadedGame: Failed to generate territories from table."));
+      return;
+    }
+  }
+
+  TMap<int32, ATerritory *> TerritoryById;
+  TMap<int32, ASkaldPlayerState *> PlayerStateById;
+  if (GS) {
+    for (ASkaldPlayerState *PlayerState : GS->Players) {
+      if (PlayerState) {
+        PlayerStateById.Add(PlayerState->GetPlayerId(), PlayerState);
+      }
+    }
+  }
+  if (WorldMap) {
+    TerritoryById.Reserve(WorldMap->Territories.Num());
+    for (ATerritory *Territory : WorldMap->Territories) {
+      if (!Territory) {
+        continue;
+      }
+      TerritoryById.Add(Territory->TerritoryID, Territory);
+      Territory->AdjacentTerritories.Reset();
+    }
+    WorldMap->SpawnedLocations.Reset();
   }
 
   SiegePool = LoadedGame->Sieges;
@@ -1331,20 +1373,12 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
   }
 
   for (const FS_Territory &TerrData : LoadedGame->Territories) {
-    ATerritory *Territory = WorldMap->GetTerritoryById(TerrData.TerritoryID);
+    ATerritory *Territory = TerritoryById.FindRef(TerrData.TerritoryID);
     if (!Territory) {
       continue;
     }
 
-    ASkaldPlayerState *TerritoryOwner = nullptr;
-    if (GS) {
-      for (ASkaldPlayerState *PS : GS->Players) {
-        if (PS && PS->GetPlayerId() == TerrData.OwnerPlayerID) {
-          TerritoryOwner = PS;
-          break;
-        }
-      }
-    }
+    ASkaldPlayerState *TerritoryOwner = PlayerStateById.FindRef(TerrData.OwnerPlayerID);
 
     Territory->OwningPlayer = TerritoryOwner;
     Territory->ArmyUnits = TerrData.ArmyUnits;
@@ -1362,7 +1396,61 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
     WriteBoolProperty(Territory, TEXT("IsNeutralSpawn"),
                       TerrData.IsNeutralSpawn);
     Territory->SetActorLocation(TerrData.Location);
+    Territory->AdjacentTerritories.Reset();
+    for (int32 NeighborId : TerrData.AdjacentIDs) {
+      if (ATerritory *Neighbor = TerritoryById.FindRef(NeighborId)) {
+        Territory->AdjacentTerritories.AddUnique(Neighbor);
+      }
+    }
+
     Territory->RefreshAppearance();
+
+    if (FS_PlayerData **PlayerDataPtr =
+            PlayerDataById.Find(TerrData.OwnerPlayerID)) {
+      FS_PlayerData *PlayerData = *PlayerDataPtr;
+      PlayerData->IsEliminated = false;
+      PlayerData->IsAlive = true;
+      PlayerData->TroopsCount += TerrData.ArmyUnits;
+      if (TerrData.IsCapital) {
+        PlayerData->CapitalsOwned += 1;
+        PlayerData->CapitalTerritoryIDs.AddUnique(TerrData.TerritoryID);
+      }
+    }
+
+    if (WorldMap) {
+      WorldMap->SpawnedLocations.Add(TerrData.TerritoryID, TerrData.Location);
+    }
+  }
+
+  for (TPair<int32, ASkaldPlayerState *> &Entry : PlayerStateById) {
+    ASkaldPlayerState *PlayerState = Entry.Value;
+    if (!PlayerState) {
+      continue;
+    }
+
+    const FS_PlayerData *const *PlayerDataPtr = PlayerDataById.Find(Entry.Key);
+    const bool bShouldBeEliminated =
+        !(PlayerDataPtr && *PlayerDataPtr) || (*PlayerDataPtr)->IsEliminated;
+
+    bool bStateChanged = false;
+    if (PlayerState->IsEliminated != bShouldBeEliminated) {
+      PlayerState->IsEliminated = bShouldBeEliminated;
+      bStateChanged = true;
+    }
+
+    if (bShouldBeEliminated && PlayerState->bHasLockedIn) {
+      PlayerState->bHasLockedIn = false;
+      bStateChanged = true;
+    }
+
+    if (bStateChanged) {
+      PlayerState->ForceNetUpdate();
+    }
+  }
+
+  if (WorldMap && WorldMap->SelectedTerritory &&
+      !TerritoryById.Contains(WorldMap->SelectedTerritory->TerritoryID)) {
+    WorldMap->SelectedTerritory = nullptr;
   }
 
   if (APlayerController *PC = UGameplayStatics::GetPlayerController(this, 0)) {
@@ -1382,6 +1470,10 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
   }
 
   RefreshHUDs();
+
+  if (GS) {
+    GS->OnPlayersUpdated.Broadcast();
+  }
 
   if (TurnManager) {
     TurnManager->SortControllersByInitiative();
