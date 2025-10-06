@@ -4,6 +4,7 @@
 #include "GameFramework/Actor.h"
 #include "SkaldTypes.h"
 #include "TimerManager.h"
+#include "UObject/SoftObjectPath.h"
 #include "Skald_TurnManager.generated.h"
 
 class ASkaldPlayerController;
@@ -77,6 +78,12 @@ public:
   /** Apply the outcome of a completed grid battle to the world map. */
   UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Battle")
   void ResolveGridBattleResult();
+
+  /** Multicast request instructing all clients to stream the specified battle level. */
+  UFUNCTION(NetMulticast, Reliable)
+  void MulticastStreamBattleLevel(const FSoftObjectPath &BattleLevelPath,
+                                  const FSkaldTravelState &TravelState,
+                                  const FS_BattlePayload &BattlePayload);
 
   /** Multicast the results of a resolved battle to all clients. */
   UFUNCTION(NetMulticast, Reliable)

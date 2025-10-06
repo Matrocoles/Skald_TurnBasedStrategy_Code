@@ -761,7 +761,12 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
             World, SelectedBattleMap, PendingPayload);
       }
 
-      if (!bStreamingBattle) {
+      if (bStreamingBattle) {
+        if (World->GetNetMode() != NM_Standalone) {
+          MulticastStreamBattleLevel(SelectedBattleMap.ToSoftObjectPath(),
+                                     TravelState, PendingPayload);
+        }
+      } else {
         GI->SetTravelPending(true);
       }
       GI->bIsInBattleMap = true;
@@ -787,6 +792,42 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
       } else {
         const FName LevelName = FName(*MapToLoad);
         UGameplayStatics::OpenLevel(World, LevelName, /*bAbsolute=*/true);
+      }
+    }
+  }
+}
+
+void ATurnManager::MulticastStreamBattleLevel_Implementation(
+    const FSoftObjectPath &BattleLevelPath, const FSkaldTravelState &TravelState,
+    const FS_BattlePayload &BattlePayload) {
+  if (HasAuthority()) {
+    return;
+  }
+
+  USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+  if (!GI) {
+    return;
+  }
+
+  GI->SetTravelState(TravelState);
+  GI->PendingBattle = BattlePayload;
+  GI->bIsInBattleMap = true;
+
+  if (USkaldBattleLevelManager *BattleLevelManager =
+          GI->GetBattleLevelManager()) {
+    if (UWorld *World = GetWorld()) {
+      TSoftObjectPtr<UWorld> LevelToStream;
+      if (BattleLevelPath.IsValid()) {
+        LevelToStream = TSoftObjectPtr<UWorld>(BattleLevelPath);
+      }
+
+      const bool bRequested = BattleLevelManager->RequestBattleLevel(
+          World, LevelToStream, BattlePayload);
+      if (!bRequested) {
+        GI->SetTravelPending(true);
+        UE_LOG(LogSkald, Warning,
+               TEXT("MulticastStreamBattleLevel failed to stream %s on client"),
+               *BattleLevelPath.ToString());
       }
     }
   }
