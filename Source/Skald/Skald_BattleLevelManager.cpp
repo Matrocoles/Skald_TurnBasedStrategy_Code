@@ -89,6 +89,7 @@ bool USkaldBattleLevelManager::RequestBattleLevel(
   ActiveStreamingLevel = StreamingLevel;
   bActiveLevelShouldBeLoaded = true;
 
+  RegisterStreamingDelegates(StreamingLevel);
   RegisterWorldDelegates();
 
   StreamingLevel->SetShouldBeVisible(false);
@@ -105,6 +106,7 @@ bool USkaldBattleLevelManager::RequestBattleLevel(
 
 void USkaldBattleLevelManager::ReleaseBattleLevel() {
   if (!ActiveStreamingLevel.IsValid()) {
+    UnregisterStreamingDelegates();
     UnregisterWorldDelegates();
     return;
   }
@@ -129,6 +131,13 @@ void USkaldBattleLevelManager::HandleLevelLoaded() {
     return;
   }
 
+  if (ULevelStreamingDynamic *StreamingLevel = ActiveStreamingLevel.Get()) {
+    if (StreamingLevelLoadedHandle.IsValid()) {
+      StreamingLevel->OnLevelLoaded.Remove(StreamingLevelLoadedHandle);
+      StreamingLevelLoadedHandle.Reset();
+    }
+  }
+
   if (LevelAddedToWorldHandle.IsValid()) {
     FWorldDelegates::LevelAddedToWorld.Remove(LevelAddedToWorldHandle);
     LevelAddedToWorldHandle.Reset();
@@ -146,7 +155,15 @@ void USkaldBattleLevelManager::HandleLevelLoaded() {
 void USkaldBattleLevelManager::HandleLevelUnloaded() {
   UE_LOG(LogSkald, Log, TEXT("BattleLevelManager: Battle level unloaded"));
 
+  if (ULevelStreamingDynamic *StreamingLevel = ActiveStreamingLevel.Get()) {
+    if (StreamingLevelUnloadedHandle.IsValid()) {
+      StreamingLevel->OnLevelUnloaded.Remove(StreamingLevelUnloadedHandle);
+      StreamingLevelUnloadedHandle.Reset();
+    }
+  }
+
   UnregisterWorldDelegates();
+  UnregisterStreamingDelegates();
 
   bActiveLevelShouldBeLoaded = false;
   ActiveStreamingLevel.Reset();
@@ -225,4 +242,34 @@ void USkaldBattleLevelManager::UnregisterWorldDelegates() {
     FWorldDelegates::LevelRemovedFromWorld.Remove(LevelRemovedFromWorldHandle);
     LevelRemovedFromWorldHandle.Reset();
   }
+}
+
+void USkaldBattleLevelManager::RegisterStreamingDelegates(
+    ULevelStreamingDynamic *StreamingLevel) {
+  UnregisterStreamingDelegates();
+
+  if (!StreamingLevel) {
+    return;
+  }
+
+  StreamingLevelLoadedHandle =
+      StreamingLevel->OnLevelLoaded.AddUObject(
+          this, &USkaldBattleLevelManager::HandleLevelLoaded);
+  StreamingLevelUnloadedHandle =
+      StreamingLevel->OnLevelUnloaded.AddUObject(
+          this, &USkaldBattleLevelManager::HandleLevelUnloaded);
+}
+
+void USkaldBattleLevelManager::UnregisterStreamingDelegates() {
+  if (ULevelStreamingDynamic *StreamingLevel = ActiveStreamingLevel.Get()) {
+    if (StreamingLevelLoadedHandle.IsValid()) {
+      StreamingLevel->OnLevelLoaded.Remove(StreamingLevelLoadedHandle);
+    }
+    if (StreamingLevelUnloadedHandle.IsValid()) {
+      StreamingLevel->OnLevelUnloaded.Remove(StreamingLevelUnloadedHandle);
+    }
+  }
+
+  StreamingLevelLoadedHandle.Reset();
+  StreamingLevelUnloadedHandle.Reset();
 }

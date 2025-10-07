@@ -41,12 +41,16 @@ private:
   bool DoesEventMatchActiveLevel(ULevel *InLevel, UWorld *InWorld) const;
   void RegisterWorldDelegates();
   void UnregisterWorldDelegates();
+  void RegisterStreamingDelegates(ULevelStreamingDynamic *StreamingLevel);
+  void UnregisterStreamingDelegates();
 
   TWeakObjectPtr<USkaldGameInstance> OwningInstance;
   TWeakObjectPtr<ULevelStreamingDynamic> ActiveStreamingLevel;
   TSoftObjectPtr<UWorld> RequestedBattleLevel;
   FDelegateHandle LevelAddedToWorldHandle;
   FDelegateHandle LevelRemovedFromWorldHandle;
+  FDelegateHandle StreamingLevelLoadedHandle;
+  FDelegateHandle StreamingLevelUnloadedHandle;
   FS_BattlePayload PendingPayload;
   bool bActiveLevelShouldBeLoaded = false;
 };
