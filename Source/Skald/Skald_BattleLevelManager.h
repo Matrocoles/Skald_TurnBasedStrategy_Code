@@ -39,6 +39,8 @@ private:
   void HandleLevelAddedToWorld(ULevel *InLevel, UWorld *InWorld);
   void HandleLevelRemovedFromWorld(ULevel *InLevel, UWorld *InWorld);
   bool DoesEventMatchActiveLevel(ULevel *InLevel, UWorld *InWorld) const;
+  void RegisterWorldDelegates();
+  void UnregisterWorldDelegates();
 
   TWeakObjectPtr<USkaldGameInstance> OwningInstance;
   TWeakObjectPtr<ULevelStreamingDynamic> ActiveStreamingLevel;

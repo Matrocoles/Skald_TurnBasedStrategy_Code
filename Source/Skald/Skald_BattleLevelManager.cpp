@@ -63,15 +63,7 @@ bool USkaldBattleLevelManager::RequestBattleLevel(
   PendingPayload = BattlePayload;
   ActiveStreamingLevel = StreamingLevel;
 
-  if (!LevelAddedToWorldHandle.IsValid()) {
-    LevelAddedToWorldHandle = FWorldDelegates::LevelAddedToWorld.AddUObject(
-        this, &USkaldBattleLevelManager::HandleLevelAddedToWorld);
-  }
-
-  if (!LevelRemovedFromWorldHandle.IsValid()) {
-    LevelRemovedFromWorldHandle = FWorldDelegates::LevelRemovedFromWorld.AddUObject(
-        this, &USkaldBattleLevelManager::HandleLevelRemovedFromWorld);
-  }
+  RegisterWorldDelegates();
 
   StreamingLevel->SetShouldBeVisible(false);
   StreamingLevel->SetShouldBeLoaded(true);
@@ -87,6 +79,7 @@ bool USkaldBattleLevelManager::RequestBattleLevel(
 
 void USkaldBattleLevelManager::ReleaseBattleLevel() {
   if (!ActiveStreamingLevel.IsValid()) {
+    UnregisterWorldDelegates();
     return;
   }
 
@@ -125,15 +118,7 @@ void USkaldBattleLevelManager::HandleLevelLoaded() {
 void USkaldBattleLevelManager::HandleLevelUnloaded() {
   UE_LOG(LogSkald, Log, TEXT("BattleLevelManager: Battle level unloaded"));
 
-  if (LevelAddedToWorldHandle.IsValid()) {
-    FWorldDelegates::LevelAddedToWorld.Remove(LevelAddedToWorldHandle);
-    LevelAddedToWorldHandle.Reset();
-  }
-
-  if (LevelRemovedFromWorldHandle.IsValid()) {
-    FWorldDelegates::LevelRemovedFromWorld.Remove(LevelRemovedFromWorldHandle);
-    LevelRemovedFromWorldHandle.Reset();
-  }
+  UnregisterWorldDelegates();
 
   ActiveStreamingLevel.Reset();
   RequestedBattleLevel.Reset();
@@ -190,4 +175,25 @@ bool USkaldBattleLevelManager::DoesEventMatchActiveLevel(ULevel *InLevel,
   }
 
   return false;
+}
+
+void USkaldBattleLevelManager::RegisterWorldDelegates() {
+  UnregisterWorldDelegates();
+
+  LevelAddedToWorldHandle = FWorldDelegates::LevelAddedToWorld.AddUObject(
+      this, &USkaldBattleLevelManager::HandleLevelAddedToWorld);
+  LevelRemovedFromWorldHandle = FWorldDelegates::LevelRemovedFromWorld.AddUObject(
+      this, &USkaldBattleLevelManager::HandleLevelRemovedFromWorld);
+}
+
+void USkaldBattleLevelManager::UnregisterWorldDelegates() {
+  if (LevelAddedToWorldHandle.IsValid()) {
+    FWorldDelegates::LevelAddedToWorld.Remove(LevelAddedToWorldHandle);
+    LevelAddedToWorldHandle.Reset();
+  }
+
+  if (LevelRemovedFromWorldHandle.IsValid()) {
+    FWorldDelegates::LevelRemovedFromWorld.Remove(LevelRemovedFromWorldHandle);
+    LevelRemovedFromWorldHandle.Reset();
+  }
 }
