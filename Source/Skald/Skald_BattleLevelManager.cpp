@@ -2,6 +2,7 @@
 
 #include "Engine/Engine.h"
 #include "Engine/Level.h"
+#include "Engine/LevelStreaming.h"
 #include "Engine/LevelStreamingDynamic.h"
 #include "Engine/World.h"
 #include "Skald_GameInstance.h"
@@ -89,6 +90,13 @@ bool USkaldBattleLevelManager::RequestBattleLevel(
   ActiveStreamingLevel = StreamingLevel;
   bActiveLevelShouldBeLoaded = true;
 
+  StreamingLevelLoadedHandle =
+      StreamingLevel->OnLevelLoaded.AddUObject(
+          this, &USkaldBattleLevelManager::HandleStreamingLevelLoaded);
+  StreamingLevelUnloadedHandle =
+      StreamingLevel->OnLevelUnloaded.AddUObject(
+          this, &USkaldBattleLevelManager::HandleStreamingLevelUnloaded);
+
   RegisterWorldDelegates();
 
   StreamingLevel->SetShouldBeVisible(false);
@@ -106,6 +114,7 @@ bool USkaldBattleLevelManager::RequestBattleLevel(
 void USkaldBattleLevelManager::ReleaseBattleLevel() {
   if (!ActiveStreamingLevel.IsValid()) {
     UnregisterWorldDelegates();
+    UnregisterStreamingDelegates();
     return;
   }
 
@@ -129,6 +138,10 @@ void USkaldBattleLevelManager::HandleLevelLoaded() {
     return;
   }
 
+  if (!bActiveLevelShouldBeLoaded) {
+    return;
+  }
+
   if (LevelAddedToWorldHandle.IsValid()) {
     FWorldDelegates::LevelAddedToWorld.Remove(LevelAddedToWorldHandle);
     LevelAddedToWorldHandle.Reset();
@@ -147,6 +160,7 @@ void USkaldBattleLevelManager::HandleLevelUnloaded() {
   UE_LOG(LogSkald, Log, TEXT("BattleLevelManager: Battle level unloaded"));
 
   UnregisterWorldDelegates();
+  UnregisterStreamingDelegates();
 
   bActiveLevelShouldBeLoaded = false;
   ActiveStreamingLevel.Reset();
@@ -174,6 +188,20 @@ void USkaldBattleLevelManager::HandleLevelRemovedFromWorld(ULevel *InLevel,
     return;
   }
 
+  HandleLevelUnloaded();
+}
+
+void USkaldBattleLevelManager::HandleStreamingLevelLoaded(ULevel *InLevel) {
+  UE_LOG(LogSkald, Verbose,
+         TEXT("BattleLevelManager: Streaming level reported loaded: %s"),
+         InLevel ? *InLevel->GetName() : TEXT("<null>"));
+  HandleLevelLoaded();
+}
+
+void USkaldBattleLevelManager::HandleStreamingLevelUnloaded(ULevel *InLevel) {
+  UE_LOG(LogSkald, Verbose,
+         TEXT("BattleLevelManager: Streaming level reported unloaded: %s"),
+         InLevel ? *InLevel->GetName() : TEXT("<null>"));
   HandleLevelUnloaded();
 }
 
@@ -224,6 +252,29 @@ void USkaldBattleLevelManager::UnregisterWorldDelegates() {
   if (LevelRemovedFromWorldHandle.IsValid()) {
     FWorldDelegates::LevelRemovedFromWorld.Remove(LevelRemovedFromWorldHandle);
     LevelRemovedFromWorldHandle.Reset();
+  }
+}
+
+void USkaldBattleLevelManager::UnregisterStreamingDelegates() {
+  if (!ActiveStreamingLevel.IsValid()) {
+    StreamingLevelLoadedHandle.Reset();
+    StreamingLevelUnloadedHandle.Reset();
+    return;
+  }
+
+  if (ULevelStreamingDynamic *StreamingLevel = ActiveStreamingLevel.Get()) {
+    if (StreamingLevelLoadedHandle.IsValid()) {
+      StreamingLevel->OnLevelLoaded.Remove(StreamingLevelLoadedHandle);
+      StreamingLevelLoadedHandle.Reset();
+    }
+
+    if (StreamingLevelUnloadedHandle.IsValid()) {
+      StreamingLevel->OnLevelUnloaded.Remove(StreamingLevelUnloadedHandle);
+      StreamingLevelUnloadedHandle.Reset();
+    }
+  } else {
+    StreamingLevelLoadedHandle.Reset();
+    StreamingLevelUnloadedHandle.Reset();
   }
 }
 
