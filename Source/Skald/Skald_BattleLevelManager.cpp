@@ -1,10 +1,12 @@
 #include "Skald_BattleLevelManager.h"
 
+#include "Engine/Engine.h"
+#include "Engine/Level.h"
 #include "Engine/LevelStreamingDynamic.h"
 #include "Engine/World.h"
-#include "Kismet/GameplayStatics.h"
 #include "Skald_GameInstance.h"
 #include "SkaldLogging.h"
+#include "UObject/Package.h"
 #include "UObject/SoftObjectPath.h"
 
 void USkaldBattleLevelManager::Initialise(USkaldGameInstance *InOwner) {
@@ -46,14 +48,14 @@ bool USkaldBattleLevelManager::RequestBattleLevel(
 
   FVector SpawnLocation = FVector::ZeroVector;
   FRotator SpawnRotation = FRotator::ZeroRotator;
-  FString Error;
+  bool bLoadSuccess = false;
   ULevelStreamingDynamic *StreamingLevel =
       ULevelStreamingDynamic::LoadLevelInstanceBySoftObjectPtr(
-          World, LevelToStream, SpawnLocation, SpawnRotation, Error);
+          World, LevelToStream, SpawnLocation, SpawnRotation, bLoadSuccess);
 
-  if (!StreamingLevel) {
+  if (!StreamingLevel || !bLoadSuccess) {
     UE_LOG(LogSkald, Error,
-           TEXT("BattleLevelManager RequestBattleLevel failed: %s"), *Error);
+           TEXT("BattleLevelManager RequestBattleLevel failed: Could not stream battle level"));
     return false;
   }
 
@@ -61,10 +63,7 @@ bool USkaldBattleLevelManager::RequestBattleLevel(
   PendingPayload = BattlePayload;
   ActiveStreamingLevel = StreamingLevel;
 
-  LevelLoadedHandle = StreamingLevel->OnLevelLoaded.AddUObject(
-      this, &USkaldBattleLevelManager::HandleLevelLoaded);
-  LevelUnloadedHandle = StreamingLevel->OnLevelUnloaded.AddUObject(
-      this, &USkaldBattleLevelManager::HandleLevelUnloaded);
+  RegisterWorldDelegates();
 
   StreamingLevel->SetShouldBeVisible(false);
   StreamingLevel->SetShouldBeLoaded(true);
@@ -80,6 +79,7 @@ bool USkaldBattleLevelManager::RequestBattleLevel(
 
 void USkaldBattleLevelManager::ReleaseBattleLevel() {
   if (!ActiveStreamingLevel.IsValid()) {
+    UnregisterWorldDelegates();
     return;
   }
 
@@ -101,11 +101,9 @@ void USkaldBattleLevelManager::HandleLevelLoaded() {
     return;
   }
 
-  if (LevelLoadedHandle.IsValid()) {
-    if (ULevelStreamingDynamic *StreamingLevel = ActiveStreamingLevel.Get()) {
-      StreamingLevel->OnLevelLoaded.Remove(LevelLoadedHandle);
-    }
-    LevelLoadedHandle.Reset();
+  if (LevelAddedToWorldHandle.IsValid()) {
+    FWorldDelegates::LevelAddedToWorld.Remove(LevelAddedToWorldHandle);
+    LevelAddedToWorldHandle.Reset();
   }
 
   ActiveStreamingLevel->SetShouldBeVisible(true);
@@ -120,16 +118,7 @@ void USkaldBattleLevelManager::HandleLevelLoaded() {
 void USkaldBattleLevelManager::HandleLevelUnloaded() {
   UE_LOG(LogSkald, Log, TEXT("BattleLevelManager: Battle level unloaded"));
 
-  if (ULevelStreamingDynamic *StreamingLevel = ActiveStreamingLevel.Get()) {
-    if (LevelLoadedHandle.IsValid()) {
-      StreamingLevel->OnLevelLoaded.Remove(LevelLoadedHandle);
-      LevelLoadedHandle.Reset();
-    }
-    if (LevelUnloadedHandle.IsValid()) {
-      StreamingLevel->OnLevelUnloaded.Remove(LevelUnloadedHandle);
-      LevelUnloadedHandle.Reset();
-    }
-  }
+  UnregisterWorldDelegates();
 
   ActiveStreamingLevel.Reset();
   RequestedBattleLevel.Reset();
@@ -138,5 +127,73 @@ void USkaldBattleLevelManager::HandleLevelUnloaded() {
   if (USkaldGameInstance *GI = OwningInstance.Get()) {
     GI->SetTravelPending(false);
     GI->bIsInBattleMap = false;
+  }
+}
+
+void USkaldBattleLevelManager::HandleLevelAddedToWorld(ULevel *InLevel,
+                                                      UWorld *InWorld) {
+  if (!DoesEventMatchActiveLevel(InLevel, InWorld)) {
+    return;
+  }
+
+  HandleLevelLoaded();
+}
+
+void USkaldBattleLevelManager::HandleLevelRemovedFromWorld(ULevel *InLevel,
+                                                           UWorld *InWorld) {
+  if (!DoesEventMatchActiveLevel(InLevel, InWorld)) {
+    return;
+  }
+
+  HandleLevelUnloaded();
+}
+
+bool USkaldBattleLevelManager::DoesEventMatchActiveLevel(ULevel *InLevel,
+                                                         UWorld *InWorld) const {
+  if (!ActiveStreamingLevel.IsValid() || !InLevel || !InWorld) {
+    return false;
+  }
+
+  if (UWorld *ActiveWorld = ActiveStreamingLevel->GetWorld()) {
+    if (ActiveWorld != InWorld) {
+      return false;
+    }
+  }
+
+  if (ActiveStreamingLevel->GetLoadedLevel() == InLevel) {
+    return true;
+  }
+
+  const FString RequestedPackage =
+      RequestedBattleLevel.ToSoftObjectPath().GetLongPackageName();
+  if (!RequestedPackage.IsEmpty()) {
+    const FString EventPackage =
+        InLevel->GetPackage() ? InLevel->GetPackage()->GetName() : FString();
+    if (RequestedPackage == EventPackage) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+void USkaldBattleLevelManager::RegisterWorldDelegates() {
+  UnregisterWorldDelegates();
+
+  LevelAddedToWorldHandle = FWorldDelegates::LevelAddedToWorld.AddUObject(
+      this, &USkaldBattleLevelManager::HandleLevelAddedToWorld);
+  LevelRemovedFromWorldHandle = FWorldDelegates::LevelRemovedFromWorld.AddUObject(
+      this, &USkaldBattleLevelManager::HandleLevelRemovedFromWorld);
+}
+
+void USkaldBattleLevelManager::UnregisterWorldDelegates() {
+  if (LevelAddedToWorldHandle.IsValid()) {
+    FWorldDelegates::LevelAddedToWorld.Remove(LevelAddedToWorldHandle);
+    LevelAddedToWorldHandle.Reset();
+  }
+
+  if (LevelRemovedFromWorldHandle.IsValid()) {
+    FWorldDelegates::LevelRemovedFromWorld.Remove(LevelRemovedFromWorldHandle);
+    LevelRemovedFromWorldHandle.Reset();
   }
 }
