@@ -45,6 +45,14 @@ bool USkaldBattleLevelManager::RequestBattleLevel(
       return false;
     }
 
+    if (ULevelStreamingDynamic *StreamingLevel = ActiveStreamingLevel.Get()) {
+      if (!StreamingLevel->GetShouldBeLoaded()) {
+        UE_LOG(LogSkald, Warning,
+               TEXT("BattleLevelManager RequestBattleLevel retry ignored: battle level currently unloading"));
+        return false;
+      }
+    }
+
     // A streaming request is already in flight for the desired level, so treat
     // the retry as a success and refresh any pending state without issuing a
     // second load request. This prevents fallback OpenLevel travel from
