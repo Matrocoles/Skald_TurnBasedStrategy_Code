@@ -38,15 +38,20 @@ private:
   void HandleLevelUnloaded();
   void HandleLevelAddedToWorld(ULevel *InLevel, UWorld *InWorld);
   void HandleLevelRemovedFromWorld(ULevel *InLevel, UWorld *InWorld);
+  void HandleStreamingLevelLoaded(ULevel *InLevel);
+  void HandleStreamingLevelUnloaded(ULevel *InLevel);
   bool DoesEventMatchActiveLevel(ULevel *InLevel, UWorld *InWorld) const;
   void RegisterWorldDelegates();
   void UnregisterWorldDelegates();
+  void UnregisterStreamingDelegates();
 
   TWeakObjectPtr<USkaldGameInstance> OwningInstance;
   TWeakObjectPtr<ULevelStreamingDynamic> ActiveStreamingLevel;
   TSoftObjectPtr<UWorld> RequestedBattleLevel;
   FDelegateHandle LevelAddedToWorldHandle;
   FDelegateHandle LevelRemovedFromWorldHandle;
+  FDelegateHandle StreamingLevelLoadedHandle;
+  FDelegateHandle StreamingLevelUnloadedHandle;
   FS_BattlePayload PendingPayload;
   bool bActiveLevelShouldBeLoaded = false;
 };
