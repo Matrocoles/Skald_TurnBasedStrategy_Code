@@ -36,9 +36,28 @@ bool USkaldBattleLevelManager::RequestBattleLevel(
   }
 
   if (ActiveStreamingLevel.IsValid()) {
-    UE_LOG(LogSkald, Warning,
-           TEXT("BattleLevelManager RequestBattleLevel ignored: battle level already active"));
-    return false;
+    const bool bMatchesRequestedLevel =
+        RequestedBattleLevel.ToSoftObjectPath() == LevelToStream.ToSoftObjectPath();
+
+    if (!bMatchesRequestedLevel) {
+      UE_LOG(LogSkald, Warning,
+             TEXT("BattleLevelManager RequestBattleLevel ignored: battle level already active"));
+      return false;
+    }
+
+    // A streaming request is already in flight for the desired level, so treat
+    // the retry as a success and refresh any pending state without issuing a
+    // second load request. This prevents fallback OpenLevel travel from
+    // tearing down the overworld when additional controllers retry.
+    PendingPayload = BattlePayload;
+    if (USkaldGameInstance *GI = OwningInstance.Get()) {
+      GI->SetTravelPending(true);
+    }
+
+    UE_LOG(LogSkald, Log,
+           TEXT("BattleLevelManager: Battle level %s already streaming, reusing active request"),
+           *LevelToStream.ToString());
+    return true;
   }
 
   FString MapName = LevelToStream.ToString();
