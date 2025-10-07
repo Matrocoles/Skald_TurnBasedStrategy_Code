@@ -45,12 +45,10 @@ bool USkaldBattleLevelManager::RequestBattleLevel(
       return false;
     }
 
-    if (ULevelStreamingDynamic *StreamingLevel = ActiveStreamingLevel.Get()) {
-      if (!StreamingLevel->GetShouldBeLoaded()) {
-        UE_LOG(LogSkald, Warning,
-               TEXT("BattleLevelManager RequestBattleLevel retry ignored: battle level currently unloading"));
-        return false;
-      }
+    if (!bActiveLevelShouldBeLoaded) {
+      UE_LOG(LogSkald, Warning,
+             TEXT("BattleLevelManager RequestBattleLevel retry ignored: battle level currently unloading"));
+      return false;
     }
 
     // A streaming request is already in flight for the desired level, so treat
@@ -89,6 +87,7 @@ bool USkaldBattleLevelManager::RequestBattleLevel(
   RequestedBattleLevel = LevelToStream;
   PendingPayload = BattlePayload;
   ActiveStreamingLevel = StreamingLevel;
+  bActiveLevelShouldBeLoaded = true;
 
   RegisterWorldDelegates();
 
@@ -119,6 +118,8 @@ void USkaldBattleLevelManager::ReleaseBattleLevel() {
     StreamingLevel->SetShouldBeLoaded(false);
   }
 
+  bActiveLevelShouldBeLoaded = false;
+
   UE_LOG(LogSkald, Log, TEXT("BattleLevelManager: Unloading battle level"));
 
 }
@@ -147,6 +148,7 @@ void USkaldBattleLevelManager::HandleLevelUnloaded() {
 
   UnregisterWorldDelegates();
 
+  bActiveLevelShouldBeLoaded = false;
   ActiveStreamingLevel.Reset();
   RequestedBattleLevel.Reset();
   PendingPayload = FS_BattlePayload();

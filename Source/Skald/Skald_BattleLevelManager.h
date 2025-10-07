@@ -48,4 +48,5 @@ private:
   FDelegateHandle LevelAddedToWorldHandle;
   FDelegateHandle LevelRemovedFromWorldHandle;
   FS_BattlePayload PendingPayload;
+  bool bActiveLevelShouldBeLoaded = false;
 };
