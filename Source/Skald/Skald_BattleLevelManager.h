@@ -48,7 +48,7 @@ private:
   bool TickStreamingStatus(float DeltaTime);
 
   TWeakObjectPtr<USkaldGameInstance> OwningInstance;
-  TWeakObjectPtr<ULevelStreamingDynamic> ActiveStreamingLevel;
+  TWeakObjectPtr<ULevelStreaming> ActiveStreamingLevel;
   TSoftObjectPtr<UWorld> RequestedBattleLevel;
   FDelegateHandle LevelAddedToWorldHandle;
   FDelegateHandle LevelRemovedFromWorldHandle;

@@ -81,12 +81,51 @@ bool USkaldBattleLevelManager::RequestBattleLevel(
     MapName = TEXT("/Game/Blueprints/Maps/BattleMap");
   }
 
-  FVector SpawnLocation = FVector::ZeroVector;
-  FRotator SpawnRotation = FRotator::ZeroRotator;
+  ULevelStreaming *StreamingLevel = nullptr;
   bool bLoadSuccess = false;
-  ULevelStreamingDynamic *StreamingLevel =
-      ULevelStreamingDynamic::LoadLevelInstanceBySoftObjectPtr(
-          World, LevelToStream, SpawnLocation, SpawnRotation, bLoadSuccess);
+
+  const FSoftObjectPath RequestedPath = LevelToStream.ToSoftObjectPath();
+  const FString RequestedPackage = RequestedPath.GetLongPackageName();
+  const FString RequestedAssetName = RequestedPath.GetAssetName();
+  for (ULevelStreaming *ExistingLevel : World->GetStreamingLevels()) {
+    if (!ExistingLevel) {
+      continue;
+    }
+
+    FString ExistingPackage = ExistingLevel->GetWorldAssetPackageName();
+    if (ExistingPackage.IsEmpty()) {
+      ExistingPackage = ExistingLevel->GetWorldAsset().ToSoftObjectPath().GetLongPackageName();
+    }
+
+    FString ExistingAssetName;
+    if (ExistingPackage.IsEmpty()) {
+      ExistingAssetName = ExistingLevel->GetWorldAsset().ToSoftObjectPath().GetAssetName();
+    } else {
+      ExistingAssetName = FPackageName::GetShortName(ExistingPackage);
+    }
+
+    const bool bPackageMatches = !RequestedPackage.IsEmpty() &&
+                                 ExistingPackage.Equals(RequestedPackage, ESearchCase::IgnoreCase);
+    const bool bAssetMatches = !RequestedAssetName.IsEmpty() &&
+                               ExistingAssetName.Equals(RequestedAssetName, ESearchCase::IgnoreCase);
+
+    if (bPackageMatches || bAssetMatches) {
+      StreamingLevel = ExistingLevel;
+      bLoadSuccess = true;
+      const FString LevelLabel = !ExistingPackage.IsEmpty() ? ExistingPackage : ExistingAssetName;
+      UE_LOG(LogSkald, Log,
+             TEXT("BattleLevelManager: Using existing streaming level %s"),
+             *LevelLabel);
+      break;
+    }
+  }
+
+  if (!StreamingLevel) {
+    FVector SpawnLocation = FVector::ZeroVector;
+    FRotator SpawnRotation = FRotator::ZeroRotator;
+    StreamingLevel = ULevelStreamingDynamic::LoadLevelInstanceBySoftObjectPtr(
+        World, LevelToStream, SpawnLocation, SpawnRotation, bLoadSuccess);
+  }
 
   if (!StreamingLevel || !bLoadSuccess) {
     UE_LOG(LogSkald, Error,
@@ -129,7 +168,7 @@ void USkaldBattleLevelManager::ReleaseBattleLevel() {
     GI->SetTravelPending(true);
   }
 
-  if (ULevelStreamingDynamic *StreamingLevel = ActiveStreamingLevel.Get()) {
+  if (ULevelStreaming *StreamingLevel = ActiveStreamingLevel.Get()) {
     StreamingLevel->SetShouldBeVisible(false);
     StreamingLevel->SetShouldBeLoaded(false);
   }
@@ -358,7 +397,7 @@ bool USkaldBattleLevelManager::TickStreamingStatus(float DeltaTime) {
     return false;
   }
 
-  ULevelStreamingDynamic *StreamingLevel = ActiveStreamingLevel.Get();
+  ULevelStreaming *StreamingLevel = ActiveStreamingLevel.Get();
   if (!StreamingLevel) {
     HandleLevelUnloaded();
     bLastKnownLoadedState = false;
