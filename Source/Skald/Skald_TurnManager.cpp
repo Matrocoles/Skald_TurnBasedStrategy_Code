@@ -769,7 +769,7 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
       } else {
         GI->SetTravelPending(true);
       }
-      GI->bIsInBattleMap = true;
+      GI->SetBattleMapActive(true);
     }
 
     UE_LOG(LogSkald, Log,
@@ -811,7 +811,7 @@ void ATurnManager::MulticastStreamBattleLevel_Implementation(
 
   GI->SetTravelState(TravelState);
   GI->PendingBattle = BattlePayload;
-  GI->bIsInBattleMap = true;
+  GI->SetBattleMapActive(true);
 
   if (USkaldBattleLevelManager *BattleLevelManager =
           GI->GetBattleLevelManager()) {
@@ -839,7 +839,7 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
     return;
   }
 
-  GI->bIsInBattleMap = false;
+  GI->SetBattleMapActive(false);
   if (USkaldBattleLevelManager *BattleLevelManager =
           GI->GetBattleLevelManager()) {
     BattleLevelManager->ReleaseBattleLevel();
