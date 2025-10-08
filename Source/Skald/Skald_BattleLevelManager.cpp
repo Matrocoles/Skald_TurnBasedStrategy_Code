@@ -12,6 +12,7 @@
 #include "SkaldLogging.h"
 #include "UObject/Package.h"
 #include "UObject/SoftObjectPath.h"
+#include "Kismet/GameplayStatics.h"
 
 void USkaldBattleLevelManager::Initialise(USkaldGameInstance *InOwner) {
 
@@ -177,14 +178,15 @@ void USkaldBattleLevelManager::HandleLevelLoaded() {
         }
 
         if (BattleGameModeClass) {
+          const FTransform SpawnTransform = FTransform::Identity;
           FActorSpawnParameters SpawnParams;
           SpawnParams.SpawnCollisionHandlingOverride =
               ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
           SpawnParams.OverrideLevel = LoadedLevel;
-          SpawnParams.bDeferConstruction = false;
+          SpawnParams.bDeferConstruction = true;
 
           ASkald_BattleGameMode *BattleGM = OwningWorld->SpawnActor<ASkald_BattleGameMode>(
-              BattleGameModeClass, FTransform::Identity, SpawnParams);
+              BattleGameModeClass, SpawnTransform, SpawnParams);
 
           if (BattleGM) {
             FString Error;
@@ -193,8 +195,18 @@ void USkaldBattleLevelManager::HandleLevelLoaded() {
                     ? RequestedBattleLevel.ToSoftObjectPath().ToString()
                     : LoadedLevel->GetPackage()->GetName();
             BattleGM->InitGame(MapName, FString(), Error);
+
+            UGameplayStatics::FinishSpawningActor(BattleGM, SpawnTransform);
+
             ActiveBattleGameMode = BattleGM;
             GI->SetActiveBattleGameMode(BattleGM);
+
+            if (!Error.IsEmpty()) {
+              UE_LOG(LogSkald, Warning,
+                     TEXT("BattleLevelManager: InitGame for %s reported: %s"),
+                     *GetNameSafe(BattleGM), *Error);
+            }
+
             UE_LOG(LogSkald, Log,
                    TEXT("BattleLevelManager: Spawned battle game mode %s (Class=%s)"),
                    *GetNameSafe(BattleGM), *GetNameSafe(BattleGameModeClass));
