@@ -27,6 +27,7 @@ void USkaldGameInstance::Init() {
   PendingBattle = FS_BattlePayload();
   PendingBattleResolution = FGridBattleResolution();
   bPendingBattleResolution = false;
+  SetBattleMapActive(false);
 
   if (!BattleLevelStreamingManager) {
     BattleLevelStreamingManager = NewObject<USkaldBattleLevelManager>(this);
@@ -124,6 +125,15 @@ void USkaldGameInstance::SetActiveBattleGameMode(
   UE_LOG(LogSkald, Log,
          TEXT("GameInstance set active battle game mode: %s"),
          *GetNameSafe(InGameMode));
+}
+
+void USkaldGameInstance::SetBattleMapActive(bool bInBattleMap) {
+  if (bIsInBattleMap == bInBattleMap) {
+    return;
+  }
+
+  bIsInBattleMap = bInBattleMap;
+  OnBattleMapStateChanged.Broadcast(bIsInBattleMap);
 }
 
 void USkaldGameInstance::SeedCombatRandomStream(int32 Seed) {
@@ -225,7 +235,7 @@ void USkaldGameInstance::ResetSessionState() {
     }
   }
   SetActiveBattleGameMode(nullptr);
-  bIsInBattleMap = false;
+  SetBattleMapActive(false);
   bTravelPending = false;
   CachedWorldMapTerritories.Empty();
   TravelState = FSkaldTravelState();

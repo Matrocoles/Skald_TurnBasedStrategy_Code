@@ -161,7 +161,7 @@ void USkaldBattleLevelManager::HandleLevelLoaded() {
 
   if (USkaldGameInstance *GI = OwningInstance.Get()) {
     GI->SetTravelPending(false);
-    GI->bIsInBattleMap = true;
+    GI->SetBattleMapActive(true);
 
     if (!GI->GetActiveBattleGameMode() && ActiveStreamingLevel.IsValid()) {
       UWorld *OwningWorld = ActiveStreamingLevel->GetWorld();
@@ -258,7 +258,7 @@ void USkaldBattleLevelManager::HandleLevelUnloaded() {
     }
     GI->SetActiveBattleGameMode(nullptr);
     GI->SetTravelPending(false);
-    GI->bIsInBattleMap = false;
+    GI->SetBattleMapActive(false);
   }
 }
 

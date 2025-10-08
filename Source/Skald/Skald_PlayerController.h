@@ -286,6 +286,10 @@ public:
   UFUNCTION()
   void HandleFactionsUpdated();
 
+  /** React to the game entering or exiting the streamed battle map. */
+  UFUNCTION()
+  void HandleBattleMapStateChanged(bool bInBattleMap);
+
   /** React to world state changes broadcast by the turn manager. */
   UFUNCTION()
   void HandleWorldStateChanged();
