@@ -5,7 +5,6 @@
 #include "Engine/Level.h"
 #include "Engine/LevelStreaming.h"
 #include "Engine/LevelStreamingDynamic.h"
-#include "Engine/LevelStreamingKismet.h"
 #include "Engine/World.h"
 #include "GameFramework/GameModeBase.h"
 #include "GameFramework/WorldSettings.h"
@@ -138,17 +137,17 @@ bool USkaldBattleLevelManager::RequestBattleLevel(
            *RequestedPackage);
 
     if (!StreamingLevel) {
-      ULevelStreamingKismet *KismetStreaming =
-          NewObject<ULevelStreamingKismet>(World, NAME_None, RF_Transient);
+      ULevelStreamingDynamic *DynamicStreaming =
+          NewObject<ULevelStreamingDynamic>(World, NAME_None, RF_Transient);
 
-      if (KismetStreaming) {
-        KismetStreaming->SetWorldAssetByPackageName(FName(*RequestedPackage));
-        KismetStreaming->SetShouldBeVisible(false);
-        KismetStreaming->SetShouldBeLoaded(false);
-        KismetStreaming->LevelTransform = FTransform::Identity;
+      if (DynamicStreaming) {
+        DynamicStreaming->SetWorldAssetByPackageName(FName(*RequestedPackage));
+        DynamicStreaming->SetShouldBeVisible(false);
+        DynamicStreaming->SetShouldBeLoaded(false);
+        DynamicStreaming->LevelTransform = FTransform::Identity;
 
-        World->AddStreamingLevel(KismetStreaming);
-        StreamingLevel = KismetStreaming;
+        World->AddStreamingLevel(DynamicStreaming);
+        StreamingLevel = DynamicStreaming;
       }
     }
 
