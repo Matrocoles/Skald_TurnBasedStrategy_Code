@@ -6,6 +6,7 @@
 #include "Containers/Ticker.h"
 #include "Skald_BattleLevelManager.generated.h"
 
+class ULevelStreaming;
 class ULevelStreamingDynamic;
 class USkaldGameInstance;
 class ULevel;
