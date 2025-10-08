@@ -24,6 +24,7 @@ class AWorldMap;
 class AFighterPawn;
 class UGridOverlayComponent;
 class UWorld;
+class ASkald_BattleGameMode;
 
 /** Command issued by the player during a battle. */
 UENUM()
@@ -375,6 +376,8 @@ protected:
   TObjectPtr<ATurnManager> TurnManager;
 
 private:
+  ASkald_BattleGameMode *ResolveBattleGameMode();
+
   /** Cache references to key game singletons and bind delegates. */
   void CacheGameReferences();
 

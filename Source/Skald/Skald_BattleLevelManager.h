@@ -10,6 +10,7 @@ class ULevelStreamingDynamic;
 class USkaldGameInstance;
 class ULevel;
 class UWorld;
+class ASkald_BattleGameMode;
 
 /**
  * Helper object responsible for loading and unloading tactical battle levels
@@ -55,4 +56,5 @@ private:
   FS_BattlePayload PendingPayload;
   bool bActiveLevelShouldBeLoaded = false;
   bool bLastKnownLoadedState = false;
+  TWeakObjectPtr<ASkald_BattleGameMode> ActiveBattleGameMode;
 };

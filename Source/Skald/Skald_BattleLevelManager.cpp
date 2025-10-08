@@ -6,6 +6,8 @@
 #include "Engine/LevelStreaming.h"
 #include "Engine/LevelStreamingDynamic.h"
 #include "Engine/World.h"
+#include "GameFramework/WorldSettings.h"
+#include "Skald_BattleGameMode.h"
 #include "Skald_GameInstance.h"
 #include "SkaldLogging.h"
 #include "UObject/Package.h"
@@ -156,6 +158,54 @@ void USkaldBattleLevelManager::HandleLevelLoaded() {
   if (USkaldGameInstance *GI = OwningInstance.Get()) {
     GI->SetTravelPending(false);
     GI->bIsInBattleMap = true;
+
+    if (!GI->GetActiveBattleGameMode() && ActiveStreamingLevel.IsValid()) {
+      UWorld *OwningWorld = ActiveStreamingLevel->GetWorld();
+      ULevel *LoadedLevel = ActiveStreamingLevel->GetLoadedLevel();
+      if (OwningWorld && LoadedLevel && OwningWorld->GetNetMode() != NM_Client) {
+        TSubclassOf<ASkald_BattleGameMode> BattleGameModeClass = nullptr;
+        if (AWorldSettings *WorldSettings = LoadedLevel->GetWorldSettings()) {
+          if (WorldSettings->GameModeOverride) {
+            BattleGameModeClass = WorldSettings->GameModeOverride;
+          } else if (WorldSettings->DefaultGameMode) {
+            BattleGameModeClass = WorldSettings->DefaultGameMode;
+          }
+        }
+
+        if (!BattleGameModeClass) {
+          BattleGameModeClass = ASkald_BattleGameMode::StaticClass();
+        }
+
+        if (BattleGameModeClass) {
+          FActorSpawnParameters SpawnParams;
+          SpawnParams.SpawnCollisionHandlingOverride =
+              ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+          SpawnParams.OverrideLevel = LoadedLevel;
+          SpawnParams.bDeferConstruction = false;
+
+          ASkald_BattleGameMode *BattleGM = OwningWorld->SpawnActor<ASkald_BattleGameMode>(
+              BattleGameModeClass, FTransform::Identity, SpawnParams);
+
+          if (BattleGM) {
+            FString Error;
+            const FString MapName =
+                RequestedBattleLevel.IsValid()
+                    ? RequestedBattleLevel.ToSoftObjectPath().ToString()
+                    : LoadedLevel->GetPackage()->GetName();
+            BattleGM->InitGame(MapName, FString(), Error);
+            ActiveBattleGameMode = BattleGM;
+            GI->SetActiveBattleGameMode(BattleGM);
+            UE_LOG(LogSkald, Log,
+                   TEXT("BattleLevelManager: Spawned battle game mode %s (Class=%s)"),
+                   *GetNameSafe(BattleGM), *GetNameSafe(BattleGameModeClass));
+          } else {
+            UE_LOG(LogSkald, Error,
+                   TEXT("BattleLevelManager: Failed to spawn battle game mode from %s"),
+                   *GetNameSafe(BattleGameModeClass));
+          }
+        }
+      }
+    }
   }
 }
 
@@ -172,6 +222,15 @@ void USkaldBattleLevelManager::HandleLevelUnloaded() {
   PendingPayload = FS_BattlePayload();
 
   if (USkaldGameInstance *GI = OwningInstance.Get()) {
+    if (ActiveBattleGameMode.IsValid()) {
+      if (ASkald_BattleGameMode *BattleGM = ActiveBattleGameMode.Get()) {
+        if (!BattleGM->IsPendingKill()) {
+          BattleGM->Destroy();
+        }
+      }
+      ActiveBattleGameMode.Reset();
+    }
+    GI->SetActiveBattleGameMode(nullptr);
     GI->SetTravelPending(false);
     GI->bIsInBattleMap = false;
   }
