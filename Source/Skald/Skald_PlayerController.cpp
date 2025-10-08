@@ -816,6 +816,13 @@ void ASkaldPlayerController::ShowOverworldHUD() {
 
   bBattleHUDVisible = false;
   bBattleHUDReadyToShow = false;
+
+  if (UWorld *World = GetWorld()) {
+    if (AWorldMap *WorldMap = Cast<AWorldMap>(
+            UGameplayStatics::GetActorOfClass(World, AWorldMap::StaticClass()))) {
+      WorldMap->SetWorldActive(true);
+    }
+  }
 }
 
 void ASkaldPlayerController::HideOverworldHUDForBattle() {
@@ -825,6 +832,13 @@ void ASkaldPlayerController::HideOverworldHUDForBattle() {
   bBattleHUDReadyToShow = false;
   if (BattleHudWidget) {
     BattleHudWidget->SetVisibility(ESlateVisibility::Collapsed);
+  }
+
+  if (UWorld *World = GetWorld()) {
+    if (AWorldMap *WorldMap = Cast<AWorldMap>(
+            UGameplayStatics::GetActorOfClass(World, AWorldMap::StaticClass()))) {
+      WorldMap->SetWorldActive(false);
+    }
   }
 }
 
@@ -1391,11 +1405,21 @@ void ASkaldPlayerController::ServerDeployUnits_Implementation(int32 TerritoryID,
 
 void ASkaldPlayerController::ServerSelectTerritory_Implementation(
     int32 TerritoryID) {
+  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+    if (GI->bIsInBattleMap && TerritoryID >= 0) {
+      return;
+    }
+  }
+
   UE_LOG(LogSkald, Log, TEXT("ServerSelectTerritory called with %d"),
          TerritoryID);
   AWorldMap *WorldMap = Cast<AWorldMap>(
       UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
   if (!WorldMap) {
+    return;
+  }
+
+  if (!WorldMap->IsWorldActive() && TerritoryID >= 0) {
     return;
   }
 
@@ -1419,6 +1443,10 @@ void ASkaldPlayerController::ClientSelectTerritory_Implementation(
   AWorldMap *WorldMap = Cast<AWorldMap>(
       UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
   if (!WorldMap) {
+    return;
+  }
+
+  if (!WorldMap->IsWorldActive() && TerritoryID >= 0) {
     return;
   }
 

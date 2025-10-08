@@ -1,5 +1,8 @@
 #include "WorldMap.h"
 #include "Algo/Reverse.h"
+#include "Components/ActorComponent.h"
+#include "Components/AudioComponent.h"
+#include "Components/PrimitiveComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Containers/Map.h"
 #include "Containers/Queue.h"
@@ -27,6 +30,78 @@ AWorldMap::AWorldMap() {
 }
 
 void AWorldMap::BeginPlay() { Super::BeginPlay(); }
+
+void AWorldMap::SetWorldActive(bool bShouldBeActive) {
+  if (bIsWorldActive == bShouldBeActive) {
+    return;
+  }
+
+  bIsWorldActive = bShouldBeActive;
+
+  SetActorHiddenInGame(!bIsWorldActive);
+  SetActorTickEnabled(bIsWorldActive);
+  SetActorEnableCollision(bIsWorldActive);
+
+  TInlineComponentArray<UPrimitiveComponent *> PrimitiveComponents(this);
+  for (UPrimitiveComponent *Primitive : PrimitiveComponents) {
+    if (!Primitive) {
+      continue;
+    }
+
+    Primitive->SetHiddenInGame(!bIsWorldActive);
+    Primitive->SetVisibility(bIsWorldActive, true);
+    Primitive->SetComponentTickEnabled(bIsWorldActive);
+
+    if (!bIsWorldActive) {
+      CachedCollisionStates.FindOrAdd(Primitive) =
+          Primitive->GetCollisionEnabled();
+      Primitive->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    } else {
+      if (TEnumAsByte<ECollisionEnabled::Type> *CachedState =
+              CachedCollisionStates.Find(Primitive)) {
+        Primitive->SetCollisionEnabled(*CachedState);
+        CachedCollisionStates.Remove(Primitive);
+      }
+    }
+  }
+
+  TInlineComponentArray<UAudioComponent *> AudioComponents(this);
+  for (UAudioComponent *Audio : AudioComponents) {
+    if (!Audio) {
+      continue;
+    }
+
+    if (!bIsWorldActive) {
+      const bool bWasPlaying = Audio->IsPlaying();
+      CachedAudioPlaybackState.FindOrAdd(Audio) = bWasPlaying;
+      if (bWasPlaying) {
+        Audio->SetPaused(true);
+      }
+    } else {
+      bool bShouldResume = false;
+      if (bool *CachedValue = CachedAudioPlaybackState.Find(Audio)) {
+        bShouldResume = *CachedValue;
+        CachedAudioPlaybackState.Remove(Audio);
+      }
+
+      if (bShouldResume) {
+        Audio->SetPaused(false);
+      }
+    }
+  }
+
+  for (auto It = CachedCollisionStates.CreateIterator(); It; ++It) {
+    if (!It.Key().IsValid()) {
+      It.RemoveCurrent();
+    }
+  }
+
+  for (auto It = CachedAudioPlaybackState.CreateIterator(); It; ++It) {
+    if (!It.Key().IsValid()) {
+      It.RemoveCurrent();
+    }
+  }
+}
 
 bool AWorldMap::GenerateTerritoriesFromTable() {
   if (!TerritoryClass) {
@@ -377,6 +452,13 @@ ATerritory *AWorldMap::GetTerritoryById(int32 TerritoryId) const {
 }
 
 void AWorldMap::SelectTerritory(ATerritory *Territory) {
+  if (!bIsWorldActive && Territory) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("WorldMap %s ignoring selection while inactive"),
+           *GetName());
+    return;
+  }
+
   if (Territory == SelectedTerritory) {
     return;
   }

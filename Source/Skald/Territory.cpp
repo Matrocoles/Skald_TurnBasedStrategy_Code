@@ -235,12 +235,24 @@ bool ATerritory::MoveTo(ATerritory *TargetTerritory, int32 Troops) {
 }
 
 void ATerritory::HandleMouseEnter(UPrimitiveComponent *TouchedComponent) {
+  if (AWorldMap *Map = Cast<AWorldMap>(GetOwner())) {
+    if (!Map->IsWorldActive()) {
+      return;
+    }
+  }
+
   if (!bIsSelected && MeshComponent) {
     MeshComponent->SetRenderCustomDepth(true);
   }
 }
 
 void ATerritory::HandleMouseLeave(UPrimitiveComponent *TouchedComponent) {
+  if (AWorldMap *Map = Cast<AWorldMap>(GetOwner())) {
+    if (!Map->IsWorldActive()) {
+      return;
+    }
+  }
+
   if (!bIsSelected && MeshComponent) {
     MeshComponent->SetRenderCustomDepth(false);
   }
@@ -248,6 +260,12 @@ void ATerritory::HandleMouseLeave(UPrimitiveComponent *TouchedComponent) {
 
 void ATerritory::HandleClicked(UPrimitiveComponent *TouchedComponent,
                                FKey ButtonPressed) {
+  if (AWorldMap *Map = Cast<AWorldMap>(GetOwner())) {
+    if (!Map->IsWorldActive()) {
+      return;
+    }
+  }
+
   UE_LOG(LogSkald, Log, TEXT("Territory %d clicked; currently %s"), TerritoryID,
          bIsSelected ? TEXT("selected") : TEXT("not selected"));
 
