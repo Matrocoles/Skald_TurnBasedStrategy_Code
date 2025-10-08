@@ -42,52 +42,73 @@ void AWorldMap::SetWorldActive(bool bShouldBeActive) {
   SetActorTickEnabled(bIsWorldActive);
   SetActorEnableCollision(bIsWorldActive);
 
-  TInlineComponentArray<UPrimitiveComponent *> PrimitiveComponents(this);
-  for (UPrimitiveComponent *Primitive : PrimitiveComponents) {
-    if (!Primitive) {
+  auto ProcessActorComponents =
+      [this](AActor *Actor) -> void {
+    if (!Actor) {
+      return;
+    }
+
+    TInlineComponentArray<UPrimitiveComponent *> PrimitiveComponents(Actor);
+    for (UPrimitiveComponent *Primitive : PrimitiveComponents) {
+      if (!Primitive) {
+        continue;
+      }
+
+      Primitive->SetHiddenInGame(!bIsWorldActive);
+      Primitive->SetVisibility(bIsWorldActive, true);
+      Primitive->SetComponentTickEnabled(bIsWorldActive);
+
+      if (!bIsWorldActive) {
+        CachedCollisionStates.FindOrAdd(Primitive) =
+            Primitive->GetCollisionEnabled();
+        Primitive->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+      } else {
+        if (TEnumAsByte<ECollisionEnabled::Type> *CachedState =
+                CachedCollisionStates.Find(Primitive)) {
+          Primitive->SetCollisionEnabled(*CachedState);
+          CachedCollisionStates.Remove(Primitive);
+        }
+      }
+    }
+
+    TInlineComponentArray<UAudioComponent *> AudioComponents(Actor);
+    for (UAudioComponent *Audio : AudioComponents) {
+      if (!Audio) {
+        continue;
+      }
+
+      if (!bIsWorldActive) {
+        const bool bWasPlaying = Audio->IsPlaying();
+        CachedAudioPlaybackState.FindOrAdd(Audio) = bWasPlaying;
+        if (bWasPlaying) {
+          Audio->SetPaused(true);
+        }
+      } else {
+        bool bShouldResume = false;
+        if (bool *CachedValue = CachedAudioPlaybackState.Find(Audio)) {
+          bShouldResume = *CachedValue;
+          CachedAudioPlaybackState.Remove(Audio);
+        }
+
+        if (bShouldResume) {
+          Audio->SetPaused(false);
+        }
+      }
+    }
+  };
+
+  ProcessActorComponents(this);
+
+  for (ATerritory *Territory : Territories) {
+    if (!IsValid(Territory)) {
       continue;
     }
 
-    Primitive->SetHiddenInGame(!bIsWorldActive);
-    Primitive->SetVisibility(bIsWorldActive, true);
-    Primitive->SetComponentTickEnabled(bIsWorldActive);
+    Territory->SetActorHiddenInGame(!bIsWorldActive);
+    Territory->SetActorTickEnabled(bIsWorldActive);
+    Territory->SetActorEnableCollision(bIsWorldActive);
 
-    if (!bIsWorldActive) {
-      CachedCollisionStates.FindOrAdd(Primitive) =
-          Primitive->GetCollisionEnabled();
-      Primitive->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    } else {
-      if (TEnumAsByte<ECollisionEnabled::Type> *CachedState =
-              CachedCollisionStates.Find(Primitive)) {
-        Primitive->SetCollisionEnabled(*CachedState);
-        CachedCollisionStates.Remove(Primitive);
-      }
-    }
-  }
-
-  TInlineComponentArray<UAudioComponent *> AudioComponents(this);
-  for (UAudioComponent *Audio : AudioComponents) {
-    if (!Audio) {
-      continue;
-    }
-
-    if (!bIsWorldActive) {
-      const bool bWasPlaying = Audio->IsPlaying();
-      CachedAudioPlaybackState.FindOrAdd(Audio) = bWasPlaying;
-      if (bWasPlaying) {
-        Audio->SetPaused(true);
-      }
-    } else {
-      bool bShouldResume = false;
-      if (bool *CachedValue = CachedAudioPlaybackState.Find(Audio)) {
-        bShouldResume = *CachedValue;
-        CachedAudioPlaybackState.Remove(Audio);
-      }
-
-      if (bShouldResume) {
-        Audio->SetPaused(false);
-      }
-    }
+    ProcessActorComponents(Territory);
   }
 
   for (auto It = CachedCollisionStates.CreateIterator(); It; ++It) {
