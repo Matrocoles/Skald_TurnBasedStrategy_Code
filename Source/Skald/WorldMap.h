@@ -2,11 +2,14 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataTable.h"
+#include "Engine/EngineTypes.h"
 #include "GameFramework/Actor.h"
 #include "WorldMap.generated.h"
 
 class ATerritory;
 class ASkaldPlayerState;
+class UPrimitiveComponent;
+class UAudioComponent;
 
 // Broadcast when a territory is selected on the world map so that interested
 // systems (e.g. player controllers) can react.
@@ -120,6 +123,14 @@ public:
   UFUNCTION(BlueprintCallable, Category = "WorldMap")
   bool MoveBetween(ATerritory *From, ATerritory *To, int32 Troops);
 
+  /** Toggle whether the overworld should be visible and interactive. */
+  UFUNCTION(BlueprintCallable, Category = "WorldMap")
+  void SetWorldActive(bool bShouldBeActive);
+
+  /** Returns whether the overworld is currently visible/interactive. */
+  UFUNCTION(BlueprintPure, Category = "WorldMap")
+  bool IsWorldActive() const { return bIsWorldActive; }
+
   /** Actor class used when spawning territory instances. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WorldMap")
   TSubclassOf<ATerritory> TerritoryClass;
@@ -159,4 +170,15 @@ public:
   int32 AutoPlaceUnitsForAI(ASkaldPlayerState *PlayerState);
 
 protected:
+  /** Whether the overworld should currently be visible and interactive. */
+  UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "WorldMap")
+  bool bIsWorldActive = true;
+
+private:
+  /** Cached collision state so we can restore original settings after battles. */
+  TMap<TWeakObjectPtr<UPrimitiveComponent>, TEnumAsByte<ECollisionEnabled::Type>>
+      CachedCollisionStates;
+
+  /** Cached audio playback state for pausing/resuming overworld ambience. */
+  TMap<TWeakObjectPtr<UAudioComponent>, bool> CachedAudioPlaybackState;
 };
