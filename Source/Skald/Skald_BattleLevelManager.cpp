@@ -5,6 +5,7 @@
 #include "Engine/Level.h"
 #include "Engine/LevelStreaming.h"
 #include "Engine/LevelStreamingDynamic.h"
+#include "Engine/LevelStreamingKismet.h"
 #include "Engine/World.h"
 #include "GameFramework/GameModeBase.h"
 #include "GameFramework/WorldSettings.h"
@@ -125,6 +126,35 @@ bool USkaldBattleLevelManager::RequestBattleLevel(
     FRotator SpawnRotation = FRotator::ZeroRotator;
     StreamingLevel = ULevelStreamingDynamic::LoadLevelInstanceBySoftObjectPtr(
         World, LevelToStream, SpawnLocation, SpawnRotation, bLoadSuccess);
+  }
+
+  if (StreamingLevel && !bLoadSuccess) {
+    StreamingLevel = nullptr;
+  }
+
+  if ((!StreamingLevel || !bLoadSuccess) && !RequestedPackage.IsEmpty()) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("BattleLevelManager: Dynamic load failed for %s, attempting manual streaming"),
+           *RequestedPackage);
+
+    if (!StreamingLevel) {
+      ULevelStreamingKismet *KismetStreaming =
+          NewObject<ULevelStreamingKismet>(World, NAME_None, RF_Transient);
+
+      if (KismetStreaming) {
+        KismetStreaming->SetWorldAssetByPackageName(FName(*RequestedPackage));
+        KismetStreaming->SetShouldBeVisible(false);
+        KismetStreaming->SetShouldBeLoaded(false);
+        KismetStreaming->LevelTransform = FTransform::Identity;
+
+        World->AddStreamingLevel(KismetStreaming);
+        StreamingLevel = KismetStreaming;
+      }
+    }
+
+    if (StreamingLevel) {
+      bLoadSuccess = true;
+    }
   }
 
   if (!StreamingLevel || !bLoadSuccess) {
