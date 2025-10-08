@@ -156,6 +156,10 @@ void ASkaldPlayerController::CacheGameReferences() {
   } else {
     CachedGameInstance->OnFactionsUpdated.AddDynamic(
         this, &ASkaldPlayerController::HandleFactionsUpdated);
+    CachedGameInstance->OnBattleMapStateChanged.RemoveDynamic(
+        this, &ASkaldPlayerController::HandleBattleMapStateChanged);
+    CachedGameInstance->OnBattleMapStateChanged.AddDynamic(
+        this, &ASkaldPlayerController::HandleBattleMapStateChanged);
   }
 }
 
@@ -293,6 +297,11 @@ void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
   if (PostLoadMapHandle.IsValid()) {
     FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(PostLoadMapHandle);
     PostLoadMapHandle.Reset();
+  }
+
+  if (CachedGameInstance) {
+    CachedGameInstance->OnBattleMapStateChanged.RemoveDynamic(
+        this, &ASkaldPlayerController::HandleBattleMapStateChanged);
   }
 
   if (MainHUD) {
@@ -1689,6 +1698,11 @@ void ASkaldPlayerController::HandleFactionsUpdated() {
   if (ASkaldPlayerState *LocalPS = GetPlayerState<ASkaldPlayerState>()) {
     MainHUD->UpdateResources(LocalPS->Resources);
   }
+}
+
+void ASkaldPlayerController::HandleBattleMapStateChanged(bool /*bInBattleMap*/) {
+  DetectBattleMap();
+  InitializeFighterSelectionIfNeeded();
 }
 
 void ASkaldPlayerController::HandleWorldStateChanged() {
