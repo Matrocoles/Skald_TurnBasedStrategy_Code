@@ -63,8 +63,7 @@ private:
   void ScheduleTryActivateNextFighter();
   bool ShouldContinueActivation(const AFighterPawn *Fighter) const;
   void CompleteFighterActivation();
-  UFUNCTION()
-  void HandleBattleMapStateChanged(bool bInBattleMap);
+  virtual void HandleBattleMapStateChanged(bool bInBattleMap) override;
 
   int32 ComputeManhattanDistance(UGridOverlayComponent *Grid,
                                  const AFighterPawn *A,

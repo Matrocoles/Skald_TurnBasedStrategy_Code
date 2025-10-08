@@ -288,7 +288,7 @@ public:
 
   /** React to the game entering or exiting the streamed battle map. */
   UFUNCTION()
-  void HandleBattleMapStateChanged(bool bInBattleMap);
+  virtual void HandleBattleMapStateChanged(bool bInBattleMap);
 
   /** React to world state changes broadcast by the turn manager. */
   UFUNCTION()
