@@ -457,6 +457,29 @@ void ASkaldAIController::DetermineControlledBattleSide() {
   if (PlayerId == Battle.DefenderPlayerID && PlayerId > 0) {
     bAIControlsDefenderSide = true;
   }
+
+  if (!bAIControlsAttackerSide || !bAIControlsDefenderSide) {
+    FString PlayerName = PS->GetPlayerName();
+    if (PlayerName.IsEmpty()) {
+      PlayerName = PS->PlayerDisplayName;
+    }
+
+    auto MatchesParticipantName = [&PlayerName](const FString &Candidate) {
+      if (PlayerName.IsEmpty() || Candidate.IsEmpty()) {
+        return false;
+      }
+      return PlayerName.Equals(Candidate, ESearchCase::IgnoreCase);
+    };
+
+    if (!bAIControlsAttackerSide &&
+        MatchesParticipantName(Battle.AttackerDisplayName)) {
+      bAIControlsAttackerSide = true;
+    }
+    if (!bAIControlsDefenderSide &&
+        MatchesParticipantName(Battle.DefenderDisplayName)) {
+      bAIControlsDefenderSide = true;
+    }
+  }
 }
 
 bool ASkaldAIController::ControlsFighter(const AFighterPawn *Fighter) const {
