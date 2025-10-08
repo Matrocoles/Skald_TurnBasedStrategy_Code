@@ -3,10 +3,7 @@
 #include "CoreMinimal.h"
 #include "SkaldTypes.h"
 #include "UObject/Object.h"
-
-namespace FTSTicker {
-struct FDelegateHandle;
-}
+#include "Containers/Ticker.h"
 #include "Skald_BattleLevelManager.generated.h"
 
 class ULevelStreamingDynamic;
