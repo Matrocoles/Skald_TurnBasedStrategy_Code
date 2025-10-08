@@ -721,6 +721,21 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
     return;
   }
 
+  {
+    TArray<AController *> ControllersToRelocate;
+    ControllersToRelocate.Reserve(2);
+    if (AttackerC) {
+      ControllersToRelocate.AddUnique(AttackerC);
+    }
+    if (DefenderC) {
+      ControllersToRelocate.AddUnique(DefenderC);
+    }
+
+    if (ControllersToRelocate.Num() > 0) {
+      RelocateControllersNearBattleGrid(ControllersToRelocate);
+    }
+  }
+
   ASkaldPlayerState *AttackerSlotPS =
       AttackerC->GetPlayerState<ASkaldPlayerState>();
   ASkaldPlayerState *DefenderSlotPS =
