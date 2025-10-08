@@ -13,6 +13,7 @@
 #include "SkaldLogging.h"
 #include "UObject/Package.h"
 #include "UObject/SoftObjectPath.h"
+#include "UObject/SoftObjectPtr.h"
 #include "Misc/EngineVersionComparison.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -175,6 +176,12 @@ void USkaldBattleLevelManager::HandleLevelLoaded() {
 #else
           if (WorldSettings->DefaultGameMode) {
             DefaultGameModeClass = WorldSettings->DefaultGameMode.Get();
+
+            if (!DefaultGameModeClass &&
+                WorldSettings->DefaultGameMode.ToSoftObjectPath().IsValid()) {
+              DefaultGameModeClass =
+                  WorldSettings->DefaultGameMode.LoadSynchronous();
+            }
           }
 #endif
 
