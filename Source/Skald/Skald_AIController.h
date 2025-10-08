@@ -42,6 +42,8 @@ private:
   void SetupBattleAutomation();
   void TeardownBattleAutomation();
 
+  ASkald_BattleGameMode *ResolveBattleGameMode() const;
+
   void DetermineControlledBattleSide();
   bool ControlsFighter(const AFighterPawn *Fighter) const;
   bool IsMyTurn() const;

@@ -6,6 +6,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Skald.h"
 #include "SkaldLogging.h"
+#include "Skald_BattleGameMode.h"
 #include "Skald_BattleLevelManager.h"
 #include "Skald_PlayerController.h"
 #include "Styling/CoreStyle.h"
@@ -102,6 +103,29 @@ void USkaldGameInstance::SetTravelPending(bool bInPending) {
   }
 }
 
+void USkaldGameInstance::SetActiveBattleGameMode(
+    ASkald_BattleGameMode *InGameMode) {
+  ASkald_BattleGameMode *Previous = ActiveBattleGameMode.Get();
+  if (Previous == InGameMode) {
+    return;
+  }
+
+  if (!InGameMode) {
+    if (Previous) {
+      UE_LOG(LogSkald, Log,
+             TEXT("GameInstance cleared active battle game mode %s"),
+             *GetNameSafe(Previous));
+    }
+    ActiveBattleGameMode = nullptr;
+    return;
+  }
+
+  ActiveBattleGameMode = InGameMode;
+  UE_LOG(LogSkald, Log,
+         TEXT("GameInstance set active battle game mode: %s"),
+         *GetNameSafe(InGameMode));
+}
+
 void USkaldGameInstance::SeedCombatRandomStream(int32 Seed) {
   CombatRandomStream.Initialize(Seed);
 }
@@ -195,6 +219,12 @@ void USkaldGameInstance::ResetSessionState() {
   if (BattleLevelStreamingManager) {
     BattleLevelStreamingManager->ReleaseBattleLevel();
   }
+  if (ASkald_BattleGameMode *BattleGM = ActiveBattleGameMode.Get()) {
+    if (!BattleGM->IsPendingKill()) {
+      BattleGM->Destroy();
+    }
+  }
+  SetActiveBattleGameMode(nullptr);
   bIsInBattleMap = false;
   bTravelPending = false;
   CachedWorldMapTerritories.Empty();

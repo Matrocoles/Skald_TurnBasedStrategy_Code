@@ -12,6 +12,7 @@ class SWidget;
 class UGridBattleManager;
 class USkaldBattleLevelManager;
 class UUserWidget;
+class ASkald_BattleGameMode;
 class USkaldSaveGame;
 class UNetDriver;
 
@@ -111,6 +112,10 @@ public:
   UPROPERTY(Transient)
   bool bTravelPending = false;
 
+  /** Active battle game mode controlling the streamed combat scene. */
+  UPROPERTY(Transient)
+  TWeakObjectPtr<ASkald_BattleGameMode> ActiveBattleGameMode;
+
   /** Snapshot of the overworld territories captured before travelling. */
   UPROPERTY(BlueprintReadWrite, Category = "Battle")
   TArray<FS_Territory> CachedWorldMapTerritories;
@@ -147,6 +152,12 @@ public:
   void SetTravelPending(bool bInPending);
 
   USkaldBattleLevelManager *GetBattleLevelManager() const { return BattleLevelStreamingManager; }
+
+  void SetActiveBattleGameMode(ASkald_BattleGameMode *InGameMode);
+
+  ASkald_BattleGameMode *GetActiveBattleGameMode() const {
+    return ActiveBattleGameMode.Get();
+  }
 
   UFUNCTION(BlueprintCallable, BlueprintPure)
   const FSkaldTravelState &GetTravelState() const { return TravelState; }

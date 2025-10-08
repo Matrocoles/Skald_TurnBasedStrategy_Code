@@ -87,6 +87,21 @@ bool IsCursorOverInteractableSlateWidget() {
 }
 }
 
+ASkald_BattleGameMode *ASkaldPlayerController::ResolveBattleGameMode() {
+  if (UWorld *World = GetWorld()) {
+    if (ASkald_BattleGameMode *BattleGM =
+            World->GetAuthGameMode<ASkald_BattleGameMode>()) {
+      return BattleGM;
+    }
+  }
+
+  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+    return GI->GetActiveBattleGameMode();
+  }
+
+  return nullptr;
+}
+
 ASkaldPlayerController::ASkaldPlayerController() {
   TurnManager = nullptr;
   HUDRef = nullptr;
@@ -615,8 +630,7 @@ void ASkaldPlayerController::Server_LockInSelection_Implementation(
          TEXT("Server_LockInSelection: %s sent %d fighters"), *GetName(),
          SelectedFighters.Num());
 
-  if (ASkald_BattleGameMode *GameMode =
-          GetWorld()->GetAuthGameMode<ASkald_BattleGameMode>())
+  if (ASkald_BattleGameMode *GameMode = ResolveBattleGameMode())
   {
     GameMode->HandleHumanLockIn(this, SelectedFighters);
   }
@@ -717,8 +731,7 @@ void ASkaldPlayerController::Server_CommitArmy_Implementation(
     PS->bArmyLockedIn = true;
   }
 
-  if (ASkald_BattleGameMode *BattleGM =
-          GetWorld()->GetAuthGameMode<ASkald_BattleGameMode>()) {
+  if (ASkald_BattleGameMode *BattleGM = ResolveBattleGameMode()) {
     BattleGM->TryLaunchBattle();
   }
 }

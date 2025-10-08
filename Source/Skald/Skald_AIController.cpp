@@ -31,6 +31,22 @@ constexpr TCHAR EnemyBattleTransitionMessage[] =
     TEXT("Enemy is preparing for battle...");
 }
 
+ASkald_BattleGameMode *ASkaldAIController::ResolveBattleGameMode() const {
+  if (UWorld *World = GetWorld()) {
+    if (ASkald_BattleGameMode *BattleGameMode =
+            World->GetAuthGameMode<ASkald_BattleGameMode>()) {
+      return BattleGameMode;
+    }
+  }
+
+  if (const USkaldGameInstance *GameInstance =
+          GetGameInstance<USkaldGameInstance>()) {
+    return GameInstance->GetActiveBattleGameMode();
+  }
+
+  return nullptr;
+}
+
 void ASkaldAIController::BeginPlay() {
   Super::BeginPlay();
 
@@ -43,11 +59,8 @@ void ASkaldAIController::BeginPlay() {
   SetupBattleAutomation();
 
   if (HasAuthority()) {
-    if (UWorld *World = GetWorld()) {
-      if (ASkald_BattleGameMode *BattleGameMode =
-              World->GetAuthGameMode<ASkald_BattleGameMode>()) {
-        BattleGameMode->OnAIControllerReady(this);
-      }
+    if (ASkald_BattleGameMode *BattleGameMode = ResolveBattleGameMode()) {
+      BattleGameMode->OnAIControllerReady(this);
     }
   }
 }
