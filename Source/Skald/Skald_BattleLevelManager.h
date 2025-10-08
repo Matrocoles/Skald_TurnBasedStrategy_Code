@@ -37,6 +37,9 @@ public:
   bool IsBattleLevelActive() const { return ActiveStreamingLevel.IsValid(); }
 
 private:
+  void HideNonBattleLevels();
+  void RestoreNonBattleLevels();
+
   void HandleLevelLoaded();
   void HandleLevelUnloaded();
   void HandleLevelAddedToWorld(ULevel *InLevel, UWorld *InWorld);
@@ -58,4 +61,14 @@ private:
   bool bActiveLevelShouldBeLoaded = false;
   bool bLastKnownLoadedState = false;
   TWeakObjectPtr<ASkald_BattleGameMode> ActiveBattleGameMode;
+
+  struct FHiddenStreamingLevelState {
+    TWeakObjectPtr<ULevelStreaming> Level;
+    bool bWasVisible = false;
+  };
+
+  TArray<FHiddenStreamingLevelState> HiddenStreamingLevels;
+  TWeakObjectPtr<ULevel> HiddenPersistentLevel;
+  TWeakObjectPtr<UWorld> CachedStreamingWorld;
+  bool bPersistentLevelWasVisible = false;
 };

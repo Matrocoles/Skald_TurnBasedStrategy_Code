@@ -56,7 +56,19 @@ void ASkaldAIController::BeginPlay() {
     BattleActionDelay = Settings->GetBattleActionDelay();
   }
 
+  USkaldGameInstance *GameInstance = GetGameInstance<USkaldGameInstance>();
+  if (GameInstance) {
+    GameInstance->OnBattleMapStateChanged.RemoveDynamic(
+        this, &ASkaldAIController::HandleBattleMapStateChanged);
+    GameInstance->OnBattleMapStateChanged.AddDynamic(
+        this, &ASkaldAIController::HandleBattleMapStateChanged);
+  }
+
   SetupBattleAutomation();
+
+  if (GameInstance && GameInstance->bIsInBattleMap) {
+    HandleBattleMapStateChanged(true);
+  }
 
   if (HasAuthority()) {
     if (ASkald_BattleGameMode *BattleGameMode = ResolveBattleGameMode()) {
@@ -374,6 +386,11 @@ void ASkaldAIController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
   ClearDecisionTimers();
   ClearEnemyTurnStatus();
   bAwaitingBattleTransition = false;
+  if (USkaldGameInstance *GameInstance =
+          GetGameInstance<USkaldGameInstance>()) {
+    GameInstance->OnBattleMapStateChanged.RemoveDynamic(
+        this, &ASkaldAIController::HandleBattleMapStateChanged);
+  }
   TeardownBattleAutomation();
   Super::EndPlay(EndPlayReason);
 }
@@ -857,6 +874,14 @@ void ASkaldAIController::CompleteFighterActivation() {
   }
 
   PendingActivationFighter = nullptr;
+}
+
+void ASkaldAIController::HandleBattleMapStateChanged(bool bInBattleMap) {
+  if (bInBattleMap) {
+    SetupBattleAutomation();
+  } else {
+    TeardownBattleAutomation();
+  }
 }
 
 void ASkaldAIController::ScheduleTryActivateNextFighter() {

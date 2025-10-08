@@ -190,6 +190,7 @@ void USkaldBattleLevelManager::ReleaseBattleLevel() {
   if (!ActiveStreamingLevel.IsValid()) {
     UnregisterWorldDelegates();
     UnregisterStreamingTicker();
+    RestoreNonBattleLevels();
     return;
   }
 
@@ -225,6 +226,7 @@ void USkaldBattleLevelManager::HandleLevelLoaded() {
   }
 
   ActiveStreamingLevel->SetShouldBeVisible(true);
+  HideNonBattleLevels();
   UE_LOG(LogSkald, Log, TEXT("BattleLevelManager: Battle level streamed and visible"));
 
   if (USkaldGameInstance *GI = OwningInstance.Get()) {
@@ -308,6 +310,7 @@ void USkaldBattleLevelManager::HandleLevelUnloaded() {
 
   UnregisterWorldDelegates();
   UnregisterStreamingTicker();
+  RestoreNonBattleLevels();
 
   bActiveLevelShouldBeLoaded = false;
   bLastKnownLoadedState = false;
@@ -446,5 +449,124 @@ bool USkaldBattleLevelManager::TickStreamingStatus(float DeltaTime) {
   }
 
   return ActiveStreamingLevel.IsValid();
+}
+
+void USkaldBattleLevelManager::HideNonBattleLevels() {
+  RestoreNonBattleLevels();
+
+  if (!ActiveStreamingLevel.IsValid()) {
+    return;
+  }
+
+  ULevelStreaming *StreamingLevel = ActiveStreamingLevel.Get();
+  if (!StreamingLevel) {
+    return;
+  }
+
+  UWorld *StreamingWorld = StreamingLevel->GetWorld();
+  if (!StreamingWorld) {
+    return;
+  }
+
+  CachedStreamingWorld = StreamingWorld;
+
+  ULevel *LoadedBattleLevel = StreamingLevel->GetLoadedLevel();
+
+  HiddenStreamingLevels.Reset();
+
+  for (ULevelStreaming *OtherLevel : StreamingWorld->GetStreamingLevels()) {
+    if (!OtherLevel || OtherLevel == StreamingLevel) {
+      continue;
+    }
+
+    const bool bWasVisible = OtherLevel->GetShouldBeVisible();
+    if (!bWasVisible) {
+      continue;
+    }
+
+    FHiddenStreamingLevelState State;
+    State.Level = OtherLevel;
+    State.bWasVisible = bWasVisible;
+    HiddenStreamingLevels.Add(State);
+
+    FString LevelLabel = OtherLevel->GetWorldAssetPackageName();
+    if (LevelLabel.IsEmpty()) {
+      LevelLabel = OtherLevel->GetWorldAsset().ToSoftObjectPath().ToString();
+    }
+
+    OtherLevel->SetShouldBeVisible(false);
+    UE_LOG(LogSkald, Verbose,
+           TEXT("BattleLevelManager: Hiding streaming level %s while battle map active"),
+           *LevelLabel);
+  }
+
+  HiddenPersistentLevel.Reset();
+  bPersistentLevelWasVisible = false;
+
+  if (ULevel *PersistentLevel = StreamingWorld->PersistentLevel) {
+    if (PersistentLevel != LoadedBattleLevel && PersistentLevel->bIsVisible) {
+      HiddenPersistentLevel = PersistentLevel;
+      bPersistentLevelWasVisible = true;
+      StreamingWorld->SetShouldBeVisible(PersistentLevel, false);
+      UE_LOG(LogSkald, Verbose,
+             TEXT("BattleLevelManager: Hiding persistent level %s"),
+             *PersistentLevel->GetOutermost()->GetName());
+    }
+  }
+}
+
+void USkaldBattleLevelManager::RestoreNonBattleLevels() {
+  if (!HiddenStreamingLevels.Num() && !HiddenPersistentLevel.IsValid()) {
+    CachedStreamingWorld.Reset();
+    bPersistentLevelWasVisible = false;
+    return;
+  }
+
+  UWorld *StreamingWorld = CachedStreamingWorld.Get();
+  if (!StreamingWorld && ActiveStreamingLevel.IsValid()) {
+    StreamingWorld = ActiveStreamingLevel->GetWorld();
+  }
+
+  for (const FHiddenStreamingLevelState &State : HiddenStreamingLevels) {
+    if (ULevelStreaming *Level = State.Level.Get()) {
+      Level->SetShouldBeVisible(State.bWasVisible);
+      if (State.bWasVisible) {
+        FString LevelLabel = Level->GetWorldAssetPackageName();
+        if (LevelLabel.IsEmpty()) {
+          LevelLabel = Level->GetWorldAsset().ToSoftObjectPath().ToString();
+        }
+        UE_LOG(LogSkald, Verbose,
+               TEXT("BattleLevelManager: Restoring visibility for streaming level %s"),
+               *LevelLabel);
+      }
+    }
+  }
+  HiddenStreamingLevels.Reset();
+
+  if (HiddenPersistentLevel.IsValid()) {
+    ULevel *PersistentLevel = HiddenPersistentLevel.Get();
+    if (PersistentLevel) {
+      if (!StreamingWorld) {
+        StreamingWorld = PersistentLevel->GetWorld();
+      }
+
+      if (StreamingWorld) {
+        StreamingWorld->SetShouldBeVisible(PersistentLevel,
+                                           bPersistentLevelWasVisible);
+      } else {
+        PersistentLevel->bIsVisible = bPersistentLevelWasVisible;
+      }
+
+      if (bPersistentLevelWasVisible) {
+        UE_LOG(LogSkald, Verbose,
+               TEXT("BattleLevelManager: Restored persistent level %s"),
+               *PersistentLevel->GetOutermost()->GetName());
+      }
+    }
+  }
+
+  HiddenPersistentLevel.Reset();
+  CachedStreamingWorld.Reset();
+  bPersistentLevelWasVisible = false;
 }
 
