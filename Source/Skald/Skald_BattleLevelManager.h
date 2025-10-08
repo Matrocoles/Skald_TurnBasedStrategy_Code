@@ -1,8 +1,12 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
 #include "SkaldTypes.h"
+#include "UObject/Object.h"
+
+namespace FTSTicker {
+struct FDelegateHandle;
+}
 #include "Skald_BattleLevelManager.generated.h"
 
 class ULevelStreamingDynamic;
@@ -38,20 +42,20 @@ private:
   void HandleLevelUnloaded();
   void HandleLevelAddedToWorld(ULevel *InLevel, UWorld *InWorld);
   void HandleLevelRemovedFromWorld(ULevel *InLevel, UWorld *InWorld);
-  void HandleStreamingLevelLoaded(ULevel *InLevel);
-  void HandleStreamingLevelUnloaded(ULevel *InLevel);
   bool DoesEventMatchActiveLevel(ULevel *InLevel, UWorld *InWorld) const;
   void RegisterWorldDelegates();
   void UnregisterWorldDelegates();
-  void UnregisterStreamingDelegates();
+  void RegisterStreamingTicker();
+  void UnregisterStreamingTicker();
+  bool TickStreamingStatus(float DeltaTime);
 
   TWeakObjectPtr<USkaldGameInstance> OwningInstance;
   TWeakObjectPtr<ULevelStreamingDynamic> ActiveStreamingLevel;
   TSoftObjectPtr<UWorld> RequestedBattleLevel;
   FDelegateHandle LevelAddedToWorldHandle;
   FDelegateHandle LevelRemovedFromWorldHandle;
-  FDelegateHandle StreamingLevelLoadedHandle;
-  FDelegateHandle StreamingLevelUnloadedHandle;
+  FTSTicker::FDelegateHandle StreamingStatusTickerHandle;
   FS_BattlePayload PendingPayload;
   bool bActiveLevelShouldBeLoaded = false;
+  bool bLastKnownLoadedState = false;
 };

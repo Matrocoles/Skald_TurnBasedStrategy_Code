@@ -1,5 +1,6 @@
 #include "Skald_BattleLevelManager.h"
 
+#include "Containers/Ticker.h"
 #include "Engine/Engine.h"
 #include "Engine/Level.h"
 #include "Engine/LevelStreaming.h"
@@ -61,6 +62,8 @@ bool USkaldBattleLevelManager::RequestBattleLevel(
       GI->SetTravelPending(true);
     }
 
+    RegisterStreamingTicker();
+
     UE_LOG(LogSkald, Log,
            TEXT("BattleLevelManager: Battle level %s already streaming, reusing active request"),
            *LevelToStream.ToString());
@@ -90,17 +93,15 @@ bool USkaldBattleLevelManager::RequestBattleLevel(
   ActiveStreamingLevel = StreamingLevel;
   bActiveLevelShouldBeLoaded = true;
 
-  StreamingLevelLoadedHandle =
-      StreamingLevel->OnLevelLoaded.AddUObject(
-          this, &USkaldBattleLevelManager::HandleStreamingLevelLoaded);
-  StreamingLevelUnloadedHandle =
-      StreamingLevel->OnLevelUnloaded.AddUObject(
-          this, &USkaldBattleLevelManager::HandleStreamingLevelUnloaded);
-
   RegisterWorldDelegates();
+  RegisterStreamingTicker();
 
   StreamingLevel->SetShouldBeVisible(false);
   StreamingLevel->SetShouldBeLoaded(true);
+
+  if (StreamingLevel->IsLevelLoaded()) {
+    HandleLevelLoaded();
+  }
 
   if (USkaldGameInstance *GI = OwningInstance.Get()) {
     GI->SetTravelPending(true);
@@ -114,7 +115,7 @@ bool USkaldBattleLevelManager::RequestBattleLevel(
 void USkaldBattleLevelManager::ReleaseBattleLevel() {
   if (!ActiveStreamingLevel.IsValid()) {
     UnregisterWorldDelegates();
-    UnregisterStreamingDelegates();
+    UnregisterStreamingTicker();
     return;
   }
 
@@ -142,6 +143,8 @@ void USkaldBattleLevelManager::HandleLevelLoaded() {
     return;
   }
 
+  bLastKnownLoadedState = true;
+
   if (LevelAddedToWorldHandle.IsValid()) {
     FWorldDelegates::LevelAddedToWorld.Remove(LevelAddedToWorldHandle);
     LevelAddedToWorldHandle.Reset();
@@ -160,9 +163,10 @@ void USkaldBattleLevelManager::HandleLevelUnloaded() {
   UE_LOG(LogSkald, Log, TEXT("BattleLevelManager: Battle level unloaded"));
 
   UnregisterWorldDelegates();
-  UnregisterStreamingDelegates();
+  UnregisterStreamingTicker();
 
   bActiveLevelShouldBeLoaded = false;
+  bLastKnownLoadedState = false;
   ActiveStreamingLevel.Reset();
   RequestedBattleLevel.Reset();
   PendingPayload = FS_BattlePayload();
@@ -188,20 +192,6 @@ void USkaldBattleLevelManager::HandleLevelRemovedFromWorld(ULevel *InLevel,
     return;
   }
 
-  HandleLevelUnloaded();
-}
-
-void USkaldBattleLevelManager::HandleStreamingLevelLoaded(ULevel *InLevel) {
-  UE_LOG(LogSkald, Verbose,
-         TEXT("BattleLevelManager: Streaming level reported loaded: %s"),
-         InLevel ? *InLevel->GetName() : TEXT("<null>"));
-  HandleLevelLoaded();
-}
-
-void USkaldBattleLevelManager::HandleStreamingLevelUnloaded(ULevel *InLevel) {
-  UE_LOG(LogSkald, Verbose,
-         TEXT("BattleLevelManager: Streaming level reported unloaded: %s"),
-         InLevel ? *InLevel->GetName() : TEXT("<null>"));
   HandleLevelUnloaded();
 }
 
@@ -255,26 +245,53 @@ void USkaldBattleLevelManager::UnregisterWorldDelegates() {
   }
 }
 
-void USkaldBattleLevelManager::UnregisterStreamingDelegates() {
+void USkaldBattleLevelManager::RegisterStreamingTicker() {
+  UnregisterStreamingTicker();
+
   if (!ActiveStreamingLevel.IsValid()) {
-    StreamingLevelLoadedHandle.Reset();
-    StreamingLevelUnloadedHandle.Reset();
+    bLastKnownLoadedState = false;
     return;
   }
 
-  if (ULevelStreamingDynamic *StreamingLevel = ActiveStreamingLevel.Get()) {
-    if (StreamingLevelLoadedHandle.IsValid()) {
-      StreamingLevel->OnLevelLoaded.Remove(StreamingLevelLoadedHandle);
-      StreamingLevelLoadedHandle.Reset();
-    }
+  bLastKnownLoadedState = ActiveStreamingLevel->IsLevelLoaded();
+  StreamingStatusTickerHandle = FTSTicker::GetCoreTicker().AddTicker(
+      FTickerDelegate::CreateUObject(this, &USkaldBattleLevelManager::TickStreamingStatus),
+      0.0f);
+}
 
-    if (StreamingLevelUnloadedHandle.IsValid()) {
-      StreamingLevel->OnLevelUnloaded.Remove(StreamingLevelUnloadedHandle);
-      StreamingLevelUnloadedHandle.Reset();
-    }
-  } else {
-    StreamingLevelLoadedHandle.Reset();
-    StreamingLevelUnloadedHandle.Reset();
+void USkaldBattleLevelManager::UnregisterStreamingTicker() {
+  if (StreamingStatusTickerHandle.IsValid()) {
+    FTSTicker::GetCoreTicker().RemoveTicker(StreamingStatusTickerHandle);
+    StreamingStatusTickerHandle.Reset();
   }
+}
+
+bool USkaldBattleLevelManager::TickStreamingStatus(float DeltaTime) {
+  if (!ActiveStreamingLevel.IsValid()) {
+    HandleLevelUnloaded();
+    bLastKnownLoadedState = false;
+    return false;
+  }
+
+  ULevelStreamingDynamic *StreamingLevel = ActiveStreamingLevel.Get();
+  if (!StreamingLevel) {
+    HandleLevelUnloaded();
+    bLastKnownLoadedState = false;
+    return false;
+  }
+
+  const bool bIsLoaded = StreamingLevel->IsLevelLoaded();
+  if (bIsLoaded != bLastKnownLoadedState) {
+    bLastKnownLoadedState = bIsLoaded;
+
+    if (bIsLoaded) {
+      HandleLevelLoaded();
+    } else {
+      HandleLevelUnloaded();
+      return false;
+    }
+  }
+
+  return ActiveStreamingLevel.IsValid();
 }
 
