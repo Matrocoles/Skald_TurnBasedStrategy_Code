@@ -173,12 +173,8 @@ void USkaldBattleLevelManager::HandleLevelLoaded() {
 #if UE_VERSION_OLDER_THAN(5, 5, 0)
           DefaultGameModeClass = WorldSettings->GetDefaultGameMode();
 #else
-          if (!WorldSettings->DefaultGameMode.IsNull()) {
+          if (WorldSettings->DefaultGameMode) {
             DefaultGameModeClass = WorldSettings->DefaultGameMode.Get();
-            if (!DefaultGameModeClass) {
-              DefaultGameModeClass =
-                  WorldSettings->DefaultGameMode.LoadSynchronous();
-            }
           }
 #endif
 
