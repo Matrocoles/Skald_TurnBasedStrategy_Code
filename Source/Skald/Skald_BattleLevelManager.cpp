@@ -167,7 +167,7 @@ void USkaldBattleLevelManager::HandleLevelLoaded() {
         TSubclassOf<ASkald_BattleGameMode> BattleGameModeClass = nullptr;
         if (AWorldSettings *WorldSettings = LoadedLevel->GetWorldSettings()) {
           if (UClass *DefaultGameModeClass =
-                  WorldSettings->GetDefaultGameModeClass()) {
+                  WorldSettings->GetDefaultGameMode()) {
             if (DefaultGameModeClass->IsChildOf(
                     ASkald_BattleGameMode::StaticClass())) {
               BattleGameModeClass = DefaultGameModeClass;
