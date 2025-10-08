@@ -6,12 +6,14 @@
 #include "Engine/LevelStreaming.h"
 #include "Engine/LevelStreamingDynamic.h"
 #include "Engine/World.h"
+#include "GameFramework/GameModeBase.h"
 #include "GameFramework/WorldSettings.h"
 #include "Skald_BattleGameMode.h"
 #include "Skald_GameInstance.h"
 #include "SkaldLogging.h"
 #include "UObject/Package.h"
 #include "UObject/SoftObjectPath.h"
+#include "Misc/EngineVersionComparison.h"
 #include "Kismet/GameplayStatics.h"
 
 void USkaldBattleLevelManager::Initialise(USkaldGameInstance *InOwner) {
@@ -166,8 +168,21 @@ void USkaldBattleLevelManager::HandleLevelLoaded() {
       if (OwningWorld && LoadedLevel && OwningWorld->GetNetMode() != NM_Client) {
         TSubclassOf<ASkald_BattleGameMode> BattleGameModeClass = nullptr;
         if (AWorldSettings *WorldSettings = LoadedLevel->GetWorldSettings()) {
-          if (UClass *DefaultGameModeClass =
-                  WorldSettings->GetDefaultGameMode()) {
+          UClass *DefaultGameModeClass = nullptr;
+
+#if UE_VERSION_OLDER_THAN(5, 5, 0)
+          DefaultGameModeClass = WorldSettings->GetDefaultGameMode();
+#else
+          if (!WorldSettings->DefaultGameMode.IsNull()) {
+            DefaultGameModeClass = WorldSettings->DefaultGameMode.Get();
+            if (!DefaultGameModeClass) {
+              DefaultGameModeClass =
+                  WorldSettings->DefaultGameMode.LoadSynchronous();
+            }
+          }
+#endif
+
+          if (DefaultGameModeClass) {
             if (DefaultGameModeClass->IsChildOf(
                     ASkald_BattleGameMode::StaticClass())) {
               BattleGameModeClass = DefaultGameModeClass;
