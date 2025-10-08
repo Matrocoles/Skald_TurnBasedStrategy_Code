@@ -654,6 +654,21 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
                                  ? Battle.TargetTerritoryID
                                  : TS.DefenderTerritory;
 
+  // When travelling into the battle map we depend on OnControllerReady to
+  // populate the pending controller slots. In practice the callbacks can fire
+  // before the battle mode finishes bootstrapping, which means SetupPendingBattle
+  // might execute before any slots have been recorded. Fallback by scanning the
+  // active controllers so the participant lookup below never runs against an
+  // empty slot array.
+  for (FConstControllerIterator It = World->GetControllerIterator(); It; ++It) {
+    if (AController *Controller = It->Get()) {
+      if (!Controller->PlayerState) {
+        Controller->InitPlayerState();
+      }
+      AssignControllerSlot(Controller);
+    }
+  }
+
   CompactSlots();
 
   TSet<int32> Used;
