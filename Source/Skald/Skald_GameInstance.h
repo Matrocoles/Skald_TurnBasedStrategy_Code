@@ -42,6 +42,9 @@ struct FSkaldTravelState
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSkaldFactionsUpdated);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSkaldBattleMapStateChanged,
+                                            bool,
+                                            bIsInBattleMap);
 /** Game instance storing player selections from the lobby. */
 UCLASS()
 class SKALD_API USkaldGameInstance : public UGameInstance {
@@ -82,6 +85,10 @@ public:
   /** Event fired when the taken faction list changes. */
   UPROPERTY(BlueprintAssignable, Category = "Player|Events")
   FSkaldFactionsUpdated OnFactionsUpdated;
+
+  /** Event fired whenever the game enters or exits the streamed battle map. */
+  UPROPERTY(BlueprintAssignable, Category = "Battle|Events")
+  FSkaldBattleMapStateChanged OnBattleMapStateChanged;
 
   /** Payload describing the battle to resolve when returning from the battle
    * map. */
@@ -154,6 +161,9 @@ public:
   USkaldBattleLevelManager *GetBattleLevelManager() const { return BattleLevelStreamingManager; }
 
   void SetActiveBattleGameMode(ASkald_BattleGameMode *InGameMode);
+
+  UFUNCTION(BlueprintCallable, Category = "Battle")
+  void SetBattleMapActive(bool bInBattleMap);
 
   ASkald_BattleGameMode *GetActiveBattleGameMode() const {
     return ActiveBattleGameMode.Get();
