@@ -269,6 +269,12 @@ ASkaldPlayerState *EnsureBattleParticipant(ASkaldGameState *GameState, UWorld *W
 }
 } // namespace
 
+void ASkald_BattleGameMode::InitializeBattleGameMode(const FString &MapName,
+                                                     const FString &Options,
+                                                     FString &ErrorMessage) {
+  InitGame(MapName, Options, ErrorMessage);
+}
+
 void ASkald_BattleGameMode::InitGame(const FString &Map, const FString &Options,
                                      FString &Error) {
   Super::InitGame(Map, Options, Error);

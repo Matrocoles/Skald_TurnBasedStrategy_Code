@@ -23,6 +23,10 @@ public:
   // Returns true once we’ve detected at least two valid controllers and kicked off setup.
   bool TrySetupBattleWhenReady();
 
+  /** Wrapper that allows external systems to trigger the protected InitGame lifecycle. */
+  void InitializeBattleGameMode(const FString &MapName, const FString &Options,
+                                FString &ErrorMessage);
+
   void BeginPreBattleSelection(class ASkaldPlayerState* AttackerPS,
                                class ASkaldPlayerState* DefenderPS,
                                int32 AttackerBudget, int32 DefenderBudget);

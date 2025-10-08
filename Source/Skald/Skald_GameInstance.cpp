@@ -220,7 +220,7 @@ void USkaldGameInstance::ResetSessionState() {
     BattleLevelStreamingManager->ReleaseBattleLevel();
   }
   if (ASkald_BattleGameMode *BattleGM = ActiveBattleGameMode.Get()) {
-    if (!BattleGM->IsPendingKill()) {
+    if (!BattleGM->IsActorBeingDestroyed()) {
       BattleGM->Destroy();
     }
   }

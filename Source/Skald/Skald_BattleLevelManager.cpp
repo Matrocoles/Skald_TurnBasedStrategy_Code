@@ -166,10 +166,12 @@ void USkaldBattleLevelManager::HandleLevelLoaded() {
       if (OwningWorld && LoadedLevel && OwningWorld->GetNetMode() != NM_Client) {
         TSubclassOf<ASkald_BattleGameMode> BattleGameModeClass = nullptr;
         if (AWorldSettings *WorldSettings = LoadedLevel->GetWorldSettings()) {
-          if (WorldSettings->GameModeOverride) {
-            BattleGameModeClass = WorldSettings->GameModeOverride;
-          } else if (WorldSettings->DefaultGameMode) {
-            BattleGameModeClass = WorldSettings->DefaultGameMode;
+          if (UClass *DefaultGameModeClass =
+                  WorldSettings->GetDefaultGameModeClass()) {
+            if (DefaultGameModeClass->IsChildOf(
+                    ASkald_BattleGameMode::StaticClass())) {
+              BattleGameModeClass = DefaultGameModeClass;
+            }
           }
         }
 
@@ -194,7 +196,7 @@ void USkaldBattleLevelManager::HandleLevelLoaded() {
                 RequestedBattleLevel.IsValid()
                     ? RequestedBattleLevel.ToSoftObjectPath().ToString()
                     : LoadedLevel->GetPackage()->GetName();
-            BattleGM->InitGame(MapName, FString(), Error);
+            BattleGM->InitializeBattleGameMode(MapName, FString(), Error);
 
             UGameplayStatics::FinishSpawningActor(BattleGM, SpawnTransform);
 
@@ -236,7 +238,7 @@ void USkaldBattleLevelManager::HandleLevelUnloaded() {
   if (USkaldGameInstance *GI = OwningInstance.Get()) {
     if (ActiveBattleGameMode.IsValid()) {
       if (ASkald_BattleGameMode *BattleGM = ActiveBattleGameMode.Get()) {
-        if (!BattleGM->IsPendingKill()) {
+        if (!BattleGM->IsActorBeingDestroyed()) {
           BattleGM->Destroy();
         }
       }
