@@ -511,7 +511,6 @@ void USkaldBattleLevelManager::HideNonBattleLevels() {
 
   HiddenPersistentLevel.Reset();
   bPersistentLevelWasVisible = false;
-  bPersistentLevelShouldBeVisible = true;
 
   if (ULevel *PersistentLevel = StreamingWorld->PersistentLevel) {
     if (PersistentLevel != LoadedBattleLevel && PersistentLevel->bIsVisible) {
@@ -520,10 +519,7 @@ void USkaldBattleLevelManager::HideNonBattleLevels() {
 #if UE_VERSION_OLDER_THAN(5, 5, 0)
       StreamingWorld->SetShouldBeVisible(PersistentLevel, false);
 #else
-      bPersistentLevelShouldBeVisible = bPersistentLevelWasVisible;
-      PersistentLevel->SetShouldBeVisibleFlag(false);
-      PersistentLevel->bIsVisible = false;
-      StreamingWorld->FlushLevelStreaming(EFlushLevelStreamingType::Visibility);
+      StreamingWorld->SetLevelVisibility(PersistentLevel, false);
 #endif
       UE_LOG(LogSkald, Verbose,
              TEXT("BattleLevelManager: Hiding persistent level %s"),
@@ -572,10 +568,8 @@ void USkaldBattleLevelManager::RestoreNonBattleLevels() {
         StreamingWorld->SetShouldBeVisible(PersistentLevel,
                                            bPersistentLevelWasVisible);
 #else
-        PersistentLevel->SetShouldBeVisibleFlag(
-            bPersistentLevelShouldBeVisible);
-        PersistentLevel->bIsVisible = bPersistentLevelWasVisible;
-        StreamingWorld->FlushLevelStreaming(EFlushLevelStreamingType::Visibility);
+        StreamingWorld->SetLevelVisibility(PersistentLevel,
+                                           bPersistentLevelWasVisible);
 #endif
       } else {
         PersistentLevel->bIsVisible = bPersistentLevelWasVisible;
@@ -592,6 +586,5 @@ void USkaldBattleLevelManager::RestoreNonBattleLevels() {
   HiddenPersistentLevel.Reset();
   CachedStreamingWorld.Reset();
   bPersistentLevelWasVisible = false;
-  bPersistentLevelShouldBeVisible = true;
 }
 

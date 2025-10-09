@@ -71,5 +71,4 @@ private:
   TWeakObjectPtr<ULevel> HiddenPersistentLevel;
   TWeakObjectPtr<UWorld> CachedStreamingWorld;
   bool bPersistentLevelWasVisible = false;
-  bool bPersistentLevelShouldBeVisible = true;
 };
