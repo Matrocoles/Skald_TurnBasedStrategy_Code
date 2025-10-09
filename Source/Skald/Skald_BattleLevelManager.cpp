@@ -5,6 +5,7 @@
 #include "Engine/Level.h"
 #include "Engine/LevelStreaming.h"
 #include "Engine/LevelStreamingDynamic.h"
+#include "Engine/LevelStreamingTypes.h"
 #include "Engine/World.h"
 #include "GameFramework/GameModeBase.h"
 #include "GameFramework/WorldSettings.h"
@@ -508,6 +509,7 @@ void USkaldBattleLevelManager::HideNonBattleLevels() {
 
   HiddenPersistentLevel.Reset();
   bPersistentLevelWasVisible = false;
+  bPersistentLevelShouldBeVisible = true;
 
   if (ULevel *PersistentLevel = StreamingWorld->PersistentLevel) {
     if (PersistentLevel != LoadedBattleLevel && PersistentLevel->bIsVisible) {
@@ -516,8 +518,10 @@ void USkaldBattleLevelManager::HideNonBattleLevels() {
 #if UE_VERSION_OLDER_THAN(5, 5, 0)
       StreamingWorld->SetShouldBeVisible(PersistentLevel, false);
 #else
+      bPersistentLevelShouldBeVisible = PersistentLevel->bShouldBeVisible;
+      PersistentLevel->bShouldBeVisible = false;
       PersistentLevel->bIsVisible = false;
-      StreamingWorld->RefreshStreamingLevelsVisibility();
+      StreamingWorld->FlushLevelStreaming(EFlushLevelStreamingType::Visibility);
 #endif
       UE_LOG(LogSkald, Verbose,
              TEXT("BattleLevelManager: Hiding persistent level %s"),
@@ -566,10 +570,12 @@ void USkaldBattleLevelManager::RestoreNonBattleLevels() {
         StreamingWorld->SetShouldBeVisible(PersistentLevel,
                                            bPersistentLevelWasVisible);
 #else
+        PersistentLevel->bShouldBeVisible = bPersistentLevelShouldBeVisible;
         PersistentLevel->bIsVisible = bPersistentLevelWasVisible;
-        StreamingWorld->RefreshStreamingLevelsVisibility();
+        StreamingWorld->FlushLevelStreaming(EFlushLevelStreamingType::Visibility);
 #endif
       } else {
+        PersistentLevel->bShouldBeVisible = bPersistentLevelShouldBeVisible;
         PersistentLevel->bIsVisible = bPersistentLevelWasVisible;
       }
 
@@ -584,5 +590,6 @@ void USkaldBattleLevelManager::RestoreNonBattleLevels() {
   HiddenPersistentLevel.Reset();
   CachedStreamingWorld.Reset();
   bPersistentLevelWasVisible = false;
+  bPersistentLevelShouldBeVisible = true;
 }
 
