@@ -521,7 +521,7 @@ void USkaldBattleLevelManager::HideNonBattleLevels() {
       StreamingWorld->SetShouldBeVisible(PersistentLevel, false);
 #else
       bPersistentLevelShouldBeVisible = bPersistentLevelWasVisible;
-      StreamingWorld->SetShouldBeVisible(PersistentLevel, false);
+      PersistentLevel->SetShouldBeVisibleFlag(false);
       PersistentLevel->bIsVisible = false;
       StreamingWorld->FlushLevelStreaming(EFlushLevelStreamingType::Visibility);
 #endif
@@ -572,8 +572,8 @@ void USkaldBattleLevelManager::RestoreNonBattleLevels() {
         StreamingWorld->SetShouldBeVisible(PersistentLevel,
                                            bPersistentLevelWasVisible);
 #else
-        StreamingWorld->SetShouldBeVisible(PersistentLevel,
-                                           bPersistentLevelShouldBeVisible);
+        PersistentLevel->SetShouldBeVisibleFlag(
+            bPersistentLevelShouldBeVisible);
         PersistentLevel->bIsVisible = bPersistentLevelWasVisible;
         StreamingWorld->FlushLevelStreaming(EFlushLevelStreamingType::Visibility);
 #endif
