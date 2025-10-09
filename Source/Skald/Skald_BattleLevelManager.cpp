@@ -355,6 +355,12 @@ void USkaldBattleLevelManager::HandleLevelLoaded() {
         }
       }
     }
+    if (ASkald_BattleGameMode *BattleGM = ActiveBattleGameMode.Get()) {
+      BattleGM->NotifyBattleLevelActivated();
+    } else if (ASkald_BattleGameMode *BattleGM = GI->GetActiveBattleGameMode()) {
+      BattleGM->NotifyBattleLevelActivated();
+      ActiveBattleGameMode = BattleGM;
+    }
   }
 }
 

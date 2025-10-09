@@ -366,6 +366,61 @@ void ASkald_BattleGameMode::BeginPlay() {
       WaitForPlayersHandle, this, &ASkald_BattleGameMode::PollBattleBootstrap, 0.25f,
       true);
   PollBattleBootstrap();
+
+  ProcessStreamingActivation();
+}
+
+void ASkald_BattleGameMode::NotifyBattleLevelActivated() {
+  bPendingStreamingActivation = true;
+  ProcessStreamingActivation();
+}
+
+void ASkald_BattleGameMode::ProcessStreamingActivation() {
+  if (!bPendingStreamingActivation) {
+    return;
+  }
+
+  if (!HasAuthority()) {
+    bPendingStreamingActivation = false;
+    return;
+  }
+
+  if (!HasActorBegunPlay()) {
+    return;
+  }
+
+  UWorld *World = GetWorld();
+  if (!World) {
+    return;
+  }
+
+  bPendingStreamingActivation = false;
+
+  TArray<AController *> ControllersToNotify;
+  for (FConstControllerIterator It = World->GetControllerIterator(); It; ++It) {
+    if (AController *Controller = It->Get()) {
+      ControllersToNotify.Add(Controller);
+    }
+  }
+
+  if (ControllersToNotify.Num() == 0) {
+    UE_LOG(LogSkaldBattle, Verbose,
+           TEXT("BattleGM streaming activation: no controllers discovered"));
+  }
+
+  for (AController *Controller : ControllersToNotify) {
+    if (Controller) {
+      OnControllerReady(Controller);
+    }
+  }
+
+  if (!GetWorldTimerManager().IsTimerActive(WaitForPlayersHandle)) {
+    GetWorldTimerManager().SetTimer(
+        WaitForPlayersHandle, this, &ASkald_BattleGameMode::PollBattleBootstrap, 0.25f,
+        true);
+  }
+
+  PollBattleBootstrap();
 }
 
 void ASkald_BattleGameMode::EnsureBattleControllers() {
