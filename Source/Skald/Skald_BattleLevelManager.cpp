@@ -560,6 +560,13 @@ void USkaldBattleLevelManager::HideNonBattleLevels() {
         HiddenPersistentLevel.Reset();
         bPersistentLevelWasVisible = false;
       }
+      bPersistentLevelWasVisible = true;
+      PRAGMA_DISABLE_DEPRECATION_WARNINGS
+      StreamingWorld->SetShouldBeVisible(PersistentLevel, false);
+      PRAGMA_ENABLE_DEPRECATION_WARNINGS
+      UE_LOG(LogSkald, Verbose,
+             TEXT("BattleLevelManager: Hiding persistent level %s"),
+             *PersistentLevel->GetOutermost()->GetName());
     }
   }
 }
@@ -601,6 +608,14 @@ void USkaldBattleLevelManager::RestoreNonBattleLevels() {
       }
 
       PersistentLevel->bIsVisible = bPersistentLevelWasVisible;
+      if (StreamingWorld) {
+        PRAGMA_DISABLE_DEPRECATION_WARNINGS
+        StreamingWorld->SetShouldBeVisible(PersistentLevel,
+                                           bPersistentLevelWasVisible);
+        PRAGMA_ENABLE_DEPRECATION_WARNINGS
+      } else {
+        PersistentLevel->bIsVisible = bPersistentLevelWasVisible;
+      }
 
       if (bPersistentLevelWasVisible) {
         UE_LOG(LogSkald, Verbose,
