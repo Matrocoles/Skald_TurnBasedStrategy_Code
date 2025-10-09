@@ -5,7 +5,9 @@
 #include "Engine/Level.h"
 #include "Engine/LevelStreaming.h"
 #include "Engine/LevelStreamingDynamic.h"
+#if UE_VERSION_OLDER_THAN(5, 5, 0)
 #include "Engine/LevelStreamingTypes.h"
+#endif
 #include "Engine/World.h"
 #include "GameFramework/GameModeBase.h"
 #include "GameFramework/WorldSettings.h"
