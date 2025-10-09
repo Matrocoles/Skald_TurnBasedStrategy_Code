@@ -5,6 +5,7 @@
 #include "Engine/Level.h"
 #include "Engine/LevelStreaming.h"
 #include "Engine/LevelStreamingDynamic.h"
+#include "Engine/LevelStreamingTypes.h"
 #include "Engine/World.h"
 #include "GameFramework/GameModeBase.h"
 #include "GameFramework/WorldSettings.h"
@@ -517,7 +518,7 @@ void USkaldBattleLevelManager::HideNonBattleLevels() {
       StreamingWorld->SetShouldBeVisible(PersistentLevel, false);
 #else
       PersistentLevel->bIsVisible = false;
-      StreamingWorld->RefreshStreamingLevelsVisibility();
+      StreamingWorld->FlushLevelStreaming(EFlushLevelStreamingType::Visibility);
 #endif
       UE_LOG(LogSkald, Verbose,
              TEXT("BattleLevelManager: Hiding persistent level %s"),
@@ -567,7 +568,7 @@ void USkaldBattleLevelManager::RestoreNonBattleLevels() {
                                            bPersistentLevelWasVisible);
 #else
         PersistentLevel->bIsVisible = bPersistentLevelWasVisible;
-        StreamingWorld->RefreshStreamingLevelsVisibility();
+        StreamingWorld->FlushLevelStreaming(EFlushLevelStreamingType::Visibility);
 #endif
       } else {
         PersistentLevel->bIsVisible = bPersistentLevelWasVisible;
