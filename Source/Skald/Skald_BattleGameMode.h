@@ -52,6 +52,13 @@ public:
   /** Move controller pawns near the active battle grid, if available. */
   bool RelocateControllersNearBattleGrid(const TArray<AController *> &Controllers) const;
 
+  /**
+   * Called when the streamed battle level becomes active so existing
+   * controllers can be registered with the battle flow without requiring a
+   * travel event.
+   */
+  void NotifyBattleLevelActivated();
+
 private:
   void SetupPendingBattle();
   void AutoCommitAIArmy(ASkaldPlayerState *PlayerState, int32 Budget) const;
@@ -68,6 +75,7 @@ private:
   void PollBattleBootstrap();
   void EnsureBattleControllers();
   void ProcessDeferredControllers();
+  void ProcessStreamingActivation();
 
   /** Controllers waiting for bootstrap while we rebuild the roster. */
   TArray<TWeakObjectPtr<AController>> DeferredReadyControllers;
@@ -97,5 +105,8 @@ private:
 
   /** Tracks which participant player IDs have finalised their selection. */
   TSet<int32> LockedInPlayers;
+
+  /** True when NotifyBattleLevelActivated ran before BeginPlay completed. */
+  bool bPendingStreamingActivation = false;
 };
 
