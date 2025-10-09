@@ -516,11 +516,9 @@ void USkaldBattleLevelManager::HideNonBattleLevels() {
     if (PersistentLevel != LoadedBattleLevel && PersistentLevel->bIsVisible) {
       HiddenPersistentLevel = PersistentLevel;
       bPersistentLevelWasVisible = true;
-#if UE_VERSION_OLDER_THAN(5, 5, 0)
+      PRAGMA_DISABLE_DEPRECATION_WARNINGS
       StreamingWorld->SetShouldBeVisible(PersistentLevel, false);
-#else
-      StreamingWorld->SetLevelVisibility(PersistentLevel, false);
-#endif
+      PRAGMA_ENABLE_DEPRECATION_WARNINGS
       UE_LOG(LogSkald, Verbose,
              TEXT("BattleLevelManager: Hiding persistent level %s"),
              *PersistentLevel->GetOutermost()->GetName());
@@ -564,13 +562,10 @@ void USkaldBattleLevelManager::RestoreNonBattleLevels() {
       }
 
       if (StreamingWorld) {
-#if UE_VERSION_OLDER_THAN(5, 5, 0)
+        PRAGMA_DISABLE_DEPRECATION_WARNINGS
         StreamingWorld->SetShouldBeVisible(PersistentLevel,
                                            bPersistentLevelWasVisible);
-#else
-        StreamingWorld->SetLevelVisibility(PersistentLevel,
-                                           bPersistentLevelWasVisible);
-#endif
+        PRAGMA_ENABLE_DEPRECATION_WARNINGS
       } else {
         PersistentLevel->bIsVisible = bPersistentLevelWasVisible;
       }
