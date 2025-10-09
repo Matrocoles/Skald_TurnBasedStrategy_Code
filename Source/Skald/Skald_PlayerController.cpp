@@ -360,6 +360,9 @@ void ASkaldPlayerController::ShowMainHUD() {
       this, nullptr, EMouseLockMode::DoNotLock, /*bHideCursorDuringCapture*/
       false);
   bShowMouseCursor = true;
+  bEnableClickEvents = true;
+  bEnableMouseOverEvents = true;
+  DefaultMouseCaptureMode = EMouseCaptureMode::NoCapture;
 }
 
 void ASkaldPlayerController::HideMainHUD() {
