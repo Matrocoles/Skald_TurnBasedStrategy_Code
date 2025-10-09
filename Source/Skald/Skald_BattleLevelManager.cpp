@@ -10,6 +10,7 @@
 #include "Engine/LevelStreamingTypes.h"
 #endif
 #include "Engine/World.h"
+#include "GameFramework/Actor.h"
 #include "GameFramework/GameModeBase.h"
 #include "GameFramework/WorldSettings.h"
 #include "Skald_BattleGameMode.h"
@@ -510,26 +511,62 @@ void USkaldBattleLevelManager::HideNonBattleLevels() {
   }
 
   HiddenPersistentLevel.Reset();
+  HiddenPersistentActors.Reset();
   bPersistentLevelWasVisible = false;
 
   if (ULevel *PersistentLevel = StreamingWorld->PersistentLevel) {
     if (PersistentLevel != LoadedBattleLevel && PersistentLevel->bIsVisible) {
       HiddenPersistentLevel = PersistentLevel;
-      bPersistentLevelWasVisible = true;
-#if UE_VERSION_OLDER_THAN(5, 5, 0)
-      StreamingWorld->SetShouldBeVisible(PersistentLevel, false);
-#else
-      StreamingWorld->SetLevelVisibility(PersistentLevel, false);
-#endif
-      UE_LOG(LogSkald, Verbose,
-             TEXT("BattleLevelManager: Hiding persistent level %s"),
-             *PersistentLevel->GetOutermost()->GetName());
+      bPersistentLevelWasVisible = PersistentLevel->bIsVisible;
+
+      bool bModifiedAnyActors = false;
+
+      for (AActor *Actor : PersistentLevel->Actors) {
+        if (!Actor || Actor->GetLevel() != PersistentLevel) {
+          continue;
+        }
+
+        // Skip world settings so the world retains its authoritative
+        // configuration while the overworld is hidden.
+        if (Actor->IsA<AWorldSettings>()) {
+          continue;
+        }
+
+        const bool bWasHiddenInGame = Actor->IsHidden();
+        const bool bHadCollision = Actor->GetActorEnableCollision();
+        const bool bWasTickEnabled = Actor->IsActorTickEnabled();
+
+        if (!bWasHiddenInGame || bHadCollision || bWasTickEnabled) {
+          FHiddenPersistentActorState ActorState;
+          ActorState.Actor = Actor;
+          ActorState.bWasHiddenInGame = bWasHiddenInGame;
+          ActorState.bHadCollision = bHadCollision;
+          ActorState.bWasTickEnabled = bWasTickEnabled;
+          HiddenPersistentActors.Add(ActorState);
+
+          Actor->SetActorHiddenInGame(true);
+          Actor->SetActorEnableCollision(false);
+          Actor->SetActorTickEnabled(false);
+          bModifiedAnyActors = true;
+        }
+      }
+
+      if (bModifiedAnyActors) {
+        PersistentLevel->bIsVisible = false;
+        UE_LOG(LogSkald, Verbose,
+               TEXT("BattleLevelManager: Hiding persistent level %s"),
+               *PersistentLevel->GetOutermost()->GetName());
+      } else {
+        HiddenPersistentLevel.Reset();
+        bPersistentLevelWasVisible = false;
+      }
     }
   }
 }
 
 void USkaldBattleLevelManager::RestoreNonBattleLevels() {
-  if (!HiddenStreamingLevels.Num() && !HiddenPersistentLevel.IsValid()) {
+  if (!HiddenStreamingLevels.Num() && !HiddenPersistentLevel.IsValid() &&
+      !HiddenPersistentActors.Num()) {
     CachedStreamingWorld.Reset();
     bPersistentLevelWasVisible = false;
     return;
@@ -563,17 +600,7 @@ void USkaldBattleLevelManager::RestoreNonBattleLevels() {
         StreamingWorld = PersistentLevel->GetWorld();
       }
 
-      if (StreamingWorld) {
-#if UE_VERSION_OLDER_THAN(5, 5, 0)
-        StreamingWorld->SetShouldBeVisible(PersistentLevel,
-                                           bPersistentLevelWasVisible);
-#else
-        StreamingWorld->SetLevelVisibility(PersistentLevel,
-                                           bPersistentLevelWasVisible);
-#endif
-      } else {
-        PersistentLevel->bIsVisible = bPersistentLevelWasVisible;
-      }
+      PersistentLevel->bIsVisible = bPersistentLevelWasVisible;
 
       if (bPersistentLevelWasVisible) {
         UE_LOG(LogSkald, Verbose,
@@ -583,6 +610,15 @@ void USkaldBattleLevelManager::RestoreNonBattleLevels() {
     }
   }
 
+  for (const FHiddenPersistentActorState &State : HiddenPersistentActors) {
+    if (AActor *Actor = State.Actor.Get()) {
+      Actor->SetActorHiddenInGame(State.bWasHiddenInGame);
+      Actor->SetActorEnableCollision(State.bHadCollision);
+      Actor->SetActorTickEnabled(State.bWasTickEnabled);
+    }
+  }
+
+  HiddenPersistentActors.Reset();
   HiddenPersistentLevel.Reset();
   CachedStreamingWorld.Reset();
   bPersistentLevelWasVisible = false;
