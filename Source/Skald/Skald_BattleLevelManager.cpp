@@ -5,6 +5,7 @@
 #include "Engine/Level.h"
 #include "Engine/LevelStreaming.h"
 #include "Engine/LevelStreamingDynamic.h"
+#include "Misc/EngineVersionComparison.h"
 #if UE_VERSION_OLDER_THAN(5, 5, 0)
 #include "Engine/LevelStreamingTypes.h"
 #endif
@@ -17,7 +18,6 @@
 #include "UObject/Package.h"
 #include "UObject/SoftObjectPath.h"
 #include "UObject/SoftObjectPtr.h"
-#include "Misc/EngineVersionComparison.h"
 #include "Kismet/GameplayStatics.h"
 
 void USkaldBattleLevelManager::Initialise(USkaldGameInstance *InOwner) {
