@@ -23,6 +23,26 @@
 
 namespace
 {
+static ULevelStreaming *FindStreamingLevelFor(ULevel *Level)
+{
+  if (!Level) {
+    return nullptr;
+  }
+
+  UWorld *OwningWorld = Level->GetWorld();
+  if (!OwningWorld) {
+    return nullptr;
+  }
+
+  for (ULevelStreaming *StreamingLevel : OwningWorld->GetStreamingLevels()) {
+    if (StreamingLevel && StreamingLevel->GetLoadedLevel() == Level) {
+      return StreamingLevel;
+    }
+  }
+
+  return nullptr;
+}
+
 static void SetPersistentLevelVisibility(UWorld *World, ULevel *PersistentLevel,
                                          bool bShouldBeVisible)
 {
@@ -31,7 +51,8 @@ static void SetPersistentLevelVisibility(UWorld *World, ULevel *PersistentLevel,
   }
 
   // UE 5.5 removed UWorld::SetShouldBeVisible in favour of setting visibility
-  // directly on ULevel, so use version guards to pick the appropriate API.
+  // via the streaming interface, so use version guards to pick the appropriate
+  // API.
 #if UE_VERSION_OLDER_THAN(5, 5, 0)
   if (World) {
     PRAGMA_DISABLE_DEPRECATION_WARNINGS
@@ -39,9 +60,11 @@ static void SetPersistentLevelVisibility(UWorld *World, ULevel *PersistentLevel,
     PRAGMA_ENABLE_DEPRECATION_WARNINGS
   }
 #else
-  PersistentLevel->SetIsVisible(bShouldBeVisible);
-  if (World) {
-    World->UpdateLevelStreaming();
+  if (ULevelStreaming *StreamingLevel = FindStreamingLevelFor(PersistentLevel)) {
+    StreamingLevel->SetShouldBeVisible(bShouldBeVisible);
+    if (World) {
+      World->UpdateLevelStreaming();
+    }
   }
 #endif
 }
