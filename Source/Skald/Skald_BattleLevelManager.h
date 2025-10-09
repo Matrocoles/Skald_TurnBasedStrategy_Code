@@ -12,6 +12,7 @@ class USkaldGameInstance;
 class ULevel;
 class UWorld;
 class ASkald_BattleGameMode;
+class AActor;
 
 /**
  * Helper object responsible for loading and unloading tactical battle levels
@@ -67,8 +68,16 @@ private:
     bool bWasVisible = false;
   };
 
+  struct FHiddenPersistentActorState {
+    TWeakObjectPtr<AActor> Actor;
+    bool bWasHiddenInGame = false;
+    bool bHadCollision = false;
+    bool bWasTickEnabled = false;
+  };
+
   TArray<FHiddenStreamingLevelState> HiddenStreamingLevels;
   TWeakObjectPtr<ULevel> HiddenPersistentLevel;
   TWeakObjectPtr<UWorld> CachedStreamingWorld;
   bool bPersistentLevelWasVisible = false;
+  TArray<FHiddenPersistentActorState> HiddenPersistentActors;
 };
