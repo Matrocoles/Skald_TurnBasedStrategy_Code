@@ -6,6 +6,7 @@
 #include "Engine/LevelStreaming.h"
 #include "Engine/LevelStreamingDynamic.h"
 #include "Misc/EngineVersionComparison.h"
+#include "Misc/PackageName.h"
 #if UE_VERSION_OLDER_THAN(5, 5, 0)
 #include "Engine/LevelStreamingTypes.h"
 #endif
@@ -67,6 +68,31 @@ static void SetPersistentLevelVisibility(UWorld *World, ULevel *PersistentLevel,
     }
   }
 #endif
+}
+
+static FString ResolveStreamingLevelPackageName(const ULevelStreaming *Level)
+{
+  if (!Level)
+  {
+    return FString();
+  }
+
+  FString PackageName = Level->GetWorldAssetPackageName();
+  if (PackageName.IsEmpty())
+  {
+    PackageName = Level->GetWorldAsset().ToSoftObjectPath().GetLongPackageName();
+  }
+
+  if (!PackageName.IsEmpty())
+  {
+    FString LongPackageName;
+    if (FPackageName::TryConvertFilenameToLongPackageName(PackageName, LongPackageName))
+    {
+      PackageName = MoveTemp(LongPackageName);
+    }
+  }
+
+  return PackageName;
 }
 } // namespace
 
@@ -542,6 +568,10 @@ void USkaldBattleLevelManager::HideNonBattleLevels() {
       continue;
     }
 
+    if (IsStreamingLevelPartOfBattleMap(OtherLevel)) {
+      continue;
+    }
+
     const bool bWasVisible =
 #if UE_VERSION_OLDER_THAN(5, 5, 0)
         OtherLevel->GetShouldBeVisible();
@@ -674,5 +704,58 @@ void USkaldBattleLevelManager::RestoreNonBattleLevels() {
   HiddenPersistentLevel.Reset();
   CachedStreamingWorld.Reset();
   bPersistentLevelWasVisible = false;
+}
+
+bool USkaldBattleLevelManager::IsStreamingLevelPartOfBattleMap(
+    ULevelStreaming *Level) const {
+  if (!Level) {
+    return false;
+  }
+
+  if (ActiveStreamingLevel.IsValid() && Level == ActiveStreamingLevel.Get()) {
+    return true;
+  }
+
+  const FString RequestedPackage =
+      RequestedBattleLevel.ToSoftObjectPath().GetLongPackageName();
+  if (RequestedPackage.IsEmpty()) {
+    return false;
+  }
+
+  FString LevelPackage = ResolveStreamingLevelPackageName(Level);
+  if (LevelPackage.IsEmpty()) {
+    return false;
+  }
+
+  if (LevelPackage.Equals(RequestedPackage, ESearchCase::IgnoreCase)) {
+    return true;
+  }
+
+  const FString RequestedPrefix = RequestedPackage + TEXT(".");
+  if (LevelPackage.StartsWith(RequestedPrefix, ESearchCase::IgnoreCase)) {
+    return true;
+  }
+
+  const FString RequestedShortName = FPackageName::GetShortName(RequestedPackage);
+  if (RequestedShortName.IsEmpty()) {
+    return false;
+  }
+
+  const FString LevelShortName = FPackageName::GetShortName(LevelPackage);
+  if (LevelShortName.IsEmpty()) {
+    return false;
+  }
+
+  if (LevelShortName.Equals(RequestedShortName, ESearchCase::IgnoreCase)) {
+    return true;
+  }
+
+  const FString RequestedSubLevelPrefix =
+      RequestedShortName + TEXT("_");
+  if (LevelShortName.StartsWith(RequestedSubLevelPrefix, ESearchCase::IgnoreCase)) {
+    return true;
+  }
+
+  return false;
 }
 
