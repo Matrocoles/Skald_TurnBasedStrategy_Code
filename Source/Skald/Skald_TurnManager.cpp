@@ -99,6 +99,7 @@ void ATurnManager::GetLifetimeReplicatedProps(
     TArray<FLifetimeProperty> &OutLifetimeProps) const {
   Super::GetLifetimeReplicatedProps(OutLifetimeProps);
   DOREPLIFETIME(ATurnManager, BattleMaps);
+  DOREPLIFETIME(ATurnManager, BattleMapEntries);
 }
 
 void ATurnManager::BeginPlay() {
@@ -567,14 +568,22 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
       GI = GetGameInstance<USkaldGameInstance>();
     }
 
+    bool bShouldStreamSelectedMap = true;
     TSoftObjectPtr<UWorld> SelectedBattleMap;
-    if (BattleMaps.Num() > 0) {
+    if (BattleMapEntries.Num() > 0) {
+      const int32 Index = FMath::RandRange(0, BattleMapEntries.Num() - 1);
+      const FBattleMapDescriptor &Entry = BattleMapEntries[Index];
+      SelectedBattleMap = Entry.Map;
+      bShouldStreamSelectedMap = Entry.bStreamAsSubLevel;
+    } else if (BattleMaps.Num() > 0) {
       const int32 Index = FMath::RandRange(0, BattleMaps.Num() - 1);
       SelectedBattleMap = BattleMaps[Index];
+      bShouldStreamSelectedMap = true;
     }
     if (SelectedBattleMap.IsNull()) {
       SelectedBattleMap = TSoftObjectPtr<UWorld>(
           FSoftObjectPath(TEXT("/Game/Blueprints/Maps/BattleMap.BattleMap")));
+      bShouldStreamSelectedMap = true;
     }
 
     FString MapToLoad =
@@ -757,14 +766,20 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
 
       if (USkaldBattleLevelManager *BattleLevelManager =
               GI->GetBattleLevelManager()) {
-        bStreamingBattle = BattleLevelManager->RequestBattleLevel(
-            World, SelectedBattleMap, PendingPayload);
+        if (bShouldStreamSelectedMap) {
+          bStreamingBattle = BattleLevelManager->RequestBattleLevel(
+              World, SelectedBattleMap, PendingPayload);
+        }
       }
 
-      if (bStreamingBattle) {
-        if (World->GetNetMode() != NM_Standalone) {
-          MulticastStreamBattleLevel(SelectedBattleMap.ToSoftObjectPath(),
-                                     TravelState, PendingPayload);
+      if (bShouldStreamSelectedMap) {
+        if (bStreamingBattle) {
+          if (World->GetNetMode() != NM_Standalone) {
+            MulticastStreamBattleLevel(SelectedBattleMap.ToSoftObjectPath(),
+                                       TravelState, PendingPayload);
+          }
+        } else {
+          GI->SetTravelPending(true);
         }
       } else {
         GI->SetTravelPending(true);
@@ -781,7 +796,7 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
            TravelState.HumanOwnedTerritories.Num(),
            TravelState.CachedTerritories.Num());
 
-    if (!bStreamingBattle) {
+    if (!bShouldStreamSelectedMap || !bStreamingBattle) {
       if (IsRunningDedicatedServer() ||
           World->GetNetMode() != NM_Standalone) {
         FString ListenMap = MapToLoad;

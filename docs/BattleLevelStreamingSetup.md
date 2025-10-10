@@ -14,7 +14,7 @@ This repository now supports resolving tactical encounters by streaming a battle
 ## 2. Register the map for random selection
 
 1. Open `BP_TurnManager` (or the blueprint that sets up `BattleMaps`).
-2. Add your battle level asset to the `Battle Maps` array. The C++ loader uses these soft object references when it picks the next arena to stream. If the array is empty, it falls back to `/Game/Blueprints/Maps/BattleMap`.
+2. Add your battle level asset to the `Battle Map Entries` array. Each entry exposes a `Stream As Sub Level` toggle—enable it for sub-level arenas that should be streamed and disable it for standalone maps that should be loaded via full travel. (The legacy `Battle Maps` array is still read for backwards compatibility, but new projects should prefer the descriptor list.) If both arrays are empty, the system falls back to `/Game/Blueprints/Maps/BattleMap`.
 
 ## 3. Ensure the battle mode actors live in the streamed level
 
