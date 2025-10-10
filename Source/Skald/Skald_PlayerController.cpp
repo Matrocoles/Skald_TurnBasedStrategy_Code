@@ -359,6 +359,7 @@ void ASkaldPlayerController::ShowMainHUD() {
   UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
       this, nullptr, EMouseLockMode::DoNotLock, /*bHideCursorDuringCapture*/
       false);
+  FocusGameViewport(this);
   bShowMouseCursor = true;
   bEnableClickEvents = true;
   bEnableMouseOverEvents = true;
@@ -1828,6 +1829,7 @@ void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
 
   UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
       this, nullptr, EMouseLockMode::DoNotLock, false);
+  FocusGameViewport(this);
   bShowMouseCursor = true;
   bEnableClickEvents = true;
   bEnableMouseOverEvents = true;
