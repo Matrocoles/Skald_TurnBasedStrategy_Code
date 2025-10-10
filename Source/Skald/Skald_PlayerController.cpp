@@ -6,6 +6,7 @@
 #include "Components/InputComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/EngineTypes.h"
+#include "Engine/Level.h"
 #include "EngineUtils.h"
 #include "FighterDataLibrary.h"
 #include "FighterPawn.h"
@@ -879,15 +880,27 @@ void ASkaldPlayerController::EnsureBattleHUDVisible() {
 }
 
 UGridOverlayComponent *ASkaldPlayerController::FindGridOverlay() const {
+  UGridOverlayComponent *FallbackOverlay = nullptr;
+
   if (UWorld *World = GetWorld()) {
     for (TActorIterator<AActor> It(World); It; ++It) {
       if (UGridOverlayComponent *Comp =
               It->FindComponentByClass<UGridOverlayComponent>()) {
-        return Comp;
+        const AActor *Owner = Comp->GetOwner();
+        const ULevel *OwnerLevel = Owner ? Owner->GetLevel() : nullptr;
+
+        if (OwnerLevel && OwnerLevel->bIsVisible) {
+          return Comp;
+        }
+
+        if (!FallbackOverlay) {
+          FallbackOverlay = Comp;
+        }
       }
     }
   }
-  return nullptr;
+
+  return FallbackOverlay;
 }
 
 AFighterPawn *ASkaldPlayerController::FindFighterAtCell(
