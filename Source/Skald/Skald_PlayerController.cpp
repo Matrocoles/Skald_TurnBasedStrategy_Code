@@ -880,27 +880,11 @@ void ASkaldPlayerController::EnsureBattleHUDVisible() {
 }
 
 UGridOverlayComponent *ASkaldPlayerController::FindGridOverlay() const {
-  UGridOverlayComponent *FallbackOverlay = nullptr;
-
   if (UWorld *World = GetWorld()) {
-    for (TActorIterator<AActor> It(World); It; ++It) {
-      if (UGridOverlayComponent *Comp =
-              It->FindComponentByClass<UGridOverlayComponent>()) {
-        const AActor *Owner = Comp->GetOwner();
-        const ULevel *OwnerLevel = Owner ? Owner->GetLevel() : nullptr;
-
-        if (OwnerLevel && OwnerLevel->bIsVisible) {
-          return Comp;
-        }
-
-        if (!FallbackOverlay) {
-          FallbackOverlay = Comp;
-        }
-      }
-    }
+    return Skald::GridOverlay::FindActiveGridOverlay(World);
   }
 
-  return FallbackOverlay;
+  return nullptr;
 }
 
 AFighterPawn *ASkaldPlayerController::FindFighterAtCell(

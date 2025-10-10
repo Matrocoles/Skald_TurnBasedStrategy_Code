@@ -13,7 +13,6 @@
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
 #include "Engine/World.h"
-#include "EngineUtils.h"
 #include "FighterPawn.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/GameStateBase.h"
@@ -974,14 +973,7 @@ bool ASkald_BattleGameMode::RelocateControllersNearBattleGrid(
     return false;
   }
 
-  UGridOverlayComponent *Grid = nullptr;
-  for (TActorIterator<AActor> It(World); It; ++It) {
-    if (UGridOverlayComponent *Found =
-            It->FindComponentByClass<UGridOverlayComponent>()) {
-      Grid = Found;
-      break;
-    }
-  }
+  UGridOverlayComponent *Grid = Skald::GridOverlay::FindActiveGridOverlay(World);
 
   FVector BaseLocation = FVector::ZeroVector;
   bool bHasLocation = false;
@@ -1112,14 +1104,8 @@ void ASkald_BattleGameMode::SpawnFighterSide(const TArray<FFighterDefinition> &R
     return;
   }
 
-  UGridOverlayComponent *Grid = nullptr;
-  for (TActorIterator<AActor> It(GetWorld()); It; ++It) {
-    if (UGridOverlayComponent *Found =
-            It->FindComponentByClass<UGridOverlayComponent>()) {
-      Grid = Found;
-      break;
-    }
-  }
+  UGridOverlayComponent *Grid =
+      Skald::GridOverlay::FindActiveGridOverlay(GetWorld());
 
   const int32 Edge = 3;
   const int32 MaxX = UGridBattleManager::GridSize - 1;

@@ -3,7 +3,10 @@
 #include "Containers/Queue.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/EngineTypes.h"
+#include "Engine/Level.h"
+#include "Engine/LevelStreaming.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "FighterPawn.h"
 #include "GridObstacleComponent.h"
 #include "Components/DecalComponent.h"
@@ -17,6 +20,101 @@
 #include "Math/Quat.h"
 #include "UObject/UObjectGlobals.h"
 #include "TimerManager.h"
+
+namespace Skald
+{
+namespace GridOverlay
+{
+bool IsComponentFromVisibleLevel(const UGridOverlayComponent* GridComponent)
+{
+  if (!IsValid(GridComponent))
+  {
+    return false;
+  }
+
+  const AActor* Owner = GridComponent->GetOwner();
+  if (!IsValid(Owner))
+  {
+    return false;
+  }
+
+  const ULevel* OwnerLevel = Owner->GetLevel();
+  if (!OwnerLevel)
+  {
+    return false;
+  }
+
+  if (OwnerLevel->bIsVisible)
+  {
+    return true;
+  }
+
+  const UWorld* World = Owner->GetWorld();
+  if (!World)
+  {
+    return false;
+  }
+
+  if (OwnerLevel == World->PersistentLevel)
+  {
+    return true;
+  }
+
+  for (const ULevelStreaming* StreamingLevel : World->GetStreamingLevels())
+  {
+    if (!StreamingLevel)
+    {
+      continue;
+    }
+
+    if (StreamingLevel->GetLoadedLevel() == OwnerLevel)
+    {
+      if (StreamingLevel->GetShouldBeVisible() || StreamingLevel->IsLevelVisible())
+      {
+        return true;
+      }
+
+      return false;
+    }
+  }
+
+  return false;
+}
+
+UGridOverlayComponent* FindActiveGridOverlay(UWorld* World, bool bPreferVisibleLevel)
+{
+  if (!World)
+  {
+    return nullptr;
+  }
+
+  UGridOverlayComponent* FallbackOverlay = nullptr;
+
+  for (TActorIterator<AActor> It(World); It; ++It)
+  {
+    if (UGridOverlayComponent* Candidate = It->FindComponentByClass<UGridOverlayComponent>())
+    {
+      if (!FallbackOverlay)
+      {
+        FallbackOverlay = Candidate;
+      }
+
+      if (!bPreferVisibleLevel)
+      {
+        return Candidate;
+      }
+
+      if (IsComponentFromVisibleLevel(Candidate))
+      {
+        return Candidate;
+      }
+    }
+  }
+
+  return FallbackOverlay;
+}
+} // namespace GridOverlay
+} // namespace Skald
 
 UGridOverlayComponent::UGridOverlayComponent() {
   PrimaryComponentTick.bCanEverTick = false;
