@@ -882,8 +882,11 @@ void ASkaldPlayerController::EnsureBattleHUDVisible() {
   BattleHudWidget->SetVisibility(ESlateVisibility::Visible);
   bBattleHUDVisible = true;
 
+  // Don't focus the HUD itself or it will consume keyboard input needed for
+  // camera controls; leave the viewport focused instead.
   UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
-      this, BattleHudWidget, EMouseLockMode::DoNotLock, false);
+      this, nullptr, EMouseLockMode::DoNotLock, false);
+  FocusGameViewport(this);
   bShowMouseCursor = true;
   bEnableClickEvents = true;
   bEnableMouseOverEvents = true;
