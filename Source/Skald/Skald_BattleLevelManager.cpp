@@ -142,12 +142,27 @@ bool USkaldBattleLevelManager::RequestBattleLevel(
     // the retry as a success and refresh any pending state without issuing a
     // second load request. This prevents fallback OpenLevel travel from
     // tearing down the overworld when additional controllers retry.
+    RequestedBattleLevel = LevelToStream;
     PendingPayload = BattlePayload;
+    bActiveLevelShouldBeLoaded = true;
+
+    const ULevelStreaming *StreamingLevel = ActiveStreamingLevel.Get();
+    const bool bLevelAlreadyLoaded =
+        StreamingLevel && StreamingLevel->IsLevelLoaded();
+
     if (USkaldGameInstance *GI = OwningInstance.Get()) {
-      GI->SetTravelPending(true);
+      if (bLevelAlreadyLoaded) {
+        GI->SetTravelPending(false);
+      } else {
+        GI->SetTravelPending(true);
+      }
     }
 
     RegisterStreamingTicker();
+
+    if (bLevelAlreadyLoaded) {
+      HandleLevelLoaded();
+    }
 
     UE_LOG(LogSkald, Log,
            TEXT("BattleLevelManager: Battle level %s already streaming, reusing active request"),
