@@ -869,6 +869,9 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
   }
 
   GI->SetBattleMapActive(false);
+  if (HasAuthority()) {
+    MulticastSetBattleMapActive(false);
+  }
   if (USkaldBattleLevelManager *BattleLevelManager =
           GI->GetBattleLevelManager()) {
     BattleLevelManager->ReleaseBattleLevel();
