@@ -884,6 +884,7 @@ void ASkaldPlayerController::EnsureBattleHUDVisible() {
 
   UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
       this, BattleHudWidget, EMouseLockMode::DoNotLock, false);
+  FocusGameViewport(this);
   bShowMouseCursor = true;
   bEnableClickEvents = true;
   bEnableMouseOverEvents = true;
