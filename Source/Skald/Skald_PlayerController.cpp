@@ -558,6 +558,17 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
     return;
   }
 
+  // If we've already locked in and are waiting for the battle HUD to take over,
+  // keep the fighter selection screen hidden so we don't immediately flip the
+  // input mode back to UI-only.
+  if (bBattleHUDReadyToShow) {
+    if (FighterSelectionWidget) {
+      FighterSelectionWidget->RemoveFromParent();
+      FighterSelectionWidget = nullptr;
+    }
+    return;
+  }
+
   ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
   if (!PS || PS->bArmyLockedIn) {
     return;
