@@ -2227,6 +2227,8 @@ void ASkaldPlayerController::HandleRightClick() {
 
 void ASkaldPlayerController::HandleRoundStarted(int32 RoundNumber,
                                                 ESkaldFaction InitiativeWinner) {
+  DetermineControlledBattleSide();
+
   LockedActiveFighter = nullptr;
   CancelCommandMode();
   UpdateBattleRoundDisplay(RoundNumber, InitiativeWinner);
