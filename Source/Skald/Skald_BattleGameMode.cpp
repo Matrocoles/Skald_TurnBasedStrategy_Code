@@ -1341,7 +1341,16 @@ bool ASkald_BattleGameMode::TrySetupBattleWhenReady() {
     }
   }
 
-  if (Valid.Num() < 2) {
+  int32 RequiredControllers = 2;
+  if (ExpectedControllers <= 1) {
+    // Solo overworld attacks can be resolved through the streaming flow while
+    // only one controller is present. The defender AI is spawned during setup,
+    // so allow the bootstrap to proceed once the travelling player has been
+    // registered.
+    RequiredControllers = 1;
+  }
+
+  if (Valid.Num() < RequiredControllers) {
     return false;
   }
 
