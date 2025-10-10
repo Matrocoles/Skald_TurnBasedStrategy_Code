@@ -6,6 +6,7 @@
 #include "Components/InputComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/EngineTypes.h"
+#include "Engine/Level.h"
 #include "EngineUtils.h"
 #include "FighterDataLibrary.h"
 #include "FighterPawn.h"
@@ -880,13 +881,9 @@ void ASkaldPlayerController::EnsureBattleHUDVisible() {
 
 UGridOverlayComponent *ASkaldPlayerController::FindGridOverlay() const {
   if (UWorld *World = GetWorld()) {
-    for (TActorIterator<AActor> It(World); It; ++It) {
-      if (UGridOverlayComponent *Comp =
-              It->FindComponentByClass<UGridOverlayComponent>()) {
-        return Comp;
-      }
-    }
+    return Skald::GridOverlay::FindActiveGridOverlay(World);
   }
+
   return nullptr;
 }
 

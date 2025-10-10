@@ -3,7 +3,6 @@
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
 #include "Engine/World.h"
-#include "EngineUtils.h"
 #include "FighterPawn.h"
 #include "GridOverlayComponent.h"
 #include "TimerManager.h"
@@ -277,13 +276,9 @@ void UBattleHUDWidget::ClearCommandPreviews() {
 
 UGridOverlayComponent *UBattleHUDWidget::FindGridOverlay() const {
   if (UWorld *World = GetWorld()) {
-    for (TActorIterator<AActor> It(World); It; ++It) {
-      if (UGridOverlayComponent *Comp =
-              It->FindComponentByClass<UGridOverlayComponent>()) {
-        return Comp;
-      }
-    }
+    return Skald::GridOverlay::FindActiveGridOverlay(World);
   }
+
   return nullptr;
 }
 

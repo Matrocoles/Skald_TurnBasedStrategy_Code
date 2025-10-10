@@ -227,16 +227,17 @@ void AFighterPawn::FinishActivation() {
 }
 
 UGridOverlayComponent *AFighterPawn::GetGrid() const {
-  if (!CachedGrid) {
-    if (UWorld *World = GetWorld()) {
-      for (TActorIterator<AActor> It(World); It; ++It) {
-        CachedGrid = It->FindComponentByClass<UGridOverlayComponent>();
-        if (CachedGrid) {
-          break;
-        }
-      }
-    }
+  if (IsValid(CachedGrid) &&
+      Skald::GridOverlay::IsComponentFromVisibleLevel(CachedGrid)) {
+    return CachedGrid;
   }
+
+  CachedGrid = nullptr;
+
+  if (UWorld *World = GetWorld()) {
+    CachedGrid = Skald::GridOverlay::FindActiveGridOverlay(World);
+  }
+
   return CachedGrid;
 }
 

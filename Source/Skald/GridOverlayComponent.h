@@ -14,6 +14,7 @@ class UMaterialInterface;
 class UStaticMesh;
 class UMaterialInstanceDynamic;
 struct FTimerHandle;
+class UWorld;
 
 USTRUCT()
 struct FPendingGridOccupancyUpdate {
@@ -482,3 +483,12 @@ protected:
   /** Resolve which colour should be used for a given grid cell. */
   FLinearColor GetBaseGridColor(int32 CellIndex) const;
 };
+
+namespace Skald
+{
+namespace GridOverlay
+{
+SKALD_API bool IsComponentFromVisibleLevel(const UGridOverlayComponent* GridComponent);
+SKALD_API UGridOverlayComponent* FindActiveGridOverlay(UWorld* World, bool bPreferVisibleLevel = true);
+} // namespace GridOverlay
+} // namespace Skald
