@@ -785,6 +785,10 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
         GI->SetTravelPending(true);
       }
       GI->SetBattleMapActive(true);
+
+      if (World->GetNetMode() != NM_Standalone) {
+        MulticastSetBattleMapActive(true);
+      }
     }
 
     UE_LOG(LogSkald, Log,
@@ -845,6 +849,16 @@ void ATurnManager::MulticastStreamBattleLevel_Implementation(
                *BattleLevelPath.ToString());
       }
     }
+  }
+}
+
+void ATurnManager::MulticastSetBattleMapActive_Implementation(bool bInBattleMap) {
+  if (HasAuthority()) {
+    return;
+  }
+
+  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+    GI->SetBattleMapActive(bInBattleMap);
   }
 }
 

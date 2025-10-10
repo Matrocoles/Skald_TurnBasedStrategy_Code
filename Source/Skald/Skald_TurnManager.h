@@ -101,6 +101,10 @@ public:
                                   const FSkaldTravelState &TravelState,
                                   const FS_BattlePayload &BattlePayload);
 
+  /** Multicast the battle map active state so clients can update immediately. */
+  UFUNCTION(NetMulticast, Reliable)
+  void MulticastSetBattleMapActive(bool bInBattleMap);
+
   /** Multicast the results of a resolved battle to all clients. */
   UFUNCTION(NetMulticast, Reliable)
   void ClientBattleResolved(int32 WinningPlayerID, int32 AttackerCasualties,
