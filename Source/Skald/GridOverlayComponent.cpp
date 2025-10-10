@@ -64,7 +64,7 @@ bool IsComponentFromVisibleLevel(const UGridOverlayComponent* GridComponent)
 
     if (StreamingLevel->GetLoadedLevel() == OwnerLevel)
     {
-      if (StreamingLevel->GetShouldBeVisible() || StreamingLevel->IsLevelVisible())
+      if (StreamingLevel->GetShouldBeVisibleFlag() || StreamingLevel->IsLevelVisible())
       {
         return true;
       }
