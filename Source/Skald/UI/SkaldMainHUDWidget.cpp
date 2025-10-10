@@ -873,11 +873,26 @@ void USkaldMainHUDWidget::HandleAttackApproved() {
   const int32 TargetID = SelectedTargetID;
   int32 ArmyCount = ActiveConfirmWidget->ArmyCount;
   bool bTargetIsCapital = false;
+  int32 MaxAvailableUnits = 0;
 
   if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
           GetWorld(), AWorldMap::StaticClass()))) {
     if (ATerritory *Source = WorldMap->GetTerritoryById(SourceID)) {
-      ArmyCount = FMath::Clamp(ArmyCount, 1, Source->ArmyUnits);
+      MaxAvailableUnits = Source->ArmyUnits - 1;
+      if (MaxAvailableUnits < 0) {
+        MaxAvailableUnits = 0;
+      }
+
+      if (MaxAvailableUnits <= 0) {
+        ShowErrorMessage(TEXT("Need more than one unit to attack"));
+        CancelAttackSelection();
+        return;
+      }
+
+      ArmyCount = FMath::Clamp(ArmyCount, 1, MaxAvailableUnits);
+      if (ActiveConfirmWidget) {
+        ActiveConfirmWidget->Setup(MaxAvailableUnits);
+      }
     }
     if (ATerritory *Target = WorldMap->GetTerritoryById(TargetID)) {
       bTargetIsCapital = Target->bIsCapital;

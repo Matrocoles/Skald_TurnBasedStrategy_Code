@@ -40,6 +40,7 @@ public:
 private:
   void HideNonBattleLevels();
   void RestoreNonBattleLevels();
+  bool IsStreamingLevelPartOfBattleMap(ULevelStreaming *Level) const;
 
   void HandleLevelLoaded();
   void HandleLevelUnloaded();
