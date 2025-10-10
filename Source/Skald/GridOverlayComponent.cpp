@@ -55,11 +55,6 @@ bool IsComponentFromVisibleLevel(const UGridOverlayComponent* GridComponent)
     return false;
   }
 
-  if (OwnerLevel == World->PersistentLevel)
-  {
-    return true;
-  }
-
   for (const ULevelStreaming* StreamingLevel : World->GetStreamingLevels())
   {
     if (!StreamingLevel)
