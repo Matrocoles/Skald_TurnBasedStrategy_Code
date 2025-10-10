@@ -962,11 +962,24 @@ void ASkaldPlayerController::DetectBattleMap() {
         CurrentMap = UGameplayStatics::GetCurrentLevelName(this, true);
       }
 
+      auto MatchesCurrentMap = [&](const TSoftObjectPtr<UWorld> &MapPtr) {
+        return CurrentMap.Equals(MapPtr.ToSoftObjectPath().GetAssetName(),
+                                 ESearchCase::IgnoreCase);
+      };
+
       for (const TSoftObjectPtr<UWorld> &Map : TM->BattleMaps) {
-        if (CurrentMap.Equals(Map.ToSoftObjectPath().GetAssetName(),
-                              ESearchCase::IgnoreCase)) {
+        if (MatchesCurrentMap(Map)) {
           bDetectedBattleMap = true;
           break;
+        }
+      }
+
+      if (!bDetectedBattleMap) {
+        for (const FBattleMapDescriptor &Entry : TM->BattleMapEntries) {
+          if (MatchesCurrentMap(Entry.Map)) {
+            bDetectedBattleMap = true;
+            break;
+          }
         }
       }
     }

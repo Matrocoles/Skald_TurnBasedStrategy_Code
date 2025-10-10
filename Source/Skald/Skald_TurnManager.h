@@ -13,6 +13,22 @@ class AWorldMap;
 class UWorld;
 class USkaldGameInstance;
 
+USTRUCT(BlueprintType)
+struct FBattleMapDescriptor {
+  GENERATED_BODY()
+
+public:
+  FBattleMapDescriptor() : bStreamAsSubLevel(true) {}
+
+  UPROPERTY(EditAnywhere, BlueprintReadWrite)
+  TSoftObjectPtr<UWorld> Map;
+
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, meta =
+                (Tooltip =
+                     "If true the map will be streamed instead of travelling"))
+  bool bStreamAsSubLevel;
+};
+
 // Broadcast whenever the overall world state changes so HUDs can refresh.
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSkaldWorldStateChanged);
 
@@ -115,6 +131,11 @@ public:
   /** Maps that can be used for grid based battles. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category = "Battle")
   TArray<TSoftObjectPtr<UWorld>> BattleMaps;
+
+  /** Optional per-map configuration including streaming preferences. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category = "Battle",
+            meta = (TitleProperty = "Map"))
+  TArray<FBattleMapDescriptor> BattleMapEntries;
 
 protected:
   UPROPERTY()
