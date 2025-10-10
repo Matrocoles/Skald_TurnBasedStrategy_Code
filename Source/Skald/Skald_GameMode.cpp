@@ -44,6 +44,7 @@ ASkaldGameMode::ASkaldGameMode() {
   DefaultPawnClass = ASkald_PlayerCharacter::StaticClass();
 
   TurnManager = nullptr;
+  TurnManagerClass = ATurnManager::StaticClass();
   WorldMap = nullptr;
   bTurnsStarted = false;
   bWorldInitialized = false;
@@ -199,7 +200,7 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
     }
 
     if (!TurnManager && !bIsMultiplayer) {
-      TurnManager = GetWorld()->SpawnActor<ATurnManager>();
+      TurnManager = ResolveTurnManager();
     }
 
     if (TurnManager) {
@@ -545,7 +546,7 @@ void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
   }
 
   if (!TurnManager) {
-    TurnManager = GetWorld()->SpawnActor<ATurnManager>();
+    TurnManager = ResolveTurnManager();
   }
 
   FS_PlayerData *PlayerData =
@@ -1654,6 +1655,47 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
   ArmyPlacementLeader.Reset();
   bTurnsStarted = true;
   TurnManager->StartTurns(StartingController);
+}
+
+ATurnManager *ASkaldGameMode::ResolveTurnManager() {
+  if (IsValid(TurnManager)) {
+    return TurnManager;
+  }
+
+  UWorld *World = GetWorld();
+  if (!World) {
+    return nullptr;
+  }
+
+  UClass *DesiredClass = TurnManagerClass ? *TurnManagerClass : ATurnManager::StaticClass();
+  if (!DesiredClass) {
+    DesiredClass = ATurnManager::StaticClass();
+  }
+
+  auto FindManager = [&](UClass *Class) -> ATurnManager * {
+    if (!Class) {
+      return nullptr;
+    }
+    return Cast<ATurnManager>(UGameplayStatics::GetActorOfClass(World, Class));
+  };
+
+  if (ATurnManager *Existing = FindManager(DesiredClass)) {
+    TurnManager = Existing;
+    return TurnManager;
+  }
+
+  if (DesiredClass != ATurnManager::StaticClass()) {
+    if (ATurnManager *BaseExisting = FindManager(ATurnManager::StaticClass())) {
+      TurnManager = BaseExisting;
+      return TurnManager;
+    }
+  }
+
+  FActorSpawnParameters SpawnParams;
+  SpawnParams.SpawnCollisionHandlingOverride =
+      ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+  TurnManager = World->SpawnActor<ATurnManager>(DesiredClass, SpawnParams);
+  return TurnManager;
 }
 
 void ASkaldGameMode::HandleArmyPlacementFailsafe() {

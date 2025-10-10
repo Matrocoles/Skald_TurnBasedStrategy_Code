@@ -97,6 +97,10 @@ protected:
   UFUNCTION()
   void HandleBattleEnded(ESkaldFaction Winner, int32 AttackerCasualties, int32 DefenderCasualties);
 
+  /** Class used when spawning the runtime turn manager. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GameMode")
+  TSubclassOf<ATurnManager> TurnManagerClass;
+
   /** Handles turn sequencing for the match. */
   UPROPERTY(BlueprintReadOnly, Category = "GameMode")
   ATurnManager *TurnManager;
@@ -198,6 +202,9 @@ private:
 
   /** Callback fired by the failsafe timer if the AI does not advance. */
   void HandleArmyPlacementFailsafe();
+
+  /** Ensure a turn manager exists, spawning or reusing one as required. */
+  ATurnManager *ResolveTurnManager();
 
   /** Attempt to restore the overworld from the cached travel snapshot. */
   bool RestoreWorldFromSnapshot();
