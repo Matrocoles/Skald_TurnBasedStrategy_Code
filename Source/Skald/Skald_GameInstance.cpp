@@ -1,5 +1,6 @@
 #include "Skald_GameInstance.h"
 
+#include "UObject/CoreUObjectDelegates.h"
 #include "Engine/World.h"
 #include "Engine/Engine.h"
 #include "Kismet/GameplayStatics.h"
@@ -25,11 +26,8 @@ void USkaldGameInstance::Init() {
     TakenFactions.Add(Faction);
   }
 
-  if (!PostWorldBeginPlayHandle.IsValid()) {
-    PostWorldBeginPlayHandle =
-        FWorldDelegates::OnWorldBeginPlay.AddUObject(
-            this, &USkaldGameInstance::HandleWorldBeginPlay);
-  }
+  FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(
+      this, &USkaldGameInstance::HandlePostLoadMap);
 
   PendingBattle = FS_BattlePayload();
   PendingBattleResolution = FGridBattleResolution();
@@ -48,10 +46,7 @@ void USkaldGameInstance::Init() {
 }
 
 void USkaldGameInstance::Shutdown() {
-  if (PostWorldBeginPlayHandle.IsValid()) {
-    FWorldDelegates::OnWorldBeginPlay.Remove(PostWorldBeginPlayHandle);
-    PostWorldBeginPlayHandle.Reset();
-  }
+  FCoreUObjectDelegates::PostLoadMapWithWorld.RemoveAll(this);
 
   Super::Shutdown();
 }
@@ -120,8 +115,12 @@ void USkaldGameInstance::SetTravelPending(bool bInPending) {
   }
 }
 
-void USkaldGameInstance::HandleWorldBeginPlay(UWorld *LoadedWorld) {
-  if (!LoadedWorld || LoadedWorld->GetGameInstance() != this) {
+void USkaldGameInstance::HandlePostLoadMap(UWorld *LoadedWorld) {
+  if (!LoadedWorld) {
+    return;
+  }
+
+  if (LoadedWorld->GetGameInstance() != this) {
     return;
   }
 
