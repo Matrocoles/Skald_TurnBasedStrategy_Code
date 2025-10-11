@@ -207,9 +207,9 @@ private:
   /** Loading overlay displayed while travelling between maps. */
   TSharedPtr<SWidget> TravelLoadingOverlay;
 
-  /** Handle invoked after the engine finishes loading a map. */
-  FDelegateHandle PostLoadMapHandle;
+  /** Handle invoked when the owning world begins play after travel. */
+  FDelegateHandle PostWorldBeginPlayHandle;
 
-  void HandlePostLoadMap(UWorld *LoadedWorld);
+  void HandleWorldBeginPlay(UWorld *LoadedWorld);
   void ResetSessionState();
 };
