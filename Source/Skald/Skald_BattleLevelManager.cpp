@@ -7,6 +7,7 @@
 #include "Engine/LevelStreamingDynamic.h"
 #include "Misc/EngineVersionComparison.h"
 #include "Misc/PackageName.h"
+#include "Misc/WorldDelegates.h"
 #if UE_VERSION_OLDER_THAN(5, 5, 0)
 #include "Engine/LevelStreamingTypes.h"
 #endif
