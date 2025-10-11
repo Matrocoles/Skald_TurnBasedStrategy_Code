@@ -184,4 +184,7 @@ protected:
 
   /** Attempt to restore a saved turn state captured before travelling. */
   bool TryResumeSavedTurnState(USkaldGameInstance *GameInstance = nullptr);
+
+  /** Ensure the cached world map pointer references a valid actor. */
+  AWorldMap *ResolveWorldMap();
 };
