@@ -101,6 +101,12 @@ public:
                                   const FSkaldTravelState &TravelState,
                                   const FS_BattlePayload &BattlePayload);
 
+  /** Multicast notification to prepare clients for travelling to a battle map
+   *  when a streaming level is not being used. */
+  UFUNCTION(NetMulticast, Reliable)
+  void MulticastPrepareBattleTravel(const FSkaldTravelState &TravelState,
+                                    const FS_BattlePayload &BattlePayload);
+
   /** Multicast the battle map active state so clients can update immediately. */
   UFUNCTION(NetMulticast, Reliable)
   void MulticastSetBattleMapActive(bool bInBattleMap);
