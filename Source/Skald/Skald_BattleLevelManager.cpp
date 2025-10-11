@@ -351,6 +351,22 @@ void USkaldBattleLevelManager::HandleLevelLoaded() {
           }
         }
 
+        if (!BattleGameModeClass ||
+            BattleGameModeClass == ASkald_BattleGameMode::StaticClass()) {
+          static const TSoftClassPtr<ASkald_BattleGameMode>
+              BlueprintBattleGameModeClass(
+                  FSoftObjectPath(TEXT("/Game/C++_BPs/Skald_BatlleGameMode_SC.Skald_BatlleGameMode_SC_C")));
+
+          if (!BlueprintBattleGameModeClass.IsNull()) {
+            if (UClass *LoadedClass = BlueprintBattleGameModeClass.LoadSynchronous()) {
+              BattleGameModeClass = LoadedClass;
+            } else {
+              UE_LOG(LogSkald, Warning,
+                     TEXT("BattleLevelManager: Failed to load Skald_BatlleGameMode_SC blueprint. Falling back to C++ class."));
+            }
+          }
+        }
+
         if (!BattleGameModeClass) {
           BattleGameModeClass = ASkald_BattleGameMode::StaticClass();
         }
