@@ -40,15 +40,6 @@
 #include "Widgets/SWidget.h"
 #include "Widgets/SWindow.h"
 
-// Portable include for FCoreUObjectDelegates across UE versions
-#if __has_include("UObject/CoreUObjectDelegates.h")
-    #include "UObject/CoreUObjectDelegates.h"
-#elif __has_include("UObject/Package.h")
-    #include "UObject/Package.h"
-#else
-    #include "UObject/UObjectGlobals.h"
-#endif
-
 #include "Engine/World.h"
 #include "Net/UnrealNetwork.h"
 
@@ -252,11 +243,11 @@ void ASkaldPlayerController::BeginPlay() {
   Super::BeginPlay();
 
   if (PostLoadMapHandle.IsValid()) {
-    FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(PostLoadMapHandle);
+    FWorldDelegates::OnPostLoadMapWithWorld.Remove(PostLoadMapHandle);
     PostLoadMapHandle.Reset();
   }
 
-  PostLoadMapHandle = FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(
+  PostLoadMapHandle = FWorldDelegates::OnPostLoadMapWithWorld.AddUObject(
       this, &ASkaldPlayerController::HandlePostLoadMap);
 
   CacheGameReferences();
@@ -304,7 +295,7 @@ void ASkaldPlayerController::BeginPlay() {
 
 void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
   if (PostLoadMapHandle.IsValid()) {
-    FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(PostLoadMapHandle);
+    FWorldDelegates::OnPostLoadMapWithWorld.Remove(PostLoadMapHandle);
     PostLoadMapHandle.Reset();
   }
 
