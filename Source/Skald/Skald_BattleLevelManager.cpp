@@ -11,6 +11,7 @@
 #include "Engine/LevelStreamingTypes.h"
 #endif
 #include "Engine/World.h"
+#include "Engine/WorldDelegates.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/GameModeBase.h"
 #include "GameFramework/WorldSettings.h"
