@@ -1,10 +1,11 @@
 #include "Skald_PlayerController.h"
 
+#include "Engine/World.h"
+#include "Engine/Engine.h"
 #include "Blueprint/UserWidget.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "ChoosePlayerWidget.h"
 #include "Components/InputComponent.h"
-#include "Engine/Engine.h"
 #include "Engine/EngineTypes.h"
 #include "Engine/Level.h"
 #include "EngineUtils.h"
@@ -40,7 +41,6 @@
 #include "Widgets/SWidget.h"
 #include "Widgets/SWindow.h"
 
-#include "Engine/World.h"
 #include "Net/UnrealNetwork.h"
 
 namespace {
