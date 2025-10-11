@@ -3,6 +3,7 @@
 #include "Blueprint/UserWidget.h"
 #include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
+#include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 #include "Skald.h"
 #include "SkaldLogging.h"
@@ -15,7 +16,6 @@
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/SOverlay.h"
 #include "Widgets/Text/STextBlock.h"
-#include "UObject/CoreUObjectDelegates.h"
 
 void USkaldGameInstance::Init() {
   Super::Init();
@@ -27,7 +27,7 @@ void USkaldGameInstance::Init() {
 
   if (!PostLoadMapHandle.IsValid()) {
     PostLoadMapHandle =
-        FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(
+        FWorldDelegates::OnPostLoadMapWithWorld.AddUObject(
             this, &USkaldGameInstance::HandlePostLoadMap);
   }
 
@@ -49,7 +49,7 @@ void USkaldGameInstance::Init() {
 
 void USkaldGameInstance::Shutdown() {
   if (PostLoadMapHandle.IsValid()) {
-    FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(PostLoadMapHandle);
+    FWorldDelegates::OnPostLoadMapWithWorld.Remove(PostLoadMapHandle);
     PostLoadMapHandle.Reset();
   }
 
