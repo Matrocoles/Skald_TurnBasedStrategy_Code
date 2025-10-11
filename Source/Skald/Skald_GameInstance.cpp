@@ -1,10 +1,10 @@
 #include "Skald_GameInstance.h"
 
-#include "Blueprint/UserWidget.h"
-#include "Engine/Engine.h"
-#include "Engine/GameViewportClient.h"
 #include "Engine/World.h"
+#include "Engine/Engine.h"
 #include "Kismet/GameplayStatics.h"
+#include "Blueprint/UserWidget.h"
+#include "Engine/GameViewportClient.h"
 #include "Skald.h"
 #include "SkaldLogging.h"
 #include "Skald_BattleGameMode.h"
