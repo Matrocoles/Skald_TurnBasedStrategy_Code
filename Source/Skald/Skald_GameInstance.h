@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Delegates/DelegateHandle.h"
+#include "Delegates/Delegate.h"
 #include "Engine/EngineBaseTypes.h"
 #include "Engine/GameInstance.h"
 #include "SkaldTypes.h"
