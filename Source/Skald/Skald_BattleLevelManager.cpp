@@ -1,7 +1,6 @@
 #include "Skald_BattleLevelManager.h"
 
 #include "Containers/Ticker.h"
-#include "Delegates/WorldDelegates.h"
 #include "Engine/Engine.h"
 #include "Engine/Level.h"
 #include "Engine/LevelStreaming.h"
