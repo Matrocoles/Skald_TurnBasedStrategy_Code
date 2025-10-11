@@ -685,13 +685,16 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
 
   bBattleLaunched = false;
 
-  auto ResetSetupStarted = [this]() { bSetupStarted = false; };
+  auto ResetSetupAttempt = [this]() {
+    bSetupStarted = false;
+    GBattleSetupTriggered = false;
+  };
 
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
   if (!GI || !GI->GridBattleManager) {
     UE_LOG(LogSkaldBattle, Warning,
            TEXT("BattleGM SetupPendingBattle: GameInstance or GridBattleManager missing"));
-    ResetSetupStarted();
+    ResetSetupAttempt();
     return;
   }
 
@@ -699,13 +702,13 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
   if (!GS) {
     UE_LOG(LogSkaldBattle, Warning,
            TEXT("BattleGM SetupPendingBattle: GameState unavailable"));
-    ResetSetupStarted();
+    ResetSetupAttempt();
     return;
   }
 
   UWorld *World = GetWorld();
   if (!World) {
-    ResetSetupStarted();
+    ResetSetupAttempt();
     return;
   }
 
@@ -784,7 +787,7 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
            TEXT("BattleGM SetupPendingBattle: Unable to resolve participants (From=%d To=%d PendingControllers=%d)"),
            Battle.FromTerritoryID, Battle.TargetTerritoryID,
            GPendingControllers.Num());
-    ResetSetupStarted();
+    ResetSetupAttempt();
     return;
   }
 
@@ -853,7 +856,7 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
            TEXT("BattleGM SetupPendingBattle: Unable to resolve participants (AttackerId=%d DefenderId=%d Territories=%d/%d)"),
            Battle.AttackerPlayerID, Battle.DefenderPlayerID,
            Battle.FromTerritoryID, Battle.TargetTerritoryID);
-    ResetSetupStarted();
+    ResetSetupAttempt();
     return;
   }
 
@@ -889,7 +892,7 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
            TEXT("BattleGM SetupPendingBattle: Failed to ensure participants (AttackerValid=%s DefenderValid=%s)"),
            AttackerPS ? TEXT("true") : TEXT("false"),
            DefenderPS ? TEXT("true") : TEXT("false"));
-    ResetSetupStarted();
+    ResetSetupAttempt();
     return;
   }
 
