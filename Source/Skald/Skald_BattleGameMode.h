@@ -71,6 +71,8 @@ private:
                                   const TArray<FFighterDefinition> &SelectedFighters,
                                   FString &OutReason);
 
+  void LogParticipantLockState(const TCHAR *Context);
+
   bool IsSoloMatch() const;
   void PollBattleBootstrap();
   void EnsureBattleControllers();

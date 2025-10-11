@@ -344,9 +344,23 @@ void USkaldBattleLevelManager::HandleLevelLoaded() {
 #endif
 
           if (DefaultGameModeClass) {
+            const FString DefaultClassPath = DefaultGameModeClass->GetPathName();
+            UE_LOG(LogSkald, Log,
+                   TEXT("BattleLevelManager: Level %s default GameMode=%s (%s)"),
+                   *GetNameSafe(LoadedLevel), *GetNameSafe(DefaultGameModeClass),
+                   *DefaultClassPath);
+
+            if (!DefaultClassPath.Contains(TEXT("Skald_BattleGameMode_SC"))) {
+              UE_LOG(LogSkald, Warning,
+                     TEXT("BattleLevelManager: Expected Skald_BattleGameMode_SC as the default battle GameMode for streamed maps."));
+            }
+
             if (DefaultGameModeClass->IsChildOf(
                     ASkald_BattleGameMode::StaticClass())) {
               BattleGameModeClass = DefaultGameModeClass;
+            } else {
+              UE_LOG(LogSkald, Warning,
+                     TEXT("BattleLevelManager: Default GameMode is not derived from Skald_BattleGameMode."));
             }
           }
         }
@@ -369,6 +383,8 @@ void USkaldBattleLevelManager::HandleLevelLoaded() {
 
         if (!BattleGameModeClass) {
           BattleGameModeClass = ASkald_BattleGameMode::StaticClass();
+          UE_LOG(LogSkald, Warning,
+                 TEXT("BattleLevelManager: Falling back to native Skald_BattleGameMode for battle map."));
         }
 
         if (BattleGameModeClass) {
