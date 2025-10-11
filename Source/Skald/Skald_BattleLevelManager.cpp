@@ -11,7 +11,11 @@
 #include "Engine/LevelStreamingTypes.h"
 #endif
 #include "Engine/World.h"
+#if UE_VERSION_OLDER_THAN(5, 5, 0)
 #include "Engine/WorldDelegates.h"
+#else
+#include "Engine/EngineDelegates.h"
+#endif
 #include "GameFramework/Actor.h"
 #include "GameFramework/GameModeBase.h"
 #include "GameFramework/WorldSettings.h"
