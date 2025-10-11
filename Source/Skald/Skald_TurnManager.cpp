@@ -801,6 +801,9 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
            TravelState.CachedTerritories.Num());
 
     if (!bShouldStreamSelectedMap || !bStreamingBattle) {
+      if (World->GetNetMode() != NM_Standalone) {
+        MulticastPrepareBattleTravel(TravelState, PendingPayload);
+      }
       if (IsRunningDedicatedServer() ||
           World->GetNetMode() != NM_Standalone) {
         FString ListenMap = MapToLoad;
@@ -849,6 +852,21 @@ void ATurnManager::MulticastStreamBattleLevel_Implementation(
                *BattleLevelPath.ToString());
       }
     }
+  }
+}
+
+void ATurnManager::MulticastPrepareBattleTravel_Implementation(
+    const FSkaldTravelState &TravelState,
+    const FS_BattlePayload &BattlePayload) {
+  if (HasAuthority()) {
+    return;
+  }
+
+  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+    GI->SetTravelState(TravelState);
+    GI->PendingBattle = BattlePayload;
+    GI->SetBattleMapActive(true);
+    GI->SetTravelPending(true);
   }
 }
 
