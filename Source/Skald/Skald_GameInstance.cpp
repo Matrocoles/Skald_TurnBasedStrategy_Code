@@ -4,6 +4,7 @@
 #include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/World.h"
+#include "Misc/WorldDelegates.h"
 #include "Kismet/GameplayStatics.h"
 #include "Skald.h"
 #include "SkaldLogging.h"
