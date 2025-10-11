@@ -7,6 +7,7 @@
 #include "SkaldTypes.h"
 #include "TimerManager.h"
 #include "Delegates/Delegate.h"
+#include "Engine/WorldDelegates.h"
 #include "Skald_PlayerController.generated.h"
 
 class ATurnManager;
