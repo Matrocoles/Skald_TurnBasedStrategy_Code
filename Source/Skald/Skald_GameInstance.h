@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Delegates/DelegateHandle.h"
 #include "Engine/EngineBaseTypes.h"
 #include "Engine/GameInstance.h"
 #include "SkaldTypes.h"
@@ -15,6 +16,7 @@ class UUserWidget;
 class ASkald_BattleGameMode;
 class USkaldSaveGame;
 class UNetDriver;
+class UWorld;
 
 USTRUCT(BlueprintType)
 struct FSkaldTravelState
@@ -53,6 +55,8 @@ class SKALD_API USkaldGameInstance : public UGameInstance {
 public:
   /** Initialize the game instance. */
   virtual void Init() override;
+
+  virtual void Shutdown() override;
 
   /** Player chosen display name. */
   UPROPERTY(BlueprintReadWrite, Category = "Player")
@@ -203,5 +207,9 @@ private:
   /** Loading overlay displayed while travelling between maps. */
   TSharedPtr<SWidget> TravelLoadingOverlay;
 
+  /** Handle invoked after the engine finishes loading a map. */
+  FDelegateHandle PostLoadMapHandle;
+
+  void HandlePostLoadMap(UWorld *LoadedWorld);
   void ResetSessionState();
 };

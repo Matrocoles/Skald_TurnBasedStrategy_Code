@@ -15,6 +15,7 @@
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/SOverlay.h"
 #include "Widgets/Text/STextBlock.h"
+#include "UObject/CoreUObjectDelegates.h"
 
 void USkaldGameInstance::Init() {
   Super::Init();
@@ -22,6 +23,12 @@ void USkaldGameInstance::Init() {
   TakenFactions.Empty();
   if (Faction != ESkaldFaction::None) {
     TakenFactions.Add(Faction);
+  }
+
+  if (!PostLoadMapHandle.IsValid()) {
+    PostLoadMapHandle =
+        FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(
+            this, &USkaldGameInstance::HandlePostLoadMap);
   }
 
   PendingBattle = FS_BattlePayload();
@@ -38,6 +45,15 @@ void USkaldGameInstance::Init() {
     GEngine->OnNetworkFailure().AddUObject(
         this, &USkaldGameInstance::HandleNetworkFailure);
   }
+}
+
+void USkaldGameInstance::Shutdown() {
+  if (PostLoadMapHandle.IsValid()) {
+    FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(PostLoadMapHandle);
+    PostLoadMapHandle.Reset();
+  }
+
+  Super::Shutdown();
 }
 
 void USkaldGameInstance::SetTravelState(const FSkaldTravelState &InState) {
@@ -102,6 +118,10 @@ void USkaldGameInstance::SetTravelPending(bool bInPending) {
       TravelLoadingOverlay.Reset();
     }
   }
+}
+
+void USkaldGameInstance::HandlePostLoadMap(UWorld * /*LoadedWorld*/) {
+  SetTravelPending(false);
 }
 
 void USkaldGameInstance::SetActiveBattleGameMode(
