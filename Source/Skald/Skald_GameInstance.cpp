@@ -25,10 +25,10 @@ void USkaldGameInstance::Init() {
     TakenFactions.Add(Faction);
   }
 
-  if (!PostLoadMapHandle.IsValid()) {
-    PostLoadMapHandle =
-        FWorldDelegates::OnPostLoadMapWithWorld.AddUObject(
-            this, &USkaldGameInstance::HandlePostLoadMap);
+  if (!PostWorldBeginPlayHandle.IsValid()) {
+    PostWorldBeginPlayHandle =
+        FWorldDelegates::OnWorldBeginPlay.AddUObject(
+            this, &USkaldGameInstance::HandleWorldBeginPlay);
   }
 
   PendingBattle = FS_BattlePayload();
@@ -48,9 +48,9 @@ void USkaldGameInstance::Init() {
 }
 
 void USkaldGameInstance::Shutdown() {
-  if (PostLoadMapHandle.IsValid()) {
-    FWorldDelegates::OnPostLoadMapWithWorld.Remove(PostLoadMapHandle);
-    PostLoadMapHandle.Reset();
+  if (PostWorldBeginPlayHandle.IsValid()) {
+    FWorldDelegates::OnWorldBeginPlay.Remove(PostWorldBeginPlayHandle);
+    PostWorldBeginPlayHandle.Reset();
   }
 
   Super::Shutdown();
@@ -120,7 +120,11 @@ void USkaldGameInstance::SetTravelPending(bool bInPending) {
   }
 }
 
-void USkaldGameInstance::HandlePostLoadMap(UWorld * /*LoadedWorld*/) {
+void USkaldGameInstance::HandleWorldBeginPlay(UWorld *LoadedWorld) {
+  if (!LoadedWorld || LoadedWorld->GetGameInstance() != this) {
+    return;
+  }
+
   SetTravelPending(false);
 }
 

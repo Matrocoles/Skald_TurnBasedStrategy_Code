@@ -212,12 +212,12 @@ protected:
   virtual void SetupInputComponent() override;
 
   UFUNCTION()
-  void HandlePostLoadMap(UWorld *LoadedWorld);
+  void HandleWorldBeginPlay(UWorld *LoadedWorld);
 
   /** Shared implementation for ending the current phase on the server. */
   void HandleEndPhaseInternal();
 
-  FDelegateHandle PostLoadMapHandle;
+  FDelegateHandle PostWorldBeginPlayHandle;
 
   /** Begin selecting a move destination. */
   UFUNCTION()

@@ -41,7 +41,6 @@
 #include "Widgets/SWindow.h"
 
 #include "Engine/World.h"
-#include "Delegates/WorldDelegates.h"
 #include "Net/UnrealNetwork.h"
 
 namespace {
@@ -243,13 +242,13 @@ void ASkaldPlayerController::InitializeChoosePlayerWidget() {
 void ASkaldPlayerController::BeginPlay() {
   Super::BeginPlay();
 
-  if (PostLoadMapHandle.IsValid()) {
-    FWorldDelegates::OnPostLoadMapWithWorld.Remove(PostLoadMapHandle);
-    PostLoadMapHandle.Reset();
+  if (PostWorldBeginPlayHandle.IsValid()) {
+    FWorldDelegates::OnWorldBeginPlay.Remove(PostWorldBeginPlayHandle);
+    PostWorldBeginPlayHandle.Reset();
   }
 
-  PostLoadMapHandle = FWorldDelegates::OnPostLoadMapWithWorld.AddUObject(
-      this, &ASkaldPlayerController::HandlePostLoadMap);
+  PostWorldBeginPlayHandle = FWorldDelegates::OnWorldBeginPlay.AddUObject(
+      this, &ASkaldPlayerController::HandleWorldBeginPlay);
 
   CacheGameReferences();
 
@@ -295,9 +294,9 @@ void ASkaldPlayerController::BeginPlay() {
 }
 
 void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
-  if (PostLoadMapHandle.IsValid()) {
-    FWorldDelegates::OnPostLoadMapWithWorld.Remove(PostLoadMapHandle);
-    PostLoadMapHandle.Reset();
+  if (PostWorldBeginPlayHandle.IsValid()) {
+    FWorldDelegates::OnWorldBeginPlay.Remove(PostWorldBeginPlayHandle);
+    PostWorldBeginPlayHandle.Reset();
   }
 
   if (CachedGameInstance) {
@@ -1058,8 +1057,8 @@ void ASkaldPlayerController::DetectBattleMap() {
   }
 }
 
-void ASkaldPlayerController::HandlePostLoadMap(UWorld *LoadedWorld) {
-  if (!LoadedWorld || !IsLocalPlayerController()) {
+void ASkaldPlayerController::HandleWorldBeginPlay(UWorld *LoadedWorld) {
+  if (!LoadedWorld || LoadedWorld != GetWorld() || !IsLocalPlayerController()) {
     return;
   }
 
