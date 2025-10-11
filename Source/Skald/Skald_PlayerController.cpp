@@ -242,14 +242,6 @@ void ASkaldPlayerController::InitializeChoosePlayerWidget() {
 void ASkaldPlayerController::BeginPlay() {
   Super::BeginPlay();
 
-  if (PostWorldBeginPlayHandle.IsValid()) {
-    FWorldDelegates::OnWorldBeginPlay.Remove(PostWorldBeginPlayHandle);
-    PostWorldBeginPlayHandle.Reset();
-  }
-
-  PostWorldBeginPlayHandle = FWorldDelegates::OnWorldBeginPlay.AddUObject(
-      this, &ASkaldPlayerController::HandleWorldBeginPlay);
-
   CacheGameReferences();
 
   DetectBattleMap();
@@ -293,12 +285,18 @@ void ASkaldPlayerController::BeginPlay() {
   TryBindWorldMap();
 }
 
-void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
-  if (PostWorldBeginPlayHandle.IsValid()) {
-    FWorldDelegates::OnWorldBeginPlay.Remove(PostWorldBeginPlayHandle);
-    PostWorldBeginPlayHandle.Reset();
+void ASkaldPlayerController::OnPossess(APawn *InPawn) {
+  Super::OnPossess(InPawn);
+
+  if (!IsLocalPlayerController()) {
+    return;
   }
 
+  DetectBattleMap();
+  InitializeFighterSelectionIfNeeded();
+}
+
+void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
   if (CachedGameInstance) {
     CachedGameInstance->OnBattleMapStateChanged.RemoveDynamic(
         this, &ASkaldPlayerController::HandleBattleMapStateChanged);
@@ -1055,15 +1053,6 @@ void ASkaldPlayerController::DetectBattleMap() {
   } else {
     ShowOverworldHUD();
   }
-}
-
-void ASkaldPlayerController::HandleWorldBeginPlay(UWorld *LoadedWorld) {
-  if (!LoadedWorld || LoadedWorld != GetWorld() || !IsLocalPlayerController()) {
-    return;
-  }
-
-  DetectBattleMap();
-  InitializeFighterSelectionIfNeeded();
 }
 
 void ASkaldPlayerController::ShowTurnAnnouncement(const FString &PlayerName,
