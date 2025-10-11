@@ -353,6 +353,17 @@ void ASkald_BattleGameMode::BeginPlay() {
     }
   }
 
+  const UClass *BattleClass = GetClass();
+  if (BattleClass == StaticClass()) {
+    UE_LOG(LogSkaldBattle, Warning,
+           TEXT("BattleGM BeginPlay: Running native Skald_BattleGameMode. ")
+           TEXT("Expected Blueprint child (Skald_BattleGameMode_SC) when streaming a battle sublevel."));
+  } else {
+    UE_LOG(LogSkaldBattle, Log,
+           TEXT("BattleGM BeginPlay: Using class %s (Path=%s)"),
+           *BattleClass->GetName(), *BattleClass->GetPathName());
+  }
+
   UE_LOG(LogSkaldBattle, Log,
          TEXT("BattleGM BeginPlay: BattleManager ready; ExpectedControllers=%d"),
          ExpectedControllers);
@@ -659,6 +670,8 @@ void ASkald_BattleGameMode::BeginPreBattleSelection(ASkaldPlayerState *AttackerP
       }
     }
   }
+
+  LogParticipantLockState(TEXT("BeginPreBattleSelection"));
 }
 
 void ASkald_BattleGameMode::SetupPendingBattle() {
@@ -1487,6 +1500,7 @@ void ASkald_BattleGameMode::HandleHumanLockIn(
     UE_LOG(LogSkaldBattle, Warning,
            TEXT("HandleHumanLockIn: validation failed for PlayerId=%d (%s)"),
            PlayerId, *FailureReason);
+    LogParticipantLockState(TEXT("HandleHumanLockIn (validation failed)"));
     PC->Client_OnLockInResult(false, FailureReason);
     return;
   }
@@ -1494,6 +1508,7 @@ void ASkald_BattleGameMode::HandleHumanLockIn(
   LockedInPlayers.Add(PlayerId);
   UE_LOG(LogSkaldBattle, Log,
          TEXT("HandleHumanLockIn: PlayerId=%d locked selection"), PlayerId);
+  LogParticipantLockState(TEXT("HandleHumanLockIn (post-commit)"));
   PC->Client_OnLockInResult(true, TEXT("Committed"));
 
   TryAdvanceAfterLockIn();
@@ -1517,6 +1532,8 @@ bool ASkald_BattleGameMode::AreBothParticipantsLocked() const
 
 void ASkald_BattleGameMode::TryAdvanceAfterLockIn()
 {
+  LogParticipantLockState(TEXT("TryAdvanceAfterLockIn"));
+
   if (!AreBothParticipantsLocked()) {
     return;
   }
@@ -1611,5 +1628,60 @@ bool ASkald_BattleGameMode::ValidateAndRecordSelection(
          Budget);
 
   return true;
+}
+
+void ASkald_BattleGameMode::LogParticipantLockState(const TCHAR *Context)
+{
+  USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+  ASkaldGameState *GS = GetGameState<ASkaldGameState>();
+
+  if (!GI || !GS)
+  {
+    UE_LOG(LogSkaldBattle, Warning,
+           TEXT("LockState[%s]: Missing GameInstance (%s) or GameState (%s)"),
+           Context ? Context : TEXT("Unknown"), GI ? TEXT("ok") : TEXT("null"),
+           GS ? TEXT("ok") : TEXT("null"));
+    return;
+  }
+
+  const FS_BattlePayload &Battle = GI->PendingBattle;
+
+  auto DescribeParticipant = [&](int32 PlayerId) -> FString {
+    if (PlayerId <= 0)
+    {
+      return FString::Printf(TEXT("Id=%d (none)"), PlayerId);
+    }
+
+    ASkaldPlayerState *PlayerPS = GS->GetPlayerById(PlayerId);
+    const bool bLocked = LockedInPlayers.Contains(PlayerId);
+
+    if (!PlayerPS)
+    {
+      return FString::Printf(TEXT("Id=%d (PlayerState missing) Locked=%s"),
+                             PlayerId, bLocked ? TEXT("true") : TEXT("false"));
+    }
+
+    return FString::Printf(
+        TEXT("Id=%d Name=%s AI=%s LockedSet=%s ArmyLocked=%s ArmySize=%d Budget=%d"),
+        PlayerId, *PlayerPS->PlayerDisplayName,
+        PlayerPS->bIsAI ? TEXT("true") : TEXT("false"),
+        bLocked ? TEXT("true") : TEXT("false"),
+        PlayerPS->bArmyLockedIn ? TEXT("true") : TEXT("false"),
+        PlayerPS->PendingArmy.Num(), PlayerPS->PendingArmyBudget);
+  };
+
+  FString LockedIds;
+  for (int32 LockedId : LockedInPlayers)
+  {
+    LockedIds += LockedIds.IsEmpty() ? TEXT("") : TEXT(",");
+    LockedIds += FString::FromInt(LockedId);
+  }
+
+  UE_LOG(LogSkaldBattle, Log,
+         TEXT("LockState[%s]: Attacker[%s] Defender[%s] LockedInPlayers={%s} Phase=%s"),
+         Context ? Context : TEXT("Unknown"),
+         *DescribeParticipant(Battle.AttackerPlayerID),
+         *DescribeParticipant(Battle.DefenderPlayerID), *LockedIds,
+         *UEnum::GetValueAsString(GS->BattlePhase));
 }
 

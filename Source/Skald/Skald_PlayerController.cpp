@@ -655,9 +655,35 @@ void ASkaldPlayerController::Server_LockInSelection_Implementation(
          TEXT("Server_LockInSelection: %s sent %d fighters"), *GetName(),
          SelectedFighters.Num());
 
-  if (ASkald_BattleGameMode *GameMode = ResolveBattleGameMode())
-  {
+  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+    const FS_BattlePayload &Battle = GI->PendingBattle;
+    UE_LOG(LogSkaldBattle, Verbose,
+           TEXT("Server_LockInSelection: PendingBattle AttackerId=%d DefenderId=%d"),
+           Battle.AttackerPlayerID, Battle.DefenderPlayerID);
+  } else {
+    UE_LOG(LogSkaldBattle, Warning,
+           TEXT("Server_LockInSelection: GameInstance missing on %s"), *GetName());
+  }
+
+  if (ASkald_BattleGameMode *GameMode = ResolveBattleGameMode()) {
+    if (UClass *GameModeClass = GameMode->GetClass()) {
+      const FString ClassPath = GameModeClass->GetPathName();
+      UE_LOG(LogSkaldBattle, Verbose,
+             TEXT("Server_LockInSelection: BattleGameMode class=%s (%s)"),
+             *GameModeClass->GetName(), *ClassPath);
+
+      if (GameModeClass == ASkald_BattleGameMode::StaticClass()) {
+        UE_LOG(LogSkaldBattle, Warning,
+               TEXT("Server_LockInSelection: Using native Skald_BattleGameMode. "
+                    "Battle sublevels should spawn Skald_BattleGameMode_SC."));
+      }
+    }
+
     GameMode->HandleHumanLockIn(this, SelectedFighters);
+  } else {
+    UE_LOG(LogSkaldBattle, Warning,
+           TEXT("Server_LockInSelection: BattleGameMode not resolved for %s"),
+           *GetName());
   }
 }
 
@@ -684,6 +710,18 @@ void ASkaldPlayerController::Client_OnLockInResult_Implementation(
       FighterSelectionWidget->SetLockInButtonEnabled(true);
     }
     return;
+  }
+
+  if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>())
+  {
+    UE_LOG(LogSkaldUI, Log,
+           TEXT("LockIn success for PlayerId=%d PendingArmy=%d Budget=%d"),
+           PS->GetPlayerId(), PS->PendingArmy.Num(), PS->PendingArmyBudget);
+  }
+  else
+  {
+    UE_LOG(LogSkaldUI, Warning,
+           TEXT("LockIn success but PlayerState missing for %s"), *GetName());
   }
 
   HandleFighterSelectionLockedIn();
@@ -1835,6 +1873,11 @@ void ASkaldPlayerController::HandleFactionLockedIn() {
 }
 
 void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
+  UE_LOG(LogSkaldUI, Log,
+         TEXT("HandleFighterSelectionLockedIn: Controller=%s Local=%s Pawn=%s"),
+         *GetName(), IsLocalController() ? TEXT("true") : TEXT("false"),
+         GetPawn() ? *GetPawn()->GetName() : TEXT("null"));
+
   if (UFighterSelectionWidget *Selection = FighterSelectionWidget) {
     Selection->RemoveFromParent();
     FighterSelectionWidget = nullptr;
@@ -1867,6 +1910,39 @@ void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
   if (CachedGameInstance && CachedGameInstance->GridBattleManager &&
       !bBattleHUDVisible) {
     EnsureBattleHUDVisible();
+  }
+
+  if (CachedGameInstance && CachedGameInstance->GridBattleManager)
+  {
+    UE_LOG(LogSkaldUI, Verbose,
+           TEXT("HandleFighterSelectionLockedIn: GridBattleManager ready (%s)"),
+           *CachedGameInstance->GridBattleManager->GetName());
+  }
+  else if (CachedGameInstance)
+  {
+    UE_LOG(LogSkaldUI, Warning,
+           TEXT("HandleFighterSelectionLockedIn: GridBattleManager missing (GI=%s)"),
+           *CachedGameInstance->GetName());
+  }
+  else
+  {
+    UE_LOG(LogSkaldUI, Warning,
+           TEXT("HandleFighterSelectionLockedIn: GameInstance missing on %s"),
+           *GetName());
+  }
+
+  if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>())
+  {
+    UE_LOG(LogSkaldUI, Log,
+           TEXT("HandleFighterSelectionLockedIn: PlayerId=%d PendingArmy=%d PendingBudget=%d ArmyLocked=%s"),
+           PS->GetPlayerId(), PS->PendingArmy.Num(), PS->PendingArmyBudget,
+           PS->bArmyLockedIn ? TEXT("true") : TEXT("false"));
+  }
+  else
+  {
+    UE_LOG(LogSkaldUI, Warning,
+           TEXT("HandleFighterSelectionLockedIn: PlayerState missing for %s"),
+           *GetName());
   }
 }
 
