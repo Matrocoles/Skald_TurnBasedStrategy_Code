@@ -41,6 +41,7 @@
 #include "Widgets/SWindow.h"
 
 #include "Engine/World.h"
+#include "Delegates/WorldDelegates.h"
 #include "Net/UnrealNetwork.h"
 
 namespace {

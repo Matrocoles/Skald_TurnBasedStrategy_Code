@@ -1,6 +1,7 @@
 #include "Skald_GameInstance.h"
 
 #include "Blueprint/UserWidget.h"
+#include "Delegates/WorldDelegates.h"
 #include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/World.h"
