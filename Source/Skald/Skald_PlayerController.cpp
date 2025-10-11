@@ -50,6 +50,7 @@
 #endif
 
 #include "Engine/World.h"
+#include "Net/UnrealNetwork.h"
 
 namespace {
 FString ResolvePlayerName(const ASkaldPlayerState *PlayerState,
@@ -132,6 +133,13 @@ ASkaldPlayerController::ASkaldPlayerController() {
   if (ChooseBP.Succeeded()) {
     ChoosePlayerWidgetClass = ChooseBP.Class;
   }
+}
+
+void ASkaldPlayerController::GetLifetimeReplicatedProps(
+    TArray<FLifetimeProperty> &OutLifetimeProps) const {
+  Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+  DOREPLIFETIME(ASkaldPlayerController, TurnManager);
 }
 
 void ASkaldPlayerController::CacheGameReferences() {
@@ -523,6 +531,14 @@ void ASkaldPlayerController::ServerInitPlayerState_Implementation(
 }
 
 void ASkaldPlayerController::SetTurnManager(ATurnManager *Manager) {
+  ApplyTurnManager(Manager);
+}
+
+void ASkaldPlayerController::OnRep_TurnManager() {
+  ApplyTurnManager(TurnManager);
+}
+
+void ASkaldPlayerController::ApplyTurnManager(ATurnManager *Manager) {
   if (TurnManager) {
     TurnManager->OnWorldStateChanged.RemoveDynamic(
         this, &ASkaldPlayerController::HandleWorldStateChanged);

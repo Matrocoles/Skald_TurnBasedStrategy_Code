@@ -64,6 +64,10 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void SetTurnManager(ATurnManager *Manager);
 
+  /** RepNotify hook for TurnManager replication. */
+  UFUNCTION()
+  void OnRep_TurnManager();
+
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void ShowTurnAnnouncement(const FString &PlayerName, bool bIsMyTurn);
 
@@ -375,9 +379,12 @@ public:
    *  uninitialised.
    */
 protected:
-  UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Turn",
-            meta = (ExposeOnSpawn = true))
+  UPROPERTY(EditInstanceOnly, BlueprintReadOnly, ReplicatedUsing = OnRep_TurnManager,
+            Category = "Turn", meta = (ExposeOnSpawn = true))
   TObjectPtr<ATurnManager> TurnManager;
+
+  /** Helper to update cached state whenever the replicated turn manager changes. */
+  void ApplyTurnManager(ATurnManager *Manager);
 
 private:
   ASkald_BattleGameMode *ResolveBattleGameMode();
