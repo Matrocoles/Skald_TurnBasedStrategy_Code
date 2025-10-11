@@ -105,8 +105,7 @@ void ATurnManager::GetLifetimeReplicatedProps(
 void ATurnManager::BeginPlay() {
   Super::BeginPlay();
 
-  CachedWorldMap = Cast<AWorldMap>(
-      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
+  CachedWorldMap = ResolveWorldMap();
 
   const bool bOnWorldMap = (CachedWorldMap != nullptr);
 
@@ -230,18 +229,18 @@ void ATurnManager::ApplyReinforcementsAndResources(ASkaldPlayerState *PS,
   }
   int32 Owned = 0;
   int32 ResourceGain = 0;
-  if (CachedWorldMap) {
-    if (CachedWorldMap->Territories.Num() == 0) {
+  if (AWorldMap *WorldMap = ResolveWorldMap()) {
+    if (WorldMap->Territories.Num() == 0) {
       UE_LOG(LogSkald, Error, TEXT("%s: WorldMap %s has no territories"),
-             Caller, *CachedWorldMap->GetName());
+             Caller, *WorldMap->GetName());
       if (GEngine) {
         GEngine->AddOnScreenDebugMessage(
             -1, 5.f, FColor::Red,
             FString::Printf(TEXT("%s: %s has no territories"), Caller,
-                            *CachedWorldMap->GetName()));
+                            *WorldMap->GetName()));
       }
     } else {
-      for (ATerritory *Terr : CachedWorldMap->Territories) {
+      for (ATerritory *Terr : WorldMap->Territories) {
         if (Terr && Terr->OwningPlayer == PS) {
           ++Owned;
           ResourceGain += Terr->Resources;
@@ -442,7 +441,8 @@ void ATurnManager::AdvanceTurn() {
     return;
   }
 
-  if (!CachedWorldMap || CachedWorldMap->Territories.Num() == 0) {
+  AWorldMap *WorldMap = ResolveWorldMap();
+  if (!WorldMap || WorldMap->Territories.Num() == 0) {
     UE_LOG(LogSkald, Warning,
            TEXT("AdvanceTurn aborted: WorldMap missing or has no territories"));
     return;
@@ -529,10 +529,7 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
     }
     SeededBattle.ReturnMap = MoveTemp(ReturnMap);
 
-    if (!IsValid(CachedWorldMap)) {
-      CachedWorldMap = Cast<AWorldMap>(
-          UGameplayStatics::GetActorOfClass(World, AWorldMap::StaticClass()));
-    }
+    CachedWorldMap = ResolveWorldMap();
 
     if (ASkaldGameMode *GameMode = World->GetAuthGameMode<ASkaldGameMode>()) {
       GameMode->CacheWorldMapSnapshot();
@@ -611,12 +608,13 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
       }
     };
 
+    AWorldMap *WorldMap = ResolveWorldMap();
     TArray<FS_Territory> TerritorySnapshots;
     bool bUsedCachedFallback = false;
     bool bCapturedFromLiveWorld = false;
-    if (CachedWorldMap) {
-      TerritorySnapshots.Reserve(CachedWorldMap->Territories.Num());
-      for (ATerritory *Territory : CachedWorldMap->Territories) {
+    if (WorldMap) {
+      TerritorySnapshots.Reserve(WorldMap->Territories.Num());
+      for (ATerritory *Territory : WorldMap->Territories) {
         if (!Territory) {
           continue;
         }
@@ -704,10 +702,10 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
     PendingPayload.TargetTerritoryID = SeededBattle.TargetTerritoryID;
 
     auto FindTerritory = [&](int32 TerritoryId) -> ATerritory * {
-      if (!CachedWorldMap) {
+      if (!WorldMap) {
         return nullptr;
       }
-      for (ATerritory *Territory : CachedWorldMap->Territories) {
+      for (ATerritory *Territory : WorldMap->Territories) {
         if (Territory && Territory->TerritoryID == TerritoryId) {
           return Territory;
         }
@@ -988,25 +986,21 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
     }
   };
 
-  if (!IsValid(CachedWorldMap)) {
-    CachedWorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
-        GetWorld(), AWorldMap::StaticClass()));
-  }
+  AWorldMap *WorldMap = ResolveWorldMap();
 
-  if (!IsValid(CachedWorldMap)) {
+  if (!WorldMap) {
     DeferResolution(TEXT("World map unavailable"));
     return;
   }
 
-  if (CachedWorldMap->Territories.Num() == 0) {
+  if (WorldMap->Territories.Num() == 0) {
     DeferResolution(TEXT("World map territories not yet generated"));
     return;
   }
 
   const FS_BattlePayload Battle = GI->PendingBattle;
-  ATerritory *Source = CachedWorldMap->GetTerritoryById(Battle.FromTerritoryID);
-  ATerritory *Target =
-      CachedWorldMap->GetTerritoryById(Battle.TargetTerritoryID);
+  ATerritory *Source = WorldMap->GetTerritoryById(Battle.FromTerritoryID);
+  ATerritory *Target = WorldMap->GetTerritoryById(Battle.TargetTerritoryID);
   if (!Source || !Target) {
     DeferResolution(TEXT("Battle territories pending restoration"));
     return;
@@ -1046,8 +1040,11 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
     GM->CacheWorldMapSnapshot();
     bUpdatedSnapshot = true;
   } else if (GI) {
+    AWorldMap *WorldMapForSnapshot = WorldMap ? WorldMap : ResolveWorldMap();
     TArray<FS_Territory> TerritorySnapshots;
-    TerritorySnapshots.Reserve(CachedWorldMap->Territories.Num());
+    if (WorldMapForSnapshot) {
+      TerritorySnapshots.Reserve(WorldMapForSnapshot->Territories.Num());
+    }
 
     auto CaptureSnapshot = [&](ATerritory *Territory) {
       FS_Territory Snapshot;
@@ -1081,11 +1078,13 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
       return Snapshot;
     };
 
-    for (ATerritory *Territory : CachedWorldMap->Territories) {
-      if (!Territory) {
-        continue;
+    if (WorldMapForSnapshot) {
+      for (ATerritory *Territory : WorldMapForSnapshot->Territories) {
+        if (!Territory) {
+          continue;
+        }
+        TerritorySnapshots.Add(CaptureSnapshot(Territory));
       }
-      TerritorySnapshots.Add(CaptureSnapshot(Territory));
     }
 
     if (TerritorySnapshots.Num() > 0) {
@@ -1130,9 +1129,9 @@ void ATurnManager::ClientBattleResolved_Implementation(
     int32 WinningPlayerID, int32 AttackerCasualties, int32 DefenderCasualties,
     int32 FromTerritoryID, int32 TargetTerritoryID, int32 NewOwnerPlayerID,
     int32 SourceArmy, int32 TargetArmy) {
-  if (CachedWorldMap) {
-    ATerritory *Source = CachedWorldMap->GetTerritoryById(FromTerritoryID);
-    ATerritory *Target = CachedWorldMap->GetTerritoryById(TargetTerritoryID);
+  if (AWorldMap *WorldMapForClient = ResolveWorldMap()) {
+    ATerritory *Source = WorldMapForClient->GetTerritoryById(FromTerritoryID);
+    ATerritory *Target = WorldMapForClient->GetTerritoryById(TargetTerritoryID);
     if (Source) {
       Source->ArmyUnits = SourceArmy;
       Source->RefreshAppearance();
@@ -1172,6 +1171,27 @@ void ATurnManager::ClientBattleResolved_Implementation(
   }
 
   OnWorldStateChanged.Broadcast();
+}
+
+AWorldMap *ATurnManager::ResolveWorldMap() {
+  if (IsValid(CachedWorldMap)) {
+    return CachedWorldMap;
+  }
+
+  CachedWorldMap = nullptr;
+
+  if (UWorld *World = GetWorld()) {
+    if (AActor *Actor =
+            UGameplayStatics::GetActorOfClass(World, AWorldMap::StaticClass())) {
+      if (AWorldMap *FoundMap = Cast<AWorldMap>(Actor)) {
+        if (IsValid(FoundMap)) {
+          CachedWorldMap = FoundMap;
+        }
+      }
+    }
+  }
+
+  return IsValid(CachedWorldMap) ? CachedWorldMap : nullptr;
 }
 
 void ATurnManager::BeginAttackPhase() {
