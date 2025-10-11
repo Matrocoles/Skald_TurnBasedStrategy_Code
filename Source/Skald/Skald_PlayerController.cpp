@@ -41,11 +41,7 @@
 #include "Widgets/SWindow.h"
 
 #include "Engine/World.h"
-#if UE_VERSION_OLDER_THAN(5, 5, 0)
-#include "Engine/WorldDelegates.h"
-#else
-#include "Engine/EngineDelegates.h"
-#endif
+#include "Delegates/WorldDelegates.h"
 #include "Net/UnrealNetwork.h"
 
 namespace {

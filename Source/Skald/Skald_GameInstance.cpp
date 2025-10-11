@@ -1,14 +1,10 @@
 #include "Skald_GameInstance.h"
 
 #include "Blueprint/UserWidget.h"
+#include "Delegates/WorldDelegates.h"
 #include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/World.h"
-#if UE_VERSION_OLDER_THAN(5, 5, 0)
-#include "Engine/WorldDelegates.h"
-#else
-#include "Engine/EngineDelegates.h"
-#endif
 #include "Kismet/GameplayStatics.h"
 #include "Skald.h"
 #include "SkaldLogging.h"
