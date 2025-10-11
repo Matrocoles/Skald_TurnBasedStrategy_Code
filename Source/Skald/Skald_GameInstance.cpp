@@ -16,6 +16,7 @@
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/SOverlay.h"
 #include "Widgets/Text/STextBlock.h"
+#include "UObject/CoreUObjectDelegates.h"
 
 void USkaldGameInstance::Init() {
   Super::Init();
@@ -27,7 +28,7 @@ void USkaldGameInstance::Init() {
 
   if (!PostLoadMapHandle.IsValid()) {
     PostLoadMapHandle =
-        FWorldDelegates::OnPostLoadMapWithWorld.AddUObject(
+        FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(
             this, &USkaldGameInstance::HandlePostLoadMap);
   }
 
@@ -49,7 +50,7 @@ void USkaldGameInstance::Init() {
 
 void USkaldGameInstance::Shutdown() {
   if (PostLoadMapHandle.IsValid()) {
-    FWorldDelegates::OnPostLoadMapWithWorld.Remove(PostLoadMapHandle);
+    FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(PostLoadMapHandle);
     PostLoadMapHandle.Reset();
   }
 
