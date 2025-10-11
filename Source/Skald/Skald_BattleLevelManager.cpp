@@ -5,17 +5,8 @@
 #include "Engine/Level.h"
 #include "Engine/LevelStreaming.h"
 #include "Engine/LevelStreamingDynamic.h"
-#include "Misc/EngineVersionComparison.h"
 #include "Misc/PackageName.h"
-#if UE_VERSION_OLDER_THAN(5, 5, 0)
-#include "Engine/LevelStreamingTypes.h"
-#endif
 #include "Engine/World.h"
-#if UE_VERSION_OLDER_THAN(5, 5, 0)
-#include "Engine/WorldDelegates.h"
-#else
-#include "Engine/EngineDelegates.h"
-#endif
 #include "GameFramework/Actor.h"
 #include "GameFramework/GameModeBase.h"
 #include "GameFramework/WorldSettings.h"
@@ -56,23 +47,12 @@ static void SetPersistentLevelVisibility(UWorld *World, ULevel *PersistentLevel,
     return;
   }
 
-  // UE 5.5 removed UWorld::SetShouldBeVisible in favour of setting visibility
-  // via the streaming interface, so use version guards to pick the appropriate
-  // API.
-#if UE_VERSION_OLDER_THAN(5, 5, 0)
-  if (World) {
-    PRAGMA_DISABLE_DEPRECATION_WARNINGS
-    World->SetShouldBeVisible(PersistentLevel, bShouldBeVisible);
-    PRAGMA_ENABLE_DEPRECATION_WARNINGS
-  }
-#else
   if (ULevelStreaming *StreamingLevel = FindStreamingLevelFor(PersistentLevel)) {
     StreamingLevel->SetShouldBeVisible(bShouldBeVisible);
     if (World) {
       World->UpdateLevelStreaming();
     }
   }
-#endif
 }
 
 static FString ResolveStreamingLevelPackageName(const ULevelStreaming *Level)
@@ -340,13 +320,9 @@ void USkaldBattleLevelManager::HandleLevelLoaded() {
         if (AWorldSettings *WorldSettings = LoadedLevel->GetWorldSettings()) {
           UClass *DefaultGameModeClass = nullptr;
 
-#if UE_VERSION_OLDER_THAN(5, 5, 0)
-          DefaultGameModeClass = WorldSettings->GetDefaultGameMode();
-#else
           if (UClass *ResolvedClass = WorldSettings->DefaultGameMode.Get()) {
             DefaultGameModeClass = ResolvedClass;
           }
-#endif
 
           if (DefaultGameModeClass) {
             const FString DefaultClassPath = DefaultGameModeClass->GetPathName();
@@ -624,13 +600,7 @@ void USkaldBattleLevelManager::HideNonBattleLevels() {
       continue;
     }
 
-    const bool bWasVisible =
-#if UE_VERSION_OLDER_THAN(5, 5, 0)
-        OtherLevel->GetShouldBeVisible();
-#else
-        OtherLevel->IsLevelVisible();
-#endif
-    ;
+    const bool bWasVisible = OtherLevel->IsLevelVisible();
     if (!bWasVisible) {
       continue;
     }
