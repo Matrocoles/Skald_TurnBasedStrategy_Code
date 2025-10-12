@@ -2,6 +2,8 @@
 
 #include "Engine/World.h"
 #include "Engine/Engine.h"
+#include "Misc/CoreDelegates.h"
+#include "Misc/EngineVersionComparison.h"
 #include "Kismet/GameplayStatics.h"
 #include "Blueprint/UserWidget.h"
 #include "Engine/GameViewportClient.h"
@@ -26,9 +28,15 @@ void USkaldGameInstance::Init() {
   }
 
   if (!PostWorldBeginPlayHandle.IsValid()) {
+#if UE_VERSION_NEWER_THAN(5, 5, 0)
+    PostWorldBeginPlayHandle =
+        FCoreDelegates::OnPostLoadMapWithWorld.AddUObject(
+            this, &USkaldGameInstance::HandleWorldBeginPlay);
+#else
     PostWorldBeginPlayHandle =
         FWorldDelegates::OnWorldBeginPlay.AddUObject(
             this, &USkaldGameInstance::HandleWorldBeginPlay);
+#endif
   }
 
   PendingBattle = FS_BattlePayload();
@@ -49,7 +57,11 @@ void USkaldGameInstance::Init() {
 
 void USkaldGameInstance::Shutdown() {
   if (PostWorldBeginPlayHandle.IsValid()) {
+#if UE_VERSION_NEWER_THAN(5, 5, 0)
+    FCoreDelegates::OnPostLoadMapWithWorld.Remove(PostWorldBeginPlayHandle);
+#else
     FWorldDelegates::OnWorldBeginPlay.Remove(PostWorldBeginPlayHandle);
+#endif
     PostWorldBeginPlayHandle.Reset();
   }
 
