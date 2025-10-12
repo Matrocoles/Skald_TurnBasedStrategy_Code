@@ -38,9 +38,6 @@
 
 #include "Misc/EngineVersionComparison.h"
 #include "Misc/CoreDelegates.h"
-#if !UE_VERSION_OLDER_THAN(5, 5, 0)
-#include "UObject/CoreUObjectDelegates.h"
-#endif
 
 #include "Framework/Application/SlateApplication.h"
 #include "Layout/WidgetPath.h"
@@ -249,19 +246,19 @@ void ASkaldPlayerController::BeginPlay() {
   Super::BeginPlay();
 
   if (PostWorldBeginPlayHandle.IsValid()) {
-#if !UE_VERSION_OLDER_THAN(5, 5, 0)
-    FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(PostWorldBeginPlayHandle);
-#else
+#if UE_VERSION_OLDER_THAN(5, 5, 0)
     FWorldDelegates::OnWorldBeginPlay.Remove(PostWorldBeginPlayHandle);
+#else
+    FWorldDelegates::OnWorldPostActorInit.Remove(PostWorldBeginPlayHandle);
 #endif
     PostWorldBeginPlayHandle.Reset();
   }
 
-#if !UE_VERSION_OLDER_THAN(5, 5, 0)
-  PostWorldBeginPlayHandle = FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(
+#if UE_VERSION_OLDER_THAN(5, 5, 0)
+  PostWorldBeginPlayHandle = FWorldDelegates::OnWorldBeginPlay.AddUObject(
       this, &ASkaldPlayerController::HandleWorldBeginPlay);
 #else
-  PostWorldBeginPlayHandle = FWorldDelegates::OnWorldBeginPlay.AddUObject(
+  PostWorldBeginPlayHandle = FWorldDelegates::OnWorldPostActorInit.AddUObject(
       this, &ASkaldPlayerController::HandleWorldBeginPlay);
 #endif
 
@@ -310,10 +307,10 @@ void ASkaldPlayerController::BeginPlay() {
 
 void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
   if (PostWorldBeginPlayHandle.IsValid()) {
-#if !UE_VERSION_OLDER_THAN(5, 5, 0)
-    FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(PostWorldBeginPlayHandle);
-#else
+#if UE_VERSION_OLDER_THAN(5, 5, 0)
     FWorldDelegates::OnWorldBeginPlay.Remove(PostWorldBeginPlayHandle);
+#else
+    FWorldDelegates::OnWorldPostActorInit.Remove(PostWorldBeginPlayHandle);
 #endif
     PostWorldBeginPlayHandle.Reset();
   }
