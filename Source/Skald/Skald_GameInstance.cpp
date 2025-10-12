@@ -3,7 +3,9 @@
 #include "Engine/World.h"
 #include "Engine/Engine.h"
 #include "Misc/CoreDelegates.h"
+#if UE_VERSION_NEWER_THAN(5, 5, 0)
 #include "UObject/CoreUObjectDelegates.h"
+#endif
 #include "Misc/EngineVersionComparison.h"
 #include "Kismet/GameplayStatics.h"
 #include "Blueprint/UserWidget.h"
