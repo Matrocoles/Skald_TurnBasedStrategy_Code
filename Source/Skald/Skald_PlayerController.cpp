@@ -37,6 +37,7 @@
 #include "WorldMap.h"
 
 #include "Misc/CoreDelegates.h"
+#include "UObject/CoreUObjectDelegates.h"
 #include "Misc/EngineVersionComparison.h"
 
 #include "Framework/Application/SlateApplication.h"
@@ -247,7 +248,7 @@ void ASkaldPlayerController::BeginPlay() {
 
   if (PostWorldBeginPlayHandle.IsValid()) {
 #if UE_VERSION_NEWER_THAN(5, 5, 0)
-    FCoreDelegates::OnPostLoadMapWithWorld.Remove(PostWorldBeginPlayHandle);
+    FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(PostWorldBeginPlayHandle);
 #else
     FWorldDelegates::OnWorldBeginPlay.Remove(PostWorldBeginPlayHandle);
 #endif
@@ -255,7 +256,7 @@ void ASkaldPlayerController::BeginPlay() {
   }
 
 #if UE_VERSION_NEWER_THAN(5, 5, 0)
-  PostWorldBeginPlayHandle = FCoreDelegates::OnPostLoadMapWithWorld.AddUObject(
+  PostWorldBeginPlayHandle = FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(
       this, &ASkaldPlayerController::HandleWorldBeginPlay);
 #else
   PostWorldBeginPlayHandle = FWorldDelegates::OnWorldBeginPlay.AddUObject(
@@ -308,7 +309,7 @@ void ASkaldPlayerController::BeginPlay() {
 void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
   if (PostWorldBeginPlayHandle.IsValid()) {
 #if UE_VERSION_NEWER_THAN(5, 5, 0)
-    FCoreDelegates::OnPostLoadMapWithWorld.Remove(PostWorldBeginPlayHandle);
+    FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(PostWorldBeginPlayHandle);
 #else
     FWorldDelegates::OnWorldBeginPlay.Remove(PostWorldBeginPlayHandle);
 #endif

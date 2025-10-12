@@ -3,6 +3,7 @@
 #include "Engine/World.h"
 #include "Engine/Engine.h"
 #include "Misc/CoreDelegates.h"
+#include "UObject/CoreUObjectDelegates.h"
 #include "Misc/EngineVersionComparison.h"
 #include "Kismet/GameplayStatics.h"
 #include "Blueprint/UserWidget.h"
@@ -30,7 +31,7 @@ void USkaldGameInstance::Init() {
   if (!PostWorldBeginPlayHandle.IsValid()) {
 #if UE_VERSION_NEWER_THAN(5, 5, 0)
     PostWorldBeginPlayHandle =
-        FCoreDelegates::OnPostLoadMapWithWorld.AddUObject(
+        FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(
             this, &USkaldGameInstance::HandleWorldBeginPlay);
 #else
     PostWorldBeginPlayHandle =
@@ -58,7 +59,7 @@ void USkaldGameInstance::Init() {
 void USkaldGameInstance::Shutdown() {
   if (PostWorldBeginPlayHandle.IsValid()) {
 #if UE_VERSION_NEWER_THAN(5, 5, 0)
-    FCoreDelegates::OnPostLoadMapWithWorld.Remove(PostWorldBeginPlayHandle);
+    FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(PostWorldBeginPlayHandle);
 #else
     FWorldDelegates::OnWorldBeginPlay.Remove(PostWorldBeginPlayHandle);
 #endif
