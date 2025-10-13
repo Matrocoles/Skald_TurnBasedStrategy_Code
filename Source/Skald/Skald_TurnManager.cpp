@@ -1160,6 +1160,12 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
   GI->PendingBattle = FS_BattlePayload();
   PendingBattle = FS_BattlePayload();
 
+  // Ensure no stale retry timers trigger another battle after resolution
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(PendingBattleTravelRetryHandle);
+  }
+  DeferredPendingBattle = FS_BattlePayload();
+
   const int32 WinningPlayerID = Resolution.WinningPlayerID;
   const int32 NewOwnerPlayerID = Resolution.NewOwnerPlayerID;
   const int32 AttackerCasualties = Resolution.AttackerCasualties;
