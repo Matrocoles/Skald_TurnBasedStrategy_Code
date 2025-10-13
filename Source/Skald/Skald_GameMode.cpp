@@ -1047,8 +1047,10 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
   }
 
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+  const bool bHasPendingTravelSnapshot =
+      GI && GI->GetPendingTravelSnapshot().Num() > 0;
   bool bWantsResume = GI && GI->bResumeTurns;
-  if (GI && !bWantsResume &&
+  if (GI && !bWantsResume && !bHasPendingTravelSnapshot &&
       (GI->SavedTurnIndex != 0 ||
        GI->SavedTurnPhase != ETurnPhase::Reinforcement)) {
     GI->SavedTurnIndex = 0;
@@ -1096,10 +1098,13 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     }
   }
 
-  if (bWantsResume && !bWorldInitialized) {
+  const bool bNeedsSnapshotRestore =
+      !bWorldInitialized && (bWantsResume || bHasPendingTravelSnapshot);
+
+  if (bNeedsSnapshotRestore) {
     const bool bRestored = RestoreWorldFromSnapshot();
     if (!bRestored) {
-      if (GI && GI->bResumeTurns) {
+      if (GI && (GI->bResumeTurns || bHasPendingTravelSnapshot)) {
         FTimerDelegate RetryInit = FTimerDelegate::CreateUObject(
             this, &ASkaldGameMode::TryInitializeWorldAndStart);
         GetWorldTimerManager().ClearTimer(RetryInitTimerHandle);
