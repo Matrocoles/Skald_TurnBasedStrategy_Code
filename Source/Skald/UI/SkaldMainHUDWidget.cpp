@@ -22,6 +22,7 @@
 #include "UObject/ConstructorHelpers.h"
 #include "WorldMap.h"
 #include "TimerManager.h"
+#include "UObject/WeakObjectPtrTemplates.h"
 
 USkaldMainHUDWidget::USkaldMainHUDWidget(
     const FObjectInitializer &ObjectInitializer)
@@ -316,10 +317,18 @@ void USkaldMainHUDWidget::ShowEndingTurn() {
     EndingTurnText->SetText(FText::FromString(TEXT("Ending turn.")));
     EndingTurnText->SetVisibility(ESlateVisibility::Visible);
     if (UWorld *World = GetWorld()) {
-      World->GetTimerManager().ClearTimer(TurnMessageTimerHandle);
-      World->GetTimerManager().SetTimer(TurnMessageTimerHandle, this,
-                                       &USkaldMainHUDWidget::HideEndingTurn,
-                                       3.f, false);
+      FTimerManager &TimerManager = World->GetTimerManager();
+      TimerManager.ClearTimer(TurnMessageTimerHandle);
+
+      const TWeakObjectPtr<USkaldMainHUDWidget> WeakThis(this);
+      FTimerDelegate TimerDelegate;
+      TimerDelegate.BindLambda([WeakThis]() {
+        if (WeakThis.IsValid()) {
+          WeakThis->HideEndingTurn();
+        }
+      });
+
+      TimerManager.SetTimer(TurnMessageTimerHandle, TimerDelegate, 3.f, false);
     }
   }
 }
@@ -338,10 +347,18 @@ void USkaldMainHUDWidget::ShowTurnMessage(bool bIsMyTurn) {
   }
   SyncPhaseButtons(bIsMyTurn);
   if (UWorld *World = GetWorld()) {
-    World->GetTimerManager().ClearTimer(TurnMessageTimerHandle);
-    World->GetTimerManager().SetTimer(TurnMessageTimerHandle, this,
-                                     &USkaldMainHUDWidget::HideEndingTurn, 3.f,
-                                     false);
+    FTimerManager &TimerManager = World->GetTimerManager();
+    TimerManager.ClearTimer(TurnMessageTimerHandle);
+
+    const TWeakObjectPtr<USkaldMainHUDWidget> WeakThis(this);
+    FTimerDelegate TimerDelegate;
+    TimerDelegate.BindLambda([WeakThis]() {
+      if (WeakThis.IsValid()) {
+        WeakThis->HideEndingTurn();
+      }
+    });
+
+    TimerManager.SetTimer(TurnMessageTimerHandle, TimerDelegate, 3.f, false);
   }
 }
 
@@ -368,10 +385,18 @@ void USkaldMainHUDWidget::UpdateInitiativeText(const FString &Message) {
     InitiativeText->SetText(FText::FromString(Message));
     InitiativeText->SetVisibility(ESlateVisibility::Visible);
     if (UWorld *World = GetWorld()) {
-      World->GetTimerManager().ClearTimer(InitiativeTimerHandle);
-      World->GetTimerManager().SetTimer(InitiativeTimerHandle, this,
-                                       &USkaldMainHUDWidget::HideInitiativeText,
-                                       3.f, false);
+      FTimerManager &TimerManager = World->GetTimerManager();
+      TimerManager.ClearTimer(InitiativeTimerHandle);
+
+      const TWeakObjectPtr<USkaldMainHUDWidget> WeakThis(this);
+      FTimerDelegate TimerDelegate;
+      TimerDelegate.BindLambda([WeakThis]() {
+        if (WeakThis.IsValid()) {
+          WeakThis->HideInitiativeText();
+        }
+      });
+
+      TimerManager.SetTimer(InitiativeTimerHandle, TimerDelegate, 3.f, false);
     }
   }
 }
