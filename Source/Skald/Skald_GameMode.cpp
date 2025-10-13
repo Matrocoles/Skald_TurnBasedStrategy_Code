@@ -983,6 +983,34 @@ void ASkaldGameMode::UpdatePlayerResources(ASkaldPlayerState *Player) {
   }
 }
 
+void ASkaldGameMode::NormalizePlayerStateIds() {
+  ASkaldGameState *GS = GetGameState<ASkaldGameState>();
+  if (!GS) {
+    return;
+  }
+
+  PlayerDataArray.SetNum(GS->PlayerArray.Num());
+
+  for (int32 i = 0; i < GS->PlayerArray.Num(); ++i) {
+    if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(GS->PlayerArray[i])) {
+      const int32 NewPlayerId = i + 1;
+      PS->SetPlayerId(NewPlayerId);
+
+      if (PlayerDataArray.IsValidIndex(i)) {
+        PlayerDataArray[i].PlayerID = NewPlayerId;
+      }
+
+      if (ASkaldPlayerController *OwningController =
+              Cast<ASkaldPlayerController>(PS->GetOwner())) {
+        if (USkaldMainHUDWidget *HUD = OwningController->GetHUDWidget()) {
+          HUD->LocalPlayerID = NewPlayerId;
+          HUD->SyncPhaseButtons(HUD->CurrentPlayerID == HUD->LocalPlayerID);
+        }
+      }
+    }
+  }
+}
+
 void ASkaldGameMode::TryInitializeWorldAndStart() {
   ASkaldGameState *GS = GetGameState<ASkaldGameState>();
   if (!GS || !TurnManager) {
@@ -1127,6 +1155,7 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
   }
 
   if (bNeedsRetry) {
+    NormalizePlayerStateIds();
     GS->OnPlayersUpdated.Broadcast();
     FTimerDelegate RefreshDelegate =
         FTimerDelegate::CreateUObject(this, &ASkaldGameMode::RefreshHUDs);
@@ -1163,22 +1192,7 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
   // Player IDs can grow without bound across repeated sessions. Reassign
   // them to a compact, 1-based range so blueprints that index by ID never
   // read past the array length while keeping IDs strictly positive.
-  for (int32 i = 0; i < GS->PlayerArray.Num(); ++i) {
-    if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(GS->PlayerArray[i])) {
-      const int32 NewPlayerId = i + 1;
-      PS->SetPlayerId(NewPlayerId);
-      if (PlayerDataArray.IsValidIndex(i)) {
-        PlayerDataArray[i].PlayerID = NewPlayerId;
-      }
-      if (ASkaldPlayerController *OwningController =
-              Cast<ASkaldPlayerController>(PS->GetOwner())) {
-        if (USkaldMainHUDWidget *HUD = OwningController->GetHUDWidget()) {
-          HUD->LocalPlayerID = NewPlayerId;
-          HUD->SyncPhaseButtons(HUD->CurrentPlayerID == HUD->LocalPlayerID);
-        }
-      }
-    }
-  }
+  NormalizePlayerStateIds();
 
   GS->OnPlayersUpdated.Broadcast();
 

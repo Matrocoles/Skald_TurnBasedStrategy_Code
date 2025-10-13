@@ -200,6 +200,9 @@ private:
   /** Remove invalid player states before re-registering controllers. */
   void CleanupStalePlayerStates();
 
+  /** Ensure player IDs remain contiguous after roster mutations. */
+  void NormalizePlayerStateIds();
+
   /** Callback fired by the failsafe timer if the AI does not advance. */
   void HandleArmyPlacementFailsafe();
 
