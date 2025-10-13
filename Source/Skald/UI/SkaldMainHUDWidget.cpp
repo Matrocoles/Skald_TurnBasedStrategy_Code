@@ -121,6 +121,15 @@ void USkaldMainHUDWidget::NativeDestruct() {
         this, &USkaldMainHUDWidget::HandleTurnIndexChanged);
   }
 
+  if (UWorld* World = GetWorld()) {
+    FTimerManager& TimerManager = World->GetTimerManager();
+    TimerManager.ClearTimer(TurnMessageTimerHandle);
+    TimerManager.ClearTimer(InitiativeTimerHandle);
+  } else {
+    TurnMessageTimerHandle.Invalidate();
+    InitiativeTimerHandle.Invalidate();
+  }
+
   if (AttackButton) {
     AttackButton->OnClicked.RemoveDynamic(
         this, &USkaldMainHUDWidget::BeginAttackSelection);
