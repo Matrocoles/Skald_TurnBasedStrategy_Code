@@ -380,6 +380,16 @@ void ASkald_BattleGameMode::BeginPlay() {
   ProcessStreamingActivation();
 }
 
+void ASkald_BattleGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason) {
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(WaitForPlayersHandle);
+  }
+
+  WaitForPlayersHandle.Invalidate();
+
+  Super::EndPlay(EndPlayReason);
+}
+
 void ASkald_BattleGameMode::NotifyBattleLevelActivated() {
   bPendingStreamingActivation = true;
   ProcessStreamingActivation();

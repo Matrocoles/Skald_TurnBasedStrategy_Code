@@ -38,6 +38,7 @@ protected:
   virtual void InitGame(const FString &Map, const FString &Options,
                         FString &Error) override;
   virtual void BeginPlay() override;
+  virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
   virtual void PostLogin(APlayerController *NewPlayer) override;
   virtual void HandleSeamlessTravelPlayer(AController *&C) override;
   virtual void TryInitializeWorldAndStart() override;
