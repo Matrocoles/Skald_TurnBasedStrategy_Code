@@ -20,6 +20,7 @@
 #include "UI/SkaldMainHUDWidget.h"
 #include "UObject/UnrealType.h"
 #include "UObject/SoftObjectPath.h"
+#include "TimerManager.h"
 #include "WorldMap.h"
 
 namespace {
@@ -521,6 +522,10 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
   bool bGameModeHasSnapshotAfterCall = GI && GI->CachedWorldMapTerritories.Num() > 0;
 
+  if (UWorld *ExistingWorld = GetWorld()) {
+    ExistingWorld->GetTimerManager().ClearTimer(PendingBattleTravelRetryHandle);
+  }
+
   if (UWorld *World = GetWorld()) {
     FString ReturnMap = NormalizeMapName(World, FString());
     if (ReturnMap.IsEmpty()) {
@@ -697,6 +702,31 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
 
     TravelState.CachedTerritories = MoveTemp(TravelSnapshots);
 
+    if (TravelState.CachedTerritories.Num() == 0) {
+      UE_LOG(LogSkald, Warning,
+             TEXT("TriggerGridBattle deferred: territory snapshot unavailable; retrying before travel."));
+
+      if (GI) {
+        GI->SetTravelPending(false);
+        GI->SetBattleMapActive(false);
+        GI->bResumeTurns = false;
+      }
+
+      if (World && !World->GetTimerManager().IsTimerActive(PendingBattleTravelRetryHandle)) {
+        FTimerDelegate RetryDelegate = FTimerDelegate::CreateUObject(
+            this, &ATurnManager::RetryPendingBattleTravel);
+        constexpr float RetryDelaySeconds = 0.1f;
+        World->GetTimerManager().SetTimer(PendingBattleTravelRetryHandle, RetryDelegate,
+                                          RetryDelaySeconds, false);
+      }
+
+      return;
+    }
+
+    if (World) {
+      World->GetTimerManager().ClearTimer(PendingBattleTravelRetryHandle);
+    }
+
     FS_BattlePayload PendingPayload = SeededBattle;
     PendingPayload.FromTerritoryID = SeededBattle.FromTerritoryID;
     PendingPayload.TargetTerritoryID = SeededBattle.TargetTerritoryID;
@@ -815,6 +845,18 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
       }
     }
   }
+}
+
+void ATurnManager::RetryPendingBattleTravel() {
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(PendingBattleTravelRetryHandle);
+  }
+
+  if (PendingBattle.FromTerritoryID <= 0 || PendingBattle.TargetTerritoryID <= 0) {
+    return;
+  }
+
+  TriggerGridBattle(PendingBattle);
 }
 
 void ATurnManager::MulticastStreamBattleLevel_Implementation(
