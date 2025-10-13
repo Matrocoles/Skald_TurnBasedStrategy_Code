@@ -11,6 +11,7 @@
 #include "SkaldLogging.h"
 #include "Skald_GameInstance.h"
 #include "Skald_BattleLevelManager.h"
+#include "Skald_BattleGameMode.h"
 #include "Skald_GameMode.h"
 #include "Skald_GameState.h"
 #include "Skald_PropertyAccess.h"
@@ -938,64 +939,27 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
   // Always mirror the pending payload locally for reference.
   PendingBattle = GI->PendingBattle;
 
-  // Capture the battle results from the active manager if available.
-  if (GI->GridBattleManager) {
-    FGridBattleResolution Resolution;
-    Resolution.bValid = true;
-    Resolution.AttackerSurvivorArmyCost =
-        GI->GridBattleManager->GetAttackerSurvivorCost();
-    Resolution.DefenderSurvivorArmyCost =
-        GI->GridBattleManager->GetDefenderSurvivorCost();
-    Resolution.AttackerCasualties = GI->GridBattleManager->GetAttackerInitialArmyCost() -
-                                    Resolution.AttackerSurvivorArmyCost;
-    Resolution.DefenderCasualties = GI->GridBattleManager->GetDefenderInitialArmyCost() -
-                                    Resolution.DefenderSurvivorArmyCost;
+  const bool bHasResolution = CapturePendingBattleResolution(GI);
 
-    const FS_BattlePayload &Battle = GI->PendingBattle;
-    ASkaldGameState *GS = GetWorld()->GetGameState<ASkaldGameState>();
-    ESkaldFaction AttackerFaction = ESkaldFaction::None;
-    ESkaldFaction DefenderFaction = ESkaldFaction::None;
-    if (GS) {
-      if (ASkaldPlayerState *AttackerPS = GS->GetPlayerById(Battle.AttackerPlayerID)) {
-        AttackerFaction = AttackerPS->Faction;
-      }
-      if (ASkaldPlayerState *DefenderPS = GS->GetPlayerById(Battle.DefenderPlayerID)) {
-        DefenderFaction = DefenderPS->Faction;
-      }
-    }
+  if (!bHasResolution) {
+    GI->SetTravelPending(false);
+    return;
+  }
 
-    const bool bAttackerVictory =
-        Resolution.AttackerSurvivorArmyCost > 0 &&
-        Resolution.DefenderSurvivorArmyCost <= 0;
-    const bool bDefenderVictory =
-        Resolution.DefenderSurvivorArmyCost > 0 &&
-        Resolution.AttackerSurvivorArmyCost <= 0;
+  ASkaldGameMode *GameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
 
-    if (bAttackerVictory) {
-      Resolution.WinningFaction = AttackerFaction;
-      Resolution.WinningPlayerID = Battle.AttackerPlayerID;
-      Resolution.NewOwnerPlayerID = Battle.AttackerPlayerID;
-    } else if (bDefenderVictory) {
-      Resolution.WinningFaction = DefenderFaction;
-      Resolution.WinningPlayerID = Battle.DefenderPlayerID;
-      Resolution.NewOwnerPlayerID = Battle.DefenderPlayerID;
-    } else {
-      Resolution.WinningFaction = ESkaldFaction::None;
-      Resolution.WinningPlayerID = Battle.DefenderPlayerID;
-      Resolution.NewOwnerPlayerID = Battle.DefenderPlayerID;
-    }
-
-    GI->PendingBattleResolution = Resolution;
-    GI->bPendingBattleResolution = true;
-    GI->GridBattleManager = nullptr;
+  if (GameMode && GameMode->IsA(ASkald_BattleGameMode::StaticClass())) {
+    // Still on the battle map; wait for travel to finish before updating the
+    // overworld. The pending resolution will be applied once the world map
+    // has been rebuilt.
+    GI->SetTravelPending(true);
+    return;
   }
 
   if (!GI->bPendingBattleResolution || !GI->PendingBattleResolution.bValid) {
     GI->SetTravelPending(false);
     return;
   }
-
-  ASkaldGameMode *GameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
   if (GameMode && !GameMode->IsWorldInitialized()) {
     GI->SetTravelPending(true);
     UE_LOG(LogSkald, Verbose,
@@ -1234,6 +1198,79 @@ AWorldMap *ATurnManager::ResolveWorldMap() {
   }
 
   return IsValid(CachedWorldMap) ? CachedWorldMap : nullptr;
+}
+
+bool ATurnManager::CapturePendingBattleResolution(
+    USkaldGameInstance *GameInstance) {
+  if (!GameInstance) {
+    return false;
+  }
+
+  if (GameInstance->bPendingBattleResolution &&
+      GameInstance->PendingBattleResolution.bValid) {
+    return true;
+  }
+
+  if (!GameInstance->GridBattleManager) {
+    return false;
+  }
+
+  FGridBattleResolution Resolution;
+  Resolution.bValid = true;
+  Resolution.AttackerSurvivorArmyCost =
+      GameInstance->GridBattleManager->GetAttackerSurvivorCost();
+  Resolution.DefenderSurvivorArmyCost =
+      GameInstance->GridBattleManager->GetDefenderSurvivorCost();
+  Resolution.AttackerCasualties =
+      GameInstance->GridBattleManager->GetAttackerInitialArmyCost() -
+      Resolution.AttackerSurvivorArmyCost;
+  Resolution.DefenderCasualties =
+      GameInstance->GridBattleManager->GetDefenderInitialArmyCost() -
+      Resolution.DefenderSurvivorArmyCost;
+
+  const FS_BattlePayload &Battle = GameInstance->PendingBattle;
+  UWorld *World = GetWorld();
+  ASkaldGameState *GameState =
+      World ? World->GetGameState<ASkaldGameState>() : nullptr;
+  ESkaldFaction AttackerFaction = ESkaldFaction::None;
+  ESkaldFaction DefenderFaction = ESkaldFaction::None;
+  if (GameState) {
+    if (ASkaldPlayerState *AttackerPS =
+            GameState->GetPlayerById(Battle.AttackerPlayerID)) {
+      AttackerFaction = AttackerPS->Faction;
+    }
+    if (ASkaldPlayerState *DefenderPS =
+            GameState->GetPlayerById(Battle.DefenderPlayerID)) {
+      DefenderFaction = DefenderPS->Faction;
+    }
+  }
+
+  const bool bAttackerVictory =
+      Resolution.AttackerSurvivorArmyCost > 0 &&
+      Resolution.DefenderSurvivorArmyCost <= 0;
+  const bool bDefenderVictory =
+      Resolution.DefenderSurvivorArmyCost > 0 &&
+      Resolution.AttackerSurvivorArmyCost <= 0;
+
+  if (bAttackerVictory) {
+    Resolution.WinningFaction = AttackerFaction;
+    Resolution.WinningPlayerID = Battle.AttackerPlayerID;
+    Resolution.NewOwnerPlayerID = Battle.AttackerPlayerID;
+  } else if (bDefenderVictory) {
+    Resolution.WinningFaction = DefenderFaction;
+    Resolution.WinningPlayerID = Battle.DefenderPlayerID;
+    Resolution.NewOwnerPlayerID = Battle.DefenderPlayerID;
+  } else {
+    Resolution.WinningFaction = ESkaldFaction::None;
+    Resolution.WinningPlayerID = Battle.DefenderPlayerID;
+    Resolution.NewOwnerPlayerID = Battle.DefenderPlayerID;
+  }
+
+  GameInstance->PendingBattleResolution = Resolution;
+  GameInstance->bPendingBattleResolution = true;
+  GameInstance->GridBattleManager = nullptr;
+
+  return true;
 }
 
 void ATurnManager::BeginAttackPhase() {

@@ -193,4 +193,7 @@ protected:
 
   /** Ensure the cached world map pointer references a valid actor. */
   AWorldMap *ResolveWorldMap();
+
+  /** Capture the most recent grid battle resolution before travelling back. */
+  bool CapturePendingBattleResolution(USkaldGameInstance *GameInstance);
 };
