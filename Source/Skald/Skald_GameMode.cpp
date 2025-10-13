@@ -1047,6 +1047,11 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
   }
 
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+  // Normalize player identifiers before evaluating restoration so cached
+  // snapshots that reference previous IDs can resolve the new PlayerState
+  // instances spawned after travel.
+  NormalizePlayerStateIds();
+
   const bool bHasPendingTravelSnapshot =
       GI && GI->GetPendingTravelSnapshot().Num() > 0;
   bool bWantsResume = GI && GI->bResumeTurns;
