@@ -139,12 +139,26 @@ void ATurnManager::BeginPlay() {
 }
 
 void ATurnManager::HandleGridBattleEnded(ESkaldFaction /*WinningFaction*/, int32 /*AttackerCasualties*/, int32 /*DefenderCasualties*/) {
+  USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+  if (GI) {
+    if (!GI->bIsInBattleMap) {
+      UE_LOG(LogSkald, Verbose,
+             TEXT("HandleGridBattleEnded ignored: battle map already inactive."));
+      return;
+    }
+
+    if (GI->GridBattleManager) {
+      GI->GridBattleManager->OnBattleEnded.RemoveDynamic(
+          this, &ATurnManager::HandleGridBattleEnded);
+    }
+  }
+
   UWorld *World = GetWorld();
 
   FString ReturnMapName;
   if (!PendingBattle.ReturnMap.IsEmpty()) {
     ReturnMapName = PendingBattle.ReturnMap;
-  } else if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+  } else if (GI) {
     ReturnMapName = GI->PendingBattle.ReturnMap;
   }
 
@@ -161,7 +175,7 @@ void ATurnManager::HandleGridBattleEnded(ESkaldFaction /*WinningFaction*/, int32
 
   ResolveGridBattleResult();
 
-  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+  if (GI) {
     GI->SetTravelPending(true);
   }
 
