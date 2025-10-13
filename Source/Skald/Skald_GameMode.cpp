@@ -344,6 +344,41 @@ void ASkaldGameMode::PopulateAIPlayers() {
   int32 SpawnAttempts = 0;
   TArray<ASkaldPlayerState *> NewlySpawnedAI;
 
+  TSet<ESkaldFaction> UsedFactions;
+  for (APlayerState *ExistingPS : GS->PlayerArray) {
+    if (ASkaldPlayerState *EPS = Cast<ASkaldPlayerState>(ExistingPS)) {
+      if (EPS->Faction != ESkaldFaction::None) {
+        UsedFactions.Add(EPS->Faction);
+      }
+    }
+  }
+
+  TArray<ESkaldFaction> ReservedFactions;
+  TSet<ESkaldFaction> RemainingReserved;
+  for (ESkaldFaction Faction : GI->TakenFactions) {
+    if (Faction == ESkaldFaction::None || UsedFactions.Contains(Faction)) {
+      continue;
+    }
+
+    ReservedFactions.Add(Faction);
+    RemainingReserved.Add(Faction);
+    UsedFactions.Add(Faction);
+  }
+
+  TArray<ESkaldFaction> Available;
+  if (UEnum *Enum = StaticEnum<ESkaldFaction>()) {
+    for (int32 i = 0; i < Enum->NumEnums(); ++i) {
+      if (Enum->HasMetaData(TEXT("Hidden"), i)) {
+        continue;
+      }
+      ESkaldFaction Fac =
+          static_cast<ESkaldFaction>(Enum->GetValueByIndex(i));
+      if (Fac != ESkaldFaction::None && !UsedFactions.Contains(Fac)) {
+        Available.Add(Fac);
+      }
+    }
+  }
+
   while (ExistingAI < TargetAI && SpawnAttempts++ < MaxSpawnAttempts) {
     FTransform SpawnTransform = FTransform::Identity;
     ASkaldPlayerController *AIController = Cast<ASkaldPlayerController>(
@@ -383,39 +418,28 @@ void ASkaldGameMode::PopulateAIPlayers() {
         FString::Printf(TEXT("AI_%d"), GS->PlayerArray.Num());
     AIState->SetPlayerName(AIState->PlayerDisplayName);
 
-    TArray<ESkaldFaction> Taken;
-    for (APlayerState *ExistingPS : GS->PlayerArray) {
-      if (ASkaldPlayerState *EPS = Cast<ASkaldPlayerState>(ExistingPS)) {
-        Taken.Add(EPS->Faction);
-      }
-    }
-    Taken.Append(GI->TakenFactions);
-
-    TArray<ESkaldFaction> Available;
-    if (UEnum *Enum = StaticEnum<ESkaldFaction>()) {
-      for (int32 i = 0; i < Enum->NumEnums(); ++i) {
-        if (Enum->HasMetaData(TEXT("Hidden"), i)) {
-          continue;
-        }
-        ESkaldFaction Fac =
-            static_cast<ESkaldFaction>(Enum->GetValueByIndex(i));
-        if (Fac != ESkaldFaction::None && !Taken.Contains(Fac)) {
-          Available.Add(Fac);
-        }
-      }
-    }
-
-    if (Available.Num() > 0) {
+    ESkaldFaction AssignedFaction = ESkaldFaction::None;
+    if (ReservedFactions.Num() > 0) {
+      AssignedFaction = ReservedFactions[0];
+      ReservedFactions.RemoveAt(0);
+      RemainingReserved.Remove(AssignedFaction);
+    } else if (Available.Num() > 0) {
       const int32 FactionIndex =
           GI->CombatRandomStream.RandRange(0, Available.Num() - 1);
-      AIState->Faction = Available[FactionIndex];
-      GI->TakenFactions.AddUnique(AIState->Faction);
-    } else {
+      AssignedFaction = Available[FactionIndex];
+      Available.RemoveAtSwap(FactionIndex);
+    }
+
+    if (AssignedFaction == ESkaldFaction::None) {
       UE_LOG(LogSkald, Error,
              TEXT("PopulateAIPlayers: no available factions for AI"));
       AIController->Destroy();
       break;
     }
+
+    AIState->Faction = AssignedFaction;
+    UsedFactions.Add(AssignedFaction);
+    GI->TakenFactions.AddUnique(AIState->Faction);
 
     RegisterPlayer(AIController);
 
@@ -439,6 +463,12 @@ void ASkaldGameMode::PopulateAIPlayers() {
         ControllersToRelocate.Add(AIController);
         BattleGM->RelocateControllersNearBattleGrid(ControllersToRelocate);
       }
+    }
+  }
+
+  if (RemainingReserved.Num() > 0) {
+    for (ESkaldFaction Faction : RemainingReserved) {
+      GI->TakenFactions.Remove(Faction);
     }
   }
 
