@@ -703,6 +703,10 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
 
     TravelState.CachedTerritories = MoveTemp(TravelSnapshots);
 
+    if (GI) {
+      GI->SetPendingTravelSnapshot(TravelState.CachedTerritories);
+    }
+
     if (TravelState.CachedTerritories.Num() == 0) {
       UE_LOG(LogSkald, Warning,
              TEXT("TriggerGridBattle deferred: territory snapshot unavailable; retrying before travel."));
@@ -1100,6 +1104,10 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
       UpdatedTravelState.CachedTerritories = GI->CachedWorldMapTerritories;
       GI->SetTravelState(UpdatedTravelState);
     }
+  }
+
+  if (GI) {
+    GI->ClearPendingTravelSnapshot();
   }
 
   GI->PendingBattle = FS_BattlePayload();

@@ -131,6 +131,11 @@ public:
   UPROPERTY(BlueprintReadWrite, Category = "Battle")
   TArray<FS_Territory> CachedWorldMapTerritories;
 
+  /** Snapshot captured immediately before travelling so the overworld can be
+   *  restored when returning from a battle map. */
+  UPROPERTY(BlueprintReadWrite, Category = "Battle")
+  TArray<FS_Territory> PendingTravelTerritories;
+
   /** Random stream used for deterministic combat rolls. */
   UPROPERTY()
   FRandomStream CombatRandomStream;
@@ -157,6 +162,19 @@ public:
 
   UFUNCTION(BlueprintCallable)
   void SetTravelState(const FSkaldTravelState &InState);
+
+  /** Cache the snapshot that should be used to rebuild the overworld after
+   *  travelling back from a battle map. */
+  void SetPendingTravelSnapshot(const TArray<FS_Territory> &Snapshot);
+
+  /** Clear any pending travel snapshot once the overworld has been rebuilt. */
+  void ClearPendingTravelSnapshot();
+
+  /** Retrieve the pending travel snapshot, if one exists. */
+  const TArray<FS_Territory> &GetPendingTravelSnapshot() const
+  {
+    return PendingTravelTerritories;
+  }
 
   /** Toggle the travel pending guard and log the change. */
   UFUNCTION(BlueprintCallable)

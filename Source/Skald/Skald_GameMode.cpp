@@ -660,7 +660,15 @@ bool ASkaldGameMode::RestoreWorldFromSnapshot() {
     return false;
   }
 
-  if (GI->CachedWorldMapTerritories.Num() == 0) {
+  const TArray<FS_Territory> *SnapshotSource = nullptr;
+  const TArray<FS_Territory> &PendingSnapshot = GI->GetPendingTravelSnapshot();
+  if (PendingSnapshot.Num() > 0) {
+    SnapshotSource = &PendingSnapshot;
+  } else if (GI->CachedWorldMapTerritories.Num() > 0) {
+    SnapshotSource = &GI->CachedWorldMapTerritories;
+  }
+
+  if (!SnapshotSource) {
     UE_LOG(LogSkald, Warning,
            TEXT("RestoreWorldFromSnapshot: No cached territory snapshot available."));
     GI->bResumeTurns = false;
@@ -690,7 +698,7 @@ bool ASkaldGameMode::RestoreWorldFromSnapshot() {
   // assigned to a null owner for the rest of the session. Defer restoration
   // until those PlayerStates exist so ownership is correctly restored.
   TSet<int32> RequiredPlayerIds;
-  for (const FS_Territory &Snapshot : GI->CachedWorldMapTerritories) {
+  for (const FS_Territory &Snapshot : *SnapshotSource) {
     if (Snapshot.OwnerPlayerID > 0) {
       RequiredPlayerIds.Add(Snapshot.OwnerPlayerID);
     }
@@ -758,7 +766,7 @@ bool ASkaldGameMode::RestoreWorldFromSnapshot() {
   FS_Territory SampleSnapshot;
   ATerritory *SampleActor = nullptr;
   bool bRecordedSample = false;
-  for (const FS_Territory &Snapshot : GI->CachedWorldMapTerritories) {
+  for (const FS_Territory &Snapshot : *SnapshotSource) {
     ATerritory *const *FoundTerritory = TerritoryById.Find(Snapshot.TerritoryID);
     if (!FoundTerritory || !*FoundTerritory) {
       continue;
@@ -846,8 +854,13 @@ bool ASkaldGameMode::RestoreWorldFromSnapshot() {
   }
 
   WorldMap->SpawnedLocations.Reset();
-  for (const FS_Territory &Snapshot : GI->CachedWorldMapTerritories) {
+  for (const FS_Territory &Snapshot : *SnapshotSource) {
     WorldMap->SpawnedLocations.Add(Snapshot.TerritoryID, Snapshot.Location);
+  }
+
+  if (SnapshotSource == &PendingSnapshot &&
+      GI->CachedWorldMapTerritories.Num() == 0) {
+    GI->CachedWorldMapTerritories = PendingSnapshot;
   }
 
   if (WorldMap->SelectedTerritory &&
