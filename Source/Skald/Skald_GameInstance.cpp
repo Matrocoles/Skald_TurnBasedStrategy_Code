@@ -79,6 +79,7 @@ void USkaldGameInstance::SetTravelState(const FSkaldTravelState &InState) {
   TravelState.bValid = true;
   if (TravelState.CachedTerritories.Num() > 0) {
     CachedWorldMapTerritories = TravelState.CachedTerritories;
+    PendingTravelTerritories = TravelState.CachedTerritories;
   }
   UE_LOG(LogSkald, Log,
          TEXT("GameInstance travel state set: Expected=%d Attacker=%d Defender=%d HumanTerritories=%d CachedTerritories=%d"),
@@ -89,6 +90,27 @@ void USkaldGameInstance::SetTravelState(const FSkaldTravelState &InState) {
   if (TravelState.CachedTerritories.Num() == 0) {
     UE_LOG(LogSkald, Warning,
            TEXT("GameInstance travel state missing cached territories snapshot"));
+  }
+}
+
+void USkaldGameInstance::SetPendingTravelSnapshot(
+    const TArray<FS_Territory> &Snapshot) {
+  PendingTravelTerritories = Snapshot;
+
+  if (PendingTravelTerritories.Num() > 0 && CachedWorldMapTerritories.Num() == 0) {
+    CachedWorldMapTerritories = PendingTravelTerritories;
+  }
+
+  UE_LOG(LogSkald, Verbose,
+         TEXT("GameInstance pending travel snapshot set (%d territories)"),
+         PendingTravelTerritories.Num());
+}
+
+void USkaldGameInstance::ClearPendingTravelSnapshot() {
+  if (PendingTravelTerritories.Num() > 0) {
+    PendingTravelTerritories.Reset();
+    UE_LOG(LogSkald, Verbose,
+           TEXT("GameInstance pending travel snapshot cleared"));
   }
 }
 
@@ -280,6 +302,7 @@ void USkaldGameInstance::ResetSessionState() {
   SetBattleMapActive(false);
   bTravelPending = false;
   CachedWorldMapTerritories.Empty();
+  PendingTravelTerritories.Empty();
   TravelState = FSkaldTravelState();
 
   SeedCombatRandomStream(FMath::Rand());
