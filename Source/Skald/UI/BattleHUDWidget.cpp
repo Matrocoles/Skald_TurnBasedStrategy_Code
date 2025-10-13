@@ -7,6 +7,7 @@
 #include "GridOverlayComponent.h"
 #include "TimerManager.h"
 #include "Engine/Texture2D.h"
+#include "UObject/WeakObjectPtrTemplates.h"
 
 void UBattleHUDWidget::NativeConstruct() {
   Super::NativeConstruct();
@@ -259,10 +260,18 @@ void UBattleHUDWidget::ShowDiceRoll(int32 RollValue) {
   }
 
   if (UWorld *World = GetWorld()) {
-    World->GetTimerManager().ClearTimer(DiceRollerHideTimer);
-    World->GetTimerManager().SetTimer(
-        DiceRollerHideTimer, this, &UBattleHUDWidget::HideDiceRoller, 1.f,
-        false);
+    FTimerManager &TimerManager = World->GetTimerManager();
+    TimerManager.ClearTimer(DiceRollerHideTimer);
+
+    const TWeakObjectPtr<UBattleHUDWidget> WeakThis(this);
+    FTimerDelegate TimerDelegate;
+    TimerDelegate.BindLambda([WeakThis]() {
+      if (WeakThis.IsValid()) {
+        WeakThis->HideDiceRoller();
+      }
+    });
+
+    TimerManager.SetTimer(DiceRollerHideTimer, TimerDelegate, 1.f, false);
   }
 }
 
