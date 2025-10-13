@@ -16,7 +16,10 @@
 #include "SkaldLogging.h"
 #include "Skald_BattleGameMode.h"
 #include "Skald_BattleLevelManager.h"
+#include "Skald_GameMode.h"
 #include "Skald_PlayerController.h"
+#include "Skald_TurnManager.h"
+#include "TimerManager.h"
 #include "Styling/CoreStyle.h"
 #include "UI/SkaldUIHelpers.h"
 #include "Widgets/Images/SImage.h"
@@ -166,6 +169,14 @@ void USkaldGameInstance::HandleWorldBeginPlay(UWorld *LoadedWorld) {
   }
 
   SetTravelPending(false);
+
+  if (LoadedWorld->GetNetMode() == NM_Client) {
+    return;
+  }
+
+  if (bPendingBattleResolution && PendingBattleResolution.bValid) {
+    RequestPendingBattleResolution(LoadedWorld);
+  }
 }
 
 void USkaldGameInstance::SetActiveBattleGameMode(
@@ -274,6 +285,65 @@ void USkaldGameInstance::ReturnToMainMenu() {
     const FName LobbyMap(TEXT("/Game/Blueprints/Maps/Skald_Lobby"));
     UGameplayStatics::OpenLevel(World, LobbyMap);
   }
+}
+
+void USkaldGameInstance::RequestPendingBattleResolution(UWorld *LoadedWorld) {
+  if (!bPendingBattleResolution || !PendingBattleResolution.bValid) {
+    return;
+  }
+
+  UWorld *World = LoadedWorld ? LoadedWorld : GetWorld();
+  if (!World) {
+    return;
+  }
+
+  World->GetTimerManager().ClearTimer(PendingBattleResolutionKickoffHandle);
+
+  FTimerDelegate ResolveDelegate = FTimerDelegate::CreateWeakLambda(
+      this, [this]() { AttemptResolvePendingBattle(0); });
+  World->GetTimerManager().SetTimerForNextTick(ResolveDelegate);
+}
+
+void USkaldGameInstance::AttemptResolvePendingBattle(int32 Attempt) {
+  if (!bPendingBattleResolution || !PendingBattleResolution.bValid) {
+    return;
+  }
+
+  UWorld *World = GetWorld();
+  if (!World || World->GetNetMode() == NM_Client) {
+    return;
+  }
+
+  ATurnManager *TurnManager = nullptr;
+  if (ASkaldGameMode *GameMode = World->GetAuthGameMode<ASkaldGameMode>()) {
+    TurnManager = GameMode->GetTurnManager();
+  }
+  if (!TurnManager) {
+    if (AActor *Actor =
+            UGameplayStatics::GetActorOfClass(World, ATurnManager::StaticClass())) {
+      TurnManager = Cast<ATurnManager>(Actor);
+    }
+  }
+
+  if (TurnManager) {
+    World->GetTimerManager().ClearTimer(PendingBattleResolutionKickoffHandle);
+    TurnManager->ResolveGridBattleResult();
+    return;
+  }
+
+  constexpr int32 MaxAttempts = 40;
+  if (Attempt + 1 >= MaxAttempts) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("GameInstance pending battle resolution could not locate a turn manager after %d attempts."),
+           Attempt + 1);
+    return;
+  }
+
+  constexpr float RetryDelaySeconds = 0.05f;
+  FTimerDelegate RetryDelegate = FTimerDelegate::CreateWeakLambda(
+      this, [this, Attempt]() { AttemptResolvePendingBattle(Attempt + 1); });
+  World->GetTimerManager().SetTimer(PendingBattleResolutionKickoffHandle,
+                                    RetryDelegate, RetryDelaySeconds, false);
 }
 
 void USkaldGameInstance::ResetSessionState() {
