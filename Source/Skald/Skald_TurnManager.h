@@ -159,6 +159,8 @@ protected:
 
   UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Turn")
   FS_BattlePayload PendingBattle;
+  /** Payload for the next battle waiting on travel/resolution to finish. */
+  FS_BattlePayload DeferredPendingBattle;
 
   UPROPERTY()
   AWorldMap *CachedWorldMap;

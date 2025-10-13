@@ -529,7 +529,7 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
                ? TEXT("true")
                : TEXT("false"));
 
-    PendingBattle = SeededBattle;
+    DeferredPendingBattle = SeededBattle;
 
     if (UWorld *World = GetWorld()) {
       if (!World->GetTimerManager().IsTimerActive(PendingBattleTravelRetryHandle)) {
@@ -570,6 +570,7 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
     }
   }
   PendingBattle = SeededBattle;
+  DeferredPendingBattle = FS_BattlePayload();
 
   if (GI) {
     GI->SeedCombatRandomStream(SeededBattle.RandomSeed);
@@ -879,11 +880,14 @@ void ATurnManager::RetryPendingBattleTravel() {
     World->GetTimerManager().ClearTimer(PendingBattleTravelRetryHandle);
   }
 
-  if (PendingBattle.FromTerritoryID <= 0 || PendingBattle.TargetTerritoryID <= 0) {
+  const FS_BattlePayload PendingPayload = DeferredPendingBattle;
+
+  if (PendingPayload.FromTerritoryID <= 0 ||
+      PendingPayload.TargetTerritoryID <= 0) {
     return;
   }
 
-  TriggerGridBattle(PendingBattle);
+  TriggerGridBattle(PendingPayload);
 }
 
 void ATurnManager::MulticastStreamBattleLevel_Implementation(
