@@ -166,6 +166,12 @@ protected:
   /** Retry handle used when deferring battle resolution until the world map has been restored. */
   FTimerHandle PendingBattleResolutionRetryHandle;
 
+  /** Retry handle used when a battle travel request must wait for a territory snapshot. */
+  FTimerHandle PendingBattleTravelRetryHandle;
+
+  /** Attempt to continue travelling to the battle map after capturing the world snapshot. */
+  void RetryPendingBattleTravel();
+
   UFUNCTION()
   void HandleGridBattleEnded(ESkaldFaction WinningFaction, int32 AttackerCasualties, int32 DefenderCasualties);
 
