@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Delegates/Delegate.h"
 #include "Engine/EngineBaseTypes.h"
+#include "TimerManager.h"
 #include "Engine/GameInstance.h"
 #include "SkaldTypes.h"
 #include "Templates/SharedPointer.h"
@@ -229,5 +230,9 @@ private:
   FDelegateHandle PostWorldBeginPlayHandle;
 
   void HandleWorldBeginPlay(UWorld *LoadedWorld);
+  void RequestPendingBattleResolution(UWorld *LoadedWorld);
+  void AttemptResolvePendingBattle(int32 Attempt);
   void ResetSessionState();
+
+  FTimerHandle PendingBattleResolutionKickoffHandle;
 };
