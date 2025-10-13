@@ -954,14 +954,21 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
 
   auto QueueRetry = [&]() {
     GI->SetTravelPending(true);
-    if (!GetWorld()->GetTimerManager().IsTimerActive(
-            PendingBattleResolutionRetryHandle)) {
+
+    UWorld *World = GetWorld();
+    if (!World) {
+      UE_LOG(LogSkald, Verbose,
+             TEXT("ResolveGridBattleResult: World unavailable; awaiting travel completion before retry."));
+      return;
+    }
+
+    FTimerManager &TimerManager = World->GetTimerManager();
+    if (!TimerManager.IsTimerActive(PendingBattleResolutionRetryHandle)) {
       FTimerDelegate RetryDelegate = FTimerDelegate::CreateUObject(
           this, &ATurnManager::ResolveGridBattleResult);
       constexpr float RetryDelaySeconds = 0.05f;
-      GetWorld()->GetTimerManager().SetTimer(
-          PendingBattleResolutionRetryHandle, RetryDelegate,
-          RetryDelaySeconds, false);
+      TimerManager.SetTimer(PendingBattleResolutionRetryHandle, RetryDelegate,
+                            RetryDelaySeconds, false);
     }
   };
 
