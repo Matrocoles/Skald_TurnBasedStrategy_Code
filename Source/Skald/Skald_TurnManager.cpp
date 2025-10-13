@@ -521,6 +521,28 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
   SeededBattle.RandomSeed = FMath::Rand();
 
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+  if (GI && (GI->bTravelPending || GI->bPendingBattleResolution)) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("TriggerGridBattle deferred: travel/resolution in progress (TravelPending=%s PendingResolution=%s)"),
+           GI->bTravelPending ? TEXT("true") : TEXT("false"),
+           (GI->bPendingBattleResolution && GI->PendingBattleResolution.bValid)
+               ? TEXT("true")
+               : TEXT("false"));
+
+    PendingBattle = SeededBattle;
+
+    if (UWorld *World = GetWorld()) {
+      if (!World->GetTimerManager().IsTimerActive(PendingBattleTravelRetryHandle)) {
+        FTimerDelegate RetryDelegate =
+            FTimerDelegate::CreateUObject(this, &ATurnManager::RetryPendingBattleTravel);
+        constexpr float RetryDelaySeconds = 0.1f;
+        World->GetTimerManager().SetTimer(PendingBattleTravelRetryHandle, RetryDelegate,
+                                          RetryDelaySeconds, false);
+      }
+    }
+    return;
+  }
+
   bool bGameModeHasSnapshotAfterCall = GI && GI->CachedWorldMapTerritories.Num() > 0;
 
   if (UWorld *ExistingWorld = GetWorld()) {
