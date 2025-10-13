@@ -948,38 +948,7 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
 
   ASkaldGameMode *GameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
 
-  if (GameMode && GameMode->IsA(ASkald_BattleGameMode::StaticClass())) {
-    // Still on the battle map; wait for travel to finish before updating the
-    // overworld. The pending resolution will be applied once the world map
-    // has been rebuilt.
-    GI->SetTravelPending(true);
-    return;
-  }
-
-  if (!GI->bPendingBattleResolution || !GI->PendingBattleResolution.bValid) {
-    GI->SetTravelPending(false);
-    return;
-  }
-  if (GameMode && !GameMode->IsWorldInitialized()) {
-    GI->SetTravelPending(true);
-    UE_LOG(LogSkald, Verbose,
-           TEXT("ResolveGridBattleResult: World not yet initialised; retrying after snapshot restoration."));
-
-    if (!GetWorld()->GetTimerManager().IsTimerActive(
-            PendingBattleResolutionRetryHandle)) {
-      FTimerDelegate RetryDelegate = FTimerDelegate::CreateUObject(
-          this, &ATurnManager::ResolveGridBattleResult);
-      constexpr float RetryDelaySeconds = 0.05f;
-      GetWorld()->GetTimerManager().SetTimer(PendingBattleResolutionRetryHandle,
-                                             RetryDelegate, RetryDelaySeconds,
-                                             false);
-    }
-    return;
-  }
-
-  auto DeferResolution = [&](const TCHAR *Reason) {
-    UE_LOG(LogSkald, Verbose,
-           TEXT("ResolveGridBattleResult: %s; retrying."), Reason);
+  auto QueueRetry = [&]() {
     GI->SetTravelPending(true);
     if (!GetWorld()->GetTimerManager().IsTimerActive(
             PendingBattleResolutionRetryHandle)) {
@@ -990,6 +959,32 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
           PendingBattleResolutionRetryHandle, RetryDelegate,
           RetryDelaySeconds, false);
     }
+  };
+
+  if (GameMode && GameMode->IsA(ASkald_BattleGameMode::StaticClass())) {
+    // Still on the battle map; wait for travel to finish before updating the
+    // overworld. The pending resolution will be applied once the world map
+    // has been rebuilt.
+    QueueRetry();
+    return;
+  }
+
+  if (!GI->bPendingBattleResolution || !GI->PendingBattleResolution.bValid) {
+    GI->SetTravelPending(false);
+    return;
+  }
+  if (GameMode && !GameMode->IsWorldInitialized()) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("ResolveGridBattleResult: World not yet initialised; retrying after snapshot restoration."));
+
+    QueueRetry();
+    return;
+  }
+
+  auto DeferResolution = [&](const TCHAR *Reason) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("ResolveGridBattleResult: %s; retrying."), Reason);
+    QueueRetry();
   };
 
   AWorldMap *WorldMap = ResolveWorldMap();
