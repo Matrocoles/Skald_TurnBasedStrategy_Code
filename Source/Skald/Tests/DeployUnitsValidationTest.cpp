@@ -61,6 +61,15 @@ bool FSkaldDeployUnitsValidationFeedbackTest::RunTest(const FString&)
     // Insufficient units
     HUD->LastError.Empty();
     Terr->OwningPlayer = PS1;
+    Terr->bIsCapital = false;
+    PS1->DeployableUnits = 5;
+    PC->ServerDeployUnits(Terr->TerritoryID, 1);
+    TestTrue(TEXT("Capital requirement error"),
+             HUD->LastError.Contains(TEXT("capital")));
+
+    // Set as capital and retry insufficient units
+    HUD->LastError.Empty();
+    Terr->bIsCapital = true;
     PS1->DeployableUnits = 0;
     PC->ServerDeployUnits(Terr->TerritoryID, 1);
     TestTrue(TEXT("Insufficient units error"),
