@@ -121,9 +121,11 @@ bool FArmyPlacementInitiativeOrderTest::RunTest(const FString &Parameters) {
   TerritoryA->TerritoryID = 1;
   TerritoryA->OwningPlayer = StateA;
   TerritoryA->ArmyUnits = 1;
+  TerritoryA->bIsCapital = true;
   TerritoryB->TerritoryID = 2;
   TerritoryB->OwningPlayer = StateB;
   TerritoryB->ArmyUnits = 1;
+  TerritoryB->bIsCapital = true;
   Map->Territories = {TerritoryA, TerritoryB};
 
   SetObjectProperty(GameMode, TEXT("TurnManager"), TurnManager);
@@ -221,9 +223,11 @@ bool FAIArmyPlacementAutoAdvanceTest::RunTest(const FString &Parameters) {
   TerritoryAI->TerritoryID = 1;
   TerritoryAI->OwningPlayer = AIState;
   TerritoryAI->ArmyUnits = 1;
+  TerritoryAI->bIsCapital = true;
   TerritoryHuman->TerritoryID = 2;
   TerritoryHuman->OwningPlayer = HumanState;
   TerritoryHuman->ArmyUnits = 1;
+  TerritoryHuman->bIsCapital = true;
   Map->Territories = {TerritoryAI, TerritoryHuman};
 
   SetObjectProperty(GameMode, TEXT("TurnManager"), TurnManager);
@@ -315,9 +319,11 @@ bool FAIArmyPlacementFailsafeRespectsHumanTest::RunTest(
   TerritoryAI->TerritoryID = 1;
   TerritoryAI->OwningPlayer = AIState;
   TerritoryAI->ArmyUnits = 1;
+  TerritoryAI->bIsCapital = true;
   TerritoryHuman->TerritoryID = 2;
   TerritoryHuman->OwningPlayer = HumanState;
   TerritoryHuman->ArmyUnits = 1;
+  TerritoryHuman->bIsCapital = true;
   Map->Territories = {TerritoryAI, TerritoryHuman};
 
   SetObjectProperty(GameMode, TEXT("TurnManager"), TurnManager);
@@ -406,7 +412,9 @@ bool FInitializeWorldSingleInitiativeRollTest::RunTest(const FString &Parameters
   GameState->AddPlayerState(StateB);
 
   TerritoryA->TerritoryID = 1;
+  TerritoryA->bIsCapital = true;
   TerritoryB->TerritoryID = 2;
+  TerritoryB->bIsCapital = true;
   Map->Territories = {TerritoryA, TerritoryB};
 
   SetObjectProperty(GameMode, TEXT("TurnManager"), TurnManager);

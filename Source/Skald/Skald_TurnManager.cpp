@@ -1066,23 +1066,43 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
   const int32 InitialSourceArmy = Source->ArmyUnits;
   const int32 InitialTargetArmy = Target->ArmyUnits;
 
-  Source->ArmyUnits = FMath::Max(0, InitialSourceArmy - Battle.ArmyCountSent);
+  const int32 AttackerBudget =
+      Battle.ArmyCountSent > 0 ? Battle.ArmyCountSent : InitialSourceArmy;
+  int32 AttackerCommitted = Resolution.AttackerCommittedArmyCost;
+  if (AttackerCommitted <= 0) {
+    AttackerCommitted = AttackerBudget;
+  }
+  AttackerCommitted = FMath::Clamp(AttackerCommitted, 0, FMath::Min(AttackerBudget, InitialSourceArmy));
+
+  const int32 DefenderBudget =
+      Battle.DefenderArmyCount > 0 ? Battle.DefenderArmyCount : InitialTargetArmy;
+  int32 DefenderCommitted = Resolution.DefenderCommittedArmyCost;
+  if (DefenderCommitted <= 0) {
+    DefenderCommitted = DefenderBudget;
+  }
+  DefenderCommitted = FMath::Clamp(DefenderCommitted, 0, FMath::Min(DefenderBudget, InitialTargetArmy));
+  const int32 DefenderUnspent = FMath::Max(0, DefenderBudget - DefenderCommitted);
+
+  Source->ArmyUnits = FMath::Max(0, InitialSourceArmy - AttackerCommitted);
 
   if (Resolution.AttackerSurvivorArmyCost > 0 &&
       Resolution.DefenderSurvivorArmyCost <= 0) {
     Target->OwningPlayer = Source->OwningPlayer;
     Target->ArmyUnits = Resolution.AttackerSurvivorArmyCost;
   } else {
-    Target->ArmyUnits = Resolution.DefenderSurvivorArmyCost;
+    int32 DefenderResult = FMath::Max(0, Resolution.DefenderSurvivorArmyCost);
+    Target->ArmyUnits = DefenderResult + DefenderUnspent;
   }
 
+  Resolution.AttackerCommittedArmyCost = AttackerCommitted;
+  Resolution.DefenderCommittedArmyCost = DefenderCommitted;
   Resolution.SourceArmyRemaining = Source->ArmyUnits;
   Resolution.TargetArmyRemaining = Target->ArmyUnits;
 
   Resolution.AttackerCasualties =
-      InitialSourceArmy - (Source->ArmyUnits + Resolution.AttackerSurvivorArmyCost);
+      FMath::Max(0, AttackerCommitted - Resolution.AttackerSurvivorArmyCost);
   Resolution.DefenderCasualties =
-      InitialTargetArmy - Resolution.DefenderSurvivorArmyCost;
+      FMath::Max(0, DefenderCommitted - Resolution.DefenderSurvivorArmyCost);
 
   Source->RefreshAppearance();
   Target->RefreshAppearance();
@@ -1277,11 +1297,15 @@ bool ATurnManager::CapturePendingBattleResolution(
       GameInstance->GridBattleManager->GetAttackerSurvivorCost();
   Resolution.DefenderSurvivorArmyCost =
       GameInstance->GridBattleManager->GetDefenderSurvivorCost();
+  Resolution.AttackerCommittedArmyCost =
+      GameInstance->GridBattleManager->GetAttackerInitialArmyCost();
+  Resolution.DefenderCommittedArmyCost =
+      GameInstance->GridBattleManager->GetDefenderInitialArmyCost();
   Resolution.AttackerCasualties =
-      GameInstance->GridBattleManager->GetAttackerInitialArmyCost() -
+      Resolution.AttackerCommittedArmyCost -
       Resolution.AttackerSurvivorArmyCost;
   Resolution.DefenderCasualties =
-      GameInstance->GridBattleManager->GetDefenderInitialArmyCost() -
+      Resolution.DefenderCommittedArmyCost -
       Resolution.DefenderSurvivorArmyCost;
 
   const FS_BattlePayload &Battle = GameInstance->PendingBattle;

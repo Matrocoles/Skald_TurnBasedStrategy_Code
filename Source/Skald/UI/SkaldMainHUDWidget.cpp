@@ -212,6 +212,16 @@ void USkaldMainHUDWidget::UpdatePhaseBanner(ETurnPhase InPhase) {
       CurrentPhase != ETurnPhase::ArmyPlacement) {
     DeployableUnitsText->SetVisibility(ESlateVisibility::Collapsed);
   }
+
+  if (!bSelectingForAttack && !bSelectingForMove) {
+    if (CurrentPhase == ETurnPhase::Reinforcement) {
+      ShowSelectionPromptMessage(TEXT("Select an owned capital."));
+    } else if (CurrentPhase == ETurnPhase::ArmyPlacement) {
+      ShowSelectionPromptMessage(TEXT("Select an owned territory."));
+    } else {
+      ShowSelectionPromptMessage(TEXT(""), false);
+    }
+  }
 }
 
 void USkaldMainHUDWidget::UpdateTerritoryInfo(const FString &TerritoryName,
@@ -231,20 +241,21 @@ void USkaldMainHUDWidget::UpdateTerritoryInfo(const FString &TerritoryName,
 
   if (DeployButton && (CurrentPhase == ETurnPhase::Reinforcement ||
                        CurrentPhase == ETurnPhase::ArmyPlacement)) {
-    bool bOwnedByLocal = false;
+    bool bOwnedCapitalByLocal = false;
     if (APlayerController *PC = GetOwningPlayer()) {
       if (ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>()) {
         if (AWorldMap *Map = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
                 GetWorld(), AWorldMap::StaticClass()))) {
           if (ATerritory *Sel = Map->SelectedTerritory) {
-            bOwnedByLocal =
+            const bool bOwnedByLocal =
                 (Sel->OwningPlayer &&
                  Sel->OwningPlayer->GetPlayerId() == PS->GetPlayerId());
+            bOwnedCapitalByLocal = bOwnedByLocal && Sel->bIsCapital;
           }
         }
       }
     }
-    const bool bShouldShowDeploy = bIsMyTurn && bOwnedByLocal;
+    const bool bShouldShowDeploy = bIsMyTurn && bOwnedCapitalByLocal;
     DeployButton->SetVisibility(bShouldShowDeploy ? ESlateVisibility::Visible
                                                   : ESlateVisibility::Collapsed);
     DeployButton->SetIsEnabled(bShouldShowDeploy);
@@ -507,7 +518,13 @@ void USkaldMainHUDWidget::CancelAttackSelection() {
     ActiveConfirmWidget->RemoveFromParent();
     ActiveConfirmWidget = nullptr;
   }
-  ShowSelectionPromptMessage(TEXT("Choose owned territory."));
+  if (CurrentPhase == ETurnPhase::Reinforcement) {
+    ShowSelectionPromptMessage(TEXT("Select an owned capital."));
+  } else if (CurrentPhase == ETurnPhase::ArmyPlacement) {
+    ShowSelectionPromptMessage(TEXT("Select an owned territory."));
+  } else {
+    ShowSelectionPromptMessage(TEXT("Choose owned territory."));
+  }
   bSelectingForAttack = false;
   SelectedSourceID = -1;
   SelectedTargetID = -1;
@@ -759,11 +776,20 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
       const bool bIsMyTurn =
           (CurrentPlayerID != -1 && EffectiveLocalPlayerId != -1 &&
            CurrentPlayerID == EffectiveLocalPlayerId);
-      const bool bShouldShowDeploy = bIsMyTurn && bOwnedByLocal;
+      const bool bIsCapital = Territory->bIsCapital;
+      const bool bShouldShowDeploy = bIsMyTurn && bOwnedByLocal && bIsCapital;
       DeployButton->SetVisibility(
           bShouldShowDeploy ? ESlateVisibility::Visible
                             : ESlateVisibility::Collapsed);
       DeployButton->SetIsEnabled(bShouldShowDeploy);
+    }
+    if (CurrentPhase == ETurnPhase::Reinforcement) {
+      if (bOwnedByLocal && !Territory->bIsCapital) {
+        ShowSelectionErrorMessage(
+            TEXT("Reinforcements can only be placed on owned capitals."));
+      } else if (bOwnedByLocal) {
+        ShowSelectionPromptMessage(TEXT("Select an owned capital."));
+      }
     }
   } else if (CurrentPhase == ETurnPhase::Engineering && bOwnedByLocal &&
              Territory->bIsCapital) {
@@ -1047,6 +1073,12 @@ void USkaldMainHUDWidget::HandleDeployClicked() {
            TEXT("HandleDeployClicked failed: invalid territory %d"),
            SelectedSourceID);
     ShowErrorMessage(TEXT("Invalid territory selected"));
+    return;
+  }
+
+  if (!Territory->bIsCapital) {
+    ShowSelectionErrorMessage(
+        TEXT("Reinforcements can only be placed on owned capitals."));
     return;
   }
 

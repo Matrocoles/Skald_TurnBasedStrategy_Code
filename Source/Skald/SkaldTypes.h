@@ -203,6 +203,14 @@ struct SKALD_API FGridBattleResolution
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     int32 DefenderSurvivorArmyCost = 0;
 
+    /** Total army cost committed by the attacker when the battle began. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    int32 AttackerCommittedArmyCost = 0;
+
+    /** Total army cost committed by the defender when the battle began. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    int32 DefenderCommittedArmyCost = 0;
+
     /** Remaining army at the source territory after casualties. */
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     int32 SourceArmyRemaining = 0;

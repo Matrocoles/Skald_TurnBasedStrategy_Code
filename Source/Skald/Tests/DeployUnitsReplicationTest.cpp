@@ -52,6 +52,7 @@ bool FSkaldDeployReplicationTest::RunTest(const FString& Parameters)
     Terr->TerritoryID = 1;
     Terr->OwningPlayer = PS1;
     Terr->ArmyUnits = 5;
+    Terr->bIsCapital = true;
     WM->Territories = {Terr};
     PS1->DeployableUnits = 10;
 
