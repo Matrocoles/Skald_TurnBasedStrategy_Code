@@ -9,6 +9,7 @@
 #include "Skald.h"
 #include "SkaldLogging.h"
 #include "SkaldSaveGame.h"
+#include "Misc/Char.h"
 #include "Skald_AIController.h"
 #include "Skald_BattleGameMode.h"
 #include "Skald_GameInstance.h"
@@ -21,6 +22,7 @@
 #include "Territory.h"
 #include "TimerManager.h"
 #include "UI/SkaldMainHUDWidget.h"
+#include "UObject/Package.h"
 #include "UObject/UnrealType.h"
 #include "WorldMap.h"
 
@@ -2192,6 +2194,50 @@ bool ASkaldGameMode::InitializeWorld() {
 void ASkaldGameMode::FillSaveGame(USkaldSaveGame *SaveGameObject) const {
   if (!SaveGameObject) {
     return;
+  }
+
+  if (const UWorld *World = GetWorld()) {
+    FString MapPath;
+    if (const ULevel *PersistentLevel = World->PersistentLevel) {
+      if (const UPackage *Package = PersistentLevel->GetOutermost()) {
+        MapPath = Package->GetName();
+      }
+    }
+
+    if (MapPath.IsEmpty()) {
+      if (const UPackage *WorldPackage = World->GetOutermost()) {
+        MapPath = WorldPackage->GetName();
+      }
+    }
+
+    if (MapPath.IsEmpty()) {
+      MapPath = World->GetMapName();
+    }
+
+    if (!MapPath.IsEmpty()) {
+      auto StripPIEPrefix = [](const FString &InPath) {
+        FString Result = InPath;
+        const FString PIEPrefix = TEXT("UEDPIE_");
+        int32 PrefixIndex = Result.Find(PIEPrefix);
+        while (PrefixIndex != INDEX_NONE) {
+          int32 RemovalStart = PrefixIndex;
+          int32 RemovalEnd = PrefixIndex + PIEPrefix.Len();
+          while (RemovalEnd < Result.Len() && FChar::IsDigit(Result[RemovalEnd])) {
+            ++RemovalEnd;
+          }
+          if (RemovalEnd < Result.Len() && Result[RemovalEnd] == TEXT('_')) {
+            ++RemovalEnd;
+          }
+          Result.RemoveAt(RemovalStart, RemovalEnd - RemovalStart);
+          PrefixIndex = Result.Find(PIEPrefix);
+        }
+        return Result;
+      };
+
+      SaveGameObject->MapAssetPath = StripPIEPrefix(MapPath);
+    } else {
+      SaveGameObject->MapAssetPath.Empty();
+    }
   }
 
   // Store basic turn information.
