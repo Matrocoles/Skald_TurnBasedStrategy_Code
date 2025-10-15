@@ -11,6 +11,7 @@
 class UGridOverlayComponent;
 class UCapsuleComponent;
 class UTexture2D;
+class UFighterActivationWidget;
 
 UENUM(BlueprintType)
 enum class EFighterPawnFootprint : uint8 {
@@ -136,11 +137,13 @@ public:
   int32 ActionsRemaining;
 
   /** True once the fighter has activated during the current round. */
-  UPROPERTY(BlueprintReadOnly, Replicated, Category = "Fighter")
+  UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_HasActivatedThisRound,
+            Category = "Fighter")
   bool bHasActivatedThisRound;
 
   /** True while this fighter is currently taking its activation. */
-  UPROPERTY(BlueprintReadOnly, Replicated, Category = "Fighter")
+  UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_IsCurrentlyActive,
+            Category = "Fighter")
   bool bIsCurrentlyActive;
 
   /** True to override the incoming spawn rotation with SpawnFacingYaw. */
@@ -174,6 +177,22 @@ public:
   /** Widget class used for the health display. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Fighter|UI")
   TSubclassOf<UUserWidget> HealthWidgetTemplate;
+
+  /** Widget indicating activation state. */
+  UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|UI")
+  UWidgetComponent *ActivationWidget;
+
+  /** Widget class used for the activation indicator. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Fighter|UI")
+  TSubclassOf<UUserWidget> ActivationWidgetTemplate;
+
+  /** Icon displayed while the fighter is taking its activation. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|UI")
+  TSoftObjectPtr<UTexture2D> ActivationReadyIcon;
+
+  /** Icon displayed once the fighter has exhausted its actions. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|UI")
+  TSoftObjectPtr<UTexture2D> ActivationSpentIcon;
 
   /** Widget class used for optional damage float indicators. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Fighter|UI")
@@ -216,6 +235,10 @@ private:
   void OnRep_ActionsRemaining();
   UFUNCTION()
   void OnRep_GridFootprint();
+  UFUNCTION()
+  void OnRep_HasActivatedThisRound();
+  UFUNCTION()
+  void OnRep_IsCurrentlyActive();
 
   /** Retrieve or create a damage widget from the pool. */
   UUserWidget *GetDamageWidgetFromPool();
@@ -240,6 +263,16 @@ private:
 
   /** Helper to broadcast the current actions remaining value. */
   void BroadcastActionsRemaining();
+
+  /** Ensure the activation widget instance is ready for use. */
+  void EnsureActivationWidget();
+
+  /** Update the activation widget to match fighter state. */
+  void UpdateActivationIndicator();
+
+  /** Resolve and cache an activation icon texture. */
+  UTexture2D *ResolveActivationIcon(TSoftObjectPtr<UTexture2D> &IconSource,
+                                    UTexture2D *&CachedTexture);
 
   /** Apply the mesh's yaw offset when orienting the fighter. */
   void ApplyFacingYaw(float TargetYaw);
@@ -308,6 +341,17 @@ private:
 
   /** Cached yaw offset derived from the display mesh's relative rotation. */
   float DisplayMeshYawOffset = 0.f;
+
+  /** Cached activation widget reference. */
+  TWeakObjectPtr<UFighterActivationWidget> CachedActivationWidget;
+
+  /** Cached ready icon texture. */
+  UPROPERTY(Transient)
+  UTexture2D *ActivationReadyTexture = nullptr;
+
+  /** Cached spent icon texture. */
+  UPROPERTY(Transient)
+  UTexture2D *ActivationSpentTexture = nullptr;
 
 public:
   /** Returns true if the fighter has already activated this round. */

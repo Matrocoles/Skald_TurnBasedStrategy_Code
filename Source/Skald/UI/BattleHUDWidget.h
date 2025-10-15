@@ -144,6 +144,9 @@ public:
   /** Enable or disable the Activate button. */
   void SetActivateEnabled(bool bEnabled);
 
+  /** Toggle visibility for the Activate button. */
+  void SetActivateVisibility(bool bVisible);
+
   /** Enable or disable the End Turn button. */
   void SetEndTurnEnabled(bool bEnabled);
 
