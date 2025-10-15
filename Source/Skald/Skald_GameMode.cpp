@@ -2002,11 +2002,12 @@ bool ASkaldGameMode::InitializeWorld() {
            CapitalTerritories.Num(), PlayerCount);
   }
 
-  auto AssignTerritory = [](ATerritory *Territory, ASkaldPlayerState *Owner) {
-    if (!Territory || !Owner) {
+  auto AssignTerritory =
+      [](ATerritory *Territory, ASkaldPlayerState *InOwner) {
+    if (!Territory || !InOwner) {
       return;
     }
-    Territory->OwningPlayer = Owner;
+    Territory->OwningPlayer = InOwner;
     Territory->bIsCapital = false;
     Territory->ArmyUnits = 1;
     Territory->RefreshAppearance();
@@ -2022,8 +2023,8 @@ bool ASkaldGameMode::InitializeWorld() {
       if (CandidateIndex >= CapitalTerritories.Num()) {
         break;
       }
-      ASkaldPlayerState *Owner = OrderedPlayerStates[PlayerIndex];
-      AssignTerritory(CapitalTerritories[CandidateIndex++], Owner);
+      ASkaldPlayerState *PlayerOwner = OrderedPlayerStates[PlayerIndex];
+      AssignTerritory(CapitalTerritories[CandidateIndex++], PlayerOwner);
       CandidateAssignments[PlayerIndex]++;
       if (PlayerCount > 0) {
         NextPlayerIndex = (PlayerIndex + 1) % PlayerCount;
@@ -2038,13 +2039,13 @@ bool ASkaldGameMode::InitializeWorld() {
     if (CandidateAssignments[PlayerIndex] >= CapitalsPerPlayer) {
       continue;
     }
-    ASkaldPlayerState *Owner = OrderedPlayerStates[PlayerIndex];
+    ASkaldPlayerState *PlayerOwner = OrderedPlayerStates[PlayerIndex];
     const int32 AssignedCount = CandidateAssignments[PlayerIndex];
     UE_LOG(LogSkald, Warning,
            TEXT("InitializeWorld: Player %s received only %d capital candidate "
                 "territory/territories during initial assignment; falling "
                 "back to other owned territories to reach %d total capitals."),
-           *Owner->GetPlayerName(), AssignedCount, CapitalsPerPlayer);
+           *PlayerOwner->GetPlayerName(), AssignedCount, CapitalsPerPlayer);
   }
 
   TArray<ATerritory *> RemainingTerritories;
