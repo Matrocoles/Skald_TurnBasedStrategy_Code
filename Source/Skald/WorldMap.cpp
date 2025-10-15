@@ -153,6 +153,7 @@ bool AWorldMap::GenerateTerritoriesFromTable() {
 
   Territories.Empty();
   SpawnedLocations.Reset();
+  CapitalCandidateIDs.Reset();
 
   ATerritory *DefaultTerritory = TerritoryClass->GetDefaultObject<ATerritory>();
   UStaticMeshComponent *MeshComp =
@@ -261,6 +262,10 @@ bool AWorldMap::GenerateTerritoriesFromTable() {
       SpawnedLocations.Add(Data->TerritoryID, Territory->GetActorLocation());
       TerritoriesById.Add(Data->TerritoryID, Territory);
       SpawnDataById.Add(Data->TerritoryID, Data);
+
+      if (Data->bIsCapital) {
+        CapitalCandidateIDs.Add(Data->TerritoryID);
+      }
     }
   }
 
@@ -587,6 +592,10 @@ bool AWorldMap::MoveBetween(ATerritory *From, ATerritory *To, int32 Troops) {
   }
 
   return true;
+}
+
+bool AWorldMap::IsCapitalCandidate(int32 TerritoryId) const {
+  return CapitalCandidateIDs.Contains(TerritoryId);
 }
 
 bool AWorldMap::AreTerritoriesAdjacent(const ATerritory *A,

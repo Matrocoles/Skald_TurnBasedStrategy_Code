@@ -156,6 +156,10 @@ public:
   UPROPERTY(BlueprintReadOnly, Category = "WorldMap")
   TMap<int32, FVector> SpawnedLocations;
 
+  /** Returns true when the supplied territory ID is flagged as a capital in
+   *  the data table. */
+  bool IsCapitalCandidate(int32 TerritoryId) const;
+
   /** Check whether two territories are adjacent, falling back to distance. */
   UFUNCTION(BlueprintCallable, Category = "WorldMap")
   bool AreTerritoriesAdjacent(const ATerritory *A, const ATerritory *B) const;
@@ -181,4 +185,7 @@ private:
 
   /** Cached audio playback state for pausing/resuming overworld ambience. */
   TMap<TWeakObjectPtr<UAudioComponent>, bool> CachedAudioPlaybackState;
+
+  /** Territory IDs marked as capital candidates in the data table. */
+  TSet<int32> CapitalCandidateIDs;
 };
