@@ -219,6 +219,9 @@ private:
   /** Hide the dice roller image after the timer elapses. */
   void HideDiceRoller();
 
+  /** Hide the initiative text after the timer elapses. */
+  void HideInitiativeText();
+
   /** Whether movement preview is currently shown. */
   bool bMoveSelected = false;
 
@@ -234,5 +237,8 @@ private:
 
   /** Timer managing dice roll visibility. */
   FTimerHandle DiceRollerHideTimer;
+
+  /** Timer managing initiative label visibility. */
+  FTimerHandle InitiativeHideTimer;
 };
 
