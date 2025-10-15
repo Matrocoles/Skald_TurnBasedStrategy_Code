@@ -5,10 +5,42 @@
 #include "Engine/DataTable.h"
 #include "GameFramework/Actor.h"
 #include "SkaldTypes.h"
-#include "Templates/Optional.h"
 #include "Engine/Texture2D.h"
 #include "TimerManager.h"
 #include "GridBattleManager.generated.h"
+
+/** Lightweight optional int32 replacement to avoid relying on engine optional templates. */
+struct FOptionalInt32
+{
+    FOptionalInt32() = default;
+
+    void Reset()
+    {
+        bIsSet = false;
+        Value = 0;
+    }
+
+    bool IsSet() const
+    {
+        return bIsSet;
+    }
+
+    int32 GetValue() const
+    {
+        return Value;
+    }
+
+    FOptionalInt32& operator=(int32 InValue)
+    {
+        Value = InValue;
+        bIsSet = true;
+        return *this;
+    }
+
+private:
+    bool bIsSet = false;
+    int32 Value = 0;
+};
 
 class AFighterPawn; // MUST be before the delegates
 
@@ -338,10 +370,10 @@ private:
     FTimerHandle InitiativePresentationTimer;
 
     /** Optional pre-supplied initiative roll for attackers. */
-    TOptional<int32> PendingInitiativeRollAttacker;
+    FOptionalInt32 PendingInitiativeRollAttacker;
 
     /** Optional pre-supplied initiative roll for defenders. */
-    TOptional<int32> PendingInitiativeRollDefender;
+    FOptionalInt32 PendingInitiativeRollDefender;
 
     /** Cached initiative roll for attackers to display in the HUD. */
     int32 LastInitiativeRollAttacker = 0;
