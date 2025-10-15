@@ -175,6 +175,10 @@ public:
   UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|UI")
   UWidgetComponent *HealthWidget;
 
+  /** Rear-facing widget mirroring the current health display. */
+  UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|UI")
+  UWidgetComponent *HealthWidgetBack;
+
   /** Widget class used for the health display. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Fighter|UI")
   TSubclassOf<UUserWidget> HealthWidgetTemplate;

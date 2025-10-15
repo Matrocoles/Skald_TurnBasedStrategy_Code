@@ -55,6 +55,21 @@ AFighterPawn::AFighterPawn() : MaxHealth(0) {
   HealthWidget->SetWidgetSpace(EWidgetSpace::World);
   HealthWidget->SetDrawAtDesiredSize(true);
 
+  HealthWidgetBack =
+      CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthWidgetBack"));
+  HealthWidgetBack->SetupAttachment(DisplayMesh);
+  HealthWidgetBack->SetTwoSided(true);
+  HealthWidgetBack->SetRelativeLocation(FVector(0.f, 0.f, 250.f));
+  HealthWidgetBack->SetRelativeRotation(FRotator(0.f, -90.f, 0.f));
+  HealthWidgetBack->SetRelativeScale3D(FVector(0.2f, 1.f, 0.5f));
+  HealthWidgetBack->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+  HealthWidgetBack->SetCollisionProfileName(
+      UCollisionProfile::NoCollision_ProfileName);
+  HealthWidgetBack->SetGenerateOverlapEvents(false);
+  HealthWidgetBack->SetCanEverAffectNavigation(false);
+  HealthWidgetBack->SetWidgetSpace(EWidgetSpace::World);
+  HealthWidgetBack->SetDrawAtDesiredSize(true);
+
   ActivationWidget =
       CreateDefaultSubobject<UWidgetComponent>(TEXT("ActivationWidget"));
   ActivationWidget->SetupAttachment(DisplayMesh);
@@ -151,20 +166,28 @@ void AFighterPawn::BeginPlay() {
     MaxHealth = FMath::Max(Stats.Health, 1);
   }
 
-  if (HealthWidget && HealthWidgetTemplate) {
-    HealthWidget->SetWidgetClass(HealthWidgetTemplate);
-  }
-  if (HealthWidget) {
-    HealthWidget->InitWidget();
+  const auto InitializeHealthWidgetComponent = [&](UWidgetComponent *Component) {
+    if (!Component) {
+      return;
+    }
+
+    if (HealthWidgetTemplate) {
+      Component->SetWidgetClass(HealthWidgetTemplate);
+    }
+    Component->InitWidget();
+
     if (UUserWidget *HealthWidgetInstance =
-            Cast<UUserWidget>(HealthWidget->GetUserWidgetObject())) {
+            Cast<UUserWidget>(Component->GetUserWidgetObject())) {
       HealthWidgetInstance->SetVisibility(ESlateVisibility::HitTestInvisible);
       if (UFighterHealthWidget *FighterHealthWidget =
               Cast<UFighterHealthWidget>(HealthWidgetInstance)) {
         FighterHealthWidget->SetHealthValues(Stats.Health, MaxHealth);
       }
     }
-  }
+  };
+
+  InitializeHealthWidgetComponent(HealthWidget);
+  InitializeHealthWidgetComponent(HealthWidgetBack);
 
   if (ActivationWidget) {
     if (ActivationWidgetTemplate) {
@@ -876,14 +899,21 @@ void AFighterPawn::UpdateMeshOffset() {
 bool AFighterPawn::IsAlive() const { return Stats.Health > 0; }
 
 void AFighterPawn::UpdateHealthDisplay(int32 NewHealth) {
-  if (!HealthWidget) {
-    return;
-  }
-  if (UFighterHealthWidget *Widget =
-          Cast<UFighterHealthWidget>(HealthWidget->GetUserWidgetObject())) {
-    const int32 SafeMax = MaxHealth > 0 ? MaxHealth : FMath::Max(1, NewHealth);
-    Widget->SetHealthValues(NewHealth, SafeMax);
-  }
+  const int32 SafeMax = MaxHealth > 0 ? MaxHealth : FMath::Max(1, NewHealth);
+
+  const auto ApplyHealthToComponent = [&](UWidgetComponent *Component) {
+    if (!Component) {
+      return;
+    }
+
+    if (UFighterHealthWidget *Widget =
+            Cast<UFighterHealthWidget>(Component->GetUserWidgetObject())) {
+      Widget->SetHealthValues(NewHealth, SafeMax);
+    }
+  };
+
+  ApplyHealthToComponent(HealthWidget);
+  ApplyHealthToComponent(HealthWidgetBack);
 }
 
 void AFighterPawn::Destroyed() {
