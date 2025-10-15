@@ -18,6 +18,7 @@
 namespace
 {
 constexpr int32 ActionsPerActivation = 2;
+constexpr float ActivationWidgetScale = 0.05f;
 }
 
 AFighterPawn::AFighterPawn() {
@@ -59,11 +60,28 @@ AFighterPawn::AFighterPawn() {
   ActivationWidget->SetDrawAtDesiredSize(true);
   ActivationWidget->SetRelativeLocation(FVector(0.f, 0.f, 520.f));
   ActivationWidget->SetRelativeRotation(FRotator(0.f, 90.f, 0.f));
+  ActivationWidget->SetRelativeScale3D(FVector(ActivationWidgetScale));
   ActivationWidget->SetCollisionEnabled(ECollisionEnabled::NoCollision);
   ActivationWidget->SetCollisionProfileName(UCollisionProfile::NoCollision_ProfileName);
   ActivationWidget->SetGenerateOverlapEvents(false);
   ActivationWidget->SetCanEverAffectNavigation(false);
   ActivationWidget->SetVisibility(false);
+
+  ActivationWidgetBack =
+      CreateDefaultSubobject<UWidgetComponent>(TEXT("ActivationWidgetBack"));
+  ActivationWidgetBack->SetupAttachment(DisplayMesh);
+  ActivationWidgetBack->SetTwoSided(true);
+  ActivationWidgetBack->SetWidgetSpace(EWidgetSpace::World);
+  ActivationWidgetBack->SetDrawAtDesiredSize(true);
+  ActivationWidgetBack->SetRelativeLocation(FVector(0.f, 0.f, 520.f));
+  ActivationWidgetBack->SetRelativeRotation(FRotator(0.f, -90.f, 0.f));
+  ActivationWidgetBack->SetRelativeScale3D(FVector(ActivationWidgetScale));
+  ActivationWidgetBack->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+  ActivationWidgetBack->SetCollisionProfileName(
+      UCollisionProfile::NoCollision_ProfileName);
+  ActivationWidgetBack->SetGenerateOverlapEvents(false);
+  ActivationWidgetBack->SetCanEverAffectNavigation(false);
+  ActivationWidgetBack->SetVisibility(false);
 
   static ConstructorHelpers::FClassFinder<UUserWidget> HealthWidgetFinder(
       TEXT("/Game/Blueprints/UI/WBP_FighterHealth"));
@@ -145,6 +163,13 @@ void AFighterPawn::BeginPlay() {
       ActivationWidget->SetWidgetClass(ActivationWidgetTemplate);
     }
     ActivationWidget->InitWidget();
+  }
+
+  if (ActivationWidgetBack) {
+    if (ActivationWidgetTemplate) {
+      ActivationWidgetBack->SetWidgetClass(ActivationWidgetTemplate);
+    }
+    ActivationWidgetBack->InitWidget();
   }
 
   OnHealthChanged.AddDynamic(this, &AFighterPawn::UpdateHealthDisplay);
@@ -899,41 +924,55 @@ void AFighterPawn::BroadcastActionsRemaining() {
 }
 
 void AFighterPawn::EnsureActivationWidget() {
-  if (!ActivationWidget) {
-    CachedActivationWidget = nullptr;
-    return;
-  }
-
-  if (!ActivationWidget->GetWidgetClass()) {
-    if (ActivationWidgetTemplate) {
-      ActivationWidget->SetWidgetClass(ActivationWidgetTemplate);
-    } else {
-      ActivationWidget->SetWidgetClass(UFighterActivationWidget::StaticClass());
+  auto PrepareWidget = [this](UWidgetComponent *WidgetComponent,
+                              TWeakObjectPtr<UFighterActivationWidget>
+                                  &CachedWidget) {
+    if (!WidgetComponent) {
+      CachedWidget = nullptr;
+      return;
     }
-  }
 
-  if (!ActivationWidget->GetUserWidgetObject()) {
-    ActivationWidget->InitWidget();
-  }
+    if (!WidgetComponent->GetWidgetClass()) {
+      if (ActivationWidgetTemplate) {
+        WidgetComponent->SetWidgetClass(ActivationWidgetTemplate);
+      } else {
+        WidgetComponent->SetWidgetClass(
+            UFighterActivationWidget::StaticClass());
+      }
+    }
 
-  if (!CachedActivationWidget.IsValid()) {
-    CachedActivationWidget = Cast<UFighterActivationWidget>(
-        ActivationWidget->GetUserWidgetObject());
-  }
+    if (!WidgetComponent->GetUserWidgetObject()) {
+      WidgetComponent->InitWidget();
+    }
 
-  if (!CachedActivationWidget.IsValid()) {
-    return;
-  }
+    if (!CachedWidget.IsValid()) {
+      CachedWidget = Cast<UFighterActivationWidget>(
+          WidgetComponent->GetUserWidgetObject());
+    }
 
-  CachedActivationWidget->SetIconTextures(
-      ResolveActivationIcon(ActivationReadyIcon, ActivationReadyTexture),
-      ResolveActivationIcon(ActivationSpentIcon, ActivationSpentTexture));
+    if (!CachedWidget.IsValid()) {
+      return;
+    }
+
+    WidgetComponent->SetRelativeScale3D(FVector(ActivationWidgetScale));
+    CachedWidget->SetIconTextures(
+        ResolveActivationIcon(ActivationReadyIcon, ActivationReadyTexture),
+        ResolveActivationIcon(ActivationSpentIcon, ActivationSpentTexture));
+  };
+
+  PrepareWidget(ActivationWidget, CachedActivationWidget);
+  PrepareWidget(ActivationWidgetBack, CachedActivationWidgetBack);
 }
 
 void AFighterPawn::UpdateActivationIndicator() {
   EnsureActivationWidget();
 
-  if (!ActivationWidget || !CachedActivationWidget.IsValid()) {
+  const bool bHasFrontWidget =
+      ActivationWidget && CachedActivationWidget.IsValid();
+  const bool bHasBackWidget =
+      ActivationWidgetBack && CachedActivationWidgetBack.IsValid();
+
+  if (!bHasFrontWidget && !bHasBackWidget) {
     return;
   }
 
@@ -948,11 +987,23 @@ void AFighterPawn::UpdateActivationIndicator() {
     }
   }
 
-  CachedActivationWidget->SetActivationState(DesiredState);
+  if (bHasFrontWidget) {
+    CachedActivationWidget->SetActivationState(DesiredState);
+  }
+  if (bHasBackWidget) {
+    CachedActivationWidgetBack->SetActivationState(DesiredState);
+  }
+
   const bool bShouldShow =
       DesiredState != EFighterActivationIndicatorState::Hidden;
-  ActivationWidget->SetVisibility(bShouldShow);
-  ActivationWidget->SetHiddenInGame(!bShouldShow);
+  if (ActivationWidget) {
+    ActivationWidget->SetVisibility(bShouldShow);
+    ActivationWidget->SetHiddenInGame(!bShouldShow);
+  }
+  if (ActivationWidgetBack) {
+    ActivationWidgetBack->SetVisibility(bShouldShow);
+    ActivationWidgetBack->SetHiddenInGame(!bShouldShow);
+  }
 }
 
 UTexture2D *AFighterPawn::ResolveActivationIcon(

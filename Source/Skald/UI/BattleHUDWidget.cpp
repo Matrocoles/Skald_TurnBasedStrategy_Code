@@ -240,6 +240,28 @@ void UBattleHUDWidget::SetRoundInfo(const FText &RoundLabel,
   }
   if (InitiativeText) {
     InitiativeText->SetText(InitiativeLabel);
+    const bool bHasInitiativeText =
+        !FText::IsEmptyOrWhitespace(InitiativeLabel);
+    InitiativeText->SetVisibility(bHasInitiativeText
+                                      ? ESlateVisibility::HitTestInvisible
+                                      : ESlateVisibility::Collapsed);
+
+    if (UWorld *World = GetWorld()) {
+      FTimerManager &TimerManager = World->GetTimerManager();
+      TimerManager.ClearTimer(InitiativeHideTimer);
+
+      if (bHasInitiativeText) {
+        const TWeakObjectPtr<UBattleHUDWidget> WeakThis(this);
+        FTimerDelegate TimerDelegate;
+        TimerDelegate.BindLambda([WeakThis]() {
+          if (WeakThis.IsValid()) {
+            WeakThis->HideInitiativeText();
+          }
+        });
+
+        TimerManager.SetTimer(InitiativeHideTimer, TimerDelegate, 3.f, false);
+      }
+    }
   }
 }
 
@@ -377,4 +399,11 @@ void UBattleHUDWidget::HideDiceRoller() {
   if (DiceBoardImage) {
     DiceBoardImage->SetVisibility(ESlateVisibility::Collapsed);
   }
+}
+
+void UBattleHUDWidget::HideInitiativeText() {
+  if (!InitiativeText) {
+    return;
+  }
+  InitiativeText->SetVisibility(ESlateVisibility::Collapsed);
 }

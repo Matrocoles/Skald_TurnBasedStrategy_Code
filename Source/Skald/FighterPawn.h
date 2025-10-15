@@ -178,9 +178,13 @@ public:
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Fighter|UI")
   TSubclassOf<UUserWidget> HealthWidgetTemplate;
 
-  /** Widget indicating activation state. */
+  /** Widget indicating activation state (front facing). */
   UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|UI")
   UWidgetComponent *ActivationWidget;
+
+  /** Widget indicating activation state (rear facing). */
+  UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|UI")
+  UWidgetComponent *ActivationWidgetBack;
 
   /** Widget class used for the activation indicator. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Fighter|UI")
@@ -342,8 +346,11 @@ private:
   /** Cached yaw offset derived from the display mesh's relative rotation. */
   float DisplayMeshYawOffset = 0.f;
 
-  /** Cached activation widget reference. */
+  /** Cached activation widget reference (front). */
   TWeakObjectPtr<UFighterActivationWidget> CachedActivationWidget;
+
+  /** Cached activation widget reference (rear). */
+  TWeakObjectPtr<UFighterActivationWidget> CachedActivationWidgetBack;
 
   /** Cached ready icon texture. */
   UPROPERTY(Transient)
