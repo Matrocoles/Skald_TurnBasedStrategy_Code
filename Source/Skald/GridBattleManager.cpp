@@ -262,26 +262,71 @@ void UGridBattleManager::RollInitiative()
         return;
     }
 
-    int32 AttackerRoll = 0;
-    int32 DefenderRoll = 0;
+    int32 AttackerRoll = PendingInitiativeRollAttacker.IsSet() ? PendingInitiativeRollAttacker.GetValue() : 0;
+    int32 DefenderRoll = PendingInitiativeRollDefender.IsSet() ? PendingInitiativeRollDefender.GetValue() : 0;
+
+    const bool bAttackerRollProvided = PendingInitiativeRollAttacker.IsSet();
+    const bool bDefenderRollProvided = PendingInitiativeRollDefender.IsSet();
+
     int32 Attempts = 0;
-    const int32 MaxAttempts = 10;
-    do
+    const int32 MaxAttempts = 100;
+
+    while (Attempts < MaxAttempts)
     {
-        AttackerRoll = Rng.RandRange(1, 20);
-        DefenderRoll = Rng.RandRange(1, 20);
+        if (!bAttackerRollProvided && AttackerRoll <= 0)
+        {
+            AttackerRoll = Rng.RandRange(1, 20);
+        }
+
+        if (!bDefenderRollProvided && DefenderRoll <= 0)
+        {
+            DefenderRoll = Rng.RandRange(1, 20);
+        }
+
+        if (AttackerRoll != DefenderRoll)
+        {
+            break;
+        }
+
+        if (bAttackerRollProvided && bDefenderRollProvided)
+        {
+            break;
+        }
+
+        if (!bAttackerRollProvided)
+        {
+            AttackerRoll = 0;
+        }
+        if (!bDefenderRollProvided)
+        {
+            DefenderRoll = 0;
+        }
+
         ++Attempts;
     }
-    while (AttackerRoll == DefenderRoll && Attempts < MaxAttempts);
 
     if (AttackerRoll == DefenderRoll)
     {
-        // As a fallback, bias ties in favour of the attacker to avoid stalling the round start.
-        ++AttackerRoll;
+        if (bAttackerRollProvided && !bDefenderRollProvided)
+        {
+            DefenderRoll = (DefenderRoll % 20) + 1;
+        }
+        else if (!bAttackerRollProvided && bDefenderRollProvided)
+        {
+            AttackerRoll = (AttackerRoll % 20) + 1;
+        }
+        else
+        {
+            // As a fallback, bias ties in favour of the attacker to avoid stalling the round start.
+            ++AttackerRoll;
+        }
     }
 
     LastInitiativeRollAttacker = AttackerRoll;
     LastInitiativeRollDefender = DefenderRoll;
+
+    PendingInitiativeRollAttacker.Reset();
+    PendingInitiativeRollDefender.Reset();
 
     if (AttackerRoll >= DefenderRoll)
     {
@@ -347,11 +392,21 @@ void UGridBattleManager::StartRound()
     ResolveInitiativeRollInternal();
 }
 
-void UGridBattleManager::ConfirmInitiativeRoll()
+void UGridBattleManager::ConfirmInitiativeRoll(int32 AttackerRoll, int32 DefenderRoll)
 {
     if (!bAwaitingInitiativeRoll || bBattleConcluded)
     {
         return;
+    }
+
+    if (AttackerRoll > 0)
+    {
+        PendingInitiativeRollAttacker = AttackerRoll;
+    }
+
+    if (DefenderRoll > 0)
+    {
+        PendingInitiativeRollDefender = DefenderRoll;
     }
 
     ResolveInitiativeRollInternal();
