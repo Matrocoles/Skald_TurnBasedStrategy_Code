@@ -106,8 +106,10 @@ void ULoadGameWidget::HandleLoadSlot(int32 SlotIndex)
             PC->bShowMouseCursor = false;
         }
 
-        // After loading, transition to the main gameplay map
-        const FName LevelName(TEXT("/Game/Blueprints/Maps/Skald_OverTop"));
+        const FString& SavedMapPath = LoadedGame->MapAssetPath;
+        const FName LevelName = SavedMapPath.IsEmpty()
+                                   ? FName(TEXT("/Game/Blueprints/Maps/OverviewMap"))
+                                   : FName(*SavedMapPath);
         UGameplayStatics::OpenLevel(this, LevelName);
     }
     else

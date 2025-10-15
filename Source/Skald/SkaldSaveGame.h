@@ -48,6 +48,10 @@ public:
     UPROPERTY(BlueprintReadWrite, Category="SaveGame", SaveGame)
     int32 RandomSeed = 0;
 
+    /** Asset path for the persistent map that was active when the game was saved. */
+    UPROPERTY(BlueprintReadWrite, Category="SaveGame", SaveGame)
+    FString MapAssetPath;
+
     /** Camera view offset at the time of saving. */
     UPROPERTY(BlueprintReadWrite, Category="SaveGame", SaveGame)
     FVector2D SavedViewOffset = FVector2D::ZeroVector;
