@@ -823,9 +823,12 @@ void AFighterPawn::ResolveNextAttackRoll() {
       DamageWidget->AddToViewport();
       if (UWorld *WorldPtr = GetWorld()) {
         FTimerHandle Timer;
+        const TWeakObjectPtr<UUserWidget> DamageWidgetWeak = DamageWidget;
         WorldPtr->GetTimerManager().SetTimer(
-            Timer, FTimerDelegate::CreateLambda([DamageWidget]() {
-              DamageWidget->RemoveFromParent();
+            Timer, FTimerDelegate::CreateLambda([DamageWidgetWeak]() {
+              if (UUserWidget *ResolvedWidget = DamageWidgetWeak.Get()) {
+                ResolvedWidget->RemoveFromParent();
+              }
             }),
             1.f, false);
       }
@@ -840,9 +843,12 @@ void AFighterPawn::ResolveNextAttackRoll() {
       MissWidget->AddToViewport();
       if (UWorld *WorldPtr = GetWorld()) {
         FTimerHandle Timer;
+        const TWeakObjectPtr<UUserWidget> MissWidgetWeak = MissWidget;
         WorldPtr->GetTimerManager().SetTimer(
-            Timer, FTimerDelegate::CreateLambda([MissWidget]() {
-              MissWidget->RemoveFromParent();
+            Timer, FTimerDelegate::CreateLambda([MissWidgetWeak]() {
+              if (UUserWidget *ResolvedWidget = MissWidgetWeak.Get()) {
+                ResolvedWidget->RemoveFromParent();
+              }
             }),
             1.f, false);
       }
