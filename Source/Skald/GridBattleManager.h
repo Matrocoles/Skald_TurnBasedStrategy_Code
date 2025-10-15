@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "SkaldTypes.h"
 #include "Engine/Texture2D.h"
+#include "TimerManager.h"
 #include "GridBattleManager.generated.h"
 
 class AFighterPawn; // MUST be before the delegates
@@ -19,6 +20,9 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnActiveFighterChanged, AFighterPawn*, NewFighter);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnRoundStarted, int32, RoundNumber, ESkaldFaction, InitiativeWinner);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInitiativePhaseStarted, int32, RoundNumber);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FOnInitiativeRollCompleted, int32, RoundNumber,
+    int32, AttackerRoll, int32, DefenderRoll, ESkaldFaction, WinningFaction);
 
 /** Statistics for a fighter in grid battle mode. */
 USTRUCT(BlueprintType)
@@ -146,6 +150,10 @@ public:
     UFUNCTION(BlueprintCallable, Category="Skald|Battle")
     void RollInitiative();
 
+    /** Continue the round after the player confirms the initiative roll. */
+    UFUNCTION(BlueprintCallable, Category="Skald|Battle")
+    void ConfirmInitiativeRoll();
+
     /** Randomly place all fighters at the start of a round. */
     UFUNCTION(BlueprintCallable, Category="Skald|Battle")
     void StartRound();
@@ -234,6 +242,14 @@ public:
     UPROPERTY(BlueprintAssignable, Category="Battle|Events")
     FOnRoundStarted OnRoundStarted;
 
+    /** Fired when a round enters the initiative rolling phase. */
+    UPROPERTY(BlueprintAssignable, Category="Battle|Events")
+    FOnInitiativePhaseStarted OnInitiativePhaseStarted;
+
+    /** Fired after initiative dice are rolled. */
+    UPROPERTY(BlueprintAssignable, Category="Battle|Events")
+    FOnInitiativeRollCompleted OnInitiativeRollCompleted;
+
     UFUNCTION(BlueprintCallable, Category="Battle")
     void RegisterFighter(AFighterPawn* Fighter, bool bAsAttacker);
 
@@ -288,6 +304,11 @@ protected:
     bool bIsAttackerTurn = true;
 
 private:
+    void ResolveInitiativeRollInternal();
+    void FinalizeRoundStart();
+    void ScheduleRoundStart(bool bDelayForPresentation);
+    bool ShouldPauseForInitiativePrompt() const;
+
     bool HasLivingFighters(bool bForAttackers) const;
     bool HasAvailableFighters(bool bForAttackers) const;
     bool IsSideAIControlled(bool bForAttackers) const;
@@ -308,5 +329,20 @@ private:
 
     /** Ensures EndBattle only broadcasts once per encounter. */
     bool bBattleConcluded = false;
+
+    /** Whether we are waiting for a player-driven initiative roll. */
+    bool bAwaitingInitiativeRoll = false;
+
+    /** Timer used to pause round start while dice are displayed. */
+    FTimerHandle InitiativePresentationTimer;
+
+    /** Cached initiative roll for attackers to display in the HUD. */
+    int32 LastInitiativeRollAttacker = 0;
+
+    /** Cached initiative roll for defenders to display in the HUD. */
+    int32 LastInitiativeRollDefender = 0;
+
+    /** Duration that initiative dice should remain visible. */
+    static constexpr float InitiativePresentationDelay = 2.f;
 };
 

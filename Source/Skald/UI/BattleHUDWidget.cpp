@@ -5,6 +5,7 @@
 #include "Engine/World.h"
 #include "FighterPawn.h"
 #include "GridOverlayComponent.h"
+#include "Math/UnrealMathUtility.h"
 #include "TimerManager.h"
 #include "Engine/Texture2D.h"
 #include "UObject/WeakObjectPtrTemplates.h"
@@ -31,8 +32,41 @@ void UBattleHUDWidget::NativeConstruct() {
         this, &UBattleHUDWidget::HandleEndTurnPressed);
   }
 
+  if (RollInitiativeButton) {
+    RollInitiativeButton->OnClicked.AddDynamic(
+        this, &UBattleHUDWidget::HandleInitiativeRollPressed);
+    RollInitiativeButton->SetVisibility(ESlateVisibility::Collapsed);
+    RollInitiativeButton->SetIsEnabled(true);
+  }
+
+  if (InitiativePromptText) {
+    InitiativePromptText->SetText(FText::GetEmpty());
+    InitiativePromptText->SetVisibility(ESlateVisibility::Collapsed);
+  }
+
   if (DiceRollerImage) {
     DiceRollerImage->SetVisibility(ESlateVisibility::Collapsed);
+  }
+}
+
+void UBattleHUDWidget::ShowInitiativePrompt(const FText &PromptText) {
+  if (InitiativePromptText) {
+    InitiativePromptText->SetText(PromptText);
+    InitiativePromptText->SetVisibility(ESlateVisibility::HitTestInvisible);
+  }
+  if (RollInitiativeButton) {
+    RollInitiativeButton->SetVisibility(ESlateVisibility::Visible);
+    RollInitiativeButton->SetIsEnabled(true);
+  }
+}
+
+void UBattleHUDWidget::HideInitiativePrompt() {
+  if (InitiativePromptText) {
+    InitiativePromptText->SetText(FText::GetEmpty());
+    InitiativePromptText->SetVisibility(ESlateVisibility::Collapsed);
+  }
+  if (RollInitiativeButton) {
+    RollInitiativeButton->SetVisibility(ESlateVisibility::Collapsed);
   }
 }
 
@@ -143,6 +177,14 @@ void UBattleHUDWidget::HandleActivatePressed() {
 void UBattleHUDWidget::HandleEndTurnPressed() {
   OnEndTurnPressed.Broadcast();
   ClearCommandPreviews();
+}
+
+void UBattleHUDWidget::HandleInitiativeRollPressed() {
+  if (RollInitiativeButton) {
+    RollInitiativeButton->SetIsEnabled(false);
+  }
+  HideInitiativePrompt();
+  OnInitiativeRollRequested.Broadcast();
 }
 
 void UBattleHUDWidget::HandleHealthChanged(int32 NewHealth) {
@@ -291,7 +333,9 @@ void UBattleHUDWidget::ShowDiceRoll(int32 RollValue) {
       }
     });
 
-    TimerManager.SetTimer(DiceRollerHideTimer, TimerDelegate, 1.f, false);
+    const float ClampedDuration = FMath::Max(0.f, DisplayDuration);
+    TimerManager.SetTimer(DiceRollerHideTimer, TimerDelegate, ClampedDuration,
+                          false);
   }
 }
 

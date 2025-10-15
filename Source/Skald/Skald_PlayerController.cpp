@@ -848,6 +848,8 @@ void ASkaldPlayerController::InitializeBattleHUD() {
           this, &ASkaldPlayerController::HandleActivatePressed);
       BattleHudWidget->OnEndTurnPressed.AddDynamic(
           this, &ASkaldPlayerController::HandleEndTurnPressed);
+      BattleHudWidget->OnInitiativeRollRequested.AddDynamic(
+          this, &ASkaldPlayerController::HandleInitiativeRollRequested);
       BattleHudWidget->SetEndTurnVisibility(false);
       BattleHudWidget->SetActivateEnabled(false);
       BattleHudWidget->SetEndTurnEnabled(false);
@@ -869,6 +871,12 @@ void ASkaldPlayerController::InitializeBattleHUD() {
     GI->GridBattleManager->OnRoundStarted.RemoveAll(this);
     GI->GridBattleManager->OnRoundStarted.AddDynamic(
         this, &ASkaldPlayerController::HandleRoundStarted);
+    GI->GridBattleManager->OnInitiativePhaseStarted.RemoveAll(this);
+    GI->GridBattleManager->OnInitiativePhaseStarted.AddDynamic(
+        this, &ASkaldPlayerController::HandleInitiativePhaseStarted);
+    GI->GridBattleManager->OnInitiativeRollCompleted.RemoveAll(this);
+    GI->GridBattleManager->OnInitiativeRollCompleted.AddDynamic(
+        this, &ASkaldPlayerController::HandleInitiativeRollCompleted);
     GI->GridBattleManager->OnBattleEnded.RemoveDynamic(
         this, &ASkaldPlayerController::HandleBattleEnded);
     GI->GridBattleManager->OnBattleEnded.AddDynamic(
@@ -2411,6 +2419,9 @@ void ASkaldPlayerController::HandleRightClick() {
 
 void ASkaldPlayerController::HandleRoundStarted(int32 RoundNumber,
                                                 ESkaldFaction InitiativeWinner) {
+  if (BattleHudWidget) {
+    BattleHudWidget->HideInitiativePrompt();
+  }
   DetermineControlledBattleSide();
 
   LockedActiveFighter = nullptr;
@@ -2419,6 +2430,51 @@ void ASkaldPlayerController::HandleRoundStarted(int32 RoundNumber,
   UpdateBattlePlayersTurnDisplay();
   UpdateBattleHUDSelection();
   UpdateBattleHUDButtons();
+}
+
+void ASkaldPlayerController::HandleInitiativePhaseStarted(int32 RoundNumber) {
+  if (!BattleHudWidget) {
+    return;
+  }
+
+  const FText PromptText = NSLOCTEXT("Skald", "BattleInitiativePrompt",
+                                     "Roll for initiative");
+  BattleHudWidget->ShowInitiativePrompt(PromptText);
+}
+
+void ASkaldPlayerController::HandleInitiativeRollCompleted(
+    int32 RoundNumber, int32 AttackerRoll, int32 DefenderRoll,
+    ESkaldFaction InitiativeWinner) {
+  if (!BattleHudWidget) {
+    return;
+  }
+
+  BattleHudWidget->HideInitiativePrompt();
+
+  DetermineControlledBattleSide();
+
+  int32 RollToShow = AttackerRoll;
+  if (!bControlsAttackerSide && bControlsDefenderSide) {
+    RollToShow = DefenderRoll;
+  } else if (bControlsAttackerSide && bControlsDefenderSide) {
+    RollToShow = FMath::Max(AttackerRoll, DefenderRoll);
+  }
+
+  if (RollToShow > 0) {
+    BattleHudWidget->ShowDiceRoll(RollToShow, 2.f);
+  }
+}
+
+void ASkaldPlayerController::HandleInitiativeRollRequested() {
+  USkaldGameInstance *GI = CachedGameInstance;
+  if (!GI) {
+    GI = GetGameInstance<USkaldGameInstance>();
+    CachedGameInstance = GI;
+  }
+
+  if (GI && GI->GridBattleManager) {
+    GI->GridBattleManager->ConfirmInitiativeRoll();
+  }
 }
 
 void ASkaldPlayerController::CancelCommandMode() {
