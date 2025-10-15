@@ -19,7 +19,7 @@
 namespace
 {
 constexpr int32 ActionsPerActivation = 2;
-constexpr float ActivationWidgetScale = 0.05f;
+constexpr float ActivationWidgetScale = 0.1f;
 }
 
 AFighterPawn::AFighterPawn() : MaxHealth(0) {
@@ -45,9 +45,9 @@ AFighterPawn::AFighterPawn() : MaxHealth(0) {
   HealthWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthWidget"));
   HealthWidget->SetupAttachment(DisplayMesh);
   HealthWidget->SetTwoSided(true);
-  HealthWidget->SetRelativeLocation(FVector(0.f, 0.f, 400.f));
+  HealthWidget->SetRelativeLocation(FVector(0.f, 0.f, 250.f));
   HealthWidget->SetRelativeRotation(FRotator(0.f, 90.f, 0.f));
-  HealthWidget->SetRelativeScale3D(FVector(1.f));
+  HealthWidget->SetRelativeScale3D(FVector(0.2f, 1.f, 0.5f));
   HealthWidget->SetCollisionEnabled(ECollisionEnabled::NoCollision);
   HealthWidget->SetCollisionProfileName(UCollisionProfile::NoCollision_ProfileName);
   HealthWidget->SetGenerateOverlapEvents(false);

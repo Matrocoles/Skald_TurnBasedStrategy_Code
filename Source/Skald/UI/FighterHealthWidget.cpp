@@ -86,10 +86,10 @@ void UFighterHealthWidget::ApplyFillColor() {
 
 FLinearColor
 UFighterHealthWidget::ResolveFillColor(float HealthFraction) const {
-  if (HealthFraction > 0.6f) {
+  if (HealthFraction > 0.4f) {
     return FLinearColor(0.133f, 0.698f, 0.298f, 1.f); // Green
   }
-  if (HealthFraction > 0.2f) {
+  if (HealthFraction > 0.19f) {
     return FLinearColor(0.949f, 0.765f, 0.058f, 1.f); // Yellow
   }
   return FLinearColor(0.835f, 0.066f, 0.066f, 1.f);   // Red
