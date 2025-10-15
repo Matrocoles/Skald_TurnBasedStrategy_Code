@@ -1505,6 +1505,9 @@ void ATurnManager::BroadcastCurrentPhase() {
       }
 
       switch (CurrentPhase) {
+      case ETurnPhase::Attack:
+        Controller->HandleAttackPhase();
+        break;
       case ETurnPhase::Engineering:
         Controller->HandleEngineeringPhase();
         break;

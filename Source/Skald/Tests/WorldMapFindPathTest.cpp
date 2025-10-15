@@ -83,4 +83,46 @@ bool FWorldMapFindPathBlockedTest::RunTest(const FString& Parameters) {
 
   return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWorldMapMoveBetweenPathTest, "Skald.WorldMap.MoveBetween.PathTraversal", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FWorldMapMoveBetweenPathTest::RunTest(const FString& Parameters) {
+  UWorld* World = FAutomationEditorCommonUtils::CreateNewMap();
+  TestNotNull(TEXT("World created"), World);
+  if (!World) {
+    return false;
+  }
+
+  AWorldMap* Map = World->SpawnActor<AWorldMap>();
+  ASkaldPlayerState* PS = World->SpawnActor<ASkaldPlayerState>();
+  ATerritory* T1 = World->SpawnActor<ATerritory>();
+  ATerritory* T2 = World->SpawnActor<ATerritory>();
+  ATerritory* T3 = World->SpawnActor<ATerritory>();
+  TestNotNull(TEXT("Map"), Map);
+  TestNotNull(TEXT("PlayerState"), PS);
+  TestNotNull(TEXT("Territory1"), T1);
+  TestNotNull(TEXT("Territory2"), T2);
+  TestNotNull(TEXT("Territory3"), T3);
+  if (!Map || !PS || !T1 || !T2 || !T3) {
+    return false;
+  }
+
+  T1->OwningPlayer = PS;
+  T2->OwningPlayer = PS;
+  T3->OwningPlayer = PS;
+  T1->AdjacentTerritories = {T2};
+  T2->AdjacentTerritories = {T1, T3};
+  T3->AdjacentTerritories = {T2};
+
+  T1->ArmyUnits = 5;
+  T2->ArmyUnits = 0;
+  T3->ArmyUnits = 1;
+
+  const bool bMoved = Map->MoveBetween(T1, T3, 3);
+  TestTrue(TEXT("Move succeeds across friendly path"), bMoved);
+  TestEqual(TEXT("Source reduced by moved units"), T1->ArmyUnits, 2);
+  TestEqual(TEXT("Intermediate territory unchanged"), T2->ArmyUnits, 0);
+  TestEqual(TEXT("Destination increased by moved units"), T3->ArmyUnits, 4);
+
+  return true;
+}
 #endif // WITH_AUTOMATION_TESTS

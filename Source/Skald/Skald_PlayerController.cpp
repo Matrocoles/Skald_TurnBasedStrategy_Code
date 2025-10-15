@@ -1104,6 +1104,25 @@ void ASkaldPlayerController::NotifyTurnEnded(const FString &PlayerName) {
   }
 }
 
+bool ASkaldPlayerController::IsMyTurn() const {
+  const UWorld *World = GetWorld();
+  if (!World) {
+    return false;
+  }
+
+  const ASkaldGameState *GameState = World->GetGameState<ASkaldGameState>();
+  const ASkaldPlayerState *MyPlayerState = GetPlayerState<ASkaldPlayerState>();
+  if (!GameState || !MyPlayerState) {
+    return false;
+  }
+
+  if (ASkaldPlayerState *Current = GameState->GetCurrentPlayer()) {
+    return Current == MyPlayerState;
+  }
+
+  return false;
+}
+
 void ASkaldPlayerController::StartTurn() {
   UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
       this, nullptr, EMouseLockMode::DoNotLock, false);
@@ -1622,6 +1641,26 @@ void ASkaldPlayerController::ServerDigTreasure_Implementation(
   }
 }
 
+void ASkaldPlayerController::HandleAttackPhase() {
+  if (const UWorld *W = GetWorld()) {
+    if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
+      if (GI->bTravelPending) {
+        return;
+      }
+    }
+  }
+
+  UE_LOG(LogSkald, Log, TEXT("Attack phase started"));
+  if (MainHUD) {
+    MainHUD->CancelMoveSelection();
+    MainHUD->CancelAttackSelection();
+    if (IsMyTurn()) {
+      MainHUD->BeginAttackSelection();
+    }
+    MainHUD->UpdateInitiativeText(TEXT("Attack Phase"));
+  }
+}
+
 void ASkaldPlayerController::HandleEngineeringPhase() {
   if (const UWorld *W = GetWorld()) {
     if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
@@ -1668,7 +1707,10 @@ void ASkaldPlayerController::HandleMovementPhase() {
   UE_LOG(LogSkald, Log, TEXT("Movement phase started"));
   if (MainHUD) {
     MainHUD->CancelAttackSelection();
-    MainHUD->BeginMoveSelection();
+    MainHUD->CancelMoveSelection();
+    if (IsMyTurn()) {
+      MainHUD->BeginMoveSelection();
+    }
     MainHUD->UpdateInitiativeText(TEXT("Movement Phase"));
   }
 }
@@ -1684,6 +1726,8 @@ void ASkaldPlayerController::HandleEndTurnPhase() {
 
   UE_LOG(LogSkald, Log, TEXT("EndTurn phase started"));
   if (MainHUD) {
+    MainHUD->CancelAttackSelection();
+    MainHUD->CancelMoveSelection();
     MainHUD->ShowEndingTurn();
     MainHUD->UpdateInitiativeText(TEXT("End Turn Phase"));
   }
@@ -1700,6 +1744,8 @@ void ASkaldPlayerController::HandleRevoltPhase() {
 
   UE_LOG(LogSkald, Log, TEXT("Revolt phase started"));
   if (MainHUD) {
+    MainHUD->CancelAttackSelection();
+    MainHUD->CancelMoveSelection();
     MainHUD->HideEndingTurn();
     MainHUD->UpdateInitiativeText(TEXT("Revolt Phase"));
   }
