@@ -863,6 +863,8 @@ void ASkaldPlayerController::InitializeBattleHUD() {
   }
 
   AFighterPawn *ActiveFighter = nullptr;
+  bool bPendingInitiativePrompt = false;
+  int32 PendingInitiativeRound = 0;
   // Bind to active-fighter changes
   if (GI && GI->GridBattleManager) {
     GI->GridBattleManager->OnActiveFighterChanged.RemoveAll(this);
@@ -894,10 +896,18 @@ void ASkaldPlayerController::InitializeBattleHUD() {
       UpdateBattleRoundDisplay(CurrentRound,
                                GI->GridBattleManager->GetInitiativeWinner());
     }
+
+    bPendingInitiativePrompt = GI->GridBattleManager->IsAwaitingInitiativeRoll();
+    PendingInitiativeRound = CurrentRound;
   }
 
   DetermineControlledBattleSide();
   HandleActiveFighterChanged(ActiveFighter);
+
+  if (bPendingInitiativePrompt) {
+    const int32 PromptRound = PendingInitiativeRound > 0 ? PendingInitiativeRound : 1;
+    HandleInitiativePhaseStarted(PromptRound);
+  }
 }
 
 void ASkaldPlayerController::ShowOverworldHUD() {

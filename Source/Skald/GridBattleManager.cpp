@@ -461,11 +461,6 @@ void UGridBattleManager::FinalizeRoundStart()
 
 bool UGridBattleManager::ShouldPauseForInitiativePrompt() const
 {
-    if (!OnInitiativePhaseStarted.IsBound())
-    {
-        return false;
-    }
-
     const bool bAttackersHuman = !IsSideAIControlled(true);
     const bool bDefendersHuman = !IsSideAIControlled(false);
     return bAttackersHuman || bDefendersHuman;
@@ -741,7 +736,7 @@ bool UGridBattleManager::IsSideAIControlled(bool bForAttackers) const
 
     const USkaldGameInstance* GameInstance = World->GetGameInstance<USkaldGameInstance>();
     int32 TargetPlayerId = INDEX_NONE;
-    bool bPendingBattleAIFlag = false;
+    bool bPendingBattleAIFlag = true;
 
     if (GameInstance)
     {
@@ -753,6 +748,16 @@ bool UGridBattleManager::IsSideAIControlled(bool bForAttackers) const
         {
             return true;
         }
+
+        if (TargetPlayerId <= 0)
+        {
+            return false;
+        }
+    }
+
+    if (!GameInstance)
+    {
+        return true;
     }
 
     bool bMatchedPlayerState = false;
@@ -773,9 +778,10 @@ bool UGridBattleManager::IsSideAIControlled(bool bForAttackers) const
 
     if (!bMatchedPlayerState)
     {
-        UE_LOG(LogSkaldBattle, Warning, TEXT("[Battle] Unable to resolve controller for %s; defaulting to AI automation."),
-            bForAttackers ? TEXT("attackers") : TEXT("defenders"));
-        return true;
+        UE_LOG(LogSkaldBattle, Warning, TEXT("[Battle] Unable to resolve controller for %s; assuming %s control."),
+            bForAttackers ? TEXT("attackers") : TEXT("defenders"),
+            bPendingBattleAIFlag ? TEXT("AI") : TEXT("player"));
+        return bPendingBattleAIFlag;
     }
 
     return bPendingBattleAIFlag;
