@@ -2416,6 +2416,9 @@ void ASkaldPlayerController::HandleEndTurnPressed() {
          TEXT("[BattleHUD] Finishing activation for %s (Round=%d, AttackerTurn=%s)"),
          *LockedActiveFighter->GetHumanReadableName(), RoundNumber,
          bAttackerTurn ? TEXT("true") : TEXT("false"));
+  if (BattleHudWidget) {
+    BattleHudWidget->SetEndTurnVisibility(false);
+  }
   CachedGameInstance->GridBattleManager->FinishActivation(
       LockedActiveFighter, EGridActivationFinishReason::Manual);
   LockedActiveFighter = nullptr;
@@ -2637,7 +2640,7 @@ void ASkaldPlayerController::UpdateBattleHUDButtons() {
       bActiveFighterSelected && LockedActiveFighter &&
       LockedActiveFighter->ActionsRemaining > 0;
   BattleHudWidget->SetActionButtonsVisibility(bShouldShowActionButtons);
-  BattleHudWidget->SetEndTurnVisibility(bHasActiveFighter);
+  BattleHudWidget->SetEndTurnVisibility(bHasFriendlyActive);
   BattleHudWidget->SetEndTurnEnabled(bHasFriendlyActive);
 }
 
