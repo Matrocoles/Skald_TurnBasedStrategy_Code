@@ -1853,7 +1853,6 @@ bool ASkaldGameMode::InitializeWorld() {
     }
     return false;
   }
-  const int32 PlayerCount = TotalPlayerCount;
 
   if (WorldMap->Territories.Num() == 0) {
     if (!WorldMap->TerritoryClass) {
@@ -1965,18 +1964,103 @@ bool ASkaldGameMode::InitializeWorld() {
       }
     }
   }
-  // Assign territories round-robin to players in initiative order
-  int32 Index = 0;
-  for (ATerritory *Territory : WorldMap->Territories) {
-    if (Territory && PlayerCount > 0) {
-      ASkaldPlayerState *TerritoryOwner =
-          Cast<ASkaldPlayerState>(GS->PlayerArray[Index % PlayerCount]);
-      Territory->OwningPlayer = TerritoryOwner;
-      Territory->bIsCapital = false;
-      Territory->ArmyUnits = 1;
-      Territory->RefreshAppearance();
-      ++Index;
+  TArray<ASkaldPlayerState *> OrderedPlayerStates;
+  OrderedPlayerStates.Reserve(GS->PlayerArray.Num());
+  for (APlayerState *PSBase : GS->PlayerArray) {
+    if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
+      OrderedPlayerStates.Add(PS);
     }
+  }
+  const int32 PlayerCount = OrderedPlayerStates.Num();
+
+  // Assign territories in two phases: first guarantee each player receives
+  // capital-eligible territories from the data table, then distribute the
+  // remaining territories round-robin.
+  TArray<ATerritory *> CapitalTerritories;
+  TArray<ATerritory *> NonCapitalTerritories;
+  for (ATerritory *Territory : WorldMap->Territories) {
+    if (!Territory) {
+      continue;
+    }
+    if (WorldMap->IsCapitalCandidate(Territory->TerritoryID)) {
+      CapitalTerritories.Add(Territory);
+    } else {
+      NonCapitalTerritories.Add(Territory);
+    }
+  }
+
+  Algo::RandomShuffle(CapitalTerritories);
+  Algo::RandomShuffle(NonCapitalTerritories);
+
+  const int32 CapitalsPerPlayer = 2;
+  const int32 RequiredCapitalSlots = PlayerCount * CapitalsPerPlayer;
+  if (PlayerCount > 0 && CapitalTerritories.Num() < RequiredCapitalSlots) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("InitializeWorld: Only %d capital candidate territories for %d "
+                "players; some capitals will fall back to non-candidate "
+                "territories."),
+           CapitalTerritories.Num(), PlayerCount);
+  }
+
+  auto AssignTerritory = [](ATerritory *Territory, ASkaldPlayerState *Owner) {
+    if (!Territory || !Owner) {
+      return;
+    }
+    Territory->OwningPlayer = Owner;
+    Territory->bIsCapital = false;
+    Territory->ArmyUnits = 1;
+    Territory->RefreshAppearance();
+  };
+
+  int32 NextPlayerIndex = 0;
+  TArray<int32> CandidateAssignments;
+  CandidateAssignments.Init(0, PlayerCount);
+
+  int32 CandidateIndex = 0;
+  for (int32 CapitalRound = 0; CapitalRound < CapitalsPerPlayer; ++CapitalRound) {
+    for (int32 PlayerIndex = 0; PlayerIndex < PlayerCount; ++PlayerIndex) {
+      if (CandidateIndex >= CapitalTerritories.Num()) {
+        break;
+      }
+      ASkaldPlayerState *Owner = OrderedPlayerStates[PlayerIndex];
+      AssignTerritory(CapitalTerritories[CandidateIndex++], Owner);
+      CandidateAssignments[PlayerIndex]++;
+      if (PlayerCount > 0) {
+        NextPlayerIndex = (PlayerIndex + 1) % PlayerCount;
+      }
+    }
+    if (CandidateIndex >= CapitalTerritories.Num()) {
+      break;
+    }
+  }
+
+  for (int32 PlayerIndex = 0; PlayerIndex < PlayerCount; ++PlayerIndex) {
+    if (CandidateAssignments[PlayerIndex] >= CapitalsPerPlayer) {
+      continue;
+    }
+    ASkaldPlayerState *Owner = OrderedPlayerStates[PlayerIndex];
+    const int32 AssignedCount = CandidateAssignments[PlayerIndex];
+    UE_LOG(LogSkald, Warning,
+           TEXT("InitializeWorld: Player %s received only %d capital candidate "
+                "territory/territories during initial assignment; falling "
+                "back to other owned territories to reach %d total capitals."),
+           *Owner->GetPlayerName(), AssignedCount, CapitalsPerPlayer);
+  }
+
+  TArray<ATerritory *> RemainingTerritories;
+  for (; CandidateIndex < CapitalTerritories.Num(); ++CandidateIndex) {
+    RemainingTerritories.Add(CapitalTerritories[CandidateIndex]);
+  }
+  RemainingTerritories.Append(NonCapitalTerritories);
+  Algo::RandomShuffle(RemainingTerritories);
+
+  int32 PlayerIndex = PlayerCount > 0 ? NextPlayerIndex : 0;
+  for (ATerritory *Territory : RemainingTerritories) {
+    if (PlayerCount == 0) {
+      break;
+    }
+    AssignTerritory(Territory, OrderedPlayerStates[PlayerIndex]);
+    PlayerIndex = (PlayerIndex + 1) % PlayerCount;
   }
 
   // Choose capitals for each player
@@ -1994,6 +2078,32 @@ bool ASkaldGameMode::InitializeWorld() {
     }
     Algo::RandomShuffle(OwnedTerritories);
 
+    TArray<ATerritory *> CapitalCandidates;
+    for (ATerritory *Territory : OwnedTerritories) {
+      if (Territory && WorldMap->IsCapitalCandidate(Territory->TerritoryID)) {
+        CapitalCandidates.Add(Territory);
+      }
+    }
+
+    if (CapitalCandidates.Num() > 0) {
+      Algo::RandomShuffle(CapitalCandidates);
+      if (CapitalCandidates.Num() < 2) {
+        UE_LOG(
+            LogSkald, Warning,
+            TEXT("InitializeWorld: Player %s has only %d capital candidate "
+                 "territory/territories; filling remaining capital slots "
+                 "with other owned territories."),
+            *PS->GetPlayerName(), CapitalCandidates.Num());
+      }
+    } else {
+      UE_LOG(LogSkald, Warning,
+             TEXT("InitializeWorld: Player %s owns no territories marked as "
+                  "capital candidates; falling back to random owned "
+                  "territories."),
+             *PS->GetPlayerName());
+      CapitalCandidates = OwnedTerritories;
+    }
+
     FS_PlayerData *PlayerData =
         PlayerDataArray.FindByPredicate([PS](const FS_PlayerData &Data) {
           return Data.PlayerID == PS->GetPlayerId();
@@ -2003,7 +2113,7 @@ bool ASkaldGameMode::InitializeWorld() {
     }
 
     int32 CapitalsAssigned = 0;
-    for (ATerritory *Territory : OwnedTerritories) {
+    for (ATerritory *Territory : CapitalCandidates) {
       if (CapitalsAssigned >= 2) {
         break;
       }
@@ -2013,6 +2123,24 @@ bool ASkaldGameMode::InitializeWorld() {
         PlayerData->CapitalTerritoryIDs.Add(Territory->TerritoryID);
       }
       ++CapitalsAssigned;
+    }
+
+    if (CapitalsAssigned < 2) {
+      for (ATerritory *Territory : OwnedTerritories) {
+        if (CapitalsAssigned >= 2) {
+          break;
+        }
+        if (!Territory || Territory->bIsCapital) {
+          continue;
+        }
+
+        Territory->bIsCapital = true;
+        Territory->RefreshAppearance();
+        if (PlayerData) {
+          PlayerData->CapitalTerritoryIDs.Add(Territory->TerritoryID);
+        }
+        ++CapitalsAssigned;
+      }
     }
   }
 

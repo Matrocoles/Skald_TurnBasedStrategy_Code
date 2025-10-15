@@ -100,6 +100,7 @@ void ATerritory::BeginPlay() {
       if (CapitalMeshAsset) {
         CapitalMesh->SetStaticMesh(CapitalMeshAsset);
       }
+      CapitalMesh->SetRelativeScale3D(FVector(2.f));
       CapitalMesh->SetVisibility(false);
       CapitalMesh->SetHiddenInGame(true);
       CapitalMesh->RegisterComponent();
