@@ -20,6 +20,7 @@ namespace
 {
 constexpr int32 ActionsPerActivation = 2;
 constexpr float ActivationWidgetScale = 0.1f;
+constexpr float WidgetMirrorSeparation = 0.5f;
 }
 
 AFighterPawn::AFighterPawn() : MaxHealth(0) {
@@ -45,7 +46,8 @@ AFighterPawn::AFighterPawn() : MaxHealth(0) {
   HealthWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthWidget"));
   HealthWidget->SetupAttachment(DisplayMesh);
   HealthWidget->SetTwoSided(true);
-  HealthWidget->SetRelativeLocation(FVector(0.f, 0.f, 250.f));
+  HealthWidget->SetRelativeLocation(
+      FVector(0.f, WidgetMirrorSeparation, 250.f));
   HealthWidget->SetRelativeRotation(FRotator(0.f, 90.f, 0.f));
   HealthWidget->SetRelativeScale3D(FVector(0.2f, 1.f, 0.5f));
   HealthWidget->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -59,7 +61,8 @@ AFighterPawn::AFighterPawn() : MaxHealth(0) {
       CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthWidgetBack"));
   HealthWidgetBack->SetupAttachment(DisplayMesh);
   HealthWidgetBack->SetTwoSided(true);
-  HealthWidgetBack->SetRelativeLocation(FVector(0.f, 0.f, 250.f));
+  HealthWidgetBack->SetRelativeLocation(
+      FVector(0.f, -WidgetMirrorSeparation, 250.f));
   HealthWidgetBack->SetRelativeRotation(FRotator(0.f, -90.f, 0.f));
   HealthWidgetBack->SetRelativeScale3D(FVector(0.2f, 1.f, 0.5f));
   HealthWidgetBack->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -76,7 +79,8 @@ AFighterPawn::AFighterPawn() : MaxHealth(0) {
   ActivationWidget->SetTwoSided(true);
   ActivationWidget->SetWidgetSpace(EWidgetSpace::World);
   ActivationWidget->SetDrawAtDesiredSize(true);
-  ActivationWidget->SetRelativeLocation(FVector(0.f, 0.f, 520.f));
+  ActivationWidget->SetRelativeLocation(
+      FVector(0.f, WidgetMirrorSeparation, 520.f));
   ActivationWidget->SetRelativeRotation(FRotator(0.f, 90.f, 0.f));
   ActivationWidget->SetRelativeScale3D(FVector(ActivationWidgetScale));
   ActivationWidget->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -91,7 +95,8 @@ AFighterPawn::AFighterPawn() : MaxHealth(0) {
   ActivationWidgetBack->SetTwoSided(true);
   ActivationWidgetBack->SetWidgetSpace(EWidgetSpace::World);
   ActivationWidgetBack->SetDrawAtDesiredSize(true);
-  ActivationWidgetBack->SetRelativeLocation(FVector(0.f, 0.f, 520.f));
+  ActivationWidgetBack->SetRelativeLocation(
+      FVector(0.f, -WidgetMirrorSeparation, 520.f));
   ActivationWidgetBack->SetRelativeRotation(FRotator(0.f, -90.f, 0.f));
   ActivationWidgetBack->SetRelativeScale3D(FVector(ActivationWidgetScale));
   ActivationWidgetBack->SetCollisionEnabled(ECollisionEnabled::NoCollision);
