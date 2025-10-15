@@ -339,6 +339,7 @@ void UGridBattleManager::StartRound()
     if (ShouldPauseForInitiativePrompt())
     {
         bAwaitingInitiativeRoll = true;
+        OnActiveFighterChanged.Broadcast(nullptr);
         OnInitiativePhaseStarted.Broadcast(CurrentRound);
         return;
     }
