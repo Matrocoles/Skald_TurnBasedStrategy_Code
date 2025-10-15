@@ -82,6 +82,10 @@ public:
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
   UTextBlock *AttackText;
 
+  /** Text displaying critical hit damage. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UTextBlock *CriticalDamageText;
+
   /** Text displaying movement range. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
   UTextBlock *MoveText;
