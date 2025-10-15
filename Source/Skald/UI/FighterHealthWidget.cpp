@@ -18,7 +18,7 @@ UFighterHealthWidget::UFighterHealthWidget(
     const FObjectInitializer &ObjectInitializer)
     : Super(ObjectInitializer), DisplayedFraction(1.f), TargetFraction(1.f),
       TargetFillColor(FLinearColor::Green) {
-  bCanEverTick = true;
+  // UUserWidget already supports ticking, so no explicit flag setup is needed.
 }
 
 void UFighterHealthWidget::SetHealthValues(int32 CurrentHealth,
