@@ -250,6 +250,11 @@ public:
             meta = (ClampMin = "0.0"))
   float BaseGridDecalFadeScreenSize = 0.01f;
 
+  /** If true, sampled cell rotations will be ignored when rendering the grid. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Display",
+            meta = (DisplayName = "NoCellRotation"))
+  bool bNoCellRotation = false;
+
   /** Vertical offset applied to the persistent grid overlay. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Display")
   float GridHeightOffset = 0.f;
@@ -482,6 +487,9 @@ protected:
 
   /** Resolve which colour should be used for a given grid cell. */
   FLinearColor GetBaseGridColor(int32 CellIndex) const;
+
+  /** Resolve the effective rotation for a grid cell, respecting editor settings. */
+  FQuat GetEffectiveCellRotation(int32 ArrayIndex) const;
 };
 
 namespace Skald

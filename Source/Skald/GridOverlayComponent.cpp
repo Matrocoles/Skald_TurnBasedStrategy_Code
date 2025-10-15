@@ -713,9 +713,7 @@ void UGridOverlayComponent::HighlightCellWithDecal(const FIntPoint &GridCoord,
   }
 
   const int32 ArrayIndex = Index(GridCoord);
-  const FQuat CellRotation =
-      CellRotations.IsValidIndex(ArrayIndex) ? CellRotations[ArrayIndex]
-                                             : FQuat::Identity;
+  const FQuat CellRotation = GetEffectiveCellRotation(ArrayIndex);
   const FVector CellNormal = CellRotation.RotateVector(FVector::UpVector).GetSafeNormal();
   const FVector CellTangent =
       CellRotation.RotateVector(FVector::ForwardVector).GetSafeNormal();
@@ -814,6 +812,15 @@ FLinearColor UGridOverlayComponent::GetBaseGridColor(int32 CellIndex) const {
   }
 
   return DefaultCellColor;
+}
+
+FQuat UGridOverlayComponent::GetEffectiveCellRotation(int32 ArrayIndex) const {
+  if (bNoCellRotation) {
+    return FQuat::Identity;
+  }
+
+  return CellRotations.IsValidIndex(ArrayIndex) ? CellRotations[ArrayIndex]
+                                                : FQuat::Identity;
 }
 
 void UGridOverlayComponent::UpdateBaseGridVisual(const FIntPoint &GridCoord) {
@@ -932,9 +939,7 @@ void UGridOverlayComponent::RebuildBaseGridInstances() {
           Decal->SetDecalMaterial(DecalMaterial);
         }
 
-        const FQuat CellRotation =
-            CellRotations.IsValidIndex(ArrayIndex) ? CellRotations[ArrayIndex]
-                                                   : FQuat::Identity;
+        const FQuat CellRotation = GetEffectiveCellRotation(ArrayIndex);
         const FVector CellNormal =
             CellRotation.RotateVector(FVector::UpVector).GetSafeNormal();
         const FVector CellTangent =
@@ -980,9 +985,7 @@ void UGridOverlayComponent::RebuildBaseGridInstances() {
       const FVector WorldCenter =
           GridToWorld(Cell) + FVector(0.f, 0.f, GridHeightOffset);
       const int32 ArrayIndex = Index(Cell);
-      const FQuat CellRotation =
-          CellRotations.IsValidIndex(ArrayIndex) ? CellRotations[ArrayIndex]
-                                                 : FQuat::Identity;
+      const FQuat CellRotation = GetEffectiveCellRotation(ArrayIndex);
       const FTransform WorldTransform(CellRotation, WorldCenter, InstanceScale);
       const FTransform RelativeTransform =
           WorldTransform.GetRelativeTransform(ComponentTransform);
@@ -1020,9 +1023,7 @@ void UGridOverlayComponent::HighlightCell(const FIntPoint &GridCoord,
   const FVector InstanceScale(EffectiveCellSize / 100.f,
                               EffectiveCellSize / 100.f, 1.f);
   const int32 ArrayIndex = Index(GridCoord);
-  const FQuat CellRotation =
-      CellRotations.IsValidIndex(ArrayIndex) ? CellRotations[ArrayIndex]
-                                             : FQuat::Identity;
+  const FQuat CellRotation = GetEffectiveCellRotation(ArrayIndex);
   const FTransform WorldTransform(CellRotation, WorldCenter, InstanceScale);
   const FTransform ComponentTransform = HighlightMeshComponent->GetComponentTransform();
   const FTransform RelativeTransform =
