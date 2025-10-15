@@ -488,6 +488,7 @@ void AFighterPawn::AlignToCurrentCell() {
 UUserWidget *AFighterPawn::GetDamageWidgetFromPool() {
   for (UUserWidget *Widget : DamageWidgetPool) {
     if (Widget && !Widget->IsInViewport()) {
+      Widget->SetVisibility(ESlateVisibility::HitTestInvisible);
       return Widget;
     }
   }
@@ -495,6 +496,7 @@ UUserWidget *AFighterPawn::GetDamageWidgetFromPool() {
     if (UWorld *World = GetWorld()) {
       if (UUserWidget *NewWidget =
               CreateWidget<UUserWidget>(World, DamageFloatWidgetTemplate)) {
+        NewWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
         DamageWidgetPool.Add(NewWidget);
         return NewWidget;
       }
@@ -506,6 +508,7 @@ UUserWidget *AFighterPawn::GetDamageWidgetFromPool() {
 UUserWidget *AFighterPawn::GetMissWidgetFromPool() {
   for (UUserWidget *Widget : MissWidgetPool) {
     if (Widget && !Widget->IsInViewport()) {
+      Widget->SetVisibility(ESlateVisibility::HitTestInvisible);
       return Widget;
     }
   }
@@ -513,6 +516,7 @@ UUserWidget *AFighterPawn::GetMissWidgetFromPool() {
     if (UWorld *World = GetWorld()) {
       if (UUserWidget *NewWidget =
               CreateWidget<UUserWidget>(World, MissWidgetTemplate)) {
+        NewWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
         MissWidgetPool.Add(NewWidget);
         return NewWidget;
       }
@@ -749,6 +753,7 @@ void AFighterPawn::ResolveNextAttackRoll() {
               DamageWidget->GetWidgetFromName(TEXT("DamageText")))) {
         Text->SetText(FText::AsNumber(Roll.Damage));
       }
+      DamageWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
       DamageWidget->AddToViewport();
       if (UWorld *WorldPtr = GetWorld()) {
         FTimerHandle Timer;
@@ -765,6 +770,7 @@ void AFighterPawn::ResolveNextAttackRoll() {
               Cast<UTextBlock>(MissWidget->GetWidgetFromName(TEXT("Missed")))) {
         MissText->SetText(NSLOCTEXT("Skald", "BattleAttackMiss", "Missed"));
       }
+      MissWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
       MissWidget->AddToViewport();
       if (UWorld *WorldPtr = GetWorld()) {
         FTimerHandle Timer;
