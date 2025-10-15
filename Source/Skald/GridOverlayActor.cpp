@@ -4,6 +4,7 @@
 #include "Engine/World.h"
 #include "GridObstacleActor.h"
 #include "GridOverlayComponent.h"
+#include "Math/RotationMatrix.h"
 #include "CollisionQueryParams.h"
 #include "Engine/HitResult.h"
 
@@ -150,7 +151,13 @@ void AGridOverlayActor::SpawnRandomObstacles() {
     const float HeightOffset = RandomStream.FRandRange(ClampedMinHeightOffset, ClampedMaxHeightOffset);
     SpawnLocation.Z += HeightOffset;
 
-    const FRotator SpawnRotation = bHitGround ? HitResult.Normal.Rotation() : FRotator::ZeroRotator;
+    FRotator SpawnRotation = FRotator::ZeroRotator;
+    if (bHitGround) {
+      const FVector SurfaceNormal = HitResult.Normal.IsNearlyZero()
+                                        ? FVector::UpVector
+                                        : HitResult.Normal.GetSafeNormal();
+      SpawnRotation = FRotationMatrix::MakeFromZ(SurfaceNormal).Rotator();
+    }
 
     FActorSpawnParameters SpawnParams;
     SpawnParams.Owner = this;
