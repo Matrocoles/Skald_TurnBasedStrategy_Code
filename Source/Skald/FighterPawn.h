@@ -12,6 +12,7 @@ class UGridOverlayComponent;
 class UCapsuleComponent;
 class UTexture2D;
 class UFighterActivationWidget;
+class UFighterHealthWidget;
 
 UENUM(BlueprintType)
 enum class EFighterPawnFootprint : uint8 {
@@ -190,6 +191,11 @@ public:
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Fighter|UI")
   TSubclassOf<UUserWidget> ActivationWidgetTemplate;
 
+  /** Maximum health used for percentage calculations. */
+  UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_MaxHealth,
+            Category = "Fighter")
+  int32 MaxHealth;
+
   /** Icon displayed while the fighter is taking its activation. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|UI")
   TSoftObjectPtr<UTexture2D> ActivationReadyIcon;
@@ -217,6 +223,12 @@ public:
   /** Retrieve the identifier associated with this fighter. */
   FName GetFighterId() const { return FighterId; }
 
+  /** Maximum health for this fighter. */
+  int32 GetMaxHealth() const { return MaxHealth; }
+
+  /** Initialize the fighter's maximum health. */
+  void InitializeMaxHealth(int32 InMaxHealth);
+
   /** Resolve the portrait texture for this fighter if available. */
   UTexture2D *GetPortraitTexture() const;
 
@@ -243,6 +255,8 @@ private:
   void OnRep_HasActivatedThisRound();
   UFUNCTION()
   void OnRep_IsCurrentlyActive();
+  UFUNCTION()
+  void OnRep_MaxHealth();
 
   /** Retrieve or create a damage widget from the pool. */
   UUserWidget *GetDamageWidgetFromPool();
