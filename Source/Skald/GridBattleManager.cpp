@@ -377,6 +377,7 @@ void UGridBattleManager::StartRound()
     if (UWorld* World = GetWorld())
     {
         World->GetTimerManager().ClearTimer(InitiativePresentationTimer);
+        World->GetTimerManager().ClearTimer(InitiativeAIRollTimer);
     }
 
     bAwaitingInitiativeRoll = false;
@@ -409,12 +410,26 @@ void UGridBattleManager::ConfirmInitiativeRoll(int32 AttackerRoll, int32 Defende
         PendingInitiativeRollDefender = DefenderRoll;
     }
 
-    ResolveInitiativeRollInternal();
+    const bool bHasAttackerRoll = PendingInitiativeRollAttacker.IsSet();
+    const bool bHasDefenderRoll = PendingInitiativeRollDefender.IsSet();
+
+    if (bHasAttackerRoll && bHasDefenderRoll)
+    {
+        ResolveInitiativeRollInternal();
+        return;
+    }
+
+    ScheduleAIRollIfNeeded();
 }
 
 void UGridBattleManager::ResolveInitiativeRollInternal()
 {
     bAwaitingInitiativeRoll = false;
+
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(InitiativeAIRollTimer);
+    }
 
     RollInitiative();
 
@@ -428,6 +443,72 @@ void UGridBattleManager::ResolveInitiativeRollInternal()
     }
 
     ScheduleRoundStart(bHasPresentationListeners);
+}
+
+void UGridBattleManager::ScheduleAIRollIfNeeded()
+{
+    if (bBattleConcluded || !bAwaitingInitiativeRoll)
+    {
+        return;
+    }
+
+    const bool bNeedsAttackerRoll = !PendingInitiativeRollAttacker.IsSet() && IsSideAIControlled(true);
+    const bool bNeedsDefenderRoll = !PendingInitiativeRollDefender.IsSet() && IsSideAIControlled(false);
+
+    if (!bNeedsAttackerRoll && !bNeedsDefenderRoll)
+    {
+        return;
+    }
+
+    if (UWorld* World = GetWorld())
+    {
+        FTimerManager& TimerManager = World->GetTimerManager();
+        TimerManager.ClearTimer(InitiativeAIRollTimer);
+
+        if (InitiativeAIRollDelay > 0.f)
+        {
+            TimerManager.SetTimer(InitiativeAIRollTimer, this, &UGridBattleManager::PerformAIRoll, InitiativeAIRollDelay, false);
+            return;
+        }
+    }
+
+    PerformAIRoll();
+}
+
+void UGridBattleManager::PerformAIRoll()
+{
+    if (bBattleConcluded || !bAwaitingInitiativeRoll)
+    {
+        return;
+    }
+
+    bool bRolledValue = false;
+
+    if (!PendingInitiativeRollAttacker.IsSet() && IsSideAIControlled(true))
+    {
+        PendingInitiativeRollAttacker = Rng.RandRange(1, 20);
+        bRolledValue = true;
+    }
+
+    if (!PendingInitiativeRollDefender.IsSet() && IsSideAIControlled(false))
+    {
+        PendingInitiativeRollDefender = Rng.RandRange(1, 20);
+        bRolledValue = true;
+    }
+
+    if (PendingInitiativeRollAttacker.IsSet() && PendingInitiativeRollDefender.IsSet())
+    {
+        ResolveInitiativeRollInternal();
+        return;
+    }
+
+    if (!bRolledValue)
+    {
+        if (UWorld* World = GetWorld())
+        {
+            World->GetTimerManager().ClearTimer(InitiativeAIRollTimer);
+        }
+    }
 }
 
 void UGridBattleManager::ScheduleRoundStart(bool bDelayForPresentation)
