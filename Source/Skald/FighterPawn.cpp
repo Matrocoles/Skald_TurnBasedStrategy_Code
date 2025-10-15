@@ -3,6 +3,7 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/WidgetComponent.h"
+#include "Components/TextBlock.h"
 #include "Engine/CollisionProfile.h"
 #include "Engine/Texture2D.h"
 #include "EngineUtils.h"
