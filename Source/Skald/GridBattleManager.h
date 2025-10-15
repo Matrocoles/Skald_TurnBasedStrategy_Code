@@ -342,6 +342,8 @@ protected:
 
 private:
     void ResolveInitiativeRollInternal();
+    void ScheduleAIRollIfNeeded();
+    void PerformAIRoll();
     void FinalizeRoundStart();
     void ScheduleRoundStart(bool bDelayForPresentation);
     bool ShouldPauseForInitiativePrompt() const;
@@ -373,6 +375,9 @@ private:
     /** Timer used to pause round start while dice are displayed. */
     FTimerHandle InitiativePresentationTimer;
 
+    /** Timer used to delay the AI's initiative roll after the player rolls. */
+    FTimerHandle InitiativeAIRollTimer;
+
     /** Optional pre-supplied initiative roll for attackers. */
     FOptionalInt32 PendingInitiativeRollAttacker;
 
@@ -387,5 +392,8 @@ private:
 
     /** Duration that initiative dice should remain visible. */
     static constexpr float InitiativePresentationDelay = 2.f;
+
+    /** Delay before the AI rolls initiative so the player's result can be shown first. */
+    static constexpr float InitiativeAIRollDelay = 1.f;
 };
 
