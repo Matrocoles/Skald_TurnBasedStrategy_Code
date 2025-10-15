@@ -20,6 +20,7 @@ void UBattleHUDWidget::NativeConstruct() {
     AttackButton->OnClicked.AddDynamic(this,
                                        &UBattleHUDWidget::HandleAttackPressed);
   }
+  SetActionButtonsVisibility(false);
   if (ActivateButton) {
     ActivateButton->OnClicked.AddDynamic(
         this, &UBattleHUDWidget::HandleActivatePressed);
@@ -96,6 +97,8 @@ void UBattleHUDWidget::BindToFighter(AFighterPawn *Fighter) {
       FighterImage->SetVisibility(ESlateVisibility::Collapsed);
     }
   }
+
+  UpdateActionButtonVisibility();
 }
 
 void UBattleHUDWidget::HandleMovePressed() {
@@ -152,6 +155,8 @@ void UBattleHUDWidget::HandleActionsChanged(int32 NewActions) {
   if (ActionsText) {
     ActionsText->SetText(FText::AsNumber(NewActions));
   }
+
+  UpdateActionButtonVisibility();
 }
 
 void UBattleHUDWidget::UpdateStatPanel() {
@@ -182,6 +187,8 @@ void UBattleHUDWidget::UpdateStatPanel() {
   if (AttackDiceText) {
     AttackDiceText->SetText(FText::AsNumber(BoundFighter->Stats.AttackDice));
   }
+
+  UpdateActionButtonVisibility();
 }
 
 void UBattleHUDWidget::SetRoundInfo(const FText &RoundLabel,
@@ -243,6 +250,11 @@ void UBattleHUDWidget::SetEndTurnVisibility(bool bVisible) {
   }
 }
 
+void UBattleHUDWidget::SetActionButtonsVisibility(bool bVisible) {
+  bActionButtonsUnlocked = bVisible;
+  UpdateActionButtonVisibility();
+}
+
 void UBattleHUDWidget::ShowDiceRoll(int32 RollValue) {
   if (!DiceRollerImage) {
     return;
@@ -288,6 +300,20 @@ void UBattleHUDWidget::ClearCommandPreviews() {
   bAttackSelected = false;
   if (UGridOverlayComponent *Grid = FindGridOverlay()) {
     Grid->ClearHighlights();
+  }
+}
+
+void UBattleHUDWidget::UpdateActionButtonVisibility() {
+  const bool bShouldShow = bActionButtonsUnlocked && BoundFighter &&
+                           BoundFighter->ActionsRemaining > 0;
+  const ESlateVisibility DesiredVisibility =
+      bShouldShow ? ESlateVisibility::Visible : ESlateVisibility::Collapsed;
+
+  if (MoveButton) {
+    MoveButton->SetVisibility(DesiredVisibility);
+  }
+  if (AttackButton) {
+    AttackButton->SetVisibility(DesiredVisibility);
   }
 }
 
