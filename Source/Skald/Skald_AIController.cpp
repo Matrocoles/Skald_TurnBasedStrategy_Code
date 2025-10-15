@@ -885,6 +885,14 @@ void ASkaldAIController::HandleBattleMapStateChanged(bool bInBattleMap) {
 }
 
 void ASkaldAIController::ScheduleTryActivateNextFighter() {
+  if (CachedBattleManager.IsValid() &&
+      CachedBattleManager->IsAwaitingInitiativeRoll()) {
+    if (UWorld *World = GetWorld()) {
+      World->GetTimerManager().ClearTimer(ActivationGapTimerHandle);
+    }
+    return;
+  }
+
   if (UWorld *World = GetWorld()) {
     World->GetTimerManager().ClearTimer(ActivationGapTimerHandle);
     World->GetTimerManager().SetTimer(
@@ -919,6 +927,10 @@ void ASkaldAIController::TryActivateNextFighter() {
 
   if (!CachedBattleManager.IsValid()) {
     SetupBattleAutomation();
+    return;
+  }
+
+  if (CachedBattleManager->IsAwaitingInitiativeRoll()) {
     return;
   }
 
