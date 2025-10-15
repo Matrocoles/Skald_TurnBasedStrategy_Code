@@ -247,6 +247,10 @@ public:
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
     bool IsAttackerTurn() const { return bIsAttackerTurn; }
 
+    /** True when initiative rolling is waiting on player input. */
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
+    bool IsAwaitingInitiativeRoll() const { return bAwaitingInitiativeRoll; }
+
     /** Current round number, starting at 1 when combat begins. */
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
     int32 GetCurrentRound() const { return CurrentRound; }
