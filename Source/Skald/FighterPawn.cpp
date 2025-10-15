@@ -2,7 +2,6 @@
 #include "Blueprint/UserWidget.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
-#include "Components/TextBlock.h"
 #include "Components/WidgetComponent.h"
 #include "Engine/CollisionProfile.h"
 #include "Engine/Texture2D.h"
@@ -14,6 +13,7 @@
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
 #include "UI/FighterActivationWidget.h"
+#include "UI/FighterHealthWidget.h"
 
 namespace
 {
@@ -21,7 +21,7 @@ constexpr int32 ActionsPerActivation = 2;
 constexpr float ActivationWidgetScale = 0.05f;
 }
 
-AFighterPawn::AFighterPawn() {
+AFighterPawn::AFighterPawn() : MaxHealth(0) {
   PrimaryActorTick.bCanEverTick = true;
   PrimaryActorTick.bStartWithTickEnabled = true;
 
@@ -51,6 +51,8 @@ AFighterPawn::AFighterPawn() {
   HealthWidget->SetCollisionProfileName(UCollisionProfile::NoCollision_ProfileName);
   HealthWidget->SetGenerateOverlapEvents(false);
   HealthWidget->SetCanEverAffectNavigation(false);
+  HealthWidget->SetWidgetSpace(EWidgetSpace::World);
+  HealthWidget->SetDrawAtDesiredSize(true);
 
   ActivationWidget =
       CreateDefaultSubobject<UWidgetComponent>(TEXT("ActivationWidget"));
@@ -83,11 +85,7 @@ AFighterPawn::AFighterPawn() {
   ActivationWidgetBack->SetCanEverAffectNavigation(false);
   ActivationWidgetBack->SetVisibility(false);
 
-  static ConstructorHelpers::FClassFinder<UUserWidget> HealthWidgetFinder(
-      TEXT("/Game/Blueprints/UI/WBP_FighterHealth"));
-  if (HealthWidgetFinder.Succeeded()) {
-    HealthWidgetTemplate = HealthWidgetFinder.Class;
-  }
+  HealthWidgetTemplate = UFighterHealthWidget::StaticClass();
 
   static ConstructorHelpers::FClassFinder<UUserWidget> DamageWidgetFinder(
       TEXT("/Game/Blueprints/UI/WBP_DamageFloat"));
@@ -127,6 +125,7 @@ void AFighterPawn::GetLifetimeReplicatedProps(
   DOREPLIFETIME(AFighterPawn, GridFootprint);
   DOREPLIFETIME(AFighterPawn, CurrentCell);
   DOREPLIFETIME(AFighterPawn, SpawnFacingYawDelta);
+  DOREPLIFETIME(AFighterPawn, MaxHealth);
 }
 
 void AFighterPawn::OnConstruction(const FTransform &Transform) {
@@ -147,6 +146,10 @@ void AFighterPawn::OnConstruction(const FTransform &Transform) {
 void AFighterPawn::BeginPlay() {
   Super::BeginPlay();
 
+  if (HasAuthority() && MaxHealth <= 0) {
+    MaxHealth = FMath::Max(Stats.Health, 1);
+  }
+
   if (HealthWidget && HealthWidgetTemplate) {
     HealthWidget->SetWidgetClass(HealthWidgetTemplate);
   }
@@ -155,6 +158,10 @@ void AFighterPawn::BeginPlay() {
     if (UUserWidget *HealthWidgetInstance =
             Cast<UUserWidget>(HealthWidget->GetUserWidgetObject())) {
       HealthWidgetInstance->SetVisibility(ESlateVisibility::HitTestInvisible);
+      if (UFighterHealthWidget *FighterHealthWidget =
+              Cast<UFighterHealthWidget>(HealthWidgetInstance)) {
+        FighterHealthWidget->SetHealthValues(Stats.Health, MaxHealth);
+      }
     }
   }
 
@@ -227,6 +234,11 @@ UTexture2D *AFighterPawn::GetPortraitTexture() const {
   }
 
   return nullptr;
+}
+
+void AFighterPawn::InitializeMaxHealth(int32 InMaxHealth) {
+  MaxHealth = FMath::Max(1, InMaxHealth);
+  UpdateHealthDisplay(Stats.Health);
 }
 
 void AFighterPawn::Tick(float DeltaSeconds) {
@@ -866,11 +878,10 @@ void AFighterPawn::UpdateHealthDisplay(int32 NewHealth) {
   if (!HealthWidget) {
     return;
   }
-  if (UUserWidget *Widget = HealthWidget->GetUserWidgetObject()) {
-    if (UTextBlock *Text =
-            Cast<UTextBlock>(Widget->GetWidgetFromName(TEXT("HealthText")))) {
-      Text->SetText(FText::AsNumber(NewHealth));
-    }
+  if (UFighterHealthWidget *Widget =
+          Cast<UFighterHealthWidget>(HealthWidget->GetUserWidgetObject())) {
+    const int32 SafeMax = MaxHealth > 0 ? MaxHealth : FMath::Max(1, NewHealth);
+    Widget->SetHealthValues(NewHealth, SafeMax);
   }
 }
 
@@ -905,6 +916,8 @@ void AFighterPawn::OnRep_Stats(const FFighterStats &OldStats) {
     UpdateHealthDisplay(Stats.Health);
   }
 }
+
+void AFighterPawn::OnRep_MaxHealth() { UpdateHealthDisplay(Stats.Health); }
 
 void AFighterPawn::OnRep_ActionsRemaining() { BroadcastActionsRemaining(); }
 
