@@ -2472,8 +2472,36 @@ void ASkaldPlayerController::HandleInitiativeRollRequested() {
     CachedGameInstance = GI;
   }
 
+  DetermineControlledBattleSide();
+
+  int32 AttackerRoll = INDEX_NONE;
+  int32 DefenderRoll = INDEX_NONE;
+
+  if (bControlsAttackerSide) {
+    AttackerRoll = FMath::RandRange(1, 20);
+  }
+
+  if (bControlsDefenderSide) {
+    DefenderRoll = FMath::RandRange(1, 20);
+  }
+
+  if (BattleHudWidget) {
+    int32 RollToDisplay = INDEX_NONE;
+    if (bControlsAttackerSide && !bControlsDefenderSide) {
+      RollToDisplay = AttackerRoll;
+    } else if (bControlsDefenderSide && !bControlsAttackerSide) {
+      RollToDisplay = DefenderRoll;
+    } else if (bControlsAttackerSide && bControlsDefenderSide) {
+      RollToDisplay = FMath::Max(AttackerRoll, DefenderRoll);
+    }
+
+    if (RollToDisplay > 0) {
+      BattleHudWidget->ShowDiceRoll(RollToDisplay, 2.f);
+    }
+  }
+
   if (GI && GI->GridBattleManager) {
-    GI->GridBattleManager->ConfirmInitiativeRoll();
+    GI->GridBattleManager->ConfirmInitiativeRoll(AttackerRoll, DefenderRoll);
   }
 }
 

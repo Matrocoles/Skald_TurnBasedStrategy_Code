@@ -5,6 +5,7 @@
 #include "Engine/DataTable.h"
 #include "GameFramework/Actor.h"
 #include "SkaldTypes.h"
+#include "Templates/Optional.h"
 #include "Engine/Texture2D.h"
 #include "TimerManager.h"
 #include "GridBattleManager.generated.h"
@@ -152,7 +153,7 @@ public:
 
     /** Continue the round after the player confirms the initiative roll. */
     UFUNCTION(BlueprintCallable, Category="Skald|Battle")
-    void ConfirmInitiativeRoll();
+    void ConfirmInitiativeRoll(int32 AttackerRoll = INDEX_NONE, int32 DefenderRoll = INDEX_NONE);
 
     /** Randomly place all fighters at the start of a round. */
     UFUNCTION(BlueprintCallable, Category="Skald|Battle")
@@ -335,6 +336,12 @@ private:
 
     /** Timer used to pause round start while dice are displayed. */
     FTimerHandle InitiativePresentationTimer;
+
+    /** Optional pre-supplied initiative roll for attackers. */
+    TOptional<int32> PendingInitiativeRollAttacker;
+
+    /** Optional pre-supplied initiative roll for defenders. */
+    TOptional<int32> PendingInitiativeRollDefender;
 
     /** Cached initiative roll for attackers to display in the HUD. */
     int32 LastInitiativeRollAttacker = 0;
