@@ -153,6 +153,9 @@ public:
   /** Toggle visibility for the End Turn button. */
   void SetEndTurnVisibility(bool bVisible);
 
+  /** Toggle visibility for the Move and Attack buttons. */
+  void SetActionButtonsVisibility(bool bVisible);
+
   /** Clear any preview highlights tracked by the widget. */
   void ClearCommandPreviews();
 
@@ -176,6 +179,9 @@ private:
   /** Update all stat text panels from the bound fighter. */
   void UpdateStatPanel();
 
+  /** Update the visibility state of action buttons. */
+  void UpdateActionButtonVisibility();
+
   /** Respond to health changes from the fighter. */
   UFUNCTION()
   void HandleHealthChanged(int32 NewHealth);
@@ -195,6 +201,9 @@ private:
 
   /** Whether attack preview is currently shown. */
   bool bAttackSelected = false;
+
+  /** Whether action buttons are allowed to be displayed. */
+  bool bActionButtonsUnlocked = false;
 
   /** Fighter currently bound to the HUD. */
   UPROPERTY()
