@@ -55,6 +55,9 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Turn")
   virtual void EndTurn();
 
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Turn")
+  bool IsMyTurn() const;
+
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void EndPhase();
 
@@ -360,6 +363,9 @@ public:
   void ClientSelectTerritory(int32 TerritoryID);
 
   /** Phase change handlers. */
+  UFUNCTION(BlueprintCallable, Category = "Turn")
+  void HandleAttackPhase();
+
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void HandleEngineeringPhase();
 

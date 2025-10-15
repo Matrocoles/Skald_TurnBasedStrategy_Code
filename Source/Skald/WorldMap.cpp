@@ -574,15 +574,13 @@ bool AWorldMap::MoveBetween(ATerritory *From, ATerritory *To, int32 Troops) {
     return false;
   }
 
-  for (int32 i = 0; i < Path.Num() - 1; ++i) {
-    ATerritory *Curr = Path[i];
-    ATerritory *Next = Path[i + 1];
-    if (!Curr->MoveTo(Next, Troops)) {
-      return false;
-    }
-    Curr->RefreshAppearance();
-    Next->RefreshAppearance();
-  }
+  From->ArmyUnits -= Troops;
+  To->ArmyUnits += Troops;
+
+  From->RefreshAppearance();
+  To->RefreshAppearance();
+
+  SelectTerritory(To);
 
   if (ASkaldGameMode *GM = GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
     GM->CheckVictoryConditions();
