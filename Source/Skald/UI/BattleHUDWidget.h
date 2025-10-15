@@ -226,6 +226,9 @@ private:
   /** Hide the initiative text after the timer elapses. */
   void HideInitiativeText();
 
+  /** Reveal the initiative roll button after a short delay. */
+  void RevealInitiativeRollButton();
+
   /** Whether movement preview is currently shown. */
   bool bMoveSelected = false;
 
@@ -244,5 +247,8 @@ private:
 
   /** Timer managing initiative label visibility. */
   FTimerHandle InitiativeHideTimer;
+
+  /** Timer delaying the display of the initiative roll button. */
+  FTimerHandle InitiativeRollButtonDelayTimer;
 };
 
