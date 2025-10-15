@@ -55,8 +55,15 @@ void UBattleHUDWidget::ShowInitiativePrompt(const FText &PromptText) {
     InitiativePromptText->SetVisibility(ESlateVisibility::HitTestInvisible);
   }
   if (RollInitiativeButton) {
-    RollInitiativeButton->SetVisibility(ESlateVisibility::Visible);
-    RollInitiativeButton->SetIsEnabled(true);
+    RollInitiativeButton->SetVisibility(ESlateVisibility::Collapsed);
+    RollInitiativeButton->SetIsEnabled(false);
+  }
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(InitiativeRollButtonDelayTimer);
+    World->GetTimerManager().SetTimer(
+        InitiativeRollButtonDelayTimer, this,
+        &UBattleHUDWidget::RevealInitiativeRollButton, 1.0f, false);
   }
 }
 
@@ -67,6 +74,11 @@ void UBattleHUDWidget::HideInitiativePrompt() {
   }
   if (RollInitiativeButton) {
     RollInitiativeButton->SetVisibility(ESlateVisibility::Collapsed);
+    RollInitiativeButton->SetIsEnabled(true);
+  }
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(InitiativeRollButtonDelayTimer);
   }
 }
 
@@ -185,6 +197,13 @@ void UBattleHUDWidget::HandleInitiativeRollPressed() {
   }
   HideInitiativePrompt();
   OnInitiativeRollRequested.Broadcast();
+}
+
+void UBattleHUDWidget::RevealInitiativeRollButton() {
+  if (RollInitiativeButton) {
+    RollInitiativeButton->SetVisibility(ESlateVisibility::Visible);
+    RollInitiativeButton->SetIsEnabled(true);
+  }
 }
 
 void UBattleHUDWidget::HandleHealthChanged(int32 NewHealth) {
