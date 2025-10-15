@@ -240,8 +240,7 @@ void UBattleHUDWidget::SetRoundInfo(const FText &RoundLabel,
   }
   if (InitiativeText) {
     InitiativeText->SetText(InitiativeLabel);
-    const bool bHasInitiativeText =
-        !FText::IsEmptyOrWhitespace(InitiativeLabel);
+    const bool bHasInitiativeText = !InitiativeLabel.IsEmptyOrWhitespace();
     InitiativeText->SetVisibility(bHasInitiativeText
                                       ? ESlateVisibility::HitTestInvisible
                                       : ESlateVisibility::Collapsed);
