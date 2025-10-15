@@ -10,7 +10,6 @@
 #include "LobbyMenuWidget.h"
 #include "Skald_GameInstance.h"
 #include "Skald_PlayerController.h"
-#include "SkaldTypes.h"
 
 void UStartGameWidget::SetLobbyMenu(ULobbyMenuWidget *InMenu) {
   OwningLobbyMenu = InMenu;
@@ -60,15 +59,8 @@ void UStartGameWidget::NativeConstruct() {
         if (Enum->HasMetaData(TEXT("Hidden"), i)) {
           continue;
         }
-
-        const int64 Value = Enum->GetValueByIndex(i);
-        const ESkaldFaction Fac = static_cast<ESkaldFaction>(Value);
-        if (!SkaldHelpers::IsSelectableFaction(Fac)) {
-          continue;
-        }
-
         const FString Name = Enum->GetNameStringByIndex(i);
-        if (!Name.IsEmpty()) {
+        if (Name != TEXT("None")) {
           FactionComboBox->AddOption(Name);
         }
       }
@@ -163,17 +155,11 @@ void UStartGameWidget::StartGame(bool bMultiplayer, bool bHost) {
 
         if (FactionComboBox) {
           const FString Option = FactionComboBox->GetSelectedOption();
-          if (!Option.IsEmpty()) {
+          if (!Option.IsEmpty() && Option != TEXT("None")) {
             if (UEnum *Enum = StaticEnum<ESkaldFaction>()) {
               const int64 Value = Enum->GetValueByNameString(Option);
               if (Value != INDEX_NONE) {
-                const ESkaldFaction Faction =
-                    static_cast<ESkaldFaction>(Value);
-                if (SkaldHelpers::IsSelectableFaction(Faction)) {
-                  GI->Faction = Faction;
-                } else {
-                  GI->Faction = ESkaldFaction::None;
-                }
+                GI->Faction = static_cast<ESkaldFaction>(Value);
               }
             }
           }
@@ -185,10 +171,8 @@ void UStartGameWidget::StartGame(bool bMultiplayer, bool bHost) {
         }
 
         GI->TakenFactions.Empty();
-        if (SkaldHelpers::IsSelectableFaction(GI->Faction)) {
+        if (GI->Faction != ESkaldFaction::None) {
           GI->TakenFactions.AddUnique(GI->Faction);
-        } else {
-          GI->Faction = ESkaldFaction::None;
         }
       } else if (!bHost) {
         if (JoinAddressBox) {
