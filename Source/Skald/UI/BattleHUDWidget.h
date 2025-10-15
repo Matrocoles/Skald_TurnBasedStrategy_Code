@@ -49,6 +49,11 @@ public:
   UPROPERTY(BlueprintAssignable, Category = "Skald|Battle|Events")
   FOnEndTurnPressed OnEndTurnPressed;
 
+  /** Delegate fired when the initiative roll button is pressed. */
+  DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInitiativeRollRequested);
+  UPROPERTY(BlueprintAssignable, Category = "Skald|Battle|Events")
+  FOnInitiativeRollRequested OnInitiativeRollRequested;
+
   /** Move action button bound from the blueprint. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
   UButton *MoveButton;
@@ -64,6 +69,10 @@ public:
   /** End turn button bound from the blueprint. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UButton *EndTurnButton;
+
+  /** Initiative roll button bound from the blueprint. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UButton *RollInitiativeButton;
 
   /** Text displaying current health. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
@@ -117,6 +126,10 @@ public:
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *PlayersTurnText;
 
+  /** Prompt displayed before rolling initiative. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UTextBlock *InitiativePromptText;
+
   /** Image used to display a temporary dice roll result. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UImage *DiceRollerImage;
@@ -130,7 +143,13 @@ public:
   TArray<TObjectPtr<UTexture2D>> DiceFaceTextures;
 
   /** Display a dice face corresponding to the supplied roll value. */
-  void ShowDiceRoll(int32 RollValue);
+  void ShowDiceRoll(int32 RollValue, float DisplayDuration = 1.f);
+
+  /** Display the initiative prompt and roll button. */
+  void ShowInitiativePrompt(const FText &PromptText);
+
+  /** Hide the initiative prompt and roll button. */
+  void HideInitiativePrompt();
 
   /** Update the round and initiative labels. */
   void SetRoundInfo(const FText &RoundLabel, const FText &InitiativeLabel);
@@ -172,6 +191,10 @@ private:
   /** Callback when EndTurnButton is pressed. */
   UFUNCTION()
   void HandleEndTurnPressed();
+
+  /** Callback when RollInitiativeButton is pressed. */
+  UFUNCTION()
+  void HandleInitiativeRollPressed();
 
   /** Update all stat text panels from the bound fighter. */
   void UpdateStatPanel();

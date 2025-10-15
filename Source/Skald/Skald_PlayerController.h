@@ -329,6 +329,17 @@ public:
   virtual void HandleRoundStarted(int32 RoundNumber,
                                   ESkaldFaction InitiativeWinner);
 
+  UFUNCTION()
+  void HandleInitiativePhaseStarted(int32 RoundNumber);
+
+  UFUNCTION()
+  void HandleInitiativeRollCompleted(int32 RoundNumber, int32 AttackerRoll,
+                                     int32 DefenderRoll,
+                                     ESkaldFaction InitiativeWinner);
+
+  UFUNCTION()
+  void HandleInitiativeRollRequested();
+
   /** Server-side processing of an attack request. */
   UFUNCTION(Server, Reliable)
   void ServerHandleAttack(int32 FromID, int32 ToID, int32 ArmySent,

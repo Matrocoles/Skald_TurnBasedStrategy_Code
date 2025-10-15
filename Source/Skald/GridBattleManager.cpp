@@ -1,5 +1,7 @@
 #include "GridBattleManager.h"
 #include "Engine/DataTable.h"
+#include "Engine/World.h"
+#include "TimerManager.h"
 #include "FighterPawn.h"
 #include "GridOverlayComponent.h"
 #include "SkaldLogging.h"
@@ -96,6 +98,9 @@ void UGridBattleManager::InitBattle(const TArray<FFighter>& Attackers, const TAr
     DefenderSurvivorArmyCost = 0;
     bTeamsAssigned = false;
     bBattleConcluded = false;
+    bAwaitingInitiativeRoll = false;
+    LastInitiativeRollAttacker = 0;
+    LastInitiativeRollDefender = 0;
 
     UE_LOG(LogSkaldBattle, Log, TEXT("[Battle] Initialised battle: Attackers=%d, Defenders=%d"), AttackerTeam.Num(), DefenderTeam.Num());
 }
@@ -230,6 +235,9 @@ void UGridBattleManager::RollInitiative()
         return;
     }
 
+    LastInitiativeRollAttacker = 0;
+    LastInitiativeRollDefender = 0;
+
     const bool bAttackersPresent = HasLivingFighters(true);
     const bool bDefendersPresent = HasLivingFighters(false);
 
@@ -271,6 +279,9 @@ void UGridBattleManager::RollInitiative()
         // As a fallback, bias ties in favour of the attacker to avoid stalling the round start.
         ++AttackerRoll;
     }
+
+    LastInitiativeRollAttacker = AttackerRoll;
+    LastInitiativeRollDefender = DefenderRoll;
 
     if (AttackerRoll >= DefenderRoll)
     {
@@ -318,14 +329,90 @@ void UGridBattleManager::StartRound()
     ActiveFighter = nullptr;
     CurrentTurn = 0;
 
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(InitiativePresentationTimer);
+    }
+
+    bAwaitingInitiativeRoll = false;
+
+    if (ShouldPauseForInitiativePrompt())
+    {
+        bAwaitingInitiativeRoll = true;
+        OnInitiativePhaseStarted.Broadcast(CurrentRound);
+        return;
+    }
+
+    ResolveInitiativeRollInternal();
+}
+
+void UGridBattleManager::ConfirmInitiativeRoll()
+{
+    if (!bAwaitingInitiativeRoll || bBattleConcluded)
+    {
+        return;
+    }
+
+    ResolveInitiativeRollInternal();
+}
+
+void UGridBattleManager::ResolveInitiativeRollInternal()
+{
+    bAwaitingInitiativeRoll = false;
+
     RollInitiative();
 
-    UE_LOG(LogSkaldBattle, Log, TEXT("[Battle] Round %d initiative winner: %s"), CurrentRound,
-        *UEnum::GetValueAsString(InitiativeWinnerFaction));
+    UE_LOG(LogSkaldBattle, Log, TEXT("[Battle] Round %d initiative winner: %s (Attacker=%d Defender=%d)"), CurrentRound,
+        *UEnum::GetValueAsString(InitiativeWinnerFaction), LastInitiativeRollAttacker, LastInitiativeRollDefender);
+
+    const bool bHasPresentationListeners = OnInitiativeRollCompleted.IsBound();
+    if (bHasPresentationListeners)
+    {
+        OnInitiativeRollCompleted.Broadcast(CurrentRound, LastInitiativeRollAttacker, LastInitiativeRollDefender, InitiativeWinnerFaction);
+    }
+
+    ScheduleRoundStart(bHasPresentationListeners);
+}
+
+void UGridBattleManager::ScheduleRoundStart(bool bDelayForPresentation)
+{
+    if (UWorld* World = GetWorld())
+    {
+        FTimerManager& TimerManager = World->GetTimerManager();
+        TimerManager.ClearTimer(InitiativePresentationTimer);
+
+        if (bDelayForPresentation && InitiativePresentationDelay > 0.f)
+        {
+            TimerManager.SetTimer(InitiativePresentationTimer, this, &UGridBattleManager::FinalizeRoundStart,
+                InitiativePresentationDelay, false);
+            return;
+        }
+    }
+
+    FinalizeRoundStart();
+}
+
+void UGridBattleManager::FinalizeRoundStart()
+{
+    if (bBattleConcluded)
+    {
+        return;
+    }
 
     OnRoundStarted.Broadcast(CurrentRound, InitiativeWinnerFaction);
-
     OnActiveFighterChanged.Broadcast(nullptr);
+}
+
+bool UGridBattleManager::ShouldPauseForInitiativePrompt() const
+{
+    if (!OnInitiativePhaseStarted.IsBound())
+    {
+        return false;
+    }
+
+    const bool bAttackersHuman = !IsSideAIControlled(true);
+    const bool bDefendersHuman = !IsSideAIControlled(false);
+    return bAttackersHuman || bDefendersHuman;
 }
 
 void UGridBattleManager::AdvanceTurn()
