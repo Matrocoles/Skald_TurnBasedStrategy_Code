@@ -905,9 +905,11 @@ void AFighterPawn::EnsureActivationWidget() {
   }
 
   if (!ActivationWidget->GetWidgetClass()) {
-    ActivationWidget->SetWidgetClass(ActivationWidgetTemplate
-                                         ? ActivationWidgetTemplate
-                                         : UFighterActivationWidget::StaticClass());
+    if (ActivationWidgetTemplate) {
+      ActivationWidget->SetWidgetClass(ActivationWidgetTemplate);
+    } else {
+      ActivationWidget->SetWidgetClass(UFighterActivationWidget::StaticClass());
+    }
   }
 
   if (!ActivationWidget->GetUserWidgetObject()) {
