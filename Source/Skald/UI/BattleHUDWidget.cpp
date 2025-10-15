@@ -105,6 +105,9 @@ void UBattleHUDWidget::BindToFighter(AFighterPawn *Fighter) {
     if (AttackText) {
       AttackText->SetText(FText::GetEmpty());
     }
+    if (CriticalDamageText) {
+      CriticalDamageText->SetText(FText::GetEmpty());
+    }
     if (MoveText) {
       MoveText->SetText(FText::GetEmpty());
     }
@@ -210,6 +213,12 @@ void UBattleHUDWidget::UpdateStatPanel() {
   }
   if (AttackText) {
     AttackText->SetText(FText::AsNumber(BoundFighter->Stats.AttackDamage));
+  }
+  if (CriticalDamageText) {
+    const int32 CriticalDamage =
+        BoundFighter->Stats.AttackDamage +
+        BoundFighter->Stats.CriticalBonusDamage;
+    CriticalDamageText->SetText(FText::AsNumber(CriticalDamage));
   }
   if (MoveText) {
     MoveText->SetText(FText::AsNumber(BoundFighter->Stats.Movement));
