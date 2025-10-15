@@ -2566,6 +2566,12 @@ void ASkaldPlayerController::UpdateBattleHUDButtons() {
   const bool bHasActiveFighter = LockedActiveFighter != nullptr;
   const bool bHasFriendlyActive =
       LockedActiveFighter && IsFriendlyFighter(LockedActiveFighter);
+  const bool bActiveFighterSelected =
+      bHasFriendlyActive && LockedActiveFighter == SelectedFighter;
+  const bool bShouldShowActionButtons =
+      bActiveFighterSelected && LockedActiveFighter &&
+      LockedActiveFighter->ActionsRemaining > 0;
+  BattleHudWidget->SetActionButtonsVisibility(bShouldShowActionButtons);
   BattleHudWidget->SetEndTurnVisibility(bHasActiveFighter);
   BattleHudWidget->SetEndTurnEnabled(bHasFriendlyActive);
 }
