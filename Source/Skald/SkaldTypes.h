@@ -20,6 +20,26 @@ namespace SkaldHelpers
     {
         return !bTargetIsCapital || ArmySent >= SkaldConstants::CapitalAttackArmyRequirement;
     }
+
+    // Returns true if the provided faction can be selected by a player or AI.
+    inline bool IsSelectableFaction(ESkaldFaction Faction)
+    {
+        if (Faction == ESkaldFaction::None)
+        {
+            return false;
+        }
+
+        if (const UEnum* EnumPtr = StaticEnum<ESkaldFaction>())
+        {
+            const FString Name = EnumPtr->GetNameStringByValue(static_cast<int64>(Faction));
+            if (Name.Contains(TEXT("MAX")))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 }
 
 UENUM(BlueprintType)

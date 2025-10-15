@@ -32,13 +32,13 @@ void UChoosePlayerWidget::NativeConstruct()
         {
             for (int32 i = 0; i < EnumPtr->NumEnums(); ++i)
             {
+                ESkaldFaction Fac = static_cast<ESkaldFaction>(EnumPtr->GetValueByIndex(i));
                 if (EnumPtr->HasMetaData(TEXT("Hidden"), i))
                 {
                     continue;
                 }
 
-                ESkaldFaction Fac = static_cast<ESkaldFaction>(EnumPtr->GetValueByIndex(i));
-                if (Fac == ESkaldFaction::None || Taken.Contains(Fac))
+                if (!SkaldHelpers::IsSelectableFaction(Fac) || Taken.Contains(Fac))
                 {
                     continue;
                 }
@@ -94,6 +94,11 @@ void UChoosePlayerWidget::OnLockIn()
         }
     }
 
+    if (!SkaldHelpers::IsSelectableFaction(Faction))
+    {
+        Faction = ESkaldFaction::None;
+    }
+
     int32 AICount = 1;
     if (AICountSpinBox)
     {
@@ -107,9 +112,13 @@ void UChoosePlayerWidget::OnLockIn()
             GI->DisplayName = Name;
             GI->Faction = Faction;
             GI->AIPlayersToSpawn = AICount;
-            if (Faction != ESkaldFaction::None)
+            if (SkaldHelpers::IsSelectableFaction(Faction))
             {
                 GI->TakenFactions.AddUnique(Faction);
+            }
+            else
+            {
+                GI->Faction = ESkaldFaction::None;
             }
         }
     }

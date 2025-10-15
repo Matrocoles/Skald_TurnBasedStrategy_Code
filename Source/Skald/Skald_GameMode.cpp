@@ -359,7 +359,8 @@ void ASkaldGameMode::PopulateAIPlayers() {
   TArray<ESkaldFaction> ReservedFactions;
   TSet<ESkaldFaction> RemainingReserved;
   for (ESkaldFaction Faction : GI->TakenFactions) {
-    if (Faction == ESkaldFaction::None || UsedFactions.Contains(Faction)) {
+    if (!SkaldHelpers::IsSelectableFaction(Faction) ||
+        UsedFactions.Contains(Faction)) {
       continue;
     }
 
@@ -376,9 +377,11 @@ void ASkaldGameMode::PopulateAIPlayers() {
       }
       ESkaldFaction Fac =
           static_cast<ESkaldFaction>(Enum->GetValueByIndex(i));
-      if (Fac != ESkaldFaction::None && !UsedFactions.Contains(Fac)) {
-        Available.Add(Fac);
+      if (!SkaldHelpers::IsSelectableFaction(Fac) ||
+          UsedFactions.Contains(Fac)) {
+        continue;
       }
+      Available.Add(Fac);
     }
   }
 
