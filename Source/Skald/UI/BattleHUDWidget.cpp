@@ -297,7 +297,7 @@ void UBattleHUDWidget::SetActionButtonsVisibility(bool bVisible) {
   UpdateActionButtonVisibility();
 }
 
-void UBattleHUDWidget::ShowDiceRoll(int32 RollValue) {
+void UBattleHUDWidget::ShowDiceRoll(int32 RollValue, float DisplayDuration) {
   if (!DiceRollerImage) {
     return;
   }
