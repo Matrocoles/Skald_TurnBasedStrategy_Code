@@ -492,4 +492,8 @@ private:
 
   bool bControlsAttackerSide = false;
   bool bControlsDefenderSide = false;
+
+  /** Cached copy of the last initiative value rolled locally so it can be
+   *  re-presented once the server confirms the result. */
+  int32 LastLocalInitiativeRoll = 0;
 };

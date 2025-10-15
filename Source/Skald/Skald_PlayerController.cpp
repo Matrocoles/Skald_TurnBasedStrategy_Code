@@ -2352,6 +2352,13 @@ void ASkaldPlayerController::HandleActivatePressed() {
     return;
   }
 
+  if (CachedGameInstance->GridBattleManager->IsAwaitingInitiativeRoll()) {
+    UE_LOG(LogSkaldBattle, Verbose,
+           TEXT("[BattleHUD] Activate ignored: Awaiting initiative roll."));
+    NotifyActionError(FString(TEXT("Roll for initiative before activating.")));
+    return;
+  }
+
   if (!CachedGameInstance->GridBattleManager->CanActivateFighter(SelectedFighter)) {
     UE_LOG(LogSkaldBattle, Log,
            TEXT("[BattleHUD] Activation rejected for %s (Round=%d, AttackerTurn=%s)"),
@@ -2412,7 +2419,12 @@ void ASkaldPlayerController::HandleEndTurnPressed() {
   CachedGameInstance->GridBattleManager->FinishActivation(
       LockedActiveFighter, EGridActivationFinishReason::Manual);
   LockedActiveFighter = nullptr;
-  UpdateBattleHUDButtons();
+
+  const bool bHadSelection = SelectedFighter != nullptr;
+  ClearSelectedFighter();
+  if (!bHadSelection) {
+    UpdateBattleHUDButtons();
+  }
   CancelCommandMode();
 }
 
@@ -2434,6 +2446,8 @@ void ASkaldPlayerController::HandleRoundStarted(int32 RoundNumber,
   }
   DetermineControlledBattleSide();
 
+  LastLocalInitiativeRoll = 0;
+
   LockedActiveFighter = nullptr;
   ClearSelectedFighter();
   CancelCommandMode();
@@ -2447,6 +2461,8 @@ void ASkaldPlayerController::HandleInitiativePhaseStarted(int32 RoundNumber) {
   if (!BattleHudWidget) {
     return;
   }
+
+  LastLocalInitiativeRoll = 0;
 
   const FText PromptText = NSLOCTEXT("Skald", "BattleInitiativePrompt",
                                      "Roll for initiative");
@@ -2464,16 +2480,21 @@ void ASkaldPlayerController::HandleInitiativeRollCompleted(
 
   DetermineControlledBattleSide();
 
-  int32 RollToShow = AttackerRoll;
-  if (!bControlsAttackerSide && bControlsDefenderSide) {
-    RollToShow = DefenderRoll;
-  } else if (bControlsAttackerSide && bControlsDefenderSide) {
-    RollToShow = FMath::Max(AttackerRoll, DefenderRoll);
+  int32 RollToShow = LastLocalInitiativeRoll;
+  if (RollToShow <= 0) {
+    RollToShow = AttackerRoll;
+    if (!bControlsAttackerSide && bControlsDefenderSide) {
+      RollToShow = DefenderRoll;
+    } else if (bControlsAttackerSide && bControlsDefenderSide) {
+      RollToShow = FMath::Max(AttackerRoll, DefenderRoll);
+    }
   }
 
   if (RollToShow > 0) {
     BattleHudWidget->ShowDiceRoll(RollToShow, 2.f);
   }
+
+  LastLocalInitiativeRoll = 0;
 }
 
 void ASkaldPlayerController::HandleInitiativeRollRequested() {
@@ -2496,19 +2517,19 @@ void ASkaldPlayerController::HandleInitiativeRollRequested() {
     DefenderRoll = FMath::RandRange(1, 20);
   }
 
-  if (BattleHudWidget) {
-    int32 RollToDisplay = INDEX_NONE;
-    if (bControlsAttackerSide && !bControlsDefenderSide) {
-      RollToDisplay = AttackerRoll;
-    } else if (bControlsDefenderSide && !bControlsAttackerSide) {
-      RollToDisplay = DefenderRoll;
-    } else if (bControlsAttackerSide && bControlsDefenderSide) {
-      RollToDisplay = FMath::Max(AttackerRoll, DefenderRoll);
-    }
+  int32 RollToDisplay = INDEX_NONE;
+  if (bControlsAttackerSide && !bControlsDefenderSide) {
+    RollToDisplay = AttackerRoll;
+  } else if (bControlsDefenderSide && !bControlsAttackerSide) {
+    RollToDisplay = DefenderRoll;
+  } else if (bControlsAttackerSide && bControlsDefenderSide) {
+    RollToDisplay = FMath::Max(AttackerRoll, DefenderRoll);
+  }
 
-    if (RollToDisplay > 0) {
-      BattleHudWidget->ShowDiceRoll(RollToDisplay, 2.f);
-    }
+  LastLocalInitiativeRoll = RollToDisplay > 0 ? RollToDisplay : 0;
+
+  if (BattleHudWidget && RollToDisplay > 0) {
+    BattleHudWidget->ShowDiceRoll(RollToDisplay, 2.f);
   }
 
   if (GI && GI->GridBattleManager) {
@@ -2590,14 +2611,19 @@ void ASkaldPlayerController::UpdateBattleHUDButtons() {
     return;
 
   bool bCanActivate = false;
-  if (SelectedFighter && !LockedActiveFighter && IsFriendlyFighter(SelectedFighter)) {
-    if (!CachedGameInstance) {
-      CachedGameInstance = GetGameInstance<USkaldGameInstance>();
-    }
-    if (CachedGameInstance && CachedGameInstance->GridBattleManager) {
-      bCanActivate =
-          CachedGameInstance->GridBattleManager->CanActivateFighter(SelectedFighter);
-    }
+  bool bAwaitingInitiative = false;
+  if (!CachedGameInstance) {
+    CachedGameInstance = GetGameInstance<USkaldGameInstance>();
+  }
+  UGridBattleManager *BattleManager =
+      CachedGameInstance ? CachedGameInstance->GridBattleManager : nullptr;
+  if (BattleManager) {
+    bAwaitingInitiative = BattleManager->IsAwaitingInitiativeRoll();
+  }
+
+  if (!bAwaitingInitiative && SelectedFighter && !LockedActiveFighter &&
+      IsFriendlyFighter(SelectedFighter) && BattleManager) {
+    bCanActivate = BattleManager->CanActivateFighter(SelectedFighter);
   }
 
   BattleHudWidget->SetActivateEnabled(bCanActivate);
@@ -2761,6 +2787,7 @@ void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,
   CancelCommandMode();
   SelectedFighter = nullptr;
   LockedActiveFighter = nullptr;
+  LastLocalInitiativeRoll = 0;
   bControlsAttackerSide = false;
   bControlsDefenderSide = false;
 

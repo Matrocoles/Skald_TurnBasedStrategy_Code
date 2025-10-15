@@ -619,6 +619,13 @@ bool UGridBattleManager::CanActivateFighter(AFighterPawn* Fighter) const
         return false;
     }
 
+    if (bAwaitingInitiativeRoll)
+    {
+        UE_LOG(LogSkaldBattle, Verbose, TEXT("[Battle] CanActivateFighter rejected (Awaiting initiative roll) -> %s"),
+            *DescribeFighter(Fighter));
+        return false;
+    }
+
     if (Fighter->HasActivatedThisRound())
     {
         UE_LOG(LogSkaldBattle, Verbose, TEXT("[Battle] CanActivateFighter rejected (Already activated this round) -> %s"),
