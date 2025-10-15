@@ -3,6 +3,7 @@
 #include "Camera/CameraComponent.h"
 #include "Engine/DataTable.h"
 #include "Engine/Engine.h"
+#include "Engine/Level.h"
 #include "Engine/World.h"
 #include "GridBattleManager.h"
 #include "Kismet/GameplayStatics.h"
