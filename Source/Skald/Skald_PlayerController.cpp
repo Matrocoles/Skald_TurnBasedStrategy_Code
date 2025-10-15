@@ -2506,6 +2506,7 @@ void ASkaldPlayerController::UpdateBattleHUDButtons() {
   }
 
   BattleHudWidget->SetActivateEnabled(bCanActivate);
+  BattleHudWidget->SetActivateVisibility(bCanActivate);
   const bool bHasActiveFighter = LockedActiveFighter != nullptr;
   const bool bHasFriendlyActive =
       LockedActiveFighter && IsFriendlyFighter(LockedActiveFighter);

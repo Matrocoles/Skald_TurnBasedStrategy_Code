@@ -23,6 +23,7 @@ void UBattleHUDWidget::NativeConstruct() {
   if (ActivateButton) {
     ActivateButton->OnClicked.AddDynamic(
         this, &UBattleHUDWidget::HandleActivatePressed);
+    ActivateButton->SetVisibility(ESlateVisibility::Collapsed);
   }
   if (EndTurnButton) {
     EndTurnButton->OnClicked.AddDynamic(
@@ -219,6 +220,13 @@ void UBattleHUDWidget::SetSelectedFighterName(const FText &Name) {
 void UBattleHUDWidget::SetActivateEnabled(bool bEnabled) {
   if (ActivateButton) {
     ActivateButton->SetIsEnabled(bEnabled);
+  }
+}
+
+void UBattleHUDWidget::SetActivateVisibility(bool bVisible) {
+  if (ActivateButton) {
+    ActivateButton->SetVisibility(bVisible ? ESlateVisibility::Visible
+                                           : ESlateVisibility::Collapsed);
   }
 }
 

@@ -3,6 +3,7 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextBlock.h"
+#include "Components/WidgetComponent.h"
 #include "Engine/CollisionProfile.h"
 #include "Engine/Texture2D.h"
 #include "EngineUtils.h"
@@ -12,6 +13,7 @@
 #include "Skald_GameInstance.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
+#include "UI/FighterActivationWidget.h"
 
 namespace
 {
@@ -44,6 +46,24 @@ AFighterPawn::AFighterPawn() {
   HealthWidget->SetRelativeLocation(FVector(0.f, 0.f, 400.f));
   HealthWidget->SetRelativeRotation(FRotator(0.f, 90.f, 0.f));
   HealthWidget->SetRelativeScale3D(FVector(1.f));
+  HealthWidget->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+  HealthWidget->SetCollisionProfileName(UCollisionProfile::NoCollision_ProfileName);
+  HealthWidget->SetGenerateOverlapEvents(false);
+  HealthWidget->SetCanEverAffectNavigation(false);
+
+  ActivationWidget =
+      CreateDefaultSubobject<UWidgetComponent>(TEXT("ActivationWidget"));
+  ActivationWidget->SetupAttachment(DisplayMesh);
+  ActivationWidget->SetTwoSided(true);
+  ActivationWidget->SetWidgetSpace(EWidgetSpace::World);
+  ActivationWidget->SetDrawAtDesiredSize(true);
+  ActivationWidget->SetRelativeLocation(FVector(0.f, 0.f, 520.f));
+  ActivationWidget->SetRelativeRotation(FRotator(0.f, 90.f, 0.f));
+  ActivationWidget->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+  ActivationWidget->SetCollisionProfileName(UCollisionProfile::NoCollision_ProfileName);
+  ActivationWidget->SetGenerateOverlapEvents(false);
+  ActivationWidget->SetCanEverAffectNavigation(false);
+  ActivationWidget->SetVisibility(false);
 
   static ConstructorHelpers::FClassFinder<UUserWidget> HealthWidgetFinder(
       TEXT("/Game/Blueprints/UI/WBP_FighterHealth"));
@@ -62,6 +82,8 @@ AFighterPawn::AFighterPawn() {
   if (MissWidgetFinder.Succeeded()) {
     MissWidgetTemplate = MissWidgetFinder.Class;
   }
+
+  ActivationWidgetTemplate = UFighterActivationWidget::StaticClass();
 
   ActionsRemaining = 0;
   bHasActivatedThisRound = false;
@@ -110,11 +132,26 @@ void AFighterPawn::BeginPlay() {
   if (HealthWidget && HealthWidgetTemplate) {
     HealthWidget->SetWidgetClass(HealthWidgetTemplate);
   }
+  if (HealthWidget) {
+    HealthWidget->InitWidget();
+    if (UUserWidget *HealthWidgetInstance =
+            Cast<UUserWidget>(HealthWidget->GetUserWidgetObject())) {
+      HealthWidgetInstance->SetVisibility(ESlateVisibility::HitTestInvisible);
+    }
+  }
+
+  if (ActivationWidget) {
+    if (ActivationWidgetTemplate) {
+      ActivationWidget->SetWidgetClass(ActivationWidgetTemplate);
+    }
+    ActivationWidget->InitWidget();
+  }
 
   OnHealthChanged.AddDynamic(this, &AFighterPawn::UpdateHealthDisplay);
   OnHealthChanged.Broadcast(Stats.Health);
 
   BroadcastActionsRemaining();
+  UpdateActivationIndicator();
 
   UpdateMeshOffset();
   RefreshDisplayMeshYawOffset();
@@ -201,6 +238,7 @@ void AFighterPawn::BeginActivation() {
   bHasActivatedThisRound = true;
 
   BroadcastActionsRemaining();
+  UpdateActivationIndicator();
 
   if (UGridOverlayComponent *Grid = GetGrid()) {
     Grid->HighlightSelection(this);
@@ -213,6 +251,7 @@ void AFighterPawn::ResetActivationState() {
   bIsCurrentlyActive = false;
 
   BroadcastActionsRemaining();
+  UpdateActivationIndicator();
 }
 
 void AFighterPawn::FinishActivation() {
@@ -220,6 +259,7 @@ void AFighterPawn::FinishActivation() {
   bIsCurrentlyActive = false;
 
   BroadcastActionsRemaining();
+  UpdateActivationIndicator();
 
   if (UGridOverlayComponent *Grid = GetGrid()) {
     Grid->ClearSelectionHighlight();
@@ -448,6 +488,7 @@ void AFighterPawn::AlignToCurrentCell() {
 UUserWidget *AFighterPawn::GetDamageWidgetFromPool() {
   for (UUserWidget *Widget : DamageWidgetPool) {
     if (Widget && !Widget->IsInViewport()) {
+      Widget->SetVisibility(ESlateVisibility::HitTestInvisible);
       return Widget;
     }
   }
@@ -455,6 +496,7 @@ UUserWidget *AFighterPawn::GetDamageWidgetFromPool() {
     if (UWorld *World = GetWorld()) {
       if (UUserWidget *NewWidget =
               CreateWidget<UUserWidget>(World, DamageFloatWidgetTemplate)) {
+        NewWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
         DamageWidgetPool.Add(NewWidget);
         return NewWidget;
       }
@@ -466,6 +508,7 @@ UUserWidget *AFighterPawn::GetDamageWidgetFromPool() {
 UUserWidget *AFighterPawn::GetMissWidgetFromPool() {
   for (UUserWidget *Widget : MissWidgetPool) {
     if (Widget && !Widget->IsInViewport()) {
+      Widget->SetVisibility(ESlateVisibility::HitTestInvisible);
       return Widget;
     }
   }
@@ -473,6 +516,7 @@ UUserWidget *AFighterPawn::GetMissWidgetFromPool() {
     if (UWorld *World = GetWorld()) {
       if (UUserWidget *NewWidget =
               CreateWidget<UUserWidget>(World, MissWidgetTemplate)) {
+        NewWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
         MissWidgetPool.Add(NewWidget);
         return NewWidget;
       }
@@ -709,6 +753,7 @@ void AFighterPawn::ResolveNextAttackRoll() {
               DamageWidget->GetWidgetFromName(TEXT("DamageText")))) {
         Text->SetText(FText::AsNumber(Roll.Damage));
       }
+      DamageWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
       DamageWidget->AddToViewport();
       if (UWorld *WorldPtr = GetWorld()) {
         FTimerHandle Timer;
@@ -725,6 +770,7 @@ void AFighterPawn::ResolveNextAttackRoll() {
               Cast<UTextBlock>(MissWidget->GetWidgetFromName(TEXT("Missed")))) {
         MissText->SetText(NSLOCTEXT("Skald", "BattleAttackMiss", "Missed"));
       }
+      MissWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
       MissWidget->AddToViewport();
       if (UWorld *WorldPtr = GetWorld()) {
         FTimerHandle Timer;
@@ -843,8 +889,83 @@ void AFighterPawn::OnRep_GridFootprint() {
   AlignToCurrentCell();
 }
 
+void AFighterPawn::OnRep_HasActivatedThisRound() { UpdateActivationIndicator(); }
+
+void AFighterPawn::OnRep_IsCurrentlyActive() { UpdateActivationIndicator(); }
+
 void AFighterPawn::BroadcastActionsRemaining() {
   OnActionsChanged.Broadcast(ActionsRemaining);
+  UpdateActivationIndicator();
+}
+
+void AFighterPawn::EnsureActivationWidget() {
+  if (!ActivationWidget) {
+    CachedActivationWidget = nullptr;
+    return;
+  }
+
+  if (!ActivationWidget->GetWidgetClass()) {
+    ActivationWidget->SetWidgetClass(ActivationWidgetTemplate
+                                         ? ActivationWidgetTemplate
+                                         : UFighterActivationWidget::StaticClass());
+  }
+
+  if (!ActivationWidget->GetUserWidgetObject()) {
+    ActivationWidget->InitWidget();
+  }
+
+  if (!CachedActivationWidget.IsValid()) {
+    CachedActivationWidget = Cast<UFighterActivationWidget>(
+        ActivationWidget->GetUserWidgetObject());
+  }
+
+  if (!CachedActivationWidget.IsValid()) {
+    return;
+  }
+
+  CachedActivationWidget->SetIconTextures(
+      ResolveActivationIcon(ActivationReadyIcon, ActivationReadyTexture),
+      ResolveActivationIcon(ActivationSpentIcon, ActivationSpentTexture));
+}
+
+void AFighterPawn::UpdateActivationIndicator() {
+  EnsureActivationWidget();
+
+  if (!ActivationWidget || !CachedActivationWidget.IsValid()) {
+    return;
+  }
+
+  EFighterActivationIndicatorState DesiredState =
+      EFighterActivationIndicatorState::Hidden;
+
+  if (IsAlive()) {
+    if (bIsCurrentlyActive) {
+      DesiredState = EFighterActivationIndicatorState::Active;
+    } else if (bHasActivatedThisRound && ActionsRemaining <= 0) {
+      DesiredState = EFighterActivationIndicatorState::Spent;
+    }
+  }
+
+  CachedActivationWidget->SetActivationState(DesiredState);
+  const bool bShouldShow =
+      DesiredState != EFighterActivationIndicatorState::Hidden;
+  ActivationWidget->SetVisibility(bShouldShow);
+  ActivationWidget->SetHiddenInGame(!bShouldShow);
+}
+
+UTexture2D *AFighterPawn::ResolveActivationIcon(
+    TSoftObjectPtr<UTexture2D> &IconSource, UTexture2D *&CachedTexture) {
+  if (CachedTexture) {
+    return CachedTexture;
+  }
+
+  if (IconSource.IsValid()) {
+    CachedTexture = IconSource.Get();
+  } else if (!IconSource.IsNull()) {
+    CachedTexture = IconSource.LoadSynchronous();
+  }
+
+  return CachedTexture;
 }
 
 bool AFighterPawn::ShouldOverrideSpawnFacingYaw() const {
