@@ -152,8 +152,8 @@ public:
     void RollInitiative();
 
     /** Continue the round after the player confirms the initiative roll. */
-    UFUNCTION(BlueprintCallable, Category="Skald|Battle")
-    void ConfirmInitiativeRoll(int32 AttackerRoll = INDEX_NONE, int32 DefenderRoll = INDEX_NONE);
+    UFUNCTION(BlueprintCallable, Category="Skald|Battle", meta = (CPP_Default_AttackerRoll = "-1", CPP_Default_DefenderRoll = "-1"))
+    void ConfirmInitiativeRoll(int32 AttackerRoll, int32 DefenderRoll);
 
     /** Randomly place all fighters at the start of a round. */
     UFUNCTION(BlueprintCallable, Category="Skald|Battle")
