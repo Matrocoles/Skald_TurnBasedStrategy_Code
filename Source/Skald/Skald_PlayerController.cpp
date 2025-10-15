@@ -2435,6 +2435,7 @@ void ASkaldPlayerController::HandleRoundStarted(int32 RoundNumber,
   DetermineControlledBattleSide();
 
   LockedActiveFighter = nullptr;
+  ClearSelectedFighter();
   CancelCommandMode();
   UpdateBattleRoundDisplay(RoundNumber, InitiativeWinner);
   UpdateBattlePlayersTurnDisplay();
