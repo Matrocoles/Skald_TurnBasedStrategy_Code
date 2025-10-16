@@ -1,14 +1,15 @@
 #if WITH_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
 #include "WorldMap.h"
-#include "Tests/AutomationEditorCommon.h"
+#include "Tests/SkaldAutomationTestHelpers.h"
 #include "Engine/World.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWorldMapDefaultTableTest, "Skald.WorldMap.DefaultTableUnset", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FWorldMapDefaultTableTest::RunTest(const FString& Parameters)
 {
-    UWorld* World = FAutomationEditorCommonUtils::CreateNewMap();
+    Skald::Tests::FScopedAutomationTestWorld TestWorld;
+    UWorld* World = TestWorld.Get();
     TestNotNull(TEXT("World should be created"), World);
     if (!World)
     {

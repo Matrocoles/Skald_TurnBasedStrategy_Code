@@ -2,7 +2,7 @@
 #include "BattleResolutionSyncTest.h"
 
 #include "Misc/AutomationTest.h"
-#include "Tests/AutomationEditorCommon.h"
+#include "Tests/SkaldAutomationTestHelpers.h"
 #include "Skald_TurnManager.h"
 #include "Skald_PlayerState.h"
 #include "Territory.h"
@@ -11,7 +11,8 @@
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldBattleResolutionSyncTest, "Skald.Multiplayer.BattleResolutionSync", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FSkaldBattleResolutionSyncTest::RunTest(const FString& Parameters) {
-  UWorld* World = FAutomationEditorCommonUtils::CreateNewMap();
+  Skald::Tests::FScopedAutomationTestWorld TestWorld;
+  UWorld* World = TestWorld.Get();
   TestNotNull(TEXT("World created"), World);
   if (!World) {
     return false;

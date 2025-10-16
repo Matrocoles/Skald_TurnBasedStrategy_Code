@@ -1,6 +1,6 @@
 #if WITH_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
-#include "Tests/AutomationEditorCommon.h"
+#include "Tests/SkaldAutomationTestHelpers.h"
 #include "Engine/World.h"
 #include "Skald_AIController.h"
 #include "Skald_PlayerState.h"
@@ -12,7 +12,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldAIDecisionFlowTest, "Skald.AI.DecisionFlo
 
 bool FSkaldAIDecisionFlowTest::RunTest(const FString& Parameters)
 {
-    UWorld* World = FAutomationEditorCommonUtils::CreateNewMap();
+    Skald::Tests::FScopedAutomationTestWorld TestWorld;
+    UWorld* World = TestWorld.Get();
     TestNotNull(TEXT("World created"), World);
     if (!World)
     {

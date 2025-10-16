@@ -32,7 +32,7 @@ void UChoosePlayerWidget::NativeConstruct()
         {
             for (int32 i = 0; i < EnumPtr->NumEnums(); ++i)
             {
-                if (EnumPtr->HasMetaData(TEXT("Hidden"), i))
+                if (!EnumPtr->GetMetaData(TEXT("Hidden"), i).IsEmpty())
                 {
                     continue;
                 }

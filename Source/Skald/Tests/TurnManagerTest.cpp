@@ -1,6 +1,6 @@
 #if WITH_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
-#include "Tests/AutomationEditorCommon.h"
+#include "Tests/SkaldAutomationTestHelpers.h"
 #include "Skald_TurnManager.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
@@ -8,7 +8,8 @@
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldTurnManagerPhaseTest, "Skald.TurnManager.PhaseTransitions", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FSkaldTurnManagerPhaseTest::RunTest(const FString& Parameters) {
-  UWorld* World = FAutomationEditorCommonUtils::CreateNewMap();
+  Skald::Tests::FScopedAutomationTestWorld TestWorld;
+  UWorld* World = TestWorld.Get();
   TestNotNull(TEXT("World created"), World);
   if (!World) {
     return false;
@@ -49,7 +50,8 @@ bool FSkaldTurnManagerPhaseTest::RunTest(const FString& Parameters) {
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldTurnManagerInitiativeTest, "Skald.TurnManager.InitiativeSort", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FSkaldTurnManagerInitiativeTest::RunTest(const FString& Parameters) {
-  UWorld* World = FAutomationEditorCommonUtils::CreateNewMap();
+  Skald::Tests::FScopedAutomationTestWorld TestWorld;
+  UWorld* World = TestWorld.Get();
   TestNotNull(TEXT("World created"), World);
   if (!World) {
     return false;

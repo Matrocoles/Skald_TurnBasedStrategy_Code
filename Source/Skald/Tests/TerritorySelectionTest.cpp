@@ -8,7 +8,7 @@
 #include "Misc/AutomationTest.h"
 #include "Territory.h"
 #include "Components/PrimitiveComponent.h"
-#include "Tests/AutomationEditorCommon.h"
+#include "Tests/SkaldAutomationTestHelpers.h"
 #include "WorldMap.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTerritorySelectionFlowTest,
@@ -17,7 +17,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTerritorySelectionFlowTest,
                                      EAutomationTestFlags::EngineFilter)
 
 bool FTerritorySelectionFlowTest::RunTest(const FString &Parameters) {
-  UWorld *World = FAutomationEditorCommonUtils::CreateNewMap();
+  Skald::Tests::FScopedAutomationTestWorld TestWorld;
+  UWorld *World = TestWorld.Get();
   TestNotNull(TEXT("World created"), World);
   if (!World) {
     return false;

@@ -56,7 +56,7 @@ void UStartGameWidget::NativeConstruct() {
     FactionComboBox->ClearOptions();
     if (UEnum *Enum = StaticEnum<ESkaldFaction>()) {
       for (int32 i = 0; i < Enum->NumEnums(); ++i) {
-        if (Enum->HasMetaData(TEXT("Hidden"), i)) {
+        if (!Enum->GetMetaData(TEXT("Hidden"), i).IsEmpty()) {
           continue;
         }
 

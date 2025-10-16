@@ -1,6 +1,6 @@
 #if WITH_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
-#include "Tests/AutomationEditorCommon.h"
+#include "Tests/SkaldAutomationTestHelpers.h"
 #include "WorldMap.h"
 #include "Territory.h"
 #include "Skald_PlayerState.h"
@@ -8,7 +8,8 @@
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWorldMapFindPathValidTest, "Skald.WorldMap.FindPath.Valid", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FWorldMapFindPathValidTest::RunTest(const FString& Parameters) {
-  UWorld* World = FAutomationEditorCommonUtils::CreateNewMap();
+  Skald::Tests::FScopedAutomationTestWorld TestWorld;
+  UWorld* World = TestWorld.Get();
   TestNotNull(TEXT("World created"), World);
   if (!World) {
     return false;
@@ -47,7 +48,8 @@ bool FWorldMapFindPathValidTest::RunTest(const FString& Parameters) {
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWorldMapFindPathBlockedTest, "Skald.WorldMap.FindPath.Blocked", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FWorldMapFindPathBlockedTest::RunTest(const FString& Parameters) {
-  UWorld* World = FAutomationEditorCommonUtils::CreateNewMap();
+  Skald::Tests::FScopedAutomationTestWorld TestWorld;
+  UWorld* World = TestWorld.Get();
   TestNotNull(TEXT("World created"), World);
   if (!World) {
     return false;
@@ -86,7 +88,8 @@ bool FWorldMapFindPathBlockedTest::RunTest(const FString& Parameters) {
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWorldMapMoveBetweenPathTest, "Skald.WorldMap.MoveBetween.PathTraversal", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FWorldMapMoveBetweenPathTest::RunTest(const FString& Parameters) {
-  UWorld* World = FAutomationEditorCommonUtils::CreateNewMap();
+  Skald::Tests::FScopedAutomationTestWorld TestWorld;
+  UWorld* World = TestWorld.Get();
   TestNotNull(TEXT("World created"), World);
   if (!World) {
     return false;

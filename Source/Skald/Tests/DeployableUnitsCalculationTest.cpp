@@ -1,7 +1,7 @@
 #if WITH_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
-#include "Tests/AutomationEditorCommon.h"
+#include "Tests/SkaldAutomationTestHelpers.h"
 #include "Skald_TurnManager.h"
 #include "Skald_PlayerState.h"
 #include "Territory.h"
@@ -10,7 +10,8 @@
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldDeployableUnitsCalculationTest, "Skald.TurnManager.DeployableUnitsCalculation", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FSkaldDeployableUnitsCalculationTest::RunTest(const FString& Parameters) {
-  UWorld* World = FAutomationEditorCommonUtils::CreateNewMap();
+  Skald::Tests::FScopedAutomationTestWorld TestWorld;
+  UWorld* World = TestWorld.Get();
   TestNotNull(TEXT("World created"), World);
   if (!World) {
     return false;

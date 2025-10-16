@@ -2,7 +2,7 @@
 #include "ChoosePlayerWidget.h"
 #include "Misc/AutomationTest.h"
 #include "Skald_PlayerController.h"
-#include "Tests/AutomationEditorCommon.h"
+#include "Tests/SkaldAutomationTestHelpers.h"
 #include "UObject/UnrealType.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldPlayerControllerLockInMovementTest,
@@ -12,7 +12,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldPlayerControllerLockInMovementTest,
 
 bool FSkaldPlayerControllerLockInMovementTest::RunTest(const FString &)
 {
-    UWorld *World = FAutomationEditorCommonUtils::CreateNewMap();
+    Skald::Tests::FScopedAutomationTestWorld TestWorld;
+    UWorld *World = TestWorld.Get();
     TestNotNull(TEXT("World created"), World);
     if (!World)
     {
