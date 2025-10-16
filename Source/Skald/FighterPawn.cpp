@@ -4,6 +4,8 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/WidgetComponent.h"
 #include "Components/TextBlock.h"
+#include "Containers/Queue.h"
+#include "Containers/Set.h"
 #include "Engine/CollisionProfile.h"
 #include "Engine/Texture2D.h"
 #include "EngineUtils.h"
@@ -630,25 +632,102 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
       return;
     }
 
-    const int32 StepX = FMath::Clamp(TargetCell.X - CurrentCell.X, -1, 1);
-    const int32 StepY = FMath::Clamp(TargetCell.Y - CurrentCell.Y, -1, 1);
-    if (FMath::Abs(StepX) == 1 && FMath::Abs(StepY) == 1) {
-      auto IsBlocked = [&](const FIntPoint &Cell) {
-        if (!Grid->IsCellInBounds(Cell) || Grid->IsObscured(Cell)) {
-          return true;
-        }
-        if (Grid->IsOccupied(Cell) && !PreviousCells.Contains(Cell) &&
-            !TargetCells.Contains(Cell)) {
-          return true;
-        }
-        return false;
-      };
+    bool bTargetReachable = CurrentCell == TargetCell;
+
+    if (!bTargetReachable) {
+      TSet<FIntPoint> IgnoredCells;
       for (const FIntPoint &Cell : PreviousCells) {
-        if (IsBlocked(Cell + FIntPoint(StepX, 0)) ||
-            IsBlocked(Cell + FIntPoint(0, StepY))) {
-          return;
+        IgnoredCells.Add(Cell);
+      }
+
+      auto CanOccupyAnchor = [&](const FIntPoint &Anchor) {
+        const TArray<FIntPoint> CandidateCells = GetOccupiedCells(Anchor);
+        for (const FIntPoint &Cell : CandidateCells) {
+          if (!Grid->IsCellInBounds(Cell) || Grid->IsObscured(Cell)) {
+            return false;
+          }
+          if (Grid->IsOccupied(Cell) && !IgnoredCells.Contains(Cell)) {
+            return false;
+          }
+        }
+        return true;
+      };
+
+      static const FIntPoint Directions[8] = {
+          FIntPoint(1, 0),  FIntPoint(-1, 0), FIntPoint(0, 1),  FIntPoint(0, -1),
+          FIntPoint(1, 1),  FIntPoint(1, -1), FIntPoint(-1, 1), FIntPoint(-1, -1)};
+
+      TSet<FIntPoint> Visited;
+      TQueue<TPair<FIntPoint, int32>> Frontier;
+      Visited.Add(CurrentCell);
+      Frontier.Enqueue(TPair<FIntPoint, int32>(CurrentCell, 0));
+
+      while (!Frontier.IsEmpty()) {
+        TPair<FIntPoint, int32> Node;
+        Frontier.Dequeue(Node);
+
+        const FIntPoint Cell = Node.Key;
+        const int32 DistanceFromStart = Node.Value;
+
+        if (Cell == TargetCell) {
+          bTargetReachable = true;
+          break;
+        }
+
+        if (DistanceFromStart >= Stats.Movement) {
+          continue;
+        }
+
+        for (const FIntPoint &Dir : Directions) {
+          const FIntPoint Next = Cell + Dir;
+          if (Visited.Contains(Next)) {
+            continue;
+          }
+          if (!CanOccupyAnchor(Next)) {
+            continue;
+          }
+          if (Dir.X != 0 && Dir.Y != 0) {
+            const TArray<FIntPoint> FromCells = GetOccupiedCells(Cell);
+            const TArray<FIntPoint> NextCells = GetOccupiedCells(Next);
+            TSet<FIntPoint> NextCellSet;
+            NextCellSet.Reserve(NextCells.Num());
+            for (const FIntPoint &NextCell : NextCells) {
+              NextCellSet.Add(NextCell);
+            }
+
+            auto IsBlocked = [&](const FIntPoint &CheckCell) {
+              if (!Grid->IsCellInBounds(CheckCell) || Grid->IsObscured(CheckCell)) {
+                return true;
+              }
+              if (Grid->IsOccupied(CheckCell) && !IgnoredCells.Contains(CheckCell) &&
+                  !NextCellSet.Contains(CheckCell)) {
+                return true;
+              }
+              return false;
+            };
+
+            bool bDiagonalClear = true;
+            for (const FIntPoint &FromCell : FromCells) {
+              if (IsBlocked(FromCell + FIntPoint(Dir.X, 0)) ||
+                  IsBlocked(FromCell + FIntPoint(0, Dir.Y))) {
+                bDiagonalClear = false;
+                break;
+              }
+            }
+
+            if (!bDiagonalClear) {
+              continue;
+            }
+          }
+
+          Visited.Add(Next);
+          Frontier.Enqueue(TPair<FIntPoint, int32>(Next, DistanceFromStart + 1));
         }
       }
+    }
+
+    if (!bTargetReachable) {
+      return;
     }
 
     for (const FIntPoint &Cell : PreviousCells) {
