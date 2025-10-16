@@ -37,6 +37,12 @@ void UChoosePlayerWidget::NativeConstruct()
                     continue;
                 }
 
+                const FString EnumName = EnumPtr->GetNameStringByIndex(i);
+                if (EnumName.EndsWith(TEXT("_MAX")))
+                {
+                    continue;
+                }
+
                 const int64 Value = EnumPtr->GetValueByIndex(i);
                 if (!EnumPtr->IsValidEnumValue(Value))
                 {
@@ -48,8 +54,7 @@ void UChoosePlayerWidget::NativeConstruct()
                 {
                     continue;
                 }
-                const FString Name = EnumPtr->GetNameStringByIndex(i);
-                FactionComboBox->AddOption(Name);
+                FactionComboBox->AddOption(EnumName);
             }
         }
         FactionComboBox->ClearSelection();
