@@ -7,7 +7,7 @@
 #include "Skald_PlayerState.h"
 #include "Skald_TurnManager.h"
 #include "Territory.h"
-#include "Tests/AutomationEditorCommon.h"
+#include "Tests/SkaldAutomationTestHelpers.h"
 #include "UObject/UnrealType.h"
 #include "WorldMap.h"
 
@@ -75,7 +75,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FArmyPlacementInitiativeOrderTest,
                                      EAutomationTestFlags::EngineFilter)
 
 bool FArmyPlacementInitiativeOrderTest::RunTest(const FString &Parameters) {
-  UWorld *World = FAutomationEditorCommonUtils::CreateNewMap();
+  Skald::Tests::FScopedAutomationTestWorld TestWorld;
+  UWorld *World = TestWorld.Get();
   TestNotNull(TEXT("World created"), World);
   if (!World) {
     return false;
@@ -176,7 +177,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAIArmyPlacementAutoAdvanceTest,
                                      EAutomationTestFlags::EngineFilter)
 
 bool FAIArmyPlacementAutoAdvanceTest::RunTest(const FString &Parameters) {
-  UWorld *World = FAutomationEditorCommonUtils::CreateNewMap();
+  Skald::Tests::FScopedAutomationTestWorld TestWorld;
+  UWorld *World = TestWorld.Get();
   TestNotNull(TEXT("World created"), World);
   if (!World) {
     return false;
@@ -271,7 +273,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAIArmyPlacementFailsafeRespectsHumanTest,
 
 bool FAIArmyPlacementFailsafeRespectsHumanTest::RunTest(
     const FString &Parameters) {
-  UWorld *World = FAutomationEditorCommonUtils::CreateNewMap();
+  Skald::Tests::FScopedAutomationTestWorld TestWorld;
+  UWorld *World = TestWorld.Get();
   TestNotNull(TEXT("World created"), World);
   if (!World) {
     return false;
@@ -368,7 +371,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FInitializeWorldSingleInitiativeRollTest,
                                      EAutomationTestFlags::EngineFilter)
 
 bool FInitializeWorldSingleInitiativeRollTest::RunTest(const FString &Parameters) {
-  UWorld *World = FAutomationEditorCommonUtils::CreateNewMap();
+  Skald::Tests::FScopedAutomationTestWorld TestWorld;
+  UWorld *World = TestWorld.Get();
   TestNotNull(TEXT("World created"), World);
   if (!World) {
     return false;

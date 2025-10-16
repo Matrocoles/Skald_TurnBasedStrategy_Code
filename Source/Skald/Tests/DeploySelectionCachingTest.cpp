@@ -2,7 +2,7 @@
 #include "DeploySelectionCachingTest.h"
 
 #include "Misc/AutomationTest.h"
-#include "Tests/AutomationEditorCommon.h"
+#include "Tests/SkaldAutomationTestHelpers.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
 #include "Skald_TurnManager.h"
@@ -20,7 +20,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSkaldDeploySelectionCachingTest::RunTest(const FString& Parameters)
 {
-    UWorld* World = FAutomationEditorCommonUtils::CreateNewMap();
+    Skald::Tests::FScopedAutomationTestWorld TestWorld;
+    UWorld* World = TestWorld.Get();
     TestNotNull(TEXT("World created"), World);
     if (!World)
     {

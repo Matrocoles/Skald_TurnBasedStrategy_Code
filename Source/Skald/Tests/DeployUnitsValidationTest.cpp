@@ -2,7 +2,7 @@
 #include "PlayerControllerValidationTest.h"
 
 #include "Misc/AutomationTest.h"
-#include "Tests/AutomationEditorCommon.h"
+#include "Tests/SkaldAutomationTestHelpers.h"
 #include "WorldMap.h"
 #include "Territory.h"
 #include "Skald_PlayerState.h"
@@ -14,7 +14,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSkaldDeployUnitsValidationFeedbackTest::RunTest(const FString&)
 {
-    UWorld* World = FAutomationEditorCommonUtils::CreateNewMap();
+    Skald::Tests::FScopedAutomationTestWorld TestWorld;
+    UWorld* World = TestWorld.Get();
     TestNotNull(TEXT("World created"), World);
     if (!World)
     {

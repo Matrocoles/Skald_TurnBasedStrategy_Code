@@ -1,6 +1,6 @@
 #if WITH_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
-#include "Tests/AutomationEditorCommon.h"
+#include "Tests/SkaldAutomationTestHelpers.h"
 #include "Territory.h"
 #include "Skald_PlayerState.h"
 #include "Engine/World.h"
@@ -11,7 +11,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldTerritoryMoveInvalidTest, "Skald.Territor
 
 bool FSkaldTerritoryMoveValidTest::RunTest(const FString& Parameters)
 {
-    UWorld* World = FAutomationEditorCommonUtils::CreateNewMap();
+    Skald::Tests::FScopedAutomationTestWorld TestWorld;
+    UWorld* World = TestWorld.Get();
     TestNotNull(TEXT("World created"), World);
     if (!World)
     {
@@ -55,7 +56,8 @@ bool FSkaldTerritoryMoveValidTest::RunTest(const FString& Parameters)
 
 bool FSkaldTerritoryMoveInvalidTest::RunTest(const FString& Parameters)
 {
-    UWorld* World = FAutomationEditorCommonUtils::CreateNewMap();
+    Skald::Tests::FScopedAutomationTestWorld TestWorld;
+    UWorld* World = TestWorld.Get();
     TestNotNull(TEXT("World created"), World);
     if (!World)
     {
