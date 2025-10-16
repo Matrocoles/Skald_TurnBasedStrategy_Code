@@ -3,6 +3,8 @@
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/Widget.h"
+#include "Containers/Queue.h"
+#include "Containers/Set.h"
 #include "Engine/Engine.h"
 #include "Kismet/GameplayStatics.h"
 #include "Skald.h"
@@ -681,8 +683,26 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
       Territory->Select();
 
       HighlightedTerritories.Empty();
-      for (ATerritory *Neighbor : Territory->AdjacentTerritories) {
-        if (Neighbor && Neighbor->OwningPlayer == Territory->OwningPlayer) {
+      TSet<ATerritory *> Visited;
+      TQueue<ATerritory *> Frontier;
+      Visited.Add(Territory);
+      Frontier.Enqueue(Territory);
+
+      while (!Frontier.IsEmpty()) {
+        ATerritory *Current = nullptr;
+        Frontier.Dequeue(Current);
+        if (!Current) {
+          continue;
+        }
+
+        for (ATerritory *Neighbor : Current->AdjacentTerritories) {
+          if (!Neighbor || Visited.Contains(Neighbor) ||
+              Neighbor->OwningPlayer != Territory->OwningPlayer) {
+            continue;
+          }
+
+          Visited.Add(Neighbor);
+          Frontier.Enqueue(Neighbor);
           Neighbor->Select();
           HighlightedTerritories.Add(Neighbor);
         }
@@ -690,14 +710,14 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
 
       if (HighlightedTerritories.Num() == 0) {
         ShowSelectionErrorMessage(
-            TEXT("No adjacent friendly territory to move into."));
+            TEXT("No connected friendly territory to move into."));
         SelectedSourceID = -1;
         Territory->Deselect();
         return;
       }
 
       ShowSelectionPromptMessage(
-          TEXT("Select an adjacent territory to receive troops."));
+          TEXT("Select a connected territory to receive troops."));
       return;
     }
 
