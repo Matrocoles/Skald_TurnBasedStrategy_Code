@@ -1,7 +1,7 @@
-#include "Misc/AutomationTest.h"
+#include "TerritorySelectionTest.h"
 
 #if WITH_AUTOMATION_TESTS
-#include "TerritorySelectionTest.h"
+#include "Misc/AutomationTest.h"
 
 #include "Engine/GameInstance.h"
 #include "Engine/LocalPlayer.h"

@@ -1,7 +1,7 @@
-#include "Misc/AutomationTest.h"
+#include "PlayerControllerValidationTest.h"
 
 #if WITH_AUTOMATION_TESTS
-#include "PlayerControllerValidationTest.h"
+#include "Misc/AutomationTest.h"
 
 #include "Tests/SkaldAutomationTestHelpers.h"
 
