@@ -83,11 +83,19 @@ void AGridOverlayActor::SpawnRandomObstacles() {
     return;
   }
 
+  const int32 ReservedColumns = bRespectFighterSpawnLanes
+                                     ? FMath::Clamp(ReservedSpawnColumnWidth, 0, GridWidth / 2)
+                                     : 0;
+  const int32 UsableColumns = GridWidth - (ReservedColumns * 2);
+  if (UsableColumns <= 0) {
+    return;
+  }
+
   if (ObstacleCandidates.Num() == 0) {
     return;
   }
 
-  const int32 MaxCells = GridWidth * GridHeight;
+  const int32 MaxCells = UsableColumns * GridHeight;
   const int32 ClampedMin = FMath::Clamp(MinObstacleCount, 0, MaxCells);
   const int32 ClampedMax = FMath::Clamp(MaxObstacleCount, ClampedMin, MaxCells);
   if (ClampedMax <= 0) {
@@ -120,7 +128,13 @@ void AGridOverlayActor::SpawnRandomObstacles() {
   while (CandidateCells.Num() < ObstaclesToSpawn && IterationCount < MaxIterations) {
     IterationCount++;
 
-    const int32 CellX = RandomStream.RandRange(0, GridWidth - 1);
+    const int32 MinCellX = ReservedColumns;
+    const int32 MaxCellX = GridWidth - ReservedColumns - 1;
+    if (MaxCellX < MinCellX) {
+      break;
+    }
+
+    const int32 CellX = RandomStream.RandRange(MinCellX, MaxCellX);
     const int32 CellY = RandomStream.RandRange(0, GridHeight - 1);
     const FIntPoint Cell(CellX, CellY);
 
@@ -128,10 +142,26 @@ void AGridOverlayActor::SpawnRandomObstacles() {
       continue;
     }
 
+    if (ReservedColumns > 0) {
+      const bool bInAttackerLane = CellX < ReservedColumns;
+      const bool bInDefenderLane = CellX >= GridWidth - ReservedColumns;
+      if (bInAttackerLane || bInDefenderLane) {
+        continue;
+      }
+    }
+
     CandidateCells.Add(Cell);
   }
 
   for (const FIntPoint &Cell : CandidateCells) {
+    if (ReservedColumns > 0) {
+      const bool bInAttackerLane = Cell.X < ReservedColumns;
+      const bool bInDefenderLane = Cell.X >= GridWidth - ReservedColumns;
+      if (bInAttackerLane || bInDefenderLane) {
+        continue;
+      }
+    }
+
     const int32 ClassIndex = RandomStream.RandRange(0, ObstacleCandidates.Num() - 1);
     const TSubclassOf<AGridObstacleActor> ObstacleClass = ObstacleCandidates[ClassIndex];
     if (!ObstacleClass) {
