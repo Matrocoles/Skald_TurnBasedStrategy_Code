@@ -1,5 +1,6 @@
-#if WITH_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
+
+#if WITH_AUTOMATION_TESTS
 #include "SkaldTypes.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldCapitalAttackRequirementTest, "Skald.Attack.CapitalRequirement", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

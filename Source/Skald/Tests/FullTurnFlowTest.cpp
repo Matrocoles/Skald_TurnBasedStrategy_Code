@@ -1,6 +1,7 @@
+#include "Misc/AutomationTest.h"
+
 #if WITH_AUTOMATION_TESTS
 #include "Components/TextBlock.h"
-#include "Misc/AutomationTest.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
 #include "Skald_TurnManager.h"

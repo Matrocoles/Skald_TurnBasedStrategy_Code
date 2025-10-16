@@ -1,5 +1,6 @@
-#if WITH_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
+
+#if WITH_AUTOMATION_TESTS
 #include "UI/SkaldMainHUDWidget.h"
 #include "UObject/Class.h"
 
