@@ -12,6 +12,8 @@
 #include "UObject/UnrealType.h"
 #include "WorldMap.h"
 
+#include "Engine/World.h"
+
 struct FSkaldGameModeAutomationAccessor {
   static void BeginArmyPlacementPhase(ASkaldGameMode *GameMode) {
     if (GameMode) {
