@@ -1,7 +1,7 @@
-#include "Misc/AutomationTest.h"
+#include "DeployUnitsReplicationTest.h"
 
 #if WITH_AUTOMATION_TESTS
-#include "DeployUnitsReplicationTest.h"
+#include "Misc/AutomationTest.h"
 
 #include "Tests/SkaldAutomationTestHelpers.h"
 #include "Skald_TurnManager.h"

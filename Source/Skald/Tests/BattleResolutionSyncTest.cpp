@@ -1,7 +1,7 @@
-#include "Misc/AutomationTest.h"
+#include "BattleResolutionSyncTest.h"
 
 #if WITH_AUTOMATION_TESTS
-#include "BattleResolutionSyncTest.h"
+#include "Misc/AutomationTest.h"
 #include "Tests/SkaldAutomationTestHelpers.h"
 #include "Skald_TurnManager.h"
 #include "Skald_PlayerState.h"
