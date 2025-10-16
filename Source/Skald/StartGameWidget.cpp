@@ -60,14 +60,18 @@ void UStartGameWidget::NativeConstruct() {
           continue;
         }
 
+        const FString EnumName = Enum->GetNameStringByIndex(i);
+        if (EnumName.EndsWith(TEXT("_MAX"))) {
+          continue;
+        }
+
         const int64 Value = Enum->GetValueByIndex(i);
         if (!Enum->IsValidEnumValue(Value)) {
           continue;
         }
 
-        const FString Name = Enum->GetNameStringByIndex(i);
-        if (Name != TEXT("None")) {
-          FactionComboBox->AddOption(Name);
+        if (EnumName != TEXT("None")) {
+          FactionComboBox->AddOption(EnumName);
         }
       }
     }

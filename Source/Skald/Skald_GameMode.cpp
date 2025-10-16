@@ -374,6 +374,11 @@ void ASkaldGameMode::PopulateAIPlayers() {
       if (Enum->HasMetaData(TEXT("Hidden"), i)) {
         continue;
       }
+
+      const FString EnumName = Enum->GetNameStringByIndex(i);
+      if (EnumName.EndsWith(TEXT("_MAX"))) {
+        continue;
+      }
       ESkaldFaction Fac =
           static_cast<ESkaldFaction>(Enum->GetValueByIndex(i));
       if (Fac != ESkaldFaction::None && !UsedFactions.Contains(Fac)) {
