@@ -2144,9 +2144,9 @@ void ASkaldPlayerController::HandleGridClick() {
             continue;
           }
 
-          const int32 DistanceToStart =
-              FMath::Abs(CandidateAnchor.X - StartCell.X) +
-              FMath::Abs(CandidateAnchor.Y - StartCell.Y);
+          const int32 DistanceToStart = FMath::Max(
+              FMath::Abs(CandidateAnchor.X - StartCell.X),
+              FMath::Abs(CandidateAnchor.Y - StartCell.Y));
           if (DistanceToStart > MovementRange) {
             continue;
           }
@@ -2175,9 +2175,9 @@ void ASkaldPlayerController::HandleGridClick() {
           }
 
           const bool bCandidateMoves = DistanceToStart > 0;
-          const int32 CandidateAnchorDistance =
-              FMath::Abs(CandidateAnchor.X - Cell.X) +
-              FMath::Abs(CandidateAnchor.Y - Cell.Y);
+          const int32 CandidateAnchorDistance = FMath::Max(
+              FMath::Abs(CandidateAnchor.X - Cell.X),
+              FMath::Abs(CandidateAnchor.Y - Cell.Y));
 
           bool bUseCandidate = false;
           if (!bFoundValidAnchor) {

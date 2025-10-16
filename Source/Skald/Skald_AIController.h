@@ -65,7 +65,7 @@ private:
   void CompleteFighterActivation();
   virtual void HandleBattleMapStateChanged(bool bInBattleMap) override;
 
-  int32 ComputeManhattanDistance(UGridOverlayComponent *Grid,
+  int32 ComputeChebyshevDistance(UGridOverlayComponent *Grid,
                                  const AFighterPawn *A,
                                  const AFighterPawn *B) const;
 
