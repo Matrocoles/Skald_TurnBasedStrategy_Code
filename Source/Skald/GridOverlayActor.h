@@ -44,6 +44,17 @@ protected:
   UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Obstacles")
   bool bSpawnRandomObstacles = false;
 
+  /** Prevent random obstacles from appearing inside fighter spawn lanes. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Obstacles",
+            meta = (EditCondition = "bSpawnRandomObstacles"))
+  bool bRespectFighterSpawnLanes = true;
+
+  /** Number of edge columns reserved for fighter spawns on each side of the grid. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Obstacles",
+            meta = (EditCondition = "bSpawnRandomObstacles && bRespectFighterSpawnLanes",
+                    ClampMin = "0"))
+  int32 ReservedSpawnColumnWidth = 3;
+
   /** Minimum number of random obstacles to spawn. */
   UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Obstacles", meta = (EditCondition = "bSpawnRandomObstacles", ClampMin = "0"))
   int32 MinObstacleCount = 0;
