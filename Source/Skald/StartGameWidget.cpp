@@ -59,6 +59,12 @@ void UStartGameWidget::NativeConstruct() {
         if (Enum->HasMetaData(TEXT("Hidden"), i)) {
           continue;
         }
+
+        const int64 Value = Enum->GetValueByIndex(i);
+        if (!Enum->IsValidEnumValue(Value)) {
+          continue;
+        }
+
         const FString Name = Enum->GetNameStringByIndex(i);
         if (Name != TEXT("None")) {
           FactionComboBox->AddOption(Name);
