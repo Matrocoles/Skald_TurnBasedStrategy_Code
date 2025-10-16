@@ -1278,6 +1278,37 @@ void UGridOverlayComponent::HighlightMovement(AFighterPawn *Fighter) {
       if (!CanOccupyAnchor(Next)) {
         continue;
       }
+      if (Dir.X != 0 && Dir.Y != 0) {
+        const FIntPoint StepX(Dir.X, 0);
+        const FIntPoint StepY(0, Dir.Y);
+        const TArray<FIntPoint> FromCells = Fighter->GetOccupiedCells(Cell);
+        const TArray<FIntPoint> NextCells = Fighter->GetOccupiedCells(Next);
+        TSet<FIntPoint> NextCellSet;
+        NextCellSet.Reserve(NextCells.Num());
+        for (const FIntPoint &NextCell : NextCells) {
+          NextCellSet.Add(NextCell);
+        }
+        auto IsBlocked = [&](const FIntPoint &CheckCell) {
+          if (!IsCellInBounds(CheckCell) || IsObscured(CheckCell)) {
+            return true;
+          }
+          if (IsOccupied(CheckCell) && !IgnoredCells.Contains(CheckCell) &&
+              !NextCellSet.Contains(CheckCell)) {
+            return true;
+          }
+          return false;
+        };
+        bool bDiagonalClear = true;
+        for (const FIntPoint &FromCell : FromCells) {
+          if (IsBlocked(FromCell + StepX) || IsBlocked(FromCell + StepY)) {
+            bDiagonalClear = false;
+            break;
+          }
+        }
+        if (!bDiagonalClear) {
+          continue;
+        }
+      }
       Visited.Add(Next);
       Frontier.Enqueue(TPair<FIntPoint, int32>(Next, Distance + 1));
     }
