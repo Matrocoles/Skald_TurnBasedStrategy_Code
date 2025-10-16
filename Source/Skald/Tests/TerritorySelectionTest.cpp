@@ -1,3 +1,5 @@
+#include "Misc/AutomationTest.h"
+
 #if WITH_AUTOMATION_TESTS
 #include "TerritorySelectionTest.h"
 
@@ -5,7 +7,6 @@
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
 #include "InputCoreTypes.h"
-#include "Misc/AutomationTest.h"
 #include "Territory.h"
 #include "Components/PrimitiveComponent.h"
 #include "Tests/SkaldAutomationTestHelpers.h"

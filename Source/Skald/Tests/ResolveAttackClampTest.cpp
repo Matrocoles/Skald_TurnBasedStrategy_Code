@@ -1,5 +1,6 @@
-#if WITH_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
+
+#if WITH_AUTOMATION_TESTS
 #include "GridBattleManager.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldResolveAttackClampTest, "Skald.GridBattle.ResolveAttackClamp", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

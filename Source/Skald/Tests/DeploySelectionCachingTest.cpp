@@ -1,7 +1,8 @@
+#include "Misc/AutomationTest.h"
+
 #if WITH_AUTOMATION_TESTS
 #include "DeploySelectionCachingTest.h"
 
-#include "Misc/AutomationTest.h"
 #include "Tests/SkaldAutomationTestHelpers.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"

@@ -1,7 +1,8 @@
+#include "Misc/AutomationTest.h"
+
 #if WITH_AUTOMATION_TESTS
 #include "PlayerControllerValidationTest.h"
 
-#include "Misc/AutomationTest.h"
 #include "Tests/SkaldAutomationTestHelpers.h"
 #include "WorldMap.h"
 #include "Territory.h"

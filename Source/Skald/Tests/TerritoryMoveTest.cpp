@@ -1,5 +1,6 @@
-#if WITH_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
+
+#if WITH_AUTOMATION_TESTS
 #include "Tests/SkaldAutomationTestHelpers.h"
 #include "Territory.h"
 #include "Skald_PlayerState.h"

@@ -1,6 +1,7 @@
+#include "Misc/AutomationTest.h"
+
 #if WITH_AUTOMATION_TESTS
 #include "ChoosePlayerWidget.h"
-#include "Misc/AutomationTest.h"
 #include "Skald_PlayerController.h"
 #include "Tests/SkaldAutomationTestHelpers.h"
 #include "UObject/UnrealType.h"
