@@ -630,27 +630,6 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
       return;
     }
 
-    const int32 StepX = FMath::Clamp(TargetCell.X - CurrentCell.X, -1, 1);
-    const int32 StepY = FMath::Clamp(TargetCell.Y - CurrentCell.Y, -1, 1);
-    if (FMath::Abs(StepX) == 1 && FMath::Abs(StepY) == 1) {
-      auto IsBlocked = [&](const FIntPoint &Cell) {
-        if (!Grid->IsCellInBounds(Cell) || Grid->IsObscured(Cell)) {
-          return true;
-        }
-        if (Grid->IsOccupied(Cell) && !PreviousCells.Contains(Cell) &&
-            !TargetCells.Contains(Cell)) {
-          return true;
-        }
-        return false;
-      };
-      for (const FIntPoint &Cell : PreviousCells) {
-        if (IsBlocked(Cell + FIntPoint(StepX, 0)) ||
-            IsBlocked(Cell + FIntPoint(0, StepY))) {
-          return;
-        }
-      }
-    }
-
     for (const FIntPoint &Cell : PreviousCells) {
       Grid->SetOccupied(Cell, false);
     }
