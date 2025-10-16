@@ -37,7 +37,13 @@ void UChoosePlayerWidget::NativeConstruct()
                     continue;
                 }
 
-                ESkaldFaction Fac = static_cast<ESkaldFaction>(EnumPtr->GetValueByIndex(i));
+                const int64 Value = EnumPtr->GetValueByIndex(i);
+                if (!EnumPtr->IsValidEnumValue(Value))
+                {
+                    continue;
+                }
+
+                ESkaldFaction Fac = static_cast<ESkaldFaction>(Value);
                 if (Fac == ESkaldFaction::None || Taken.Contains(Fac))
                 {
                     continue;
