@@ -516,7 +516,7 @@ bool ASkaldAIController::IsMyTurn() const {
          (!bAttackerTurn && bAIControlsDefenderSide);
 }
 
-int32 ASkaldAIController::ComputeManhattanDistance(UGridOverlayComponent * /*Grid*/,
+int32 ASkaldAIController::ComputeChebyshevDistance(UGridOverlayComponent * /*Grid*/,
                                                    const AFighterPawn *A,
                                                    const AFighterPawn *B) const {
   if (!A || !B) {
@@ -558,7 +558,7 @@ AFighterPawn *ASkaldAIController::FindNearestEnemy(AFighterPawn *Fighter) const 
       continue;
     }
 
-    const int32 Distance = ComputeManhattanDistance(Grid, Fighter, Candidate);
+    const int32 Distance = ComputeChebyshevDistance(Grid, Fighter, Candidate);
     if (Distance < BestDistance) {
       BestDistance = Distance;
       BestEnemy = Candidate;
@@ -590,7 +590,7 @@ AFighterPawn *ASkaldAIController::FindNextFriendlyFighter(bool bExpectAttacker) 
     }
 
     UGridOverlayComponent *Grid = Candidate->GetGrid();
-    const int32 Distance = ComputeManhattanDistance(
+    const int32 Distance = ComputeChebyshevDistance(
         Grid, Candidate, FindNearestEnemy(Candidate));
     if (Distance < BestDistance || !BestFighter) {
       BestDistance = Distance;
@@ -659,8 +659,9 @@ bool ASkaldAIController::TryMoveTowardsNearestEnemy(AFighterPawn *Fighter) {
     int32 BestDistance = TNumericLimits<int32>::Max();
     for (const FIntPoint &SelfCell : CandidateCells) {
       for (const FIntPoint &EnemyCellCoord : EnemyFootprint) {
-        const int32 Distance = FMath::Abs(SelfCell.X - EnemyCellCoord.X) +
-                               FMath::Abs(SelfCell.Y - EnemyCellCoord.Y);
+        const int32 Distance = FMath::Max(
+            FMath::Abs(SelfCell.X - EnemyCellCoord.X),
+            FMath::Abs(SelfCell.Y - EnemyCellCoord.Y));
         if (Distance < BestDistance) {
           BestDistance = Distance;
           if (BestDistance == 0) {
@@ -700,8 +701,9 @@ bool ASkaldAIController::TryMoveTowardsNearestEnemy(AFighterPawn *Fighter) {
   };
 
   for (int32 Step = 0; Step < MaxSteps; ++Step) {
-    TArray<FIntPoint> Directions = {FIntPoint(1, 0), FIntPoint(-1, 0),
-                                    FIntPoint(0, 1), FIntPoint(0, -1)};
+    TArray<FIntPoint> Directions = {FIntPoint(1, 0),   FIntPoint(-1, 0),  FIntPoint(0, 1),
+                                    FIntPoint(0, -1),  FIntPoint(1, 1),   FIntPoint(1, -1),
+                                    FIntPoint(-1, 1), FIntPoint(-1, -1)};
     Directions.Sort([&](const FIntPoint &A, const FIntPoint &B) {
       const int32 DistA = ComputeDistanceFromAnchor(Current + A);
       const int32 DistB = ComputeDistanceFromAnchor(Current + B);

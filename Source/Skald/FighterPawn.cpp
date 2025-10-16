@@ -379,8 +379,8 @@ int32 AFighterPawn::GetFootprintDistanceToCell(const FIntPoint &Cell,
   FIntPoint BestCell = CurrentCell;
 
   for (const FIntPoint &SelfCell : OccupiedCells) {
-    const int32 Distance = FMath::Abs(SelfCell.X - Cell.X) +
-                           FMath::Abs(SelfCell.Y - Cell.Y);
+    const int32 Distance = FMath::Max(
+        FMath::Abs(SelfCell.X - Cell.X), FMath::Abs(SelfCell.Y - Cell.Y));
     if (Distance < BestDistance) {
       BestDistance = Distance;
       BestCell = SelfCell;
@@ -419,8 +419,9 @@ int32 AFighterPawn::GetFootprintDistanceToFighter(
 
   for (const FIntPoint &SelfCell : SelfCells) {
     for (const FIntPoint &OtherCell : OtherCells) {
-      const int32 Distance = FMath::Abs(SelfCell.X - OtherCell.X) +
-                             FMath::Abs(SelfCell.Y - OtherCell.Y);
+      const int32 Distance = FMath::Max(
+          FMath::Abs(SelfCell.X - OtherCell.X),
+          FMath::Abs(SelfCell.Y - OtherCell.Y));
       if (Distance < BestDistance) {
         BestDistance = Distance;
         BestSelf = SelfCell;
@@ -462,8 +463,9 @@ bool AFighterPawn::HasLineOfSightToFighter(
 
   for (const FIntPoint &SelfCell : SelfCells) {
     for (const FIntPoint &OtherCell : OtherCells) {
-      const int32 Distance = FMath::Abs(SelfCell.X - OtherCell.X) +
-                             FMath::Abs(SelfCell.Y - OtherCell.Y);
+      const int32 Distance = FMath::Max(
+          FMath::Abs(SelfCell.X - OtherCell.X),
+          FMath::Abs(SelfCell.Y - OtherCell.Y));
       if (Distance > Range) {
         continue;
       }
@@ -595,8 +597,9 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
   if (!bIsCurrentlyActive || ActionsRemaining <= 0) {
     return;
   }
-  const int32 Distance = FMath::Abs(TargetCell.X - CurrentCell.X) +
-                         FMath::Abs(TargetCell.Y - CurrentCell.Y);
+  const int32 Distance = FMath::Max(
+      FMath::Abs(TargetCell.X - CurrentCell.X),
+      FMath::Abs(TargetCell.Y - CurrentCell.Y));
   if (Distance > Stats.Movement) {
     return;
   }

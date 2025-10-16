@@ -1266,8 +1266,9 @@ void UGridOverlayComponent::HighlightMovement(AFighterPawn *Fighter) {
       continue;
     }
 
-    static const FIntPoint Directions[4] = {FIntPoint(1, 0), FIntPoint(-1, 0),
-                                            FIntPoint(0, 1), FIntPoint(0, -1)};
+    static const FIntPoint Directions[8] = {
+        FIntPoint(1, 0),  FIntPoint(-1, 0), FIntPoint(0, 1),  FIntPoint(0, -1),
+        FIntPoint(1, 1),  FIntPoint(1, -1), FIntPoint(-1, 1), FIntPoint(-1, -1)};
 
     for (const FIntPoint &Dir : Directions) {
       const FIntPoint Next = Cell + Dir;
@@ -1315,8 +1316,8 @@ void UGridOverlayComponent::HighlightAttack(AFighterPawn *Fighter) {
 
       bool bWithinRange = false;
       for (const FIntPoint &SelfCell : Footprint) {
-        const int32 Distance =
-            FMath::Abs(SelfCell.X - Target.X) + FMath::Abs(SelfCell.Y - Target.Y);
+        const int32 Distance = FMath::Max(
+            FMath::Abs(SelfCell.X - Target.X), FMath::Abs(SelfCell.Y - Target.Y));
         if (Distance > Range) {
           continue;
         }

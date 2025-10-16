@@ -91,11 +91,11 @@ public:
   /** Returns true if the fighter's footprint overlaps the specified cell. */
   bool OccupiesCell(const FIntPoint &Cell) const;
 
-  /** Manhattan distance from the fighter's footprint to a specific cell. */
+  /** Chebyshev distance from the fighter's footprint to a specific cell. */
   int32 GetFootprintDistanceToCell(const FIntPoint &Cell,
                                    FIntPoint *OutClosestCell = nullptr) const;
 
-  /** Manhattan distance between this fighter's footprint and another's. */
+  /** Chebyshev distance between this fighter's footprint and another's. */
   int32 GetFootprintDistanceToFighter(
       const AFighterPawn *Other, FIntPoint *OutSelfCell = nullptr,
       FIntPoint *OutOtherCell = nullptr) const;
