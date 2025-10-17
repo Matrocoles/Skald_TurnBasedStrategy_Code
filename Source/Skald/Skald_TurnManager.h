@@ -44,6 +44,8 @@ public:
 
   virtual void BeginPlay() override;
 
+  virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
   virtual void GetLifetimeReplicatedProps(
       TArray<FLifetimeProperty> &OutLifetimeProps) const override;
 
@@ -171,11 +173,21 @@ protected:
   /** Retry handle used when a battle travel request must wait for a territory snapshot. */
   FTimerHandle PendingBattleTravelRetryHandle;
 
+  /** Retry handle used when waiting for the battle manager to become available on the battle map. */
+  FTimerHandle BattleEndBindingRetryHandle;
+
   /** Attempt to continue travelling to the battle map after capturing the world snapshot. */
   void RetryPendingBattleTravel();
 
   UFUNCTION()
   void HandleGridBattleEnded(ESkaldFaction WinningFaction, int32 AttackerCasualties, int32 DefenderCasualties);
+
+  UFUNCTION()
+  void HandleBattleMapStateChanged(bool bInBattleMap);
+
+  void AttemptBindBattleEnd(USkaldGameInstance *GameInstance, int32 Attempt = 0);
+
+  void ClearBattleEndBinding(USkaldGameInstance *GameInstance);
 
   /** Notify controllers and HUDs of a phase change. */
   void BroadcastCurrentPhase();

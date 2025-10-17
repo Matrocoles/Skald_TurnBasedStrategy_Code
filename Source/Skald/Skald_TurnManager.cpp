@@ -135,6 +135,11 @@ void ATurnManager::BeginPlay() {
   const bool bOnWorldMap = (CachedWorldMap != nullptr);
 
   if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+    GI->OnBattleMapStateChanged.RemoveDynamic(
+        this, &ATurnManager::HandleBattleMapStateChanged);
+    GI->OnBattleMapStateChanged.AddDynamic(
+        this, &ATurnManager::HandleBattleMapStateChanged);
+
     const bool bHasPendingResolution =
         GI->bPendingBattleResolution || GI->PendingBattleResolution.bValid;
 
@@ -147,9 +152,8 @@ void ATurnManager::BeginPlay() {
     }
 
     // On the battle map, listen for battle end and travel back on event
-    if (!bOnWorldMap && GI->GridBattleManager) {
-      GI->GridBattleManager->OnBattleEnded.AddDynamic(
-          this, &ATurnManager::HandleGridBattleEnded);
+    if (!bOnWorldMap) {
+      AttemptBindBattleEnd(GI);
     }
 
   }
@@ -161,6 +165,18 @@ void ATurnManager::BeginPlay() {
   }
 }
 
+void ATurnManager::EndPlay(const EEndPlayReason::Type EndPlayReason) {
+  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+    GI->OnBattleMapStateChanged.RemoveDynamic(
+        this, &ATurnManager::HandleBattleMapStateChanged);
+    ClearBattleEndBinding(GI);
+  } else if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(BattleEndBindingRetryHandle);
+  }
+
+  Super::EndPlay(EndPlayReason);
+}
+
 void ATurnManager::HandleGridBattleEnded(ESkaldFaction /*WinningFaction*/, int32 /*AttackerCasualties*/, int32 /*DefenderCasualties*/) {
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
   if (GI) {
@@ -170,10 +186,7 @@ void ATurnManager::HandleGridBattleEnded(ESkaldFaction /*WinningFaction*/, int32
       return;
     }
 
-    if (GI->GridBattleManager) {
-      GI->GridBattleManager->OnBattleEnded.RemoveDynamic(
-          this, &ATurnManager::HandleGridBattleEnded);
-    }
+    ClearBattleEndBinding(GI);
   }
 
   UWorld *World = GetWorld();
@@ -233,6 +246,76 @@ void ATurnManager::HandleGridBattleEnded(ESkaldFaction /*WinningFaction*/, int32
       World->ServerTravel(ReturnMapName);
       break;
     }
+  }
+}
+
+void ATurnManager::HandleBattleMapStateChanged(bool bInBattleMap) {
+  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+    if (bInBattleMap) {
+      AttemptBindBattleEnd(GI);
+    } else {
+      ClearBattleEndBinding(GI);
+    }
+  }
+}
+
+void ATurnManager::AttemptBindBattleEnd(USkaldGameInstance *GameInstance,
+                                        int32 Attempt) {
+  if (!GameInstance || !GameInstance->bIsInBattleMap) {
+    return;
+  }
+
+  UWorld *World = GetWorld();
+  if (World) {
+    World->GetTimerManager().ClearTimer(BattleEndBindingRetryHandle);
+  }
+
+  UGridBattleManager *BattleManager = GameInstance->GridBattleManager;
+  if (BattleManager) {
+    if (!BattleManager->OnBattleEnded.IsAlreadyBound(
+            this, &ATurnManager::HandleGridBattleEnded)) {
+      BattleManager->OnBattleEnded.AddDynamic(
+          this, &ATurnManager::HandleGridBattleEnded);
+    }
+    return;
+  }
+
+  if (!World) {
+    return;
+  }
+
+  constexpr int32 MaxAttempts = 40;
+  if (Attempt >= MaxAttempts) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("TurnManager could not bind battle end delegate after %d attempts."),
+           Attempt);
+    return;
+  }
+
+  constexpr float RetryDelaySeconds = 0.05f;
+  FTimerDelegate RetryDelegate = FTimerDelegate::CreateWeakLambda(
+      this, [this, Attempt]() {
+        if (USkaldGameInstance *RetryGI =
+                GetGameInstance<USkaldGameInstance>()) {
+          AttemptBindBattleEnd(RetryGI, Attempt + 1);
+        }
+      });
+  World->GetTimerManager().SetTimer(BattleEndBindingRetryHandle, RetryDelegate,
+                                    RetryDelaySeconds, false);
+}
+
+void ATurnManager::ClearBattleEndBinding(USkaldGameInstance *GameInstance) {
+  if (!GameInstance) {
+    return;
+  }
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(BattleEndBindingRetryHandle);
+  }
+
+  if (GameInstance->GridBattleManager) {
+    GameInstance->GridBattleManager->OnBattleEnded.RemoveDynamic(
+        this, &ATurnManager::HandleGridBattleEnded);
   }
 }
 
