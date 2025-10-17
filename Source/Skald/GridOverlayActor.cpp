@@ -150,6 +150,14 @@ void AGridOverlayActor::SpawnRandomObstacles() {
       }
     }
 
+    if (CandidateCells.Contains(Cell)) {
+      continue;
+    }
+
+    if (GridComponent->IsOccupied(Cell) || GridComponent->IsObscured(Cell)) {
+      continue;
+    }
+
     CandidateCells.Add(Cell);
   }
 
