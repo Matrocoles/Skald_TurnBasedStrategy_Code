@@ -2,7 +2,8 @@
 
 #include "Misc/AutomationTest.h"
 
-#if defined(WITH_AUTOMATION_TESTS) && WITH_AUTOMATION_TESTS
+#if defined(WITH_AUTOMATION_TESTS)
+#if WITH_AUTOMATION_TESTS
 
 #include "CoreMinimal.h"
 
@@ -28,5 +29,6 @@ private:
 };
 }
 
-#endif // defined(WITH_AUTOMATION_TESTS) && WITH_AUTOMATION_TESTS
+#endif  // WITH_AUTOMATION_TESTS
+#endif  // defined(WITH_AUTOMATION_TESTS)
 
