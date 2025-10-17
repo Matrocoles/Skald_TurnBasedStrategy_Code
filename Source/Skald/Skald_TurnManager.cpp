@@ -1,6 +1,7 @@
 #include "Skald_TurnManager.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "Engine/Level.h"
 #include "EngineUtils.h"
 #include "GridBattleManager.h"
 #include "Kismet/GameplayStatics.h"
@@ -21,6 +22,7 @@
 #include "UI/SkaldMainHUDWidget.h"
 #include "UObject/UnrealType.h"
 #include "UObject/SoftObjectPath.h"
+#include "UObject/Package.h"
 #include "TimerManager.h"
 #include "WorldMap.h"
 
@@ -34,11 +36,32 @@ FString GetResolvedPlayerName(const ASkaldPlayerState *PlayerState,
   return PlayerState->GetResolvedPlayerName(Context);
 }
 
+FString GetWorldPackageName(const UWorld *World) {
+  if (!World) {
+    return FString();
+  }
+
+  if (const ULevel *PersistentLevel = World->PersistentLevel) {
+    if (const UPackage *Package = PersistentLevel->GetOutermost()) {
+      return Package->GetName();
+    }
+  }
+
+  if (const UPackage *WorldPackage = World->GetPackage()) {
+    return WorldPackage->GetName();
+  }
+
+  return FString();
+}
+
 FString NormalizeMapName(UWorld *World, FString Candidate) {
   FString Result = MoveTemp(Candidate);
 
   if (Result.IsEmpty() && World) {
     Result = World->URL.Map;
+    if (Result.IsEmpty()) {
+      Result = GetWorldPackageName(World);
+    }
   }
 
   if (!Result.IsEmpty()) {
@@ -568,6 +591,12 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
     if (ReturnMap.IsEmpty()) {
       ReturnMap = NormalizeMapName(
           World, UGameplayStatics::GetCurrentLevelName(World, true));
+    }
+    if (ReturnMap.IsEmpty() || FPackageName::IsShortPackageName(ReturnMap)) {
+      const FString PackageName = GetWorldPackageName(World);
+      if (!PackageName.IsEmpty()) {
+        ReturnMap = PackageName;
+      }
     }
     SeededBattle.ReturnMap = MoveTemp(ReturnMap);
 
