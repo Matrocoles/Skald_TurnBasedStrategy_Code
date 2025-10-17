@@ -6,19 +6,21 @@
 #include "Algo/RandomShuffle.h"
 #include "Algo/Sort.h"
 #include "AIController.h"
-#include "GridBattleManager.h"
-#include "Skald.h"
-#include "Skald_GameInstance.h"
-#include "Skald_GameState.h"
-#include "Skald_PlayerController.h"
-#include "Skald_PlayerState.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "FighterPawn.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
+#include "GridBattleManager.h"
+#include "GridObstacleActor.h"
 #include "GridOverlayComponent.h"
+#include "Skald.h"
+#include "Skald_GameInstance.h"
+#include "Skald_GameState.h"
+#include "Skald_PlayerController.h"
+#include "Skald_PlayerState.h"
 #include "Territory.h"
 #include "TimerManager.h"
 #include "WorldMap.h"
@@ -34,6 +36,7 @@ struct FPendingControllerSlot {
 
 static TArray<FPendingControllerSlot> GPendingControllers;
 static bool GBattleSetupTriggered = false;
+constexpr float BattleSpawnHeightPadding = 300.f;
 
 static bool IsAIController(const AController *C) {
   return C && C->IsA(ASkaldAIController::StaticClass());
@@ -1004,25 +1007,37 @@ bool ASkald_BattleGameMode::RelocateControllersNearBattleGrid(
   FVector BaseLocation = FVector::ZeroVector;
   bool bHasLocation = false;
 
+  float HighestSurfaceZ = BaseLocation.Z;
+
   if (Grid) {
     const int32 Width = Grid->GetWidth();
     const int32 Height = Grid->GetHeight();
     const float CellSize = Grid->GetCellSize();
 
     BaseLocation = Grid->GetOrigin();
+    HighestSurfaceZ = FMath::Max(HighestSurfaceZ, BaseLocation.Z);
 
     if (Width > 0 && Height > 0 && CellSize > KINDA_SMALL_NUMBER) {
       BaseLocation.X += (static_cast<float>(Width) * CellSize) * 0.5f;
       BaseLocation.Y += (static_cast<float>(Height) * CellSize) * 0.5f;
       bHasLocation = true;
+
+      for (int32 Y = 0; Y < Height; ++Y) {
+        for (int32 X = 0; X < Width; ++X) {
+          const float CellHeight = Grid->GetCellHeight(FIntPoint(X, Y));
+          HighestSurfaceZ = FMath::Max(HighestSurfaceZ, CellHeight);
+        }
+      }
     } else if (AActor *OwnerActor = Grid->GetOwner()) {
       BaseLocation = OwnerActor->GetActorLocation();
+      HighestSurfaceZ = FMath::Max(HighestSurfaceZ, BaseLocation.Z);
       bHasLocation = true;
     }
   }
 
   if (!bHasLocation && Grid && Grid->GetOwner()) {
     BaseLocation = Grid->GetOwner()->GetActorLocation();
+    HighestSurfaceZ = FMath::Max(HighestSurfaceZ, BaseLocation.Z);
     bHasLocation = true;
   }
 
@@ -1031,6 +1046,7 @@ bool ASkald_BattleGameMode::RelocateControllersNearBattleGrid(
       if (Controller) {
         if (APawn *Pawn = Controller->GetPawn()) {
           BaseLocation = Pawn->GetActorLocation();
+          HighestSurfaceZ = FMath::Max(HighestSurfaceZ, BaseLocation.Z);
           bHasLocation = true;
           break;
         }
@@ -1044,7 +1060,14 @@ bool ASkald_BattleGameMode::RelocateControllersNearBattleGrid(
     return false;
   }
 
-  BaseLocation.Z += 100.f;
+  if (World) {
+    for (TActorIterator<AGridObstacleActor> It(World); It; ++It) {
+      const FBox Bounds = It->GetComponentsBoundingBox(true);
+      HighestSurfaceZ = FMath::Max(HighestSurfaceZ, Bounds.Max.Z);
+    }
+  }
+
+  BaseLocation.Z = HighestSurfaceZ + BattleSpawnHeightPadding;
   const float YSpacing = 150.f;
 
   for (int32 Index = 0; Index < Controllers.Num(); ++Index) {
