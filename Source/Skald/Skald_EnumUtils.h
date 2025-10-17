@@ -1,11 +1,17 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "UObject/Enum.h"
 
 namespace Skald::EnumUtils {
 inline bool HasMetaData(const UEnum* Enum, FName Key, int32 Index) {
 #if WITH_METADATA
-  return Enum && !Enum->GetMetaData(Key, Index).IsEmpty();
+  if (!Enum) {
+    return false;
+  }
+
+  const FString KeyString = Key.ToString();
+  return !Enum->GetMetaData(*KeyString, Index).IsEmpty();
 #else
   return false;
 #endif
