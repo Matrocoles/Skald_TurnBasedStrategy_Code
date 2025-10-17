@@ -1,6 +1,6 @@
 #include "Misc/AutomationTest.h"
 
-#if WITH_AUTOMATION_TESTS
+#if defined(WITH_AUTOMATION_TESTS) && WITH_AUTOMATION_TESTS
 #include "Components/TextBlock.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
@@ -125,4 +125,4 @@ bool FSkaldFullTurnFlowTest::RunTest(const FString &Parameters) {
 
   return true;
 }
-#endif // WITH_AUTOMATION_TESTS
+#endif // defined(WITH_AUTOMATION_TESTS) && WITH_AUTOMATION_TESTS

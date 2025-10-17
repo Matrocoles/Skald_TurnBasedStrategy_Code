@@ -1,6 +1,6 @@
 #include "Misc/AutomationTest.h"
 
-#if WITH_AUTOMATION_TESTS
+#if defined(WITH_AUTOMATION_TESTS) && WITH_AUTOMATION_TESTS
 #include "Tests/SkaldAutomationTestHelpers.h"
 #include "Skald_TurnManager.h"
 #include "Skald_PlayerController.h"
@@ -88,4 +88,4 @@ bool FSkaldTurnManagerInitiativeTest::RunTest(const FString& Parameters) {
 
   return true;
 }
-#endif // WITH_AUTOMATION_TESTS
+#endif // defined(WITH_AUTOMATION_TESTS) && WITH_AUTOMATION_TESTS

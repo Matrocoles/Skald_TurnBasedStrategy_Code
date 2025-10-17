@@ -1,6 +1,6 @@
 #include "Misc/AutomationTest.h"
 
-#if WITH_AUTOMATION_TESTS
+#if defined(WITH_AUTOMATION_TESTS) && WITH_AUTOMATION_TESTS
 #include "Tests/SkaldAutomationTestHelpers.h"
 #include "WorldMap.h"
 #include "Territory.h"
@@ -129,4 +129,4 @@ bool FWorldMapMoveBetweenPathTest::RunTest(const FString& Parameters) {
 
   return true;
 }
-#endif // WITH_AUTOMATION_TESTS
+#endif // defined(WITH_AUTOMATION_TESTS) && WITH_AUTOMATION_TESTS

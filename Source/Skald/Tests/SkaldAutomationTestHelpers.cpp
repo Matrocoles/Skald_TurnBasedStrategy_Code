@@ -1,6 +1,6 @@
 #include "Tests/SkaldAutomationTestHelpers.h"
 
-#if WITH_AUTOMATION_TESTS
+#if defined(WITH_AUTOMATION_TESTS) && WITH_AUTOMATION_TESTS
 
 #include "Engine/Engine.h"
 #include "Engine/World.h"
@@ -62,5 +62,5 @@ FScopedAutomationTestWorld::~FScopedAutomationTestWorld()
 }
 } // namespace Skald::Tests
 
-#endif // WITH_AUTOMATION_TESTS
+#endif // defined(WITH_AUTOMATION_TESTS) && WITH_AUTOMATION_TESTS
 
