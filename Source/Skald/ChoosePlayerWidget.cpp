@@ -4,6 +4,7 @@
 #include "Components/ComboBoxString.h"
 #include "Components/EditableTextBox.h"
 #include "Components/SpinBox.h"
+#include "Skald_EnumUtils.h"
 #include "Skald_GameInstance.h"
 #include "Skald_GameMode.h"
 #include "Skald_PlayerController.h"
@@ -32,7 +33,7 @@ void UChoosePlayerWidget::NativeConstruct()
         {
             for (int32 i = 0; i < EnumPtr->NumEnums(); ++i)
             {
-                if (!EnumPtr->GetMetaData(TEXT("Hidden"), i).IsEmpty())
+                if (Skald::EnumUtils::IsHiddenEntry(EnumPtr, i))
                 {
                     continue;
                 }

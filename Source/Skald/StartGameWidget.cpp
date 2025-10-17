@@ -8,6 +8,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "LobbyMenuWidget.h"
+#include "Skald_EnumUtils.h"
 #include "Skald_GameInstance.h"
 #include "Skald_PlayerController.h"
 
@@ -56,7 +57,7 @@ void UStartGameWidget::NativeConstruct() {
     FactionComboBox->ClearOptions();
     if (UEnum *Enum = StaticEnum<ESkaldFaction>()) {
       for (int32 i = 0; i < Enum->NumEnums(); ++i) {
-        if (!Enum->GetMetaData(TEXT("Hidden"), i).IsEmpty()) {
+        if (Skald::EnumUtils::IsHiddenEntry(Enum, i)) {
           continue;
         }
 

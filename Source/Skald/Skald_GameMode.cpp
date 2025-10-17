@@ -8,6 +8,7 @@
 #include "GridBattleManager.h"
 #include "Kismet/GameplayStatics.h"
 #include "Skald.h"
+#include "Skald_EnumUtils.h"
 #include "SkaldLogging.h"
 #include "SkaldSaveGame.h"
 #include "Misc/Char.h"
@@ -371,7 +372,7 @@ void ASkaldGameMode::PopulateAIPlayers() {
   TArray<ESkaldFaction> Available;
   if (UEnum *Enum = StaticEnum<ESkaldFaction>()) {
     for (int32 i = 0; i < Enum->NumEnums(); ++i) {
-      if (!Enum->GetMetaData(TEXT("Hidden"), i).IsEmpty()) {
+      if (Skald::EnumUtils::IsHiddenEntry(Enum, i)) {
         continue;
       }
 
