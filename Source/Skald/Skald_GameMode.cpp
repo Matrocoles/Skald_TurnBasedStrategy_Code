@@ -21,7 +21,6 @@
 #include "Skald_PlayerState.h"
 #include "Skald_TurnManager.h"
 #include "Territory.h"
-#include "Misc/EngineVersionComparison.h"
 #include "TimerManager.h"
 #include "UI/SkaldMainHUDWidget.h"
 #include "UObject/Package.h"
@@ -372,11 +371,7 @@ void ASkaldGameMode::PopulateAIPlayers() {
   TArray<ESkaldFaction> Available;
   if (UEnum *Enum = StaticEnum<ESkaldFaction>()) {
     for (int32 i = 0; i < Enum->NumEnums(); ++i) {
-#if UE_VERSION_OLDER_THAN(5, 5, 0)
       if (!Enum->GetMetaData(TEXT("Hidden"), i).IsEmpty()) {
-#else
-      if (Enum->HasMetaData(TEXT("Hidden"), i)) {
-#endif
         continue;
       }
 
