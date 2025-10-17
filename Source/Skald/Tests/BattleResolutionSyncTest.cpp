@@ -1,6 +1,6 @@
 #include "BattleResolutionSyncTest.h"
 
-#if WITH_AUTOMATION_TESTS
+#if defined(WITH_AUTOMATION_TESTS) && WITH_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
 #include "Tests/SkaldAutomationTestHelpers.h"
 #include "Skald_TurnManager.h"
@@ -63,4 +63,4 @@ bool FSkaldBattleResolutionSyncTest::RunTest(const FString& Parameters) {
 
   return true;
 }
-#endif // WITH_AUTOMATION_TESTS
+#endif // defined(WITH_AUTOMATION_TESTS) && WITH_AUTOMATION_TESTS

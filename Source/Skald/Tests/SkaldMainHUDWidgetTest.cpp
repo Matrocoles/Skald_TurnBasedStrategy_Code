@@ -1,6 +1,6 @@
 #include "Misc/AutomationTest.h"
 
-#if WITH_AUTOMATION_TESTS
+#if defined(WITH_AUTOMATION_TESTS) && WITH_AUTOMATION_TESTS
 #include "UI/SkaldMainHUDWidget.h"
 #include "UObject/Class.h"
 
@@ -15,4 +15,4 @@ bool FSkaldMainHUDWidgetBindingsTest::RunTest(const FString& Parameters)
     TestNotNull(TEXT("EndPhaseButton property should exist"), WidgetClass->FindPropertyByName(GET_MEMBER_NAME_CHECKED(USkaldMainHUDWidget, EndPhaseButton)));
     return true;
 }
-#endif // WITH_AUTOMATION_TESTS
+#endif // defined(WITH_AUTOMATION_TESTS) && WITH_AUTOMATION_TESTS
