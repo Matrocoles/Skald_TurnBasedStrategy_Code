@@ -1,7 +1,12 @@
 #pragma once
 
 #include "CoreMinimal.h"
+
+#if __has_include("UObject/Enum.h")
 #include "UObject/Enum.h"
+#else
+#include "UObject/Class.h"
+#endif
 
 namespace Skald::EnumUtils {
 inline bool HasMetaData(const UEnum* Enum, FName Key, int32 Index) {
