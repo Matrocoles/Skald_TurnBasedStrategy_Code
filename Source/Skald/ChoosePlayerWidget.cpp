@@ -4,7 +4,6 @@
 #include "Components/ComboBoxString.h"
 #include "Components/EditableTextBox.h"
 #include "Components/SpinBox.h"
-#include "Misc/EngineVersionComparison.h"
 #include "Skald_GameInstance.h"
 #include "Skald_GameMode.h"
 #include "Skald_PlayerController.h"
@@ -33,11 +32,7 @@ void UChoosePlayerWidget::NativeConstruct()
         {
             for (int32 i = 0; i < EnumPtr->NumEnums(); ++i)
             {
-#if UE_VERSION_OLDER_THAN(5, 5, 0)
                 if (!EnumPtr->GetMetaData(TEXT("Hidden"), i).IsEmpty())
-#else
-                if (EnumPtr->HasMetaData(TEXT("Hidden"), i))
-#endif
                 {
                     continue;
                 }
