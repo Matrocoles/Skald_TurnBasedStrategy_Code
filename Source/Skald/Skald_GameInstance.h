@@ -105,7 +105,8 @@ public:
   FGridBattleResolution PendingBattleResolution;
 
   /** True when PendingBattleResolution contains unapplied data. */
-  UPROPERTY(BlueprintReadWrite, Category = "Battle")
+  UPROPERTY(BlueprintReadWrite, Category = "Battle",
+            meta = (ScriptName = "has_pending_battle_resolution"))
   bool bPendingBattleResolution = false;
 
   /** Runtime manager used to execute grid based battles. */
