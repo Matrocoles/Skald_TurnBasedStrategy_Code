@@ -1,6 +1,7 @@
 #include "PlayerControllerValidationTest.h"
 
-#if defined(WITH_AUTOMATION_TESTS) && WITH_AUTOMATION_TESTS
+#if defined(WITH_AUTOMATION_TESTS)
+#if WITH_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
 
 #include "Tests/SkaldAutomationTestHelpers.h"
@@ -39,4 +40,5 @@ bool FSkaldPlayerControllerValidationFeedbackTest::RunTest(const FString &)
 
     return true;
 }
-#endif // defined(WITH_AUTOMATION_TESTS) && WITH_AUTOMATION_TESTS
+#endif  // WITH_AUTOMATION_TESTS
+#endif  // defined(WITH_AUTOMATION_TESTS)

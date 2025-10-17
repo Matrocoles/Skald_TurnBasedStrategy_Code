@@ -1,6 +1,7 @@
 #include "Misc/AutomationTest.h"
 
-#if defined(WITH_AUTOMATION_TESTS) && WITH_AUTOMATION_TESTS
+#if defined(WITH_AUTOMATION_TESTS)
+#if WITH_AUTOMATION_TESTS
 #include "SkaldTypes.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldCapitalAttackRequirementTest, "Skald.Attack.CapitalRequirement", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -12,4 +13,5 @@ bool FSkaldCapitalAttackRequirementTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Capital attack meeting requirement is valid"), SkaldHelpers::MeetsCapitalAttackRequirement(true, SkaldConstants::CapitalAttackArmyRequirement));
     return true;
 }
-#endif // defined(WITH_AUTOMATION_TESTS) && WITH_AUTOMATION_TESTS
+#endif  // WITH_AUTOMATION_TESTS
+#endif  // defined(WITH_AUTOMATION_TESTS)
