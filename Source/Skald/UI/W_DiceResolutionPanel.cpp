@@ -148,9 +148,9 @@ void UW_DiceResolutionPanel::RevealNextDie()
                 : FLinearColor(0.55f, 0.55f, 0.58f);
             Entry->SetColorAndOpacity(FSlateColor(EntryColour));
 
-            if (UVerticalBoxSlot* Slot = OutcomeList->AddChildToVerticalBox(Entry))
+            if (UVerticalBoxSlot* EntrySlot = OutcomeList->AddChildToVerticalBox(Entry))
             {
-                Slot->SetPadding(FMargin(0.f, 2.f));
+                EntrySlot->SetPadding(FMargin(0.f, 2.f));
             }
         }
     }
