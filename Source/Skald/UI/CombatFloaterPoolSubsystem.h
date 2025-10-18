@@ -6,6 +6,7 @@
 
 class APlayerController;
 class UW_FloatingText;
+class UUserWidget;
 
 /**
  * Subsystem that manages pooled floating combat text widgets to minimise

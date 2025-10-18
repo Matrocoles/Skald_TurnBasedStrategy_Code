@@ -14,7 +14,7 @@
 
 UBattleHUDWidget::UBattleHUDWidget(const FObjectInitializer &ObjectInitializer)
     : Super(ObjectInitializer) {
-  bCanEverTick = true;
+  SetCanTick(true);
   FloaterWidgetClass = UW_FloatingText::StaticClass();
 }
 
