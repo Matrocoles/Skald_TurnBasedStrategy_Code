@@ -77,15 +77,17 @@ FString StripStreamingPrefixFromPackageName(FString PackageName,
 
   FString Result = PackageName;
 
-  FString PathPart;
-  FString AssetPart;
-  if (FPackageName::SplitLongPackageName(Result, PathPart, AssetPart)) {
-    FString TrimmedAsset = AssetPart;
-    StripPrefix(TrimmedAsset);
-    if (!TrimmedAsset.IsEmpty() && TrimmedAsset != AssetPart) {
-      Result = PathPart + TEXT("/") + TrimmedAsset;
+  if (FPackageName::IsValidLongPackageName(Result)) {
+    const FString PathPart = FPackageName::GetLongPackagePath(Result);
+    FString AssetPart = FPackageName::GetShortName(Result);
+    if (!PathPart.IsEmpty() && !AssetPart.IsEmpty()) {
+      FString TrimmedAsset = AssetPart;
+      StripPrefix(TrimmedAsset);
+      if (!TrimmedAsset.IsEmpty() && TrimmedAsset != AssetPart) {
+        Result = PathPart + TEXT("/") + TrimmedAsset;
+      }
+      return Result;
     }
-    return Result;
   }
 
   StripPrefix(Result);
@@ -131,10 +133,8 @@ FString EnsureLongPackageName(FString MapName, const UWorld *ReferenceWorld) {
     FString ReferencePackage = GetWorldPackageName(ReferenceWorld);
     ReferencePackage = StripStreamingPrefixFromPackageName(ReferencePackage, ReferenceWorld);
 
-    FString PathPart;
-    FString AssetPart;
-    if (FPackageName::SplitLongPackageName(ReferencePackage, PathPart,
-                                           AssetPart)) {
+    if (FPackageName::IsValidLongPackageName(ReferencePackage)) {
+      const FString PathPart = FPackageName::GetLongPackagePath(ReferencePackage);
       if (!PathPart.IsEmpty()) {
         Result = PathPart + TEXT("/") + Result;
       }
