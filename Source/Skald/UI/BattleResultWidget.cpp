@@ -32,7 +32,7 @@ void UBattleResultWidget::EnsureLayout() {
       BattleResultText = WidgetTree->ConstructWidget<UTextBlock>(
           UTextBlock::StaticClass(), TEXT("BattleResultText"));
       BattleResultText->SetJustification(ETextJustify::Center);
-      FSlateFontInfo ResultFont = BattleResultText->Font;
+      FSlateFontInfo ResultFont = BattleResultText->GetFont();
       ResultFont.Size = 72;
       BattleResultText->SetFont(ResultFont);
       Box->AddChildToVerticalBox(BattleResultText);
