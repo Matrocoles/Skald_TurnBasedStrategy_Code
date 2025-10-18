@@ -596,10 +596,35 @@ void ATurnManager::AttemptBindBattleEnd(USkaldGameInstance *GameInstance,
 
   UGridBattleManager *BattleManager = GameInstance->GridBattleManager;
   if (BattleManager) {
+    if (UGridBattleManager *PreviouslyBound = BoundBattleManager.Get()) {
+      if (PreviouslyBound != BattleManager) {
+        PreviouslyBound->OnBattleEnded.RemoveDynamic(
+            this, &ATurnManager::HandleGridBattleEnded);
+      }
+    }
+
     if (!BattleManager->OnBattleEnded.IsAlreadyBound(
             this, &ATurnManager::HandleGridBattleEnded)) {
       BattleManager->OnBattleEnded.AddDynamic(
           this, &ATurnManager::HandleGridBattleEnded);
+    }
+
+    BoundBattleManager = BattleManager;
+
+    if (World) {
+      constexpr float RebindPollSeconds = 0.1f;
+      FTimerDelegate MonitorDelegate = FTimerDelegate::CreateWeakLambda(
+          this, [this]() {
+            if (USkaldGameInstance *RetryGI =
+                    GetGameInstance<USkaldGameInstance>()) {
+              if (RetryGI->bIsInBattleMap) {
+                AttemptBindBattleEnd(RetryGI);
+              }
+            }
+          });
+      World->GetTimerManager().SetTimer(
+          BattleEndBindingRetryHandle, MonitorDelegate, RebindPollSeconds,
+          false);
     }
     return;
   }
@@ -641,6 +666,15 @@ void ATurnManager::ClearBattleEndBinding(USkaldGameInstance *GameInstance) {
     GameInstance->GridBattleManager->OnBattleEnded.RemoveDynamic(
         this, &ATurnManager::HandleGridBattleEnded);
   }
+
+  if (UGridBattleManager *PreviouslyBound = BoundBattleManager.Get()) {
+    if (PreviouslyBound != GameInstance->GridBattleManager) {
+      PreviouslyBound->OnBattleEnded.RemoveDynamic(
+          this, &ATurnManager::HandleGridBattleEnded);
+    }
+  }
+
+  BoundBattleManager = nullptr;
 }
 
 void ATurnManager::RegisterController(ASkaldPlayerController *Controller) {
