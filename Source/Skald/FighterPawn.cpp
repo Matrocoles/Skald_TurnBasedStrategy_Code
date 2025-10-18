@@ -3,7 +3,6 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/WidgetComponent.h"
-#include "Components/TextBlock.h"
 #include "Containers/Queue.h"
 #include "Containers/Set.h"
 #include "Engine/CollisionProfile.h"
@@ -109,18 +108,6 @@ AFighterPawn::AFighterPawn() : MaxHealth(0) {
   ActivationWidgetBack->SetVisibility(false);
 
   HealthWidgetTemplate = UFighterHealthWidget::StaticClass();
-
-  static ConstructorHelpers::FClassFinder<UUserWidget> DamageWidgetFinder(
-      TEXT("/Game/Blueprints/UI/WBP_DamageFloat"));
-  if (DamageWidgetFinder.Succeeded()) {
-    DamageFloatWidgetTemplate = DamageWidgetFinder.Class;
-  }
-
-  static ConstructorHelpers::FClassFinder<UUserWidget> MissWidgetFinder(
-      TEXT("/Game/Blueprints/UI/WBP_MissWidget"));
-  if (MissWidgetFinder.Succeeded()) {
-    MissWidgetTemplate = MissWidgetFinder.Class;
-  }
 
   ActivationWidgetTemplate = UFighterActivationWidget::StaticClass();
 
@@ -555,46 +542,6 @@ void AFighterPawn::AlignToCurrentCell() {
   }
 }
 
-UUserWidget *AFighterPawn::GetDamageWidgetFromPool() {
-  for (UUserWidget *Widget : DamageWidgetPool) {
-    if (Widget && !Widget->IsInViewport()) {
-      Widget->SetVisibility(ESlateVisibility::HitTestInvisible);
-      return Widget;
-    }
-  }
-  if (DamageFloatWidgetTemplate) {
-    if (UWorld *World = GetWorld()) {
-      if (UUserWidget *NewWidget =
-              CreateWidget<UUserWidget>(World, DamageFloatWidgetTemplate)) {
-        NewWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
-        DamageWidgetPool.Add(NewWidget);
-        return NewWidget;
-      }
-    }
-  }
-  return nullptr;
-}
-
-UUserWidget *AFighterPawn::GetMissWidgetFromPool() {
-  for (UUserWidget *Widget : MissWidgetPool) {
-    if (Widget && !Widget->IsInViewport()) {
-      Widget->SetVisibility(ESlateVisibility::HitTestInvisible);
-      return Widget;
-    }
-  }
-  if (MissWidgetTemplate) {
-    if (UWorld *World = GetWorld()) {
-      if (UUserWidget *NewWidget =
-              CreateWidget<UUserWidget>(World, MissWidgetTemplate)) {
-        NewWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
-        MissWidgetPool.Add(NewWidget);
-        return NewWidget;
-      }
-    }
-  }
-  return nullptr;
-}
-
 void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
   if (!bIsCurrentlyActive || ActionsRemaining <= 0) {
     return;
@@ -915,46 +862,6 @@ void AFighterPawn::ResolveNextAttackRoll() {
         FMath::Max(0, Target->Stats.Health - Roll.Damage);
     if (Target->Stats.Health <= 0) {
       bPendingAttackTargetDied = true;
-    }
-
-    if (UUserWidget *DamageWidget = GetDamageWidgetFromPool()) {
-      if (UTextBlock *Text = Cast<UTextBlock>(
-              DamageWidget->GetWidgetFromName(TEXT("DamageText")))) {
-        Text->SetText(FText::AsNumber(Roll.Damage));
-      }
-      DamageWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
-      DamageWidget->AddToViewport();
-      if (UWorld *WorldPtr = GetWorld()) {
-        FTimerHandle Timer;
-        const TWeakObjectPtr<UUserWidget> DamageWidgetWeak = DamageWidget;
-        WorldPtr->GetTimerManager().SetTimer(
-            Timer, FTimerDelegate::CreateLambda([DamageWidgetWeak]() {
-              if (UUserWidget *ResolvedWidget = DamageWidgetWeak.Get()) {
-                ResolvedWidget->RemoveFromParent();
-              }
-            }),
-            1.f, false);
-      }
-    }
-  } else {
-    if (UUserWidget *MissWidget = GetMissWidgetFromPool()) {
-      if (UTextBlock *MissText =
-              Cast<UTextBlock>(MissWidget->GetWidgetFromName(TEXT("Missed")))) {
-        MissText->SetText(NSLOCTEXT("Skald", "BattleAttackMiss", "Missed"));
-      }
-      MissWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
-      MissWidget->AddToViewport();
-      if (UWorld *WorldPtr = GetWorld()) {
-        FTimerHandle Timer;
-        const TWeakObjectPtr<UUserWidget> MissWidgetWeak = MissWidget;
-        WorldPtr->GetTimerManager().SetTimer(
-            Timer, FTimerDelegate::CreateLambda([MissWidgetWeak]() {
-              if (UUserWidget *ResolvedWidget = MissWidgetWeak.Get()) {
-                ResolvedWidget->RemoveFromParent();
-              }
-            }),
-            1.f, false);
-      }
     }
   }
 

@@ -18,6 +18,19 @@ class ASkaldGameMode;
 class ASkaldGameState;
 class USkaldGameInstance;
 class USoundBase;
+class UCombatFloaterPoolSubsystem;
+class UW_FloatingText;
+
+struct FSkaldActiveFloater {
+  TWeakObjectPtr<UW_FloatingText> Floater;
+  FVector AnchorLocation = FVector::ZeroVector;
+  FVector2D InitialOffset = FVector2D::ZeroVector;
+  float HorizontalDirection = 1.f;
+  float Lifetime = 1.5f;
+  float FadeDuration = 0.35f;
+  float Elapsed = 0.f;
+  float Scale = 1.f;
+};
 
 // Delegates broadcasting user UI actions to game logic
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FSkaldAttackRequested, int32,
@@ -58,6 +71,9 @@ class SKALD_API USkaldMainHUDWidget : public UUserWidget {
 
 public:
   USkaldMainHUDWidget(const FObjectInitializer& ObjectInitializer);
+
+  virtual void NativeTick(const FGeometry& MyGeometry,
+                          float InDeltaTime) override;
 
   // Identity / state (read by BP)
   UPROPERTY(BlueprintReadWrite, Category = "Skald|State")
@@ -198,6 +214,14 @@ public:
   UFUNCTION(BlueprintImplementableEvent, Category = "Skald|HUD")
   void BP_ShowErrorMessage(const FString &Message);
 
+  /** Display floating combat text anchored to a world position. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|HUD|Floaters")
+  void ShowFloatingTextAtLocation(const FVector &WorldLocation,
+                                  const FText &Message,
+                                  const FLinearColor &Tint,
+                                  float Scale = 1.f,
+                                  float LifetimeOverride = -1.f);
+
   // BlueprintCallable functions — selection UX helpers
   UFUNCTION(BlueprintCallable, Category = "Skald|Selection")
   void BeginAttackSelection();
@@ -337,6 +361,10 @@ protected:
   UFUNCTION()
   void HandleDeployClicked();
 
+  void UpdateActiveFloaters(float DeltaSeconds);
+  void ReleaseFloaterAtIndex(int32 Index);
+  UCombatFloaterPoolSubsystem *ResolveFloaterPool();
+
   UFUNCTION()
   void HandleAttackApproved();
 
@@ -344,6 +372,35 @@ protected:
 
   UPROPERTY()
   UConfirmAttackWidget *ActiveConfirmWidget = nullptr;
+
+  /** Class used when requesting floaters from the subsystem. */
+  UPROPERTY(EditAnywhere, Category = "Skald|HUD|Floaters")
+  TSubclassOf<UW_FloatingText> FloaterWidgetClass;
+
+  /** How long floaters remain visible in seconds. */
+  UPROPERTY(EditAnywhere, Category = "Skald|HUD|Floaters")
+  float FloaterLifetime = 1.6f;
+
+  /** Portion of the lifetime reserved for fading out. */
+  UPROPERTY(EditAnywhere, Category = "Skald|HUD|Floaters")
+  float FloaterFadeDuration = 0.35f;
+
+  /** Maximum vertical offset (in pixels) applied across the arc. */
+  UPROPERTY(EditAnywhere, Category = "Skald|HUD|Floaters")
+  float FloaterArcHeight = 120.f;
+
+  /** Horizontal drift (in pixels) applied over the lifetime. */
+  UPROPERTY(EditAnywhere, Category = "Skald|HUD|Floaters")
+  float FloaterHorizontalDrift = 40.f;
+
+  /** Margin used when clamping to the screen bounds. */
+  UPROPERTY(EditAnywhere, Category = "Skald|HUD|Floaters")
+  float FloaterClampMargin = 24.f;
+
+  /** Active floating text widgets driven by the HUD tick. */
+  TArray<FSkaldActiveFloater> ActiveFloaters;
+
+  TWeakObjectPtr<UCombatFloaterPoolSubsystem> CachedFloaterPool;
 
   UPROPERTY()
   UDeployWidget *ActiveDeployWidget = nullptr;

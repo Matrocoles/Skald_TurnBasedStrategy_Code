@@ -208,14 +208,6 @@ public:
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|UI")
   TSoftObjectPtr<UTexture2D> ActivationSpentIcon;
 
-  /** Widget class used for optional damage float indicators. */
-  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Fighter|UI")
-  TSubclassOf<UUserWidget> DamageFloatWidgetTemplate;
-
-  /** Widget class used for optional miss indicators. */
-  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Fighter|UI")
-  TSubclassOf<UUserWidget> MissWidgetTemplate;
-
   /** Event broadcast when health changes. */
   UPROPERTY(BlueprintAssignable, Category = "Fighter|Events")
   FOnHealthChanged OnHealthChanged;
@@ -261,12 +253,6 @@ private:
   void OnRep_IsCurrentlyActive();
   UFUNCTION()
   void OnRep_MaxHealth();
-
-  /** Retrieve or create a damage widget from the pool. */
-  UUserWidget *GetDamageWidgetFromPool();
-
-  /** Retrieve or create a miss widget from the pool. */
-  UUserWidget *GetMissWidgetFromPool();
 
   /** Align the visible mesh with the collision capsule. */
   void UpdateMeshOffset();
@@ -321,14 +307,6 @@ private:
 
   /** Finalise any pending attack resolution and clean up timers/state. */
   void FinalizeQueuedAttack();
-
-  /** Pool of reusable damage widgets to avoid repeated allocations. */
-  UPROPERTY()
-  TArray<UUserWidget *> DamageWidgetPool;
-
-  /** Pool of reusable miss widgets to avoid repeated allocations. */
-  UPROPERTY()
-  TArray<UUserWidget *> MissWidgetPool;
 
   /** Pending attack rolls awaiting delayed resolution. */
   TArray<FQueuedAttackRoll> PendingAttackRolls;

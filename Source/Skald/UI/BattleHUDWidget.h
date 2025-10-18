@@ -10,6 +10,19 @@ class UTextBlock;
 class AFighterPawn;
 class UGridOverlayComponent;
 class UTexture2D;
+class UCombatFloaterPoolSubsystem;
+class UW_FloatingText;
+
+struct FBattleActiveFloater {
+  TWeakObjectPtr<UW_FloatingText> Floater;
+  FVector AnchorLocation = FVector::ZeroVector;
+  FVector2D InitialOffset = FVector2D::ZeroVector;
+  float HorizontalDirection = 1.f;
+  float Lifetime = 1.4f;
+  float FadeDuration = 0.35f;
+  float Elapsed = 0.f;
+  float Scale = 1.f;
+};
 
 /**
  * HUD widget displayed during grid battles.
@@ -19,7 +32,12 @@ class SKALD_API UBattleHUDWidget : public UUserWidget {
   GENERATED_BODY()
 
 public:
+  UBattleHUDWidget(const FObjectInitializer &ObjectInitializer);
+
   virtual void NativeConstruct() override;
+  virtual void NativeTick(const FGeometry &MyGeometry,
+                          float InDeltaTime) override;
+  virtual void NativeDestruct() override;
 
   /** Refresh all stat text from the currently bound fighter. */
   UFUNCTION(BlueprintCallable, Category = "Skald|Battle")
@@ -182,6 +200,14 @@ public:
   /** Clear any preview highlights tracked by the widget. */
   void ClearCommandPreviews();
 
+  /** Display floating text anchored around a world location. */
+  void ShowCombatFloater(const FVector &WorldLocation, const FText &Message,
+                         const FLinearColor &Tint, float Scale = 1.f,
+                         float LifetimeOverride = -1.f);
+
+  /** Helper used by attack resolution events to show damage/miss floaters. */
+  void ShowAttackResultFloater(AFighterPawn *Target, bool bHit, int32 Damage);
+
 private:
   /** Callback when MoveButton is pressed. */
   UFUNCTION()
@@ -228,6 +254,47 @@ private:
 
   /** Reveal the initiative roll button after a short delay. */
   void RevealInitiativeRollButton();
+
+  void UpdateCombatFloaters(float DeltaSeconds);
+  void ReleaseFloaterAtIndex(int32 Index);
+  UCombatFloaterPoolSubsystem *ResolveFloaterPool();
+
+  /** Class used to spawn floaters via the shared subsystem. */
+  UPROPERTY(EditAnywhere, Category = "Skald|Battle|Floaters")
+  TSubclassOf<UW_FloatingText> FloaterWidgetClass;
+
+  /** Lifetime for damage/miss floaters. */
+  UPROPERTY(EditAnywhere, Category = "Skald|Battle|Floaters")
+  float FloaterLifetime = 1.4f;
+
+  /** Portion of the lifetime reserved for the fade. */
+  UPROPERTY(EditAnywhere, Category = "Skald|Battle|Floaters")
+  float FloaterFadeDuration = 0.35f;
+
+  /** Height of the arc applied to floaters. */
+  UPROPERTY(EditAnywhere, Category = "Skald|Battle|Floaters")
+  float FloaterArcHeight = 110.f;
+
+  /** Horizontal drift in pixels over the lifetime. */
+  UPROPERTY(EditAnywhere, Category = "Skald|Battle|Floaters")
+  float FloaterHorizontalDrift = 36.f;
+
+  /** Clamp margin for projected positions. */
+  UPROPERTY(EditAnywhere, Category = "Skald|Battle|Floaters")
+  float FloaterClampMargin = 28.f;
+
+  /** Default colour for successful hits. */
+  UPROPERTY(EditAnywhere, Category = "Skald|Battle|Floaters")
+  FLinearColor HitFloaterColor = FLinearColor(0.9f, 0.2f, 0.2f);
+
+  /** Default colour for misses. */
+  UPROPERTY(EditAnywhere, Category = "Skald|Battle|Floaters")
+  FLinearColor MissFloaterColor = FLinearColor(0.8f, 0.8f, 0.8f);
+
+  /** Active floating text widgets managed by the battle HUD. */
+  TArray<FBattleActiveFloater> ActiveFloaters;
+
+  TWeakObjectPtr<UCombatFloaterPoolSubsystem> CachedFloaterPool;
 
   /** Whether movement preview is currently shown. */
   bool bMoveSelected = false;

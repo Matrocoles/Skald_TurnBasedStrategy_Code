@@ -5,10 +5,18 @@
 #include "Engine/World.h"
 #include "FighterPawn.h"
 #include "GridOverlayComponent.h"
+#include "UI/CombatFloaterPoolSubsystem.h"
+#include "UI/W_FloatingText.h"
 #include "Math/UnrealMathUtility.h"
 #include "TimerManager.h"
 #include "Engine/Texture2D.h"
 #include "UObject/WeakObjectPtrTemplates.h"
+
+UBattleHUDWidget::UBattleHUDWidget(const FObjectInitializer &ObjectInitializer)
+    : Super(ObjectInitializer) {
+  bCanEverTick = true;
+  FloaterWidgetClass = UW_FloatingText::StaticClass();
+}
 
 void UBattleHUDWidget::NativeConstruct() {
   Super::NativeConstruct();
@@ -47,6 +55,27 @@ void UBattleHUDWidget::NativeConstruct() {
   if (DiceRollerImage) {
     DiceRollerImage->SetVisibility(ESlateVisibility::Collapsed);
   }
+
+  if (UCombatFloaterPoolSubsystem *FloaterPool = ResolveFloaterPool()) {
+    if (FloaterWidgetClass) {
+      FloaterPool->FloaterWidgetClass = FloaterWidgetClass;
+    }
+  }
+}
+
+void UBattleHUDWidget::NativeTick(const FGeometry &MyGeometry,
+                                  float InDeltaTime) {
+  Super::NativeTick(MyGeometry, InDeltaTime);
+  UpdateCombatFloaters(InDeltaTime);
+}
+
+void UBattleHUDWidget::NativeDestruct() {
+  while (ActiveFloaters.Num() > 0) {
+    ReleaseFloaterAtIndex(ActiveFloaters.Num() - 1);
+  }
+  CachedFloaterPool.Reset();
+
+  Super::NativeDestruct();
 }
 
 void UBattleHUDWidget::ShowInitiativePrompt(const FText &PromptText) {
@@ -433,4 +462,133 @@ void UBattleHUDWidget::HideInitiativeText() {
     return;
   }
   InitiativeText->SetVisibility(ESlateVisibility::Collapsed);
+}
+
+void UBattleHUDWidget::ShowCombatFloater(const FVector &WorldLocation,
+                                         const FText &Message,
+                                         const FLinearColor &Tint, float Scale,
+                                         float LifetimeOverride) {
+  UCombatFloaterPoolSubsystem *Pool = ResolveFloaterPool();
+  if (!Pool) {
+    return;
+  }
+
+  if (FloaterWidgetClass) {
+    Pool->FloaterWidgetClass = FloaterWidgetClass;
+  }
+
+  APlayerController *OwningController = GetOwningPlayer();
+  if (!OwningController) {
+    return;
+  }
+
+  if (UW_FloatingText *Floater = Pool->SpawnFloater(OwningController)) {
+    Floater->SetText(Message);
+    Floater->SetColorAndOpacity(Tint);
+    Floater->SetFloaterOpacity(1.f);
+    Floater->SetFloaterScale(Scale);
+
+    FBattleActiveFloater &Entry = ActiveFloaters.AddDefaulted_GetRef();
+    Entry.Floater = Floater;
+    Entry.AnchorLocation = WorldLocation;
+    Entry.InitialOffset = FVector2D(FMath::RandRange(-18.f, 18.f), 0.f);
+    Entry.HorizontalDirection = FMath::RandBool() ? 1.f : -1.f;
+    Entry.Lifetime = LifetimeOverride > 0.f ? LifetimeOverride : FloaterLifetime;
+    Entry.Lifetime = FMath::Max(Entry.Lifetime, 0.1f);
+    Entry.FadeDuration = FloaterFadeDuration;
+    Entry.Elapsed = 0.f;
+    Entry.Scale = Scale;
+
+    Floater->UpdateProjection(WorldLocation, Entry.InitialOffset,
+                              FloaterClampMargin);
+  }
+}
+
+void UBattleHUDWidget::ShowAttackResultFloater(AFighterPawn *Target, bool bHit,
+                                               int32 Damage) {
+  if (!Target) {
+    return;
+  }
+
+  const FVector BaseLocation =
+      Target->GetActorLocation() + FVector(0.f, 0.f, 150.f);
+  const FText Text =
+      bHit ? FText::AsNumber(Damage)
+           : NSLOCTEXT("Skald", "BattleFloaterMiss", "Miss");
+  const FLinearColor Colour = bHit ? HitFloaterColor : MissFloaterColor;
+  const float Scale = bHit ? 1.f : 0.9f;
+
+  ShowCombatFloater(BaseLocation, Text, Colour, Scale);
+}
+
+void UBattleHUDWidget::UpdateCombatFloaters(float DeltaSeconds) {
+  if (ActiveFloaters.Num() == 0) {
+    return;
+  }
+
+  for (int32 Index = ActiveFloaters.Num() - 1; Index >= 0; --Index) {
+    FBattleActiveFloater &Entry = ActiveFloaters[Index];
+    UW_FloatingText *Floater = Entry.Floater.Get();
+    if (!Floater) {
+      ActiveFloaters.RemoveAtSwap(Index);
+      continue;
+    }
+
+    Entry.Elapsed += DeltaSeconds;
+    const float Lifetime = FMath::Max(Entry.Lifetime, 0.1f);
+    const float Normalised = FMath::Clamp(Entry.Elapsed / Lifetime, 0.f, 1.f);
+
+    const float VerticalArc = FMath::Sin(Normalised * PI) * FloaterArcHeight;
+    const float Horizontal = Entry.HorizontalDirection * FloaterHorizontalDrift *
+                             Normalised;
+    const FVector2D Offset = Entry.InitialOffset +
+                             FVector2D(Horizontal, -VerticalArc);
+
+    Floater->UpdateProjection(Entry.AnchorLocation, Offset, FloaterClampMargin);
+
+    const float FadeStart = FMath::Max(Lifetime - Entry.FadeDuration, 0.f);
+    float Opacity = 1.f;
+    if (Entry.Elapsed >= FadeStart && Entry.FadeDuration > KINDA_SMALL_NUMBER) {
+      Opacity = FMath::Clamp((Lifetime - Entry.Elapsed) / Entry.FadeDuration,
+                             0.f, 1.f);
+    }
+    Floater->SetFloaterOpacity(Opacity);
+    Floater->SetFloaterScale(Entry.Scale);
+
+    if (Entry.Elapsed >= Lifetime) {
+      ReleaseFloaterAtIndex(Index);
+    }
+  }
+}
+
+void UBattleHUDWidget::ReleaseFloaterAtIndex(int32 Index) {
+  if (!ActiveFloaters.IsValidIndex(Index)) {
+    return;
+  }
+
+  if (UW_FloatingText *Floater = ActiveFloaters[Index].Floater.Get()) {
+    if (UCombatFloaterPoolSubsystem *Pool = ResolveFloaterPool()) {
+      Pool->ReleaseFloater(Floater);
+    } else {
+      Floater->RemoveFromParent();
+    }
+  }
+
+  ActiveFloaters.RemoveAtSwap(Index);
+}
+
+UCombatFloaterPoolSubsystem *UBattleHUDWidget::ResolveFloaterPool() {
+  if (CachedFloaterPool.IsValid()) {
+    return CachedFloaterPool.Get();
+  }
+
+  if (UWorld *World = GetWorld()) {
+    if (UCombatFloaterPoolSubsystem *Pool =
+            World->GetSubsystem<UCombatFloaterPoolSubsystem>()) {
+      CachedFloaterPool = Pool;
+      return Pool;
+    }
+  }
+
+  return nullptr;
 }
