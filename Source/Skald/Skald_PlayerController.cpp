@@ -1672,9 +1672,6 @@ void ASkaldPlayerController::HandleAttackPhase() {
   if (MainHUD) {
     MainHUD->CancelMoveSelection();
     MainHUD->CancelAttackSelection();
-    if (IsMyTurn()) {
-      MainHUD->BeginAttackSelection();
-    }
     MainHUD->UpdateInitiativeText(TEXT("Attack Phase"));
   }
 }
@@ -1726,9 +1723,6 @@ void ASkaldPlayerController::HandleMovementPhase() {
   if (MainHUD) {
     MainHUD->CancelAttackSelection();
     MainHUD->CancelMoveSelection();
-    if (IsMyTurn()) {
-      MainHUD->BeginMoveSelection();
-    }
     MainHUD->UpdateInitiativeText(TEXT("Movement Phase"));
   }
 }
