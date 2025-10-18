@@ -43,12 +43,12 @@ FString GetWorldPackageName(const UWorld *World) {
 
   if (const ULevel *PersistentLevel = World->PersistentLevel) {
     if (const UPackage *Package = PersistentLevel->GetOutermost()) {
-      return Package->GetName();
+      return Package->GetPathName();
     }
   }
 
   if (const UPackage *WorldPackage = World->GetPackage()) {
-    return WorldPackage->GetName();
+    return WorldPackage->GetPathName();
   }
 
   return FString();
