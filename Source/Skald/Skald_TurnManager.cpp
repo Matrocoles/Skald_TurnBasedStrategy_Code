@@ -28,8 +28,56 @@
 #include "WorldMap.h"
 
 #include "AssetRegistry/AssetRegistryModule.h"
+#include "AssetRegistry/AssetRegistryTypes.h"
+#include "AssetRegistry/IAssetRegistry.h"
 
 namespace {
+FString ResolveMapPackageFromRegistry(const FString &MapName) {
+  if (MapName.IsEmpty()) {
+    return FString();
+  }
+
+  FAssetRegistryModule *AssetRegistryModule =
+      FModuleManager::GetModulePtr<FAssetRegistryModule>("AssetRegistry");
+  if (!AssetRegistryModule) {
+    return FString();
+  }
+
+  IAssetRegistry &AssetRegistry = AssetRegistryModule->Get();
+  const FName TargetAssetName(*MapName);
+  const FTopLevelAssetPath WorldClassPath =
+      UWorld::StaticClass()->GetClassPathName();
+
+  auto MatchesTarget = [&](const FAssetData &Asset) {
+    return Asset.AssetName == TargetAssetName &&
+           Asset.AssetClassPath == WorldClassPath;
+  };
+
+  FARFilter Filter;
+  Filter.bRecursivePaths = true;
+  Filter.ClassPaths.Add(WorldClassPath);
+  Filter.PackagePaths.Add(FName(TEXT("/Game")));
+
+  TArray<FAssetData> Assets;
+  AssetRegistry.GetAssets(Filter, Assets);
+  for (const FAssetData &Asset : Assets) {
+    if (MatchesTarget(Asset)) {
+      return Asset.PackageName.ToString();
+    }
+  }
+
+  Assets.Reset();
+  if (AssetRegistry.GetAllAssets(Assets, /*bIncludeOnlyOnDiskAssets=*/true)) {
+    for (const FAssetData &Asset : Assets) {
+      if (MatchesTarget(Asset)) {
+        return Asset.PackageName.ToString();
+      }
+    }
+  }
+
+  return FString();
+}
+
 FString GetResolvedPlayerName(const ASkaldPlayerState *PlayerState,
                               const TCHAR *Context) {
   if (!PlayerState) {
