@@ -346,6 +346,8 @@ protected:
                                   bool bShow = true);
   void ShowSelectionErrorMessage(const FString &Message);
 
+  ATerritory *GetCurrentlySelectedTerritory() const;
+
   virtual void NativeConstruct() override;
   virtual void NativeDestruct() override;
 
