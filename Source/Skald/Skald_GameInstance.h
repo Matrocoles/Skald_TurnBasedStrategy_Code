@@ -36,6 +36,10 @@ struct FSkaldTravelState
   UPROPERTY(BlueprintReadWrite, EditAnywhere)
   int32 DefenderTerritory = -1;
 
+  /** Canonical map to return to once battle travel completes. */
+  UPROPERTY(BlueprintReadWrite, EditAnywhere)
+  FString ReturnMap;
+
   /** Snapshot of the overworld territories captured prior to travel. */
   UPROPERTY(BlueprintReadWrite, EditAnywhere)
   TArray<FS_Territory> CachedTerritories;

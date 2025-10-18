@@ -1089,6 +1089,7 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
     TravelState.ExpectedControllers = ValidControllers;
     TravelState.AttackerTerritory = SeededBattle.FromTerritoryID;
     TravelState.DefenderTerritory = SeededBattle.TargetTerritoryID;
+    TravelState.ReturnMap = ResolveCanonicalReturnMapFromWorld(World);
 
     auto AppendHumanOwnership = [&](ASkaldPlayerState *OwnerPS, int32 TerritoryID) {
       if (OwnerPS && !OwnerPS->bIsAI && TerritoryID > 0) {
