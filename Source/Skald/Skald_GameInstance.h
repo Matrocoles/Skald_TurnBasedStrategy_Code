@@ -155,6 +155,10 @@ public:
   UPROPERTY(BlueprintReadWrite, Category = "Turn")
   int32 SavedTurnIndex = 0;
 
+  /** Identifier of the player whose turn was active prior to travelling. */
+  UPROPERTY(BlueprintReadWrite, Category = "Turn")
+  int32 SavedTurnPlayerId = 0;
+
   /** Phase of the turn cycle that was active before travelling. */
   UPROPERTY(BlueprintReadWrite, Category = "Turn")
   ETurnPhase SavedTurnPhase = ETurnPhase::Reinforcement;
