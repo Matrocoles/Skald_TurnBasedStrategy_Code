@@ -28,8 +28,15 @@
 #include "WorldMap.h"
 
 #include "AssetRegistry/AssetRegistryModule.h"
-#include "AssetRegistry/AssetRegistryTypes.h"
 #include "AssetRegistry/IAssetRegistry.h"
+
+#if ENGINE_MAJOR_VERSION > 5 ||                                             \
+    (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5)
+#include "AssetRegistry/ARFilter.h"
+#include "AssetRegistry/AssetData.h"
+#else
+#include "AssetRegistry/AssetRegistryTypes.h"
+#endif
 
 namespace {
 FString ResolveMapPackageFromRegistry(const FString &MapName) {
