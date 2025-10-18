@@ -43,6 +43,12 @@ namespace {
 FString GetWorldPackageName(const UWorld *World);
 FString ResolveMapPackageFromRegistry(const FString &MapName);
 
+FString GetFallbackOverviewMapPackageName()
+{
+  static const FString FallbackPath(TEXT("/Game/Blueprints/Maps/OverviewMap"));
+  return FallbackPath;
+}
+
 FString StripStreamingPrefixFromPackageName(FString PackageName,
                                             const UWorld *ReferenceWorld) {
   if (PackageName.IsEmpty() || !ReferenceWorld) {
@@ -495,16 +501,23 @@ void ATurnManager::HandleGridBattleEnded(ESkaldFaction /*WinningFaction*/, int32
   }
 
   if (ReturnMapName.IsEmpty()) {
-    const FString PendingBattleValue = PendingBattle.ReturnMap;
-    const FString GameInstanceValue = GI ? GI->PendingBattle.ReturnMap : FString();
-    const TCHAR *PendingValueForLog =
-        PendingBattleValue.IsEmpty() ? TEXT("<Empty>") : *PendingBattleValue;
-    const TCHAR *GameInstanceValueForLog =
-        GameInstanceValue.IsEmpty() ? TEXT("<Empty>") : *GameInstanceValue;
-    UE_LOG(LogSkald, Error,
-           TEXT("HandleGridBattleEnded: unable to resolve return map (Pending='%s', GI='%s')."),
-           PendingValueForLog, GameInstanceValueForLog);
-    return;
+    const FString FallbackMap = GetFallbackOverviewMapPackageName();
+    if (TryResolveReturnMap(FallbackMap, TEXT("FallbackOverviewMap"))) {
+      if (GI) {
+        GI->SetPendingReturnMap(ReturnMapName);
+      }
+    } else {
+      const FString PendingBattleValue = PendingBattle.ReturnMap;
+      const FString GameInstanceValue = GI ? GI->PendingBattle.ReturnMap : FString();
+      const TCHAR *PendingValueForLog =
+          PendingBattleValue.IsEmpty() ? TEXT("<Empty>") : *PendingBattleValue;
+      const TCHAR *GameInstanceValueForLog =
+          GameInstanceValue.IsEmpty() ? TEXT("<Empty>") : *GameInstanceValue;
+      UE_LOG(LogSkald, Error,
+             TEXT("HandleGridBattleEnded: unable to resolve return map (Pending='%s', GI='%s')."),
+             PendingValueForLog, GameInstanceValueForLog);
+      return;
+    }
   }
 
   UE_LOG(LogSkald, Verbose,
@@ -997,11 +1010,13 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
     SeededBattle.ReturnMap = ResolveCanonicalReturnMapFromWorld(World);
 
     if (SeededBattle.ReturnMap.IsEmpty()) {
+      const FString FallbackMap = GetFallbackOverviewMapPackageName();
       UE_LOG(LogSkald, Error,
-             TEXT("TriggerGridBattle: Failed to resolve a canonical return map for world %s."),
-             *GetNameSafe(World));
+             TEXT("TriggerGridBattle: Failed to resolve a canonical return map for world %s. Falling back to '%s'."),
+             *GetNameSafe(World), *FallbackMap);
+      SeededBattle.ReturnMap = FallbackMap;
       if (GI) {
-        GI->ClearPendingReturnMap();
+        GI->SetPendingReturnMap(FallbackMap);
       }
     } else if (!FPackageName::IsValidLongPackageName(SeededBattle.ReturnMap)) {
       UE_LOG(LogSkald, Warning,
