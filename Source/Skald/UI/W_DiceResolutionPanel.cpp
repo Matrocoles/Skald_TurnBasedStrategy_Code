@@ -87,9 +87,13 @@ void UW_DiceResolutionPanel::ResetPanel()
     UpdateTallies();
 }
 
-void UW_DiceResolutionPanel::SetDiceFaceTextures(const TArray<TObjectPtr<UTexture2D>>& InTextures)
+void UW_DiceResolutionPanel::SetDiceFaceTextures(const TArray<UTexture2D*>& InTextures)
 {
-    DiceFaceTextures = InTextures;
+    DiceFaceTextures.Reset(InTextures.Num());
+    for (UTexture2D* Texture : InTextures)
+    {
+        DiceFaceTextures.Add(Texture);
+    }
 }
 
 void UW_DiceResolutionPanel::ClearOutcomeEntries()
