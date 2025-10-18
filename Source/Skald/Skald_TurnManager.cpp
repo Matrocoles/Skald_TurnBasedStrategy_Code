@@ -45,12 +45,13 @@ FString ResolveMapPackageFromRegistry(const FString &MapName) {
   }
 
   FAssetRegistryModule *AssetRegistryModule =
-      FModuleManager::GetModulePtr<FAssetRegistryModule>("AssetRegistry");
+      FModuleManager::LoadModulePtr<FAssetRegistryModule>("AssetRegistry");
   if (!AssetRegistryModule) {
     return FString();
   }
 
   IAssetRegistry &AssetRegistry = AssetRegistryModule->Get();
+  AssetRegistry.WaitForCompletion();
   const FName TargetAssetName(*MapName);
   const FTopLevelAssetPath WorldClassPath =
       UWorld::StaticClass()->GetClassPathName();
@@ -190,6 +191,27 @@ FString NormalizeMapName(UWorld *World, FString Candidate) {
     }
   }
 
+  if (!Result.IsEmpty() && !FPackageName::IsValidLongPackageName(Result)) {
+    FString ConvertedName;
+    if (FPackageName::TryConvertFilenameToLongPackageName(Result, ConvertedName)) {
+      Result = MoveTemp(ConvertedName);
+    } else {
+      const FSoftObjectPath ObjectPath(Result);
+      const FString LongFromObject = ObjectPath.GetLongPackageName();
+      if (!LongFromObject.IsEmpty()) {
+        Result = LongFromObject;
+      }
+    }
+  }
+
+  if (!Result.IsEmpty() && !FPackageName::IsValidLongPackageName(Result) &&
+      FPackageName::IsShortPackageName(Result)) {
+    const FString RegistryName = ResolveMapPackageFromRegistry(Result);
+    if (!RegistryName.IsEmpty()) {
+      Result = RegistryName;
+    }
+  }
+
   return Result;
 }
 } // namespace
@@ -291,6 +313,15 @@ void ATurnManager::HandleGridBattleEnded(ESkaldFaction /*WinningFaction*/, int32
 
   if (ReturnMapName.IsEmpty()) {
     ReturnMapName = UGameplayStatics::GetCurrentLevelName(this, true);
+  }
+
+  ReturnMapName = NormalizeMapName(nullptr, MoveTemp(ReturnMapName));
+
+  if (!ReturnMapName.IsEmpty() &&
+      !FPackageName::IsValidLongPackageName(ReturnMapName)) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("HandleGridBattleEnded resolved non-long return map '%s'."),
+           *ReturnMapName);
   }
 
   ResolveGridBattleResult();
@@ -766,6 +797,19 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
       }
     }
     SeededBattle.ReturnMap = MoveTemp(ReturnMap);
+
+    if (!SeededBattle.ReturnMap.IsEmpty()) {
+      FString CanonicalReturn = NormalizeMapName(nullptr, SeededBattle.ReturnMap);
+      if (!CanonicalReturn.IsEmpty()) {
+        SeededBattle.ReturnMap = MoveTemp(CanonicalReturn);
+      }
+
+      if (!FPackageName::IsValidLongPackageName(SeededBattle.ReturnMap)) {
+        UE_LOG(LogSkald, Warning,
+               TEXT("TriggerGridBattle cached non-long return map '%s'."),
+               *SeededBattle.ReturnMap);
+      }
+    }
 
     CachedWorldMap = ResolveWorldMap();
 
