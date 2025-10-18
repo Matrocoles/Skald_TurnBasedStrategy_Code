@@ -21,6 +21,12 @@ This backlog breaks the dice resolution revamp into startable tasks. Each task c
   - On miss: play whoosh SFX and slide a narrow angled “MISS” tag past defender (10–16px drift then fade).
   - Ensure success uses teal/blue-green palette, misses neutral gray, and shapes differ (✔ vs ×) for accessibility.
 
+- **Wire baseline combat audio cues**
+  - Randomize dice-roll sound effects by selecting from a designer-filled `TArray<USoundBase*> DiceRollVariants` as each die reveals.
+  - Trigger three attack-start cues (`AttackPrepare`, `AttackResolve`, `AttackCrit`) right as the attacker enters resolution so animation, UI, and audio stay aligned.
+  - Loop a movement bed while fighters traverse the grid, updating attenuation from the mover each tick and stopping cleanly when locomotion finishes.
+  - Feed all new cues through the existing master audio mix so the global settings slider scales them alongside current sounds.
+
 ## Medium polish (premium feel)
 
 - **Resolve bar feedback**
@@ -35,6 +41,11 @@ This backlog breaks the dice resolution revamp into startable tasks. Each task c
   - Aggregate floaters for attacks resolving within 300 ms, showing a single "-XX" with short counting animation.
   - Cap concurrent floaters on screen (~6) and queue extras for later display.
 
+- **Layer audio sweeteners and variations**
+  - Add lightweight success pings and miss whooshes that sync with the staggered die reveals and resolve bar progress.
+  - Blend movement loop texture variants (stone, dirt, metal) based on traversed tile material, crossfading when the surface changes.
+  - Fire the hit/miss/crit outcome cues from the same handler that batches floaters so audio aligns with aggregated damage feedback.
+
 ## Deluxe stretch goals
 
 - **Cinematic crit moments**
@@ -47,10 +58,18 @@ This backlog breaks the dice resolution revamp into startable tasks. Each task c
 - **Combat log panel**
   - Append concise log entries ("Lancer hit (2) • Guard blocked (1) • Bleed applied") tied to `FDiceRollResult` data for reference.
 
+- **Crit stingers and ambient swells**
+  - Layer a faction-aware crit stinger that ducks other channels during the cinematic slowdown.
+  - Fade in a short tonal swell as the resolve bar nears completion, releasing it when the bar resolves for added drama.
+
 ## Accessibility
 
 - **Low-motion toggle**
   - Add settings flag to disable trails, camera shake, and intense flashes, substituting crossfade highlights.
   - Maintain success/failure differentiation through icons and text when motion is reduced.
+
+- **Audio intensity toggle alignment**
+  - Pair the low-motion option with an audio-intensity reduction that mutes sweeteners while leaving core informational cues (dice roll, hit/miss/crit) audible.
+  - Expose the cue arrays in data assets so designers can add or swap sounds without additional code churn.
 
 Each bullet above represents a self-contained task you can start; together they satisfy the full plan while respecting the one-attack-per-die flow.
