@@ -514,8 +514,8 @@ void USkaldMainHUDWidget::QueueDiceResolution(AFighterPawn *Attacker,
                                               AFighterPawn *Defender,
                                               const FDiceRollResult &Result) {
   FQueuedDiceResolution Entry;
-  Entry.Attacker = Attacker;
-  Entry.Defender = Defender;
+  Entry.Attacker = MakeWeakObjectPtr(Attacker);
+  Entry.Defender = MakeWeakObjectPtr(Defender);
   Entry.Result = Result;
   PendingDiceResolutions.Add(MoveTemp(Entry));
 
