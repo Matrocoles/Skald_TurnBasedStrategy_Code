@@ -5,7 +5,10 @@
 #include "TimerManager.h"
 #include "W_DiceResolutionPanel.generated.h"
 
+class UHorizontalBox;
+class UImage;
 class UTextBlock;
+class UTexture2D;
 class UVerticalBox;
 class UWidget;
 
@@ -37,6 +40,10 @@ public:
     UFUNCTION(BlueprintCallable, Category="Skald|Battle|Dice")
     void ResetPanel();
 
+    /** Override the dice face textures used for reveal imagery. */
+    UFUNCTION(BlueprintCallable, Category="Skald|Battle|Dice")
+    void SetDiceFaceTextures(const TArray<TObjectPtr<UTexture2D>>& InTextures);
+
 protected:
     void ClearOutcomeEntries();
     void ScheduleNextReveal(float MinDelay, float MaxDelay);
@@ -64,8 +71,13 @@ protected:
     UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
     UWidget* ResolveProgressPlaceholder;
 
+    /** Dice face textures indexed from 1 to 6 that should be displayed during reveals. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Skald|Battle|Dice")
+    TArray<TObjectPtr<UTexture2D>> DiceFaceTextures;
+
 private:
     void BroadcastCompletion();
+    UTexture2D* ResolveDiceTexture(int32 RollValue) const;
 
     /** Copy of the current result used for playback. */
     FDiceRollResult ActiveResult;
