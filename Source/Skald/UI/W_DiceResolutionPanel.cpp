@@ -10,11 +10,13 @@
 #include "Engine/World.h"
 #include "Math/UnrealMathUtility.h"
 #include "TimerManager.h"
+#include "Math/Vector2D.h"
 
 namespace
 {
 constexpr float RevealDelayMinSeconds = 0.08f;
 constexpr float RevealDelayMaxSeconds = 0.12f;
+const FVector2D DiceOutcomeImageSize(72.f, 72.f);
 }
 
 UW_DiceResolutionPanel::UW_DiceResolutionPanel(const FObjectInitializer& ObjectInitializer)
@@ -58,7 +60,7 @@ void UW_DiceResolutionPanel::BeginResolution(const FDiceRollResult& Result)
         return;
     }
 
-    ScheduleNextReveal(RevealDelayMinSeconds, RevealDelayMaxSeconds);
+    RevealNextDie();
 }
 
 void UW_DiceResolutionPanel::ResetPanel()
@@ -162,6 +164,7 @@ void UW_DiceResolutionPanel::RevealNextDie()
                 if (DieImage)
                 {
                     DieImage->SetBrushFromTexture(DieTexture, true);
+                    DieImage->SetBrushSize(DiceOutcomeImageSize);
                     DieImage->SetVisibility(ESlateVisibility::HitTestInvisible);
 
                     if (UHorizontalBoxSlot* ImageSlot = EntryRow->AddChildToHorizontalBox(DieImage))
