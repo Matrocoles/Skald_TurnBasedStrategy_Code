@@ -517,13 +517,23 @@ void ATurnManager::HandleGridBattleEnded(ESkaldFaction /*WinningFaction*/, int32
 
   if (World) {
     const ENetMode NetMode = World->GetNetMode();
-    FString NetModeString;
-    if (const UEnum *NetModeEnum = StaticEnum<ENetMode>()) {
-      NetModeString =
-          NetModeEnum->GetNameStringByValue(static_cast<int64>(NetMode));
-    }
-    const TCHAR *NetModeStringPtr =
-        NetModeString.IsEmpty() ? TEXT("Unknown") : *NetModeString;
+    auto NetModeToString = [](ENetMode InNetMode) {
+      switch (InNetMode) {
+      case NM_Standalone:
+        return TEXT("NM_Standalone");
+      case NM_DedicatedServer:
+        return TEXT("NM_DedicatedServer");
+      case NM_ListenServer:
+        return TEXT("NM_ListenServer");
+      case NM_Client:
+        return TEXT("NM_Client");
+      case NM_MAX:
+        return TEXT("NM_MAX");
+      default:
+        return TEXT("Unknown");
+      }
+    };
+    const TCHAR *NetModeStringPtr = NetModeToString(NetMode);
 
     UE_LOG(LogSkald, Log,
            TEXT("HandleGridBattleEnded: travelling to '%s' (source=%s, NetMode=%s)."),
