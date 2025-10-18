@@ -63,6 +63,10 @@ public:
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *AttackDamageText;
 
+  /** Critical damage display text. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UTextBlock *CriticalDamageText;
+
   /** Attack dice display text. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *AttackDiceText;

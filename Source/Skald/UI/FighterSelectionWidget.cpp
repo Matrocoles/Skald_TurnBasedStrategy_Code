@@ -60,6 +60,11 @@ void UFighterEntryWidget::Init(const FFighterDefinition &InFighter,
   if (AttackDamageText) {
     AttackDamageText->SetText(FText::AsNumber(Fighter.Stats.AttackDamage));
   }
+  if (CriticalDamageText) {
+    const int32 CriticalDamage =
+        Fighter.Stats.AttackDamage + Fighter.Stats.CriticalBonusDamage;
+    CriticalDamageText->SetText(FText::AsNumber(CriticalDamage));
+  }
   if (AttackDiceText) {
     AttackDiceText->SetText(FText::AsNumber(Fighter.Stats.AttackDice));
   }
