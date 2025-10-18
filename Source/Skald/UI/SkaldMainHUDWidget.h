@@ -218,6 +218,10 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Skald|Selection")
   void CancelMoveSelection();
 
+  /** Display the outcome of a move attempt originating from this HUD. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Selection")
+  void HandleMoveOutcome(bool bSuccess, const FString &Message);
+
   /** Reset movement selection after a failed attempt so players can retry. */
   UFUNCTION(BlueprintCallable, Category = "Skald|Selection")
   void ResetMoveSelectionAfterInvalidAttempt();

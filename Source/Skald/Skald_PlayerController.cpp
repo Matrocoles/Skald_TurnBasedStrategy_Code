@@ -1274,6 +1274,51 @@ bool ASkaldPlayerController::ValidateAttack(int32 FromID, int32 ToID,
   return true;
 }
 
+bool ASkaldPlayerController::ValidateMoveRequest(
+    AWorldMap *WorldMap, int32 FromID, int32 ToID, int32 Troops,
+    ATerritory *&OutSource, ATerritory *&OutTarget, FString &OutError) const {
+  OutSource = nullptr;
+  OutTarget = nullptr;
+
+  if (!WorldMap) {
+    OutError = TEXT("World map not found");
+    return false;
+  }
+
+  OutSource = WorldMap->GetTerritoryById(FromID);
+  OutTarget = WorldMap->GetTerritoryById(ToID);
+  if (!OutSource || !OutTarget) {
+    OutError = TEXT("Invalid territory selection");
+    return false;
+  }
+
+  ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
+  if (!PS) {
+    OutError = TEXT("Missing player state");
+    return false;
+  }
+
+  if (OutSource->OwningPlayer != PS || OutTarget->OwningPlayer != PS) {
+    OutError = TEXT("You may only move between your territories");
+    return false;
+  }
+
+  const int32 MaxMovable = OutSource->ArmyUnits - 1;
+  if (Troops <= 0 || Troops > MaxMovable) {
+    OutError = TEXT("Invalid troop count for movement");
+    return false;
+  }
+
+  TArray<ATerritory *> Path;
+  if (!WorldMap->FindPath(OutSource, OutTarget, Path) || Path.Num() < 2) {
+    OutError =
+        TEXT("Selected territories must be connected by a friendly path");
+    return false;
+  }
+
+  return true;
+}
+
 void ASkaldPlayerController::HandleAttackRequested(int32 FromID, int32 ToID,
                                                    int32 ArmySent,
                                                    bool bUseSiege) {
@@ -1408,46 +1453,29 @@ void ASkaldPlayerController::HandleMoveRequested(int32 FromID, int32 ToID,
     }
   };
 
+  if (!IsMyTurn()) {
+    NotifyActionError(TEXT("You can only move troops during your turn"));
+    ResetSelectionForRetry();
+    return;
+  }
+
+  const bool bInMovementPhase =
+      (TurnManager && TurnManager->GetCurrentPhase() == ETurnPhase::Movement) ||
+      (MainHUD && MainHUD->CurrentPhase == ETurnPhase::Movement);
+  if (!bInMovementPhase) {
+    NotifyActionError(TEXT("Troops can only move during the movement phase"));
+    ResetSelectionForRetry();
+    return;
+  }
+
   AWorldMap *WorldMap = Cast<AWorldMap>(
       UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
-  if (!WorldMap) {
-    NotifyActionError(TEXT("World map not found"));
-    ResetSelectionForRetry();
-    return;
-  }
-
-  ATerritory *Source = WorldMap->GetTerritoryById(FromID);
-  ATerritory *Target = WorldMap->GetTerritoryById(ToID);
-  if (!Source || !Target) {
-    NotifyActionError(TEXT("Invalid territory selection"));
-    ResetSelectionForRetry();
-    return;
-  }
-
-  ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
-  if (!PS) {
-    NotifyActionError(TEXT("Missing player state"));
-    ResetSelectionForRetry();
-    return;
-  }
-
-  if (Source->OwningPlayer != PS || Target->OwningPlayer != PS) {
-    NotifyActionError(TEXT("You may only move between your territories"));
-    ResetSelectionForRetry();
-    return;
-  }
-
-  const int32 MaxMovable = Source->ArmyUnits - 1;
-  if (Troops <= 0 || Troops > MaxMovable) {
-    NotifyActionError(TEXT("Invalid troop count for movement"));
-    ResetSelectionForRetry();
-    return;
-  }
-
-  TArray<ATerritory *> Path;
-  if (!WorldMap->FindPath(Source, Target, Path) || Path.Num() < 2) {
-    NotifyActionError(
-        TEXT("Selected territories must be connected by a friendly path"));
+  FString Error;
+  ATerritory *Source = nullptr;
+  ATerritory *Target = nullptr;
+  if (!ValidateMoveRequest(WorldMap, FromID, ToID, Troops, Source, Target,
+                           Error)) {
+    NotifyActionError(Error);
     ResetSelectionForRetry();
     return;
   }
@@ -1458,25 +1486,43 @@ void ASkaldPlayerController::HandleMoveRequested(int32 FromID, int32 ToID,
 void ASkaldPlayerController::ServerHandleMove_Implementation(int32 FromID,
                                                              int32 ToID,
                                                              int32 Troops) {
+  FString Error;
+  if (!EnsureTurnManager(TEXT("ServerHandleMove"))) {
+    Error = TEXT("Unable to resolve turn manager");
+    ClientHandleMoveOutcome(false, FromID, ToID, Error);
+    return;
+  }
+
+  if (TurnManager->GetCurrentPhase() != ETurnPhase::Movement) {
+    Error = TEXT("Troops can only move during the movement phase");
+    ClientHandleMoveOutcome(false, FromID, ToID, Error);
+    return;
+  }
+
+  if (!IsMyTurn()) {
+    Error = TEXT("You can only move troops during your turn");
+    ClientHandleMoveOutcome(false, FromID, ToID, Error);
+    return;
+  }
+
   AWorldMap *WorldMap = Cast<AWorldMap>(
       UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
-  if (!WorldMap) {
+  ATerritory *Source = nullptr;
+  ATerritory *Target = nullptr;
+  if (!ValidateMoveRequest(WorldMap, FromID, ToID, Troops, Source, Target,
+                           Error)) {
+    ClientHandleMoveOutcome(false, FromID, ToID, Error);
     return;
   }
 
-  ATerritory *Source = WorldMap->GetTerritoryById(FromID);
-  ATerritory *Target = WorldMap->GetTerritoryById(ToID);
-  if (!Source || !Target) {
+  if (!WorldMap || !WorldMap->MoveBetween(Source, Target, Troops)) {
+    Error = TEXT("Unable to move troops right now");
+    ClientHandleMoveOutcome(false, FromID, ToID, Error);
     return;
   }
 
-  if (Troops <= 0 || Troops >= Source->ArmyUnits) {
-    return;
-  }
-
-  if (!WorldMap->MoveBetween(Source, Target, Troops)) {
-    return;
-  }
+  ClientHandleMoveOutcome(true, FromID, ToID,
+                          TEXT("Troops moved. Use End Phase to finish movement."));
 
   if (TurnManager) {
     for (ASkaldPlayerController *Controller : TurnManager->GetControllers()) {
@@ -1619,11 +1665,47 @@ void ASkaldPlayerController::ClientSelectTerritory_Implementation(
 void ASkaldPlayerController::HandleEndAttackRequested(bool bConfirmed) {
   UE_LOG(LogSkald, Log, TEXT("HUD end attack %s"),
          bConfirmed ? TEXT("confirmed") : TEXT("cancelled"));
+
+  if (!bConfirmed) {
+    return;
+  }
+
+  if (!IsMyTurn()) {
+    NotifyActionError(TEXT("You can only end the phase during your turn"));
+    return;
+  }
+
+  if ((TurnManager && TurnManager->GetCurrentPhase() != ETurnPhase::Attack) ||
+      (!TurnManager && MainHUD &&
+       MainHUD->CurrentPhase != ETurnPhase::Attack)) {
+    NotifyActionError(TEXT("You are not in the attack phase"));
+    return;
+  }
+
+  EndPhase();
 }
 
 void ASkaldPlayerController::HandleEndMovementRequested(bool bConfirmed) {
   UE_LOG(LogSkald, Log, TEXT("HUD end move %s"),
          bConfirmed ? TEXT("confirmed") : TEXT("cancelled"));
+
+  if (!bConfirmed) {
+    return;
+  }
+
+  if (!IsMyTurn()) {
+    NotifyActionError(TEXT("You can only end the phase during your turn"));
+    return;
+  }
+
+  if ((TurnManager && TurnManager->GetCurrentPhase() != ETurnPhase::Movement) ||
+      (!TurnManager && MainHUD &&
+       MainHUD->CurrentPhase != ETurnPhase::Movement)) {
+    NotifyActionError(TEXT("You are not in the movement phase"));
+    return;
+  }
+
+  EndPhase();
 }
 
 void ASkaldPlayerController::HandleEngineeringRequested(int32 CapitalID,
@@ -1794,6 +1876,20 @@ void ASkaldPlayerController::NotifyActionError_Implementation(
     MainHUD->ShowErrorMessage(Message);
   } else if (GEngine) {
     GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Red, Message);
+  }
+}
+
+void ASkaldPlayerController::ClientHandleMoveOutcome_Implementation(
+    bool bSuccess, int32 /*FromID*/, int32 /*ToID*/, const FString &Message) {
+  if (MainHUD) {
+    MainHUD->HandleMoveOutcome(bSuccess, Message);
+  } else if (GEngine) {
+    GEngine->AddOnScreenDebugMessage(-1, 4.f,
+                                     bSuccess ? FColor::Green : FColor::Red,
+                                     Message);
+  }
+  if (!bSuccess) {
+    UE_LOG(LogSkald, Warning, TEXT("Move request failed: %s"), *Message);
   }
 }
 

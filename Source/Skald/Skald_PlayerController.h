@@ -366,6 +366,11 @@ public:
   UFUNCTION(Server, Reliable)
   void ServerHandleMove(int32 FromID, int32 ToID, int32 Troops);
 
+  /** Notify the client of the result of a move request. */
+  UFUNCTION(Client, Reliable)
+  void ClientHandleMoveOutcome(bool bSuccess, int32 FromID, int32 ToID,
+                               const FString &Message);
+
   /** Server-side processing of a unit deployment. */
   UFUNCTION(Server, Reliable)
   void ServerDeployUnits(int32 TerritoryID, int32 Amount);
@@ -454,6 +459,10 @@ private:
 
   bool ValidateAttack(int32 FromID, int32 ToID, int32 ArmySent, bool bUseSiege,
                       FString *OutError);
+
+  bool ValidateMoveRequest(AWorldMap *WorldMap, int32 FromID, int32 ToID,
+                           int32 Troops, ATerritory *&OutSource,
+                           ATerritory *&OutTarget, FString &OutError) const;
 
   UFUNCTION(Client, Reliable)
   void NotifyActionError(const FString &Message);
