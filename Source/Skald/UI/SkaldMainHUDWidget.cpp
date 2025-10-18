@@ -217,12 +217,6 @@ void USkaldMainHUDWidget::HandleEndPhaseClicked() {
   } else if (CurrentPhase == ETurnPhase::Movement) {
     OnEndMovementRequested.Broadcast(true);
   }
-
-  if (APlayerController *PC = GetOwningPlayer()) {
-    if (ASkaldPlayerController *SPC = Cast<ASkaldPlayerController>(PC)) {
-      SPC->EndPhase();
-    }
-  }
 }
 
 void USkaldMainHUDWidget::UpdateTurnBanner(int32 InCurrentPlayerID,
@@ -608,8 +602,17 @@ void USkaldMainHUDWidget::BeginMoveSelection() {
 void USkaldMainHUDWidget::SubmitMove(int32 FromID, int32 ToID, int32 Troops) {
   OnMoveRequested.Broadcast(FromID, ToID, Troops);
   CancelMoveSelection();
-  ShowSelectionPromptMessage(
-      TEXT("Troops moved. Use End Phase to finish movement."));
+}
+
+void USkaldMainHUDWidget::HandleMoveOutcome(bool bSuccess,
+                                            const FString &Message) {
+  if (bSuccess) {
+    ShowSelectionPromptMessage(Message);
+    return;
+  }
+
+  ShowErrorMessage(Message);
+  ResetMoveSelectionAfterInvalidAttempt();
 }
 
 void USkaldMainHUDWidget::CancelMoveSelection() {
