@@ -1,5 +1,6 @@
 #include "UI/BattleHUDWidget.h"
 #include "Components/Button.h"
+#include "Components/CanvasPanelSlot.h"
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
 #include "Engine/World.h"
@@ -9,6 +10,7 @@
 #include "UI/W_DiceResolutionPanel.h"
 #include "UI/W_FloatingText.h"
 #include "Math/UnrealMathUtility.h"
+#include "Math/Vector2D.h"
 #include "TimerManager.h"
 #include "Engine/Texture2D.h"
 #include "UObject/WeakObjectPtrTemplates.h"
@@ -400,6 +402,9 @@ void UBattleHUDWidget::ShowDiceRoll(int32 RollValue, float DisplayDuration) {
     return;
   }
 
+  constexpr float DiceDisplaySize = 180.f;
+  constexpr float DiceBoardPadding = 48.f;
+
   UTexture2D *Texture = nullptr;
   const int32 Index = RollValue - 1;
   if (DiceFaceTextures.IsValidIndex(Index)) {
@@ -408,8 +413,28 @@ void UBattleHUDWidget::ShowDiceRoll(int32 RollValue, float DisplayDuration) {
 
   if (Texture) {
     DiceRollerImage->SetBrushFromTexture(Texture, true);
+    DiceRollerImage->SetBrushSize(FVector2D(DiceDisplaySize, DiceDisplaySize));
+    DiceRollerImage->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
+
+    if (UCanvasPanelSlot *DiceSlot = Cast<UCanvasPanelSlot>(DiceRollerImage->Slot)) {
+      DiceSlot->SetAnchors(FAnchors(0.5f, 0.5f));
+      DiceSlot->SetAlignment(FVector2D(0.5f, 0.5f));
+      DiceSlot->SetPosition(FVector2D::ZeroVector);
+      DiceSlot->SetSize(FVector2D(DiceDisplaySize, DiceDisplaySize));
+    }
+
     DiceRollerImage->SetVisibility(ESlateVisibility::HitTestInvisible);
     if (DiceBoardImage) {
+      DiceBoardImage->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
+
+      if (UCanvasPanelSlot *BoardSlot = Cast<UCanvasPanelSlot>(DiceBoardImage->Slot)) {
+        BoardSlot->SetAnchors(FAnchors(0.5f, 0.5f));
+        BoardSlot->SetAlignment(FVector2D(0.5f, 0.5f));
+        BoardSlot->SetPosition(FVector2D::ZeroVector);
+        BoardSlot->SetSize(FVector2D(DiceDisplaySize + DiceBoardPadding,
+                                     DiceDisplaySize + DiceBoardPadding));
+      }
+
       DiceBoardImage->SetVisibility(ESlateVisibility::HitTestInvisible);
     }
   } else {
@@ -431,7 +456,7 @@ void UBattleHUDWidget::ShowDiceRoll(int32 RollValue, float DisplayDuration) {
       }
     });
 
-    const float ClampedDuration = FMath::Max(0.f, DisplayDuration);
+    const float ClampedDuration = FMath::Clamp(DisplayDuration, 0.35f, 1.25f);
     TimerManager.SetTimer(DiceRollerHideTimer, TimerDelegate, ClampedDuration,
                           false);
   }
