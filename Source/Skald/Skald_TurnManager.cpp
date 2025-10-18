@@ -468,7 +468,10 @@ void ATurnManager::HandleGridBattleEnded(ESkaldFaction /*WinningFaction*/, int32
       return false;
     }
 
-    FString Canonical = EnsureLongPackageName(Candidate, World);
+    FString Canonical = EnsureLongPackageName(Candidate, nullptr);
+    if (Canonical.IsEmpty() && World) {
+      Canonical = EnsureLongPackageName(Candidate, World);
+    }
     if (Canonical.IsEmpty()) {
       UE_LOG(LogSkald, Warning,
              TEXT("HandleGridBattleEnded: %s value '%s' is not a valid long package name."),
