@@ -676,9 +676,7 @@ bool ASkaldAIController::TryMoveTowardsNearestEnemy(AFighterPawn *Fighter) {
     return BestDistance;
   };
 
-  FIntPoint Current = StartCell;
-  int32 CurrentDistance = ComputeDistanceFromAnchor(Current);
-
+  const int32 CurrentDistance = ComputeDistanceFromAnchor(StartCell);
   const int32 MaxSteps = Fighter->Stats.Movement;
 
   TSet<FIntPoint> IgnoredCells;
@@ -700,45 +698,105 @@ bool ASkaldAIController::TryMoveTowardsNearestEnemy(AFighterPawn *Fighter) {
     return true;
   };
 
-  for (int32 Step = 0; Step < MaxSteps; ++Step) {
-    TArray<FIntPoint> Directions = {FIntPoint(1, 0),   FIntPoint(-1, 0),  FIntPoint(0, 1),
-                                    FIntPoint(0, -1),  FIntPoint(1, 1),   FIntPoint(1, -1),
-                                    FIntPoint(-1, 1), FIntPoint(-1, -1)};
-    Directions.Sort([&](const FIntPoint &A, const FIntPoint &B) {
-      const int32 DistA = ComputeDistanceFromAnchor(Current + A);
-      const int32 DistB = ComputeDistanceFromAnchor(Current + B);
-      return DistA < DistB;
-    });
-
-    bool bMovedThisStep = false;
-    for (const FIntPoint &Dir : Directions) {
-      const FIntPoint Candidate = Current + Dir;
-      if (!CanOccupyAnchor(Candidate)) {
-        continue;
-      }
-
-      const int32 CandidateDistance = ComputeDistanceFromAnchor(Candidate);
-      if (CandidateDistance >= CurrentDistance) {
-        continue;
-      }
-
-      Current = Candidate;
-      CurrentDistance = CandidateDistance;
-      bMovedThisStep = true;
-      break;
+  auto IsDiagonalStepClear = [&](const FIntPoint &From, const FIntPoint &To) {
+    if (From.X == To.X || From.Y == To.Y) {
+      return true;
     }
 
-    if (!bMovedThisStep) {
-      break;
+    const TArray<FIntPoint> FromCells = Fighter->GetOccupiedCells(From);
+    const TArray<FIntPoint> NextCells = Fighter->GetOccupiedCells(To);
+
+    TSet<FIntPoint> NextCellSet;
+    NextCellSet.Reserve(NextCells.Num());
+    for (const FIntPoint &NextCell : NextCells) {
+      NextCellSet.Add(NextCell);
+    }
+
+    auto IsBlocked = [&](const FIntPoint &CheckCell) {
+      if (!Grid->IsCellInBounds(CheckCell) || Grid->IsObscured(CheckCell)) {
+        return true;
+      }
+      if (Grid->IsOccupied(CheckCell) && !IgnoredCells.Contains(CheckCell) &&
+          !NextCellSet.Contains(CheckCell)) {
+        return true;
+      }
+      return false;
+    };
+
+    const int32 StepX = FMath::Clamp(To.X - From.X, -1, 1);
+    const int32 StepY = FMath::Clamp(To.Y - From.Y, -1, 1);
+    for (const FIntPoint &FromCell : FromCells) {
+      if (IsBlocked(FromCell + FIntPoint(StepX, 0)) ||
+          IsBlocked(FromCell + FIntPoint(0, StepY))) {
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  static const FIntPoint Directions[] = {
+      FIntPoint(1, 0),  FIntPoint(-1, 0), FIntPoint(0, 1),  FIntPoint(0, -1),
+      FIntPoint(1, 1),  FIntPoint(1, -1), FIntPoint(-1, 1), FIntPoint(-1, -1)};
+
+  TSet<FIntPoint> Visited;
+  TQueue<TPair<FIntPoint, int32>> Frontier;
+  Visited.Add(StartCell);
+  Frontier.Enqueue(TPair<FIntPoint, int32>(StartCell, 0));
+
+  FIntPoint BestAnchor = StartCell;
+  int32 BestDistance = CurrentDistance;
+  int32 BestPathCost = TNumericLimits<int32>::Max();
+
+  while (!Frontier.IsEmpty()) {
+    TPair<FIntPoint, int32> Node;
+    Frontier.Dequeue(Node);
+
+    const FIntPoint Cell = Node.Key;
+    const int32 DistanceFromStart = Node.Value;
+
+    for (const FIntPoint &Dir : Directions) {
+      const FIntPoint Next = Cell + Dir;
+
+      if (Visited.Contains(Next)) {
+        continue;
+      }
+
+      const int32 StepCost = DistanceFromStart + 1;
+      if (StepCost > MaxSteps) {
+        continue;
+      }
+
+      if (!CanOccupyAnchor(Next)) {
+        continue;
+      }
+
+      if (!IsDiagonalStepClear(Cell, Next)) {
+        continue;
+      }
+
+      Visited.Add(Next);
+      Frontier.Enqueue(TPair<FIntPoint, int32>(Next, StepCost));
+
+      const int32 CandidateDistance = ComputeDistanceFromAnchor(Next);
+      if (CandidateDistance > BestDistance) {
+        continue;
+      }
+
+      if (CandidateDistance < BestDistance || StepCost < BestPathCost) {
+        BestDistance = CandidateDistance;
+        BestPathCost = StepCost;
+        BestAnchor = Next;
+      }
     }
   }
 
-  if (Current == StartCell) {
+  if (BestAnchor == StartCell) {
     return false;
   }
 
   const int32 ActionsBefore = Fighter->ActionsRemaining;
-  Fighter->MoveToCell(Current);
+  Fighter->MoveToCell(BestAnchor);
   return Fighter->ActionsRemaining < ActionsBefore;
 }
 
