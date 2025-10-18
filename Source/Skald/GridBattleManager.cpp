@@ -561,17 +561,20 @@ void UGridBattleManager::AdvanceTurn()
     OnActiveFighterChanged.Broadcast(nullptr);
 }
 
-void UGridBattleManager::ReportAttackRoll(AFighterPawn* Attacker, AFighterPawn* Defender, int32 Roll, bool bHit, int32 Damage)
+void UGridBattleManager::ReportAttackResolution(AFighterPawn* Attacker, AFighterPawn* Defender, const FDiceRollResult& Result)
 {
     if (!Attacker || !Defender)
     {
         return;
     }
 
-    UE_LOG(LogSkaldBattle, Log, TEXT("[Battle] Attack roll: %s -> %s | Roll=%d Result=%s Damage=%d"),
-        *DescribeFighter(Attacker), *DescribeFighter(Defender), Roll, bHit ? TEXT("Hit") : TEXT("Miss"), Damage);
+    const int32 DiceRolled = Result.DiceOutcomes.Num();
+    UE_LOG(LogSkaldBattle, Log,
+        TEXT("[Battle] Attack resolved: %s -> %s | Dice=%d Hits=%d Crits=%d Misses=%d Damage=%d RemainingHP=%d"),
+        *DescribeFighter(Attacker), *DescribeFighter(Defender), DiceRolled, Result.HitCount, Result.CriticalHitCount,
+        Result.MissCount, Result.TotalDamage, Result.EndingHealth);
 
-    OnAttackResolved.Broadcast(Attacker, Defender, Roll, bHit, Damage);
+    OnAttackResolved.Broadcast(Attacker, Defender, Result);
 }
 
 void UGridBattleManager::ReportAttackRejected(AFighterPawn* Attacker, AFighterPawn* Defender, const FText& Reason)

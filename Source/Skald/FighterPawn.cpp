@@ -807,6 +807,38 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
 
 void AFighterPawn::StartQueuedAttack(AFighterPawn *Target,
                                      TArray<FQueuedAttackRoll> &&Rolls) {
+  FDiceRollResult DiceResult;
+  DiceResult.DiceOutcomes.Reserve(Rolls.Num());
+  if (Target) {
+    DiceResult.StartingHealth = Target->Stats.Health;
+  }
+
+  int32 SimulatedHealth = DiceResult.StartingHealth;
+  for (const FQueuedAttackRoll &Roll : Rolls) {
+    FDiceRollOutcome &Outcome = DiceResult.DiceOutcomes.AddDefaulted_GetRef();
+    Outcome.RollValue = Roll.RollValue;
+    Outcome.Damage = Roll.Damage;
+    Outcome.bHit = Roll.bHit;
+    Outcome.bCritical = Roll.bHit && Roll.RollValue == 6 &&
+                        Roll.Damage > Stats.AttackDamage;
+
+    if (Roll.bHit) {
+      ++DiceResult.HitCount;
+      DiceResult.TotalDamage += Roll.Damage;
+      if (Outcome.bCritical) {
+        ++DiceResult.CriticalHitCount;
+      }
+    } else {
+      ++DiceResult.MissCount;
+    }
+
+    if (Roll.bHit) {
+      SimulatedHealth = FMath::Max(0, SimulatedHealth - Roll.Damage);
+    }
+  }
+
+  DiceResult.EndingHealth = SimulatedHealth;
+
   if (UWorld *World = GetWorld()) {
     World->GetTimerManager().ClearTimer(AttackRollTimerHandle);
   }
@@ -816,6 +848,12 @@ void AFighterPawn::StartQueuedAttack(AFighterPawn *Target,
   PendingAttackTarget = Target;
   bPendingAttackTargetDied = false;
   bHasProcessedPendingRoll = false;
+
+  if (USkaldGameInstance *GI = Cast<USkaldGameInstance>(GetGameInstance())) {
+    if (UGridBattleManager *BattleManager = GI->GridBattleManager) {
+      BattleManager->ReportAttackResolution(this, Target, DiceResult);
+    }
+  }
 
   if (PendingAttackRolls.Num() == 0) {
     FinalizeQueuedAttack();
@@ -849,13 +887,6 @@ void AFighterPawn::ResolveNextAttackRoll() {
 
   const FQueuedAttackRoll Roll = PendingAttackRolls[PendingAttackRollIndex];
   bHasProcessedPendingRoll = true;
-
-  if (USkaldGameInstance *GI = Cast<USkaldGameInstance>(GetGameInstance())) {
-    if (UGridBattleManager *BattleManager = GI->GridBattleManager) {
-      BattleManager->ReportAttackRoll(this, Target, Roll.RollValue, Roll.bHit,
-                                      Roll.Damage);
-    }
-  }
 
   if (Roll.bHit) {
     Target->Stats.Health =
