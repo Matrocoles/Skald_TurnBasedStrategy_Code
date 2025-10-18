@@ -1,5 +1,7 @@
 #include "UI/SkaldMainHUDWidget.h"
 #include "Components/Button.h"
+#include "Components/CanvasPanelSlot.h"
+#include "Components/OverlaySlot.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/Widget.h"
@@ -112,6 +114,8 @@ void USkaldMainHUDWidget::NativeConstruct() {
     DeployButton->SetVisibility(ESlateVisibility::Collapsed);
   }
 
+  ConfigureBroadcastText();
+
   SyncPhaseButtons(false);
   RebuildPlayerList(CachedPlayers);
 }
@@ -124,8 +128,8 @@ void USkaldMainHUDWidget::NativeDestruct() {
         this, &USkaldMainHUDWidget::HandleTurnIndexChanged);
   }
 
-  if (UWorld* World = GetWorld()) {
-    FTimerManager& TimerManager = World->GetTimerManager();
+  if (UWorld *World = GetWorld()) {
+    FTimerManager &TimerManager = World->GetTimerManager();
     TimerManager.ClearTimer(TurnMessageTimerHandle);
     TimerManager.ClearTimer(InitiativeTimerHandle);
   } else {
@@ -159,6 +163,43 @@ void USkaldMainHUDWidget::NativeDestruct() {
   }
 
   Super::NativeDestruct();
+}
+
+void USkaldMainHUDWidget::ConfigureBroadcastText() {
+  if (bBroadcastTextConfigured || !EndingTurnText) {
+    return;
+  }
+
+  FSlateFontInfo FontInfo = EndingTurnText->Font;
+  const int32 OriginalSize = FontInfo.Size > 0 ? FontInfo.Size : 24;
+  FontInfo.Size = OriginalSize * 2;
+  EndingTurnText->SetFont(FontInfo);
+  EndingTurnText->SetJustification(ETextJustify::Center);
+  EndingTurnText->SetAutoWrapText(false);
+
+  if (UCanvasPanelSlot *CanvasSlot = Cast<UCanvasPanelSlot>(EndingTurnText->Slot)) {
+    CanvasSlot->SetAnchors(FAnchors(0.5f, 0.f, 0.5f, 0.f));
+    CanvasSlot->SetAlignment(FVector2D(0.5f, 0.f));
+    CanvasSlot->SetPosition(FVector2D(0.f, 20.f));
+  } else if (UOverlaySlot *OverlaySlot = Cast<UOverlaySlot>(EndingTurnText->Slot)) {
+    OverlaySlot->SetHorizontalAlignment(HAlign_Center);
+    OverlaySlot->SetVerticalAlignment(VAlign_Top);
+    OverlaySlot->SetPadding(FMargin(0.f, 20.f, 0.f, 0.f));
+  }
+
+  bBroadcastTextConfigured = true;
+}
+
+void USkaldMainHUDWidget::ApplyBroadcastStyle(bool bIsPlayerMessage) {
+  ConfigureBroadcastText();
+
+  if (!EndingTurnText) {
+    return;
+  }
+
+  const FLinearColor PlayerColor = FLinearColor::Green;
+  const FLinearColor EnemyColor = FLinearColor::Red;
+  EndingTurnText->SetColorAndOpacity(bIsPlayerMessage ? PlayerColor : EnemyColor);
 }
 
 void USkaldMainHUDWidget::HandleEndTurnClicked() {
@@ -333,6 +374,7 @@ void USkaldMainHUDWidget::RebuildPlayerList(
 
 void USkaldMainHUDWidget::ShowEndingTurn() {
   if (EndingTurnText) {
+    ApplyBroadcastStyle(true);
     EndingTurnText->SetText(FText::FromString(TEXT("Ending turn.")));
     EndingTurnText->SetVisibility(ESlateVisibility::Visible);
     if (UWorld *World = GetWorld()) {
@@ -360,6 +402,7 @@ void USkaldMainHUDWidget::HideEndingTurn() {
 
 void USkaldMainHUDWidget::ShowTurnMessage(bool bIsMyTurn) {
   if (EndingTurnText) {
+    ApplyBroadcastStyle(bIsMyTurn);
     EndingTurnText->SetText(
         FText::FromString(bIsMyTurn ? TEXT("Your turn") : TEXT("Enemy turn")));
     EndingTurnText->SetVisibility(ESlateVisibility::Visible);
@@ -383,6 +426,7 @@ void USkaldMainHUDWidget::ShowTurnMessage(bool bIsMyTurn) {
 
 void USkaldMainHUDWidget::ShowEnemyTurnInProgress(const FString &Message) {
   if (EndingTurnText) {
+    ApplyBroadcastStyle(false);
     EndingTurnText->SetText(FText::FromString(Message));
     EndingTurnText->SetVisibility(ESlateVisibility::Visible);
   }

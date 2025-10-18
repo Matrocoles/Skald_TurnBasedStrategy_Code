@@ -311,6 +311,12 @@ public:
   TSubclassOf<UDeployWidget> DeployWidgetClass;
 
 protected:
+  /** Ensure the broadcast text widget is positioned and styled for readability. */
+  void ConfigureBroadcastText();
+
+  /** Apply the appropriate color for player/enemy broadcast messages. */
+  void ApplyBroadcastStyle(bool bIsPlayerMessage);
+
   UFUNCTION()
   void HideInitiativeText();
 
@@ -337,6 +343,9 @@ protected:
 
   UPROPERTY()
   UDeployWidget *ActiveDeployWidget = nullptr;
+
+  /** Prevent reconfiguring the broadcast text multiple times. */
+  bool bBroadcastTextConfigured = false;
 
   UPROPERTY()
   TArray<ATerritory *> HighlightedTerritories;
