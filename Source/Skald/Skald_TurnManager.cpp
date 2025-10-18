@@ -5,7 +5,6 @@
 #include "EngineUtils.h"
 #include "GridBattleManager.h"
 #include "Kismet/GameplayStatics.h"
-#include "Misc/LexicalConversion.h"
 #include "Misc/PackageName.h"
 #include "Modules/ModuleManager.h"
 #include "Net/UnrealNetwork.h"
@@ -517,12 +516,18 @@ void ATurnManager::HandleGridBattleEnded(ESkaldFaction /*WinningFaction*/, int32
 
   if (World) {
     const ENetMode NetMode = World->GetNetMode();
-    const TCHAR *NetModeString = LexToString(NetMode);
+    FString NetModeString;
+    if (const UEnum *NetModeEnum = StaticEnum<ENetMode>()) {
+      NetModeString =
+          NetModeEnum->GetNameStringByValue(static_cast<int64>(NetMode));
+    }
+    const TCHAR *NetModeStringPtr =
+        NetModeString.IsEmpty() ? TEXT("Unknown") : *NetModeString;
 
     UE_LOG(LogSkald, Log,
            TEXT("HandleGridBattleEnded: travelling to '%s' (source=%s, NetMode=%s)."),
            *ReturnMapName, *ReturnMapSource,
-           NetModeString ? NetModeString : TEXT("Unknown"));
+           NetModeStringPtr);
 
     switch (NetMode) {
     case NM_Standalone: {
