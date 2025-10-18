@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Blueprint/UserWidget.h"
+#include "GridBattleManager.h"
 #include "TimerManager.h"
 #include "BattleHUDWidget.generated.h"
 
@@ -11,6 +12,7 @@ class AFighterPawn;
 class UGridOverlayComponent;
 class UTexture2D;
 class UCombatFloaterPoolSubsystem;
+class UW_DiceResolutionPanel;
 class UW_FloatingText;
 
 struct FBattleActiveFloater {
@@ -71,6 +73,12 @@ public:
   DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInitiativeRollRequested);
   UPROPERTY(BlueprintAssignable, Category = "Skald|Battle|Events")
   FOnInitiativeRollRequested OnInitiativeRollRequested;
+
+  DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
+      FOnResolutionComplete, AFighterPawn *, Attacker, AFighterPawn *, Defender,
+      const FDiceRollResult &, Result);
+  UPROPERTY(BlueprintAssignable, Category = "Skald|Battle|Events")
+  FOnResolutionComplete OnResolutionComplete;
 
   /** Move action button bound from the blueprint. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
@@ -160,6 +168,10 @@ public:
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UImage *DiceBoardImage;
 
+  /** Panel that reveals per-die outcomes in sequence. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UW_DiceResolutionPanel *DiceResolutionPanel;
+
   /** Textures representing dice faces, indexed from 1 to 6. */
   UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skald|Battle|Dice")
   TArray<TObjectPtr<UTexture2D>> DiceFaceTextures;
@@ -208,6 +220,10 @@ public:
   /** Helper used by attack resolution events to show damage/miss floaters. */
   void ShowAttackResultFloater(AFighterPawn *Target, bool bHit, int32 Damage);
 
+  /** Queue a dice resolution sequence for presentation on the panel. */
+  void QueueDiceResolution(AFighterPawn *Attacker, AFighterPawn *Defender,
+                           const FDiceRollResult &Result);
+
 private:
   /** Callback when MoveButton is pressed. */
   UFUNCTION()
@@ -255,6 +271,11 @@ private:
   /** Reveal the initiative roll button after a short delay. */
   void RevealInitiativeRollButton();
 
+  void ProcessNextDiceResolution();
+
+  UFUNCTION()
+  void HandleDicePanelResolved(const FDiceRollResult &Result);
+
   void UpdateCombatFloaters(float DeltaSeconds);
   void ReleaseFloaterAtIndex(int32 Index);
   UCombatFloaterPoolSubsystem *ResolveFloaterPool();
@@ -295,6 +316,16 @@ private:
   TArray<FBattleActiveFloater> ActiveFloaters;
 
   TWeakObjectPtr<UCombatFloaterPoolSubsystem> CachedFloaterPool;
+
+  struct FBattleQueuedDiceResolution {
+    TWeakObjectPtr<AFighterPawn> Attacker;
+    TWeakObjectPtr<AFighterPawn> Defender;
+    FDiceRollResult Result;
+  };
+
+  TArray<FBattleQueuedDiceResolution> PendingDiceResolutions;
+  bool bDiceResolutionActive = false;
+  FBattleQueuedDiceResolution ActiveDiceResolution;
 
   /** Whether movement preview is currently shown. */
   bool bMoveSelected = false;

@@ -491,7 +491,12 @@ private:
   void UpdateBattlePlayersTurnDisplay();
   UFUNCTION()
   void HandleAttackResolved(AFighterPawn *Attacker, AFighterPawn *Defender,
-                            int32 Roll, bool bHit, int32 Damage);
+                            const FDiceRollResult &Result);
+
+  UFUNCTION()
+  void HandleDiceResolutionComplete(AFighterPawn *Attacker,
+                                     AFighterPawn *Defender,
+                                     const FDiceRollResult &Result);
   UFUNCTION()
   void HandleAttackRejected(AFighterPawn *Attacker, AFighterPawn *Defender,
                             const FText &Reason);
