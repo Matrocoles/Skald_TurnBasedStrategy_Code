@@ -8,6 +8,25 @@ class UGridOverlayComponent;
 class USceneComponent;
 class AGridObstacleActor;
 
+USTRUCT(BlueprintType)
+struct FGridObstacleSpawnList {
+  GENERATED_BODY()
+
+  /** Minimum number of obstacles to spawn from this list. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Obstacles", meta = (ClampMin = "0"))
+  int32 MinObstacleCount = 0;
+
+  /** Maximum number of obstacles to spawn from this list. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Obstacles", meta = (ClampMin = "0"))
+  int32 MaxObstacleCount = 0;
+
+  /** Candidate obstacle classes that can be spawned from this list. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Obstacles")
+  TArray<TSubclassOf<AGridObstacleActor>> ObstacleCandidates;
+
+  bool HasCandidates() const { return ObstacleCandidates.Num() > 0; }
+};
+
 /**
  * Actor wrapper that exposes the grid overlay component directly in the level.
  */
@@ -55,17 +74,21 @@ protected:
                     ClampMin = "0"))
   int32 ReservedSpawnColumnWidth = 3;
 
-  /** Minimum number of random obstacles to spawn. */
-  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Obstacles", meta = (EditCondition = "bSpawnRandomObstacles", ClampMin = "0"))
-  int32 MinObstacleCount = 0;
+  /** Large obstacle definitions. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Obstacles", meta = (EditCondition = "bSpawnRandomObstacles"), DisplayName = "Large Obstacles")
+  FGridObstacleSpawnList LargeObstacles;
 
-  /** Maximum number of random obstacles to spawn. */
-  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Obstacles", meta = (EditCondition = "bSpawnRandomObstacles", ClampMin = "0"))
-  int32 MaxObstacleCount = 0;
+  /** Medium obstacle definitions. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Obstacles", meta = (EditCondition = "bSpawnRandomObstacles"), DisplayName = "Medium Obstacles")
+  FGridObstacleSpawnList MediumObstacles;
 
-  /** Candidate obstacle classes that can be spawned. */
-  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Obstacles", meta = (EditCondition = "bSpawnRandomObstacles"))
-  TArray<TSubclassOf<AGridObstacleActor>> ObstacleCandidates;
+  /** Small obstacle definitions. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Obstacles", meta = (EditCondition = "bSpawnRandomObstacles"), DisplayName = "Small Obstacles")
+  FGridObstacleSpawnList SmallObstacles;
+
+  /** Additional obstacle definitions for miscellaneous props. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Obstacles", meta = (EditCondition = "bSpawnRandomObstacles"), DisplayName = "Misc Obstacles")
+  FGridObstacleSpawnList MiscObstacles;
 
   /** Optional deterministic seed override for obstacle placement. */
   UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Obstacles", meta = (EditCondition = "bSpawnRandomObstacles"))
