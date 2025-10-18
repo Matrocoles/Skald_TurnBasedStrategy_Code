@@ -6,6 +6,7 @@
 #include "GridBattleManager.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/PackageName.h"
+#include "Modules/ModuleManager.h"
 #include "Net/UnrealNetwork.h"
 #include "Runtime/Launch/Resources/Version.h"
 #include "Skald.h"
@@ -26,6 +27,8 @@
 #include "TimerManager.h"
 #include "WorldMap.h"
 
+#include "AssetRegistry/AssetRegistryModule.h"
+
 namespace {
 FString GetResolvedPlayerName(const ASkaldPlayerState *PlayerState,
                               const TCHAR *Context) {
@@ -41,14 +44,77 @@ FString GetWorldPackageName(const UWorld *World) {
     return FString();
   }
 
+  const FSoftObjectPath WorldPath(World);
+  const FString PathFromObject = WorldPath.GetLongPackageName();
+  if (!PathFromObject.IsEmpty()) {
+    return PathFromObject;
+  }
+
   if (const ULevel *PersistentLevel = World->PersistentLevel) {
     if (const UPackage *Package = PersistentLevel->GetOutermost()) {
-      return Package->GetName();
+      const FString PackageName = Package->GetName();
+      if (FPackageName::IsValidLongPackageName(PackageName)) {
+        return PackageName;
+      }
     }
   }
 
   if (const UPackage *WorldPackage = World->GetPackage()) {
-    return WorldPackage->GetName();
+    const FString PackageName = WorldPackage->GetName();
+    if (FPackageName::IsValidLongPackageName(PackageName)) {
+      return PackageName;
+    }
+  }
+
+  return FString();
+}
+
+FString ResolveMapPackageFromRegistry(const FString &MapName) {
+  if (MapName.IsEmpty()) {
+    return FString();
+  }
+
+  static TMap<FString, FString> CachedMapNames;
+  FString NormalisedKey = MapName;
+  NormalisedKey.ToLowerInline();
+  if (const FString *Cached = CachedMapNames.Find(NormalisedKey)) {
+    return *Cached;
+  }
+
+  FAssetRegistryModule *AssetRegistryModule =
+      FModuleManager::LoadModulePtr<FAssetRegistryModule>("AssetRegistry");
+  if (!AssetRegistryModule) {
+    return FString();
+  }
+
+  static bool bInitialisedCache = false;
+  if (!bInitialisedCache) {
+    FARFilter Filter;
+#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1)
+    Filter.ClassPaths.Add(UWorld::StaticClass()->GetClassPathName());
+#else
+    Filter.ClassNames.Add(UWorld::StaticClass()->GetFName());
+#endif
+    Filter.bRecursiveClasses = true;
+    Filter.bIncludeOnlyOnDiskAssets = false;
+
+    TArray<FAssetData> WorldAssets;
+    AssetRegistryModule->Get().GetAssets(Filter, WorldAssets);
+
+    for (const FAssetData &Asset : WorldAssets) {
+      FString AssetNameString = Asset.AssetName.ToString();
+      const FString PackageNameString = Asset.PackageName.ToString();
+      if (!AssetNameString.IsEmpty() && !PackageNameString.IsEmpty()) {
+        AssetNameString.ToLowerInline();
+        CachedMapNames.Add(AssetNameString, PackageNameString);
+      }
+    }
+
+    bInitialisedCache = true;
+  }
+
+  if (const FString *CachedValue = CachedMapNames.Find(NormalisedKey)) {
+    return *CachedValue;
   }
 
   return FString();
@@ -93,15 +159,35 @@ FString NormalizeMapName(UWorld *World, FString Candidate) {
       }
     }
 
-    FString LongPackageName;
     if (FPackageName::IsShortPackageName(Result)) {
+      FString LongPackageName;
       if (FPackageName::SearchForPackageOnDisk(Result, &LongPackageName)) {
         Result = MoveTemp(LongPackageName);
+      } else {
+        const FString RegistryName = ResolveMapPackageFromRegistry(Result);
+        if (!RegistryName.IsEmpty()) {
+          Result = RegistryName;
+        }
       }
-    } else if (!FPackageName::IsValidLongPackageName(Result)) {
-      if (FPackageName::TryConvertFilenameToLongPackageName(Result,
-                                                           LongPackageName)) {
-        Result = MoveTemp(LongPackageName);
+    } else {
+      FSoftObjectPath MapPath(Result);
+      if (MapPath.IsValid()) {
+        const FString LongPackageName = MapPath.GetLongPackageName();
+        if (!LongPackageName.IsEmpty()) {
+          Result = LongPackageName;
+        }
+      } else if (Result.Contains(TEXT("."))) {
+        const FString ObjectPathPackage =
+            FPackageName::ObjectPathToPackageName(Result);
+        if (!ObjectPathPackage.IsEmpty()) {
+          Result = ObjectPathPackage;
+        }
+      } else if (!FPackageName::IsValidLongPackageName(Result)) {
+        FString ConvertedName;
+        if (FPackageName::TryConvertFilenameToLongPackageName(Result,
+                                                             ConvertedName)) {
+          Result = MoveTemp(ConvertedName);
+        }
       }
     }
   }
