@@ -2837,6 +2837,10 @@ void ASkaldPlayerController::HandleAttackResolved(AFighterPawn *Attacker,
   }
 
   BattleHudWidget->ShowDiceRoll(Roll);
+
+  if (Defender) {
+    BattleHudWidget->ShowAttackResultFloater(Defender, bHit, Damage);
+  }
 }
 
 void ASkaldPlayerController::HandleAttackRejected(AFighterPawn *Attacker,
