@@ -17,6 +17,7 @@ class SWidget;
 class ASkaldGameMode;
 class ASkaldGameState;
 class USkaldGameInstance;
+class USoundBase;
 
 // Delegates broadcasting user UI actions to game logic
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FSkaldAttackRequested, int32,
@@ -83,6 +84,10 @@ public:
 
   UPROPERTY(BlueprintReadWrite, Category = "Skald|Selection")
   bool bSelectingForMove = false;
+
+  /** Sound played whenever a new world round begins. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Audio")
+  USoundBase *RoundStartSound = nullptr;
 
   UPROPERTY(BlueprintReadWrite, Category = "Skald|Siege")
   bool bUseSiegeForNextAttack = false;

@@ -199,7 +199,7 @@ void ATerritory::Deselect() {
 void ATerritory::EndPlay(const EEndPlayReason::Type Reason) {
   if (AWorldMap *Map = Cast<AWorldMap>(GetOwner())) {
     if (Map->SelectedTerritory == this) {
-      Map->SelectTerritory(nullptr);
+      Map->SelectTerritory(nullptr, false);
     }
   }
   Super::EndPlay(Reason);
