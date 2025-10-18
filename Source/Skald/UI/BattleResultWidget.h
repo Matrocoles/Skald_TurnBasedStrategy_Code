@@ -4,6 +4,7 @@
 #include "BattleResultWidget.generated.h"
 
 class UTextBlock;
+class USoundBase;
 
 /** Simple widget that displays battle outcome text and casualty totals. */
 UCLASS()
@@ -22,8 +23,17 @@ private:
   void EnsureLayout();
 
   UPROPERTY()
+  UTextBlock *BattleResultText = nullptr;
+
+  UPROPERTY()
   UTextBlock *OutcomeText = nullptr;
 
   UPROPERTY()
   UTextBlock *CasualtyText = nullptr;
+
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Battle", meta = (AllowPrivateAccess = "true"))
+  USoundBase *VictorySound = nullptr;
+
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Battle", meta = (AllowPrivateAccess = "true"))
+  USoundBase *DefeatSound = nullptr;
 };

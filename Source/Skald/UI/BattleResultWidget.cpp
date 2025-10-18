@@ -4,6 +4,8 @@
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
+#include "Kismet/GameplayStatics.h"
+#include "Styling/SlateFontInfo.h"
 
 void UBattleResultWidget::NativeConstruct() {
   Super::NativeConstruct();
@@ -26,6 +28,16 @@ void UBattleResultWidget::EnsureLayout() {
   }
 
   if (UVerticalBox *Box = Cast<UVerticalBox>(WidgetTree->RootWidget)) {
+    if (!BattleResultText) {
+      BattleResultText = WidgetTree->ConstructWidget<UTextBlock>(
+          UTextBlock::StaticClass(), TEXT("BattleResultText"));
+      BattleResultText->SetJustification(ETextJustify::Center);
+      FSlateFontInfo ResultFont = BattleResultText->Font;
+      ResultFont.Size = 72;
+      BattleResultText->SetFont(ResultFont);
+      Box->AddChildToVerticalBox(BattleResultText);
+    }
+
     if (!OutcomeText) {
       OutcomeText = WidgetTree->ConstructWidget<UTextBlock>(
           UTextBlock::StaticClass(), TEXT("OutcomeText"));
@@ -47,6 +59,21 @@ void UBattleResultWidget::SetBattleOutcome(bool bPlayerWon, bool bPlayerLost,
                                            int32 DefenderCasualties) {
   EnsureLayout();
 
+  if (BattleResultText) {
+    if (bPlayerWon) {
+      BattleResultText->SetText(
+          NSLOCTEXT("BattleResultWidget", "VictoryLarge", "Victory!!"));
+      BattleResultText->SetColorAndOpacity(FSlateColor(FLinearColor::Green));
+    } else if (bPlayerLost) {
+      BattleResultText->SetText(
+          NSLOCTEXT("BattleResultWidget", "DefeatLarge", "Defeat!!"));
+      BattleResultText->SetColorAndOpacity(FSlateColor(FLinearColor::Red));
+    } else {
+      BattleResultText->SetText(FText::GetEmpty());
+      BattleResultText->SetColorAndOpacity(FSlateColor(FLinearColor::White));
+    }
+  }
+
   if (OutcomeText) {
     FText OutcomeLabel;
     if (bPlayerWon) {
@@ -66,5 +93,15 @@ void UBattleResultWidget::SetBattleOutcome(bool bPlayerWon, bool bPlayerLost,
         FText::AsNumber(AttackerCasualties),
         FText::AsNumber(DefenderCasualties));
     CasualtyText->SetText(CasualtyLabel);
+  }
+
+  if (bPlayerWon) {
+    if (VictorySound) {
+      UGameplayStatics::PlaySound2D(this, VictorySound);
+    }
+  } else if (bPlayerLost) {
+    if (DefeatSound) {
+      UGameplayStatics::PlaySound2D(this, DefeatSound);
+    }
   }
 }
