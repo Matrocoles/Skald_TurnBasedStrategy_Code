@@ -42,7 +42,7 @@ public:
 
     /** Override the dice face textures used for reveal imagery. */
     UFUNCTION(BlueprintCallable, Category="Skald|Battle|Dice")
-    void SetDiceFaceTextures(const TArray<TObjectPtr<UTexture2D>>& InTextures);
+    void SetDiceFaceTextures(const TArray<UTexture2D*>& InTextures);
 
 protected:
     void ClearOutcomeEntries();
