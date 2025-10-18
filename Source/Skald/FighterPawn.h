@@ -326,6 +326,12 @@ private:
   /** Tracks whether any pending attack roll has been processed. */
   bool bHasProcessedPendingRoll = false;
 
+  /** Cached dice roll data to broadcast once resolution completes. */
+  FDiceRollResult PendingAttackDiceResult;
+
+  /** Tracks whether cached dice data should be reported on finalisation. */
+  bool bHasPendingDiceResult = false;
+
   /** Current cell occupied by the fighter. */
   UPROPERTY(Replicated)
   FIntPoint CurrentCell;

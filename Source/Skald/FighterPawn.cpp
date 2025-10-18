@@ -848,12 +848,8 @@ void AFighterPawn::StartQueuedAttack(AFighterPawn *Target,
   PendingAttackTarget = Target;
   bPendingAttackTargetDied = false;
   bHasProcessedPendingRoll = false;
-
-  if (USkaldGameInstance *GI = Cast<USkaldGameInstance>(GetGameInstance())) {
-    if (UGridBattleManager *BattleManager = GI->GridBattleManager) {
-      BattleManager->ReportAttackResolution(this, Target, DiceResult);
-    }
-  }
+  PendingAttackDiceResult = DiceResult;
+  bHasPendingDiceResult = true;
 
   if (PendingAttackRolls.Num() == 0) {
     FinalizeQueuedAttack();
@@ -927,10 +923,25 @@ void AFighterPawn::FinalizeQueuedAttack() {
     if (!bPendingAttackTargetDied && !bHasProcessedPendingRoll) {
       Target->OnHealthChanged.Broadcast(Target->Stats.Health);
     }
+
+    if (bHasPendingDiceResult) {
+      PendingAttackDiceResult.EndingHealth = Target->Stats.Health;
+
+      if (USkaldGameInstance *GI =
+              Cast<USkaldGameInstance>(GetGameInstance())) {
+        if (UGridBattleManager *BattleManager = GI->GridBattleManager) {
+          BattleManager->ReportAttackResolution(this, Target,
+                                               PendingAttackDiceResult);
+        }
+      }
+    }
     if (!Target->IsAlive() && !Target->IsActorBeingDestroyed()) {
       Target->Destroy();
     }
   }
+
+  bHasPendingDiceResult = false;
+  PendingAttackDiceResult = FDiceRollResult();
 
   PendingAttackRolls.Reset();
   PendingAttackRollIndex = 0;
