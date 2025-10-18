@@ -1178,13 +1178,32 @@ void ASkald_BattleGameMode::SpawnFighterSide(const TArray<FFighterDefinition> &R
       }
     }
 
-    const FVector BaseSpawnLoc =
+    FVector TerrainLocation =
         Grid ? Grid->GridToWorld(Cell) : FVector::ZeroVector;
-    FVector SpawnLoc = BaseSpawnLoc;
+    float RequestedHalfHeight = 0.f;
     if (const AFighterPawn *DefaultPawn =
             DesiredClass->GetDefaultObject<AFighterPawn>()) {
-      SpawnLoc.Z += DefaultPawn->GetSimpleCollisionHalfHeight();
+      RequestedHalfHeight = DefaultPawn->GetSimpleCollisionHalfHeight();
+
+      if (Grid) {
+        const TArray<FIntPoint> FootprintCells =
+            DefaultPawn->GetOccupiedCells(Cell);
+        FVector AccumulatedLocation = FVector::ZeroVector;
+        int32 CellCount = 0;
+        for (const FIntPoint &Occupied : FootprintCells) {
+          AccumulatedLocation += Grid->GridToWorld(Occupied);
+          ++CellCount;
+        }
+
+        if (CellCount > 0) {
+          TerrainLocation = AccumulatedLocation /
+                            static_cast<float>(CellCount);
+        }
+      }
     }
+
+    FVector SpawnLoc = TerrainLocation;
+    SpawnLoc.Z += RequestedHalfHeight;
     FActorSpawnParameters Params;
     Params.SpawnCollisionHandlingOverride =
         ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
@@ -1192,13 +1211,12 @@ void ASkald_BattleGameMode::SpawnFighterSide(const TArray<FFighterDefinition> &R
     AFighterPawn *Pawn = GetWorld()->SpawnActor<AFighterPawn>(
         DesiredClass, SpawnLoc, FRotator::ZeroRotator, Params);
     if (Pawn) {
-      const float RequestedHalfHeight = SpawnLoc.Z - BaseSpawnLoc.Z;
       const float ActualHalfHeight = Pawn->GetSimpleCollisionHalfHeight();
 
       if (!FMath::IsNearlyEqual(ActualHalfHeight, RequestedHalfHeight,
                                 KINDA_SMALL_NUMBER)) {
-        FVector AdjustedLocation = Pawn->GetActorLocation();
-        AdjustedLocation.Z += ActualHalfHeight - RequestedHalfHeight;
+        FVector AdjustedLocation = TerrainLocation;
+        AdjustedLocation.Z += ActualHalfHeight;
 
         FHitResult HitResult;
         Pawn->SetActorLocation(AdjustedLocation, /*bSweep*/ true, &HitResult);
