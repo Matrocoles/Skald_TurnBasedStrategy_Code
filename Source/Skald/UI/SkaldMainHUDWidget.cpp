@@ -34,7 +34,8 @@
 USkaldMainHUDWidget::USkaldMainHUDWidget(
     const FObjectInitializer &ObjectInitializer)
     : Super(ObjectInitializer) {
-  SetCanTick(true);
+  bCanEverTick = true;
+  bCanTick = true;
   FloaterWidgetClass = UW_FloatingText::StaticClass();
 
   static ConstructorHelpers::FClassFinder<UDeployWidget> DeployBP(
