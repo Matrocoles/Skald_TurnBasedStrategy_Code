@@ -1,5 +1,6 @@
 #include "Skald_TurnManager.h"
 #include "Engine/Engine.h"
+#include "Engine/EngineBaseTypes.h"
 #include "Engine/World.h"
 #include "Engine/Level.h"
 #include "EngineUtils.h"
