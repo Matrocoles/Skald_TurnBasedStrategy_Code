@@ -1098,6 +1098,7 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
       (GI->SavedTurnIndex != 0 ||
        GI->SavedTurnPhase != ETurnPhase::Reinforcement)) {
     GI->SavedTurnIndex = 0;
+    GI->SavedTurnPlayerId = 0;
     GI->SavedTurnPhase = ETurnPhase::Reinforcement;
   }
 

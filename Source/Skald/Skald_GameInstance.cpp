@@ -403,6 +403,7 @@ void USkaldGameInstance::ResetSessionState() {
 
   SeedCombatRandomStream(FMath::Rand());
   SavedTurnIndex = 0;
+  SavedTurnPlayerId = 0;
   SavedTurnPhase = ETurnPhase::Reinforcement;
   bResumeTurns = false;
   LoadedSaveGame = nullptr;

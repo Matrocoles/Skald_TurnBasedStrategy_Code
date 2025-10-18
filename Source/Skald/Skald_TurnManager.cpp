@@ -780,18 +780,48 @@ bool ATurnManager::TryResumeSavedTurnState(USkaldGameInstance *GameInstance) {
   }
 
   const int32 SavedIndex = GI->SavedTurnIndex;
-  if (!Controllers.IsValidIndex(SavedIndex) || !Controllers[SavedIndex].IsValid()) {
+  const int32 SavedPlayerId = GI->SavedTurnPlayerId;
+
+  auto ResolveIndexForPlayerId = [&](int32 PlayerId) -> int32 {
+    if (PlayerId <= 0) {
+      return INDEX_NONE;
+    }
+
+    for (int32 Index = 0; Index < Controllers.Num(); ++Index) {
+      if (!Controllers[Index].IsValid()) {
+        continue;
+      }
+      if (ASkaldPlayerController *Candidate = Controllers[Index].Get()) {
+        if (ASkaldPlayerState *PS =
+                Candidate->GetPlayerState<ASkaldPlayerState>()) {
+          if (PS->GetPlayerId() == PlayerId) {
+            return Index;
+          }
+        }
+      }
+    }
+    return INDEX_NONE;
+  };
+
+  int32 TargetIndex = ResolveIndexForPlayerId(SavedPlayerId);
+  if (!Controllers.IsValidIndex(TargetIndex) || !Controllers[TargetIndex].IsValid()) {
+    TargetIndex = SavedIndex;
+  }
+
+  if (!Controllers.IsValidIndex(TargetIndex) || !Controllers[TargetIndex].IsValid()) {
     return false;
   }
 
-  ASkaldPlayerController *Controller = Controllers[SavedIndex].Get();
+  ASkaldPlayerController *Controller = Controllers[TargetIndex].Get();
   if (!Controller) {
     return false;
   }
 
-  CurrentIndex = SavedIndex;
+  CurrentIndex = TargetIndex;
   CurrentPhase = GI->SavedTurnPhase;
   GI->bResumeTurns = false;
+  GI->SavedTurnPlayerId = 0;
+  GI->SavedTurnIndex = TargetIndex;
 
   SyncGameStateTurnIndex();
   Controller->StartTurn();
@@ -1091,7 +1121,17 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
 
   // Save the current turn state so it can be restored after travelling.
   if (GI) {
+    int32 SavedPlayerId = 0;
+    if (Controllers.IsValidIndex(CurrentIndex) &&
+        Controllers[CurrentIndex].IsValid()) {
+      if (ASkaldPlayerState *PS =
+              Controllers[CurrentIndex]->GetPlayerState<ASkaldPlayerState>()) {
+        SavedPlayerId = PS->GetPlayerId();
+      }
+    }
+
     GI->SavedTurnIndex = CurrentIndex;
+    GI->SavedTurnPlayerId = SavedPlayerId;
     GI->SavedTurnPhase = CurrentPhase;
     GI->bResumeTurns = true;
   }
