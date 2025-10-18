@@ -117,6 +117,31 @@ void USkaldGameInstance::ClearPendingTravelSnapshot() {
   }
 }
 
+void USkaldGameInstance::SetPendingReturnMap(const FString &InReturnMap) {
+  if (PendingReturnMap.Equals(InReturnMap, ESearchCase::CaseSensitive)) {
+    return;
+  }
+
+  PendingReturnMap = InReturnMap;
+
+  const TCHAR *LoggedValue = PendingReturnMap.IsEmpty()
+                                 ? TEXT("<Empty>")
+                                 : *PendingReturnMap;
+  UE_LOG(LogSkald, Log, TEXT("GameInstance pending return map set to %s"),
+         LoggedValue);
+}
+
+void USkaldGameInstance::ClearPendingReturnMap() {
+  if (PendingReturnMap.IsEmpty()) {
+    return;
+  }
+
+  UE_LOG(LogSkald, Verbose,
+         TEXT("GameInstance pending return map cleared (was '%s')"),
+         *PendingReturnMap);
+  PendingReturnMap.Reset();
+}
+
 void USkaldGameInstance::SetTravelPending(bool bInPending) {
   if (bTravelPending == bInPending) {
     return;
@@ -371,6 +396,7 @@ void USkaldGameInstance::ResetSessionState() {
   SetActiveBattleGameMode(nullptr);
   SetBattleMapActive(false);
   bTravelPending = false;
+  PendingReturnMap.Reset();
   CachedWorldMapTerritories.Empty();
   PendingTravelTerritories.Empty();
   TravelState = FSkaldTravelState();

@@ -487,8 +487,11 @@ void ATurnManager::HandleGridBattleEnded(ESkaldFaction /*WinningFaction*/, int32
   if (!TryResolveReturnMap(PendingBattle.ReturnMap,
                            TEXT("PendingBattle.ReturnMap")) &&
       GI) {
-    TryResolveReturnMap(GI->PendingBattle.ReturnMap,
-                        TEXT("GameInstance.PendingBattle.ReturnMap"));
+    if (!TryResolveReturnMap(GI->PendingBattle.ReturnMap,
+                             TEXT("GameInstance.PendingBattle.ReturnMap"))) {
+      TryResolveReturnMap(GI->GetPendingReturnMap(),
+                          TEXT("GameInstance.PendingReturnMap"));
+    }
   }
 
   if (ReturnMapName.IsEmpty()) {
@@ -997,6 +1000,9 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
       UE_LOG(LogSkald, Error,
              TEXT("TriggerGridBattle: Failed to resolve a canonical return map for world %s."),
              *GetNameSafe(World));
+      if (GI) {
+        GI->ClearPendingReturnMap();
+      }
     } else if (!FPackageName::IsValidLongPackageName(SeededBattle.ReturnMap)) {
       UE_LOG(LogSkald, Warning,
              TEXT("TriggerGridBattle resolved return map '%s' which is not a valid long package name."),
@@ -1005,6 +1011,9 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
       UE_LOG(LogSkald, Log,
              TEXT("TriggerGridBattle: storing return map '%s' before travelling to battle."),
              *SeededBattle.ReturnMap);
+      if (GI) {
+        GI->SetPendingReturnMap(SeededBattle.ReturnMap);
+      }
     }
 
     CachedWorldMap = ResolveWorldMap();
@@ -1387,6 +1396,7 @@ void ATurnManager::MulticastPrepareBattleTravel_Implementation(
     GI->SetTravelState(TravelState);
     GI->PendingBattle = BattlePayload;
     GI->SetBattleMapActive(true);
+    GI->SetPendingReturnMap(TravelState.ReturnMap);
     GI->SetTravelPending(true);
   }
 }
@@ -1615,6 +1625,7 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
 
   GI->PendingBattle = FS_BattlePayload();
   PendingBattle = FS_BattlePayload();
+  GI->ClearPendingReturnMap();
 
   // Ensure no stale retry timers trigger another battle after resolution
   if (UWorld *World = GetWorld()) {
