@@ -10,6 +10,7 @@ class ATerritory;
 class ASkaldPlayerState;
 class UPrimitiveComponent;
 class UAudioComponent;
+class USoundBase;
 
 // Broadcast when a territory is selected on the world map so that interested
 // systems (e.g. player controllers) can react.
@@ -103,9 +104,13 @@ public:
   UFUNCTION(BlueprintCallable, Category = "WorldMap")
   ATerritory *GetTerritoryById(int32 TerritoryId) const;
 
+  /** Sound played when a territory becomes selected on this map. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WorldMap|Audio")
+  USoundBase *TerritorySelectedSound = nullptr;
+
   /** Handle territory selection. */
   UFUNCTION(BlueprintCallable, Category = "WorldMap")
-  void SelectTerritory(ATerritory *Territory);
+  void SelectTerritory(ATerritory *Territory, bool bPlaySelectionSound = true);
 
   UFUNCTION(NetMulticast, Reliable)
   void MulticastSelectTerritory(int32 TerritoryID);

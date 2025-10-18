@@ -25,6 +25,7 @@ class AFighterPawn;
 class UGridOverlayComponent;
 class UWorld;
 class ASkald_BattleGameMode;
+class USoundBase;
 
 /** Command issued by the player during a battle. */
 UENUM()
@@ -150,6 +151,10 @@ protected:
   /** Widget class used for displaying battle victory. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "UI")
   TSubclassOf<UUserWidget> VictoryWidgetClass;
+
+  /** Sound to play for the local player when a tactical round begins. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Audio")
+  USoundBase *BattleRoundStartSound = nullptr;
 
   /** Reference to the HUD widget instance. */
   UPROPERTY(BlueprintReadOnly, Category = "UI",

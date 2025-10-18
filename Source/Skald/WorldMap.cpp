@@ -18,6 +18,7 @@
 #include "Templates/Function.h"
 #include "Territory.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Kismet/GameplayStatics.h"
 #include <cfloat>
 
 // Constructor sets default properties but leaves TerritoryTable unassigned so
@@ -477,7 +478,8 @@ ATerritory *AWorldMap::GetTerritoryById(int32 TerritoryId) const {
   return Found ? *Found : nullptr;
 }
 
-void AWorldMap::SelectTerritory(ATerritory *Territory) {
+void AWorldMap::SelectTerritory(ATerritory *Territory,
+                                bool bPlaySelectionSound) {
   if (!bIsWorldActive && Territory) {
     UE_LOG(LogSkald, Verbose,
            TEXT("WorldMap %s ignoring selection while inactive"),
@@ -501,6 +503,13 @@ void AWorldMap::SelectTerritory(ATerritory *Territory) {
   SelectedTerritory = IsValid(Territory) ? Territory : nullptr;
   if (SelectedTerritory) {
     SelectedTerritory->Select();
+  }
+
+  const bool bShouldPlaySound =
+      bPlaySelectionSound && TerritorySelectedSound &&
+      GetNetMode() != NM_DedicatedServer;
+  if (bShouldPlaySound) {
+    UGameplayStatics::PlaySound2D(this, TerritorySelectedSound);
   }
 
   OnTerritorySelected.Broadcast(SelectedTerritory);

@@ -1572,7 +1572,7 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
   }
 
   if (TerritoryID < 0) {
-    WorldMap->SelectTerritory(nullptr);     // server authority
+    WorldMap->SelectTerritory(nullptr, false); // server authority
     WorldMap->MulticastSelectTerritory(-1); // replicate to all clients
     return;
   }
@@ -1582,7 +1582,7 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
     return;
   }
 
-  WorldMap->SelectTerritory(Terr);                 // server authority
+  WorldMap->SelectTerritory(Terr, false);          // server authority
   WorldMap->MulticastSelectTerritory(TerritoryID); // replicate to all clients
 }
 
@@ -2444,6 +2444,10 @@ void ASkaldPlayerController::HandleRightClick() {
 
 void ASkaldPlayerController::HandleRoundStarted(int32 RoundNumber,
                                                 ESkaldFaction InitiativeWinner) {
+  if (IsLocalController() && BattleRoundStartSound) {
+    UGameplayStatics::PlaySound2D(this, BattleRoundStartSound);
+  }
+
   if (BattleHudWidget) {
     BattleHudWidget->HideInitiativePrompt();
   }
