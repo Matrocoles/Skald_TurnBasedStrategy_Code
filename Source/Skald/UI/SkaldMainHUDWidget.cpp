@@ -581,6 +581,19 @@ void USkaldMainHUDWidget::CancelMoveSelection() {
   }
 }
 
+void USkaldMainHUDWidget::ResetMoveSelectionAfterInvalidAttempt() {
+  ClearTerritoryHighlights();
+  SelectedSourceID = -1;
+  SelectedTargetID = -1;
+  if (CurrentPhase == ETurnPhase::Movement) {
+    bSelectingForMove = true;
+    bSelectingForAttack = false;
+    ShowSelectionPromptMessage(TEXT("Select a territory to move troops from."));
+  } else {
+    bSelectingForMove = false;
+  }
+}
+
 void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
   if (!Territory) {
     return;
