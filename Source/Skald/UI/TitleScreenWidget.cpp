@@ -6,7 +6,7 @@
 #include "Components/VerticalBoxSlot.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
-#include "Components/WidgetTree.h"
+#include "Blueprint/WidgetTree.h"
 #include "Styling/CoreStyle.h"
 #include "TimerManager.h"
 

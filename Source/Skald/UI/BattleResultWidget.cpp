@@ -5,7 +5,7 @@
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Kismet/GameplayStatics.h"
-#include "Styling/SlateFontInfo.h"
+#include "Fonts/SlateFontInfo.h"
 
 void UBattleResultWidget::NativeConstruct() {
   Super::NativeConstruct();
