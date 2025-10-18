@@ -5,6 +5,7 @@
 #include "EngineUtils.h"
 #include "GridBattleManager.h"
 #include "Kismet/GameplayStatics.h"
+#include "Misc/LexicalConversion.h"
 #include "Misc/PackageName.h"
 #include "Modules/ModuleManager.h"
 #include "Net/UnrealNetwork.h"
@@ -39,6 +40,164 @@
 #endif
 
 namespace {
+FString StripStreamingPrefixFromPackageName(FString PackageName,
+                                            const UWorld *ReferenceWorld) {
+  if (PackageName.IsEmpty() || !ReferenceWorld) {
+    return PackageName;
+  }
+
+  const FString Prefix = ReferenceWorld->StreamingLevelsPrefix;
+  if (Prefix.IsEmpty()) {
+    return PackageName;
+  }
+
+  auto StripPrefix = [&Prefix](FString &Value) {
+    if (Value.StartsWith(Prefix)) {
+      Value.RightChopInline(Prefix.Len(),
+#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5)
+                             EAllowShrinking::No
+#else
+                             /*bAllowShrinking=*/false
+#endif
+      );
+
+      if (Value.StartsWith(TEXT("_"))) {
+        Value.RightChopInline(1,
+#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5)
+                               EAllowShrinking::No
+#else
+                               /*bAllowShrinking=*/false
+#endif
+        );
+      }
+    }
+  };
+
+  FString Result = PackageName;
+
+  FString PathPart;
+  FString AssetPart;
+  if (FPackageName::SplitLongPackageName(Result, PathPart, AssetPart)) {
+    FString TrimmedAsset = AssetPart;
+    StripPrefix(TrimmedAsset);
+    if (!TrimmedAsset.IsEmpty() && TrimmedAsset != AssetPart) {
+      Result = PathPart + TEXT("/") + TrimmedAsset;
+    }
+    return Result;
+  }
+
+  StripPrefix(Result);
+  return Result;
+}
+
+FString EnsureLongPackageName(FString MapName, const UWorld *ReferenceWorld) {
+  FString Result = MoveTemp(MapName);
+  if (Result.IsEmpty()) {
+    return Result;
+  }
+
+  int32 OptionsIndex = INDEX_NONE;
+  if (Result.FindChar(TEXT('?'), OptionsIndex)) {
+#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5)
+    Result.LeftInline(OptionsIndex, EAllowShrinking::No);
+#else
+    Result.LeftInline(OptionsIndex, /*bAllowShrinking=*/false);
+#endif
+  }
+
+  if (Result.EndsWith(TEXT(".umap"))) {
+#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5)
+    Result.LeftChopInline(5, EAllowShrinking::No);
+#else
+    Result.LeftChopInline(5, /*bAllowShrinking=*/false);
+#endif
+  }
+
+  if (Result.Contains(TEXT("."))) {
+    const FString PackageOnly = FPackageName::ObjectPathToPackageName(Result);
+    if (!PackageOnly.IsEmpty()) {
+      Result = PackageOnly;
+    }
+  }
+
+  if (ReferenceWorld) {
+    Result = StripStreamingPrefixFromPackageName(Result, ReferenceWorld);
+  }
+
+  if (!Result.IsEmpty() && FPackageName::IsShortPackageName(Result) &&
+      ReferenceWorld) {
+    FString ReferencePackage = GetWorldPackageName(ReferenceWorld);
+    ReferencePackage = StripStreamingPrefixFromPackageName(ReferencePackage, ReferenceWorld);
+
+    FString PathPart;
+    FString AssetPart;
+    if (FPackageName::SplitLongPackageName(ReferencePackage, PathPart,
+                                           AssetPart)) {
+      if (!PathPart.IsEmpty()) {
+        Result = PathPart + TEXT("/") + Result;
+      }
+    }
+  }
+
+  if (!Result.IsEmpty() && !FPackageName::IsValidLongPackageName(Result)) {
+    FString Converted;
+    if (FPackageName::TryConvertFilenameToLongPackageName(Result, Converted)) {
+      Result = MoveTemp(Converted);
+    }
+  }
+
+  if (!Result.IsEmpty() && !FPackageName::IsValidLongPackageName(Result)) {
+    const FString RegistryName = ResolveMapPackageFromRegistry(Result);
+    if (!RegistryName.IsEmpty()) {
+      Result = RegistryName;
+    }
+  }
+
+  if (ReferenceWorld && !Result.IsEmpty()) {
+    Result = StripStreamingPrefixFromPackageName(Result, ReferenceWorld);
+  }
+
+  if (!Result.IsEmpty() && FPackageName::IsValidLongPackageName(Result)) {
+    return Result;
+  }
+
+  return FString();
+}
+
+FString ResolveCanonicalReturnMapFromWorld(UWorld *World) {
+  if (!World) {
+    return FString();
+  }
+
+  struct FMapCandidate {
+    FString Value;
+    const TCHAR *Label;
+  };
+
+  TArray<FMapCandidate, TInlineAllocator<4>> Candidates;
+  Candidates.Add({GetWorldPackageName(World), TEXT("world package")});
+  Candidates.Add({World->URL.Map, TEXT("URL map")});
+  Candidates.Add({UGameplayStatics::GetCurrentLevelName(World, false),
+                  TEXT("current level (full)")});
+  Candidates.Add({UGameplayStatics::GetCurrentLevelName(World, true),
+                  TEXT("current level (stripped)")});
+
+  for (const FMapCandidate &Candidate : Candidates) {
+    FString Canonical = EnsureLongPackageName(Candidate.Value, World);
+    if (!Canonical.IsEmpty()) {
+      UE_LOG(LogSkald, Log,
+             TEXT("ResolveCanonicalReturnMapFromWorld: %s candidate '%s' -> '%s'"),
+             Candidate.Label, *Candidate.Value, *Canonical);
+      return Canonical;
+    }
+  }
+
+  UE_LOG(LogSkald, Error,
+         TEXT("ResolveCanonicalReturnMapFromWorld: failed for world %s (URL=%s)"),
+         *GetNameSafe(World), *World->URL.Map);
+  return FString();
+}
+
 FString ResolveMapPackageFromRegistry(const FString &MapName) {
   if (MapName.IsEmpty()) {
     return FString();
@@ -298,31 +457,50 @@ void ATurnManager::HandleGridBattleEnded(ESkaldFaction /*WinningFaction*/, int32
   UWorld *World = GetWorld();
 
   FString ReturnMapName;
-  if (!PendingBattle.ReturnMap.IsEmpty()) {
-    ReturnMapName = PendingBattle.ReturnMap;
-  } else if (GI) {
-    ReturnMapName = GI->PendingBattle.ReturnMap;
-  }
+  FString ReturnMapSource;
 
-  ReturnMapName = NormalizeMapName(World, MoveTemp(ReturnMapName));
+  auto TryResolveReturnMap = [&](const FString &Candidate,
+                                 const TCHAR *SourceLabel) {
+    if (Candidate.IsEmpty()) {
+      return false;
+    }
 
-  if (ReturnMapName.IsEmpty() && World) {
-    ReturnMapName = NormalizeMapName(
-        World, UGameplayStatics::GetCurrentLevelName(World, true));
+    FString Canonical = EnsureLongPackageName(Candidate, World);
+    if (Canonical.IsEmpty()) {
+      UE_LOG(LogSkald, Warning,
+             TEXT("HandleGridBattleEnded: %s value '%s' is not a valid long package name."),
+             SourceLabel, *Candidate);
+      return false;
+    }
+
+    ReturnMapName = MoveTemp(Canonical);
+    ReturnMapSource = SourceLabel;
+    return true;
+  };
+
+  if (!TryResolveReturnMap(PendingBattle.ReturnMap,
+                           TEXT("PendingBattle.ReturnMap")) &&
+      GI) {
+    TryResolveReturnMap(GI->PendingBattle.ReturnMap,
+                        TEXT("GameInstance.PendingBattle.ReturnMap"));
   }
 
   if (ReturnMapName.IsEmpty()) {
-    ReturnMapName = UGameplayStatics::GetCurrentLevelName(this, true);
+    const FString PendingBattleValue = PendingBattle.ReturnMap;
+    const FString GameInstanceValue = GI ? GI->PendingBattle.ReturnMap : FString();
+    const TCHAR *PendingValueForLog =
+        PendingBattleValue.IsEmpty() ? TEXT("<Empty>") : *PendingBattleValue;
+    const TCHAR *GameInstanceValueForLog =
+        GameInstanceValue.IsEmpty() ? TEXT("<Empty>") : *GameInstanceValue;
+    UE_LOG(LogSkald, Error,
+           TEXT("HandleGridBattleEnded: unable to resolve return map (Pending='%s', GI='%s')."),
+           PendingValueForLog, GameInstanceValueForLog);
+    return;
   }
 
-  ReturnMapName = NormalizeMapName(nullptr, MoveTemp(ReturnMapName));
-
-  if (!ReturnMapName.IsEmpty() &&
-      !FPackageName::IsValidLongPackageName(ReturnMapName)) {
-    UE_LOG(LogSkald, Warning,
-           TEXT("HandleGridBattleEnded resolved non-long return map '%s'."),
-           *ReturnMapName);
-  }
+  UE_LOG(LogSkald, Verbose,
+         TEXT("HandleGridBattleEnded: resolved return map '%s' from %s."),
+         *ReturnMapName, *ReturnMapSource);
 
   ResolveGridBattleResult();
 
@@ -336,6 +514,12 @@ void ATurnManager::HandleGridBattleEnded(ESkaldFaction /*WinningFaction*/, int32
 
   if (World) {
     const ENetMode NetMode = World->GetNetMode();
+    const TCHAR *NetModeString = LexToString(NetMode);
+
+    UE_LOG(LogSkald, Log,
+           TEXT("HandleGridBattleEnded: travelling to '%s' (source=%s, NetMode=%s)."),
+           *ReturnMapName, *ReturnMapSource,
+           NetModeString ? NetModeString : TEXT("Unknown"));
 
     switch (NetMode) {
     case NM_Standalone: {
@@ -785,30 +969,20 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
   }
 
   if (UWorld *World = GetWorld()) {
-    FString ReturnMap = NormalizeMapName(World, FString());
-    if (ReturnMap.IsEmpty()) {
-      ReturnMap = NormalizeMapName(
-          World, UGameplayStatics::GetCurrentLevelName(World, true));
-    }
-    if (ReturnMap.IsEmpty() || FPackageName::IsShortPackageName(ReturnMap)) {
-      const FString PackageName = GetWorldPackageName(World);
-      if (!PackageName.IsEmpty()) {
-        ReturnMap = PackageName;
-      }
-    }
-    SeededBattle.ReturnMap = MoveTemp(ReturnMap);
+    SeededBattle.ReturnMap = ResolveCanonicalReturnMapFromWorld(World);
 
-    if (!SeededBattle.ReturnMap.IsEmpty()) {
-      FString CanonicalReturn = NormalizeMapName(nullptr, SeededBattle.ReturnMap);
-      if (!CanonicalReturn.IsEmpty()) {
-        SeededBattle.ReturnMap = MoveTemp(CanonicalReturn);
-      }
-
-      if (!FPackageName::IsValidLongPackageName(SeededBattle.ReturnMap)) {
-        UE_LOG(LogSkald, Warning,
-               TEXT("TriggerGridBattle cached non-long return map '%s'."),
-               *SeededBattle.ReturnMap);
-      }
+    if (SeededBattle.ReturnMap.IsEmpty()) {
+      UE_LOG(LogSkald, Error,
+             TEXT("TriggerGridBattle: Failed to resolve a canonical return map for world %s."),
+             *GetNameSafe(World));
+    } else if (!FPackageName::IsValidLongPackageName(SeededBattle.ReturnMap)) {
+      UE_LOG(LogSkald, Warning,
+             TEXT("TriggerGridBattle resolved return map '%s' which is not a valid long package name."),
+             *SeededBattle.ReturnMap);
+    } else {
+      UE_LOG(LogSkald, Log,
+             TEXT("TriggerGridBattle: storing return map '%s' before travelling to battle."),
+             *SeededBattle.ReturnMap);
     }
 
     CachedWorldMap = ResolveWorldMap();
