@@ -7,6 +7,7 @@
 #include "Components/Widget.h"
 #include "Containers/Queue.h"
 #include "Containers/Set.h"
+#include "FighterPawn.h"
 #include "Engine/Engine.h"
 #include "Kismet/GameplayStatics.h"
 #include "Skald.h"
