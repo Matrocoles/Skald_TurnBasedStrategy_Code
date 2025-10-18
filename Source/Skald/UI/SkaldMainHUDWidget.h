@@ -20,6 +20,7 @@ class ASkaldGameState;
 class USkaldGameInstance;
 class USoundBase;
 class UCombatFloaterPoolSubsystem;
+class UTexture2D;
 class UW_FloatingText;
 class UW_DiceResolutionPanel;
 class AFighterPawn;
@@ -352,6 +353,10 @@ public:
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
             meta = (BindWidgetOptional))
   UW_DiceResolutionPanel *DiceResolutionPanel;
+
+  /** Dice face textures that should be mirrored on the resolution panel. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skald|Widgets|Dice")
+  TArray<TObjectPtr<UTexture2D>> DiceFaceTextures;
 
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Widgets")
   TSubclassOf<UConfirmAttackWidget> ConfirmAttackWidgetClass;

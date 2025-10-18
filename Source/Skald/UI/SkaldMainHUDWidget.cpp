@@ -124,6 +124,7 @@ void USkaldMainHUDWidget::NativeConstruct() {
   if (DiceResolutionPanel) {
     DiceResolutionPanel->OnResolutionComplete.AddDynamic(
         this, &USkaldMainHUDWidget::HandleDicePanelResolved);
+    DiceResolutionPanel->SetDiceFaceTextures(DiceFaceTextures);
   }
 
   ConfigureBroadcastText();

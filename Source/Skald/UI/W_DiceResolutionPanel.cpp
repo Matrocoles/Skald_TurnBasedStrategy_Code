@@ -1,8 +1,12 @@
 #include "UI/W_DiceResolutionPanel.h"
+#include "Components/HorizontalBox.h"
+#include "Components/HorizontalBoxSlot.h"
+#include "Components/Image.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Components/Widget.h"
+#include "Engine/Texture2D.h"
 #include "Engine/World.h"
 #include "Math/UnrealMathUtility.h"
 #include "TimerManager.h"
@@ -83,6 +87,11 @@ void UW_DiceResolutionPanel::ResetPanel()
     UpdateTallies();
 }
 
+void UW_DiceResolutionPanel::SetDiceFaceTextures(const TArray<TObjectPtr<UTexture2D>>& InTextures)
+{
+    DiceFaceTextures = InTextures;
+}
+
 void UW_DiceResolutionPanel::ClearOutcomeEntries()
 {
     if (OutcomeList)
@@ -128,27 +137,71 @@ void UW_DiceResolutionPanel::RevealNextDie()
     const FDiceRollOutcome& Outcome = ActiveResult.DiceOutcomes[RevealIndex];
     if (OutcomeList)
     {
-        UTextBlock* Entry = NewObject<UTextBlock>(OutcomeList);
-        if (Entry)
+        UHorizontalBox* EntryRow = NewObject<UHorizontalBox>(OutcomeList);
+        if (EntryRow)
         {
+            EntryRow->SetVisibility(ESlateVisibility::HitTestInvisible);
+
             const FText OutcomeLabel = Outcome.bHit
                 ? (Outcome.bCritical
                     ? NSLOCTEXT("SkaldBattle", "DiceOutcomeCrit", "Crit")
                     : NSLOCTEXT("SkaldBattle", "DiceOutcomeHit", "Hit"))
                 : NSLOCTEXT("SkaldBattle", "DiceOutcomeMiss", "Miss");
-            const FText EntryText = FText::Format(
-                NSLOCTEXT("SkaldBattle", "DiceOutcomeEntry", "#{0} • {1} ({2})"),
-                FText::AsNumber(RevealIndex + 1),
-                FText::AsNumber(FMath::Max(Outcome.RollValue, 0)),
-                OutcomeLabel);
-            Entry->SetText(EntryText);
 
-            const FLinearColor EntryColour = Outcome.bHit
+            const FLinearColor OutcomeColour = Outcome.bHit
                 ? (Outcome.bCritical ? FLinearColor(0.98f, 0.78f, 0.15f) : FLinearColor(0.12f, 0.76f, 0.45f))
                 : FLinearColor(0.55f, 0.55f, 0.58f);
-            Entry->SetColorAndOpacity(FSlateColor(EntryColour));
 
-            if (UVerticalBoxSlot* EntrySlot = OutcomeList->AddChildToVerticalBox(Entry))
+            if (UTexture2D* DieTexture = ResolveDiceTexture(Outcome.RollValue))
+            {
+                UImage* DieImage = NewObject<UImage>(EntryRow);
+                if (DieImage)
+                {
+                    DieImage->SetBrushFromTexture(DieTexture, true);
+                    DieImage->SetVisibility(ESlateVisibility::HitTestInvisible);
+
+                    if (UHorizontalBoxSlot* ImageSlot = EntryRow->AddChildToHorizontalBox(DieImage))
+                    {
+                        ImageSlot->SetPadding(FMargin(0.f, 0.f, 8.f, 0.f));
+                        ImageSlot->SetVerticalAlignment(VAlign_Center);
+                    }
+                }
+            }
+
+            UTextBlock* ValueText = NewObject<UTextBlock>(EntryRow);
+            if (ValueText)
+            {
+                const FText ValueLabel = FText::Format(
+                    NSLOCTEXT("SkaldBattle", "DiceOutcomeEntryValue", "#{0} • {1}"),
+                    FText::AsNumber(RevealIndex + 1),
+                    FText::AsNumber(FMath::Max(Outcome.RollValue, 0)));
+                ValueText->SetText(ValueLabel);
+                ValueText->SetVisibility(ESlateVisibility::HitTestInvisible);
+
+                if (UHorizontalBoxSlot* ValueSlot = EntryRow->AddChildToHorizontalBox(ValueText))
+                {
+                    ValueSlot->SetVerticalAlignment(VAlign_Center);
+                }
+            }
+
+            UTextBlock* OutcomeText = NewObject<UTextBlock>(EntryRow);
+            if (OutcomeText)
+            {
+                const FText LabelText = FText::Format(
+                    NSLOCTEXT("SkaldBattle", "DiceOutcomeEntryLabel", "({0})"),
+                    OutcomeLabel);
+                OutcomeText->SetText(LabelText);
+                OutcomeText->SetColorAndOpacity(FSlateColor(OutcomeColour));
+                OutcomeText->SetVisibility(ESlateVisibility::HitTestInvisible);
+
+                if (UHorizontalBoxSlot* LabelSlot = EntryRow->AddChildToHorizontalBox(OutcomeText))
+                {
+                    LabelSlot->SetPadding(FMargin(8.f, 0.f, 0.f, 0.f));
+                    LabelSlot->SetVerticalAlignment(VAlign_Center);
+                }
+            }
+
+            if (UVerticalBoxSlot* EntrySlot = OutcomeList->AddChildToVerticalBox(EntryRow))
             {
                 EntrySlot->SetPadding(FMargin(0.f, 2.f));
             }
@@ -247,5 +300,21 @@ void UW_DiceResolutionPanel::BroadcastCompletion()
     }
 
     OnResolutionComplete.Broadcast(ActiveResult);
+}
+
+UTexture2D* UW_DiceResolutionPanel::ResolveDiceTexture(int32 RollValue) const
+{
+    if (DiceFaceTextures.Num() == 0)
+    {
+        return nullptr;
+    }
+
+    const int32 Index = RollValue - 1;
+    if (DiceFaceTextures.IsValidIndex(Index))
+    {
+        return DiceFaceTextures[Index];
+    }
+
+    return nullptr;
 }
 

@@ -50,6 +50,7 @@ void UBattleHUDWidget::NativeConstruct() {
   if (DiceResolutionPanel) {
     DiceResolutionPanel->OnResolutionComplete.AddDynamic(
         this, &UBattleHUDWidget::HandleDicePanelResolved);
+    DiceResolutionPanel->SetDiceFaceTextures(DiceFaceTextures);
   }
 
   if (InitiativePromptText) {
