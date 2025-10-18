@@ -100,6 +100,11 @@ public:
   UPROPERTY(BlueprintReadWrite, Category = "Battle")
   FS_BattlePayload PendingBattle;
 
+  /** Canonical path to the map that should be reloaded after resolving the
+   *  current battle. */
+  UPROPERTY(BlueprintReadWrite, Category = "Battle")
+  FString PendingReturnMap;
+
   /** Serialized results waiting to be applied on the overworld. */
   UPROPERTY(BlueprintReadWrite, Category = "Battle")
   FGridBattleResolution PendingBattleResolution;
@@ -177,6 +182,16 @@ public:
   {
     return PendingTravelTerritories;
   }
+
+  /** Store the canonical map path we should travel back to once combat
+   *  concludes. */
+  void SetPendingReturnMap(const FString &InReturnMap);
+
+  /** Return the currently cached travel destination, if any. */
+  const FString &GetPendingReturnMap() const { return PendingReturnMap; }
+
+  /** Clear any cached return destination once travel has completed. */
+  void ClearPendingReturnMap();
 
   /** Toggle the travel pending guard and log the change. */
   UFUNCTION(BlueprintCallable)
