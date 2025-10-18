@@ -12,6 +12,7 @@ class ASkaldPlayerState;
 class AWorldMap;
 class UWorld;
 class USkaldGameInstance;
+class UGridBattleManager;
 
 USTRUCT(BlueprintType)
 struct FBattleMapDescriptor {
@@ -175,6 +176,9 @@ protected:
 
   /** Retry handle used when waiting for the battle manager to become available on the battle map. */
   FTimerHandle BattleEndBindingRetryHandle;
+
+  /** Cached battle manager that currently has a battle end delegate bound. */
+  TWeakObjectPtr<class UGridBattleManager> BoundBattleManager;
 
   /** Attempt to continue travelling to the battle map after capturing the world snapshot. */
   void RetryPendingBattleTravel();
