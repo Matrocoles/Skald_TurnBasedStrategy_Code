@@ -6,6 +6,7 @@
 #include "GridBattleManager.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/PackageName.h"
+#include "Modules/ModuleManager.h"
 #include "Net/UnrealNetwork.h"
 #include "Runtime/Launch/Resources/Version.h"
 #include "Skald.h"
@@ -26,6 +27,8 @@
 #include "TimerManager.h"
 #include "WorldMap.h"
 
+#include "AssetRegistry/AssetRegistryModule.h"
+
 namespace {
 FString GetResolvedPlayerName(const ASkaldPlayerState *PlayerState,
                               const TCHAR *Context) {
@@ -39,6 +42,12 @@ FString GetResolvedPlayerName(const ASkaldPlayerState *PlayerState,
 FString GetWorldPackageName(const UWorld *World) {
   if (!World) {
     return FString();
+  }
+
+  const FSoftObjectPath WorldPath(World);
+  const FString PathFromObject = WorldPath.GetLongPackageName();
+  if (!PathFromObject.IsEmpty()) {
+    return PathFromObject;
   }
 
   if (const ULevel *PersistentLevel = World->PersistentLevel) {
@@ -93,15 +102,35 @@ FString NormalizeMapName(UWorld *World, FString Candidate) {
       }
     }
 
-    FString LongPackageName;
     if (FPackageName::IsShortPackageName(Result)) {
+      FString LongPackageName;
       if (FPackageName::SearchForPackageOnDisk(Result, &LongPackageName)) {
         Result = MoveTemp(LongPackageName);
+      } else {
+        const FString RegistryName = ResolveMapPackageFromRegistry(Result);
+        if (!RegistryName.IsEmpty()) {
+          Result = RegistryName;
+        }
       }
-    } else if (!FPackageName::IsValidLongPackageName(Result)) {
-      if (FPackageName::TryConvertFilenameToLongPackageName(Result,
-                                                           LongPackageName)) {
-        Result = MoveTemp(LongPackageName);
+    } else {
+      FSoftObjectPath MapPath(Result);
+      if (MapPath.IsValid()) {
+        const FString LongPackageName = MapPath.GetLongPackageName();
+        if (!LongPackageName.IsEmpty()) {
+          Result = LongPackageName;
+        }
+      } else if (Result.Contains(TEXT("."))) {
+        const FString ObjectPathPackage =
+            FPackageName::ObjectPathToPackageName(Result);
+        if (!ObjectPathPackage.IsEmpty()) {
+          Result = ObjectPathPackage;
+        }
+      } else if (!FPackageName::IsValidLongPackageName(Result)) {
+        FString ConvertedName;
+        if (FPackageName::TryConvertFilenameToLongPackageName(Result,
+                                                             ConvertedName)) {
+          Result = MoveTemp(ConvertedName);
+        }
       }
     }
   }
