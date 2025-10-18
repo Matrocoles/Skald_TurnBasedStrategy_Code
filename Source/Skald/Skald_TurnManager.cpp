@@ -52,69 +52,12 @@ FString GetWorldPackageName(const UWorld *World) {
 
   if (const ULevel *PersistentLevel = World->PersistentLevel) {
     if (const UPackage *Package = PersistentLevel->GetOutermost()) {
-      const FString PackageName = Package->GetName();
-      if (FPackageName::IsValidLongPackageName(PackageName)) {
-        return PackageName;
-      }
+      return Package->GetPathName();
     }
   }
 
   if (const UPackage *WorldPackage = World->GetPackage()) {
-    const FString PackageName = WorldPackage->GetName();
-    if (FPackageName::IsValidLongPackageName(PackageName)) {
-      return PackageName;
-    }
-  }
-
-  return FString();
-}
-
-FString ResolveMapPackageFromRegistry(const FString &MapName) {
-  if (MapName.IsEmpty()) {
-    return FString();
-  }
-
-  static TMap<FString, FString> CachedMapNames;
-  FString NormalisedKey = MapName;
-  NormalisedKey.ToLowerInline();
-  if (const FString *Cached = CachedMapNames.Find(NormalisedKey)) {
-    return *Cached;
-  }
-
-  FAssetRegistryModule *AssetRegistryModule =
-      FModuleManager::LoadModulePtr<FAssetRegistryModule>("AssetRegistry");
-  if (!AssetRegistryModule) {
-    return FString();
-  }
-
-  static bool bInitialisedCache = false;
-  if (!bInitialisedCache) {
-    FARFilter Filter;
-#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1)
-    Filter.ClassPaths.Add(UWorld::StaticClass()->GetClassPathName());
-#else
-    Filter.ClassNames.Add(UWorld::StaticClass()->GetFName());
-#endif
-    Filter.bRecursiveClasses = true;
-    Filter.bIncludeOnlyOnDiskAssets = false;
-
-    TArray<FAssetData> WorldAssets;
-    AssetRegistryModule->Get().GetAssets(Filter, WorldAssets);
-
-    for (const FAssetData &Asset : WorldAssets) {
-      FString AssetNameString = Asset.AssetName.ToString();
-      const FString PackageNameString = Asset.PackageName.ToString();
-      if (!AssetNameString.IsEmpty() && !PackageNameString.IsEmpty()) {
-        AssetNameString.ToLowerInline();
-        CachedMapNames.Add(AssetNameString, PackageNameString);
-      }
-    }
-
-    bInitialisedCache = true;
-  }
-
-  if (const FString *CachedValue = CachedMapNames.Find(NormalisedKey)) {
-    return *CachedValue;
+    return WorldPackage->GetPathName();
   }
 
   return FString();
