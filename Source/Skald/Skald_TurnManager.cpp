@@ -40,6 +40,9 @@
 #endif
 
 namespace {
+FString GetWorldPackageName(const UWorld *World);
+FString ResolveMapPackageFromRegistry(const FString &MapName);
+
 FString StripStreamingPrefixFromPackageName(FString PackageName,
                                             const UWorld *ReferenceWorld) {
   if (PackageName.IsEmpty() || !ReferenceWorld) {
