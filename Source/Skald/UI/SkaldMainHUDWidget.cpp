@@ -24,6 +24,7 @@
 #include "UI/DeployWidget.h"
 #include "UI/CombatFloaterPoolSubsystem.h"
 #include "UI/W_FloatingText.h"
+#include "UI/W_DiceResolutionPanel.h"
 #include "UI/SkaldUIHelpers.h"
 #include "UObject/ConstructorHelpers.h"
 #include "WorldMap.h"
@@ -120,6 +121,11 @@ void USkaldMainHUDWidget::NativeConstruct() {
     DeployButton->SetVisibility(ESlateVisibility::Collapsed);
   }
 
+  if (DiceResolutionPanel) {
+    DiceResolutionPanel->OnResolutionComplete.AddDynamic(
+        this, &USkaldMainHUDWidget::HandleDicePanelResolved);
+  }
+
   ConfigureBroadcastText();
 
   SyncPhaseButtons(false);
@@ -139,6 +145,15 @@ void USkaldMainHUDWidget::NativeTick(const FGeometry &MyGeometry,
 }
 
 void USkaldMainHUDWidget::NativeDestruct() {
+  if (DiceResolutionPanel) {
+    DiceResolutionPanel->OnResolutionComplete.RemoveDynamic(
+        this, &USkaldMainHUDWidget::HandleDicePanelResolved);
+  }
+
+  PendingDiceResolutions.Reset();
+  bDiceResolutionActive = false;
+  ActiveDiceResolution = FQueuedDiceResolution();
+
   if (GameState) {
     GameState->OnPlayersUpdated.RemoveDynamic(
         this, &USkaldMainHUDWidget::HandlePlayersUpdated);
@@ -494,6 +509,63 @@ void USkaldMainHUDWidget::ShowTurnEnded(const FString &PlayerName) {
   const FString Text =
       FString::Printf(TEXT("%s ended their turn"), *PlayerName);
   UpdateInitiativeText(Text);
+}
+
+void USkaldMainHUDWidget::QueueDiceResolution(AFighterPawn *Attacker,
+                                              AFighterPawn *Defender,
+                                              const FDiceRollResult &Result) {
+  FQueuedDiceResolution Entry;
+  Entry.Attacker = Attacker;
+  Entry.Defender = Defender;
+  Entry.Result = Result;
+  PendingDiceResolutions.Add(MoveTemp(Entry));
+
+  if (!bDiceResolutionActive) {
+    ProcessNextDiceResolution();
+  }
+}
+
+void USkaldMainHUDWidget::ProcessNextDiceResolution() {
+  if (bDiceResolutionActive) {
+    return;
+  }
+
+  if (PendingDiceResolutions.Num() == 0) {
+    return;
+  }
+
+  bDiceResolutionActive = true;
+  ActiveDiceResolution = PendingDiceResolutions[0];
+  PendingDiceResolutions.RemoveAt(0);
+
+  if (!DiceResolutionPanel) {
+    OnResolutionComplete.Broadcast(ActiveDiceResolution.Attacker.Get(),
+                                   ActiveDiceResolution.Defender.Get(),
+                                   ActiveDiceResolution.Result);
+    bDiceResolutionActive = false;
+    ProcessNextDiceResolution();
+    return;
+  }
+
+  DiceResolutionPanel->OverrideDiceFaceTextures(DiceFaceTextures);
+  DiceResolutionPanel->BeginResolution(ActiveDiceResolution.Result);
+}
+
+void USkaldMainHUDWidget::HandleDicePanelResolved(
+    const FDiceRollResult &Result) {
+  if (!bDiceResolutionActive) {
+    OnResolutionComplete.Broadcast(nullptr, nullptr, Result);
+    return;
+  }
+
+  OnResolutionComplete.Broadcast(ActiveDiceResolution.Attacker.Get(),
+                                 ActiveDiceResolution.Defender.Get(),
+                                 ActiveDiceResolution.Result);
+
+  bDiceResolutionActive = false;
+  ActiveDiceResolution = FQueuedDiceResolution();
+
+  ProcessNextDiceResolution();
 }
 
 void USkaldMainHUDWidget::HideInitiativeText() {

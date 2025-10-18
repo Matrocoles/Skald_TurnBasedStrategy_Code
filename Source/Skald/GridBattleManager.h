@@ -46,8 +46,53 @@ class AFighterPawn; // MUST be before the delegates
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
     FOnBattleEnded, ESkaldFaction, WinningFaction, int32, AttackerCasualties, int32, DefenderCasualties);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(
-    FOnAttackResolved, AFighterPawn*, Attacker, AFighterPawn*, Defender, int32, Roll, bool, bHit, int32, Damage);
+USTRUCT(BlueprintType)
+struct FDiceRollOutcome
+{
+    GENERATED_BODY();
+
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Battle|Dice")
+    int32 RollValue = 1;
+
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Battle|Dice")
+    int32 Damage = 0;
+
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Battle|Dice")
+    bool bHit = false;
+
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Battle|Dice")
+    bool bCritical = false;
+};
+
+USTRUCT(BlueprintType)
+struct FDiceRollResult
+{
+    GENERATED_BODY();
+
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Battle|Dice")
+    TArray<FDiceRollOutcome> DiceOutcomes;
+
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Battle|Dice")
+    int32 TotalDamage = 0;
+
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Battle|Dice")
+    int32 HitCount = 0;
+
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Battle|Dice")
+    int32 CriticalHitCount = 0;
+
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Battle|Dice")
+    int32 MissCount = 0;
+
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Battle|Dice")
+    int32 StartingHealth = 0;
+
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Battle|Dice")
+    int32 EndingHealth = 0;
+};
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
+    FOnAttackResolved, AFighterPawn*, Attacker, AFighterPawn*, Defender, const FDiceRollResult&, Result);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
     FOnAttackRejected, AFighterPawn*, Attacker, AFighterPawn*, Defender, const FText&, Reason);
 
@@ -293,7 +338,7 @@ public:
     UFUNCTION(BlueprintCallable, Category="Battle")
     void UnregisterFighter(AFighterPawn* Fighter);
 
-    void ReportAttackRoll(AFighterPawn* Attacker, AFighterPawn* Defender, int32 Roll, bool bHit, int32 Damage);
+    void ReportAttackResolution(AFighterPawn* Attacker, AFighterPawn* Defender, const FDiceRollResult& Result);
     void ReportAttackRejected(AFighterPawn* Attacker, AFighterPawn* Defender, const FText& Reason);
 
     /** Table containing fighter definitions. */

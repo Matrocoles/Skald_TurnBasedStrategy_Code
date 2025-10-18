@@ -850,6 +850,8 @@ void ASkaldPlayerController::InitializeBattleHUD() {
           this, &ASkaldPlayerController::HandleEndTurnPressed);
       BattleHudWidget->OnInitiativeRollRequested.AddDynamic(
           this, &ASkaldPlayerController::HandleInitiativeRollRequested);
+      BattleHudWidget->OnResolutionComplete.AddDynamic(
+          this, &ASkaldPlayerController::HandleDiceResolutionComplete);
       BattleHudWidget->SetEndTurnVisibility(false);
       BattleHudWidget->SetActivateEnabled(false);
       BattleHudWidget->SetEndTurnEnabled(false);
@@ -2830,17 +2832,31 @@ void ASkaldPlayerController::UpdateBattlePlayersTurnDisplay() {
 
 void ASkaldPlayerController::HandleAttackResolved(AFighterPawn *Attacker,
                                                   AFighterPawn *Defender,
-                                                  int32 Roll, bool bHit,
-                                                  int32 Damage) {
+                                                  const FDiceRollResult &Result) {
   if (!BattleHudWidget) {
+    if (MainHUD) {
+      MainHUD->QueueDiceResolution(Attacker, Defender, Result);
+    }
     return;
   }
 
-  BattleHudWidget->ShowDiceRoll(Roll);
-
-  if (Defender) {
-    BattleHudWidget->ShowAttackResultFloater(Defender, bHit, Damage);
+  BattleHudWidget->QueueDiceResolution(Attacker, Defender, Result);
+  if (MainHUD) {
+    MainHUD->QueueDiceResolution(Attacker, Defender, Result);
   }
+}
+
+void ASkaldPlayerController::HandleDiceResolutionComplete(
+    AFighterPawn *Attacker, AFighterPawn *Defender,
+    const FDiceRollResult &Result) {
+  if (!BattleHudWidget || !Defender) {
+    return;
+  }
+
+  const bool bAnyDamage = Result.TotalDamage > 0;
+  const int32 DisplayDamage = bAnyDamage ? Result.TotalDamage : 0;
+  BattleHudWidget->ShowAttackResultFloater(Defender, bAnyDamage,
+                                           DisplayDamage);
 }
 
 void ASkaldPlayerController::HandleAttackRejected(AFighterPawn *Attacker,

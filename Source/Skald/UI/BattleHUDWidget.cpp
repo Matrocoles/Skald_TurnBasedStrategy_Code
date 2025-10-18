@@ -6,6 +6,7 @@
 #include "FighterPawn.h"
 #include "GridOverlayComponent.h"
 #include "UI/CombatFloaterPoolSubsystem.h"
+#include "UI/W_DiceResolutionPanel.h"
 #include "UI/W_FloatingText.h"
 #include "Math/UnrealMathUtility.h"
 #include "TimerManager.h"
@@ -47,6 +48,11 @@ void UBattleHUDWidget::NativeConstruct() {
     RollInitiativeButton->SetIsEnabled(true);
   }
 
+  if (DiceResolutionPanel) {
+    DiceResolutionPanel->OnResolutionComplete.AddDynamic(
+        this, &UBattleHUDWidget::HandleDicePanelResolved);
+  }
+
   if (InitiativePromptText) {
     InitiativePromptText->SetText(FText::GetEmpty());
     InitiativePromptText->SetVisibility(ESlateVisibility::Collapsed);
@@ -70,6 +76,15 @@ void UBattleHUDWidget::NativeTick(const FGeometry &MyGeometry,
 }
 
 void UBattleHUDWidget::NativeDestruct() {
+  if (DiceResolutionPanel) {
+    DiceResolutionPanel->OnResolutionComplete.RemoveDynamic(
+        this, &UBattleHUDWidget::HandleDicePanelResolved);
+  }
+
+  PendingDiceResolutions.Reset();
+  bDiceResolutionActive = false;
+  ActiveDiceResolution = FBattleQueuedDiceResolution();
+
   while (ActiveFloaters.Num() > 0) {
     ReleaseFloaterAtIndex(ActiveFloaters.Num() - 1);
   }
@@ -519,6 +534,63 @@ void UBattleHUDWidget::ShowAttackResultFloater(AFighterPawn *Target, bool bHit,
   const float Scale = bHit ? 1.f : 0.9f;
 
   ShowCombatFloater(BaseLocation, Text, Colour, Scale);
+}
+
+void UBattleHUDWidget::QueueDiceResolution(AFighterPawn *Attacker,
+                                           AFighterPawn *Defender,
+                                           const FDiceRollResult &Result) {
+  FBattleQueuedDiceResolution Entry;
+  Entry.Attacker = Attacker;
+  Entry.Defender = Defender;
+  Entry.Result = Result;
+  PendingDiceResolutions.Add(MoveTemp(Entry));
+
+  if (!bDiceResolutionActive) {
+    ProcessNextDiceResolution();
+  }
+}
+
+void UBattleHUDWidget::ProcessNextDiceResolution() {
+  if (bDiceResolutionActive) {
+    return;
+  }
+
+  if (PendingDiceResolutions.Num() == 0) {
+    return;
+  }
+
+  bDiceResolutionActive = true;
+  ActiveDiceResolution = PendingDiceResolutions[0];
+  PendingDiceResolutions.RemoveAt(0);
+
+  if (!DiceResolutionPanel) {
+    OnResolutionComplete.Broadcast(ActiveDiceResolution.Attacker.Get(),
+                                   ActiveDiceResolution.Defender.Get(),
+                                   ActiveDiceResolution.Result);
+    bDiceResolutionActive = false;
+    ProcessNextDiceResolution();
+    return;
+  }
+
+  DiceResolutionPanel->OverrideDiceFaceTextures(DiceFaceTextures);
+  DiceResolutionPanel->BeginResolution(ActiveDiceResolution.Result);
+}
+
+void UBattleHUDWidget::HandleDicePanelResolved(
+    const FDiceRollResult &Result) {
+  if (!bDiceResolutionActive) {
+    OnResolutionComplete.Broadcast(nullptr, nullptr, Result);
+    return;
+  }
+
+  OnResolutionComplete.Broadcast(ActiveDiceResolution.Attacker.Get(),
+                                 ActiveDiceResolution.Defender.Get(),
+                                 ActiveDiceResolution.Result);
+
+  bDiceResolutionActive = false;
+  ActiveDiceResolution = FBattleQueuedDiceResolution();
+
+  ProcessNextDiceResolution();
 }
 
 void UBattleHUDWidget::UpdateCombatFloaters(float DeltaSeconds) {

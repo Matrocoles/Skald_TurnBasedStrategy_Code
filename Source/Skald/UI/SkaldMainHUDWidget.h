@@ -2,6 +2,7 @@
 
 #include "Blueprint/UserWidget.h"
 #include "CoreMinimal.h"
+#include "GridBattleManager.h"
 #include "SkaldTypes.h"
 #include "TimerManager.h"
 #include "SkaldMainHUDWidget.generated.h"
@@ -20,6 +21,9 @@ class USkaldGameInstance;
 class USoundBase;
 class UCombatFloaterPoolSubsystem;
 class UW_FloatingText;
+class UW_DiceResolutionPanel;
+class AFighterPawn;
+class UTexture2D;
 
 struct FSkaldActiveFloater {
   TWeakObjectPtr<UW_FloatingText> Floater;
@@ -144,6 +148,12 @@ public:
   UPROPERTY(BlueprintAssignable, Category = "Skald|Events")
   FSkaldEndMovementRequested OnEndMovementRequested;
 
+  DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
+      FOnDiceResolutionComplete, AFighterPawn *, Attacker, AFighterPawn *,
+      Defender, const FDiceRollResult &, Result);
+  UPROPERTY(BlueprintAssignable, Category = "Skald|Battle|Events")
+  FOnDiceResolutionComplete OnResolutionComplete;
+
   // BlueprintCallable functions — game → HUD (push updates)
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
   void UpdateTurnBanner(int32 InCurrentPlayerID, int32 InTurnNumber);
@@ -193,6 +203,10 @@ public:
   /** Display a message that a player has ended their turn. */
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
   void ShowTurnEnded(const FString &PlayerName);
+
+  /** Queue a dice resolution sequence for the shared dice panel. */
+  void QueueDiceResolution(AFighterPawn *Attacker, AFighterPawn *Defender,
+                           const FDiceRollResult &Result);
 
   /** Update and display the initiative announcement. */
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
@@ -336,6 +350,14 @@ public:
             meta = (BindWidget))
   UTextBlock *ResourcesText;
 
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
+            meta = (BindWidgetOptional))
+  UW_DiceResolutionPanel *DiceResolutionPanel;
+
+  /** Textures representing dice faces, indexed from 1 upward. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skald|Widgets|Dice")
+  TArray<TObjectPtr<UTexture2D>> DiceFaceTextures;
+
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Widgets")
   TSubclassOf<UConfirmAttackWidget> ConfirmAttackWidgetClass;
 
@@ -368,6 +390,10 @@ protected:
   void UpdateActiveFloaters(float DeltaSeconds);
   void ReleaseFloaterAtIndex(int32 Index);
   UCombatFloaterPoolSubsystem *ResolveFloaterPool();
+  void ProcessNextDiceResolution();
+
+  UFUNCTION()
+  void HandleDicePanelResolved(const FDiceRollResult &Result);
 
   UFUNCTION()
   void HandleAttackApproved();
@@ -405,6 +431,16 @@ protected:
   TArray<FSkaldActiveFloater> ActiveFloaters;
 
   TWeakObjectPtr<UCombatFloaterPoolSubsystem> CachedFloaterPool;
+
+  struct FQueuedDiceResolution {
+    TWeakObjectPtr<AFighterPawn> Attacker;
+    TWeakObjectPtr<AFighterPawn> Defender;
+    FDiceRollResult Result;
+  };
+
+  TArray<FQueuedDiceResolution> PendingDiceResolutions;
+  bool bDiceResolutionActive = false;
+  FQueuedDiceResolution ActiveDiceResolution;
 
   UPROPERTY()
   UDeployWidget *ActiveDeployWidget = nullptr;
