@@ -22,7 +22,7 @@ UTitleScreenWidget::UTitleScreenWidget(const FObjectInitializer& ObjectInitializ
     , bFadePromptIn(false)
     , bHasBeenDismissed(false)
 {
-    bIsFocusable = true;
+    SetIsFocusable(true);
 }
 
 void UTitleScreenWidget::NativeConstruct()

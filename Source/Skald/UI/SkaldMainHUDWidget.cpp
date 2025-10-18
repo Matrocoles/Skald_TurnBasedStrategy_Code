@@ -170,7 +170,7 @@ void USkaldMainHUDWidget::ConfigureBroadcastText() {
     return;
   }
 
-  FSlateFontInfo FontInfo = EndingTurnText->Font;
+  FSlateFontInfo FontInfo = EndingTurnText->GetFont();
   const int32 OriginalSize = FontInfo.Size > 0 ? FontInfo.Size : 24;
   FontInfo.Size = OriginalSize * 2;
   EndingTurnText->SetFont(FontInfo);
