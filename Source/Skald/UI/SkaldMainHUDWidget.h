@@ -218,6 +218,10 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Skald|Selection")
   void CancelMoveSelection();
 
+  /** Reset movement selection after a failed attempt so players can retry. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Selection")
+  void ResetMoveSelectionAfterInvalidAttempt();
+
   UFUNCTION(BlueprintCallable, Category = "Skald|Selection")
   void OnTerritoryClickedUI(ATerritory *Territory);
 

@@ -1402,10 +1402,17 @@ void ASkaldPlayerController::HandleMoveRequested(int32 FromID, int32 ToID,
   UE_LOG(LogSkald, Log, TEXT("HUD move from %d to %d with %d"), FromID, ToID,
          Troops);
 
+  const auto ResetSelectionForRetry = [this]() {
+    if (MainHUD && MainHUD->CurrentPhase == ETurnPhase::Movement) {
+      MainHUD->ResetMoveSelectionAfterInvalidAttempt();
+    }
+  };
+
   AWorldMap *WorldMap = Cast<AWorldMap>(
       UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
   if (!WorldMap) {
     NotifyActionError(TEXT("World map not found"));
+    ResetSelectionForRetry();
     return;
   }
 
@@ -1413,23 +1420,27 @@ void ASkaldPlayerController::HandleMoveRequested(int32 FromID, int32 ToID,
   ATerritory *Target = WorldMap->GetTerritoryById(ToID);
   if (!Source || !Target) {
     NotifyActionError(TEXT("Invalid territory selection"));
+    ResetSelectionForRetry();
     return;
   }
 
   ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
   if (!PS) {
     NotifyActionError(TEXT("Missing player state"));
+    ResetSelectionForRetry();
     return;
   }
 
   if (Source->OwningPlayer != PS || Target->OwningPlayer != PS) {
     NotifyActionError(TEXT("You may only move between your territories"));
+    ResetSelectionForRetry();
     return;
   }
 
   const int32 MaxMovable = Source->ArmyUnits - 1;
   if (Troops <= 0 || Troops > MaxMovable) {
     NotifyActionError(TEXT("Invalid troop count for movement"));
+    ResetSelectionForRetry();
     return;
   }
 
@@ -1437,6 +1448,7 @@ void ASkaldPlayerController::HandleMoveRequested(int32 FromID, int32 ToID,
   if (!WorldMap->FindPath(Source, Target, Path) || Path.Num() < 2) {
     NotifyActionError(
         TEXT("Selected territories must be connected by a friendly path"));
+    ResetSelectionForRetry();
     return;
   }
 
