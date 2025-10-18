@@ -4,21 +4,31 @@
 #include "LobbyPlayerController.generated.h"
 
 class ULobbyMenuWidget;
-class UUserWidget;
+class UTitleScreenWidget;
 
 UCLASS()
 class SKALD_API ALobbyPlayerController : public APlayerController
 {
     GENERATED_BODY()
 public:
+    ALobbyPlayerController();
     virtual void BeginPlay() override;
 
 protected:
     UPROPERTY(EditDefaultsOnly, Category="UI")
-    TSubclassOf<UUserWidget> LobbyWidgetClass;
+    TSubclassOf<ULobbyMenuWidget> LobbyWidgetClass;
+
+    UPROPERTY(EditDefaultsOnly, Category="UI")
+    TSubclassOf<UTitleScreenWidget> TitleScreenWidgetClass;
 
     UPROPERTY()
     ULobbyMenuWidget* LobbyWidgetInstance = nullptr;
 
+    UPROPERTY()
+    UTitleScreenWidget* TitleScreenWidgetInstance = nullptr;
+
     void InitLobbyUI();
+
+    UFUNCTION()
+    void HandleTitleScreenDismissed();
 };
