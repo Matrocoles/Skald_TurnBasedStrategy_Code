@@ -214,8 +214,17 @@ void USkaldMainHUDWidget::HandleEndTurnClicked() {
 void USkaldMainHUDWidget::HandleEndPhaseClicked() {
   if (CurrentPhase == ETurnPhase::Attack) {
     OnEndAttackRequested.Broadcast(true);
-  } else if (CurrentPhase == ETurnPhase::Movement) {
+    return;
+  }
+
+  if (CurrentPhase == ETurnPhase::Movement) {
     OnEndMovementRequested.Broadcast(true);
+    return;
+  }
+
+  if (ASkaldPlayerController *PlayerController =
+          Cast<ASkaldPlayerController>(GetOwningPlayer())) {
+    PlayerController->EndPhase();
   }
 }
 
