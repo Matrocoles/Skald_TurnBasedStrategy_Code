@@ -1,13 +1,54 @@
 #pragma once
 
-#include "Camera/MatineeCameraShake.h"
+#include "Camera/CameraShakeBase.h"
+#include "Camera/CameraTypes.h"
+#include "Math/Rotator.h"
+#include "Math/Vector.h"
 #include "SkaldBattleCameraShakes.generated.h"
+
+/**
+ * Minimal oscillating shake built on top of the UE 5.5 camera shake base class.
+ */
+UCLASS(Abstract)
+class SKALD_API USkaldOscillationCameraShake : public UCameraShakeBase {
+  GENERATED_BODY()
+
+public:
+  USkaldOscillationCameraShake();
+
+protected:
+  virtual void StartShake(const FCameraShakeStartParams &Params) override;
+  virtual void UpdateAndApplyCameraShake(float DeltaTime, float Alpha,
+                                         FMinimalViewInfo &InOutPOV) override;
+  virtual void StopShake(const FCameraShakeStopParams &Params) override;
+  virtual bool IsFinished() const override;
+
+  void ConfigureShake(float InDuration, float InBlendInTime,
+                      float InBlendOutTime,
+                      const FRotator &InRotationAmplitude,
+                      const FRotator &InRotationFrequency,
+                      const FVector &InLocationAmplitude,
+                      const FVector &InLocationFrequency);
+
+protected:
+  float Duration;
+  float BlendInTime;
+  float BlendOutTime;
+  FRotator RotationAmplitude;
+  FRotator RotationFrequency;
+  FVector LocationAmplitude;
+  FVector LocationFrequency;
+
+private:
+  float ElapsedTime;
+  bool bIsActive;
+};
 
 /**
  * Lightweight micro shake triggered when a battle attack successfully hits.
  */
 UCLASS()
-class SKALD_API USkaldHitCameraShake : public UMatineeCameraShake {
+class SKALD_API USkaldHitCameraShake : public USkaldOscillationCameraShake {
   GENERATED_BODY()
 
 public:
@@ -18,7 +59,7 @@ public:
  * Even subtler shake used for near-miss feedback to keep motion comfortable.
  */
 UCLASS()
-class SKALD_API USkaldMissCameraShake : public UMatineeCameraShake {
+class SKALD_API USkaldMissCameraShake : public USkaldOscillationCameraShake {
   GENERATED_BODY()
 
 public:
