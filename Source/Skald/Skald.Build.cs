@@ -20,7 +20,8 @@ public class Skald : ModuleRules
                         "Slate",
                         "SlateCore",
                         // Required for ENetworkFailure enum used in USkaldGameInstance
-                        "NetCore"
+                        "NetCore",
+                        "GameplayCameras"
                 });
 
                 PrivateDependencyModuleNames.AddRange(new string[]
