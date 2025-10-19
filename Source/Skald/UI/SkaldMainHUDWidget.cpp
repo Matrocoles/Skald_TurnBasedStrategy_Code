@@ -132,6 +132,8 @@ void USkaldMainHUDWidget::NativeConstruct() {
     DiceResolutionPanel->SetDiceFaceTextures(DiceFaceTexturePtrs);
   }
 
+  ApplyDiceResolutionPanelLayoutInternal(DefaultDiceResolutionPanelLayout);
+
   ConfigureBroadcastText();
 
   SyncPhaseButtons(false);
@@ -552,6 +554,11 @@ void USkaldMainHUDWidget::ProcessNextDiceResolution() {
     ProcessNextDiceResolution();
     return;
   }
+
+  const FDiceResolutionPanelLayout Layout = ResolveDiceResolutionPanelLayout(
+      ActiveDiceResolution.Attacker.Get(), ActiveDiceResolution.Defender.Get(),
+      ActiveDiceResolution.Result);
+  ApplyDiceResolutionPanelLayoutInternal(Layout);
 
   DiceResolutionPanel->BeginResolution(ActiveDiceResolution.Result);
 }
@@ -1455,4 +1462,49 @@ UCombatFloaterPoolSubsystem *USkaldMainHUDWidget::ResolveFloaterPool() {
   }
 
   return nullptr;
+}
+
+void USkaldMainHUDWidget::SetDefaultDiceResolutionPanelLayout(
+    const FDiceResolutionPanelLayout &Layout) {
+  DefaultDiceResolutionPanelLayout = Layout;
+  ApplyDiceResolutionPanelLayoutInternal(DefaultDiceResolutionPanelLayout);
+}
+
+void USkaldMainHUDWidget::ApplyDiceResolutionPanelLayout(
+    const FDiceResolutionPanelLayout &Layout) {
+  ApplyDiceResolutionPanelLayoutInternal(Layout);
+}
+
+FDiceResolutionPanelLayout
+USkaldMainHUDWidget::ResolveDiceResolutionPanelLayout_Implementation(
+    AFighterPawn *Attacker, AFighterPawn *Defender,
+    const FDiceRollResult &Result) const {
+  return DefaultDiceResolutionPanelLayout;
+}
+
+void USkaldMainHUDWidget::ApplyDiceResolutionPanelLayoutInternal(
+    const FDiceResolutionPanelLayout &Layout) {
+  if (!DiceResolutionPanel || !Layout.bApplyLayout) {
+    return;
+  }
+
+  if (UPanelSlot *PanelSlot = DiceResolutionPanel->Slot) {
+    if (UCanvasPanelSlot *CanvasSlot = Cast<UCanvasPanelSlot>(PanelSlot)) {
+      if (Layout.bOverrideAnchors) {
+        CanvasSlot->SetAnchors(Layout.Anchors);
+      }
+
+      if (Layout.bOverrideAlignment) {
+        CanvasSlot->SetAlignment(Layout.Alignment);
+      }
+
+      if (Layout.bOverridePosition) {
+        CanvasSlot->SetPosition(Layout.Position);
+      }
+
+      if (Layout.bOverrideSize) {
+        CanvasSlot->SetSize(Layout.Size);
+      }
+    }
+  }
 }

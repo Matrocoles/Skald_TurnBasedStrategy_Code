@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Blueprint/UserWidget.h"
+#include "Components/SlateWrapperTypes.h"
 #include "GridBattleManager.h"
 #include "TimerManager.h"
 #include "W_DiceResolutionPanel.generated.h"
@@ -11,6 +12,51 @@ class UTextBlock;
 class UTexture2D;
 class UVerticalBox;
 class UWidget;
+
+/**
+ * Layout overrides that can be applied to the dice resolution panel's canvas slot.
+ */
+USTRUCT(BlueprintType)
+struct SKALD_API FDiceResolutionPanelLayout
+{
+    GENERATED_BODY();
+
+    /** Whether any overrides should be applied. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Layout")
+    bool bApplyLayout = false;
+
+    /** Apply custom anchors before revealing dice. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Layout", meta=(EditCondition="bApplyLayout"))
+    bool bOverrideAnchors = false;
+
+    /** Anchors to assign when overriding. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Layout", meta=(EditCondition="bApplyLayout && bOverrideAnchors"))
+    FAnchors Anchors = FAnchors(0.5f, 0.5f);
+
+    /** Apply a custom alignment on the slot. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Layout", meta=(EditCondition="bApplyLayout"))
+    bool bOverrideAlignment = false;
+
+    /** Alignment to assign when overriding. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Layout", meta=(EditCondition="bApplyLayout && bOverrideAlignment"))
+    FVector2D Alignment = FVector2D(0.5f, 0.5f);
+
+    /** Apply a custom position within the canvas. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Layout", meta=(EditCondition="bApplyLayout"))
+    bool bOverridePosition = false;
+
+    /** Position (in pixels) to use when overriding. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Layout", meta=(EditCondition="bApplyLayout && bOverridePosition"))
+    FVector2D Position = FVector2D::ZeroVector;
+
+    /** Apply a custom size on the canvas slot. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Layout", meta=(EditCondition="bApplyLayout"))
+    bool bOverrideSize = false;
+
+    /** Desired size (in pixels) to set when overriding. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Layout", meta=(EditCondition="bApplyLayout && bOverrideSize"))
+    FVector2D Size = FVector2D(512.f, 256.f);
+};
 
 /**
  * Displays per-die combat resolution details with staggered reveals.
