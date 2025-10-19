@@ -404,9 +404,9 @@ void UBattleHUDWidget::ShowDiceRoll(int32 RollValue, float DisplayDuration) {
     return;
   }
 
-  constexpr float DiceDisplaySize = 90.f;
-  constexpr float DiceBoardPadding = 24.f;
-  constexpr FVector2D DiceOffset(0.f, 80.f);
+  const float DiceDisplaySize = 90.f;
+  const float DiceBoardPadding = 24.f;
+  const FVector2D DiceOffset(0.f, 80.f);
 
   UTexture2D *Texture = nullptr;
   const int32 Index = RollValue - 1;
@@ -417,7 +417,8 @@ void UBattleHUDWidget::ShowDiceRoll(int32 RollValue, float DisplayDuration) {
   bool bDisplayedRoll = false;
   if (Texture) {
     DiceRollerImage->SetBrushFromTexture(Texture, true);
-    DiceRollerImage->SetBrushSize(FVector2D(DiceDisplaySize, DiceDisplaySize));
+    DiceRollerImage->SetDesiredSizeOverride(
+        FVector2D(DiceDisplaySize, DiceDisplaySize));
     DiceRollerImage->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
 
     if (UCanvasPanelSlot *DiceSlot = Cast<UCanvasPanelSlot>(DiceRollerImage->Slot)) {
