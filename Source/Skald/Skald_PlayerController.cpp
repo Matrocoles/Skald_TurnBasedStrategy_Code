@@ -2621,11 +2621,11 @@ void ASkaldPlayerController::HandleInitiativeRollRequested() {
   int32 DefenderRoll = INDEX_NONE;
 
   if (bControlsAttackerSide) {
-    AttackerRoll = FMath::RandRange(1, 20);
+    AttackerRoll = FMath::RandRange(1, UGridBattleManager::InitiativeDiceSides);
   }
 
   if (bControlsDefenderSide) {
-    DefenderRoll = FMath::RandRange(1, 20);
+    DefenderRoll = FMath::RandRange(1, UGridBattleManager::InitiativeDiceSides);
   }
 
   int32 RollToDisplay = INDEX_NONE;

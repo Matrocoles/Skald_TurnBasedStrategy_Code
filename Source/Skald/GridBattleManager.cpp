@@ -275,12 +275,12 @@ void UGridBattleManager::RollInitiative()
     {
         if (!bAttackerRollProvided && AttackerRoll <= 0)
         {
-            AttackerRoll = Rng.RandRange(1, 20);
+            AttackerRoll = Rng.RandRange(1, InitiativeDiceSides);
         }
 
         if (!bDefenderRollProvided && DefenderRoll <= 0)
         {
-            DefenderRoll = Rng.RandRange(1, 20);
+            DefenderRoll = Rng.RandRange(1, InitiativeDiceSides);
         }
 
         if (AttackerRoll != DefenderRoll)
@@ -309,16 +309,20 @@ void UGridBattleManager::RollInitiative()
     {
         if (bAttackerRollProvided && !bDefenderRollProvided)
         {
-            DefenderRoll = (DefenderRoll % 20) + 1;
+            DefenderRoll = (DefenderRoll % InitiativeDiceSides) + 1;
         }
         else if (!bAttackerRollProvided && bDefenderRollProvided)
         {
-            AttackerRoll = (AttackerRoll % 20) + 1;
+            AttackerRoll = (AttackerRoll % InitiativeDiceSides) + 1;
         }
         else
         {
             // As a fallback, bias ties in favour of the attacker to avoid stalling the round start.
-            ++AttackerRoll;
+            AttackerRoll = InitiativeDiceSides;
+            if (DefenderRoll == AttackerRoll)
+            {
+                DefenderRoll = FMath::Max(1, AttackerRoll - 1);
+            }
         }
     }
 
@@ -486,13 +490,13 @@ void UGridBattleManager::PerformAIRoll()
 
     if (!PendingInitiativeRollAttacker.IsSet() && IsSideAIControlled(true))
     {
-        PendingInitiativeRollAttacker = Rng.RandRange(1, 20);
+        PendingInitiativeRollAttacker = Rng.RandRange(1, InitiativeDiceSides);
         bRolledValue = true;
     }
 
     if (!PendingInitiativeRollDefender.IsSet() && IsSideAIControlled(false))
     {
-        PendingInitiativeRollDefender = Rng.RandRange(1, 20);
+        PendingInitiativeRollDefender = Rng.RandRange(1, InitiativeDiceSides);
         bRolledValue = true;
     }
 

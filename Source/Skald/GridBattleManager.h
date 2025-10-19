@@ -209,6 +209,9 @@ class SKALD_API UGridBattleManager : public UObject
     GENERATED_BODY()
 
 public:
+    /** Number of sides on the initiative die. */
+    static constexpr int32 InitiativeDiceSides = 6;
+
     /** Load fighter definitions and set default state. */
     UGridBattleManager();
 
