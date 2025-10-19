@@ -8,6 +8,7 @@
 
 class UButton;
 class UImage;
+class UCanvasRenderTarget2D;
 class UTextBlock;
 class AFighterPawn;
 class UGridOverlayComponent;
@@ -170,6 +171,10 @@ public:
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UImage *DiceBoardImage;
 
+  /** Render target used to draw fallback dice faces for high-value rolls. */
+  UPROPERTY(Transient)
+  TObjectPtr<UCanvasRenderTarget2D> DiceRollerRenderTarget;
+
   /** Panel that reveals per-die outcomes in sequence. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UW_DiceResolutionPanel *DiceResolutionPanel;
@@ -292,6 +297,14 @@ private:
 
   /** Hide the dice roller image after the timer elapses. */
   void HideDiceRoller();
+
+  /** Draws the numeric fallback dice face onto the render target. */
+  UFUNCTION()
+  void HandleDiceRenderTargetUpdate(class UCanvas *Canvas, int32 Width,
+                                    int32 Height);
+
+  /** Cached numeric value for the pending dice render target update. */
+  int32 PendingDiceRenderValue = 0;
 
   /** Hide the initiative text after the timer elapses. */
   void HideInitiativeText();
