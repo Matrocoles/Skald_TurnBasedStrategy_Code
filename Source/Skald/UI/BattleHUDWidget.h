@@ -11,6 +11,7 @@ class UTextBlock;
 class AFighterPawn;
 class UGridOverlayComponent;
 class UTexture2D;
+class USoundBase;
 class UCombatFloaterPoolSubsystem;
 class UW_DiceResolutionPanel;
 class UW_FloatingText;
@@ -175,6 +176,10 @@ public:
   /** Textures representing dice faces, indexed from 1 to 6. */
   UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skald|Battle|Dice")
   TArray<TObjectPtr<UTexture2D>> DiceFaceTextures;
+
+  /** Optional sound effect to play when a dice roll is shown. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skald|Battle|Dice")
+  TObjectPtr<USoundBase> DiceRollSound;
 
   /** Display a dice face corresponding to the supplied roll value. */
   void ShowDiceRoll(int32 RollValue, float DisplayDuration = 1.f);
