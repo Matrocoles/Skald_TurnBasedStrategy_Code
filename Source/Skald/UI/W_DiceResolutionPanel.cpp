@@ -15,8 +15,8 @@
 
 namespace
 {
-constexpr float RevealDelayMinSeconds = 0.08f;
-constexpr float RevealDelayMaxSeconds = 0.12f;
+constexpr float RevealDelaySeconds = 0.8f;
+constexpr float CompletionDelaySeconds = 0.8f;
 }
 
 UW_DiceResolutionPanel::UW_DiceResolutionPanel(const FObjectInitializer& ObjectInitializer)
@@ -57,7 +57,7 @@ void UW_DiceResolutionPanel::BeginResolution(const FDiceRollResult& Result)
 
     if (ActiveResult.DiceOutcomes.Num() == 0)
     {
-        HandleCompletionDelayElapsed();
+        ScheduleCompletionDelay(CompletionDelaySeconds);
         return;
     }
 
@@ -107,7 +107,7 @@ void UW_DiceResolutionPanel::ClearOutcomeEntries()
     }
 }
 
-void UW_DiceResolutionPanel::ScheduleNextReveal(float MinDelay, float MaxDelay)
+void UW_DiceResolutionPanel::ScheduleNextReveal(float DelaySeconds)
 {
     if (!bResolutionActive)
     {
@@ -119,12 +119,26 @@ void UW_DiceResolutionPanel::ScheduleNextReveal(float MinDelay, float MaxDelay)
         FTimerManager& TimerManager = World->GetTimerManager();
         TimerManager.ClearTimer(CompletionTimerHandle);
         TimerManager.ClearTimer(RevealTimerHandle);
-        const float Delay = FMath::FRandRange(MinDelay, MaxDelay);
-        TimerManager.SetTimer(RevealTimerHandle, this, &UW_DiceResolutionPanel::RevealNextDie, Delay, false);
+        TimerManager.SetTimer(RevealTimerHandle, this, &UW_DiceResolutionPanel::RevealNextDie, DelaySeconds, false);
     }
     else
     {
         RevealNextDie();
+    }
+}
+
+void UW_DiceResolutionPanel::ScheduleCompletionDelay(float DelaySeconds)
+{
+    if (UWorld* World = GetWorld())
+    {
+        FTimerManager& TimerManager = World->GetTimerManager();
+        TimerManager.ClearTimer(RevealTimerHandle);
+        TimerManager.ClearTimer(CompletionTimerHandle);
+        TimerManager.SetTimer(CompletionTimerHandle, this, &UW_DiceResolutionPanel::HandleCompletionDelayElapsed, DelaySeconds, false);
+    }
+    else
+    {
+        HandleCompletionDelayElapsed();
     }
 }
 
@@ -261,21 +275,11 @@ void UW_DiceResolutionPanel::RevealNextDie()
 
     if (RevealIndex >= ActiveResult.DiceOutcomes.Num())
     {
-        if (UWorld* World = GetWorld())
-        {
-            FTimerManager& TimerManager = World->GetTimerManager();
-            TimerManager.ClearTimer(RevealTimerHandle);
-            const float Delay = FMath::FRandRange(RevealDelayMinSeconds, RevealDelayMaxSeconds);
-            TimerManager.SetTimer(CompletionTimerHandle, this, &UW_DiceResolutionPanel::HandleCompletionDelayElapsed, Delay, false);
-        }
-        else
-        {
-            HandleCompletionDelayElapsed();
-        }
+        ScheduleCompletionDelay(CompletionDelaySeconds);
     }
     else
     {
-        ScheduleNextReveal(RevealDelayMinSeconds, RevealDelayMaxSeconds);
+        ScheduleNextReveal(RevealDelaySeconds);
     }
 }
 
@@ -284,9 +288,11 @@ void UW_DiceResolutionPanel::HandleCompletionDelayElapsed()
     if (!bResolutionActive)
     {
         BroadcastCompletion();
+        ResetPanel();
         return;
     }
 
+    const bool bWasActive = bResolutionActive;
     bResolutionActive = false;
 
     if (ResolveProgressPlaceholder)
@@ -295,6 +301,11 @@ void UW_DiceResolutionPanel::HandleCompletionDelayElapsed()
     }
 
     BroadcastCompletion();
+
+    if (bWasActive)
+    {
+        ResetPanel();
+    }
 }
 
 void UW_DiceResolutionPanel::UpdateTallies()
