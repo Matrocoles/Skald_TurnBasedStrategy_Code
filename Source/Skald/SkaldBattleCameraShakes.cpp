@@ -1,6 +1,5 @@
 #include "SkaldBattleCameraShakes.h"
 
-#include "Camera/CameraTypes.h"
 #include "Math/UnrealMathUtility.h"
 
 namespace {
@@ -60,43 +59,46 @@ void USkaldOscillationCameraShake::StartShake(
 }
 
 void USkaldOscillationCameraShake::UpdateAndApplyCameraShake(
-    float DeltaTime, float Alpha, FMinimalViewInfo &InOutPOV) {
-  Super::UpdateAndApplyCameraShake(DeltaTime, Alpha, InOutPOV);
+    const FCameraShakeUpdateParams &Params,
+    FCameraShakeUpdateResult &OutResult) {
+  OutResult.LocationOffset = FVector::ZeroVector;
+  OutResult.RotationOffset = FRotator::ZeroRotator;
+  OutResult.FOV = 0.f;
 
   if (!bIsActive) {
     return;
   }
 
-  ElapsedTime += DeltaTime;
+  ElapsedTime += Params.DeltaTime;
 
-  const float Blend = ComputeBlendFactor(ElapsedTime, Duration, BlendInTime,
-                                         BlendOutTime) * Alpha;
+  const float Blend =
+      ComputeBlendFactor(ElapsedTime, Duration, BlendInTime, BlendOutTime);
   if (Blend <= KINDA_SMALL_NUMBER) {
+    if (ElapsedTime >= Duration) {
+      bIsActive = false;
+    }
     return;
   }
 
   const float TwoPi = UE_TWO_PI;
 
-  auto EvalSine = [ElapsedTime, TwoPi](float Frequency) {
+  auto EvalSine = [ElapsedTime = ElapsedTime, TwoPi](float Frequency) {
     return FMath::Sin(ElapsedTime * Frequency * TwoPi);
   };
 
-  const float PitchDelta =
-      RotationAmplitude.Pitch * EvalSine(RotationFrequency.Pitch) * Blend;
-  const float YawDelta =
-      RotationAmplitude.Yaw * EvalSine(RotationFrequency.Yaw) * Blend;
-  const float RollDelta =
-      RotationAmplitude.Roll * EvalSine(RotationFrequency.Roll) * Blend;
+  OutResult.LocationOffset =
+      FVector(LocationAmplitude.X * EvalSine(LocationFrequency.X),
+              LocationAmplitude.Y * EvalSine(LocationFrequency.Y),
+              LocationAmplitude.Z * EvalSine(LocationFrequency.Z)) *
+      Blend;
 
-  InOutPOV.Rotation.Pitch += PitchDelta;
-  InOutPOV.Rotation.Yaw += YawDelta;
-  InOutPOV.Rotation.Roll += RollDelta;
+  OutResult.RotationOffset =
+      FRotator(RotationAmplitude.Pitch * EvalSine(RotationFrequency.Pitch),
+               RotationAmplitude.Yaw * EvalSine(RotationFrequency.Yaw),
+               RotationAmplitude.Roll * EvalSine(RotationFrequency.Roll)) *
+      Blend;
 
-  const float XDelta = LocationAmplitude.X * EvalSine(LocationFrequency.X);
-  const float YDelta = LocationAmplitude.Y * EvalSine(LocationFrequency.Y);
-  const float ZDelta = LocationAmplitude.Z * EvalSine(LocationFrequency.Z);
-
-  InOutPOV.Location += FVector(XDelta, YDelta, ZDelta) * Blend;
+  OutResult.FOV = 0.f;
 
   if (ElapsedTime >= Duration) {
     bIsActive = false;

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Camera/CameraShakeBase.h"
-#include "Camera/CameraTypes.h"
 #include "Math/Rotator.h"
 #include "Math/Vector.h"
 #include "SkaldBattleCameraShakes.generated.h"
@@ -18,8 +17,9 @@ public:
 
 protected:
   virtual void StartShake(const FCameraShakeStartParams &Params) override;
-  virtual void UpdateAndApplyCameraShake(float DeltaTime, float Alpha,
-                                         FMinimalViewInfo &InOutPOV) override;
+  virtual void UpdateAndApplyCameraShake(
+      const FCameraShakeUpdateParams &Params,
+      FCameraShakeUpdateResult &OutResult) override;
   virtual void StopShake(const FCameraShakeStopParams &Params) override;
   virtual bool IsFinished() const override;
 
