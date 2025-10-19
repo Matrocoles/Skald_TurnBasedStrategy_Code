@@ -33,9 +33,7 @@ public class Skald : ModuleRules
                         "OnlineSubsystem",
                         "Landscape",
                         "AssetRegistry",
-                        "Niagara",
-                        // Required for legacy camera shake support in UE 5.4+
-                        "LegacyCameraShake"
+                        "Niagara"
                 });
 
                 PrivateIncludePaths.AddRange(new string[]
