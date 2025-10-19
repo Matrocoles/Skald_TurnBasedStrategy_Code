@@ -197,7 +197,7 @@ void AFighterPawn::BeginPlay() {
     ActivationWidgetBack->InitWidget();
   }
 
-  OnHealthChanged.AddDynamic(this, &AFighterPawn::UpdateHealthDisplay);
+  OnHealthChanged.AddDynamic(this, &AFighterPawn::HandleHealthChanged);
   OnHealthChanged.Broadcast(Stats.Health);
 
   BroadcastActionsRemaining();
@@ -977,6 +977,37 @@ void AFighterPawn::UpdateHealthDisplay(int32 NewHealth) {
 
   ApplyHealthToComponent(HealthWidget);
   ApplyHealthToComponent(HealthWidgetBack);
+}
+
+void AFighterPawn::HandleHealthChanged(int32 NewHealth) {
+  PendingHealthDisplayValue = NewHealth;
+  bHasPendingHealthDisplay = true;
+
+  if (!bHoldHealthDisplay) {
+    bHasPendingHealthDisplay = false;
+    UpdateHealthDisplay(NewHealth);
+  }
+}
+
+void AFighterPawn::HoldHealthDisplay(int32 DisplayHealth) {
+  bHoldHealthDisplay = true;
+  UpdateHealthDisplay(FMath::Max(0, DisplayHealth));
+}
+
+void AFighterPawn::ReleaseHealthDisplayHold() {
+  const bool bWasHeld = bHoldHealthDisplay;
+  bHoldHealthDisplay = false;
+
+  if (!bHasPendingHealthDisplay) {
+    if (bWasHeld) {
+      UpdateHealthDisplay(Stats.Health);
+    }
+    return;
+  }
+
+  const int32 HealthToDisplay = PendingHealthDisplayValue;
+  bHasPendingHealthDisplay = false;
+  UpdateHealthDisplay(HealthToDisplay);
 }
 
 void AFighterPawn::Destroyed() {

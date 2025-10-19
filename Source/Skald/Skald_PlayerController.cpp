@@ -2840,6 +2840,10 @@ void ASkaldPlayerController::HandleAttackResolved(AFighterPawn *Attacker,
     return;
   }
 
+  if (Defender) {
+    Defender->HoldHealthDisplay(Result.StartingHealth);
+  }
+
   BattleHudWidget->QueueDiceResolution(Attacker, Defender, Result);
   if (MainHUD) {
     MainHUD->QueueDiceResolution(Attacker, Defender, Result);
@@ -2857,6 +2861,8 @@ void ASkaldPlayerController::HandleDiceResolutionComplete(
   const int32 DisplayDamage = bAnyDamage ? Result.TotalDamage : 0;
   BattleHudWidget->ShowAttackResultFloater(Defender, bAnyDamage,
                                            DisplayDamage);
+
+  Defender->ReleaseHealthDisplayHold();
 }
 
 void ASkaldPlayerController::HandleAttackRejected(AFighterPawn *Attacker,
