@@ -76,14 +76,16 @@ void UW_FloatingText::SetFloaterScale(float InScale) {
 
 void UW_FloatingText::SetTagStyle(bool bMissTag) {
   if (FloatingText && !bHasDefaultFont) {
-    DefaultFont = FloatingText->Font;
+    DefaultFont = FloatingText->GetFont();
     bHasDefaultFont = true;
   }
 
   SetRenderTransformAngle(bMissTag ? -14.f : 0.f);
 
   if (FloatingText) {
-    FSlateFontInfo FontInfo = bHasDefaultFont ? DefaultFont : FloatingText->Font;
+    const FSlateFontInfo FontInfoTemplate =
+        bHasDefaultFont ? DefaultFont : FloatingText->GetFont();
+    FSlateFontInfo FontInfo = FontInfoTemplate;
     if (bMissTag) {
       FontInfo.OutlineSettings.OutlineSize = 2;
       FontInfo.OutlineSettings.OutlineColor = FLinearColor(0.f, 0.f, 0.f, 0.65f);
