@@ -2,6 +2,7 @@
 #include "Components/HorizontalBox.h"
 #include "Components/HorizontalBoxSlot.h"
 #include "Components/Image.h"
+#include "Components/PanelSlot.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
@@ -16,12 +17,12 @@ namespace
 {
 constexpr float RevealDelayMinSeconds = 0.08f;
 constexpr float RevealDelayMaxSeconds = 0.12f;
-const FVector2D DiceOutcomeImageSize(72.f, 72.f);
 }
 
 UW_DiceResolutionPanel::UW_DiceResolutionPanel(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer)
 {
+    OutcomeEntryWidgetClass = UW_DiceResolutionEntryWidget::StaticClass();
 }
 
 void UW_DiceResolutionPanel::NativeConstruct()
@@ -141,76 +142,102 @@ void UW_DiceResolutionPanel::RevealNextDie()
     }
 
     const FDiceRollOutcome& Outcome = ActiveResult.DiceOutcomes[RevealIndex];
+    UTexture2D* ResolvedTexture = ResolveDiceTexture(Outcome.RollValue);
+
     if (OutcomeList)
     {
-        UHorizontalBox* EntryRow = NewObject<UHorizontalBox>(OutcomeList);
-        if (EntryRow)
+        bool bEntryAdded = false;
+
+        if (OutcomeEntryWidgetClass)
         {
-            EntryRow->SetVisibility(ESlateVisibility::HitTestInvisible);
-
-            const FText OutcomeLabel = Outcome.bHit
-                ? (Outcome.bCritical
-                    ? NSLOCTEXT("SkaldBattle", "DiceOutcomeCrit", "Crit")
-                    : NSLOCTEXT("SkaldBattle", "DiceOutcomeHit", "Hit"))
-                : NSLOCTEXT("SkaldBattle", "DiceOutcomeMiss", "Miss");
-
-            const FLinearColor OutcomeColour = Outcome.bHit
-                ? (Outcome.bCritical ? FLinearColor(0.98f, 0.78f, 0.15f) : FLinearColor(0.12f, 0.76f, 0.45f))
-                : FLinearColor(0.55f, 0.55f, 0.58f);
-
-            if (UTexture2D* DieTexture = ResolveDiceTexture(Outcome.RollValue))
+            if (UW_DiceResolutionEntryWidget* EntryWidget = CreateWidget<UW_DiceResolutionEntryWidget>(this, OutcomeEntryWidgetClass))
             {
-                UImage* DieImage = NewObject<UImage>(EntryRow);
-                if (DieImage)
-                {
-                    DieImage->SetBrushFromTexture(DieTexture, true);
-                    DieImage->SetBrushSize(DiceOutcomeImageSize);
-                    DieImage->SetVisibility(ESlateVisibility::HitTestInvisible);
+                EntryWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
+                EntryWidget->ConfigureOutcome(Outcome, RevealIndex, ResolvedTexture);
 
-                    if (UHorizontalBoxSlot* ImageSlot = EntryRow->AddChildToHorizontalBox(DieImage))
+                if (UPanelSlot* AddedSlot = OutcomeList->AddChild(EntryWidget))
+                {
+                    if (UVerticalBoxSlot* EntrySlot = Cast<UVerticalBoxSlot>(AddedSlot))
                     {
-                        ImageSlot->SetPadding(FMargin(0.f, 0.f, 8.f, 0.f));
-                        ImageSlot->SetVerticalAlignment(VAlign_Center);
+                        EntrySlot->SetPadding(OutcomeEntryPadding);
                     }
                 }
+
+                bEntryAdded = true;
             }
+        }
 
-            UTextBlock* ValueText = NewObject<UTextBlock>(EntryRow);
-            if (ValueText)
+        if (!bEntryAdded)
+        {
+            UHorizontalBox* EntryRow = NewObject<UHorizontalBox>(OutcomeList);
+            if (EntryRow)
             {
-                const FText ValueLabel = FText::Format(
-                    NSLOCTEXT("SkaldBattle", "DiceOutcomeEntryValue", "#{0} • {1}"),
-                    FText::AsNumber(RevealIndex + 1),
-                    FText::AsNumber(FMath::Max(Outcome.RollValue, 0)));
-                ValueText->SetText(ValueLabel);
-                ValueText->SetVisibility(ESlateVisibility::HitTestInvisible);
+                EntryRow->SetVisibility(ESlateVisibility::HitTestInvisible);
 
-                if (UHorizontalBoxSlot* ValueSlot = EntryRow->AddChildToHorizontalBox(ValueText))
+                const FText OutcomeLabel = Outcome.bHit
+                    ? (Outcome.bCritical
+                        ? NSLOCTEXT("SkaldBattle", "DiceOutcomeCrit", "Crit")
+                        : NSLOCTEXT("SkaldBattle", "DiceOutcomeHit", "Hit"))
+                    : NSLOCTEXT("SkaldBattle", "DiceOutcomeMiss", "Miss");
+
+                const FLinearColor OutcomeColour = Outcome.bHit
+                    ? (Outcome.bCritical ? FLinearColor(0.98f, 0.78f, 0.15f) : FLinearColor(0.12f, 0.76f, 0.45f))
+                    : FLinearColor(0.55f, 0.55f, 0.58f);
+
+                if (ResolvedTexture)
                 {
-                    ValueSlot->SetVerticalAlignment(VAlign_Center);
+                    UImage* DieImage = NewObject<UImage>(EntryRow);
+                    if (DieImage)
+                    {
+                        DieImage->SetBrushFromTexture(ResolvedTexture, true);
+                        DieImage->SetBrushSize(FVector2D(72.f, 72.f));
+                        DieImage->SetVisibility(ESlateVisibility::HitTestInvisible);
+
+                        if (UHorizontalBoxSlot* ImageSlot = EntryRow->AddChildToHorizontalBox(DieImage))
+                        {
+                            ImageSlot->SetPadding(FMargin(0.f, 0.f, 8.f, 0.f));
+                            ImageSlot->SetVerticalAlignment(VAlign_Center);
+                        }
+                    }
                 }
-            }
 
-            UTextBlock* OutcomeText = NewObject<UTextBlock>(EntryRow);
-            if (OutcomeText)
-            {
-                const FText LabelText = FText::Format(
-                    NSLOCTEXT("SkaldBattle", "DiceOutcomeEntryLabel", "({0})"),
-                    OutcomeLabel);
-                OutcomeText->SetText(LabelText);
-                OutcomeText->SetColorAndOpacity(FSlateColor(OutcomeColour));
-                OutcomeText->SetVisibility(ESlateVisibility::HitTestInvisible);
-
-                if (UHorizontalBoxSlot* LabelSlot = EntryRow->AddChildToHorizontalBox(OutcomeText))
+                UTextBlock* ValueText = NewObject<UTextBlock>(EntryRow);
+                if (ValueText)
                 {
-                    LabelSlot->SetPadding(FMargin(8.f, 0.f, 0.f, 0.f));
-                    LabelSlot->SetVerticalAlignment(VAlign_Center);
-                }
-            }
+                    const FText ValueLabel = FText::Format(
+                        NSLOCTEXT("SkaldBattle", "DiceOutcomeEntryValue", "#{0} • {1}"),
+                        FText::AsNumber(RevealIndex + 1),
+                        FText::AsNumber(FMath::Max(Outcome.RollValue, 0)));
+                    ValueText->SetText(ValueLabel);
+                    ValueText->SetVisibility(ESlateVisibility::HitTestInvisible);
 
-            if (UVerticalBoxSlot* EntrySlot = OutcomeList->AddChildToVerticalBox(EntryRow))
-            {
-                EntrySlot->SetPadding(FMargin(0.f, 2.f));
+                    if (UHorizontalBoxSlot* ValueSlot = EntryRow->AddChildToHorizontalBox(ValueText))
+                    {
+                        ValueSlot->SetVerticalAlignment(VAlign_Center);
+                    }
+                }
+
+                UTextBlock* OutcomeText = NewObject<UTextBlock>(EntryRow);
+                if (OutcomeText)
+                {
+                    const FText LabelText = FText::Format(
+                        NSLOCTEXT("SkaldBattle", "DiceOutcomeEntryLabel", "({0})"),
+                        OutcomeLabel);
+                    OutcomeText->SetText(LabelText);
+                    OutcomeText->SetColorAndOpacity(FSlateColor(OutcomeColour));
+                    OutcomeText->SetVisibility(ESlateVisibility::HitTestInvisible);
+
+                    if (UHorizontalBoxSlot* LabelSlot = EntryRow->AddChildToHorizontalBox(OutcomeText))
+                    {
+                        LabelSlot->SetPadding(FMargin(8.f, 0.f, 0.f, 0.f));
+                        LabelSlot->SetVerticalAlignment(VAlign_Center);
+                    }
+                }
+
+                if (UVerticalBoxSlot* EntrySlot = OutcomeList->AddChildToVerticalBox(EntryRow))
+                {
+                    EntrySlot->SetPadding(OutcomeEntryPadding);
+                }
             }
         }
     }
@@ -323,5 +350,57 @@ UTexture2D* UW_DiceResolutionPanel::ResolveDiceTexture(int32 RollValue) const
     }
 
     return nullptr;
+}
+
+UW_DiceResolutionEntryWidget::UW_DiceResolutionEntryWidget(const FObjectInitializer& ObjectInitializer)
+    : Super(ObjectInitializer)
+{
+}
+
+void UW_DiceResolutionEntryWidget::ConfigureOutcome(const FDiceRollOutcome& Outcome, int32 DisplayIndex, UTexture2D* DieTexture)
+{
+    const FLinearColor OutcomeColour = Outcome.bHit
+        ? (Outcome.bCritical ? CritColour : HitColour)
+        : MissColour;
+
+    if (DiceFaceImage)
+    {
+        if (DieTexture)
+        {
+            DiceFaceImage->SetBrushFromTexture(DieTexture, true);
+            DiceFaceImage->SetVisibility(ESlateVisibility::HitTestInvisible);
+        }
+        else
+        {
+            DiceFaceImage->SetVisibility(ESlateVisibility::Collapsed);
+        }
+
+        DiceFaceImage->SetBrushSize(DiceImageSize);
+    }
+
+    if (RollValueText)
+    {
+        const FText ValueLabel = FText::Format(
+            NSLOCTEXT("SkaldBattle", "DiceOutcomeEntryValue", "#{0} • {1}"),
+            FText::AsNumber(DisplayIndex + 1),
+            FText::AsNumber(FMath::Max(Outcome.RollValue, 0)));
+        RollValueText->SetText(ValueLabel);
+        RollValueText->SetVisibility(ESlateVisibility::HitTestInvisible);
+    }
+
+    if (OutcomeLabelText)
+    {
+        const FText OutcomeLabel = FText::Format(
+            NSLOCTEXT("SkaldBattle", "DiceOutcomeEntryLabel", "({0})"),
+            Outcome.bHit
+                ? (Outcome.bCritical
+                    ? NSLOCTEXT("SkaldBattle", "DiceOutcomeCrit", "Crit")
+                    : NSLOCTEXT("SkaldBattle", "DiceOutcomeHit", "Hit"))
+                : NSLOCTEXT("SkaldBattle", "DiceOutcomeMiss", "Miss"));
+
+        OutcomeLabelText->SetText(OutcomeLabel);
+        OutcomeLabelText->SetColorAndOpacity(FSlateColor(OutcomeColour));
+        OutcomeLabelText->SetVisibility(ESlateVisibility::HitTestInvisible);
+    }
 }
 

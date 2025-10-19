@@ -4,6 +4,7 @@
 #include "Components/SlateWrapperTypes.h"
 #include "GridBattleManager.h"
 #include "TimerManager.h"
+#include "Templates/SubclassOf.h"
 #include "W_DiceResolutionPanel.generated.h"
 
 class UHorizontalBox;
@@ -12,6 +13,7 @@ class UTextBlock;
 class UTexture2D;
 class UVerticalBox;
 class UWidget;
+class UW_DiceResolutionEntryWidget;
 
 /**
  * Layout overrides that can be applied to the dice resolution panel's canvas slot.
@@ -121,6 +123,14 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Skald|Battle|Dice")
     TArray<TObjectPtr<UTexture2D>> DiceFaceTextures;
 
+    /** Widget class used when creating individual dice outcome entries. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Skald|Battle|Dice")
+    TSubclassOf<UW_DiceResolutionEntryWidget> OutcomeEntryWidgetClass;
+
+    /** Padding applied to each generated outcome entry slot. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Skald|Battle|Dice|Layout")
+    FMargin OutcomeEntryPadding = FMargin(0.f, 2.f);
+
 private:
     void BroadcastCompletion();
     UTexture2D* ResolveDiceTexture(int32 RollValue) const;
@@ -148,5 +158,50 @@ private:
 
     /** Timer managing the anticipation pause before completion broadcast. */
     FTimerHandle CompletionTimerHandle;
+};
+
+/**
+ * Entry widget used to present a single dice outcome within the resolution list.
+ */
+UCLASS(Blueprintable, BlueprintType)
+class SKALD_API UW_DiceResolutionEntryWidget : public UUserWidget
+{
+    GENERATED_BODY()
+
+public:
+    UW_DiceResolutionEntryWidget(const FObjectInitializer& ObjectInitializer);
+
+    /** Configure the entry visuals based on the revealed outcome. */
+    UFUNCTION(BlueprintCallable, Category="Skald|Battle|Dice")
+    void ConfigureOutcome(const FDiceRollOutcome& Outcome, int32 DisplayIndex, UTexture2D* DieTexture);
+
+protected:
+    /** Optional image displaying the dice face. */
+    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+    UImage* DiceFaceImage;
+
+    /** Optional text used to show the dice roll identifier and value. */
+    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+    UTextBlock* RollValueText;
+
+    /** Optional text used to show the hit/crit/miss status. */
+    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+    UTextBlock* OutcomeLabelText;
+
+    /** Colour applied when the outcome is a normal hit. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Skald|Battle|Dice|Appearance")
+    FLinearColor HitColour = FLinearColor(0.12f, 0.76f, 0.45f);
+
+    /** Colour applied when the outcome is a critical hit. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Skald|Battle|Dice|Appearance")
+    FLinearColor CritColour = FLinearColor(0.98f, 0.78f, 0.15f);
+
+    /** Colour applied when the outcome is a miss. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Skald|Battle|Dice|Appearance")
+    FLinearColor MissColour = FLinearColor(0.55f, 0.55f, 0.58f);
+
+    /** Brush size applied to the dice face image when present. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Skald|Battle|Dice|Appearance")
+    FVector2D DiceImageSize = FVector2D(72.f, 72.f);
 };
 
