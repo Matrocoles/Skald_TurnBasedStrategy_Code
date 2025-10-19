@@ -33,7 +33,9 @@ public class Skald : ModuleRules
                         "OnlineSubsystem",
                         "Landscape",
                         "AssetRegistry",
-                        "Niagara"
+                        "Niagara",
+                        // Required for legacy UMatineeCameraShake derived classes
+                        "MatineeCameraShake"
                 });
 
                 PrivateIncludePaths.AddRange(new string[]
