@@ -230,10 +230,12 @@ public:
   /** Display floating text anchored around a world location. */
   void ShowCombatFloater(const FVector &WorldLocation, const FText &Message,
                          const FLinearColor &Tint, float Scale = 1.f,
+                         bool bUseMissStyling = false,
                          float LifetimeOverride = -1.f);
 
   /** Helper used by attack resolution events to show damage/miss floaters. */
-  void ShowAttackResultFloater(AFighterPawn *Target, bool bHit, int32 Damage);
+  void ShowAttackResultFloater(AFighterPawn *Target,
+                               const FDiceRollResult &Result);
 
   /** Queue a dice resolution sequence for presentation on the panel. */
   void QueueDiceResolution(AFighterPawn *Attacker, AFighterPawn *Defender,
@@ -347,11 +349,15 @@ private:
 
   /** Default colour for successful hits. */
   UPROPERTY(EditAnywhere, Category = "Skald|Battle|Floaters")
-  FLinearColor HitFloaterColor = FLinearColor(0.9f, 0.2f, 0.2f);
+  FLinearColor HitFloaterColor = FLinearColor(0.12f, 0.76f, 0.45f);
+
+  /** Default colour for critical hits. */
+  UPROPERTY(EditAnywhere, Category = "Skald|Battle|Floaters")
+  FLinearColor CriticalFloaterColor = FLinearColor(0.98f, 0.78f, 0.15f);
 
   /** Default colour for misses. */
   UPROPERTY(EditAnywhere, Category = "Skald|Battle|Floaters")
-  FLinearColor MissFloaterColor = FLinearColor(0.8f, 0.8f, 0.8f);
+  FLinearColor MissFloaterColor = FLinearColor(0.7f, 0.7f, 0.74f);
 
   /** Active floating text widgets managed by the battle HUD. */
   TArray<FBattleActiveFloater> ActiveFloaters;

@@ -13,6 +13,8 @@ class UCapsuleComponent;
 class UTexture2D;
 class UFighterActivationWidget;
 class UFighterHealthWidget;
+class UCurveFloat;
+class UMaterialInstanceDynamic;
 
 UENUM(BlueprintType)
 enum class EFighterPawnFootprint : uint8 {
@@ -310,6 +312,18 @@ private:
   /** Rotate the fighter to face from one grid cell towards another. */
   void FaceTowardsCells(const FIntPoint &FromCell, const FIntPoint &ToCell);
 
+  /** Prepare and cache dynamic materials used for hit feedback. */
+  void InitializeDisplayMeshMaterials();
+
+  /** Begin a hit flash using the supplied damage ratio for intensity. */
+  void TriggerHitFlash(float DamageRatio);
+
+  /** Advance the active hit flash timeline. */
+  void UpdateHitFlash(float DeltaSeconds);
+
+  /** Apply a normalised flash value across cached material instances. */
+  void ApplyHitFlash(float NormalisedValue);
+
   /** Data describing a single queued attack roll. */
   struct FQueuedAttackRoll {
     int32 RollValue = 1;
@@ -380,6 +394,28 @@ private:
   /** Cached spent icon texture. */
   UPROPERTY(Transient)
   UTexture2D *ActivationSpentTexture = nullptr;
+
+  /** Scalar curve controlling the hit flash falloff. */
+  UPROPERTY(EditDefaultsOnly, Category = "Fighter|VFX")
+  TObjectPtr<UCurveFloat> HitFlashCurve = nullptr;
+
+  /** Duration of the hit flash when no curve data is provided. */
+  UPROPERTY(EditDefaultsOnly, Category = "Fighter|VFX")
+  float HitFlashDuration = 0.35f;
+
+  /** Parameter driven on the display mesh to provide hit feedback. */
+  UPROPERTY(EditDefaultsOnly, Category = "Fighter|VFX")
+  FName HitFlashParameterName = TEXT("HitFlash");
+
+  /** Dynamic materials sourced from the display mesh for hit effects. */
+  UPROPERTY()
+  TArray<TObjectPtr<UMaterialInstanceDynamic>> CachedDisplayMeshMIDs;
+
+  float HitFlashElapsed = 0.f;
+  float HitFlashStrength = 1.f;
+  bool bHitFlashActive = false;
+  bool bHasRecordedHealth = false;
+  int32 LastKnownHealth = 0;
 
 public:
   /** Returns true if the fighter has already activated this round. */
