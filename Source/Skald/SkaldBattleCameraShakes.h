@@ -1,7 +1,8 @@
 #pragma once
 
 #include "Camera/CameraShakeBase.h"
-#include "OscillatorCameraShakePattern.h"
+#include "Camera/CameraShakePattern.h"
+#include "Camera/CameraShakePatterns/OscillatorCameraShakePattern.h"
 #include "SkaldBattleCameraShakes.generated.h"
 
 /**
