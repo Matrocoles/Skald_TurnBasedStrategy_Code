@@ -3,6 +3,10 @@
 #include "Components/CanvasPanelSlot.h"
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
+#include "Engine/Canvas.h"
+#include "Engine/CanvasRenderTarget2D.h"
+#include "Engine/Engine.h"
+#include "Slate/SlateBrush.h"
 #include "Engine/World.h"
 #include "FighterPawn.h"
 #include "GridOverlayComponent.h"
@@ -12,6 +16,7 @@
 #include "Math/UnrealMathUtility.h"
 #include "Math/Vector2D.h"
 #include "TimerManager.h"
+#include "CanvasItem.h"
 #include "Engine/Texture2D.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
@@ -95,6 +100,12 @@ void UBattleHUDWidget::NativeDestruct() {
   PendingDiceResolutions.Reset();
   bDiceResolutionActive = false;
   ActiveDiceResolution = FBattleQueuedDiceResolution();
+
+  if (DiceRollerRenderTarget) {
+    DiceRollerRenderTarget->OnCanvasRenderTargetUpdate.RemoveDynamic(
+        this, &UBattleHUDWidget::HandleDiceRenderTargetUpdate);
+    DiceRollerRenderTarget = nullptr;
+  }
 
   while (ActiveFloaters.Num() > 0) {
     ReleaseFloaterAtIndex(ActiveFloaters.Num() - 1);
@@ -410,15 +421,41 @@ void UBattleHUDWidget::ShowDiceRoll(int32 RollValue, float DisplayDuration) {
   const float DiceBoardPadding = 24.f;
   const FVector2D DiceOffset(0.f, 80.f);
 
-  UTexture2D *Texture = nullptr;
+  UObject *DiceResource = nullptr;
   const int32 Index = RollValue - 1;
   if (DiceFaceTextures.IsValidIndex(Index)) {
-    Texture = DiceFaceTextures[Index];
+    DiceResource = DiceFaceTextures[Index];
+  }
+
+  if (!DiceResource) {
+    if (!DiceRollerRenderTarget) {
+      DiceRollerRenderTarget = UCanvasRenderTarget2D::CreateCanvasRenderTarget2D(
+          this, UCanvasRenderTarget2D::StaticClass(), 256, 256);
+      if (DiceRollerRenderTarget) {
+        DiceRollerRenderTarget->bShouldClearRenderTargetOnReceiveUpdate = true;
+        DiceRollerRenderTarget->OnCanvasRenderTargetUpdate.AddDynamic(
+            this, &UBattleHUDWidget::HandleDiceRenderTargetUpdate);
+      }
+    }
+
+    if (DiceRollerRenderTarget) {
+      PendingDiceRenderValue = RollValue;
+      DiceRollerRenderTarget->ClearColor = FLinearColor::Transparent;
+      DiceRollerRenderTarget->UpdateResourceImmediate();
+      DiceResource = DiceRollerRenderTarget;
+    }
   }
 
   bool bDisplayedRoll = false;
-  if (Texture) {
-    DiceRollerImage->SetBrushFromTexture(Texture, true);
+  if (DiceResource) {
+    if (UTexture2D *Texture = Cast<UTexture2D>(DiceResource)) {
+      DiceRollerImage->SetBrushFromTexture(Texture, true);
+    } else {
+      FSlateBrush Brush = DiceRollerImage->Brush;
+      Brush.SetResourceObject(DiceResource);
+      Brush.ImageSize = FVector2D(DiceDisplaySize, DiceDisplaySize);
+      DiceRollerImage->SetBrush(Brush);
+    }
     DiceRollerImage->SetDesiredSizeOverride(
         FVector2D(DiceDisplaySize, DiceDisplaySize));
     DiceRollerImage->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
@@ -514,9 +551,57 @@ void UBattleHUDWidget::HideDiceRoller() {
   }
   DiceRollerImage->SetVisibility(ESlateVisibility::Collapsed);
   DiceRollerImage->SetBrushFromTexture(nullptr);
+  PendingDiceRenderValue = 0;
   if (DiceBoardImage) {
     DiceBoardImage->SetVisibility(ESlateVisibility::Collapsed);
   }
+}
+
+void UBattleHUDWidget::HandleDiceRenderTargetUpdate(UCanvas *Canvas, int32 Width,
+                                                    int32 Height) {
+  if (!Canvas || Width <= 0 || Height <= 0) {
+    return;
+  }
+
+  const FVector2D Size(Width, Height);
+  const FLinearColor BackgroundColor(0.f, 0.f, 0.f, 0.75f);
+  FCanvasTileItem Tile(FVector2D::ZeroVector, Size, BackgroundColor);
+  Tile.BlendMode = SE_BLEND_Translucent;
+  Canvas->DrawItem(Tile);
+
+  const FLinearColor BorderColor(1.f, 1.f, 1.f, 0.85f);
+  const float BorderThickness = 6.f;
+  FCanvasBoxItem Border(FVector2D::ZeroVector, Size);
+  Border.SetColor(BorderColor);
+  Border.LineThickness = BorderThickness;
+  Canvas->DrawItem(Border);
+
+  if (!GEngine) {
+    return;
+  }
+
+  UFont *Font = GEngine->GetLargeFont();
+  if (!Font) {
+    Font = GEngine->GetMediumFont();
+  }
+  if (!Font) {
+    Font = GEngine->GetSmallFont();
+  }
+
+  if (!Font || PendingDiceRenderValue <= 0) {
+    return;
+  }
+
+  const FString RollString = FString::FromInt(PendingDiceRenderValue);
+  FCanvasTextItem TextItem(FVector2D::ZeroVector, FText::FromString(RollString),
+                           Font, FLinearColor::White);
+  TextItem.bCentreX = true;
+  TextItem.bCentreY = true;
+  TextItem.EnableShadow(FLinearColor::Black);
+  TextItem.Scale = FVector2D(2.6f, 2.6f);
+
+  const FVector2D Center(Width * 0.5f, Height * 0.5f);
+  Canvas->DrawItem(TextItem, Center);
 }
 
 void UBattleHUDWidget::HideInitiativeText() {
