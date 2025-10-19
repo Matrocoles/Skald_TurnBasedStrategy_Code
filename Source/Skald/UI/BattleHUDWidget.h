@@ -3,6 +3,7 @@
 #include "Blueprint/UserWidget.h"
 #include "GridBattleManager.h"
 #include "TimerManager.h"
+#include "UI/W_DiceResolutionPanel.h"
 #include "BattleHUDWidget.generated.h"
 
 class UButton;
@@ -177,6 +178,10 @@ public:
   UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skald|Battle|Dice")
   TArray<TObjectPtr<UTexture2D>> DiceFaceTextures;
 
+  /** Default layout overrides applied to the attack dice reveal panel. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skald|Battle|Dice")
+  FDiceResolutionPanelLayout DefaultDiceResolutionPanelLayout;
+
   /** Optional sound effect to play when a dice roll is shown. */
   UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skald|Battle|Dice")
   TObjectPtr<USoundBase> DiceRollSound;
@@ -228,6 +233,24 @@ public:
   /** Queue a dice resolution sequence for presentation on the panel. */
   void QueueDiceResolution(AFighterPawn *Attacker, AFighterPawn *Defender,
                            const FDiceRollResult &Result);
+
+  /** Override the default layout values at runtime. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Battle|Dice")
+  void SetDefaultDiceResolutionPanelLayout(const FDiceResolutionPanelLayout &Layout);
+
+  /** Apply a layout override immediately without mutating the defaults. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Battle|Dice")
+  void ApplyDiceResolutionPanelLayout(const FDiceResolutionPanelLayout &Layout);
+
+  /**
+   * Resolve the layout that should be applied before revealing the current dice roll.
+   * Blueprint implementations can customize placement on a per-attack basis.
+   */
+  UFUNCTION(BlueprintNativeEvent, Category = "Skald|Battle|Dice")
+  FDiceResolutionPanelLayout ResolveDiceResolutionPanelLayout(
+      AFighterPawn *Attacker, AFighterPawn *Defender, const FDiceRollResult &Result) const;
+  FDiceResolutionPanelLayout ResolveDiceResolutionPanelLayout_Implementation(
+      AFighterPawn *Attacker, AFighterPawn *Defender, const FDiceRollResult &Result) const;
 
 private:
   /** Callback when MoveButton is pressed. */
@@ -353,5 +376,7 @@ private:
 
   /** Timer delaying the display of the initiative roll button. */
   FTimerHandle InitiativeRollButtonDelayTimer;
+
+  void ApplyDiceResolutionPanelLayoutInternal(const FDiceResolutionPanelLayout &Layout);
 };
 
