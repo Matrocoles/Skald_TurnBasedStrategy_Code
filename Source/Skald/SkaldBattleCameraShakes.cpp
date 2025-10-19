@@ -1,30 +1,36 @@
 #include "SkaldBattleCameraShakes.h"
 
+#include "Camera/MatineeCameraShakePattern.h"
+
 USkaldHitCameraShake::USkaldHitCameraShake() {
-  OscillationDuration = 0.2f;
-  OscillationBlendInTime = 0.04f;
-  OscillationBlendOutTime = 0.12f;
+  if (UMatineeCameraShakePattern* Pattern = GetCameraShakePattern()) {
+    Pattern->OscillationDuration = 0.2f;
+    Pattern->OscillationBlendInTime = 0.04f;
+    Pattern->OscillationBlendOutTime = 0.12f;
 
-  RotOscillation.Pitch.Amplitude = 0.75f;
-  RotOscillation.Pitch.Frequency = 30.f;
-  RotOscillation.Yaw.Amplitude = 0.6f;
-  RotOscillation.Yaw.Frequency = 26.f;
+    Pattern->RotOscillation.Pitch.Amplitude = 0.75f;
+    Pattern->RotOscillation.Pitch.Frequency = 30.f;
+    Pattern->RotOscillation.Yaw.Amplitude = 0.6f;
+    Pattern->RotOscillation.Yaw.Frequency = 26.f;
 
-  LocOscillation.Z.Amplitude = 1.5f;
-  LocOscillation.Z.Frequency = 22.f;
+    Pattern->LocOscillation.Z.Amplitude = 1.5f;
+    Pattern->LocOscillation.Z.Frequency = 22.f;
+  }
 }
 
 USkaldMissCameraShake::USkaldMissCameraShake() {
-  OscillationDuration = 0.12f;
-  OscillationBlendInTime = 0.03f;
-  OscillationBlendOutTime = 0.08f;
+  if (UMatineeCameraShakePattern* Pattern = GetCameraShakePattern()) {
+    Pattern->OscillationDuration = 0.12f;
+    Pattern->OscillationBlendInTime = 0.03f;
+    Pattern->OscillationBlendOutTime = 0.08f;
 
-  RotOscillation.Pitch.Amplitude = 0.35f;
-  RotOscillation.Pitch.Frequency = 22.f;
-  RotOscillation.Yaw.Amplitude = 0.3f;
-  RotOscillation.Yaw.Frequency = 20.f;
+    Pattern->RotOscillation.Pitch.Amplitude = 0.35f;
+    Pattern->RotOscillation.Pitch.Frequency = 22.f;
+    Pattern->RotOscillation.Yaw.Amplitude = 0.3f;
+    Pattern->RotOscillation.Yaw.Frequency = 20.f;
 
-  LocOscillation.Z.Amplitude = 0.75f;
-  LocOscillation.Z.Frequency = 18.f;
+    Pattern->LocOscillation.Z.Amplitude = 0.75f;
+    Pattern->LocOscillation.Z.Frequency = 18.f;
+  }
 }
 
