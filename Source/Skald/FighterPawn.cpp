@@ -205,7 +205,7 @@ void AFighterPawn::BeginPlay() {
     ActivationWidgetBack->InitWidget();
   }
 
-  OnHealthChanged.AddDynamic(this, &AFighterPawn::UpdateHealthDisplay);
+  OnHealthChanged.AddDynamic(this, &AFighterPawn::HandleHealthChanged);
   OnHealthChanged.Broadcast(Stats.Health);
 
   BroadcastActionsRemaining();
@@ -858,12 +858,8 @@ void AFighterPawn::StartQueuedAttack(AFighterPawn *Target,
   PendingAttackTarget = Target;
   bPendingAttackTargetDied = false;
   bHasProcessedPendingRoll = false;
-
-  if (USkaldGameInstance *GI = Cast<USkaldGameInstance>(GetGameInstance())) {
-    if (UGridBattleManager *BattleManager = GI->GridBattleManager) {
-      BattleManager->ReportAttackResolution(this, Target, DiceResult);
-    }
-  }
+  PendingAttackDiceResult = DiceResult;
+  bHasPendingDiceResult = true;
 
   if (PendingAttackRolls.Num() == 0) {
     FinalizeQueuedAttack();
@@ -937,10 +933,25 @@ void AFighterPawn::FinalizeQueuedAttack() {
     if (!bPendingAttackTargetDied && !bHasProcessedPendingRoll) {
       Target->OnHealthChanged.Broadcast(Target->Stats.Health);
     }
+
+    if (bHasPendingDiceResult) {
+      PendingAttackDiceResult.EndingHealth = Target->Stats.Health;
+
+      if (USkaldGameInstance *GI =
+              Cast<USkaldGameInstance>(GetGameInstance())) {
+        if (UGridBattleManager *BattleManager = GI->GridBattleManager) {
+          BattleManager->ReportAttackResolution(this, Target,
+                                               PendingAttackDiceResult);
+        }
+      }
+    }
     if (!Target->IsAlive() && !Target->IsActorBeingDestroyed()) {
       Target->Destroy();
     }
   }
+
+  bHasPendingDiceResult = false;
+  PendingAttackDiceResult = FDiceRollResult();
 
   PendingAttackRolls.Reset();
   PendingAttackRollIndex = 0;
@@ -1088,6 +1099,37 @@ void AFighterPawn::UpdateHealthDisplay(int32 NewHealth) {
   ApplyHealthToComponent(HealthWidgetBack);
 
   LastKnownHealth = NewHealth;
+}
+
+void AFighterPawn::HandleHealthChanged(int32 NewHealth) {
+  PendingHealthDisplayValue = NewHealth;
+  bHasPendingHealthDisplay = true;
+
+  if (!bHoldHealthDisplay) {
+    bHasPendingHealthDisplay = false;
+    UpdateHealthDisplay(NewHealth);
+  }
+}
+
+void AFighterPawn::HoldHealthDisplay(int32 DisplayHealth) {
+  bHoldHealthDisplay = true;
+  UpdateHealthDisplay(FMath::Max(0, DisplayHealth));
+}
+
+void AFighterPawn::ReleaseHealthDisplayHold() {
+  const bool bWasHeld = bHoldHealthDisplay;
+  bHoldHealthDisplay = false;
+
+  if (!bHasPendingHealthDisplay) {
+    if (bWasHeld) {
+      UpdateHealthDisplay(Stats.Health);
+    }
+    return;
+  }
+
+  const int32 HealthToDisplay = PendingHealthDisplayValue;
+  bHasPendingHealthDisplay = false;
+  UpdateHealthDisplay(HealthToDisplay);
 }
 
 void AFighterPawn::Destroyed() {

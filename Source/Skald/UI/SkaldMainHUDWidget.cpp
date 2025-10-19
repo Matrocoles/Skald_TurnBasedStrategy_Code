@@ -7,6 +7,7 @@
 #include "Components/Widget.h"
 #include "Containers/Queue.h"
 #include "Containers/Set.h"
+#include "FighterPawn.h"
 #include "Engine/Engine.h"
 #include "Kismet/GameplayStatics.h"
 #include "Skald.h"
@@ -123,7 +124,15 @@ void USkaldMainHUDWidget::NativeConstruct() {
   if (DiceResolutionPanel) {
     DiceResolutionPanel->OnResolutionComplete.AddDynamic(
         this, &USkaldMainHUDWidget::HandleDicePanelResolved);
+    TArray<UTexture2D *> DiceFaceTexturePtrs;
+    DiceFaceTexturePtrs.Reserve(DiceFaceTextures.Num());
+    for (const TObjectPtr<UTexture2D> &Texture : DiceFaceTextures) {
+      DiceFaceTexturePtrs.Add(Texture.Get());
+    }
+    DiceResolutionPanel->SetDiceFaceTextures(DiceFaceTexturePtrs);
   }
+
+  ApplyDiceResolutionPanelLayoutInternal(DefaultDiceResolutionPanelLayout);
 
   ConfigureBroadcastText();
 
@@ -514,8 +523,8 @@ void USkaldMainHUDWidget::QueueDiceResolution(AFighterPawn *Attacker,
                                               AFighterPawn *Defender,
                                               const FDiceRollResult &Result) {
   FQueuedDiceResolution Entry;
-  Entry.Attacker = Attacker;
-  Entry.Defender = Defender;
+  Entry.Attacker = MakeWeakObjectPtr(Attacker);
+  Entry.Defender = MakeWeakObjectPtr(Defender);
   Entry.Result = Result;
   PendingDiceResolutions.Add(MoveTemp(Entry));
 
@@ -545,6 +554,11 @@ void USkaldMainHUDWidget::ProcessNextDiceResolution() {
     ProcessNextDiceResolution();
     return;
   }
+
+  const FDiceResolutionPanelLayout Layout = ResolveDiceResolutionPanelLayout(
+      ActiveDiceResolution.Attacker.Get(), ActiveDiceResolution.Defender.Get(),
+      ActiveDiceResolution.Result);
+  ApplyDiceResolutionPanelLayoutInternal(Layout);
 
   DiceResolutionPanel->BeginResolution(ActiveDiceResolution.Result);
 }
@@ -1448,4 +1462,49 @@ UCombatFloaterPoolSubsystem *USkaldMainHUDWidget::ResolveFloaterPool() {
   }
 
   return nullptr;
+}
+
+void USkaldMainHUDWidget::SetDefaultDiceResolutionPanelLayout(
+    const FDiceResolutionPanelLayout &Layout) {
+  DefaultDiceResolutionPanelLayout = Layout;
+  ApplyDiceResolutionPanelLayoutInternal(DefaultDiceResolutionPanelLayout);
+}
+
+void USkaldMainHUDWidget::ApplyDiceResolutionPanelLayout(
+    const FDiceResolutionPanelLayout &Layout) {
+  ApplyDiceResolutionPanelLayoutInternal(Layout);
+}
+
+FDiceResolutionPanelLayout
+USkaldMainHUDWidget::ResolveDiceResolutionPanelLayout_Implementation(
+    AFighterPawn *Attacker, AFighterPawn *Defender,
+    const FDiceRollResult &Result) const {
+  return DefaultDiceResolutionPanelLayout;
+}
+
+void USkaldMainHUDWidget::ApplyDiceResolutionPanelLayoutInternal(
+    const FDiceResolutionPanelLayout &Layout) {
+  if (!DiceResolutionPanel || !Layout.bApplyLayout) {
+    return;
+  }
+
+  if (UPanelSlot *PanelSlot = DiceResolutionPanel->Slot) {
+    if (UCanvasPanelSlot *CanvasSlot = Cast<UCanvasPanelSlot>(PanelSlot)) {
+      if (Layout.bOverrideAnchors) {
+        CanvasSlot->SetAnchors(Layout.Anchors);
+      }
+
+      if (Layout.bOverrideAlignment) {
+        CanvasSlot->SetAlignment(Layout.Alignment);
+      }
+
+      if (Layout.bOverridePosition) {
+        CanvasSlot->SetPosition(Layout.Position);
+      }
+
+      if (Layout.bOverrideSize) {
+        CanvasSlot->SetSize(Layout.Size);
+      }
+    }
+  }
 }

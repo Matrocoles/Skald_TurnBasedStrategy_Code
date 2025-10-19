@@ -5,6 +5,7 @@
 #include "GridBattleManager.h"
 #include "SkaldTypes.h"
 #include "TimerManager.h"
+#include "UI/W_DiceResolutionPanel.h"
 #include "SkaldMainHUDWidget.generated.h"
 
 class UButton;
@@ -20,6 +21,7 @@ class ASkaldGameState;
 class USkaldGameInstance;
 class USoundBase;
 class UCombatFloaterPoolSubsystem;
+class UTexture2D;
 class UW_FloatingText;
 class UW_DiceResolutionPanel;
 class AFighterPawn;
@@ -207,6 +209,21 @@ public:
   void QueueDiceResolution(AFighterPawn *Attacker, AFighterPawn *Defender,
                            const FDiceRollResult &Result);
 
+  /** Override the default layout values at runtime. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Widgets|Dice")
+  void SetDefaultDiceResolutionPanelLayout(const FDiceResolutionPanelLayout &Layout);
+
+  /** Apply a layout override immediately without mutating the defaults. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Widgets|Dice")
+  void ApplyDiceResolutionPanelLayout(const FDiceResolutionPanelLayout &Layout);
+
+  /** Blueprint hook for computing layout on a per-resolution basis. */
+  UFUNCTION(BlueprintNativeEvent, Category = "Skald|Widgets|Dice")
+  FDiceResolutionPanelLayout ResolveDiceResolutionPanelLayout(
+      AFighterPawn *Attacker, AFighterPawn *Defender, const FDiceRollResult &Result) const;
+  FDiceResolutionPanelLayout ResolveDiceResolutionPanelLayout_Implementation(
+      AFighterPawn *Attacker, AFighterPawn *Defender, const FDiceRollResult &Result) const;
+
   /** Update and display the initiative announcement. */
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
   void UpdateInitiativeText(const FString &Message);
@@ -353,6 +370,14 @@ public:
             meta = (BindWidgetOptional))
   UW_DiceResolutionPanel *DiceResolutionPanel;
 
+  /** Dice face textures that should be mirrored on the resolution panel. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skald|Widgets|Dice")
+  TArray<TObjectPtr<UTexture2D>> DiceFaceTextures;
+
+  /** Default layout overrides applied to the strategic HUD dice panel. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skald|Widgets|Dice")
+  FDiceResolutionPanelLayout DefaultDiceResolutionPanelLayout;
+
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Widgets")
   TSubclassOf<UConfirmAttackWidget> ConfirmAttackWidgetClass;
 
@@ -413,6 +438,8 @@ protected:
   /** Maximum vertical offset (in pixels) applied across the arc. */
   UPROPERTY(EditAnywhere, Category = "Skald|HUD|Floaters")
   float FloaterArcHeight = 120.f;
+
+  void ApplyDiceResolutionPanelLayoutInternal(const FDiceResolutionPanelLayout &Layout);
 
   /** Horizontal drift (in pixels) applied over the lifetime. */
   UPROPERTY(EditAnywhere, Category = "Skald|HUD|Floaters")

@@ -2633,11 +2633,11 @@ void ASkaldPlayerController::HandleInitiativeRollRequested() {
   int32 DefenderRoll = INDEX_NONE;
 
   if (bControlsAttackerSide) {
-    AttackerRoll = FMath::RandRange(1, 20);
+    AttackerRoll = FMath::RandRange(1, UGridBattleManager::InitiativeDiceSides);
   }
 
   if (bControlsDefenderSide) {
-    DefenderRoll = FMath::RandRange(1, 20);
+    DefenderRoll = FMath::RandRange(1, UGridBattleManager::InitiativeDiceSides);
   }
 
   int32 RollToDisplay = INDEX_NONE;
@@ -2915,6 +2915,10 @@ void ASkaldPlayerController::HandleAttackResolved(AFighterPawn *Attacker,
     return;
   }
 
+  if (Defender) {
+    Defender->HoldHealthDisplay(Result.StartingHealth);
+  }
+
   BattleHudWidget->QueueDiceResolution(Attacker, Defender, Result);
   if (MainHUD) {
     MainHUD->QueueDiceResolution(Attacker, Defender, Result);
@@ -2928,7 +2932,12 @@ void ASkaldPlayerController::HandleDiceResolutionComplete(
     return;
   }
 
-  BattleHudWidget->ShowAttackResultFloater(Defender, Result);
+  const bool bAnyDamage = Result.TotalDamage > 0;
+  const int32 DisplayDamage = bAnyDamage ? Result.TotalDamage : 0;
+  BattleHudWidget->ShowAttackResultFloater(Defender, bAnyDamage,
+                                           DisplayDamage);
+
+  Defender->ReleaseHealthDisplayHold();
 }
 
 void ASkaldPlayerController::HandleAttackRejected(AFighterPawn *Attacker,

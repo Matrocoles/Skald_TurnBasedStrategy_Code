@@ -1,21 +1,28 @@
 #include "UI/W_DiceResolutionPanel.h"
+#include "Components/HorizontalBox.h"
+#include "Components/HorizontalBoxSlot.h"
+#include "Components/Image.h"
+#include "Components/PanelSlot.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Components/Widget.h"
+#include "Engine/Texture2D.h"
 #include "Engine/World.h"
 #include "Math/UnrealMathUtility.h"
 #include "TimerManager.h"
+#include "Math/Vector2D.h"
 
 namespace
 {
-constexpr float RevealDelayMinSeconds = 0.08f;
-constexpr float RevealDelayMaxSeconds = 0.12f;
+constexpr float RevealDelaySeconds = 0.8f;
+constexpr float CompletionDelaySeconds = 0.8f;
 }
 
 UW_DiceResolutionPanel::UW_DiceResolutionPanel(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer)
 {
+    OutcomeEntryWidgetClass = UW_DiceResolutionEntryWidget::StaticClass();
 }
 
 void UW_DiceResolutionPanel::NativeConstruct()
@@ -50,11 +57,11 @@ void UW_DiceResolutionPanel::BeginResolution(const FDiceRollResult& Result)
 
     if (ActiveResult.DiceOutcomes.Num() == 0)
     {
-        HandleCompletionDelayElapsed();
+        ScheduleCompletionDelay(CompletionDelaySeconds);
         return;
     }
 
-    ScheduleNextReveal(RevealDelayMinSeconds, RevealDelayMaxSeconds);
+    RevealNextDie();
 }
 
 void UW_DiceResolutionPanel::ResetPanel()
@@ -83,6 +90,15 @@ void UW_DiceResolutionPanel::ResetPanel()
     UpdateTallies();
 }
 
+void UW_DiceResolutionPanel::SetDiceFaceTextures(const TArray<UTexture2D*>& InTextures)
+{
+    DiceFaceTextures.Reset(InTextures.Num());
+    for (UTexture2D* Texture : InTextures)
+    {
+        DiceFaceTextures.Add(Texture);
+    }
+}
+
 void UW_DiceResolutionPanel::ClearOutcomeEntries()
 {
     if (OutcomeList)
@@ -91,7 +107,7 @@ void UW_DiceResolutionPanel::ClearOutcomeEntries()
     }
 }
 
-void UW_DiceResolutionPanel::ScheduleNextReveal(float MinDelay, float MaxDelay)
+void UW_DiceResolutionPanel::ScheduleNextReveal(float DelaySeconds)
 {
     if (!bResolutionActive)
     {
@@ -103,12 +119,26 @@ void UW_DiceResolutionPanel::ScheduleNextReveal(float MinDelay, float MaxDelay)
         FTimerManager& TimerManager = World->GetTimerManager();
         TimerManager.ClearTimer(CompletionTimerHandle);
         TimerManager.ClearTimer(RevealTimerHandle);
-        const float Delay = FMath::FRandRange(MinDelay, MaxDelay);
-        TimerManager.SetTimer(RevealTimerHandle, this, &UW_DiceResolutionPanel::RevealNextDie, Delay, false);
+        TimerManager.SetTimer(RevealTimerHandle, this, &UW_DiceResolutionPanel::RevealNextDie, DelaySeconds, false);
     }
     else
     {
         RevealNextDie();
+    }
+}
+
+void UW_DiceResolutionPanel::ScheduleCompletionDelay(float DelaySeconds)
+{
+    if (UWorld* World = GetWorld())
+    {
+        FTimerManager& TimerManager = World->GetTimerManager();
+        TimerManager.ClearTimer(RevealTimerHandle);
+        TimerManager.ClearTimer(CompletionTimerHandle);
+        TimerManager.SetTimer(CompletionTimerHandle, this, &UW_DiceResolutionPanel::HandleCompletionDelayElapsed, DelaySeconds, false);
+    }
+    else
+    {
+        HandleCompletionDelayElapsed();
     }
 }
 
@@ -126,31 +156,102 @@ void UW_DiceResolutionPanel::RevealNextDie()
     }
 
     const FDiceRollOutcome& Outcome = ActiveResult.DiceOutcomes[RevealIndex];
+    UTexture2D* ResolvedTexture = ResolveDiceTexture(Outcome.RollValue);
+
     if (OutcomeList)
     {
-        UTextBlock* Entry = NewObject<UTextBlock>(OutcomeList);
-        if (Entry)
+        bool bEntryAdded = false;
+
+        if (OutcomeEntryWidgetClass)
         {
-            const FText OutcomeLabel = Outcome.bHit
-                ? (Outcome.bCritical
-                    ? NSLOCTEXT("SkaldBattle", "DiceOutcomeCrit", "Crit")
-                    : NSLOCTEXT("SkaldBattle", "DiceOutcomeHit", "Hit"))
-                : NSLOCTEXT("SkaldBattle", "DiceOutcomeMiss", "Miss");
-            const FText EntryText = FText::Format(
-                NSLOCTEXT("SkaldBattle", "DiceOutcomeEntry", "#{0} • {1} ({2})"),
-                FText::AsNumber(RevealIndex + 1),
-                FText::AsNumber(FMath::Max(Outcome.RollValue, 0)),
-                OutcomeLabel);
-            Entry->SetText(EntryText);
-
-            const FLinearColor EntryColour = Outcome.bHit
-                ? (Outcome.bCritical ? FLinearColor(0.98f, 0.78f, 0.15f) : FLinearColor(0.12f, 0.76f, 0.45f))
-                : FLinearColor(0.55f, 0.55f, 0.58f);
-            Entry->SetColorAndOpacity(FSlateColor(EntryColour));
-
-            if (UVerticalBoxSlot* Slot = OutcomeList->AddChildToVerticalBox(Entry))
+            if (UW_DiceResolutionEntryWidget* EntryWidget = CreateWidget<UW_DiceResolutionEntryWidget>(this, OutcomeEntryWidgetClass))
             {
-                Slot->SetPadding(FMargin(0.f, 2.f));
+                EntryWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
+                EntryWidget->ConfigureOutcome(Outcome, RevealIndex, ResolvedTexture);
+
+                if (UPanelSlot* AddedSlot = OutcomeList->AddChild(EntryWidget))
+                {
+                    if (UVerticalBoxSlot* EntrySlot = Cast<UVerticalBoxSlot>(AddedSlot))
+                    {
+                        EntrySlot->SetPadding(OutcomeEntryPadding);
+                    }
+                }
+
+                bEntryAdded = true;
+            }
+        }
+
+        if (!bEntryAdded)
+        {
+            UHorizontalBox* EntryRow = NewObject<UHorizontalBox>(OutcomeList);
+            if (EntryRow)
+            {
+                EntryRow->SetVisibility(ESlateVisibility::HitTestInvisible);
+
+                const FText OutcomeLabel = Outcome.bHit
+                    ? (Outcome.bCritical
+                        ? NSLOCTEXT("SkaldBattle", "DiceOutcomeCrit", "Crit")
+                        : NSLOCTEXT("SkaldBattle", "DiceOutcomeHit", "Hit"))
+                    : NSLOCTEXT("SkaldBattle", "DiceOutcomeMiss", "Miss");
+
+                const FLinearColor OutcomeColour = Outcome.bHit
+                    ? (Outcome.bCritical ? FLinearColor(0.98f, 0.78f, 0.15f) : FLinearColor(0.12f, 0.76f, 0.45f))
+                    : FLinearColor(0.55f, 0.55f, 0.58f);
+
+                if (ResolvedTexture)
+                {
+                    UImage* DieImage = NewObject<UImage>(EntryRow);
+                    if (DieImage)
+                    {
+                        DieImage->SetBrushFromTexture(ResolvedTexture, true);
+                        DieImage->SetDesiredSizeOverride(FVector2D(72.f, 72.f));
+                        DieImage->SetVisibility(ESlateVisibility::HitTestInvisible);
+
+                        if (UHorizontalBoxSlot* ImageSlot = EntryRow->AddChildToHorizontalBox(DieImage))
+                        {
+                            ImageSlot->SetPadding(FMargin(0.f, 0.f, 8.f, 0.f));
+                            ImageSlot->SetVerticalAlignment(VAlign_Center);
+                        }
+                    }
+                }
+
+                UTextBlock* ValueText = NewObject<UTextBlock>(EntryRow);
+                if (ValueText)
+                {
+                    const FText ValueLabel = FText::Format(
+                        NSLOCTEXT("SkaldBattle", "DiceOutcomeEntryValue", "#{0} • {1}"),
+                        FText::AsNumber(RevealIndex + 1),
+                        FText::AsNumber(FMath::Max(Outcome.RollValue, 0)));
+                    ValueText->SetText(ValueLabel);
+                    ValueText->SetVisibility(ESlateVisibility::HitTestInvisible);
+
+                    if (UHorizontalBoxSlot* ValueSlot = EntryRow->AddChildToHorizontalBox(ValueText))
+                    {
+                        ValueSlot->SetVerticalAlignment(VAlign_Center);
+                    }
+                }
+
+                UTextBlock* OutcomeText = NewObject<UTextBlock>(EntryRow);
+                if (OutcomeText)
+                {
+                    const FText LabelText = FText::Format(
+                        NSLOCTEXT("SkaldBattle", "DiceOutcomeEntryLabel", "({0})"),
+                        OutcomeLabel);
+                    OutcomeText->SetText(LabelText);
+                    OutcomeText->SetColorAndOpacity(FSlateColor(OutcomeColour));
+                    OutcomeText->SetVisibility(ESlateVisibility::HitTestInvisible);
+
+                    if (UHorizontalBoxSlot* LabelSlot = EntryRow->AddChildToHorizontalBox(OutcomeText))
+                    {
+                        LabelSlot->SetPadding(FMargin(8.f, 0.f, 0.f, 0.f));
+                        LabelSlot->SetVerticalAlignment(VAlign_Center);
+                    }
+                }
+
+                if (UVerticalBoxSlot* EntrySlot = OutcomeList->AddChildToVerticalBox(EntryRow))
+                {
+                    EntrySlot->SetPadding(OutcomeEntryPadding);
+                }
             }
         }
     }
@@ -174,21 +275,11 @@ void UW_DiceResolutionPanel::RevealNextDie()
 
     if (RevealIndex >= ActiveResult.DiceOutcomes.Num())
     {
-        if (UWorld* World = GetWorld())
-        {
-            FTimerManager& TimerManager = World->GetTimerManager();
-            TimerManager.ClearTimer(RevealTimerHandle);
-            const float Delay = FMath::FRandRange(RevealDelayMinSeconds, RevealDelayMaxSeconds);
-            TimerManager.SetTimer(CompletionTimerHandle, this, &UW_DiceResolutionPanel::HandleCompletionDelayElapsed, Delay, false);
-        }
-        else
-        {
-            HandleCompletionDelayElapsed();
-        }
+        ScheduleCompletionDelay(CompletionDelaySeconds);
     }
     else
     {
-        ScheduleNextReveal(RevealDelayMinSeconds, RevealDelayMaxSeconds);
+        ScheduleNextReveal(RevealDelaySeconds);
     }
 }
 
@@ -197,9 +288,11 @@ void UW_DiceResolutionPanel::HandleCompletionDelayElapsed()
     if (!bResolutionActive)
     {
         BroadcastCompletion();
+        ResetPanel();
         return;
     }
 
+    const bool bWasActive = bResolutionActive;
     bResolutionActive = false;
 
     if (ResolveProgressPlaceholder)
@@ -208,6 +301,11 @@ void UW_DiceResolutionPanel::HandleCompletionDelayElapsed()
     }
 
     BroadcastCompletion();
+
+    if (bWasActive)
+    {
+        ResetPanel();
+    }
 }
 
 void UW_DiceResolutionPanel::UpdateTallies()
@@ -247,5 +345,73 @@ void UW_DiceResolutionPanel::BroadcastCompletion()
     }
 
     OnResolutionComplete.Broadcast(ActiveResult);
+}
+
+UTexture2D* UW_DiceResolutionPanel::ResolveDiceTexture(int32 RollValue) const
+{
+    if (DiceFaceTextures.Num() == 0)
+    {
+        return nullptr;
+    }
+
+    const int32 Index = RollValue - 1;
+    if (DiceFaceTextures.IsValidIndex(Index))
+    {
+        return DiceFaceTextures[Index];
+    }
+
+    return nullptr;
+}
+
+UW_DiceResolutionEntryWidget::UW_DiceResolutionEntryWidget(const FObjectInitializer& ObjectInitializer)
+    : Super(ObjectInitializer)
+{
+}
+
+void UW_DiceResolutionEntryWidget::ConfigureOutcome(const FDiceRollOutcome& Outcome, int32 DisplayIndex, UTexture2D* DieTexture)
+{
+    const FLinearColor OutcomeColour = Outcome.bHit
+        ? (Outcome.bCritical ? CritColour : HitColour)
+        : MissColour;
+
+    if (DiceFaceImage)
+    {
+        if (DieTexture)
+        {
+            DiceFaceImage->SetBrushFromTexture(DieTexture, true);
+            DiceFaceImage->SetVisibility(ESlateVisibility::HitTestInvisible);
+        }
+        else
+        {
+            DiceFaceImage->SetVisibility(ESlateVisibility::Collapsed);
+        }
+
+        DiceFaceImage->SetDesiredSizeOverride(DiceImageSize);
+    }
+
+    if (RollValueText)
+    {
+        const FText ValueLabel = FText::Format(
+            NSLOCTEXT("SkaldBattle", "DiceOutcomeEntryValue", "#{0} • {1}"),
+            FText::AsNumber(DisplayIndex + 1),
+            FText::AsNumber(FMath::Max(Outcome.RollValue, 0)));
+        RollValueText->SetText(ValueLabel);
+        RollValueText->SetVisibility(ESlateVisibility::HitTestInvisible);
+    }
+
+    if (OutcomeLabelText)
+    {
+        const FText OutcomeLabel = FText::Format(
+            NSLOCTEXT("SkaldBattle", "DiceOutcomeEntryLabel", "({0})"),
+            Outcome.bHit
+                ? (Outcome.bCritical
+                    ? NSLOCTEXT("SkaldBattle", "DiceOutcomeCrit", "Crit")
+                    : NSLOCTEXT("SkaldBattle", "DiceOutcomeHit", "Hit"))
+                : NSLOCTEXT("SkaldBattle", "DiceOutcomeMiss", "Miss"));
+
+        OutcomeLabelText->SetText(OutcomeLabel);
+        OutcomeLabelText->SetColorAndOpacity(FSlateColor(OutcomeColour));
+        OutcomeLabelText->SetVisibility(ESlateVisibility::HitTestInvisible);
+    }
 }
 

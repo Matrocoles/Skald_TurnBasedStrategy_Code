@@ -1,7 +1,12 @@
 #include "UI/BattleHUDWidget.h"
 #include "Components/Button.h"
+#include "Components/CanvasPanelSlot.h"
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
+#include "Engine/Canvas.h"
+#include "Engine/CanvasRenderTarget2D.h"
+#include "Engine/Engine.h"
+#include "Styling/SlateBrush.h"
 #include "Engine/World.h"
 #include "FighterPawn.h"
 #include "GridOverlayComponent.h"
@@ -9,13 +14,16 @@
 #include "UI/W_DiceResolutionPanel.h"
 #include "UI/W_FloatingText.h"
 #include "Math/UnrealMathUtility.h"
+#include "Math/Vector2D.h"
 #include "TimerManager.h"
+#include "CanvasItem.h"
 #include "Engine/Texture2D.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundBase.h"
 #include "UObject/WeakObjectPtrTemplates.h"
 
 UBattleHUDWidget::UBattleHUDWidget(const FObjectInitializer &ObjectInitializer)
     : Super(ObjectInitializer) {
-  SetCanTick(true);
   FloaterWidgetClass = UW_FloatingText::StaticClass();
 }
 
@@ -51,7 +59,15 @@ void UBattleHUDWidget::NativeConstruct() {
   if (DiceResolutionPanel) {
     DiceResolutionPanel->OnResolutionComplete.AddDynamic(
         this, &UBattleHUDWidget::HandleDicePanelResolved);
+    TArray<UTexture2D *> DiceFaceTexturePtrs;
+    DiceFaceTexturePtrs.Reserve(DiceFaceTextures.Num());
+    for (const TObjectPtr<UTexture2D> &Texture : DiceFaceTextures) {
+      DiceFaceTexturePtrs.Add(Texture.Get());
+    }
+    DiceResolutionPanel->SetDiceFaceTextures(DiceFaceTexturePtrs);
   }
+
+  ApplyDiceResolutionPanelLayoutInternal(DefaultDiceResolutionPanelLayout);
 
   if (InitiativePromptText) {
     InitiativePromptText->SetText(FText::GetEmpty());
@@ -84,6 +100,12 @@ void UBattleHUDWidget::NativeDestruct() {
   PendingDiceResolutions.Reset();
   bDiceResolutionActive = false;
   ActiveDiceResolution = FBattleQueuedDiceResolution();
+
+  if (DiceRollerRenderTarget) {
+    DiceRollerRenderTarget->OnCanvasRenderTargetUpdate.RemoveDynamic(
+        this, &UBattleHUDWidget::HandleDiceRenderTargetUpdate);
+    DiceRollerRenderTarget = nullptr;
+  }
 
   while (ActiveFloaters.Num() > 0) {
     ReleaseFloaterAtIndex(ActiveFloaters.Num() - 1);
@@ -395,23 +417,80 @@ void UBattleHUDWidget::ShowDiceRoll(int32 RollValue, float DisplayDuration) {
     return;
   }
 
-  UTexture2D *Texture = nullptr;
+  const float DiceDisplaySize = 90.f;
+  const float DiceBoardPadding = 24.f;
+  const FVector2D DiceOffset(0.f, 80.f);
+
+  UObject *DiceResource = nullptr;
   const int32 Index = RollValue - 1;
   if (DiceFaceTextures.IsValidIndex(Index)) {
-    Texture = DiceFaceTextures[Index];
+    DiceResource = DiceFaceTextures[Index];
   }
 
-  if (Texture) {
-    DiceRollerImage->SetBrushFromTexture(Texture, true);
+  if (!DiceResource) {
+    if (!DiceRollerRenderTarget) {
+      DiceRollerRenderTarget = UCanvasRenderTarget2D::CreateCanvasRenderTarget2D(
+          this, UCanvasRenderTarget2D::StaticClass(), 256, 256);
+      if (DiceRollerRenderTarget) {
+        DiceRollerRenderTarget->OnCanvasRenderTargetUpdate.AddDynamic(
+            this, &UBattleHUDWidget::HandleDiceRenderTargetUpdate);
+      }
+    }
+
+    if (DiceRollerRenderTarget) {
+      PendingDiceRenderValue = RollValue;
+      DiceRollerRenderTarget->ClearColor = FLinearColor::Transparent;
+      DiceRollerRenderTarget->UpdateResourceImmediate();
+      DiceResource = DiceRollerRenderTarget;
+    }
+  }
+
+  bool bDisplayedRoll = false;
+  if (DiceResource) {
+    if (UTexture2D *Texture = Cast<UTexture2D>(DiceResource)) {
+      DiceRollerImage->SetBrushFromTexture(Texture, true);
+    } else {
+      FSlateBrush Brush = DiceRollerImage->GetBrush();
+      Brush.SetResourceObject(DiceResource);
+      Brush.ImageSize = FVector2D(DiceDisplaySize, DiceDisplaySize);
+      DiceRollerImage->SetBrush(Brush);
+    }
+    DiceRollerImage->SetDesiredSizeOverride(
+        FVector2D(DiceDisplaySize, DiceDisplaySize));
+    DiceRollerImage->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
+
+    if (UCanvasPanelSlot *DiceSlot = Cast<UCanvasPanelSlot>(DiceRollerImage->Slot)) {
+      DiceSlot->SetAnchors(FAnchors(0.5f, 0.f));
+      DiceSlot->SetAlignment(FVector2D(0.5f, 0.f));
+      DiceSlot->SetPosition(DiceOffset);
+      DiceSlot->SetSize(FVector2D(DiceDisplaySize, DiceDisplaySize));
+    }
+
     DiceRollerImage->SetVisibility(ESlateVisibility::HitTestInvisible);
     if (DiceBoardImage) {
+      DiceBoardImage->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
+
+      if (UCanvasPanelSlot *BoardSlot = Cast<UCanvasPanelSlot>(DiceBoardImage->Slot)) {
+        BoardSlot->SetAnchors(FAnchors(0.5f, 0.f));
+        BoardSlot->SetAlignment(FVector2D(0.5f, 0.f));
+        BoardSlot->SetPosition(DiceOffset - FVector2D(0.f, DiceBoardPadding * 0.5f));
+        BoardSlot->SetSize(FVector2D(DiceDisplaySize + DiceBoardPadding,
+                                     DiceDisplaySize + DiceBoardPadding));
+      }
+
       DiceBoardImage->SetVisibility(ESlateVisibility::HitTestInvisible);
     }
+
+    bDisplayedRoll = true;
   } else {
     DiceRollerImage->SetVisibility(ESlateVisibility::Collapsed);
     if (DiceBoardImage) {
       DiceBoardImage->SetVisibility(ESlateVisibility::Collapsed);
     }
+  }
+
+  if (bDisplayedRoll && DiceRollSound) {
+    UGameplayStatics::PlaySound2D(this, DiceRollSound);
   }
 
   if (UWorld *World = GetWorld()) {
@@ -426,7 +505,7 @@ void UBattleHUDWidget::ShowDiceRoll(int32 RollValue, float DisplayDuration) {
       }
     });
 
-    const float ClampedDuration = FMath::Max(0.f, DisplayDuration);
+    const float ClampedDuration = FMath::Clamp(DisplayDuration, 0.35f, 1.25f);
     TimerManager.SetTimer(DiceRollerHideTimer, TimerDelegate, ClampedDuration,
                           false);
   }
@@ -466,10 +545,62 @@ void UBattleHUDWidget::HideDiceRoller() {
   if (!DiceRollerImage) {
     return;
   }
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(DiceRollerHideTimer);
+  }
   DiceRollerImage->SetVisibility(ESlateVisibility::Collapsed);
+  DiceRollerImage->SetBrushFromTexture(nullptr);
+  PendingDiceRenderValue = 0;
   if (DiceBoardImage) {
     DiceBoardImage->SetVisibility(ESlateVisibility::Collapsed);
   }
+}
+
+void UBattleHUDWidget::HandleDiceRenderTargetUpdate(UCanvas *Canvas, int32 Width,
+                                                    int32 Height) {
+  if (!Canvas || Width <= 0 || Height <= 0) {
+    return;
+  }
+
+  const FVector2D Size(Width, Height);
+  const FLinearColor BackgroundColor(0.f, 0.f, 0.f, 0.75f);
+  FCanvasTileItem Tile(FVector2D::ZeroVector, Size, BackgroundColor);
+  Tile.BlendMode = SE_BLEND_Translucent;
+  Canvas->DrawItem(Tile);
+
+  const FLinearColor BorderColor(1.f, 1.f, 1.f, 0.85f);
+  const float BorderThickness = 6.f;
+  FCanvasBoxItem Border(FVector2D::ZeroVector, Size);
+  Border.SetColor(BorderColor);
+  Border.LineThickness = BorderThickness;
+  Canvas->DrawItem(Border);
+
+  if (!GEngine) {
+    return;
+  }
+
+  UFont *Font = GEngine->GetLargeFont();
+  if (!Font) {
+    Font = GEngine->GetMediumFont();
+  }
+  if (!Font) {
+    Font = GEngine->GetSmallFont();
+  }
+
+  if (!Font || PendingDiceRenderValue <= 0) {
+    return;
+  }
+
+  const FString RollString = FString::FromInt(PendingDiceRenderValue);
+  FCanvasTextItem TextItem(FVector2D::ZeroVector, FText::FromString(RollString),
+                           Font, FLinearColor::White);
+  TextItem.bCentreX = true;
+  TextItem.bCentreY = true;
+  TextItem.EnableShadow(FLinearColor::Black);
+  TextItem.Scale = FVector2D(2.6f, 2.6f);
+
+  const FVector2D Center(Width * 0.5f, Height * 0.5f);
+  Canvas->DrawItem(TextItem, Center);
 }
 
 void UBattleHUDWidget::HideInitiativeText() {
@@ -581,11 +712,18 @@ void UBattleHUDWidget::ProcessNextDiceResolution() {
     return;
   }
 
+  const FDiceResolutionPanelLayout Layout = ResolveDiceResolutionPanelLayout(
+      ActiveDiceResolution.Attacker.Get(), ActiveDiceResolution.Defender.Get(),
+      ActiveDiceResolution.Result);
+  ApplyDiceResolutionPanelLayoutInternal(Layout);
+
   DiceResolutionPanel->BeginResolution(ActiveDiceResolution.Result);
 }
 
 void UBattleHUDWidget::HandleDicePanelResolved(
     const FDiceRollResult &Result) {
+  HideDiceRoller();
+
   if (!bDiceResolutionActive) {
     OnResolutionComplete.Broadcast(nullptr, nullptr, Result);
     return;
@@ -671,4 +809,49 @@ UCombatFloaterPoolSubsystem *UBattleHUDWidget::ResolveFloaterPool() {
   }
 
   return nullptr;
+}
+
+void UBattleHUDWidget::SetDefaultDiceResolutionPanelLayout(
+    const FDiceResolutionPanelLayout &Layout) {
+  DefaultDiceResolutionPanelLayout = Layout;
+  ApplyDiceResolutionPanelLayoutInternal(DefaultDiceResolutionPanelLayout);
+}
+
+void UBattleHUDWidget::ApplyDiceResolutionPanelLayout(
+    const FDiceResolutionPanelLayout &Layout) {
+  ApplyDiceResolutionPanelLayoutInternal(Layout);
+}
+
+FDiceResolutionPanelLayout
+UBattleHUDWidget::ResolveDiceResolutionPanelLayout_Implementation(
+    AFighterPawn *Attacker, AFighterPawn *Defender,
+    const FDiceRollResult &Result) const {
+  return DefaultDiceResolutionPanelLayout;
+}
+
+void UBattleHUDWidget::ApplyDiceResolutionPanelLayoutInternal(
+    const FDiceResolutionPanelLayout &Layout) {
+  if (!DiceResolutionPanel || !Layout.bApplyLayout) {
+    return;
+  }
+
+  if (UPanelSlot *PanelSlot = DiceResolutionPanel->Slot) {
+    if (UCanvasPanelSlot *CanvasSlot = Cast<UCanvasPanelSlot>(PanelSlot)) {
+      if (Layout.bOverrideAnchors) {
+        CanvasSlot->SetAnchors(Layout.Anchors);
+      }
+
+      if (Layout.bOverrideAlignment) {
+        CanvasSlot->SetAlignment(Layout.Alignment);
+      }
+
+      if (Layout.bOverridePosition) {
+        CanvasSlot->SetPosition(Layout.Position);
+      }
+
+      if (Layout.bOverrideSize) {
+        CanvasSlot->SetSize(Layout.Size);
+      }
+    }
+  }
 }

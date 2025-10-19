@@ -3,14 +3,17 @@
 #include "Blueprint/UserWidget.h"
 #include "GridBattleManager.h"
 #include "TimerManager.h"
+#include "UI/W_DiceResolutionPanel.h"
 #include "BattleHUDWidget.generated.h"
 
 class UButton;
 class UImage;
+class UCanvasRenderTarget2D;
 class UTextBlock;
 class AFighterPawn;
 class UGridOverlayComponent;
 class UTexture2D;
+class USoundBase;
 class UCombatFloaterPoolSubsystem;
 class UW_DiceResolutionPanel;
 class UW_FloatingText;
@@ -168,6 +171,10 @@ public:
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UImage *DiceBoardImage;
 
+  /** Render target used to draw fallback dice faces for high-value rolls. */
+  UPROPERTY(Transient)
+  TObjectPtr<UCanvasRenderTarget2D> DiceRollerRenderTarget;
+
   /** Panel that reveals per-die outcomes in sequence. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UW_DiceResolutionPanel *DiceResolutionPanel;
@@ -175,6 +182,14 @@ public:
   /** Textures representing dice faces, indexed from 1 to 6. */
   UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skald|Battle|Dice")
   TArray<TObjectPtr<UTexture2D>> DiceFaceTextures;
+
+  /** Default layout overrides applied to the attack dice reveal panel. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skald|Battle|Dice")
+  FDiceResolutionPanelLayout DefaultDiceResolutionPanelLayout;
+
+  /** Optional sound effect to play when a dice roll is shown. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skald|Battle|Dice")
+  TObjectPtr<USoundBase> DiceRollSound;
 
   /** Display a dice face corresponding to the supplied roll value. */
   void ShowDiceRoll(int32 RollValue, float DisplayDuration = 1.f);
@@ -226,6 +241,24 @@ public:
   void QueueDiceResolution(AFighterPawn *Attacker, AFighterPawn *Defender,
                            const FDiceRollResult &Result);
 
+  /** Override the default layout values at runtime. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Battle|Dice")
+  void SetDefaultDiceResolutionPanelLayout(const FDiceResolutionPanelLayout &Layout);
+
+  /** Apply a layout override immediately without mutating the defaults. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Battle|Dice")
+  void ApplyDiceResolutionPanelLayout(const FDiceResolutionPanelLayout &Layout);
+
+  /**
+   * Resolve the layout that should be applied before revealing the current dice roll.
+   * Blueprint implementations can customize placement on a per-attack basis.
+   */
+  UFUNCTION(BlueprintNativeEvent, Category = "Skald|Battle|Dice")
+  FDiceResolutionPanelLayout ResolveDiceResolutionPanelLayout(
+      AFighterPawn *Attacker, AFighterPawn *Defender, const FDiceRollResult &Result) const;
+  FDiceResolutionPanelLayout ResolveDiceResolutionPanelLayout_Implementation(
+      AFighterPawn *Attacker, AFighterPawn *Defender, const FDiceRollResult &Result) const;
+
 private:
   /** Callback when MoveButton is pressed. */
   UFUNCTION()
@@ -266,6 +299,14 @@ private:
 
   /** Hide the dice roller image after the timer elapses. */
   void HideDiceRoller();
+
+  /** Draws the numeric fallback dice face onto the render target. */
+  UFUNCTION()
+  void HandleDiceRenderTargetUpdate(class UCanvas *Canvas, int32 Width,
+                                    int32 Height);
+
+  /** Cached numeric value for the pending dice render target update. */
+  int32 PendingDiceRenderValue = 0;
 
   /** Hide the initiative text after the timer elapses. */
   void HideInitiativeText();
@@ -354,5 +395,7 @@ private:
 
   /** Timer delaying the display of the initiative roll button. */
   FTimerHandle InitiativeRollButtonDelayTimer;
+
+  void ApplyDiceResolutionPanelLayoutInternal(const FDiceResolutionPanelLayout &Layout);
 };
 
