@@ -26,6 +26,8 @@ class UGridOverlayComponent;
 class UWorld;
 class ASkald_BattleGameMode;
 class USoundBase;
+class UCameraShakeBase;
+class UNiagaraSystem;
 
 /** Command issued by the player during a battle. */
 UENUM()
@@ -155,6 +157,30 @@ protected:
   /** Sound to play for the local player when a tactical round begins. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Audio")
   USoundBase *BattleRoundStartSound = nullptr;
+
+  /** Camera shake to trigger for successful hits. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
+  TSubclassOf<UCameraShakeBase> HitCameraShakeClass;
+
+  /** Camera shake to trigger for misses or glancing blows. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
+  TSubclassOf<UCameraShakeBase> MissCameraShakeClass;
+
+  /** Niagara or particle cue to spawn for successful hits. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
+  UNiagaraSystem *HitImpactEffect = nullptr;
+
+  /** Niagara or particle cue to spawn for misses. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
+  UNiagaraSystem *MissImpactEffect = nullptr;
+
+  /** Audio cue played when a hit lands. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
+  USoundBase *HitImpactSound = nullptr;
+
+  /** Audio cue played when an attack misses. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
+  USoundBase *MissImpactSound = nullptr;
 
   /** Reference to the HUD widget instance. */
   UPROPERTY(BlueprintReadOnly, Category = "UI",
@@ -492,6 +518,9 @@ private:
   UFUNCTION()
   void HandleAttackResolved(AFighterPawn *Attacker, AFighterPawn *Defender,
                             const FDiceRollResult &Result);
+
+  void PlayAttackFeedback(AFighterPawn *Attacker, AFighterPawn *Defender,
+                          const FDiceRollResult &Result);
 
   UFUNCTION()
   void HandleDiceResolutionComplete(AFighterPawn *Attacker,

@@ -16,6 +16,9 @@
 #include "InputCoreTypes.h"
 #include "Internationalization/Text.h"
 #include "Kismet/GameplayStatics.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraSystem.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Skald.h"
 #include "SkaldTypes.h"
 #include "Skald_GameInstance.h"
@@ -25,6 +28,7 @@
 #include "Skald_GameState.h"
 #include "Skald_PlayerState.h"
 #include "Skald_TurnManager.h"
+#include "SkaldBattleCameraShakes.h"
 #include "Territory.h"
 #include "TimerManager.h"
 #include "UI/BattleHUDWidget.h"
@@ -131,6 +135,14 @@ ASkaldPlayerController::ASkaldPlayerController() {
       TEXT("/Game/Blueprints/UI/Skald_ChoosePlayerWidget"));
   if (ChooseBP.Succeeded()) {
     ChoosePlayerWidgetClass = ChooseBP.Class;
+  }
+
+  if (!HitCameraShakeClass) {
+    HitCameraShakeClass = USkaldHitCameraShake::StaticClass();
+  }
+
+  if (!MissCameraShakeClass) {
+    MissCameraShakeClass = USkaldMissCameraShake::StaticClass();
   }
 }
 
@@ -2830,9 +2842,72 @@ void ASkaldPlayerController::UpdateBattlePlayersTurnDisplay() {
   BattleHudWidget->SetPlayersTurnLabel(Label);
 }
 
+void ASkaldPlayerController::PlayAttackFeedback(
+    AFighterPawn *Attacker, AFighterPawn *Defender,
+    const FDiceRollResult &Result) {
+  if (!Defender) {
+    return;
+  }
+
+  UWorld *World = GetWorld();
+  if (!World) {
+    return;
+  }
+
+  const bool bAnyDamage = Result.TotalDamage > 0;
+  const FVector ImpactLocation = Defender->GetActorLocation() +
+                                 FVector(0.f, 0.f, 120.f);
+  const FRotator ImpactRotation = Attacker
+                                      ? (Defender->GetActorLocation() -
+                                         Attacker->GetActorLocation())
+                                            .Rotation()
+                                      : FRotator::ZeroRotator;
+
+  if (bAnyDamage) {
+    if (HitImpactEffect) {
+      UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+          World, HitImpactEffect, ImpactLocation, ImpactRotation);
+    }
+    if (HitImpactSound) {
+      UGameplayStatics::PlaySoundAtLocation(this, HitImpactSound,
+                                            ImpactLocation);
+    }
+  } else {
+    if (MissImpactEffect) {
+      UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+          World, MissImpactEffect, ImpactLocation, ImpactRotation);
+    }
+    if (MissImpactSound) {
+      UGameplayStatics::PlaySoundAtLocation(this, MissImpactSound,
+                                            ImpactLocation);
+    }
+  }
+
+  const int32 EffectiveMax = Defender->GetMaxHealth() > 0
+                                 ? Defender->GetMaxHealth()
+                                 : FMath::Max(Result.TotalDamage, 1);
+  const float DamageRatio = bAnyDamage
+                                ? static_cast<float>(Result.TotalDamage) /
+                                      static_cast<float>(EffectiveMax)
+                                : 0.f;
+  const float ShakeScale = bAnyDamage
+                               ? FMath::Clamp(0.4f + DamageRatio, 0.35f, 1.5f)
+                               : 0.25f;
+
+  if (APlayerCameraManager *CameraManager = PlayerCameraManager) {
+    TSubclassOf<UCameraShakeBase> CameraShake =
+        bAnyDamage ? HitCameraShakeClass : MissCameraShakeClass;
+    if (CameraShake) {
+      CameraManager->StartCameraShake(CameraShake, ShakeScale);
+    }
+  }
+}
+
 void ASkaldPlayerController::HandleAttackResolved(AFighterPawn *Attacker,
                                                   AFighterPawn *Defender,
                                                   const FDiceRollResult &Result) {
+  PlayAttackFeedback(Attacker, Defender, Result);
+
   if (!BattleHudWidget) {
     if (MainHUD) {
       MainHUD->QueueDiceResolution(Attacker, Defender, Result);
@@ -2853,10 +2928,7 @@ void ASkaldPlayerController::HandleDiceResolutionComplete(
     return;
   }
 
-  const bool bAnyDamage = Result.TotalDamage > 0;
-  const int32 DisplayDamage = bAnyDamage ? Result.TotalDamage : 0;
-  BattleHudWidget->ShowAttackResultFloater(Defender, bAnyDamage,
-                                           DisplayDamage);
+  BattleHudWidget->ShowAttackResultFloater(Defender, Result);
 }
 
 void ASkaldPlayerController::HandleAttackRejected(AFighterPawn *Attacker,

@@ -482,6 +482,7 @@ void UBattleHUDWidget::HideInitiativeText() {
 void UBattleHUDWidget::ShowCombatFloater(const FVector &WorldLocation,
                                          const FText &Message,
                                          const FLinearColor &Tint, float Scale,
+                                         bool bUseMissStyling,
                                          float LifetimeOverride) {
   UCombatFloaterPoolSubsystem *Pool = ResolveFloaterPool();
   if (!Pool) {
@@ -501,6 +502,7 @@ void UBattleHUDWidget::ShowCombatFloater(const FVector &WorldLocation,
     Floater->SetText(Message);
     Floater->SetColorAndOpacity(Tint);
     Floater->SetFloaterOpacity(1.f);
+    Floater->SetTagStyle(bUseMissStyling);
     Floater->SetFloaterScale(Scale);
 
     FBattleActiveFloater &Entry = ActiveFloaters.AddDefaulted_GetRef();
@@ -519,21 +521,28 @@ void UBattleHUDWidget::ShowCombatFloater(const FVector &WorldLocation,
   }
 }
 
-void UBattleHUDWidget::ShowAttackResultFloater(AFighterPawn *Target, bool bHit,
-                                               int32 Damage) {
+void UBattleHUDWidget::ShowAttackResultFloater(AFighterPawn *Target,
+                                               const FDiceRollResult &Result) {
   if (!Target) {
     return;
   }
 
+  const bool bAnyDamage = Result.TotalDamage > 0;
+  const bool bCritical = bAnyDamage && Result.CriticalHitCount > 0;
+
   const FVector BaseLocation =
       Target->GetActorLocation() + FVector(0.f, 0.f, 150.f);
   const FText Text =
-      bHit ? FText::AsNumber(Damage)
-           : NSLOCTEXT("Skald", "BattleFloaterMiss", "Miss");
-  const FLinearColor Colour = bHit ? HitFloaterColor : MissFloaterColor;
-  const float Scale = bHit ? 1.f : 0.9f;
+      bAnyDamage ? FText::AsNumber(Result.TotalDamage)
+                 : NSLOCTEXT("Skald", "BattleFloaterMiss", "Miss");
 
-  ShowCombatFloater(BaseLocation, Text, Colour, Scale);
+  const FLinearColor Colour =
+      bAnyDamage
+          ? (bCritical ? CriticalFloaterColor : HitFloaterColor)
+          : MissFloaterColor;
+  const float Scale = bAnyDamage ? (bCritical ? 1.12f : 1.f) : 1.05f;
+
+  ShowCombatFloater(BaseLocation, Text, Colour, Scale, !bAnyDamage);
 }
 
 void UBattleHUDWidget::QueueDiceResolution(AFighterPawn *Attacker,

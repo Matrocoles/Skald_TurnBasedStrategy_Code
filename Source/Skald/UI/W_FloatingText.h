@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Blueprint/UserWidget.h"
+#include "Fonts/SlateFontInfo.h"
 #include "W_FloatingText.generated.h"
 
 class UInvalidationBox;
@@ -36,6 +37,9 @@ public:
   /** Uniformly scale the floater widget. */
   void SetFloaterScale(float InScale);
 
+  /** Apply stylistic tweaks for hits or misses. */
+  void SetTagStyle(bool bMissTag);
+
   /**
    * Project the supplied world location to the screen, applying the provided
    * offset. Returns false when the position cannot be projected (typically when
@@ -70,5 +74,9 @@ private:
 
   /** Whether the floater is currently considered active. */
   bool bActive = false;
+
+  /** Cached copy of the default font so outlines can be restored. */
+  FSlateFontInfo DefaultFont;
+  bool bHasDefaultFont = false;
 };
 
