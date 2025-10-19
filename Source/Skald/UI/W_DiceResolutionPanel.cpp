@@ -190,7 +190,7 @@ void UW_DiceResolutionPanel::RevealNextDie()
                     if (DieImage)
                     {
                         DieImage->SetBrushFromTexture(ResolvedTexture, true);
-                        DieImage->SetBrushSize(FVector2D(72.f, 72.f));
+                        DieImage->SetDesiredSizeOverride(FVector2D(72.f, 72.f));
                         DieImage->SetVisibility(ESlateVisibility::HitTestInvisible);
 
                         if (UHorizontalBoxSlot* ImageSlot = EntryRow->AddChildToHorizontalBox(DieImage))
@@ -375,7 +375,7 @@ void UW_DiceResolutionEntryWidget::ConfigureOutcome(const FDiceRollOutcome& Outc
             DiceFaceImage->SetVisibility(ESlateVisibility::Collapsed);
         }
 
-        DiceFaceImage->SetBrushSize(DiceImageSize);
+        DiceFaceImage->SetDesiredSizeOverride(DiceImageSize);
     }
 
     if (RollValueText)

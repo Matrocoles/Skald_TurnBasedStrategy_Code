@@ -10,7 +10,7 @@
 
 UW_FloatingText::UW_FloatingText(const FObjectInitializer &ObjectInitializer)
     : Super(ObjectInitializer) {
-  bIsFocusable = false;
+  SetIsFocusable(false);
 }
 
 void UW_FloatingText::InitializeFloater(APlayerController *InOwningPlayer) {
