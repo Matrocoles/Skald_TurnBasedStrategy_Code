@@ -34,8 +34,8 @@ public class Skald : ModuleRules
                         "Landscape",
                         "AssetRegistry",
                         "Niagara",
-                        // Required for legacy UMatineeCameraShake derived classes
-                        "MatineeCameraShake"
+                        // Required for legacy camera shake support in UE 5.4+
+                        "LegacyCameraShake"
                 });
 
                 PrivateIncludePaths.AddRange(new string[]
