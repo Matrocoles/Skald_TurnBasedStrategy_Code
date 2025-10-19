@@ -13,6 +13,8 @@
 #include "Math/Vector2D.h"
 #include "TimerManager.h"
 #include "Engine/Texture2D.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundBase.h"
 #include "UObject/WeakObjectPtrTemplates.h"
 
 UBattleHUDWidget::UBattleHUDWidget(const FObjectInitializer &ObjectInitializer)
@@ -402,8 +404,9 @@ void UBattleHUDWidget::ShowDiceRoll(int32 RollValue, float DisplayDuration) {
     return;
   }
 
-  constexpr float DiceDisplaySize = 180.f;
-  constexpr float DiceBoardPadding = 48.f;
+  constexpr float DiceDisplaySize = 90.f;
+  constexpr float DiceBoardPadding = 24.f;
+  constexpr FVector2D DiceOffset(0.f, 80.f);
 
   UTexture2D *Texture = nullptr;
   const int32 Index = RollValue - 1;
@@ -411,15 +414,16 @@ void UBattleHUDWidget::ShowDiceRoll(int32 RollValue, float DisplayDuration) {
     Texture = DiceFaceTextures[Index];
   }
 
+  bool bDisplayedRoll = false;
   if (Texture) {
     DiceRollerImage->SetBrushFromTexture(Texture, true);
     DiceRollerImage->SetBrushSize(FVector2D(DiceDisplaySize, DiceDisplaySize));
     DiceRollerImage->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
 
     if (UCanvasPanelSlot *DiceSlot = Cast<UCanvasPanelSlot>(DiceRollerImage->Slot)) {
-      DiceSlot->SetAnchors(FAnchors(0.5f, 0.5f));
-      DiceSlot->SetAlignment(FVector2D(0.5f, 0.5f));
-      DiceSlot->SetPosition(FVector2D::ZeroVector);
+      DiceSlot->SetAnchors(FAnchors(0.5f, 0.f));
+      DiceSlot->SetAlignment(FVector2D(0.5f, 0.f));
+      DiceSlot->SetPosition(DiceOffset);
       DiceSlot->SetSize(FVector2D(DiceDisplaySize, DiceDisplaySize));
     }
 
@@ -428,20 +432,26 @@ void UBattleHUDWidget::ShowDiceRoll(int32 RollValue, float DisplayDuration) {
       DiceBoardImage->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
 
       if (UCanvasPanelSlot *BoardSlot = Cast<UCanvasPanelSlot>(DiceBoardImage->Slot)) {
-        BoardSlot->SetAnchors(FAnchors(0.5f, 0.5f));
-        BoardSlot->SetAlignment(FVector2D(0.5f, 0.5f));
-        BoardSlot->SetPosition(FVector2D::ZeroVector);
+        BoardSlot->SetAnchors(FAnchors(0.5f, 0.f));
+        BoardSlot->SetAlignment(FVector2D(0.5f, 0.f));
+        BoardSlot->SetPosition(DiceOffset - FVector2D(0.f, DiceBoardPadding * 0.5f));
         BoardSlot->SetSize(FVector2D(DiceDisplaySize + DiceBoardPadding,
                                      DiceDisplaySize + DiceBoardPadding));
       }
 
       DiceBoardImage->SetVisibility(ESlateVisibility::HitTestInvisible);
     }
+
+    bDisplayedRoll = true;
   } else {
     DiceRollerImage->SetVisibility(ESlateVisibility::Collapsed);
     if (DiceBoardImage) {
       DiceBoardImage->SetVisibility(ESlateVisibility::Collapsed);
     }
+  }
+
+  if (bDisplayedRoll && DiceRollSound) {
+    UGameplayStatics::PlaySound2D(this, DiceRollSound);
   }
 
   if (UWorld *World = GetWorld()) {
@@ -496,7 +506,11 @@ void UBattleHUDWidget::HideDiceRoller() {
   if (!DiceRollerImage) {
     return;
   }
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(DiceRollerHideTimer);
+  }
   DiceRollerImage->SetVisibility(ESlateVisibility::Collapsed);
+  DiceRollerImage->SetBrushFromTexture(nullptr);
   if (DiceBoardImage) {
     DiceBoardImage->SetVisibility(ESlateVisibility::Collapsed);
   }
@@ -607,6 +621,8 @@ void UBattleHUDWidget::ProcessNextDiceResolution() {
 
 void UBattleHUDWidget::HandleDicePanelResolved(
     const FDiceRollResult &Result) {
+  HideDiceRoller();
+
   if (!bDiceResolutionActive) {
     OnResolutionComplete.Broadcast(nullptr, nullptr, Result);
     return;
