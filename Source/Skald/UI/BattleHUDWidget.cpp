@@ -6,7 +6,7 @@
 #include "Engine/Canvas.h"
 #include "Engine/CanvasRenderTarget2D.h"
 #include "Engine/Engine.h"
-#include "Slate/SlateBrush.h"
+#include "Styling/SlateBrush.h"
 #include "Engine/World.h"
 #include "FighterPawn.h"
 #include "GridOverlayComponent.h"
