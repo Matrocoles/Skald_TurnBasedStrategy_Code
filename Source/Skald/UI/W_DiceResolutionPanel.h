@@ -94,7 +94,8 @@ public:
 
 protected:
     void ClearOutcomeEntries();
-    void ScheduleNextReveal(float MinDelay, float MaxDelay);
+    void ScheduleNextReveal(float DelaySeconds);
+    void ScheduleCompletionDelay(float DelaySeconds);
     void RevealNextDie();
     void HandleCompletionDelayElapsed();
     void UpdateTallies();
