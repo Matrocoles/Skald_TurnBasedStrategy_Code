@@ -10,11 +10,7 @@
 			"LoadingPhase": "Default"
 		}
 	],
-	"Plugins": [
-                {
-                        "Name": "LegacyCameraShake",
-                        "Enabled": true
-                },
+        "Plugins": [
                 {
                         "Name": "ModelingToolsEditorMode",
                         "Enabled": false
