@@ -225,6 +225,12 @@ public:
   /** Initialize the fighter's maximum health. */
   void InitializeMaxHealth(int32 InMaxHealth);
 
+  /** Temporarily locks the health widget to the provided value. */
+  void HoldHealthDisplay(int32 DisplayHealth);
+
+  /** Releases any active hold and applies pending health changes. */
+  void ReleaseHealthDisplayHold();
+
   /** Resolve the portrait texture for this fighter if available. */
   UTexture2D *GetPortraitTexture() const;
 
@@ -233,12 +239,25 @@ protected:
   virtual void Destroyed() override;
 
 private:
+  /** Whether the health display should remain fixed during presentation. */
+  bool bHoldHealthDisplay = false;
+
+  /** True when a new health value is waiting for the hold to end. */
+  bool bHasPendingHealthDisplay = false;
+
+  /** Deferred health value that will be applied once unlocked. */
+  int32 PendingHealthDisplayValue = 0;
+
   bool ShouldOverrideSpawnFacingYaw() const;
   float GetCurrentWorldFacingYaw() const;
 
   /** Update the health widget with a new value. */
   UFUNCTION()
   void UpdateHealthDisplay(int32 NewHealth);
+
+  /** Handles health change broadcasts so we can defer UI updates. */
+  UFUNCTION()
+  void HandleHealthChanged(int32 NewHealth);
 
   /** Respond when the fighter stats replicate to clients. */
   UFUNCTION()
