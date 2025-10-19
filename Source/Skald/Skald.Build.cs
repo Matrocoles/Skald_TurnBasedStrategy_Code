@@ -33,7 +33,8 @@ public class Skald : ModuleRules
                         "OnlineSubsystem",
                         "Landscape",
                         "AssetRegistry",
-                        "Niagara"
+                        "Niagara",
+                        "GameplayCameras"
                 });
 
                 PrivateIncludePaths.AddRange(new string[]
