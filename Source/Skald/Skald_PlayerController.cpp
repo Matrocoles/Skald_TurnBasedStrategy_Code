@@ -2932,10 +2932,7 @@ void ASkaldPlayerController::HandleDiceResolutionComplete(
     return;
   }
 
-  const bool bAnyDamage = Result.TotalDamage > 0;
-  const int32 DisplayDamage = bAnyDamage ? Result.TotalDamage : 0;
-  BattleHudWidget->ShowAttackResultFloater(Defender, bAnyDamage,
-                                           DisplayDamage);
+  BattleHudWidget->ShowAttackResultFloater(Defender, Result);
 
   Defender->ReleaseHealthDisplayHold();
 }
