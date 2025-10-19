@@ -11,10 +11,14 @@
 		}
 	],
 	"Plugins": [
-		{
-			"Name": "ModelingToolsEditorMode",
-			"Enabled": false
-		},
+                {
+                        "Name": "LegacyCameraShake",
+                        "Enabled": true
+                },
+                {
+                        "Name": "ModelingToolsEditorMode",
+                        "Enabled": false
+                },
 		{
 			"Name": "VisualStudioTools",
 			"Enabled": false,
