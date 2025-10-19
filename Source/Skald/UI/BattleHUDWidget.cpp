@@ -432,7 +432,6 @@ void UBattleHUDWidget::ShowDiceRoll(int32 RollValue, float DisplayDuration) {
       DiceRollerRenderTarget = UCanvasRenderTarget2D::CreateCanvasRenderTarget2D(
           this, UCanvasRenderTarget2D::StaticClass(), 256, 256);
       if (DiceRollerRenderTarget) {
-        DiceRollerRenderTarget->bShouldClearRenderTargetOnReceiveUpdate = true;
         DiceRollerRenderTarget->OnCanvasRenderTargetUpdate.AddDynamic(
             this, &UBattleHUDWidget::HandleDiceRenderTargetUpdate);
       }
@@ -451,7 +450,7 @@ void UBattleHUDWidget::ShowDiceRoll(int32 RollValue, float DisplayDuration) {
     if (UTexture2D *Texture = Cast<UTexture2D>(DiceResource)) {
       DiceRollerImage->SetBrushFromTexture(Texture, true);
     } else {
-      FSlateBrush Brush = DiceRollerImage->Brush;
+      FSlateBrush Brush = DiceRollerImage->GetBrush();
       Brush.SetResourceObject(DiceResource);
       Brush.ImageSize = FVector2D(DiceDisplaySize, DiceDisplaySize);
       DiceRollerImage->SetBrush(Brush);
