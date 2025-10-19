@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Camera/CameraShake.h"
+#include "MatineeCameraShake.h"
 #include "SkaldBattleCameraShakes.generated.h"
 
 /**
