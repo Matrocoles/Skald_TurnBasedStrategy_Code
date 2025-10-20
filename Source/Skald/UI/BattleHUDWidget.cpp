@@ -653,11 +653,16 @@ void UBattleHUDWidget::ShowCombatFloater(const FVector &WorldLocation,
   }
 }
 
-void UBattleHUDWidget::ShowAttackResultFloater(AFighterPawn* Target, bool bHit, int32 Damage)
-{
+void UBattleHUDWidget::ShowAttackResultFloater(AFighterPawn *Target,
+                                               const FDiceRollResult &Result) {
+  const bool bAnyHits = Result.HitCount > 0 || Result.TotalDamage > 0;
+  const int32 Damage = Result.TotalDamage;
+
   // TODO: integrate with CombatFloaterPoolSubsystem if available.
-  UE_LOG(LogSkald, Verbose, TEXT("ShowAttackResultFloater: Target=%s Hit=%d Damage=%d"),
-         Target ? *Target->GetName() : TEXT("None"), bHit ? 1 : 0, Damage);
+  UE_LOG(LogSkald, Verbose,
+         TEXT("ShowAttackResultFloater: Target=%s Hit=%d Damage=%d Criticals=%d Misses=%d"),
+         Target ? *Target->GetName() : TEXT("None"), bAnyHits ? 1 : 0, Damage,
+         Result.CriticalHitCount, Result.MissCount);
 }
 
 void UBattleHUDWidget::QueueDiceResolution(AFighterPawn *Attacker,
