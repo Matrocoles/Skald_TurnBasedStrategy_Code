@@ -816,6 +816,11 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
   }
 }
 
+bool AFighterPawn::IsResolvingQueuedAttack() const {
+  return PendingAttackTarget.IsValid() || PendingAttackRolls.Num() > 0 ||
+         bHasPendingDiceResult;
+}
+
 void AFighterPawn::StartQueuedAttack(AFighterPawn *Target,
                                      TArray<FQueuedAttackRoll> &&Rolls) {
   FDiceRollResult DiceResult;

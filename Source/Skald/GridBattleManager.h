@@ -7,6 +7,7 @@
 #include "SkaldTypes.h"
 #include "Engine/Texture2D.h"
 #include "TimerManager.h"
+#include "Delegates/Delegate.h"
 #include "GridBattleManager.generated.h"
 
 /** Lightweight optional int32 replacement to avoid relying on engine optional templates. */
@@ -402,6 +403,15 @@ private:
     void EvaluateRoundProgress(bool bPreviousWasAttacker);
     void ClearInactiveFighters();
 
+    struct FDeferredActivationFinish
+    {
+        EGridActivationFinishReason Reason = EGridActivationFinishReason::Auto;
+        bool bWasAttacker = true;
+    };
+
+    void HandleDeferredActivationFinalized(TWeakObjectPtr<AFighterPawn> FighterPtr);
+    void ClearDeferredActivationTracking(TWeakObjectPtr<AFighterPawn> FighterPtr);
+
     // Track both counts and costs separately
     int32 AttackerSurvivorUnitCount = 0;
     int32 DefenderSurvivorUnitCount = 0;
@@ -443,5 +453,11 @@ private:
 
     /** Delay before the AI rolls initiative so the player's result can be shown first. */
     static constexpr float InitiativeAIRollDelay = 1.f;
+
+    /** Deferred finish requests awaiting completion of queued attacks. */
+    TMap<TWeakObjectPtr<AFighterPawn>, FDeferredActivationFinish> DeferredActivationFinishes;
+
+    /** Handles bound to fighter queued-attack completion delegates. */
+    TMap<TWeakObjectPtr<AFighterPawn>, FDelegateHandle> DeferredFinishDelegateHandles;
 };
 

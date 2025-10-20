@@ -71,6 +71,9 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Fighter")
   void PerformAttack(AFighterPawn *Target);
 
+  /** True while queued attack rolls are still being processed. */
+  bool IsResolvingQueuedAttack() const;
+
   /** Event fired after any queued attack finishes resolving. */
   FOnQueuedAttackFinalized OnQueuedAttackFinalized;
 
