@@ -12,6 +12,12 @@
 #include "Skald_GameInstance.h"
 #include "Skald_PlayerController.h"
 
+namespace {
+
+constexpr const TCHAR *FactionPlaceholderOption = TEXT("Choose your Faction.");
+
+} // namespace
+
 void UStartGameWidget::SetLobbyMenu(ULobbyMenuWidget *InMenu) {
   OwningLobbyMenu = InMenu;
 }
@@ -55,6 +61,7 @@ void UStartGameWidget::NativeConstruct() {
 
   if (FactionComboBox) {
     FactionComboBox->ClearOptions();
+    FactionComboBox->AddOption(FactionPlaceholderOption);
     if (UEnum *Enum = StaticEnum<ESkaldFaction>()) {
       for (int32 i = 0; i < Enum->NumEnums(); ++i) {
         if (Skald::EnumUtils::IsHiddenEntry(Enum, i)) {
@@ -76,7 +83,7 @@ void UStartGameWidget::NativeConstruct() {
         }
       }
     }
-    FactionComboBox->ClearSelection();
+    FactionComboBox->SetSelectedOption(FactionPlaceholderOption);
     FactionComboBox->SetVisibility(ESlateVisibility::Collapsed);
   }
 
@@ -166,7 +173,8 @@ void UStartGameWidget::StartGame(bool bMultiplayer, bool bHost) {
 
         if (FactionComboBox) {
           const FString Option = FactionComboBox->GetSelectedOption();
-          if (!Option.IsEmpty() && Option != TEXT("None")) {
+          if (!Option.IsEmpty() && Option != TEXT("None") &&
+              Option != FactionPlaceholderOption) {
             if (UEnum *Enum = StaticEnum<ESkaldFaction>()) {
               const int64 Value = Enum->GetValueByNameString(Option);
               if (Value != INDEX_NONE) {
