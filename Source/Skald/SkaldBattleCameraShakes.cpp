@@ -1,6 +1,5 @@
 #include "SkaldBattleCameraShakes.h"
 
-#include "Camera/CameraShakePattern.h"
 #include "Camera/OscillatorCameraShakePattern.h"
 
 USkaldOscillationCameraShake::USkaldOscillationCameraShake(const FObjectInitializer& ObjectInitializer)
