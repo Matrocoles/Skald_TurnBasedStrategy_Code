@@ -528,6 +528,11 @@ private:
                                      AFighterPawn *Defender,
                                      const FDiceRollResult &Result);
   UFUNCTION()
+  void HandleDiceOutcomeRevealed(AFighterPawn *Attacker,
+                                 AFighterPawn *Defender,
+                                 const FDiceRollOutcome &Outcome,
+                                 int32 RevealIndex);
+  UFUNCTION()
   void HandleAttackRejected(AFighterPawn *Attacker, AFighterPawn *Defender,
                             const FText &Reason);
   bool IsFriendlyFighter(const AFighterPawn *Fighter) const;

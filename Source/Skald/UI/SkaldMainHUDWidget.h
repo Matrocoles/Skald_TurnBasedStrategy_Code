@@ -152,8 +152,14 @@ public:
   DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
       FOnDiceResolutionComplete, AFighterPawn *, Attacker, AFighterPawn *,
       Defender, const FDiceRollResult &, Result);
+  DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(
+      FOnDiceOutcomeRevealed, AFighterPawn *, Attacker, AFighterPawn *, Defender,
+      const FDiceRollOutcome &, Outcome, int32, RevealIndex);
   UPROPERTY(BlueprintAssignable, Category = "Skald|Battle|Events")
   FOnDiceResolutionComplete OnResolutionComplete;
+
+  UPROPERTY(BlueprintAssignable, Category = "Skald|Battle|Events")
+  FOnDiceOutcomeRevealed OnDiceOutcomeRevealed;
 
   // BlueprintCallable functions — game → HUD (push updates)
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
@@ -414,6 +420,10 @@ protected:
 
   UFUNCTION()
   void HandleDicePanelResolved(const FDiceRollResult &Result);
+
+  UFUNCTION()
+  void HandleDiceOutcomeRevealed(const FDiceRollOutcome &Outcome,
+                                 int32 RevealIndex);
 
   UFUNCTION()
   void HandleAttackApproved();

@@ -860,6 +860,8 @@ void ASkaldPlayerController::InitializeBattleHUD() {
           this, &ASkaldPlayerController::HandleInitiativeRollRequested);
       BattleHudWidget->OnResolutionComplete.AddDynamic(
           this, &ASkaldPlayerController::HandleDiceResolutionComplete);
+      BattleHudWidget->OnDiceOutcomeRevealed.AddDynamic(
+          this, &ASkaldPlayerController::HandleDiceOutcomeRevealed);
       BattleHudWidget->SetEndTurnVisibility(false);
       BattleHudWidget->SetActivateEnabled(false);
       BattleHudWidget->SetEndTurnEnabled(false);
@@ -2879,24 +2881,6 @@ void ASkaldPlayerController::PlayAttackFeedback(
     }
   }
 
-  const int32 EffectiveMax = Defender->GetMaxHealth() > 0
-                                 ? Defender->GetMaxHealth()
-                                 : FMath::Max(Result.TotalDamage, 1);
-  const float DamageRatio = bAnyDamage
-                                ? static_cast<float>(Result.TotalDamage) /
-                                      static_cast<float>(EffectiveMax)
-                                : 0.f;
-  const float ShakeScale = bAnyDamage
-                               ? FMath::Clamp(0.4f + DamageRatio, 0.35f, 1.5f)
-                               : 0.25f;
-
-  if (APlayerCameraManager *CameraManager = PlayerCameraManager) {
-    TSubclassOf<UCameraShakeBase> CameraShake =
-        bAnyDamage ? HitCameraShakeClass : MissCameraShakeClass;
-    if (CameraShake) {
-      CameraManager->StartCameraShake(CameraShake, ShakeScale);
-    }
-  }
 }
 
 void ASkaldPlayerController::HandleAttackResolved(AFighterPawn *Attacker,
@@ -2931,6 +2915,29 @@ void ASkaldPlayerController::HandleDiceResolutionComplete(
   BattleHudWidget->ShowAttackResultFloater(Defender, Result);
 
   Defender->ReleaseHealthDisplayHold();
+}
+
+void ASkaldPlayerController::HandleDiceOutcomeRevealed(
+    AFighterPawn *Attacker, AFighterPawn *Defender,
+    const FDiceRollOutcome &Outcome, int32 RevealIndex) {
+  if (!PlayerCameraManager) {
+    return;
+  }
+
+  TSubclassOf<UCameraShakeBase> CameraShake = nullptr;
+  float ShakeScale = 1.f;
+
+  if (Outcome.bHit) {
+    CameraShake = HitCameraShakeClass;
+    ShakeScale = Outcome.bCritical ? 1.15f : 0.75f;
+  } else {
+    CameraShake = MissCameraShakeClass;
+    ShakeScale = 0.45f;
+  }
+
+  if (CameraShake) {
+    PlayerCameraManager->StartCameraShake(CameraShake, ShakeScale);
+  }
 }
 
 void ASkaldPlayerController::HandleAttackRejected(AFighterPawn *Attacker,
