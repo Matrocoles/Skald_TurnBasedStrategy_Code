@@ -223,6 +223,15 @@ private:
   /** Prompt players to roll strategic initiative before world initialization. */
   void BeginStrategicInitiativePhase();
 
+  /** Remove stale or disconnecting players from the pending confirmation set. */
+  void RemovePendingStrategicInitiativePlayer(ASkaldPlayerState *PlayerState);
+
+  /** Strip invalid weak pointers left behind after controller teardown. */
+  void PrunePendingStrategicInitiativePlayers();
+
+  /** Re-evaluate the initiative phase after the pending set mutates. */
+  void HandlePendingStrategicInitiativeUpdate();
+
   /** Finalise the initiative phase once all confirmations arrive. */
   void ResolveStrategicInitiativePhase();
 
