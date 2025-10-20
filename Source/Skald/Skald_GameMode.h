@@ -2,9 +2,11 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
+#include "GridBattleManager.h"
 #include "SkaldTypes.h"
 #include "TimerManager.h"
-#include "GridBattleManager.h"
+#include "Containers/Set.h"
+#include "UObject/WeakObjectPtr.h"
 #include "Skald_GameMode.generated.h"
 class ATurnManager;
 class ASkaldGameState;
@@ -156,6 +158,9 @@ public:
   /** Attempt to initialise the world and start the game flow. */
   virtual void TryInitializeWorldAndStart();
 
+  /** Record that a controller has confirmed the strategic initiative roll. */
+  void ConfirmStrategicInitiativeRoll(ASkaldPlayerController *Controller);
+
 protected:
   /** Timer used to retry initialization until readiness checks pass. */
   FTimerHandle RetryInitTimerHandle;
@@ -214,4 +219,24 @@ private:
 
   /** Timer used to retry snapshot capture when no territories are present yet. */
   FTimerHandle TerritorySnapshotRetryHandle;
+
+  /** Prompt players to roll strategic initiative before world initialization. */
+  void BeginStrategicInitiativePhase();
+
+  /** Finalise the initiative phase once all confirmations arrive. */
+  void ResolveStrategicInitiativePhase();
+
+  /** Dispatch initiative results to the appropriate controller. */
+  void NotifyStrategicInitiativeRoll(ASkaldPlayerController *Controller,
+                                     int32 RoundNumber, int32 RollValue,
+                                     bool bWonInitiative);
+
+  /** Track players still needing to confirm the initiative roll. */
+  TSet<TWeakObjectPtr<ASkaldPlayerState>> PendingStrategicInitiativePlayers;
+
+  /** Whether the game is waiting for players to trigger the initiative roll. */
+  bool bAwaitingStrategicInitiativeInput = false;
+
+  /** Whether the strategic initiative prompt has been shown this cycle. */
+  bool bStrategicInitiativePromptIssued = false;
 };
