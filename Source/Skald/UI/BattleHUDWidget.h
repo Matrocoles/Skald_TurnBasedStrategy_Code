@@ -234,8 +234,8 @@ public:
                          float LifetimeOverride = -1.f);
 
   /** Helper used by attack resolution events to show damage/miss floaters. */
-  void ShowAttackResultFloater(AFighterPawn *Target,
-                               const FDiceRollResult &Result);
+  UFUNCTION(BlueprintCallable, Category="Skald|HUD")
+  void ShowAttackResultFloater(class AFighterPawn* Target, bool bHit, int32 Damage);
 
   /** Queue a dice resolution sequence for presentation on the panel. */
   void QueueDiceResolution(AFighterPawn *Attacker, AFighterPawn *Defender,
