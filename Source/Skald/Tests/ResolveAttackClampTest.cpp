@@ -15,9 +15,12 @@ bool FSkaldResolveAttackClampTest::RunTest(const FString& Parameters) {
 
   FRandomStream RandomStream(3);
   int32 OutDamage = 0;
-  UGridBattleManager::ResolveAttack(Attacker, Defender, OutDamage, RandomStream);
+  const bool bDefenderSurvived =
+      UGridBattleManager::ResolveAttack(Attacker, Defender, OutDamage,
+                                        RandomStream);
 
-  TestTrue(TEXT("Damage exceeds health"), OutDamage > 5);
+  TestFalse(TEXT("Defender should be defeated"), bDefenderSurvived);
+  TestEqual(TEXT("Damage is clamped to defender health"), OutDamage, 5);
   TestEqual(TEXT("Defender health clamped"), Defender.Stats.Health, 0);
   return true;
 }
