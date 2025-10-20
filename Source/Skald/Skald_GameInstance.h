@@ -18,6 +18,10 @@ class ASkald_BattleGameMode;
 class USkaldSaveGame;
 class UNetDriver;
 class UWorld;
+class UAudioComponent;
+class USoundAttenuation;
+class USoundBase;
+class USoundClass;
 
 USTRUCT(BlueprintType)
 struct FSkaldTravelState
@@ -175,6 +179,30 @@ public:
   UPROPERTY(Transient)
   TObjectPtr<UUserWidget> DeployWidget = nullptr;
 
+  /** Dice roll variants designers can assign for per-die reveals. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Audio|Battle")
+  TArray<TObjectPtr<USoundBase>> DiceRollVariants;
+
+  /** Attack preparation cues triggered as resolution begins. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Audio|Battle")
+  TArray<TObjectPtr<USoundBase>> AttackPrepareCues;
+
+  /** Attack resolution cues triggered whenever hits occur. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Audio|Battle")
+  TArray<TObjectPtr<USoundBase>> AttackResolveCues;
+
+  /** Additional cues to highlight critical successes. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Audio|Battle")
+  TArray<TObjectPtr<USoundBase>> AttackCritCues;
+
+  /** Optional attenuation settings shared by attack cues. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Audio|Battle")
+  TObjectPtr<USoundAttenuation> AttackCueAttenuation = nullptr;
+
+  /** Sound class used when spawning transient battle cues (defaults to master bus). */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Audio|Battle")
+  TObjectPtr<USoundClass> MasterSoundClass = nullptr;
+
   UFUNCTION(BlueprintCallable)
   void SetTravelState(const FSkaldTravelState &InState);
 
@@ -197,6 +225,25 @@ public:
 
   /** Return the currently cached travel destination, if any. */
   const FString &GetPendingReturnMap() const { return PendingReturnMap; }
+
+  /** Play a randomized dice roll sound for UI driven reveals. */
+  UFUNCTION(BlueprintCallable, Category = "Audio|Battle")
+  void PlayRandomDiceRollVariant(UObject *WorldContextObject) const;
+
+  /** Fire an attack preparation cue at the provided world location. */
+  UFUNCTION(BlueprintCallable, Category = "Audio|Battle")
+  void PlayAttackPrepareCue(UObject *WorldContextObject,
+                            const FVector &Location) const;
+
+  /** Fire an attack resolution cue at the provided world location. */
+  UFUNCTION(BlueprintCallable, Category = "Audio|Battle")
+  void PlayAttackResolveCue(UObject *WorldContextObject,
+                            const FVector &Location) const;
+
+  /** Fire an attack critical cue at the provided world location. */
+  UFUNCTION(BlueprintCallable, Category = "Audio|Battle")
+  void PlayAttackCritCue(UObject *WorldContextObject,
+                         const FVector &Location) const;
 
   /** Clear any cached return destination once travel has completed. */
   void ClearPendingReturnMap();

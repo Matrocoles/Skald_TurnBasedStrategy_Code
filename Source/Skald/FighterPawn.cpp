@@ -1,5 +1,6 @@
 #include "FighterPawn.h"
 #include "Blueprint/UserWidget.h"
+#include "Components/AudioComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/WidgetComponent.h"
@@ -19,12 +20,16 @@
 #include "UObject/ConstructorHelpers.h"
 #include "UI/FighterActivationWidget.h"
 #include "UI/FighterHealthWidget.h"
+#include "Sound/SoundAttenuation.h"
+#include "Sound/SoundBase.h"
+#include "Sound/SoundClass.h"
 
 namespace
 {
 constexpr int32 ActionsPerActivation = 2;
 constexpr float ActivationWidgetScale = 0.1f;
 constexpr float WidgetMirrorSeparation = 0.5f;
+constexpr float LocomotionFadeOutSeconds = 0.12f;
 }
 
 AFighterPawn::AFighterPawn() : MaxHealth(0) {
@@ -109,6 +114,15 @@ AFighterPawn::AFighterPawn() : MaxHealth(0) {
   ActivationWidgetBack->SetGenerateOverlapEvents(false);
   ActivationWidgetBack->SetCanEverAffectNavigation(false);
   ActivationWidgetBack->SetVisibility(false);
+
+  LocomotionAudioComponent =
+      CreateDefaultSubobject<UAudioComponent>(TEXT("LocomotionAudioComponent"));
+  LocomotionAudioComponent->SetupAttachment(RootComponent);
+  LocomotionAudioComponent->bAutoActivate = false;
+  LocomotionAudioComponent->bAutoDestroy = false;
+  LocomotionAudioComponent->bStopWhenOwnerDestroyed = true;
+  LocomotionAudioComponent->bAllowSpatialization = true;
+  LocomotionAudioComponent->SetRelativeLocation(FVector::ZeroVector);
 
   HealthWidgetTemplate = UFighterHealthWidget::StaticClass();
 
@@ -273,8 +287,12 @@ void AFighterPawn::Tick(float DeltaSeconds) {
   UpdateHitFlash(DeltaSeconds);
 
   if (!bIsMoving) {
+    StopLocomotionAudio();
+    UpdateLocomotionAudioLocation(GetActorLocation());
     return;
   }
+
+  StartLocomotionAudio();
 
   const FVector CurrentLocation = GetActorLocation();
   const float EffectiveSpeed = FMath::Max(MovementSpeed, KINDA_SMALL_NUMBER);
@@ -282,6 +300,7 @@ void AFighterPawn::Tick(float DeltaSeconds) {
       FMath::VInterpConstantTo(CurrentLocation, MovementTargetLocation, DeltaSeconds,
                                EffectiveSpeed);
   SetActorLocation(NextLocation);
+  UpdateLocomotionAudioLocation(NextLocation);
 
   const float EffectiveTolerance =
       FMath::Max(MovementStopTolerance, KINDA_SMALL_NUMBER);
@@ -290,6 +309,8 @@ void AFighterPawn::Tick(float DeltaSeconds) {
     SetActorLocation(MovementTargetLocation);
     bIsMoving = false;
     MovementTargetLocation = GetActorLocation();
+    UpdateLocomotionAudioLocation(MovementTargetLocation);
+    StopLocomotionAudio();
   }
 }
 
@@ -709,8 +730,11 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
     SetActorLocation(MovementTargetLocation);
     bIsMoving = false;
     MovementTargetLocation = GetActorLocation();
+    UpdateLocomotionAudioLocation(MovementTargetLocation);
+    StopLocomotionAudio();
   } else {
     bIsMoving = true;
+    StartLocomotionAudio();
   }
   ActionsRemaining = FMath::Max(0, ActionsRemaining - 1);
 
@@ -760,10 +784,11 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
     return;
   }
 
+  USkaldGameInstance *GameInstance = nullptr;
   FRandomStream *RandomStream = nullptr;
   if (UWorld *World = GetWorld()) {
-    if (USkaldGameInstance *GameInstance =
-            Cast<USkaldGameInstance>(World->GetGameInstance())) {
+    GameInstance = Cast<USkaldGameInstance>(World->GetGameInstance());
+    if (GameInstance) {
       RandomStream = &GameInstance->CombatRandomStream;
     }
   }
@@ -798,6 +823,10 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
     NewRoll.RollValue = Roll;
     NewRoll.Damage = DamageThisDie;
     NewRoll.bHit = DamageThisDie > 0;
+  }
+
+  if (GameInstance) {
+    GameInstance->PlayAttackPrepareCue(this, GetActorLocation());
   }
 
   StartQueuedAttack(Target, MoveTemp(QueuedRolls));
@@ -860,6 +889,17 @@ void AFighterPawn::StartQueuedAttack(AFighterPawn *Target,
   bHasProcessedPendingRoll = false;
   PendingAttackDiceResult = DiceResult;
   bHasPendingDiceResult = true;
+
+  if (USkaldGameInstance *GameInstance =
+          Cast<USkaldGameInstance>(GetGameInstance())) {
+    const FVector CueLocation = GetActorLocation();
+    if (DiceResult.DiceOutcomes.Num() > 0) {
+      GameInstance->PlayAttackResolveCue(this, CueLocation);
+      if (DiceResult.CriticalHitCount > 0) {
+        GameInstance->PlayAttackCritCue(this, CueLocation);
+      }
+    }
+  }
 
   if (PendingAttackRolls.Num() == 0) {
     FinalizeQueuedAttack();
@@ -960,6 +1000,51 @@ void AFighterPawn::FinalizeQueuedAttack() {
   bHasProcessedPendingRoll = false;
 
   OnQueuedAttackFinalized.Broadcast();
+}
+
+void AFighterPawn::StartLocomotionAudio() {
+  if (!LocomotionAudioComponent || !LocomotionLoopSound) {
+    return;
+  }
+
+  bLocomotionLoopStopping = false;
+
+  if (LocomotionAudioComponent->GetSound() != LocomotionLoopSound) {
+    LocomotionAudioComponent->SetSound(LocomotionLoopSound);
+  }
+
+  LocomotionAudioComponent->AttenuationSettings = LocomotionAttenuation;
+  LocomotionAudioComponent->SoundClassOverride =
+      LocomotionSoundClassOverride;
+
+  LocomotionAudioComponent->SetWorldLocation(GetActorLocation());
+
+  if (!LocomotionAudioComponent->IsPlaying()) {
+    LocomotionAudioComponent->Play();
+  }
+}
+
+void AFighterPawn::StopLocomotionAudio() {
+  if (!LocomotionAudioComponent) {
+    bLocomotionLoopStopping = false;
+    return;
+  }
+
+  if (!LocomotionAudioComponent->IsPlaying()) {
+    bLocomotionLoopStopping = false;
+    return;
+  }
+
+  if (!bLocomotionLoopStopping) {
+    LocomotionAudioComponent->FadeOut(LocomotionFadeOutSeconds, 0.f);
+    bLocomotionLoopStopping = true;
+  }
+}
+
+void AFighterPawn::UpdateLocomotionAudioLocation(const FVector &InLocation) {
+  if (LocomotionAudioComponent) {
+    LocomotionAudioComponent->SetWorldLocation(InLocation);
+  }
 }
 
 void AFighterPawn::InitializeDisplayMeshMaterials() {

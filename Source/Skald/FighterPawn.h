@@ -15,6 +15,10 @@ class UFighterActivationWidget;
 class UFighterHealthWidget;
 class UCurveFloat;
 class UMaterialInstanceDynamic;
+class UAudioComponent;
+class USoundAttenuation;
+class USoundBase;
+class USoundClass;
 
 UENUM(BlueprintType)
 enum class EFighterPawnFootprint : uint8 {
@@ -197,6 +201,22 @@ public:
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Fighter|UI")
   TSubclassOf<UUserWidget> ActivationWidgetTemplate;
 
+  /** Audio component responsible for locomotion loop playback. */
+  UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|Audio")
+  UAudioComponent *LocomotionAudioComponent;
+
+  /** Looping cue designers can assign for grid traversal. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Audio")
+  TObjectPtr<USoundBase> LocomotionLoopSound = nullptr;
+
+  /** Attenuation profile applied to locomotion playback. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Audio")
+  TObjectPtr<USoundAttenuation> LocomotionAttenuation = nullptr;
+
+  /** Optional sound class override used to route locomotion through the master bus. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Audio")
+  TObjectPtr<USoundClass> LocomotionSoundClassOverride = nullptr;
+
   /** Maximum health used for percentage calculations. */
   UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_MaxHealth,
             Category = "Fighter")
@@ -341,6 +361,15 @@ private:
   /** Finalise any pending attack resolution and clean up timers/state. */
   void FinalizeQueuedAttack();
 
+  /** Start playing the locomotion loop if available. */
+  void StartLocomotionAudio();
+
+  /** Stop the locomotion loop, fading when possible. */
+  void StopLocomotionAudio();
+
+  /** Keep the locomotion audio positioned with the pawn. */
+  void UpdateLocomotionAudioLocation(const FVector &InLocation);
+
   /** Pending attack rolls awaiting delayed resolution. */
   TArray<FQueuedAttackRoll> PendingAttackRolls;
 
@@ -374,6 +403,9 @@ private:
 
   /** True while the fighter is interpolating towards a grid cell. */
   bool bIsMoving = false;
+
+  /** Tracks when the locomotion loop is in the middle of a fade out. */
+  bool bLocomotionLoopStopping = false;
 
   /** World-space destination for the current interpolated move. */
   FVector MovementTargetLocation = FVector::ZeroVector;

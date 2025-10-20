@@ -1,5 +1,6 @@
 #include "Skald_GameInstance.h"
 
+#include "Components/AudioComponent.h"
 #include "Engine/World.h"
 #include "Engine/Engine.h"
 #include "Misc/EngineVersionComparison.h"
@@ -12,6 +13,9 @@
 #include "Kismet/GameplayStatics.h"
 #include "Blueprint/UserWidget.h"
 #include "Engine/GameViewportClient.h"
+#include "Sound/SoundAttenuation.h"
+#include "Sound/SoundBase.h"
+#include "Sound/SoundClass.h"
 #include "Skald.h"
 #include "SkaldLogging.h"
 #include "Skald_BattleGameMode.h"
@@ -26,6 +30,71 @@
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/SOverlay.h"
 #include "Widgets/Text/STextBlock.h"
+
+namespace
+{
+USoundBase *SelectRandomSound(const TArray<TObjectPtr<USoundBase>> &Candidates)
+{
+  const int32 CandidateCount = Candidates.Num();
+  if (CandidateCount == 0)
+  {
+    return nullptr;
+  }
+
+  for (int32 Attempt = 0; Attempt < CandidateCount; ++Attempt)
+  {
+    const int32 Index = FMath::RandHelper(CandidateCount);
+    if (Candidates.IsValidIndex(Index))
+    {
+      if (USoundBase *ResolvedSound = Candidates[Index])
+      {
+        return ResolvedSound;
+      }
+    }
+  }
+
+  for (USoundBase *FallbackSound : Candidates)
+  {
+    if (FallbackSound)
+    {
+      return FallbackSound;
+    }
+  }
+
+  return nullptr;
+}
+
+UAudioComponent *SpawnBattleSound(UObject *WorldContextObject, USoundBase *Sound,
+                                  USoundClass *MasterSoundClass,
+                                  USoundAttenuation *AttenuationSettings,
+                                  const FVector *Location)
+{
+  if (!WorldContextObject || !Sound)
+  {
+    return nullptr;
+  }
+
+  UAudioComponent *SpawnedComponent = nullptr;
+
+  if (Location)
+  {
+    SpawnedComponent = UGameplayStatics::SpawnSoundAtLocation(
+        WorldContextObject, Sound, *Location, FRotator::ZeroRotator, 1.f, 1.f,
+        0.f, AttenuationSettings);
+  }
+  else
+  {
+    SpawnedComponent = UGameplayStatics::SpawnSound2D(WorldContextObject, Sound);
+  }
+
+  if (SpawnedComponent && MasterSoundClass)
+  {
+    SpawnedComponent->SoundClassOverride = MasterSoundClass;
+  }
+
+  return SpawnedComponent;
+}
+} // namespace
 
 void USkaldGameInstance::Init() {
   Super::Init();
@@ -129,6 +198,42 @@ void USkaldGameInstance::SetPendingReturnMap(const FString &InReturnMap) {
                                  : *PendingReturnMap;
   UE_LOG(LogSkald, Log, TEXT("GameInstance pending return map set to %s"),
          LoggedValue);
+}
+
+void USkaldGameInstance::PlayRandomDiceRollVariant(
+    UObject *WorldContextObject) const {
+  if (!WorldContextObject) {
+    return;
+  }
+
+  if (USoundBase *Sound = SelectRandomSound(DiceRollVariants)) {
+    SpawnBattleSound(WorldContextObject, Sound, MasterSoundClass.Get(), nullptr,
+                     nullptr);
+  }
+}
+
+void USkaldGameInstance::PlayAttackPrepareCue(
+    UObject *WorldContextObject, const FVector &Location) const {
+  if (USoundBase *Sound = SelectRandomSound(AttackPrepareCues)) {
+    SpawnBattleSound(WorldContextObject, Sound, MasterSoundClass.Get(),
+                     AttackCueAttenuation.Get(), &Location);
+  }
+}
+
+void USkaldGameInstance::PlayAttackResolveCue(
+    UObject *WorldContextObject, const FVector &Location) const {
+  if (USoundBase *Sound = SelectRandomSound(AttackResolveCues)) {
+    SpawnBattleSound(WorldContextObject, Sound, MasterSoundClass.Get(),
+                     AttackCueAttenuation.Get(), &Location);
+  }
+}
+
+void USkaldGameInstance::PlayAttackCritCue(UObject *WorldContextObject,
+                                           const FVector &Location) const {
+  if (USoundBase *Sound = SelectRandomSound(AttackCritCues)) {
+    SpawnBattleSound(WorldContextObject, Sound, MasterSoundClass.Get(),
+                     AttackCueAttenuation.Get(), &Location);
+  }
 }
 
 void USkaldGameInstance::ClearPendingReturnMap() {

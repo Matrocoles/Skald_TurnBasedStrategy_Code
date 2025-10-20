@@ -12,6 +12,7 @@
 #include "Math/UnrealMathUtility.h"
 #include "TimerManager.h"
 #include "Math/Vector2D.h"
+#include "Skald_GameInstance.h"
 
 namespace
 {
@@ -153,6 +154,14 @@ void UW_DiceResolutionPanel::RevealNextDie()
     {
         HandleCompletionDelayElapsed();
         return;
+    }
+
+    if (UWorld* World = GetWorld())
+    {
+        if (USkaldGameInstance* GameInstance = Cast<USkaldGameInstance>(World->GetGameInstance()))
+        {
+            GameInstance->PlayRandomDiceRollVariant(this);
+        }
     }
 
     const FDiceRollOutcome& Outcome = ActiveResult.DiceOutcomes[RevealIndex];
