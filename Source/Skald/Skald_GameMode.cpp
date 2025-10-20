@@ -2171,6 +2171,20 @@ bool ASkaldGameMode::InitializeWorld() {
   }
 
   if (HighestPS) {
+    for (FConstPlayerControllerIterator It =
+             GetWorld()->GetPlayerControllerIterator();
+         It; ++It) {
+      if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(*It)) {
+        ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>();
+        const bool bIsAI = PS && PS->bIsAI;
+        if (!bIsAI && PS) {
+          const int32 RollValue = PS->InitiativeRoll;
+          const bool bWon = (PS == HighestPS);
+          PC->ClientPromptStrategicInitiative(/*RoundNumber*/ 1, RollValue, bWon);
+        }
+      }
+    }
+
     const FString Message = FString::Printf(
         TEXT("%s wins initiative with a roll of %d"),
         *HighestPS->GetResolvedPlayerName(TEXT("InitializeWorld_Initiative")),

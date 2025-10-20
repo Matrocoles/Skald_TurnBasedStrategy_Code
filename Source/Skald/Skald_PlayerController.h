@@ -376,6 +376,13 @@ public:
   UFUNCTION()
   void HandleInitiativeRollRequested();
 
+  UFUNCTION()
+  void HandleStrategicInitiativeRollRequested();
+
+  UFUNCTION(Client, Reliable)
+  void ClientPromptStrategicInitiative(int32 RoundNumber, int32 RollValue,
+                                       bool bWonInitiative);
+
   /** Server-side processing of an attack request. */
   UFUNCTION(Server, Reliable)
   void ServerHandleAttack(int32 FromID, int32 ToID, int32 ArmySent,
@@ -556,4 +563,16 @@ private:
   /** Cached copy of the last initiative value rolled locally so it can be
    *  re-presented once the server confirms the result. */
   int32 LastLocalInitiativeRoll = 0;
+
+  /** Cached initiative value pending presentation on the strategic HUD. */
+  int32 PendingStrategicInitiativeRoll = 0;
+
+  /** Round index associated with the pending strategic initiative roll. */
+  int32 PendingStrategicInitiativeRound = 0;
+
+  /** Whether the cached strategic initiative roll was the winning value. */
+  bool bPendingStrategicInitiativeWin = false;
+
+  /** Whether the main HUD is waiting for the player to roll strategic initiative. */
+  bool bAwaitingStrategicInitiativeRoll = false;
 };
