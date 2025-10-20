@@ -1,4 +1,5 @@
 #include "UI/BattleHUDWidget.h"
+#include "SkaldLogging.h"
 #include "Components/Button.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/Image.h"
@@ -652,28 +653,11 @@ void UBattleHUDWidget::ShowCombatFloater(const FVector &WorldLocation,
   }
 }
 
-void UBattleHUDWidget::ShowAttackResultFloater(AFighterPawn *Target,
-                                               const FDiceRollResult &Result) {
-  if (!Target) {
-    return;
-  }
-
-  const bool bAnyDamage = Result.TotalDamage > 0;
-  const bool bCritical = bAnyDamage && Result.CriticalHitCount > 0;
-
-  const FVector BaseLocation =
-      Target->GetActorLocation() + FVector(0.f, 0.f, 150.f);
-  const FText Text =
-      bAnyDamage ? FText::AsNumber(Result.TotalDamage)
-                 : NSLOCTEXT("Skald", "BattleFloaterMiss", "Miss");
-
-  const FLinearColor Colour =
-      bAnyDamage
-          ? (bCritical ? CriticalFloaterColor : HitFloaterColor)
-          : MissFloaterColor;
-  const float Scale = bAnyDamage ? (bCritical ? 1.12f : 1.f) : 1.05f;
-
-  ShowCombatFloater(BaseLocation, Text, Colour, Scale, !bAnyDamage);
+void UBattleHUDWidget::ShowAttackResultFloater(AFighterPawn* Target, bool bHit, int32 Damage)
+{
+  // TODO: integrate with CombatFloaterPoolSubsystem if available.
+  UE_LOG(LogSkald, Verbose, TEXT("ShowAttackResultFloater: Target=%s Hit=%d Damage=%d"),
+         Target ? *Target->GetName() : TEXT("None"), bHit ? 1 : 0, Damage);
 }
 
 void UBattleHUDWidget::QueueDiceResolution(AFighterPawn *Attacker,

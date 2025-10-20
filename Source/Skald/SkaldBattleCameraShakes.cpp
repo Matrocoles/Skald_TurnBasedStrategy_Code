@@ -53,7 +53,7 @@ void USkaldOscillationCameraShake::ConfigureShake(
 }
 
 void USkaldOscillationCameraShake::StartShake(
-    const FCameraShakeStartParams &Params) {
+    const FCameraShakeStartParams& Params) {
   Super::StartShake(Params);
 
   ElapsedTime = 0.f;
@@ -61,8 +61,8 @@ void USkaldOscillationCameraShake::StartShake(
 }
 
 void USkaldOscillationCameraShake::UpdateAndApplyCameraShake(
-    const FCameraShakeUpdateParams &Params,
-    FCameraShakeUpdateResult &OutResult) {
+    const FCameraShakeUpdateParams& Params,
+    FCameraShakeUpdateResult& OutResult) {
   OutResult.LocationOffset = FVector::ZeroVector;
   OutResult.RotationOffset = FRotator::ZeroRotator;
   OutResult.FOV = 0.f;
@@ -108,7 +108,7 @@ void USkaldOscillationCameraShake::UpdateAndApplyCameraShake(
 }
 
 void USkaldOscillationCameraShake::StopShake(
-    const FCameraShakeStopParams &Params) {
+    const FCameraShakeStopParams& Params) {
   Super::StopShake(Params);
   bIsActive = false;
 }
