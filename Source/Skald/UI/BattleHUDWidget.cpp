@@ -60,6 +60,8 @@ void UBattleHUDWidget::NativeConstruct() {
   if (DiceResolutionPanel) {
     DiceResolutionPanel->OnResolutionComplete.AddDynamic(
         this, &UBattleHUDWidget::HandleDicePanelResolved);
+    DiceResolutionPanel->OnDiceOutcomeRevealed.AddDynamic(
+        this, &UBattleHUDWidget::HandleDiceOutcomeRevealed);
     TArray<UTexture2D *> DiceFaceTexturePtrs;
     DiceFaceTexturePtrs.Reserve(DiceFaceTextures.Num());
     for (const TObjectPtr<UTexture2D> &Texture : DiceFaceTextures) {
@@ -96,6 +98,8 @@ void UBattleHUDWidget::NativeDestruct() {
   if (DiceResolutionPanel) {
     DiceResolutionPanel->OnResolutionComplete.RemoveDynamic(
         this, &UBattleHUDWidget::HandleDicePanelResolved);
+    DiceResolutionPanel->OnDiceOutcomeRevealed.RemoveDynamic(
+        this, &UBattleHUDWidget::HandleDiceOutcomeRevealed);
   }
 
   PendingDiceResolutions.Reset();
@@ -726,6 +730,18 @@ void UBattleHUDWidget::HandleDicePanelResolved(
   ActiveDiceResolution = FBattleQueuedDiceResolution();
 
   ProcessNextDiceResolution();
+}
+
+void UBattleHUDWidget::HandleDiceOutcomeRevealed(
+    const FDiceRollOutcome &Outcome, int32 RevealIndex) {
+  if (!bDiceResolutionActive) {
+    OnDiceOutcomeRevealed.Broadcast(nullptr, nullptr, Outcome, RevealIndex);
+    return;
+  }
+
+  OnDiceOutcomeRevealed.Broadcast(ActiveDiceResolution.Attacker.Get(),
+                                  ActiveDiceResolution.Defender.Get(), Outcome,
+                                  RevealIndex);
 }
 
 void UBattleHUDWidget::UpdateCombatFloaters(float DeltaSeconds) {

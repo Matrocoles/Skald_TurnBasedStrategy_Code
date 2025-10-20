@@ -15,7 +15,8 @@
 
 namespace
 {
-constexpr float RevealDelaySeconds = 0.8f;
+constexpr float FirstRevealDelaySeconds = 0.6f;
+constexpr float SubsequentRevealDelaySeconds = 0.8f;
 constexpr float CompletionDelaySeconds = 0.8f;
 }
 
@@ -155,7 +156,8 @@ void UW_DiceResolutionPanel::RevealNextDie()
         return;
     }
 
-    const FDiceRollOutcome& Outcome = ActiveResult.DiceOutcomes[RevealIndex];
+    const int32 CurrentIndex = RevealIndex;
+    const FDiceRollOutcome& Outcome = ActiveResult.DiceOutcomes[CurrentIndex];
     UTexture2D* ResolvedTexture = ResolveDiceTexture(Outcome.RollValue);
 
     if (OutcomeList)
@@ -271,6 +273,8 @@ void UW_DiceResolutionPanel::RevealNextDie()
 
     UpdateTallies();
 
+    OnDiceOutcomeRevealed.Broadcast(Outcome, CurrentIndex);
+
     ++RevealIndex;
 
     if (RevealIndex >= ActiveResult.DiceOutcomes.Num())
@@ -279,7 +283,10 @@ void UW_DiceResolutionPanel::RevealNextDie()
     }
     else
     {
-        ScheduleNextReveal(RevealDelaySeconds);
+        const float NextDelay = (CurrentIndex == 0)
+            ? FirstRevealDelaySeconds
+            : SubsequentRevealDelaySeconds;
+        ScheduleNextReveal(NextDelay);
     }
 }
 

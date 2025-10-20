@@ -80,8 +80,14 @@ public:
   DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
       FOnResolutionComplete, AFighterPawn *, Attacker, AFighterPawn *, Defender,
       const FDiceRollResult &, Result);
+  DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(
+      FOnDiceOutcomeRevealed, AFighterPawn *, Attacker, AFighterPawn *, Defender,
+      const FDiceRollOutcome &, Outcome, int32, RevealIndex);
   UPROPERTY(BlueprintAssignable, Category = "Skald|Battle|Events")
   FOnResolutionComplete OnResolutionComplete;
+
+  UPROPERTY(BlueprintAssignable, Category = "Skald|Battle|Events")
+  FOnDiceOutcomeRevealed OnDiceOutcomeRevealed;
 
   /** Move action button bound from the blueprint. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
@@ -319,6 +325,10 @@ private:
 
   UFUNCTION()
   void HandleDicePanelResolved(const FDiceRollResult &Result);
+
+  UFUNCTION()
+  void HandleDiceOutcomeRevealed(const FDiceRollOutcome &Outcome,
+                                 int32 RevealIndex);
 
   void UpdateCombatFloaters(float DeltaSeconds);
   void ReleaseFloaterAtIndex(int32 Index);

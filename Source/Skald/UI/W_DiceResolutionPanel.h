@@ -75,10 +75,15 @@ public:
     virtual void NativeDestruct() override;
 
     DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDiceResolutionComplete, const FDiceRollResult&, Result);
+    DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnDiceOutcomeRevealed, const FDiceRollOutcome&, Outcome, int32, RevealIndex);
 
     /** Fired after all dice have been revealed and the anticipation pause completes. */
     UPROPERTY(BlueprintAssignable, Category="Skald|Battle|Dice")
     FOnDiceResolutionComplete OnResolutionComplete;
+
+    /** Fired immediately after a single die outcome has been revealed. */
+    UPROPERTY(BlueprintAssignable, Category="Skald|Battle|Dice")
+    FOnDiceOutcomeRevealed OnDiceOutcomeRevealed;
 
     /** Begin revealing a new dice resolution result. */
     UFUNCTION(BlueprintCallable, Category="Skald|Battle|Dice")
