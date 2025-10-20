@@ -2203,6 +2203,9 @@ void ASkaldPlayerController::HandleGridClick() {
   if (!IsLocalController())
     return;
 
+  if (bAwaitingStrategicInitiativeRoll)
+    return;
+
   if (IsCursorOverInteractableSlateWidget()) {
     return;
   }
@@ -2712,6 +2715,8 @@ void ASkaldPlayerController::HandleStrategicInitiativeRollRequested() {
     MainHUD->UpdateInitiativeText(RoundMessage.ToString());
   }
 
+  ServerConfirmStrategicInitiativeRoll();
+
   PendingStrategicInitiativeRoll = 0;
   PendingStrategicInitiativeRound = 0;
   bPendingStrategicInitiativeWin = false;
@@ -2730,6 +2735,19 @@ void ASkaldPlayerController::ClientPromptStrategicInitiative_Implementation(
     const FText PromptText = NSLOCTEXT("Skald", "StrategicInitiativePrompt",
                                        "Roll for initiative");
     MainHUD->ShowStrategicInitiativePrompt(PromptText);
+  }
+}
+
+void ASkaldPlayerController::ServerConfirmStrategicInitiativeRoll_Implementation() {
+  ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
+  if (PS) {
+    PS->bHasAcknowledgedStrategicInitiative = true;
+  }
+
+  if (UWorld *World = GetWorld()) {
+    if (ASkaldGameMode *GM = World->GetAuthGameMode<ASkaldGameMode>()) {
+      GM->TryInitializeWorldAndStart();
+    }
   }
 }
 
