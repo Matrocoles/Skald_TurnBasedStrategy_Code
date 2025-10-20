@@ -1,6 +1,7 @@
 #include "UI/SkaldMainHUDWidget.h"
 #include "Components/Button.h"
 #include "Components/CanvasPanelSlot.h"
+#include "Components/Image.h"
 #include "Components/OverlaySlot.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
@@ -8,7 +9,11 @@
 #include "Containers/Queue.h"
 #include "Containers/Set.h"
 #include "FighterPawn.h"
+#include "Engine/Canvas.h"
+#include "Engine/CanvasRenderTarget2D.h"
 #include "Engine/Engine.h"
+#include "Engine/Texture2D.h"
+#include "CanvasItem.h"
 #include "Kismet/GameplayStatics.h"
 #include "Skald.h"
 #include "SkaldLogging.h"
@@ -121,6 +126,24 @@ void USkaldMainHUDWidget::NativeConstruct() {
     DeployButton->SetVisibility(ESlateVisibility::Collapsed);
   }
 
+  if (RollInitiativeButton) {
+    RollInitiativeButton->OnClicked.AddDynamic(
+        this, &USkaldMainHUDWidget::HandleStrategicInitiativeRollPressed);
+    RollInitiativeButton->SetVisibility(ESlateVisibility::Collapsed);
+    RollInitiativeButton->SetIsEnabled(true);
+  }
+  if (InitiativePromptText) {
+    InitiativePromptText->SetText(FText::GetEmpty());
+    InitiativePromptText->SetVisibility(ESlateVisibility::Collapsed);
+  }
+  if (InitiativeDiceImage) {
+    InitiativeDiceImage->SetVisibility(ESlateVisibility::Collapsed);
+    InitiativeDiceImage->SetBrushFromTexture(nullptr);
+  }
+  if (InitiativeDiceBoardImage) {
+    InitiativeDiceBoardImage->SetVisibility(ESlateVisibility::Collapsed);
+  }
+
   if (DiceResolutionPanel) {
     DiceResolutionPanel->OnResolutionComplete.AddDynamic(
         this, &USkaldMainHUDWidget::HandleDicePanelResolved);
@@ -177,9 +200,13 @@ void USkaldMainHUDWidget::NativeDestruct() {
     FTimerManager &TimerManager = World->GetTimerManager();
     TimerManager.ClearTimer(TurnMessageTimerHandle);
     TimerManager.ClearTimer(InitiativeTimerHandle);
+    TimerManager.ClearTimer(StrategicInitiativeRollDelayHandle);
+    TimerManager.ClearTimer(StrategicInitiativeDiceHideHandle);
   } else {
     TurnMessageTimerHandle.Invalidate();
     InitiativeTimerHandle.Invalidate();
+    StrategicInitiativeRollDelayHandle.Invalidate();
+    StrategicInitiativeDiceHideHandle.Invalidate();
   }
 
   if (AttackButton) {
@@ -205,6 +232,11 @@ void USkaldMainHUDWidget::NativeDestruct() {
   if (DeployButton) {
     DeployButton->OnClicked.RemoveDynamic(
         this, &USkaldMainHUDWidget::HandleDeployClicked);
+  }
+
+  if (RollInitiativeButton) {
+    RollInitiativeButton->OnClicked.RemoveDynamic(
+        this, &USkaldMainHUDWidget::HandleStrategicInitiativeRollPressed);
   }
 
   while (ActiveFloaters.Num() > 0) {
@@ -494,6 +526,238 @@ void USkaldMainHUDWidget::HideEnemyTurnInProgress() {
     World->GetTimerManager().ClearTimer(TurnMessageTimerHandle);
   }
   HideEndingTurn();
+}
+
+void USkaldMainHUDWidget::ShowStrategicInitiativePrompt(const FText &PromptText,
+                                                        float ButtonDelay) {
+  if (InitiativePromptText) {
+    InitiativePromptText->SetText(PromptText);
+    InitiativePromptText->SetVisibility(ESlateVisibility::HitTestInvisible);
+  }
+
+  if (RollInitiativeButton) {
+    RollInitiativeButton->SetVisibility(ESlateVisibility::Collapsed);
+    RollInitiativeButton->SetIsEnabled(false);
+  }
+
+  if (UWorld *World = GetWorld()) {
+    FTimerManager &TimerManager = World->GetTimerManager();
+    TimerManager.ClearTimer(StrategicInitiativeRollDelayHandle);
+
+    if (RollInitiativeButton) {
+      const float DelaySeconds = FMath::Max(ButtonDelay, 0.f);
+      if (DelaySeconds <= KINDA_SMALL_NUMBER) {
+        RevealStrategicInitiativeRollButton();
+      } else {
+        TimerManager.SetTimer(StrategicInitiativeRollDelayHandle, this,
+                              &USkaldMainHUDWidget::RevealStrategicInitiativeRollButton,
+                              DelaySeconds, false);
+      }
+    }
+  }
+}
+
+void USkaldMainHUDWidget::HideStrategicInitiativePrompt() {
+  if (InitiativePromptText) {
+    InitiativePromptText->SetText(FText::GetEmpty());
+    InitiativePromptText->SetVisibility(ESlateVisibility::Collapsed);
+  }
+
+  if (RollInitiativeButton) {
+    RollInitiativeButton->SetVisibility(ESlateVisibility::Collapsed);
+    RollInitiativeButton->SetIsEnabled(true);
+  }
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(StrategicInitiativeRollDelayHandle);
+  } else {
+    StrategicInitiativeRollDelayHandle.Invalidate();
+  }
+}
+
+void USkaldMainHUDWidget::ShowStrategicInitiativeRoll(int32 RollValue,
+                                                      float DisplayDuration) {
+  if (!InitiativeDiceImage) {
+    return;
+  }
+
+  if (RollValue <= 0) {
+    HideStrategicInitiativeDice();
+    return;
+  }
+
+  UObject *DiceResource = nullptr;
+  const int32 TextureIndex = RollValue - 1;
+  if (DiceFaceTextures.IsValidIndex(TextureIndex)) {
+    DiceResource = DiceFaceTextures[TextureIndex].Get();
+  }
+
+  if (!DiceResource) {
+    if (!StrategicInitiativeDiceRenderTarget) {
+      StrategicInitiativeDiceRenderTarget =
+          UCanvasRenderTarget2D::CreateCanvasRenderTarget2D(
+              this, UCanvasRenderTarget2D::StaticClass(), 256, 256);
+      if (StrategicInitiativeDiceRenderTarget) {
+        StrategicInitiativeDiceRenderTarget->OnCanvasRenderTargetUpdate.AddDynamic(
+            this, &USkaldMainHUDWidget::HandleStrategicDiceRenderTargetUpdate);
+      }
+    }
+
+    if (StrategicInitiativeDiceRenderTarget) {
+      PendingStrategicInitiativeValue = RollValue;
+      StrategicInitiativeDiceRenderTarget->ClearColor = FLinearColor::Transparent;
+      StrategicInitiativeDiceRenderTarget->UpdateResourceImmediate();
+      DiceResource = StrategicInitiativeDiceRenderTarget;
+    }
+  }
+
+  const float DiceDisplaySize = 90.f;
+  const float DiceBoardPadding = 24.f;
+  const FVector2D DiceOffset(0.f, 80.f);
+
+  bool bDisplayedDice = false;
+  if (DiceResource) {
+    if (UTexture2D *Texture = Cast<UTexture2D>(DiceResource)) {
+      InitiativeDiceImage->SetBrushFromTexture(Texture, true);
+    } else {
+      FSlateBrush Brush = InitiativeDiceImage->GetBrush();
+      Brush.SetResourceObject(DiceResource);
+      Brush.ImageSize = FVector2D(DiceDisplaySize, DiceDisplaySize);
+      InitiativeDiceImage->SetBrush(Brush);
+    }
+
+    InitiativeDiceImage->SetDesiredSizeOverride(
+        FVector2D(DiceDisplaySize, DiceDisplaySize));
+    InitiativeDiceImage->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
+
+    if (UCanvasPanelSlot *DiceSlot =
+            Cast<UCanvasPanelSlot>(InitiativeDiceImage->Slot)) {
+      DiceSlot->SetAnchors(FAnchors(0.5f, 0.f));
+      DiceSlot->SetAlignment(FVector2D(0.5f, 0.f));
+      DiceSlot->SetPosition(DiceOffset);
+      DiceSlot->SetSize(FVector2D(DiceDisplaySize, DiceDisplaySize));
+    }
+
+    InitiativeDiceImage->SetVisibility(ESlateVisibility::HitTestInvisible);
+
+    if (InitiativeDiceBoardImage) {
+      InitiativeDiceBoardImage->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
+
+      if (UCanvasPanelSlot *BoardSlot =
+              Cast<UCanvasPanelSlot>(InitiativeDiceBoardImage->Slot)) {
+        BoardSlot->SetAnchors(FAnchors(0.5f, 0.f));
+        BoardSlot->SetAlignment(FVector2D(0.5f, 0.f));
+        BoardSlot->SetPosition(
+            DiceOffset - FVector2D(0.f, DiceBoardPadding * 0.5f));
+        BoardSlot->SetSize(FVector2D(DiceDisplaySize + DiceBoardPadding,
+                                     DiceDisplaySize + DiceBoardPadding));
+      }
+
+      InitiativeDiceBoardImage->SetVisibility(ESlateVisibility::HitTestInvisible);
+    }
+
+    bDisplayedDice = true;
+  } else {
+    HideStrategicInitiativeDice();
+  }
+
+  if (bDisplayedDice && InitiativeDiceSound) {
+    UGameplayStatics::PlaySound2D(this, InitiativeDiceSound);
+  }
+
+  if (bDisplayedDice) {
+    if (UWorld *World = GetWorld()) {
+      FTimerManager &TimerManager = World->GetTimerManager();
+      TimerManager.ClearTimer(StrategicInitiativeDiceHideHandle);
+
+      const float ClampedDuration =
+          FMath::Clamp(DisplayDuration, 0.35f, 1.25f);
+      TimerManager.SetTimer(StrategicInitiativeDiceHideHandle, this,
+                            &USkaldMainHUDWidget::HideStrategicInitiativeDice,
+                            ClampedDuration, false);
+    }
+  }
+}
+
+void USkaldMainHUDWidget::HandleStrategicInitiativeRollPressed() {
+  if (RollInitiativeButton) {
+    RollInitiativeButton->SetIsEnabled(false);
+  }
+
+  HideStrategicInitiativePrompt();
+
+  OnStrategicInitiativeRollRequested.Broadcast();
+}
+
+void USkaldMainHUDWidget::RevealStrategicInitiativeRollButton() {
+  if (RollInitiativeButton) {
+    RollInitiativeButton->SetVisibility(ESlateVisibility::Visible);
+    RollInitiativeButton->SetIsEnabled(true);
+  }
+}
+
+void USkaldMainHUDWidget::HideStrategicInitiativeDice() {
+  if (!InitiativeDiceImage) {
+    return;
+  }
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(StrategicInitiativeDiceHideHandle);
+  } else {
+    StrategicInitiativeDiceHideHandle.Invalidate();
+  }
+
+  InitiativeDiceImage->SetVisibility(ESlateVisibility::Collapsed);
+  InitiativeDiceImage->SetBrushFromTexture(nullptr);
+  PendingStrategicInitiativeValue = 0;
+
+  if (InitiativeDiceBoardImage) {
+    InitiativeDiceBoardImage->SetVisibility(ESlateVisibility::Collapsed);
+  }
+}
+
+void USkaldMainHUDWidget::HandleStrategicDiceRenderTargetUpdate(
+    UCanvas *Canvas, int32 Width, int32 Height) {
+  if (!Canvas || Width <= 0 || Height <= 0) {
+    return;
+  }
+
+  const FVector2D Size(Width, Height);
+  const FLinearColor BackgroundColor(0.f, 0.f, 0.f, 0.75f);
+  FCanvasTileItem Tile(FVector2D::ZeroVector, Size, BackgroundColor);
+  Tile.BlendMode = SE_BLEND_Translucent;
+  Canvas->DrawItem(Tile);
+
+  const FLinearColor BorderColor(1.f, 1.f, 1.f, 0.85f);
+  const float BorderThickness = 6.f;
+  FCanvasBoxItem Border(FVector2D::ZeroVector, Size);
+  Border.SetColor(BorderColor);
+  Border.LineThickness = BorderThickness;
+  Canvas->DrawItem(Border);
+
+  if (!GEngine || PendingStrategicInitiativeValue <= 0) {
+    return;
+  }
+
+  UFont *Font = GEngine->GetLargeFont();
+  if (!Font) {
+    Font = GEngine->GetMediumFont();
+  }
+  if (!Font) {
+    Font = GEngine->GetSmallFont();
+  }
+  if (!Font) {
+    return;
+  }
+
+  const FString RollString = FString::FromInt(PendingStrategicInitiativeValue);
+  FCanvasTextItem TextItem(FVector2D::ZeroVector, FText::FromString(RollString),
+                           Font, FLinearColor::White);
+  TextItem.bCentreX = true;
+  TextItem.bCentreY = true;
+  TextItem.EnableShadow(FLinearColor::Black);
+  TextItem.Scale = FVector2D(2.6f, 2.6f);
+  Canvas->DrawItem(TextItem);
 }
 
 void USkaldMainHUDWidget::UpdateInitiativeText(const FString &Message) {

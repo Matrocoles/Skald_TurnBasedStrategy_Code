@@ -9,6 +9,7 @@
 #include "SkaldMainHUDWidget.generated.h"
 
 class UButton;
+class UImage;
 class UTextBlock;
 class UVerticalBox;
 class ATerritory;
@@ -149,6 +150,11 @@ public:
   UPROPERTY(BlueprintAssignable, Category = "Skald|Events")
   FSkaldEndMovementRequested OnEndMovementRequested;
 
+  /** Delegate fired when the strategic initiative roll button is pressed. */
+  DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnStrategicInitiativeRollRequested);
+  UPROPERTY(BlueprintAssignable, Category = "Skald|Events")
+  FOnStrategicInitiativeRollRequested OnStrategicInitiativeRollRequested;
+
   DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
       FOnDiceResolutionComplete, AFighterPawn *, Attacker, AFighterPawn *,
       Defender, const FDiceRollResult &, Result);
@@ -198,6 +204,18 @@ public:
   /** Show whose turn it is and toggle the End Turn button. */
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
   void ShowTurnMessage(bool bIsMyTurn);
+
+  /** Display the prompt instructing the player to roll for strategic initiative. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|HUD|Initiative")
+  void ShowStrategicInitiativePrompt(const FText &PromptText, float ButtonDelay = 1.f);
+
+  /** Hide the strategic initiative roll prompt and associated button. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|HUD|Initiative")
+  void HideStrategicInitiativePrompt();
+
+  /** Display the rolled initiative value using the configured dice visuals. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|HUD|Initiative")
+  void ShowStrategicInitiativeRoll(int32 RollValue, float DisplayDuration = 1.f);
 
   /** Show an in-progress enemy turn message without auto-hiding. */
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
@@ -365,6 +383,22 @@ public:
   UTextBlock *InitiativeText;
 
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
+            meta = (BindWidgetOptional))
+  UButton *RollInitiativeButton;
+
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
+            meta = (BindWidgetOptional))
+  UTextBlock *InitiativePromptText;
+
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
+            meta = (BindWidgetOptional))
+  UImage *InitiativeDiceImage;
+
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
+            meta = (BindWidgetOptional))
+  UImage *InitiativeDiceBoardImage;
+
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
             meta = (BindWidget))
   UTextBlock *DeployableUnitsText;
 
@@ -384,6 +418,10 @@ public:
   UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skald|Widgets|Dice")
   FDiceResolutionPanelLayout DefaultDiceResolutionPanelLayout;
 
+  /** Optional sound played when the strategic initiative die is revealed. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skald|Widgets|Dice")
+  TObjectPtr<USoundBase> InitiativeDiceSound;
+
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Widgets")
   TSubclassOf<UConfirmAttackWidget> ConfirmAttackWidgetClass;
 
@@ -402,6 +440,8 @@ protected:
 
   FTimerHandle InitiativeTimerHandle;
   FTimerHandle TurnMessageTimerHandle;
+  FTimerHandle StrategicInitiativeRollDelayHandle;
+  FTimerHandle StrategicInitiativeDiceHideHandle;
 
   // Internal handlers for widget actions
   UFUNCTION()
@@ -412,6 +452,16 @@ protected:
 
   UFUNCTION()
   void HandleDeployClicked();
+
+  UFUNCTION()
+  void HandleStrategicInitiativeRollPressed();
+
+  void RevealStrategicInitiativeRollButton();
+  void HideStrategicInitiativeDice();
+
+  UFUNCTION()
+  void HandleStrategicDiceRenderTargetUpdate(class UCanvas *Canvas, int32 Width,
+                                             int32 Height);
 
   void UpdateActiveFloaters(float DeltaSeconds);
   void ReleaseFloaterAtIndex(int32 Index);
@@ -473,6 +523,11 @@ protected:
   TArray<FQueuedDiceResolution> PendingDiceResolutions;
   bool bDiceResolutionActive = false;
   FQueuedDiceResolution ActiveDiceResolution;
+
+  UPROPERTY(Transient)
+  TObjectPtr<class UCanvasRenderTarget2D> StrategicInitiativeDiceRenderTarget;
+
+  int32 PendingStrategicInitiativeValue = 0;
 
   UPROPERTY()
   UDeployWidget *ActiveDeployWidget = nullptr;
