@@ -54,9 +54,19 @@ void UW_DiceResolutionPanel::BeginResolution(const FDiceRollResult& Result)
         ResolveProgressPlaceholder->SetVisibility(ESlateVisibility::HitTestInvisible);
     }
 
+    UpdateSummaryLabels();
+
+    const bool bHasDice = ActiveResult.DiceOutcomes.Num() > 0;
+    if (!bHasDice)
+    {
+        RevealedHits = ActiveResult.HitCount;
+        RevealedMisses = ActiveResult.MissCount;
+        RevealedCrits = ActiveResult.CriticalHitCount;
+    }
+
     UpdateTallies();
 
-    if (ActiveResult.DiceOutcomes.Num() == 0)
+    if (!bHasDice)
     {
         ScheduleCompletionDelay(CompletionDelaySeconds);
         return;
@@ -88,6 +98,7 @@ void UW_DiceResolutionPanel::ResetPanel()
         ResolveProgressPlaceholder->SetVisibility(ESlateVisibility::Collapsed);
     }
 
+    UpdateSummaryLabels();
     UpdateTallies();
 }
 
@@ -339,6 +350,45 @@ void UW_DiceResolutionPanel::UpdateTallies()
     if (CritCountText)
     {
         CritCountText->SetText(CritsText);
+    }
+}
+
+void UW_DiceResolutionPanel::UpdateSummaryLabels()
+{
+    const bool bHasMeaningfulHealth = ActiveResult.StartingHealth > 0 || ActiveResult.EndingHealth > 0;
+    const bool bHasDamage = ActiveResult.TotalDamage > 0;
+
+    if (TotalDamageText)
+    {
+        if (!bHasDamage && !bHasMeaningfulHealth && !bResolutionActive)
+        {
+            TotalDamageText->SetText(FText::GetEmpty());
+        }
+        else
+        {
+            const int32 TotalDamage = FMath::Max(ActiveResult.TotalDamage, 0);
+            const FText DamageText = FText::Format(
+                NSLOCTEXT("SkaldBattle", "DiceTotalDamageFormat", "Damage: {0}"),
+                FText::AsNumber(TotalDamage));
+            TotalDamageText->SetText(DamageText);
+        }
+    }
+
+    if (HealthSummaryText)
+    {
+        if (!bHasMeaningfulHealth && !bHasDamage && !bResolutionActive)
+        {
+            HealthSummaryText->SetText(FText::GetEmpty());
+        }
+        else
+        {
+            const int32 StartingHealth = FMath::Max(ActiveResult.StartingHealth, 0);
+            const int32 EndingHealth = FMath::Max(ActiveResult.EndingHealth, 0);
+            const FText HealthText = FText::Format(
+                NSLOCTEXT("SkaldBattle", "DiceHealthSummaryFormat", "HP: {0} → {1}"),
+                FText::AsNumber(StartingHealth), FText::AsNumber(EndingHealth));
+            HealthSummaryText->SetText(HealthText);
+        }
     }
 }
 

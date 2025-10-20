@@ -164,7 +164,7 @@ FDiceRollResult UGridBattleManager::ResolveAttackDice(const FFighterStats& Attac
     return Result;
 }
 
-bool UGridBattleManager::ResolveAttack(FFighter& Attacker, FFighter& Defender, int32& OutDamage, FRandomStream& RandomStream)
+bool UGridBattleManager::ResolveAttack(FFighter& Attacker, FFighter& Defender, int32& OutDamage, FRandomStream& RandomStream, FDiceRollResult& OutResult)
 {
     const int32 StartingHealth = Defender.Stats.Health;
 
@@ -172,6 +172,7 @@ bool UGridBattleManager::ResolveAttack(FFighter& Attacker, FFighter& Defender, i
     Defender.Stats.Health = FMath::Max(0, Result.EndingHealth);
 
     OutDamage = FMath::Clamp(Result.TotalDamage, 0, StartingHealth);
+    OutResult = Result;
 
     return Result.EndingHealth > 0;
 }
@@ -604,11 +605,6 @@ void UGridBattleManager::AdvanceTurn()
 
 void UGridBattleManager::ReportAttackResolution(AFighterPawn* Attacker, AFighterPawn* Defender, const FDiceRollResult& Result)
 {
-    if (!Attacker || !Defender)
-    {
-        return;
-    }
-
     const int32 DiceRolled = Result.DiceOutcomes.Num();
     UE_LOG(LogSkaldBattle, Log,
         TEXT("[Battle] Attack resolved: %s -> %s | Dice=%d Hits=%d Crits=%d Misses=%d Damage=%d RemainingHP=%d"),
@@ -616,6 +612,11 @@ void UGridBattleManager::ReportAttackResolution(AFighterPawn* Attacker, AFighter
         Result.MissCount, Result.TotalDamage, Result.EndingHealth);
 
     OnAttackResolved.Broadcast(Attacker, Defender, Result);
+}
+
+void UGridBattleManager::ReportSimulatedAttackResolution(const FDiceRollResult& Result)
+{
+    ReportAttackResolution(nullptr, nullptr, Result);
 }
 
 void UGridBattleManager::ReportAttackRejected(AFighterPawn* Attacker, AFighterPawn* Defender, const FText& Reason)

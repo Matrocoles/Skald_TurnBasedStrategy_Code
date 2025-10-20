@@ -1,6 +1,7 @@
 #include "UI/BattleHUDWidget.h"
 #include "SkaldLogging.h"
 #include "Components/Button.h"
+#include "Components/CapsuleComponent.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
@@ -673,14 +674,89 @@ void UBattleHUDWidget::ShowCombatFloater(const FVector &WorldLocation,
 
 void UBattleHUDWidget::ShowAttackResultFloater(AFighterPawn *Target,
                                                const FDiceRollResult &Result) {
-  const bool bAnyHits = Result.HitCount > 0 || Result.TotalDamage > 0;
-  const int32 Damage = Result.TotalDamage;
+  if (!Target) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("ShowAttackResultFloater skipped (no target). Damage=%d Hits=%d Crits=%d Misses=%d HP=%d->%d"),
+           Result.TotalDamage, Result.HitCount, Result.CriticalHitCount,
+           Result.MissCount, Result.StartingHealth, Result.EndingHealth);
+    return;
+  }
 
-  // TODO: integrate with CombatFloaterPoolSubsystem if available.
+  const float CapsuleHalfHeight = Target->GetSimpleCollisionHalfHeight();
+  const float AnchorHeight = CapsuleHalfHeight > KINDA_SMALL_NUMBER
+                                 ? CapsuleHalfHeight
+                                 : 88.f;
+  const FVector BaseLocation =
+      Target->GetActorLocation() +
+      FVector(0.f, 0.f, AnchorHeight + FloaterAnchorHeightOffset);
+
+  int32 FloaterIndex = 0;
+  const auto SpawnFloater = [&](const FText &Label, const FLinearColor &Tint,
+                                float Scale, bool bMissStyle,
+                                float LifetimeOverride = -1.f) {
+    const FVector StackLocation =
+        BaseLocation + FVector(0.f, 0.f, FloaterStackSpacing * FloaterIndex);
+    ShowCombatFloater(StackLocation, Label, Tint, Scale, bMissStyle,
+                      LifetimeOverride);
+    ++FloaterIndex;
+  };
+
+  const int32 Damage = FMath::Max(Result.TotalDamage, 0);
+  const bool bAnyHits = Result.HitCount > 0 || Damage > 0;
+  const bool bAnyCrits = Result.CriticalHitCount > 0;
+
+  if (bAnyHits) {
+    const FLinearColor DamageTint =
+        bAnyCrits ? CriticalFloaterColor : HitFloaterColor;
+    const float DamageScale = bAnyCrits ? 1.35f : 1.1f;
+    const FText DamageLabel = Damage > 0
+                                  ? FText::Format(NSLOCTEXT("SkaldBattle",
+                                                             "DamageFloaterLabel",
+                                                             "-{0}"),
+                                                  FText::AsNumber(Damage))
+                                  : NSLOCTEXT("SkaldBattle",
+                                              "DamageFloaterZeroLabel", "0");
+    SpawnFloater(DamageLabel, DamageTint, DamageScale, false);
+
+    if (Result.CriticalHitCount > 0) {
+      const FText CritLabel = Result.CriticalHitCount > 1
+                                  ? FText::Format(NSLOCTEXT("SkaldBattle",
+                                                             "CritFloaterPlural",
+                                                             "CRIT ×{0}"),
+                                                  FText::AsNumber(
+                                                      Result.CriticalHitCount))
+                                  : NSLOCTEXT("SkaldBattle",
+                                              "CritFloaterSingular", "CRIT!");
+      SpawnFloater(CritLabel, CriticalFloaterColor, 1.0f, false);
+    } else if (Result.HitCount > 1) {
+      const FText HitLabel = FText::Format(
+          NSLOCTEXT("SkaldBattle", "HitFloaterPlural", "Hits ×{0}"),
+          FText::AsNumber(Result.HitCount));
+      SpawnFloater(HitLabel, HitFloaterColor, 0.95f, false);
+    }
+  } else {
+    const int32 MissCount = FMath::Max(Result.MissCount, 1);
+    const FText MissLabel = MissCount > 1
+                                ? FText::Format(NSLOCTEXT("SkaldBattle",
+                                                           "MissFloaterPlural",
+                                                           "Miss ×{0}"),
+                                                FText::AsNumber(MissCount))
+                                : NSLOCTEXT("SkaldBattle",
+                                            "MissFloaterSingular", "Miss");
+    SpawnFloater(MissLabel, MissFloaterColor, 1.0f, true);
+  }
+
+  const int32 StartingHealth = FMath::Max(Result.StartingHealth, 0);
+  const int32 EndingHealth = FMath::Max(Result.EndingHealth, 0);
+  const FText HealthLabel = FText::Format(
+      NSLOCTEXT("SkaldBattle", "HealthFloaterLabel", "HP {0} → {1}"),
+      FText::AsNumber(StartingHealth), FText::AsNumber(EndingHealth));
+  SpawnFloater(HealthLabel, HealthFloaterColor, 0.95f, false, 2.1f);
+
   UE_LOG(LogSkald, Verbose,
-         TEXT("ShowAttackResultFloater: Target=%s Hit=%d Damage=%d Criticals=%d Misses=%d"),
-         Target ? *Target->GetName() : TEXT("None"), bAnyHits ? 1 : 0, Damage,
-         Result.CriticalHitCount, Result.MissCount);
+         TEXT("ShowAttackResultFloater: Target=%s Damage=%d Hits=%d Crits=%d Misses=%d HP=%d->%d"),
+         *Target->GetName(), Damage, Result.HitCount, Result.CriticalHitCount,
+         Result.MissCount, Result.StartingHealth, Result.EndingHealth);
 }
 
 void UBattleHUDWidget::QueueDiceResolution(AFighterPawn *Attacker,
