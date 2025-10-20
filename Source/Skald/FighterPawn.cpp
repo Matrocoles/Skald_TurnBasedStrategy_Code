@@ -25,6 +25,7 @@ namespace
 constexpr int32 ActionsPerActivation = 2;
 constexpr float ActivationWidgetScale = 0.1f;
 constexpr float WidgetMirrorSeparation = 0.5f;
+constexpr float AutoHealthHoldFallbackDelay = 2.f;
 }
 
 AFighterPawn::AFighterPawn() : MaxHealth(0) {
@@ -1105,6 +1106,25 @@ void AFighterPawn::HandleHealthChanged(int32 NewHealth) {
   PendingHealthDisplayValue = NewHealth;
   bHasPendingHealthDisplay = true;
 
+  const bool bHasPreviousHealth = bHasRecordedHealth;
+  const bool bDamageTaken = bHasPreviousHealth && NewHealth < LastKnownHealth;
+
+  if (bDamageTaken && !bHoldHealthDisplay) {
+    bHoldHealthDisplay = true;
+    bAutoHealthDisplayHoldActive = true;
+    bHealthDisplayHoldClaimed = false;
+
+    if (UWorld *World = GetWorld()) {
+      World->GetTimerManager().ClearTimer(AutoHealthHoldTimerHandle);
+      World->GetTimerManager().SetTimer(
+          AutoHealthHoldTimerHandle, this,
+          &AFighterPawn::HandleAutoHealthHoldExpired,
+          AutoHealthHoldFallbackDelay, false);
+    }
+
+    return;
+  }
+
   if (!bHoldHealthDisplay) {
     bHasPendingHealthDisplay = false;
     UpdateHealthDisplay(NewHealth);
@@ -1113,12 +1133,25 @@ void AFighterPawn::HandleHealthChanged(int32 NewHealth) {
 
 void AFighterPawn::HoldHealthDisplay(int32 DisplayHealth) {
   bHoldHealthDisplay = true;
+  bHealthDisplayHoldClaimed = true;
+  bAutoHealthDisplayHoldActive = false;
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(AutoHealthHoldTimerHandle);
+  }
+
   UpdateHealthDisplay(FMath::Max(0, DisplayHealth));
 }
 
 void AFighterPawn::ReleaseHealthDisplayHold() {
   const bool bWasHeld = bHoldHealthDisplay;
   bHoldHealthDisplay = false;
+  bAutoHealthDisplayHoldActive = false;
+  bHealthDisplayHoldClaimed = false;
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(AutoHealthHoldTimerHandle);
+  }
 
   if (!bHasPendingHealthDisplay) {
     if (bWasHeld) {
@@ -1130,6 +1163,15 @@ void AFighterPawn::ReleaseHealthDisplayHold() {
   const int32 HealthToDisplay = PendingHealthDisplayValue;
   bHasPendingHealthDisplay = false;
   UpdateHealthDisplay(HealthToDisplay);
+}
+
+void AFighterPawn::HandleAutoHealthHoldExpired() {
+  if (!bAutoHealthDisplayHoldActive || bHealthDisplayHoldClaimed) {
+    return;
+  }
+
+  bAutoHealthDisplayHoldActive = false;
+  ReleaseHealthDisplayHold();
 }
 
 void AFighterPawn::Destroyed() {

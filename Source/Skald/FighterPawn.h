@@ -250,6 +250,15 @@ private:
   /** Deferred health value that will be applied once unlocked. */
   int32 PendingHealthDisplayValue = 0;
 
+  /** True when damage triggered an automatic hold awaiting presentation. */
+  bool bAutoHealthDisplayHoldActive = false;
+
+  /** Tracks whether an external system claimed the current health hold. */
+  bool bHealthDisplayHoldClaimed = false;
+
+  /** Timer used to release automatic holds if no presentation consumes them. */
+  FTimerHandle AutoHealthHoldTimerHandle;
+
   bool ShouldOverrideSpawnFacingYaw() const;
   float GetCurrentWorldFacingYaw() const;
 
@@ -260,6 +269,9 @@ private:
   /** Handles health change broadcasts so we can defer UI updates. */
   UFUNCTION()
   void HandleHealthChanged(int32 NewHealth);
+
+  /** Release an automatic hold if no presentation claimed it in time. */
+  void HandleAutoHealthHoldExpired();
 
   /** Respond when the fighter stats replicate to clients. */
   UFUNCTION()
