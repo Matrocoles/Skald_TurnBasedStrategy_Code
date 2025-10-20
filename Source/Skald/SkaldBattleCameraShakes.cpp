@@ -25,8 +25,10 @@ float ComputeBlendFactor(float Time, float Duration, float BlendInTime,
 }
 } // namespace
 
-USkaldOscillationCameraShake::USkaldOscillationCameraShake()
-    : Duration(0.2f),
+USkaldOscillationCameraShake::USkaldOscillationCameraShake(
+    const FObjectInitializer &ObjectInitializer)
+    : Super(ObjectInitializer),
+      Duration(0.2f),
       BlendInTime(0.05f),
       BlendOutTime(0.05f),
       RotationAmplitude(ForceInitToZero),
@@ -115,7 +117,9 @@ bool USkaldOscillationCameraShake::IsFinished() const {
   return !bIsActive || ElapsedTime >= Duration;
 }
 
-USkaldHitCameraShake::USkaldHitCameraShake() {
+USkaldHitCameraShake::USkaldHitCameraShake(
+    const FObjectInitializer &ObjectInitializer)
+    : Super(ObjectInitializer) {
   ConfigureShake(
       /*Duration*/ 0.2f,
       /*BlendInTime*/ 0.04f,
@@ -126,7 +130,9 @@ USkaldHitCameraShake::USkaldHitCameraShake() {
       /*LocationFrequency*/ FVector(0.f, 0.f, 22.f));
 }
 
-USkaldMissCameraShake::USkaldMissCameraShake() {
+USkaldMissCameraShake::USkaldMissCameraShake(
+    const FObjectInitializer &ObjectInitializer)
+    : Super(ObjectInitializer) {
   ConfigureShake(
       /*Duration*/ 0.12f,
       /*BlendInTime*/ 0.03f,

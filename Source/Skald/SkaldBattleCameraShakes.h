@@ -1,6 +1,8 @@
 #pragma once
 
+#include "CoreMinimal.h"
 #include "Camera/CameraShakeBase.h"
+#include "Camera/CameraShakeBaseTypes.h"
 #include "Math/Rotator.h"
 #include "Math/Vector.h"
 #include "SkaldBattleCameraShakes.generated.h"
@@ -13,7 +15,8 @@ class SKALD_API USkaldOscillationCameraShake : public UCameraShakeBase {
   GENERATED_BODY()
 
 public:
-  USkaldOscillationCameraShake();
+  explicit USkaldOscillationCameraShake(
+      const FObjectInitializer &ObjectInitializer = FObjectInitializer::Get());
 
 protected:
   virtual void StartShake(const FCameraShakeStartParams &Params) override;
@@ -52,7 +55,8 @@ class SKALD_API USkaldHitCameraShake : public USkaldOscillationCameraShake {
   GENERATED_BODY()
 
 public:
-  USkaldHitCameraShake();
+  explicit USkaldHitCameraShake(
+      const FObjectInitializer &ObjectInitializer = FObjectInitializer::Get());
 };
 
 /**
@@ -63,6 +67,7 @@ class SKALD_API USkaldMissCameraShake : public USkaldOscillationCameraShake {
   GENERATED_BODY()
 
 public:
-  USkaldMissCameraShake();
+  explicit USkaldMissCameraShake(
+      const FObjectInitializer &ObjectInitializer = FObjectInitializer::Get());
 };
 
