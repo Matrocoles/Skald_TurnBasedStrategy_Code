@@ -686,6 +686,29 @@ void UGridBattleManager::FinishActivation(AFighterPawn* Fighter, EGridActivation
         return;
     }
 
+    if (FighterToFinish->IsResolvingQueuedAttack())
+    {
+        TWeakObjectPtr<AFighterPawn> FighterPtr = FighterToFinish;
+        FDeferredActivationFinish& DeferredRequest = DeferredActivationFinishes.FindOrAdd(FighterPtr);
+        DeferredRequest.Reason = Reason;
+        DeferredRequest.bWasAttacker = FighterToFinish->bIsAttacker;
+
+        if (!DeferredFinishDelegateHandles.Contains(FighterPtr))
+        {
+            FDelegateHandle Handle = FighterToFinish->OnQueuedAttackFinalized.AddLambda(
+                [this, FighterPtr]()
+                {
+                    HandleDeferredActivationFinalized(FighterPtr);
+                });
+            DeferredFinishDelegateHandles.Add(FighterPtr, Handle);
+        }
+
+        UE_LOG(LogSkaldBattle, Verbose,
+            TEXT("[Battle] Deferring FinishActivation for %s until queued attack completes"),
+            *DescribeFighter(FighterToFinish));
+        return;
+    }
+
     const bool bWasAttacker = FighterToFinish->bIsAttacker;
 
     if (Reason == EGridActivationFinishReason::Auto && !IsSideAIControlled(bWasAttacker))
@@ -715,6 +738,44 @@ void UGridBattleManager::FinishActivation(AFighterPawn* Fighter, EGridActivation
     {
         OnActiveFighterChanged.Broadcast(nullptr);
     }
+}
+
+void UGridBattleManager::HandleDeferredActivationFinalized(TWeakObjectPtr<AFighterPawn> FighterPtr)
+{
+    FDeferredActivationFinish Request;
+    if (!DeferredActivationFinishes.RemoveAndCopyValue(FighterPtr, Request))
+    {
+        ClearDeferredActivationTracking(FighterPtr);
+        return;
+    }
+
+    AFighterPawn* Fighter = FighterPtr.Get();
+    ClearDeferredActivationTracking(FighterPtr);
+
+    if (!Fighter)
+    {
+        UE_LOG(LogSkaldBattle, Verbose, TEXT("[Battle] Deferred activation target no longer valid; advancing state"));
+        ActiveFighter = nullptr;
+        EvaluateRoundProgress(Request.bWasAttacker);
+        OnActiveFighterChanged.Broadcast(nullptr);
+        return;
+    }
+
+    FinishActivation(Fighter, Request.Reason);
+}
+
+void UGridBattleManager::ClearDeferredActivationTracking(TWeakObjectPtr<AFighterPawn> FighterPtr)
+{
+    if (AFighterPawn* Fighter = FighterPtr.Get())
+    {
+        if (FDelegateHandle* Handle = DeferredFinishDelegateHandles.Find(FighterPtr))
+        {
+            Fighter->OnQueuedAttackFinalized.Remove(*Handle);
+        }
+    }
+
+    DeferredFinishDelegateHandles.Remove(FighterPtr);
+    DeferredActivationFinishes.Remove(FighterPtr);
 }
 
 bool UGridBattleManager::HasLivingFighters(bool bForAttackers) const

@@ -4,7 +4,7 @@
 namespace
 {
 constexpr float DefaultEnemyTurnStepDelay = 0.75f;
-constexpr float DefaultBattleActionDelay = 0.5f;
+constexpr float DefaultBattleActionDelay = 1.0f;
 }
 
 USkaldGameUserSettings::USkaldGameUserSettings()
@@ -30,7 +30,7 @@ void USkaldGameUserSettings::SetEnemyTurnStepDelay(float InDelay)
 
 void USkaldGameUserSettings::SetBattleActionDelay(float InDelay)
 {
-  BattleActionDelay = FMath::Max(0.0f, InDelay);
+  BattleActionDelay = FMath::Max(1.0f, InDelay);
 }
 
 void USkaldGameUserSettings::SetToDefaults()

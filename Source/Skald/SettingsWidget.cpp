@@ -28,7 +28,7 @@ void USettingsWidget::NativeConstruct()
     PendingResolution = FIntPoint::ZeroValue;
     PendingQuality = 0;
     PendingEnemyTurnDelay = 0.75f;
-    PendingBattleActionDelay = 0.5f;
+    PendingBattleActionDelay = 1.0f;
 
     if (ApplyButton)
     {
@@ -213,6 +213,6 @@ void USettingsWidget::HandleEnemyTurnDelayChanged(float Value)
 
 void USettingsWidget::HandleBattleActionDelayChanged(float Value)
 {
-    PendingBattleActionDelay = FMath::Max(0.0f, Value);
+    PendingBattleActionDelay = FMath::Max(1.0f, Value);
 }
 

@@ -104,7 +104,7 @@ private:
 
   /** Delay between individual AI-controlled actions during grid battles. */
   UPROPERTY(EditAnywhere, Category = "Battle|AI", meta = (ClampMin = "0.0"))
-  float BattleActionDelay = 0.5f;
+  float BattleActionDelay = 1.0f;
 
   /** Delay applied between fighter activations to provide pacing. */
   UPROPERTY(EditAnywhere, Category = "Battle|AI", meta = (ClampMin = "0.0"))

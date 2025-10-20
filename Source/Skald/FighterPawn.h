@@ -71,6 +71,9 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Fighter")
   void PerformAttack(AFighterPawn *Target);
 
+  /** True while queued attack rolls are still being processed. */
+  bool IsResolvingQueuedAttack() const;
+
   /** Event fired after any queued attack finishes resolving. */
   FOnQueuedAttackFinalized OnQueuedAttackFinalized;
 
@@ -352,6 +355,12 @@ private:
 
   /** Finalise any pending attack resolution and clean up timers/state. */
   void FinalizeQueuedAttack();
+
+  /** Cancel any pending queued attack without reporting results. */
+  void CancelQueuedAttack();
+
+  /** Reset queued attack bookkeeping and optionally notify listeners. */
+  void ClearQueuedAttackState(bool bBroadcastFinalized);
 
   /** Pending attack rolls awaiting delayed resolution. */
   TArray<FQueuedAttackRoll> PendingAttackRolls;

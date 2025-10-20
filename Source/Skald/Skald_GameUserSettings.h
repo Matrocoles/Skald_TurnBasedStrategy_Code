@@ -31,6 +31,6 @@ protected:
   float EnemyTurnStepDelay;
 
   /** Time between AI-controlled actions during battles. */
-  UPROPERTY(Config, EditAnywhere, Category = "AI", meta = (ClampMin = "0.0"))
+  UPROPERTY(Config, EditAnywhere, Category = "AI", meta = (ClampMin = "1.0"))
   float BattleActionDelay;
 };

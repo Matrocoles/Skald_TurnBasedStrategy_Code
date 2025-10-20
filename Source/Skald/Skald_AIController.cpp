@@ -54,6 +54,7 @@ void ASkaldAIController::BeginPlay() {
           USkaldGameUserSettings::GetSkaldGameUserSettings()) {
     EnemyTurnStepDelay = Settings->GetEnemyTurnStepDelay();
     BattleActionDelay = Settings->GetBattleActionDelay();
+    BattleActionDelay = FMath::Max(1.0f, BattleActionDelay);
   }
 
   USkaldGameInstance *GameInstance = GetGameInstance<USkaldGameInstance>();
@@ -822,9 +823,10 @@ bool ASkaldAIController::ShouldContinueActivation(
 void ASkaldAIController::ScheduleNextActivationAttempt() {
   if (UWorld *World = GetWorld()) {
     World->GetTimerManager().ClearTimer(FighterActionTimerHandle);
+    const float EffectiveDelay = FMath::Max(1.0f, BattleActionDelay);
     World->GetTimerManager().SetTimer(
         FighterActionTimerHandle, this,
-        &ASkaldAIController::ProcessQueuedActivationIntent, BattleActionDelay,
+        &ASkaldAIController::ProcessQueuedActivationIntent, EffectiveDelay,
         false);
   }
 }
