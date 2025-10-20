@@ -2601,6 +2601,25 @@ void ASkaldPlayerController::HandleInitiativeRollCompleted(
 
   DetermineControlledBattleSide();
 
+  USkaldGameInstance *GI = CachedGameInstance;
+  if (!GI) {
+    GI = GetGameInstance<USkaldGameInstance>();
+    CachedGameInstance = GI;
+  }
+
+  bool bPlayerWonInitiative = false;
+  if (GI && InitiativeWinner != ESkaldFaction::None) {
+    const FS_BattlePayload &Battle = GI->PendingBattle;
+    if ((bControlsAttackerSide && Battle.AttackerFaction == InitiativeWinner) ||
+        (bControlsDefenderSide && Battle.DefenderFaction == InitiativeWinner)) {
+      bPlayerWonInitiative = true;
+    }
+  }
+
+  if (bPlayerWonInitiative && InitiativeWinSound && IsLocalController()) {
+    UGameplayStatics::PlaySound2D(this, InitiativeWinSound);
+  }
+
   int32 RollToShow = LastLocalInitiativeRoll;
   if (RollToShow <= 0) {
     RollToShow = AttackerRoll;
