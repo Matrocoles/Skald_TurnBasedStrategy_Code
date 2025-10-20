@@ -159,6 +159,10 @@ protected:
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Audio")
   USoundBase *BattleRoundStartSound = nullptr;
 
+  /** Sound to play for the local player when their world map turn begins. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Audio")
+  USoundBase *WorldTurnStartSound = nullptr;
+
   /** Sound to play when the local player wins the initiative roll. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Audio")
   USoundBase *InitiativeWinSound = nullptr;

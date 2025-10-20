@@ -1169,6 +1169,14 @@ void ASkaldPlayerController::StartTurn() {
   bEnableMouseOverEvents = true;
   DefaultMouseCaptureMode = EMouseCaptureMode::NoCapture;
 
+  const bool bOnWorldMap =
+      !bIsBattleMap &&
+      !(CachedGameInstance && CachedGameInstance->bIsInBattleMap);
+
+  if (bOnWorldMap && IsLocalController() && WorldTurnStartSound) {
+    UGameplayStatics::PlaySound2D(this, WorldTurnStartSound);
+  }
+
   // Drive GameState turn index so HUDs can react on all clients.
   if (ASkaldGameState *GS = GetWorld()->GetGameState<ASkaldGameState>()) {
     if (ASkaldPlayerState *MyPS = GetPlayerState<ASkaldPlayerState>()) {
