@@ -24,7 +24,6 @@
 #include "Skald_GameInstance.h"
 #include "Skald_GameMode.h"
 #include "Skald_BattleGameMode.h"
-#include "SkaldBattleCameraShakes.h"
 #include "SkaldLogging.h"
 #include "Skald_GameState.h"
 #include "Skald_PlayerState.h"
@@ -137,12 +136,9 @@ ASkaldPlayerController::ASkaldPlayerController() {
     ChoosePlayerWidgetClass = ChooseBP.Class;
   }
 
-  if (!HitCameraShakeClass) {
-    HitCameraShakeClass = USkaldHitCameraShake::StaticClass();
-  }
-
-  if (!MissCameraShakeClass) {
-    MissCameraShakeClass = USkaldMissCameraShake::StaticClass();
+  if (!HitCameraShakeClass || !MissCameraShakeClass) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("ASkaldPlayerController camera shake classes unset. Assign Blueprint overrides in defaults to enable feedback."));
   }
 }
 
