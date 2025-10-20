@@ -6,13 +6,6 @@
 #include "Math/Vector.h"
 #include "SkaldBattleCameraShakes.generated.h"
 
-// Forward declarations of the UE camera shake param/result structs.
-// (Do NOT include CameraShakeBaseTypes.h; it is not present on this UE 5.5.4 install)
-struct FCameraShakeStartParams;
-struct FCameraShakeUpdateParams;
-struct FCameraShakeUpdateResult;
-struct FCameraShakeStopParams;
-
 /**
  * Minimal oscillating shake built on top of the UE 5.5 camera shake base class.
  */
@@ -26,10 +19,11 @@ public:
         const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
 protected:
-    virtual void StartShake(const struct FCameraShakeStartParams& Params) override;
-    virtual void UpdateAndApplyCameraShake(const struct FCameraShakeUpdateParams& Params,
-                                           struct FCameraShakeUpdateResult& OutResult) override;
-    virtual void StopShake(const struct FCameraShakeStopParams& Params) override;
+    // Correct UE 5.5.4 signatures
+    virtual void StartShake(const struct FCameraShakeBaseStartParams& Params) override;
+    virtual void UpdateAndApplyCameraShake(const struct FCameraShakeBaseUpdateParams& Params,
+                                           struct FCameraShakeBaseUpdateResult& OutResult) override;
+    virtual void StopShake(bool bImmediately) override;
     virtual bool IsFinished() const override;
 
     void ConfigureShake(float InDuration, float InBlendInTime, float InBlendOutTime,
@@ -73,3 +67,4 @@ public:
     explicit USkaldMissCameraShake(
         const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 };
+
