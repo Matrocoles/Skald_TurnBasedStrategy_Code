@@ -387,6 +387,13 @@ public:
   void ClientPromptStrategicInitiative(int32 RoundNumber, int32 RollValue,
                                        bool bWonInitiative);
 
+  UFUNCTION(Server, Reliable)
+  void ServerConfirmStrategicInitiativeRollReady();
+
+  UFUNCTION(Client, Reliable)
+  void ClientDisplayStrategicInitiativeResult(int32 RoundNumber, int32 RollValue,
+                                              bool bWonInitiative);
+
   /** Server-side processing of an attack request. */
   UFUNCTION(Server, Reliable)
   void ServerHandleAttack(int32 FromID, int32 ToID, int32 ArmySent,
@@ -458,6 +465,9 @@ protected:
   void ApplyTurnManager(ATurnManager *Manager);
 
 private:
+  /** Display the stored strategic initiative roll if one is pending. */
+  void ShowPendingStrategicInitiativeResult();
+
   ASkald_BattleGameMode *ResolveBattleGameMode();
 
   /** Cache references to key game singletons and bind delegates. */
