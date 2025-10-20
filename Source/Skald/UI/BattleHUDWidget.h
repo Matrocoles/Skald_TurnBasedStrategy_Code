@@ -330,6 +330,13 @@ private:
   void HandleDiceOutcomeRevealed(const FDiceRollOutcome &Outcome,
                                  int32 RevealIndex);
 
+  void BeginHealthTextHold(AFighterPawn *Fighter, int32 DisplayValue,
+                           int32 FinalValue);
+
+  void ReleaseHealthTextHold(AFighterPawn *Fighter);
+
+  void ClearHealthTextHold();
+
   void UpdateCombatFloaters(float DeltaSeconds);
   void ReleaseFloaterAtIndex(int32 Index);
   UCombatFloaterPoolSubsystem *ResolveFloaterPool();
@@ -384,6 +391,11 @@ private:
   TArray<FBattleQueuedDiceResolution> PendingDiceResolutions;
   bool bDiceResolutionActive = false;
   FBattleQueuedDiceResolution ActiveDiceResolution;
+
+  TWeakObjectPtr<AFighterPawn> HeldHealthTextFighter;
+  bool bHealthTextHoldActive = false;
+  bool bHasPendingHealthTextValue = false;
+  int32 PendingHealthTextValue = 0;
 
   /** Whether movement preview is currently shown. */
   bool bMoveSelected = false;

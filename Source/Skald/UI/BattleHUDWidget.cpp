@@ -117,6 +117,8 @@ void UBattleHUDWidget::NativeDestruct() {
   }
   CachedFloaterPool.Reset();
 
+  ClearHealthTextHold();
+
   Super::NativeDestruct();
 }
 
@@ -162,6 +164,11 @@ void UBattleHUDWidget::BindToFighter(AFighterPawn *Fighter) {
     BoundFighter->OnActionsChanged.RemoveDynamic(
         this, &UBattleHUDWidget::HandleActionsChanged);
   }
+
+  if (BoundFighter && BoundFighter != Fighter) {
+    ClearHealthTextHold();
+  }
+
   BoundFighter = Fighter;
   if (BoundFighter) {
     BoundFighter->OnHealthChanged.AddDynamic(
@@ -281,6 +288,13 @@ void UBattleHUDWidget::RevealInitiativeRollButton() {
 }
 
 void UBattleHUDWidget::HandleHealthChanged(int32 NewHealth) {
+  if (bHealthTextHoldActive && HeldHealthTextFighter.IsValid() &&
+      HeldHealthTextFighter.Get() == BoundFighter) {
+    bHasPendingHealthTextValue = true;
+    PendingHealthTextValue = FMath::Max(0, NewHealth);
+    return;
+  }
+
   if (HealthText) {
     HealthText->SetText(FText::AsNumber(NewHealth));
   }
@@ -678,6 +692,8 @@ void UBattleHUDWidget::QueueDiceResolution(AFighterPawn *Attacker,
   Entry.Result = Result;
   PendingDiceResolutions.Add(MoveTemp(Entry));
 
+  BeginHealthTextHold(Defender, Result.StartingHealth, Result.EndingHealth);
+
   if (!bDiceResolutionActive) {
     ProcessNextDiceResolution();
   }
@@ -700,6 +716,7 @@ void UBattleHUDWidget::ProcessNextDiceResolution() {
     OnResolutionComplete.Broadcast(ActiveDiceResolution.Attacker.Get(),
                                    ActiveDiceResolution.Defender.Get(),
                                    ActiveDiceResolution.Result);
+    ReleaseHealthTextHold(ActiveDiceResolution.Defender.Get());
     bDiceResolutionActive = false;
     ProcessNextDiceResolution();
     return;
@@ -718,6 +735,7 @@ void UBattleHUDWidget::HandleDicePanelResolved(
   HideDiceRoller();
 
   if (!bDiceResolutionActive) {
+    ReleaseHealthTextHold(nullptr);
     OnResolutionComplete.Broadcast(nullptr, nullptr, Result);
     return;
   }
@@ -725,6 +743,8 @@ void UBattleHUDWidget::HandleDicePanelResolved(
   OnResolutionComplete.Broadcast(ActiveDiceResolution.Attacker.Get(),
                                  ActiveDiceResolution.Defender.Get(),
                                  ActiveDiceResolution.Result);
+
+  ReleaseHealthTextHold(ActiveDiceResolution.Defender.Get());
 
   bDiceResolutionActive = false;
   ActiveDiceResolution = FBattleQueuedDiceResolution();
@@ -742,6 +762,69 @@ void UBattleHUDWidget::HandleDiceOutcomeRevealed(
   OnDiceOutcomeRevealed.Broadcast(ActiveDiceResolution.Attacker.Get(),
                                   ActiveDiceResolution.Defender.Get(), Outcome,
                                   RevealIndex);
+}
+
+void UBattleHUDWidget::BeginHealthTextHold(AFighterPawn *Fighter,
+                                           int32 DisplayValue,
+                                           int32 FinalValue) {
+  if (!Fighter) {
+    return;
+  }
+
+  if (BoundFighter != Fighter) {
+    if (bHealthTextHoldActive && HeldHealthTextFighter.IsValid() &&
+        HeldHealthTextFighter.Get() == Fighter) {
+      bHasPendingHealthTextValue = true;
+      PendingHealthTextValue = FMath::Max(0, FinalValue);
+    }
+    return;
+  }
+
+  HeldHealthTextFighter = Fighter;
+  bHealthTextHoldActive = true;
+  bHasPendingHealthTextValue = true;
+  PendingHealthTextValue = FMath::Max(0, FinalValue);
+
+  if (HealthText) {
+    HealthText->SetText(
+        FText::AsNumber(FMath::Max(0, DisplayValue)));
+  }
+}
+
+void UBattleHUDWidget::ReleaseHealthTextHold(AFighterPawn *Fighter) {
+  if (!bHealthTextHoldActive) {
+    return;
+  }
+
+  if (HeldHealthTextFighter.IsValid() && Fighter &&
+      HeldHealthTextFighter.Get() != Fighter) {
+    return;
+  }
+
+  AFighterPawn *ResolvedFighter = Fighter;
+  if (!ResolvedFighter) {
+    ResolvedFighter = HeldHealthTextFighter.Get();
+  }
+  if (!ResolvedFighter) {
+    ResolvedFighter = BoundFighter;
+  }
+
+  if (ResolvedFighter && HealthText && BoundFighter == ResolvedFighter) {
+    const int32 FinalValue = bHasPendingHealthTextValue
+                                 ? PendingHealthTextValue
+                                 : FMath::Max(0, ResolvedFighter->Stats.Health);
+    HealthText->SetText(
+        FText::AsNumber(FMath::Max(0, FinalValue)));
+  }
+
+  ClearHealthTextHold();
+}
+
+void UBattleHUDWidget::ClearHealthTextHold() {
+  bHealthTextHoldActive = false;
+  bHasPendingHealthTextValue = false;
+  PendingHealthTextValue = 0;
+  HeldHealthTextFighter.Reset();
 }
 
 void UBattleHUDWidget::UpdateCombatFloaters(float DeltaSeconds) {
