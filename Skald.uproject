@@ -10,11 +10,11 @@
 			"LoadingPhase": "Default"
 		}
 	],
-        "Plugins": [
-                {
-                        "Name": "ModelingToolsEditorMode",
-                        "Enabled": false
-                },
+	"Plugins": [
+		{
+			"Name": "ModelingToolsEditorMode",
+			"Enabled": false
+		},
 		{
 			"Name": "VisualStudioTools",
 			"Enabled": false,
@@ -73,6 +73,10 @@
 		{
 			"Name": "GLTFExporter",
 			"Enabled": false
+		},
+		{
+			"Name": "CascadeToNiagaraConverter",
+			"Enabled": true
 		}
 	]
 }
