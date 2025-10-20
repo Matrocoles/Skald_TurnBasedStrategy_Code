@@ -105,38 +105,75 @@ void UGridBattleManager::InitBattle(const TArray<FFighter>& Attackers, const TAr
     UE_LOG(LogSkaldBattle, Log, TEXT("[Battle] Initialised battle: Attackers=%d, Defenders=%d"), AttackerTeam.Num(), DefenderTeam.Num());
 }
 
+FDiceRollResult UGridBattleManager::ResolveAttackDice(const FFighterStats& AttackerStats, const FFighterStats& DefenderStats, FRandomStream& RandomStream)
+{
+    FDiceRollResult Result;
+    Result.StartingHealth = DefenderStats.Health;
+    Result.EndingHealth = DefenderStats.Health;
+
+    if (AttackerStats.AttackDice <= 0 || Result.StartingHealth <= 0)
+    {
+        return Result;
+    }
+
+    const int32 RequiredRoll = AttackerStats.Strength > DefenderStats.Defence ? 3 :
+        (AttackerStats.Strength < DefenderStats.Defence ? 5 : 4);
+
+    const int32 DiceToRoll = FMath::Max(0, AttackerStats.AttackDice);
+    Result.DiceOutcomes.Reserve(DiceToRoll);
+
+    int32 SimulatedHealth = Result.StartingHealth;
+    for (int32 DieIndex = 0; DieIndex < DiceToRoll && SimulatedHealth > 0; ++DieIndex)
+    {
+        FDiceRollOutcome& Outcome = Result.DiceOutcomes.AddDefaulted_GetRef();
+        Outcome.RollValue = RandomStream.RandRange(1, 6);
+
+        int32 Damage = 0;
+        if (Outcome.RollValue == 6)
+        {
+            Damage = AttackerStats.AttackDamage + AttackerStats.CriticalBonusDamage;
+        }
+        else if (Outcome.RollValue >= RequiredRoll)
+        {
+            Damage = AttackerStats.AttackDamage;
+        }
+
+        Outcome.Damage = Damage;
+        Outcome.bHit = Damage > 0;
+        Outcome.bCritical = Outcome.bHit && Outcome.RollValue == 6 && Damage > AttackerStats.AttackDamage;
+
+        if (Outcome.bHit)
+        {
+            const int32 AppliedDamage = FMath::Min(Damage, SimulatedHealth);
+            SimulatedHealth -= AppliedDamage;
+            Result.TotalDamage += AppliedDamage;
+            ++Result.HitCount;
+
+            if (Outcome.bCritical)
+            {
+                ++Result.CriticalHitCount;
+            }
+        }
+        else
+        {
+            ++Result.MissCount;
+        }
+    }
+
+    Result.EndingHealth = SimulatedHealth;
+    return Result;
+}
+
 bool UGridBattleManager::ResolveAttack(FFighter& Attacker, FFighter& Defender, int32& OutDamage, FRandomStream& RandomStream)
 {
-    OutDamage = 0;
-    bool bDefeated = false;
-    const int32 RequiredRoll = Attacker.Stats.Strength > Defender.Stats.Defence ? 3 :
-        (Attacker.Stats.Strength < Defender.Stats.Defence ? 5 : 4);
+    const int32 StartingHealth = Defender.Stats.Health;
 
-    for (int32 i = 0; i < Attacker.Stats.AttackDice; ++i)
-    {
-        int32 Roll = RandomStream.RandRange(1, 6);
-        if (Roll == 6)
-        {
-            int32 Damage = Attacker.Stats.AttackDamage + Attacker.Stats.CriticalBonusDamage;
-            Defender.Stats.Health -= Damage;
-            Defender.Stats.Health = FMath::Max(Defender.Stats.Health, 0);
-            OutDamage += Damage;
-        }
-        else if (Roll >= RequiredRoll)
-        {
-            int32 Damage = Attacker.Stats.AttackDamage;
-            Defender.Stats.Health -= Damage;
-            Defender.Stats.Health = FMath::Max(Defender.Stats.Health, 0);
-            OutDamage += Damage;
-        }
-    }
+    FDiceRollResult Result = ResolveAttackDice(Attacker.Stats, Defender.Stats, RandomStream);
+    Defender.Stats.Health = FMath::Max(0, Result.EndingHealth);
 
-    if (Defender.Stats.Health <= 0)
-    {
-        bDefeated = true;
-    }
+    OutDamage = FMath::Clamp(Result.TotalDamage, 0, StartingHealth);
 
-    return bDefeated;
+    return Result.EndingHealth > 0;
 }
 
 int32 UGridBattleManager::GetAttackerSurvivors()

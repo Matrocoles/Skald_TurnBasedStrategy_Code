@@ -339,16 +339,8 @@ private:
   /** Apply a normalised flash value across cached material instances. */
   void ApplyHitFlash(float NormalisedValue);
 
-  /** Data describing a single queued attack roll. */
-  struct FQueuedAttackRoll {
-    int32 RollValue = 1;
-    int32 Damage = 0;
-    bool bHit = false;
-  };
-
   /** Begin resolving queued attack rolls with a delay between each. */
-  void StartQueuedAttack(AFighterPawn *Target,
-                         TArray<FQueuedAttackRoll> &&Rolls);
+  void StartQueuedAttack(AFighterPawn *Target, FDiceRollResult &&DiceResult);
 
   /** Apply the next queued attack roll, showing the appropriate widget. */
   void ResolveNextAttackRoll();
@@ -362,11 +354,8 @@ private:
   /** Reset queued attack bookkeeping and optionally notify listeners. */
   void ClearQueuedAttackState(bool bBroadcastFinalized);
 
-  /** Pending attack rolls awaiting delayed resolution. */
-  TArray<FQueuedAttackRoll> PendingAttackRolls;
-
-  /** Index of the next pending attack roll to resolve. */
-  int32 PendingAttackRollIndex = 0;
+  /** Index of the next pending dice outcome to resolve. */
+  int32 PendingAttackOutcomeIndex = 0;
 
   /** Target currently receiving delayed attack rolls. */
   TWeakObjectPtr<AFighterPawn> PendingAttackTarget;

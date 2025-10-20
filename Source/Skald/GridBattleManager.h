@@ -224,8 +224,9 @@ public:
     UFUNCTION(BlueprintCallable, Category="Skald|Battle")
     void SetRandomSeed(int32 Seed);
 
-    /** Resolve an attack following strength/defence rules. Returns true if the defender is defeated. */
+    /** Resolve an attack following strength/defence rules. Returns true if the defender survives. */
     UFUNCTION(BlueprintCallable, Category="Battle")
+    static FDiceRollResult ResolveAttackDice(const FFighterStats& AttackerStats, const FFighterStats& DefenderStats, UPARAM(ref) FRandomStream& RandomStream);
     static bool ResolveAttack(FFighter& Attacker, FFighter& Defender, int32& OutDamage, UPARAM(ref) FRandomStream& RandomStream);
 
     /** Roll initiative for the next round, determining which side acts first. */
