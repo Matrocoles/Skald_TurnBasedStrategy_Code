@@ -522,6 +522,8 @@ private:
 
   void PlayAttackFeedback(AFighterPawn *Attacker, AFighterPawn *Defender,
                           const FDiceRollResult &Result);
+  void PlayDiceOutcomeFeedback(AFighterPawn *Attacker, AFighterPawn *Defender,
+                               const FDiceRollOutcome &Outcome);
 
   UFUNCTION()
   void HandleDiceResolutionComplete(AFighterPawn *Attacker,
