@@ -1328,7 +1328,6 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
         if (PS->InitiativeRoll > 0) {
           PS->InitiativeRoll = 0;
         }
-        PS->bHasAcknowledgedStrategicInitiative = PS->bIsAI;
       }
     }
 
@@ -1343,12 +1342,6 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
   if (bWorldInitialized && bReadyToStart && !bTurnsStarted && TurnManager &&
       TurnManager->GetCurrentPhase() != ETurnPhase::ArmyPlacement &&
       TurnManager->GetControllerCount() > 0) {
-    if (!HaveAllPlayersAcknowledgedStrategicInitiative()) {
-      UE_LOG(LogSkald, Verbose,
-             TEXT("TryInitializeWorldAndStart: Awaiting initiative rolls"));
-      return;
-    }
-
     bTurnsStarted = true;
     TurnManager->SortControllersByInitiative();
     TurnManager->StartTurns();
@@ -1363,26 +1356,6 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
   if (bWorldInitialized && bTurnsStarted) {
     GetWorldTimerManager().ClearTimer(RetryInitTimerHandle);
   }
-}
-
-bool ASkaldGameMode::HaveAllPlayersAcknowledgedStrategicInitiative() const {
-  const ASkaldGameState *GS = GetGameState<ASkaldGameState>();
-  if (!GS) {
-    return false;
-  }
-
-  for (APlayerState *PSBase : GS->PlayerArray) {
-    const ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase);
-    if (!PS) {
-      continue;
-    }
-
-    if (!PS->bHasAcknowledgedStrategicInitiative) {
-      return false;
-    }
-  }
-
-  return true;
 }
 
 void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
@@ -1974,8 +1947,6 @@ bool ASkaldGameMode::InitializeWorld() {
         FallbackStream.Initialize(FMath::Rand());
         PS->InitiativeRoll = FallbackStream.RandRange(1, 6);
       }
-
-      PS->bHasAcknowledgedStrategicInitiative = PS->bIsAI;
     }
   }
 

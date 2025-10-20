@@ -522,7 +522,6 @@ protected:
 
   TArray<FQueuedDiceResolution> PendingDiceResolutions;
   bool bDiceResolutionActive = false;
-  bool bStrategicInitiativePending = false;
   FQueuedDiceResolution ActiveDiceResolution;
 
   UPROPERTY(Transient)

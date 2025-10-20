@@ -530,8 +530,6 @@ void USkaldMainHUDWidget::HideEnemyTurnInProgress() {
 
 void USkaldMainHUDWidget::ShowStrategicInitiativePrompt(const FText &PromptText,
                                                         float ButtonDelay) {
-  bStrategicInitiativePending = true;
-
   if (InitiativePromptText) {
     InitiativePromptText->SetText(PromptText);
     InitiativePromptText->SetVisibility(ESlateVisibility::HitTestInvisible);
@@ -557,13 +555,9 @@ void USkaldMainHUDWidget::ShowStrategicInitiativePrompt(const FText &PromptText,
       }
     }
   }
-
-  SyncPhaseButtons(false);
 }
 
 void USkaldMainHUDWidget::HideStrategicInitiativePrompt() {
-  bStrategicInitiativePending = false;
-
   if (InitiativePromptText) {
     InitiativePromptText->SetText(FText::GetEmpty());
     InitiativePromptText->SetVisibility(ESlateVisibility::Collapsed);
@@ -579,17 +573,6 @@ void USkaldMainHUDWidget::HideStrategicInitiativePrompt() {
   } else {
     StrategicInitiativeRollDelayHandle.Invalidate();
   }
-
-  int32 ResolvedLocalId = LocalPlayerID;
-  if (ResolvedLocalId == -1) {
-    ResolvedLocalId = ResolveLocalPlayerId();
-    if (ResolvedLocalId != -1) {
-      LocalPlayerID = ResolvedLocalId;
-    }
-  }
-  const bool bIsMyTurn =
-      (CurrentPlayerID == ResolvedLocalId) && ResolvedLocalId != -1;
-  SyncPhaseButtons(bIsMyTurn);
 }
 
 void USkaldMainHUDWidget::ShowStrategicInitiativeRoll(int32 RollValue,
@@ -1415,9 +1398,7 @@ void USkaldMainHUDWidget::HandleTurnIndexChanged(int32 /*NewTurnIndex*/) {
 }
 
 void USkaldMainHUDWidget::SyncPhaseButtons(bool bIsMyTurn) {
-  const bool bAllowControls = bIsMyTurn && !bStrategicInitiativePending;
-
-  BP_SetPhaseButtons(CurrentPhase, bAllowControls);
+  BP_SetPhaseButtons(CurrentPhase, bIsMyTurn);
 
   auto SetButtonState = [](UButton *Button, bool bShouldShow,
                            bool bShouldEnable) {
@@ -1430,26 +1411,25 @@ void USkaldMainHUDWidget::SyncPhaseButtons(bool bIsMyTurn) {
     Button->SetIsEnabled(bShouldEnable && bShouldShow);
   };
 
-  const bool bShowAttackButton =
-      bAllowControls && CurrentPhase == ETurnPhase::Attack;
+  const bool bShowAttackButton = bIsMyTurn && CurrentPhase == ETurnPhase::Attack;
   SetButtonState(AttackButton, bShowAttackButton, bShowAttackButton);
 
   const bool bShowMoveButton =
-      bAllowControls && CurrentPhase == ETurnPhase::Movement;
+      bIsMyTurn && CurrentPhase == ETurnPhase::Movement;
   SetButtonState(MoveButton, bShowMoveButton, bShowMoveButton);
 
   const bool bShowDeployButton =
-      bAllowControls &&
+      bIsMyTurn &&
       (CurrentPhase == ETurnPhase::Reinforcement ||
        CurrentPhase == ETurnPhase::ArmyPlacement);
   SetButtonState(DeployButton, bShowDeployButton, bShowDeployButton);
 
   const bool bShowEndPhaseButton =
-      bAllowControls && CurrentPhase != ETurnPhase::EndTurn;
+      bIsMyTurn && CurrentPhase != ETurnPhase::EndTurn;
   SetButtonState(EndPhaseButton, bShowEndPhaseButton, bShowEndPhaseButton);
 
   const bool bShowEndTurnButton =
-      bAllowControls && CurrentPhase == ETurnPhase::EndTurn;
+      bIsMyTurn && CurrentPhase == ETurnPhase::EndTurn;
   SetButtonState(EndTurnButton, bShowEndTurnButton, bShowEndTurnButton);
 }
 
