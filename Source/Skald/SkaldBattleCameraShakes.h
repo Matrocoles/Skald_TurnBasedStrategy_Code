@@ -2,10 +2,18 @@
 
 #include "CoreMinimal.h"
 #include "Camera/CameraShakeBase.h"
-#include "Camera/CameraShakeBaseTypes.h"
 #include "Math/Rotator.h"
 #include "Math/Vector.h"
 #include "SkaldBattleCameraShakes.generated.h"
+
+#if __has_include("Camera/CameraShakeBaseTypes.h")
+#include "Camera/CameraShakeBaseTypes.h"
+#else
+using FCameraShakeStartParams = FCameraShakeBaseStartParams;
+using FCameraShakeUpdateParams = FCameraShakeBaseUpdateParams;
+using FCameraShakeUpdateResult = FCameraShakeBaseUpdateResult;
+using FCameraShakeStopParams = FCameraShakeBaseStopParams;
+#endif
 
 /**
  * Minimal oscillating shake built on top of the UE 5.5 camera shake base class.
@@ -70,4 +78,3 @@ public:
   explicit USkaldMissCameraShake(
       const FObjectInitializer &ObjectInitializer = FObjectInitializer::Get());
 };
-
