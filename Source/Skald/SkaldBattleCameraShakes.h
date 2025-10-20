@@ -2,10 +2,16 @@
 
 #include "CoreMinimal.h"
 #include "Camera/CameraShakeBase.h"
-#include "Camera/CameraShakeBaseTypes.h" // REQUIRED in UE5.5 for FCameraShake*Params
 #include "Math/Rotator.h"
 #include "Math/Vector.h"
 #include "SkaldBattleCameraShakes.generated.h"
+
+// Forward declarations of the UE camera shake param/result structs.
+// (Do NOT include CameraShakeBaseTypes.h; it is not present on this UE 5.5.4 install)
+struct FCameraShakeStartParams;
+struct FCameraShakeUpdateParams;
+struct FCameraShakeUpdateResult;
+struct FCameraShakeStopParams;
 
 /**
  * Minimal oscillating shake built on top of the UE 5.5 camera shake base class.
@@ -46,9 +52,7 @@ private:
     bool  bIsActive;
 };
 
-/**
- * Lightweight micro shake triggered when a battle attack successfully hits.
- */
+/** Lightweight micro shake triggered when a battle attack successfully hits. */
 UCLASS()
 class SKALD_API USkaldHitCameraShake : public USkaldOscillationCameraShake
 {
