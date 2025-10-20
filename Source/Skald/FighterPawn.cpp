@@ -956,16 +956,34 @@ void AFighterPawn::FinalizeQueuedAttack() {
     }
   }
 
+  ClearQueuedAttackState(true);
+}
+
+void AFighterPawn::CancelQueuedAttack() {
+  if (!IsResolvingQueuedAttack()) {
+    return;
+  }
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(AttackRollTimerHandle);
+  }
+
+  ClearQueuedAttackState(true);
+}
+
+void AFighterPawn::ClearQueuedAttackState(bool bBroadcastFinalized) {
   bHasPendingDiceResult = false;
   PendingAttackDiceResult = FDiceRollResult();
 
   PendingAttackRolls.Reset();
   PendingAttackRollIndex = 0;
-  PendingAttackTarget = nullptr;
+  PendingAttackTarget.Reset();
   bPendingAttackTargetDied = false;
   bHasProcessedPendingRoll = false;
 
-  OnQueuedAttackFinalized.Broadcast();
+  if (bBroadcastFinalized) {
+    OnQueuedAttackFinalized.Broadcast();
+  }
 }
 
 void AFighterPawn::InitializeDisplayMeshMaterials() {
@@ -1180,6 +1198,7 @@ void AFighterPawn::HandleAutoHealthHoldExpired() {
 }
 
 void AFighterPawn::Destroyed() {
+  CancelQueuedAttack();
   FinishActivation();
   if (UGridOverlayComponent *Grid = GetGrid()) {
     const TArray<FIntPoint> OccupiedCells = GetOccupiedCells();
