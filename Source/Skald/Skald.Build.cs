@@ -32,7 +32,8 @@ public class Skald : ModuleRules
                         "UMG",
                         "OnlineSubsystem",
                         "Landscape",
-                        "AssetRegistry"
+                        "AssetRegistry",
+                        "Niagara"
                 });
 
                 PrivateIncludePaths.AddRange(new string[]

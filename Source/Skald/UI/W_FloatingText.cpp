@@ -19,6 +19,7 @@ void UW_FloatingText::InitializeFloater(APlayerController *InOwningPlayer) {
   SetVisibility(ESlateVisibility::HitTestInvisible);
   SetRenderOpacity(1.f);
   SetRenderScale(FVector2D(1.f, 1.f));
+  SetRenderTransformAngle(0.f);
   SetAlignmentInViewport(FVector2D(0.5f, 0.5f));
   ApplyInvalidation();
 }
@@ -31,9 +32,15 @@ void UW_FloatingText::ResetForPool() {
 
   SetRenderOpacity(1.f);
   SetRenderScale(FVector2D(1.f, 1.f));
+  SetRenderTransformAngle(0.f);
   SetVisibility(ESlateVisibility::Collapsed);
   if (FloatingText) {
     FloatingText->SetText(FText::GetEmpty());
+    if (bHasDefaultFont) {
+      FloatingText->SetFont(DefaultFont);
+    }
+    FloatingText->SetShadowOffset(FVector2D::ZeroVector);
+    FloatingText->SetShadowColorAndOpacity(FLinearColor::Transparent);
   }
   ApplyInvalidation();
 }
@@ -64,6 +71,34 @@ void UW_FloatingText::SetFloaterOpacity(float InOpacity) {
 void UW_FloatingText::SetFloaterScale(float InScale) {
   const float SafeScale = FMath::Max(0.01f, InScale);
   SetRenderScale(FVector2D(SafeScale, SafeScale));
+  ApplyInvalidation();
+}
+
+void UW_FloatingText::SetTagStyle(bool bMissTag) {
+  if (FloatingText && !bHasDefaultFont) {
+    DefaultFont = FloatingText->Font;
+    bHasDefaultFont = true;
+  }
+
+  SetRenderTransformAngle(bMissTag ? -14.f : 0.f);
+
+  if (FloatingText) {
+    FSlateFontInfo FontInfo = bHasDefaultFont ? DefaultFont : FloatingText->Font;
+    if (bMissTag) {
+      FontInfo.OutlineSettings.OutlineSize = 2;
+      FontInfo.OutlineSettings.OutlineColor = FLinearColor(0.f, 0.f, 0.f, 0.65f);
+    }
+    FloatingText->SetFont(FontInfo);
+
+    const FVector2D ShadowOffset = bMissTag ? FVector2D(2.f, 2.f)
+                                            : FVector2D(1.f, 1.f);
+    const FLinearColor ShadowColor =
+        bMissTag ? FLinearColor(0.f, 0.f, 0.f, 0.55f)
+                 : FLinearColor(0.f, 0.f, 0.f, 0.35f);
+    FloatingText->SetShadowOffset(ShadowOffset);
+    FloatingText->SetShadowColorAndOpacity(ShadowColor);
+  }
+
   ApplyInvalidation();
 }
 

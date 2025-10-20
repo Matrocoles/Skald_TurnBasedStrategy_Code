@@ -10,6 +10,9 @@
 #include "EngineUtils.h"
 #include "GridBattleManager.h"
 #include "GridOverlayComponent.h"
+#include "Curves/CurveFloat.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
 #include "Skald_GameInstance.h"
 #include "TimerManager.h"
@@ -156,6 +159,11 @@ void AFighterPawn::OnConstruction(const FTransform &Transform) {
 void AFighterPawn::BeginPlay() {
   Super::BeginPlay();
 
+  InitializeDisplayMeshMaterials();
+  ApplyHitFlash(0.f);
+  LastKnownHealth = Stats.Health;
+  bHasRecordedHealth = true;
+
   if (HasAuthority() && MaxHealth <= 0) {
     MaxHealth = FMath::Max(Stats.Health, 1);
   }
@@ -261,6 +269,8 @@ void AFighterPawn::InitializeMaxHealth(int32 InMaxHealth) {
 
 void AFighterPawn::Tick(float DeltaSeconds) {
   Super::Tick(DeltaSeconds);
+
+  UpdateHitFlash(DeltaSeconds);
 
   if (!bIsMoving) {
     return;
@@ -941,6 +951,105 @@ void AFighterPawn::FinalizeQueuedAttack() {
   OnQueuedAttackFinalized.Broadcast();
 }
 
+void AFighterPawn::InitializeDisplayMeshMaterials() {
+  if (!DisplayMesh) {
+    return;
+  }
+
+  bool bHasValidMIDs = CachedDisplayMeshMIDs.Num() > 0;
+  if (bHasValidMIDs) {
+    for (UMaterialInstanceDynamic *MID : CachedDisplayMeshMIDs) {
+      if (!MID) {
+        bHasValidMIDs = false;
+        break;
+      }
+    }
+  }
+
+  if (bHasValidMIDs) {
+    return;
+  }
+
+  CachedDisplayMeshMIDs.Reset();
+  const int32 MaterialCount = DisplayMesh->GetNumMaterials();
+  CachedDisplayMeshMIDs.Reserve(MaterialCount);
+
+  for (int32 Index = 0; Index < MaterialCount; ++Index) {
+    if (UMaterialInterface *Material = DisplayMesh->GetMaterial(Index)) {
+      if (UMaterialInstanceDynamic *MID =
+              DisplayMesh->CreateDynamicMaterialInstance(Index, Material)) {
+        CachedDisplayMeshMIDs.Add(MID);
+        if (MID) {
+          MID->SetScalarParameterValue(HitFlashParameterName, 0.f);
+        }
+      }
+    }
+  }
+}
+
+void AFighterPawn::TriggerHitFlash(float DamageRatio) {
+  InitializeDisplayMeshMaterials();
+
+  if (CachedDisplayMeshMIDs.Num() == 0) {
+    return;
+  }
+
+  const float ClampedRatio = FMath::Clamp(DamageRatio, 0.f, 1.f);
+  HitFlashStrength = FMath::GetMappedRangeValueClamped(FVector2D(0.f, 1.f),
+                                                       FVector2D(0.45f, 1.f),
+                                                       ClampedRatio);
+  HitFlashElapsed = 0.f;
+  bHitFlashActive = true;
+
+  const float InitialValue = HitFlashCurve ? HitFlashCurve->GetFloatValue(0.f)
+                                           : 1.f;
+  ApplyHitFlash(InitialValue * HitFlashStrength);
+}
+
+void AFighterPawn::UpdateHitFlash(float DeltaSeconds) {
+  if (!bHitFlashActive) {
+    return;
+  }
+
+  const float SafeDelta = FMath::Max(DeltaSeconds, 0.f);
+  HitFlashElapsed += SafeDelta;
+
+  float EffectiveDuration = HitFlashDuration;
+  if (HitFlashCurve) {
+    float MinTime = 0.f;
+    float MaxTime = 0.f;
+    HitFlashCurve->GetTimeRange(MinTime, MaxTime);
+    EffectiveDuration = FMath::Max(MaxTime, KINDA_SMALL_NUMBER);
+  }
+
+  EffectiveDuration = FMath::Max(EffectiveDuration, KINDA_SMALL_NUMBER);
+  const float Normalised = FMath::Clamp(HitFlashElapsed / EffectiveDuration,
+                                        0.f, 1.f);
+
+  const float CurveValue = HitFlashCurve
+                               ? HitFlashCurve->GetFloatValue(HitFlashElapsed)
+                               : 1.f - Normalised;
+  ApplyHitFlash(FMath::Max(0.f, CurveValue) * HitFlashStrength);
+
+  if (HitFlashElapsed >= EffectiveDuration) {
+    bHitFlashActive = false;
+    ApplyHitFlash(0.f);
+  }
+}
+
+void AFighterPawn::ApplyHitFlash(float NormalisedValue) {
+  if (CachedDisplayMeshMIDs.Num() == 0) {
+    return;
+  }
+
+  const float ClampedValue = FMath::Clamp(NormalisedValue, 0.f, 1.5f);
+  for (UMaterialInstanceDynamic *MID : CachedDisplayMeshMIDs) {
+    if (MID) {
+      MID->SetScalarParameterValue(HitFlashParameterName, ClampedValue);
+    }
+  }
+}
+
 void AFighterPawn::UpdateMeshOffset() {
   if (DisplayMesh && CollisionComponent) {
     const float HalfHeight = CollisionComponent->GetUnscaledCapsuleHalfHeight();
@@ -952,6 +1061,17 @@ bool AFighterPawn::IsAlive() const { return Stats.Health > 0; }
 
 void AFighterPawn::UpdateHealthDisplay(int32 NewHealth) {
   const int32 SafeMax = MaxHealth > 0 ? MaxHealth : FMath::Max(1, NewHealth);
+
+  if (!bHasRecordedHealth) {
+    LastKnownHealth = NewHealth;
+    bHasRecordedHealth = true;
+  } else if (NewHealth < LastKnownHealth) {
+    const int32 Damage = LastKnownHealth - NewHealth;
+    const int32 EffectiveMax = FMath::Max(SafeMax, 1);
+    const float DamageRatio = static_cast<float>(Damage) /
+                              static_cast<float>(EffectiveMax);
+    TriggerHitFlash(DamageRatio);
+  }
 
   const auto ApplyHealthToComponent = [&](UWidgetComponent *Component) {
     if (!Component) {
@@ -966,6 +1086,8 @@ void AFighterPawn::UpdateHealthDisplay(int32 NewHealth) {
 
   ApplyHealthToComponent(HealthWidget);
   ApplyHealthToComponent(HealthWidgetBack);
+
+  LastKnownHealth = NewHealth;
 }
 
 void AFighterPawn::Destroyed() {
@@ -989,6 +1111,11 @@ void AFighterPawn::Destroyed() {
 }
 
 void AFighterPawn::OnRep_Stats(const FFighterStats &OldStats) {
+  if (!bHasRecordedHealth) {
+    LastKnownHealth = OldStats.Health > 0 ? OldStats.Health : Stats.Health;
+    bHasRecordedHealth = true;
+  }
+
   if (Stats.Health != OldStats.Health) {
     const bool bHadListeners = OnHealthChanged.IsBound();
     OnHealthChanged.Broadcast(Stats.Health);
