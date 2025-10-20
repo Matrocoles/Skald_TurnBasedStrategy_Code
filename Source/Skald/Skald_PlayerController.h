@@ -387,6 +387,9 @@ public:
   void ClientPromptStrategicInitiative(int32 RoundNumber, int32 RollValue,
                                        bool bWonInitiative);
 
+  UFUNCTION(Server, Reliable)
+  void ServerConfirmStrategicInitiativeRoll();
+
   /** Server-side processing of an attack request. */
   UFUNCTION(Server, Reliable)
   void ServerHandleAttack(int32 FromID, int32 ToID, int32 ArmySent,

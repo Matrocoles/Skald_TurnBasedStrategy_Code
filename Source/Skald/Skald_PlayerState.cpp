@@ -10,7 +10,8 @@
 #include "UI/SkaldMainHUDWidget.h"
 
 ASkaldPlayerState::ASkaldPlayerState()
-    : DeployableUnits(0), InitiativeRoll(0), Resources(0),
+    : DeployableUnits(0), InitiativeRoll(0),
+      bHasAcknowledgedStrategicInitiative(false), Resources(0),
       PlayerDisplayName(TEXT("")), Faction(ESkaldFaction::None), bIsAI(false),
       bHasLockedIn(false), IsEliminated(false) {}
 
@@ -42,6 +43,7 @@ void ASkaldPlayerState::GetLifetimeReplicatedProps(
   DOREPLIFETIME(ASkaldPlayerState, bIsAI);
   DOREPLIFETIME(ASkaldPlayerState, DeployableUnits);
   DOREPLIFETIME(ASkaldPlayerState, InitiativeRoll);
+  DOREPLIFETIME(ASkaldPlayerState, bHasAcknowledgedStrategicInitiative);
   DOREPLIFETIME(ASkaldPlayerState, Resources);
   DOREPLIFETIME(ASkaldPlayerState, bHasLockedIn);
   DOREPLIFETIME(ASkaldPlayerState, IsEliminated);
@@ -89,6 +91,14 @@ void ASkaldPlayerState::OnRep_PlayerDisplayName() {
 }
 
 void ASkaldPlayerState::OnRep_IsAI() {
+  if (UWorld *World = GetWorld()) {
+    if (ASkaldGameState *GS = World->GetGameState<ASkaldGameState>()) {
+      GS->OnPlayersUpdated.Broadcast();
+    }
+  }
+}
+
+void ASkaldPlayerState::OnRep_StrategicInitiativeAcknowledged() {
   if (UWorld *World = GetWorld()) {
     if (ASkaldGameState *GS = World->GetGameState<ASkaldGameState>()) {
       GS->OnPlayersUpdated.Broadcast();

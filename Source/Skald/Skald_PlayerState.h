@@ -29,6 +29,12 @@ public:
   UPROPERTY(BlueprintReadWrite, Replicated, Category = "PlayerState")
   int32 InitiativeRoll;
 
+  /** Whether the player has acknowledged the current strategic initiative roll. */
+  UPROPERTY(BlueprintReadWrite, ReplicatedUsing =
+                OnRep_StrategicInitiativeAcknowledged,
+            Category = "PlayerState")
+  bool bHasAcknowledgedStrategicInitiative = false;
+
   /** Resource points available to the player. */
   UPROPERTY(BlueprintReadWrite, Replicated, Category = "PlayerState")
   int32 Resources;
@@ -83,6 +89,9 @@ public:
 
   UFUNCTION()
   void OnRep_IsAI();
+
+  UFUNCTION()
+  void OnRep_StrategicInitiativeAcknowledged();
 
   virtual void OnRep_PlayerId() override;
 
