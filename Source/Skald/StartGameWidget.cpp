@@ -83,7 +83,11 @@ void UStartGameWidget::NativeConstruct() {
         }
       }
     }
+    FactionComboBox->RefreshOptions();
     FactionComboBox->SetSelectedOption(FactionPlaceholderOption);
+    if (FactionComboBox->GetSelectedOption() != FactionPlaceholderOption) {
+      FactionComboBox->SetSelectedIndex(0);
+    }
     FactionComboBox->SetVisibility(ESlateVisibility::Collapsed);
   }
 
