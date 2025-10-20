@@ -15,13 +15,16 @@ bool FSkaldResolveAttackClampTest::RunTest(const FString& Parameters) {
 
   FRandomStream RandomStream(3);
   int32 OutDamage = 0;
+  FDiceRollResult OutResult;
   const bool bDefenderSurvived =
       UGridBattleManager::ResolveAttack(Attacker, Defender, OutDamage,
-                                        RandomStream);
+                                        RandomStream, OutResult);
 
   TestFalse(TEXT("Defender should be defeated"), bDefenderSurvived);
   TestEqual(TEXT("Damage is clamped to defender health"), OutDamage, 5);
   TestEqual(TEXT("Defender health clamped"), Defender.Stats.Health, 0);
+  TestEqual(TEXT("Total damage recorded"), OutResult.TotalDamage, 5);
+  TestEqual(TEXT("Ending health recorded"), OutResult.EndingHealth, 0);
   return true;
 }
 #endif  // WITH_AUTOMATION_TESTS

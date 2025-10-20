@@ -227,7 +227,9 @@ public:
     /** Resolve an attack following strength/defence rules. Returns true if the defender survives. */
     UFUNCTION(BlueprintCallable, Category="Battle")
     static FDiceRollResult ResolveAttackDice(const FFighterStats& AttackerStats, const FFighterStats& DefenderStats, UPARAM(ref) FRandomStream& RandomStream);
-    static bool ResolveAttack(FFighter& Attacker, FFighter& Defender, int32& OutDamage, UPARAM(ref) FRandomStream& RandomStream);
+
+    UFUNCTION(BlueprintCallable, Category="Battle|Dice")
+    static bool ResolveAttack(UPARAM(ref) FFighter& Attacker, UPARAM(ref) FFighter& Defender, UPARAM(ref) int32& OutDamage, UPARAM(ref) FRandomStream& RandomStream, UPARAM(ref) FDiceRollResult& OutResult);
 
     /** Roll initiative for the next round, determining which side acts first. */
     UFUNCTION(BlueprintCallable, Category="Skald|Battle")
@@ -343,7 +345,11 @@ public:
     UFUNCTION(BlueprintCallable, Category="Battle")
     void UnregisterFighter(AFighterPawn* Fighter);
 
+    UFUNCTION(BlueprintCallable, Category="Battle|Events")
     void ReportAttackResolution(AFighterPawn* Attacker, AFighterPawn* Defender, const FDiceRollResult& Result);
+
+    UFUNCTION(BlueprintCallable, Category="Battle|Events")
+    void ReportSimulatedAttackResolution(const FDiceRollResult& Result);
     void ReportAttackRejected(AFighterPawn* Attacker, AFighterPawn* Defender, const FText& Reason);
 
     /** Table containing fighter definitions. */

@@ -104,6 +104,7 @@ protected:
     void RevealNextDie();
     void HandleCompletionDelayElapsed();
     void UpdateTallies();
+    void UpdateSummaryLabels();
 
     /** Text displaying total hits revealed so far. */
     UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
@@ -116,6 +117,14 @@ protected:
     /** Text displaying total critical hits revealed so far. */
     UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
     UTextBlock* CritCountText;
+
+    /** Text displaying the aggregate damage dealt by the attack. */
+    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+    UTextBlock* TotalDamageText;
+
+    /** Text displaying the defender health before and after the attack. */
+    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+    UTextBlock* HealthSummaryText;
 
     /** Container for per-die outcome entries. */
     UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))

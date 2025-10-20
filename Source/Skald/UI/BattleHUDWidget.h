@@ -377,6 +377,18 @@ private:
   UPROPERTY(EditAnywhere, Category = "Skald|Battle|Floaters")
   FLinearColor MissFloaterColor = FLinearColor(0.7f, 0.7f, 0.74f);
 
+  /** Default colour for health summary floaters. */
+  UPROPERTY(EditAnywhere, Category = "Skald|Battle|Floaters")
+  FLinearColor HealthFloaterColor = FLinearColor(0.82f, 0.82f, 0.9f);
+
+  /** Offset applied above the fighter when spawning floaters. */
+  UPROPERTY(EditAnywhere, Category = "Skald|Battle|Floaters")
+  float FloaterAnchorHeightOffset = 60.f;
+
+  /** Vertical spacing applied when stacking multiple floaters. */
+  UPROPERTY(EditAnywhere, Category = "Skald|Battle|Floaters")
+  float FloaterStackSpacing = 36.f;
+
   /** Active floating text widgets managed by the battle HUD. */
   TArray<FBattleActiveFloater> ActiveFloaters;
 
