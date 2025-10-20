@@ -122,10 +122,14 @@ void ASkaldGameMode::Logout(AController *Exiting) {
     if (ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>()) {
       PlayerID = PS->GetPlayerId();
       bHasValidPlayerState = true;
+
+      RemovePendingStrategicInitiativePlayer(PS);
     }
   }
 
   Super::Logout(Exiting);
+
+  HandlePendingStrategicInitiativeUpdate();
 
   if (bHasValidPlayerState) {
     PlayerDataArray.RemoveAll([PlayerID](const FS_PlayerData &Data) {
@@ -299,6 +303,8 @@ void ASkaldGameMode::CleanupStalePlayerStates() {
   if (bRemovedAny) {
     GS->OnPlayersUpdated.Broadcast();
   }
+
+  HandlePendingStrategicInitiativeUpdate();
 }
 
 void ASkaldGameMode::PopulateAIPlayers() {
@@ -1393,6 +1399,37 @@ void ASkaldGameMode::BeginStrategicInitiativePhase() {
   }
 }
 
+void ASkaldGameMode::RemovePendingStrategicInitiativePlayer(
+    ASkaldPlayerState *PlayerState) {
+  if (!bAwaitingStrategicInitiativeInput) {
+    return;
+  }
+
+  if (PlayerState) {
+    PendingStrategicInitiativePlayers.Remove(
+        TWeakObjectPtr<ASkaldPlayerState>(PlayerState));
+  }
+
+  HandlePendingStrategicInitiativeUpdate();
+}
+
+void ASkaldGameMode::PrunePendingStrategicInitiativePlayers() {
+  for (auto It = PendingStrategicInitiativePlayers.CreateIterator(); It; ++It) {
+    if (!It->IsValid()) {
+      It.RemoveCurrent();
+    }
+  }
+}
+
+void ASkaldGameMode::HandlePendingStrategicInitiativeUpdate() {
+  PrunePendingStrategicInitiativePlayers();
+
+  if (bAwaitingStrategicInitiativeInput &&
+      PendingStrategicInitiativePlayers.Num() == 0) {
+    ResolveStrategicInitiativePhase();
+  }
+}
+
 void ASkaldGameMode::ConfirmStrategicInitiativeRoll(
     ASkaldPlayerController *Controller) {
   if (!Controller || !bAwaitingStrategicInitiativeInput) {
@@ -1404,11 +1441,7 @@ void ASkaldGameMode::ConfirmStrategicInitiativeRoll(
     return;
   }
 
-  PendingStrategicInitiativePlayers.Remove(TWeakObjectPtr<ASkaldPlayerState>(PS));
-
-  if (PendingStrategicInitiativePlayers.Num() == 0) {
-    ResolveStrategicInitiativePhase();
-  }
+  RemovePendingStrategicInitiativePlayer(PS);
 }
 
 void ASkaldGameMode::ResolveStrategicInitiativePhase() {
