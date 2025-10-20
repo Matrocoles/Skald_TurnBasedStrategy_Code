@@ -214,6 +214,4 @@ private:
 
   /** Timer used to retry snapshot capture when no territories are present yet. */
   FTimerHandle TerritorySnapshotRetryHandle;
-
-  bool HaveAllPlayersAcknowledgedStrategicInitiative() const;
 };
