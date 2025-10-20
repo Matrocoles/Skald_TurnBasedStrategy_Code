@@ -235,7 +235,8 @@ public:
 
   /** Helper used by attack resolution events to show damage/miss floaters. */
   UFUNCTION(BlueprintCallable, Category="Skald|HUD")
-  void ShowAttackResultFloater(class AFighterPawn* Target, bool bHit, int32 Damage);
+  void ShowAttackResultFloater(class AFighterPawn *Target,
+                               const FDiceRollResult &Result);
 
   /** Queue a dice resolution sequence for presentation on the panel. */
   void QueueDiceResolution(AFighterPawn *Attacker, AFighterPawn *Defender,
