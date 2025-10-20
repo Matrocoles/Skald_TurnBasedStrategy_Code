@@ -233,6 +233,8 @@ void ASkaldPlayerController::InitializeHUDWidget() {
     const FText PromptText = NSLOCTEXT("Skald", "StrategicInitiativePrompt",
                                        "Roll for initiative");
     MainHUD->ShowStrategicInitiativePrompt(PromptText);
+  } else if (PendingStrategicInitiativeRoll > 0) {
+    ShowPendingStrategicInitiativeResult();
   }
 
   // Notify the game mode that the HUD is now ready so world start checks can
@@ -2699,26 +2701,38 @@ void ASkaldPlayerController::HandleStrategicInitiativeRollRequested() {
   if (MainHUD) {
     MainHUD->HideStrategicInitiativePrompt();
 
-    if (PendingStrategicInitiativeRoll > 0) {
-      MainHUD->ShowStrategicInitiativeRoll(PendingStrategicInitiativeRoll, 2.f);
-    }
-
-    if (MainHUD->RoundStartSound) {
-      UGameplayStatics::PlaySound2D(this, MainHUD->RoundStartSound);
-    }
-
-    if (bPendingStrategicInitiativeWin && InitiativeWinSound && IsLocalController()) {
-      UGameplayStatics::PlaySound2D(this, InitiativeWinSound);
-    }
-
-    const int32 EffectiveRound =
-        PendingStrategicInitiativeRound > 0 ? PendingStrategicInitiativeRound
-                                            : FMath::Max(MainHUD->TurnNumber, 1);
-    const FText RoundMessage = FText::Format(
-        NSLOCTEXT("Skald", "StrategicRoundStart", "Round {0} begins"),
-        FText::AsNumber(EffectiveRound));
-    MainHUD->UpdateInitiativeText(RoundMessage.ToString());
+    const FText RollingText =
+        NSLOCTEXT("Skald", "StrategicInitiativeRolling",
+                  "Rolling for initiative...");
+    MainHUD->UpdateInitiativeText(RollingText.ToString());
   }
+
+  ServerConfirmStrategicInitiativeRollReady();
+}
+
+void ASkaldPlayerController::ShowPendingStrategicInitiativeResult() {
+  if (!MainHUD || PendingStrategicInitiativeRoll <= 0) {
+    return;
+  }
+
+  MainHUD->HideStrategicInitiativePrompt();
+  MainHUD->ShowStrategicInitiativeRoll(PendingStrategicInitiativeRoll, 2.f);
+
+  if (MainHUD->RoundStartSound) {
+    UGameplayStatics::PlaySound2D(this, MainHUD->RoundStartSound);
+  }
+
+  if (bPendingStrategicInitiativeWin && InitiativeWinSound && IsLocalController()) {
+    UGameplayStatics::PlaySound2D(this, InitiativeWinSound);
+  }
+
+  const int32 EffectiveRound = PendingStrategicInitiativeRound > 0
+                                   ? PendingStrategicInitiativeRound
+                                   : FMath::Max(MainHUD->TurnNumber, 1);
+  const FText RoundMessage =
+      FText::Format(NSLOCTEXT("Skald", "StrategicRoundStart", "Round {0} begins"),
+                    FText::AsNumber(EffectiveRound));
+  MainHUD->UpdateInitiativeText(RoundMessage.ToString());
 
   PendingStrategicInitiativeRoll = 0;
   PendingStrategicInitiativeRound = 0;
@@ -2739,6 +2753,24 @@ void ASkaldPlayerController::ClientPromptStrategicInitiative_Implementation(
                                        "Roll for initiative");
     MainHUD->ShowStrategicInitiativePrompt(PromptText);
   }
+}
+
+void ASkaldPlayerController::ServerConfirmStrategicInitiativeRollReady_Implementation() {
+  if (ASkaldGameMode *GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<ASkaldGameMode>()
+                                            : nullptr) {
+    GameMode->ConfirmStrategicInitiativeRoll(this);
+  }
+}
+
+void ASkaldPlayerController::ClientDisplayStrategicInitiativeResult_Implementation(
+    int32 RoundNumber, int32 RollValue, bool bWonInitiative) {
+  PendingStrategicInitiativeRound = RoundNumber;
+  PendingStrategicInitiativeRoll = RollValue;
+  bPendingStrategicInitiativeWin = bWonInitiative;
+  bAwaitingStrategicInitiativeRoll = false;
+
+  ShowMainHUD();
+  ShowPendingStrategicInitiativeResult();
 }
 
 void ASkaldPlayerController::CancelCommandMode() {
