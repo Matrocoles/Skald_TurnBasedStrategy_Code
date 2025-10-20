@@ -2,12 +2,12 @@
 
 #include "CoreMinimal.h"
 #include "Camera/CameraShakeBase.h"
-#include "Math/Rotator.h"
-#include "Math/Vector.h"
 #include "SkaldBattleCameraShakes.generated.h"
 
 /**
- * Minimal oscillating shake built on top of the UE 5.5 camera shake base class.
+ * Base class for Skald camera shakes using the UE5 pattern system.
+ * We DO NOT override Start/Update/Stop/IsFinished.
+ * Instead we construct and assign a UOscillatorCameraShakePattern at runtime.
  */
 UCLASS(Abstract)
 class SKALD_API USkaldOscillationCameraShake : public UCameraShakeBase
@@ -15,56 +15,37 @@ class SKALD_API USkaldOscillationCameraShake : public UCameraShakeBase
     GENERATED_BODY()
 
 public:
-    explicit USkaldOscillationCameraShake(
-        const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+    explicit USkaldOscillationCameraShake(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
 protected:
-    // Correct UE 5.5.4 signatures
-    virtual void StartShake(const struct FCameraShakeBaseStartParams& Params) override;
-    virtual void UpdateAndApplyCameraShake(const struct FCameraShakeBaseUpdateParams& Params,
-                                           struct FCameraShakeBaseUpdateResult& OutResult) override;
-    virtual void StopShake(bool bImmediately) override;
-    virtual bool IsFinished() const override;
-
-    void ConfigureShake(float InDuration, float InBlendInTime, float InBlendOutTime,
-                        const FRotator& InRotationAmplitude,
-                        const FRotator& InRotationFrequency,
-                        const FVector& InLocationAmplitude,
-                        const FVector& InLocationFrequency);
-
-protected:
-    float    Duration;
-    float    BlendInTime;
-    float    BlendOutTime;
-    FRotator RotationAmplitude;
-    FRotator RotationFrequency;
-    FVector  LocationAmplitude;
-    FVector  LocationFrequency;
-
-private:
-    float ElapsedTime;
-    bool  bIsActive;
+    /** Helper to create and wire up an oscillator pattern with the given params. */
+    void BuildOscillationPattern(
+        const FRotator& RotAmplitude,     // degrees
+        const FRotator& RotFrequency,     // Hz
+        const FVector&  LocAmplitude,     // units
+        const FVector&  LocFrequency,     // Hz
+        float DurationSeconds,
+        float BlendInSeconds,
+        float BlendOutSeconds
+    );
 };
 
-/** Lightweight micro shake triggered when a battle attack successfully hits. */
+/** Stronger hit feedback. */
 UCLASS()
 class SKALD_API USkaldHitCameraShake : public USkaldOscillationCameraShake
 {
     GENERATED_BODY()
 
 public:
-    explicit USkaldHitCameraShake(
-        const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+    explicit USkaldHitCameraShake(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 };
 
-/** Subtler shake used for near-miss feedback. */
+/** Subtle miss/near-miss feedback. */
 UCLASS()
 class SKALD_API USkaldMissCameraShake : public USkaldOscillationCameraShake
 {
     GENERATED_BODY()
 
 public:
-    explicit USkaldMissCameraShake(
-        const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+    explicit USkaldMissCameraShake(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 };
-
