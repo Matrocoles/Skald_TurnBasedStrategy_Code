@@ -159,6 +159,10 @@ protected:
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Audio")
   USoundBase *BattleRoundStartSound = nullptr;
 
+  /** Sound to play when the local player wins the initiative roll. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Audio")
+  USoundBase *InitiativeWinSound = nullptr;
+
   /** Camera shake to trigger for successful hits. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
   TSubclassOf<UCameraShakeBase> HitCameraShakeClass;
