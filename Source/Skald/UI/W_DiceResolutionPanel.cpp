@@ -15,8 +15,8 @@
 
 namespace
 {
-constexpr float FirstRevealDelaySeconds = 0.6f;
-constexpr float SubsequentRevealDelaySeconds = 0.8f;
+constexpr float FirstRevealDelaySeconds = 1.1f;
+constexpr float SubsequentRevealDelaySeconds = 1.3f;
 constexpr float CompletionDelaySeconds = 0.8f;
 }
 

@@ -2847,21 +2847,39 @@ void ASkaldPlayerController::PlayAttackFeedback(
     return;
   }
 
+  if (Result.DiceOutcomes.Num() > 0) {
+    // Dice resolution will trigger individual outcome feedback; no aggregate
+    // cue is necessary here to avoid double-playing effects.
+    return;
+  }
+
+  FDiceRollOutcome SyntheticOutcome;
+  SyntheticOutcome.bHit = Result.TotalDamage > 0;
+  SyntheticOutcome.bCritical = Result.CriticalHitCount > 0;
+  PlayDiceOutcomeFeedback(Attacker, Defender, SyntheticOutcome);
+}
+
+void ASkaldPlayerController::PlayDiceOutcomeFeedback(
+    AFighterPawn *Attacker, AFighterPawn *Defender,
+    const FDiceRollOutcome &Outcome) {
+  if (!Defender) {
+    return;
+  }
+
   UWorld *World = GetWorld();
   if (!World) {
     return;
   }
 
-  const bool bAnyDamage = Result.TotalDamage > 0;
-  const FVector ImpactLocation = Defender->GetActorLocation() +
-                                 FVector(0.f, 0.f, 120.f);
+  const FVector ImpactLocation =
+      Defender->GetActorLocation() + FVector(0.f, 0.f, 120.f);
   const FRotator ImpactRotation = Attacker
                                       ? (Defender->GetActorLocation() -
                                          Attacker->GetActorLocation())
                                             .Rotation()
                                       : FRotator::ZeroRotator;
 
-  if (bAnyDamage) {
+  if (Outcome.bHit) {
     if (HitImpactEffect) {
       UNiagaraFunctionLibrary::SpawnSystemAtLocation(
           World, HitImpactEffect, ImpactLocation, ImpactRotation);
@@ -2880,7 +2898,6 @@ void ASkaldPlayerController::PlayAttackFeedback(
                                             ImpactLocation);
     }
   }
-
 }
 
 void ASkaldPlayerController::HandleAttackResolved(AFighterPawn *Attacker,
@@ -2920,6 +2937,8 @@ void ASkaldPlayerController::HandleDiceResolutionComplete(
 void ASkaldPlayerController::HandleDiceOutcomeRevealed(
     AFighterPawn *Attacker, AFighterPawn *Defender,
     const FDiceRollOutcome &Outcome, int32 RevealIndex) {
+  PlayDiceOutcomeFeedback(Attacker, Defender, Outcome);
+
   if (!PlayerCameraManager) {
     return;
   }
