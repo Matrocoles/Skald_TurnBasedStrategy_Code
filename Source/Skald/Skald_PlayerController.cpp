@@ -1613,7 +1613,9 @@ void ASkaldPlayerController::ServerDeployUnits_Implementation(int32 TerritoryID,
     return;
   }
 
-  if (!Terr->bIsCapital) {
+  const bool bIsArmyPlacementPhase =
+      (TurnManager && TurnManager->GetCurrentPhase() == ETurnPhase::ArmyPlacement);
+  if (!bIsArmyPlacementPhase && !Terr->bIsCapital) {
     UE_LOG(LogSkald, Warning,
            TEXT("ServerDeployUnits: Territory %d is not a capital"),
            TerritoryID);

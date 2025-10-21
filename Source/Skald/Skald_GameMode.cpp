@@ -1715,9 +1715,32 @@ void ASkaldGameMode::BeginArmyPlacementPhase() {
                         *GetNameSafe(ActiveController), *PhaseString));
   }
 
-  // Calculate deployable units for each player based on owned territories and
-  // update HUDs.
-  for (ASkaldPlayerController *PC : TurnManager->GetControllers()) {
+  int32 ActivePlayerCount = 0;
+  for (ASkaldPlayerController *PC : Controllers) {
+    if (ASkaldPlayerState *PS =
+            PC ? PC->GetPlayerState<ASkaldPlayerState>() : nullptr) {
+      if (!PS->IsEliminated) {
+        ++ActivePlayerCount;
+      }
+    }
+  }
+
+  auto ResolveInitialDeployableUnits = [](int32 PlayerCount, int32 OwnedCount) {
+    switch (PlayerCount) {
+    case 2:
+      return 40;
+    case 3:
+      return 30;
+    case 4:
+      return 20;
+    default:
+      return FMath::CeilToInt(OwnedCount / 3.f);
+    }
+  };
+
+  // Calculate deployable units for each player based on the total number of
+  // active players in the match and update HUDs.
+  for (ASkaldPlayerController *PC : Controllers) {
     if (ASkaldPlayerState *PS =
             PC ? PC->GetPlayerState<ASkaldPlayerState>() : nullptr) {
       int32 Owned = 0;
@@ -1726,7 +1749,9 @@ void ASkaldGameMode::BeginArmyPlacementPhase() {
           ++Owned;
         }
       }
-      PS->DeployableUnits = FMath::CeilToInt(Owned / 3.f);
+
+      PS->DeployableUnits =
+          ResolveInitialDeployableUnits(ActivePlayerCount, Owned);
       TurnManager->BroadcastDeployableUnits(PS);
     }
   }

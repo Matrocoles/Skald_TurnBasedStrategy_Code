@@ -376,21 +376,27 @@ void USkaldMainHUDWidget::UpdateTerritoryInfo(const FString &TerritoryName,
 
   if (DeployButton && (CurrentPhase == ETurnPhase::Reinforcement ||
                        CurrentPhase == ETurnPhase::ArmyPlacement)) {
-    bool bOwnedCapitalByLocal = false;
+    bool bOwnedByLocal = false;
+    bool bIsCapital = false;
     if (APlayerController *PC = GetOwningPlayer()) {
       if (ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>()) {
         if (AWorldMap *Map = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
                 GetWorld(), AWorldMap::StaticClass()))) {
           if (ATerritory *Sel = Map->SelectedTerritory) {
-            const bool bOwnedByLocal =
+            bOwnedByLocal =
                 (Sel->OwningPlayer &&
                  Sel->OwningPlayer->GetPlayerId() == PS->GetPlayerId());
-            bOwnedCapitalByLocal = bOwnedByLocal && Sel->bIsCapital;
+            if (bOwnedByLocal) {
+              bIsCapital = Sel->bIsCapital;
+            }
           }
         }
       }
     }
-    const bool bShouldShowDeploy = bIsMyTurn && bOwnedCapitalByLocal;
+    const bool bIsArmyPlacement = CurrentPhase == ETurnPhase::ArmyPlacement;
+    const bool bCanDeployHere =
+        bOwnedByLocal && (bIsArmyPlacement || bIsCapital);
+    const bool bShouldShowDeploy = bIsMyTurn && bCanDeployHere;
     DeployButton->SetVisibility(bShouldShowDeploy ? ESlateVisibility::Visible
                                                   : ESlateVisibility::Collapsed);
     DeployButton->SetIsEnabled(bShouldShowDeploy);
@@ -1333,7 +1339,10 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
           (CurrentPlayerID != -1 && EffectiveLocalPlayerId != -1 &&
            CurrentPlayerID == EffectiveLocalPlayerId);
       const bool bIsCapital = Territory->bIsCapital;
-      const bool bShouldShowDeploy = bIsMyTurn && bOwnedByLocal && bIsCapital;
+      const bool bIsArmyPlacement = CurrentPhase == ETurnPhase::ArmyPlacement;
+      const bool bCanDeployHere =
+          bOwnedByLocal && (bIsArmyPlacement || bIsCapital);
+      const bool bShouldShowDeploy = bIsMyTurn && bCanDeployHere;
       DeployButton->SetVisibility(
           bShouldShowDeploy ? ESlateVisibility::Visible
                             : ESlateVisibility::Collapsed);
@@ -1346,6 +1355,8 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
       } else if (bOwnedByLocal) {
         ShowSelectionPromptMessage(TEXT("Select an owned capital."));
       }
+    } else if (CurrentPhase == ETurnPhase::ArmyPlacement && bOwnedByLocal) {
+      ShowSelectionPromptMessage(TEXT("Select an owned territory."));
     }
   } else if (CurrentPhase == ETurnPhase::Engineering && bOwnedByLocal &&
              Territory->bIsCapital) {
@@ -1655,7 +1666,8 @@ void USkaldMainHUDWidget::HandleDeployClicked() {
     return;
   }
 
-  if (!Territory->bIsCapital) {
+  const bool bIsArmyPlacement = CurrentPhase == ETurnPhase::ArmyPlacement;
+  if (!bIsArmyPlacement && !Territory->bIsCapital) {
     ShowSelectionErrorMessage(
         TEXT("Reinforcements can only be placed on owned capitals."));
     return;
