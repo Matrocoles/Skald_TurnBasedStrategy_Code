@@ -1943,15 +1943,19 @@ void ATurnManager::AdvancePhase() {
 }
 
 void ATurnManager::EndCurrentPhase() {
-  if (const UWorld *W = GetWorld()) {
-    if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
-      if (GI->bTravelPending) {
-        return;
+  const bool bArmyPlacement = CurrentPhase == ETurnPhase::ArmyPlacement;
+
+  if (!bArmyPlacement) {
+    if (const UWorld *W = GetWorld()) {
+      if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
+        if (GI->bTravelPending) {
+          return;
+        }
       }
     }
   }
 
-  if (CurrentPhase == ETurnPhase::ArmyPlacement) {
+  if (bArmyPlacement) {
     if (ASkaldGameMode *GM = GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
       GM->AdvanceArmyPlacement();
     }
