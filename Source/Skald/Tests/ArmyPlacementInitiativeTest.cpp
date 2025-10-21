@@ -148,17 +148,17 @@ bool FArmyPlacementInitiativeOrderTest::RunTest(const FString &Parameters) {
   const int32 IndexB = GameState->PlayerArray.IndexOfByKey(StateB);
   TestTrue(TEXT("PlayerA index valid"), IndexA != INDEX_NONE);
   TestTrue(TEXT("PlayerB index valid"), IndexB != INDEX_NONE);
-  TestEqual(TEXT("PlayerA deployable units"), StateA->DeployableUnits, 1);
-  TestEqual(TEXT("PlayerB deployable units"), StateB->DeployableUnits, 1);
+  TestEqual(TEXT("PlayerA deployable units"), StateA->DeployableUnits, 40);
+  TestEqual(TEXT("PlayerB deployable units"), StateB->DeployableUnits, 40);
   TestEqual(TEXT("Army placement begins with initiative winner"), GameState->CurrentTurnIndex,
             IndexA);
 
-  ControllerA->ServerDeployUnits(TerritoryA->TerritoryID, 1);
+  ControllerA->ServerDeployUnits(TerritoryA->TerritoryID, 40);
   TestEqual(TEXT("PlayerA spent units"), StateA->DeployableUnits, 0);
   ControllerA->EndPhase();
   TestEqual(TEXT("Second player receives placement turn"), GameState->CurrentTurnIndex, IndexB);
 
-  ControllerB->ServerDeployUnits(TerritoryB->TerritoryID, 1);
+  ControllerB->ServerDeployUnits(TerritoryB->TerritoryID, 40);
   TestEqual(TEXT("PlayerB spent units"), StateB->DeployableUnits, 0);
   ControllerB->EndPhase();
 
@@ -250,10 +250,10 @@ bool FAIArmyPlacementAutoAdvanceTest::RunTest(const FString &Parameters) {
   const int32 HumanIndex = GameState->PlayerArray.IndexOfByKey(HumanState);
   TestTrue(TEXT("Human player index valid"), HumanIndex != INDEX_NONE);
   TestEqual(TEXT("AI spent deployable units"), AIState->DeployableUnits, 0);
-  TestEqual(TEXT("AI territory reinforced"), TerritoryAI->ArmyUnits, 2);
+  TestEqual(TEXT("AI territory reinforced"), TerritoryAI->ArmyUnits, 41);
   TestEqual(TEXT("Human player's placement turn"), GameState->CurrentTurnIndex, HumanIndex);
 
-  HumanController->ServerDeployUnits(TerritoryHuman->TerritoryID, 1);
+  HumanController->ServerDeployUnits(TerritoryHuman->TerritoryID, 40);
   TestEqual(TEXT("Human spent deployable units"), HumanState->DeployableUnits, 0);
   HumanController->EndPhase();
 
@@ -358,9 +358,9 @@ bool FAIArmyPlacementFailsafeRespectsHumanTest::RunTest(
   TestEqual(TEXT("Phase unchanged after failsafe"),
             TurnManager->GetCurrentPhase(), ETurnPhase::ArmyPlacement);
   TestEqual(TEXT("Human still has units to place"), HumanState->DeployableUnits,
-            1);
+            40);
 
-  HumanController->ServerDeployUnits(TerritoryHuman->TerritoryID, 1);
+  HumanController->ServerDeployUnits(TerritoryHuman->TerritoryID, 40);
   HumanController->EndPhase();
 
   TestEqual(TEXT("Turns advance after human finishes"),
