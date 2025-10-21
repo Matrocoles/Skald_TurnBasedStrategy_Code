@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/GameStateBase.h"
 #include "GridBattleManager.h" // for FFighterDefinition (ensure it’s a USTRUCT)
+#include "TimerManager.h"
 #include "Skald_GameState.generated.h"
 
 class ASkaldPlayerState;
@@ -102,6 +103,11 @@ public:
      */
     void NotifyBattleSummaryChanged();
 
+    /** Request a short-lived global slowdown for cinematic feedback. */
+    void RequestTransientSlowdown(float TargetDilation, float DurationSeconds);
+
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
 protected:
     UFUNCTION()
     void OnRep_Players();
@@ -123,5 +129,12 @@ protected:
 
     /** Keep Players unique & stably ordered by PlayerId. */
     void SortAndDedupPlayers();
+
+    void HandleTimeDilationReset();
+
+    FTimerHandle TimeDilationResetHandle;
+    float OriginalTimeDilation = 1.f;
+    float ActiveTimeDilation = 1.f;
+    bool bTimeDilationRequestActive = false;
 };
 

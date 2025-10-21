@@ -183,6 +183,22 @@ protected:
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
   UNiagaraSystem *MissImpactEffect = nullptr;
 
+  /** Default Niagara effect triggered by a high-stakes critical. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
+  UNiagaraSystem *DefaultHighStakesCriticalEffect = nullptr;
+
+  /** Optional faction overrides for high-stakes critical effects. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
+  TMap<ESkaldFaction, UNiagaraSystem *> HighStakesCriticalFactionEffects;
+
+  /** Default audio cue triggered by a high-stakes critical. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
+  USoundBase *DefaultHighStakesCriticalSound = nullptr;
+
+  /** Optional faction overrides for high-stakes critical audio. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
+  TMap<ESkaldFaction, USoundBase *> HighStakesCriticalFactionSounds;
+
   /** Audio cue played when a hit lands. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
   USoundBase *HitImpactSound = nullptr;
@@ -549,6 +565,9 @@ private:
                           const FDiceRollResult &Result);
   void PlayDiceOutcomeFeedback(AFighterPawn *Attacker, AFighterPawn *Defender,
                                const FDiceRollOutcome &Outcome);
+  void TriggerHighStakesCritFeedback(AFighterPawn *Attacker,
+                                     AFighterPawn *Defender,
+                                     const FDiceRollResult &Result);
 
   UFUNCTION()
   void HandleDiceResolutionComplete(AFighterPawn *Attacker,

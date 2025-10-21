@@ -27,6 +27,9 @@
 UBattleHUDWidget::UBattleHUDWidget(const FObjectInitializer &ObjectInitializer)
     : Super(ObjectInitializer) {
   FloaterWidgetClass = UW_FloatingText::StaticClass();
+  CriticalFloaterStyle.Scale = 1.35f;
+  HighStakesCriticalFloaterStyle.Color = FLinearColor(0.94f, 0.2f, 0.2f);
+  HighStakesCriticalFloaterStyle.Scale = 1.55f;
 }
 
 void UBattleHUDWidget::NativeConstruct() {
@@ -705,10 +708,26 @@ void UBattleHUDWidget::ShowAttackResultFloater(AFighterPawn *Target,
   const bool bAnyHits = Result.HitCount > 0 || Damage > 0;
   const bool bAnyCrits = Result.CriticalHitCount > 0;
 
+  const FSkaldFloaterStyle *AppliedCritStyle = nullptr;
+  if (bAnyCrits)
+  {
+    if (Result.bHighStakesCritical)
+    {
+      const FSkaldFloaterStyle *FactionOverride = Result.HighStakesFaction != ESkaldFaction::None
+                                                      ? HighStakesFloaterOverrides.Find(Result.HighStakesFaction)
+                                                      : nullptr;
+      AppliedCritStyle = FactionOverride ? FactionOverride : &HighStakesCriticalFloaterStyle;
+    }
+    else
+    {
+      AppliedCritStyle = &CriticalFloaterStyle;
+    }
+  }
+
   if (bAnyHits) {
     const FLinearColor DamageTint =
-        bAnyCrits ? CriticalFloaterColor : HitFloaterColor;
-    const float DamageScale = bAnyCrits ? 1.35f : 1.1f;
+        AppliedCritStyle ? AppliedCritStyle->Color : (bAnyCrits ? CriticalFloaterStyle.Color : HitFloaterColor);
+    const float DamageScale = AppliedCritStyle ? AppliedCritStyle->Scale : (bAnyCrits ? CriticalFloaterStyle.Scale : 1.1f);
     const FText DamageLabel = Damage > 0
                                   ? FText::Format(NSLOCTEXT("SkaldBattle",
                                                              "DamageFloaterLabel",
@@ -727,7 +746,9 @@ void UBattleHUDWidget::ShowAttackResultFloater(AFighterPawn *Target,
                                                       Result.CriticalHitCount))
                                   : NSLOCTEXT("SkaldBattle",
                                               "CritFloaterSingular", "CRIT!");
-      SpawnFloater(CritLabel, CriticalFloaterColor, 1.0f, false);
+      const FLinearColor CritTint = AppliedCritStyle ? AppliedCritStyle->Color : CriticalFloaterStyle.Color;
+      const float CritScale = AppliedCritStyle ? AppliedCritStyle->Scale : CriticalFloaterStyle.Scale;
+      SpawnFloater(CritLabel, CritTint, CritScale, false);
     } else if (Result.HitCount > 1) {
       const FText HitLabel = FText::Format(
           NSLOCTEXT("SkaldBattle", "HitFloaterPlural", "Hits ×{0}"),

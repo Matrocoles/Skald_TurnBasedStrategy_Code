@@ -18,6 +18,18 @@ class UCombatFloaterPoolSubsystem;
 class UW_DiceResolutionPanel;
 class UW_FloatingText;
 
+USTRUCT(BlueprintType)
+struct SKALD_API FSkaldFloaterStyle {
+  GENERATED_BODY();
+
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Battle|Floaters")
+  FLinearColor Color = FLinearColor(0.98f, 0.78f, 0.15f);
+
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Battle|Floaters",
+            meta = (ClampMin = "0.1"))
+  float Scale = 1.0f;
+};
+
 struct FBattleActiveFloater {
   TWeakObjectPtr<UW_FloatingText> Floater;
   FVector AnchorLocation = FVector::ZeroVector;
@@ -371,7 +383,13 @@ private:
 
   /** Default colour for critical hits. */
   UPROPERTY(EditAnywhere, Category = "Skald|Battle|Floaters")
-  FLinearColor CriticalFloaterColor = FLinearColor(0.98f, 0.78f, 0.15f);
+  FSkaldFloaterStyle CriticalFloaterStyle;
+
+  UPROPERTY(EditAnywhere, Category = "Skald|Battle|Floaters")
+  FSkaldFloaterStyle HighStakesCriticalFloaterStyle;
+
+  UPROPERTY(EditAnywhere, Category = "Skald|Battle|Floaters")
+  TMap<ESkaldFaction, FSkaldFloaterStyle> HighStakesFloaterOverrides;
 
   /** Default colour for misses. */
   UPROPERTY(EditAnywhere, Category = "Skald|Battle|Floaters")

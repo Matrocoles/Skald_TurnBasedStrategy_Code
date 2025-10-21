@@ -3017,10 +3017,76 @@ void ASkaldPlayerController::PlayDiceOutcomeFeedback(
   }
 }
 
+void ASkaldPlayerController::TriggerHighStakesCritFeedback(
+    AFighterPawn *Attacker, AFighterPawn *Defender,
+    const FDiceRollResult &Result) {
+  if (!Result.bHighStakesCritical || !Defender) {
+    return;
+  }
+
+  UWorld *World = GetWorld();
+  if (!World) {
+    return;
+  }
+
+  UNiagaraSystem *ResolvedEffect = nullptr;
+  USoundBase *ResolvedSound = nullptr;
+  if (Result.HighStakesFaction != ESkaldFaction::None) {
+    if (UNiagaraSystem **FactionEffect =
+            HighStakesCriticalFactionEffects.Find(Result.HighStakesFaction)) {
+      ResolvedEffect = *FactionEffect;
+    }
+    if (USoundBase **FactionSound =
+            HighStakesCriticalFactionSounds.Find(Result.HighStakesFaction)) {
+      ResolvedSound = *FactionSound;
+    }
+  }
+
+  if (!ResolvedEffect) {
+    ResolvedEffect = DefaultHighStakesCriticalEffect;
+  }
+
+  if (!ResolvedSound) {
+    ResolvedSound = DefaultHighStakesCriticalSound;
+  }
+
+  if (!ResolvedEffect && !ResolvedSound) {
+    return;
+  }
+
+  const FVector EffectLocation =
+      Defender->GetActorLocation() + FVector(0.f, 0.f, 160.f);
+  const FRotator EffectRotation = Attacker
+                                      ? (Defender->GetActorLocation() -
+                                         Attacker->GetActorLocation())
+                                            .Rotation()
+                                      : FRotator::ZeroRotator;
+
+  if (ResolvedEffect) {
+    UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+        World, ResolvedEffect, EffectLocation, EffectRotation);
+  }
+
+  if (ResolvedSound) {
+    UGameplayStatics::PlaySoundAtLocation(this, ResolvedSound,
+                                          EffectLocation);
+  }
+}
+
 void ASkaldPlayerController::HandleAttackResolved(AFighterPawn *Attacker,
                                                   AFighterPawn *Defender,
                                                   const FDiceRollResult &Result) {
   PlayAttackFeedback(Attacker, Defender, Result);
+
+  if (Result.bHighStakesCritical) {
+    TriggerHighStakesCritFeedback(Attacker, Defender, Result);
+
+    if (UWorld *World = GetWorld()) {
+      if (ASkaldGameState *GameState = World->GetGameState<ASkaldGameState>()) {
+        GameState->RequestTransientSlowdown(0.2f, 0.25f);
+      }
+    }
+  }
 
   if (!BattleHudWidget) {
     if (MainHUD) {

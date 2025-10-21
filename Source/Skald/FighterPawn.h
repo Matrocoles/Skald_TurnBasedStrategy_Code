@@ -123,6 +123,10 @@ public:
   UPROPERTY(BlueprintReadOnly, Replicated, Category = "Fighter")
   FName FighterId;
 
+  /** Faction owning this fighter instance. */
+  UPROPERTY(BlueprintReadWrite, EditAnywhere, Replicated, Category = "Fighter")
+  ESkaldFaction Faction = ESkaldFaction::None;
+
   /** Portrait associated with this fighter definition. */
   UPROPERTY(BlueprintReadOnly, Replicated, Category = "Fighter|UI")
   TSoftObjectPtr<UTexture2D> FighterPortrait;

@@ -83,6 +83,9 @@ struct FDiceRollResult
     int32 CriticalHitCount = 0;
 
     UPROPERTY(BlueprintReadOnly, Category="Skald|Battle|Dice")
+    int32 HighestCriticalDamage = 0;
+
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Battle|Dice")
     int32 MissCount = 0;
 
     UPROPERTY(BlueprintReadOnly, Category="Skald|Battle|Dice")
@@ -90,6 +93,12 @@ struct FDiceRollResult
 
     UPROPERTY(BlueprintReadOnly, Category="Skald|Battle|Dice")
     int32 EndingHealth = 0;
+
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Battle|Dice")
+    bool bHighStakesCritical = false;
+
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Battle|Dice")
+    ESkaldFaction HighStakesFaction = ESkaldFaction::None;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(

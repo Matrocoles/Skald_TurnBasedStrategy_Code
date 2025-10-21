@@ -131,6 +131,7 @@ void AFighterPawn::GetLifetimeReplicatedProps(
 
   DOREPLIFETIME(AFighterPawn, Stats);
   DOREPLIFETIME(AFighterPawn, FighterId);
+  DOREPLIFETIME(AFighterPawn, Faction);
   DOREPLIFETIME(AFighterPawn, FighterPortrait);
   DOREPLIFETIME(AFighterPawn, bIsAttacker);
   DOREPLIFETIME(AFighterPawn, ActionsRemaining);
@@ -774,6 +775,7 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
 
   FDiceRollResult DiceResult =
       UGridBattleManager::ResolveAttackDice(Stats, Target->Stats, *RandomStream);
+  DiceResult.HighStakesFaction = Faction;
 
   StartQueuedAttack(Target, MoveTemp(DiceResult));
 
