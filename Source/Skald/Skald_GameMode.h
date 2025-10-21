@@ -192,6 +192,9 @@ private:
   /** Controller that opened army placement with the highest initiative roll. */
   TWeakObjectPtr<ASkaldPlayerController> ArmyPlacementLeader;
 
+  /** Delay handle used to let HUDs update before the next placement turn. */
+  FTimerHandle ArmyPlacementAutoAdvanceHandle;
+
   /** Failsafe to ensure AI army placement advances the phase. */
   FTimerHandle ArmyPlacementFailsafeHandle;
 
@@ -215,6 +218,9 @@ private:
 
   /** Callback fired by the failsafe timer if the AI does not advance. */
   void HandleArmyPlacementFailsafe();
+
+  /** Triggered after a brief delay to advance to the next placement turn. */
+  void HandleArmyPlacementAutoAdvance();
 
   /** Ensure a turn manager exists, spawning or reusing one as required. */
   ATurnManager *ResolveTurnManager();
