@@ -73,6 +73,11 @@ public:
   /** Whether the world has already been initialised. */
   bool IsWorldInitialized() const { return bWorldInitialized; }
 
+  /** Whether the game is waiting on players to roll strategic initiative. */
+  bool IsAwaitingStrategicInitiative() const {
+    return bAwaitingStrategicInitiativeInput;
+  }
+
   /** Handle a player confirming their name and faction selection. */
   void HandlePlayerLockedIn(ASkaldPlayerState *PS);
 
