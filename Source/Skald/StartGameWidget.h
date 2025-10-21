@@ -10,6 +10,7 @@ class APlayerController;
 class UEditableTextBox;
 class UComboBoxString;
 class USpinBox;
+class UWidget;
 
 /**
  * Menu shown after pressing Start Game, to choose single or multiplayer.
@@ -97,6 +98,9 @@ protected:
 
   UFUNCTION(BlueprintCallable, Category = "Skald|Widgets")
   void OnLockIn();
+
+  UFUNCTION()
+  UWidget *GenerateFactionOptionWidget(const FString &Option);
 
   void StartGame(bool bMultiplayer, bool bHost);
 
