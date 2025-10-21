@@ -20,6 +20,18 @@ class UNetDriver;
 class UWorld;
 
 USTRUCT(BlueprintType)
+struct FSkaldPlayerIdentityMapping
+{
+  GENERATED_BODY()
+
+  UPROPERTY(BlueprintReadWrite, EditAnywhere)
+  FString UniqueId;
+
+  UPROPERTY(BlueprintReadWrite, EditAnywhere)
+  int32 PlayerId = INDEX_NONE;
+};
+
+USTRUCT(BlueprintType)
 struct FSkaldTravelState
 {
   GENERATED_BODY()
@@ -46,7 +58,43 @@ struct FSkaldTravelState
 
   /** Mapping from a stable player identity to the PlayerID they owned. */
   UPROPERTY(BlueprintReadWrite, EditAnywhere)
-  TMap<FString, int32> PlayerIdsByUniqueId;
+  TArray<FSkaldPlayerIdentityMapping> PlayerIdsByUniqueId;
+
+  void AddOrUpdatePlayerIdentity(const FString& UniqueId, int32 PlayerId)
+  {
+    if (UniqueId.IsEmpty())
+    {
+      return;
+    }
+
+    for (FSkaldPlayerIdentityMapping& Entry : PlayerIdsByUniqueId)
+    {
+      if (Entry.UniqueId == UniqueId)
+      {
+        Entry.PlayerId = PlayerId;
+        return;
+      }
+    }
+
+    FSkaldPlayerIdentityMapping NewEntry;
+    NewEntry.UniqueId = UniqueId;
+    NewEntry.PlayerId = PlayerId;
+    PlayerIdsByUniqueId.Add(MoveTemp(NewEntry));
+  }
+
+  TMap<FString, int32> BuildPlayerIdentityMap() const
+  {
+    TMap<FString, int32> Result;
+    Result.Reserve(PlayerIdsByUniqueId.Num());
+    for (const FSkaldPlayerIdentityMapping& Entry : PlayerIdsByUniqueId)
+    {
+      if (!Entry.UniqueId.IsEmpty())
+      {
+        Result.Add(Entry.UniqueId, Entry.PlayerId);
+      }
+    }
+    return Result;
+  }
 
   UPROPERTY(BlueprintReadWrite, EditAnywhere)
   bool bValid = false;
