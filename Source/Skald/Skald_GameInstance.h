@@ -44,6 +44,10 @@ struct FSkaldTravelState
   UPROPERTY(BlueprintReadWrite, EditAnywhere)
   TArray<FS_Territory> CachedTerritories;
 
+  /** Mapping from a stable player identity to the PlayerID they owned. */
+  UPROPERTY(BlueprintReadWrite, EditAnywhere)
+  TMap<FString, int32> PlayerIdsByUniqueId;
+
   UPROPERTY(BlueprintReadWrite, EditAnywhere)
   bool bValid = false;
 };
