@@ -13,7 +13,6 @@
 #include "SkaldSaveGame.h"
 #include "Misc/Char.h"
 #include "Skald_AIController.h"
-#include "Net/OnlineReplStructs.h"
 #include "Skald_BattleGameMode.h"
 #include "Skald_GameInstance.h"
 #include "Skald_GameState.h"
@@ -36,29 +35,6 @@ constexpr float RetryInitDelay = 0.01f;
 constexpr float ArmyPlacementAutoAdvanceDelay = 0.15f;
 // Instance variables moved into ASkaldGameMode to avoid cross-instance
 // interference; see header for declarations.
-
-FString BuildPlayerIdentityKey(const ASkaldPlayerState *PlayerState) {
-  if (!PlayerState) {
-    return FString();
-  }
-
-  const FUniqueNetIdRepl &UniqueId = PlayerState->GetUniqueId();
-  if (UniqueId.IsValid()) {
-    return FString::Printf(TEXT("UID:%s"), *UniqueId.ToString());
-  }
-
-  if (!PlayerState->PlayerDisplayName.IsEmpty()) {
-    return FString::Printf(TEXT("NAME:%s"),
-                           *PlayerState->PlayerDisplayName);
-  }
-
-  const FString PlayerName = PlayerState->GetPlayerName();
-  if (!PlayerName.IsEmpty()) {
-    return FString::Printf(TEXT("PNAME:%s"), *PlayerName);
-  }
-
-  return PlayerState->GetName();
-}
 } // namespace
 
 using Skald::PropertyAccess::ReadBoolProperty;
@@ -1075,101 +1051,24 @@ void ASkaldGameMode::NormalizePlayerStateIds() {
     return;
   }
 
-  USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
-  TMap<FString, int32> IdentityMap;
-  if (GI) {
-    const FSkaldTravelState &TravelState = GI->GetTravelState();
-    if (TravelState.bValid && TravelState.PlayerIdsByUniqueId.Num() > 0) {
-      IdentityMap = TravelState.PlayerIdsByUniqueId;
-    }
-  }
-
-  TSet<int32> AssignedIds;
-  TArray<ASkaldPlayerState *> PendingAssignment;
-
-  for (APlayerState *PSBase : GS->PlayerArray) {
-    ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase);
-    if (!PS) {
-      continue;
-    }
-
-    const FString Identity = BuildPlayerIdentityKey(PS);
-    const int32 *MappedId = IdentityMap.Find(Identity);
-    if (MappedId && *MappedId > 0 && !AssignedIds.Contains(*MappedId)) {
-      if (PS->GetPlayerId() != *MappedId) {
-        PS->SetPlayerId(*MappedId);
-      }
-      AssignedIds.Add(*MappedId);
-      continue;
-    }
-
-    const int32 ExistingId = PS->GetPlayerId();
-    if (ExistingId > 0 && !AssignedIds.Contains(ExistingId)) {
-      AssignedIds.Add(ExistingId);
-    } else {
-      PendingAssignment.Add(PS);
-    }
-  }
-
-  int32 NextId = 1;
-  const auto AcquireNextId = [&]() {
-    while (AssignedIds.Contains(NextId)) {
-      ++NextId;
-    }
-    const int32 Result = NextId;
-    AssignedIds.Add(Result);
-    ++NextId;
-    return Result;
-  };
-
-  for (ASkaldPlayerState *PS : PendingAssignment) {
-    if (!PS) {
-      continue;
-    }
-
-    int32 DesiredId = PS->GetPlayerId();
-    if (DesiredId <= 0 || AssignedIds.Contains(DesiredId)) {
-      DesiredId = AcquireNextId();
-      if (PS->GetPlayerId() != DesiredId) {
-        PS->SetPlayerId(DesiredId);
-      }
-    } else {
-      AssignedIds.Add(DesiredId);
-    }
-  }
-
   PlayerDataArray.SetNum(GS->PlayerArray.Num());
 
   for (int32 i = 0; i < GS->PlayerArray.Num(); ++i) {
     if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(GS->PlayerArray[i])) {
+      const int32 NewPlayerId = i + 1;
+      PS->SetPlayerId(NewPlayerId);
+
       if (PlayerDataArray.IsValidIndex(i)) {
-        PlayerDataArray[i].PlayerID = PS->GetPlayerId();
+        PlayerDataArray[i].PlayerID = NewPlayerId;
       }
 
       if (ASkaldPlayerController *OwningController =
               Cast<ASkaldPlayerController>(PS->GetOwner())) {
         if (USkaldMainHUDWidget *HUD = OwningController->GetHUDWidget()) {
-          HUD->LocalPlayerID = PS->GetPlayerId();
+          HUD->LocalPlayerID = NewPlayerId;
           HUD->SyncPhaseButtons(HUD->CurrentPlayerID == HUD->LocalPlayerID);
         }
       }
-    }
-  }
-
-  if (GI) {
-    FSkaldTravelState UpdatedTravelState = GI->GetTravelState();
-    if (UpdatedTravelState.bValid) {
-      UpdatedTravelState.PlayerIdsByUniqueId.Reset();
-      for (APlayerState *PSBase : GS->PlayerArray) {
-        if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
-          const FString Identity = BuildPlayerIdentityKey(PS);
-          if (!Identity.IsEmpty()) {
-            UpdatedTravelState.PlayerIdsByUniqueId.FindOrAdd(Identity) =
-                PS->GetPlayerId();
-          }
-        }
-      }
-      GI->SetTravelState(UpdatedTravelState);
     }
   }
 }
