@@ -22,7 +22,7 @@ public:
 private:
   void EnsureLayout();
 
-  UPROPERTY()
+  UPROPERTY(meta = (BindWidgetOptional))
   UTextBlock *BattleResultText = nullptr;
 
   UPROPERTY()
