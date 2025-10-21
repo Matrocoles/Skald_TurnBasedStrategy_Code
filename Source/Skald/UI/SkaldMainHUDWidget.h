@@ -353,9 +353,15 @@ public:
             meta = (BindWidget))
   UTextBlock *PhaseText;
 
+  /** Legacy selection prompt text block kept for backward compatibility. */
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
             meta = (BindWidget))
   UTextBlock *SelectionPrompt;
+
+  /** Optional dedicated text block for selection prompts. */
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
+            meta = (BindWidgetOptional))
+  UTextBlock *SelectionPromptText;
 
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|HUD|Prompts")
   FText ReinforcementSelectionPromptText;
@@ -484,6 +490,7 @@ protected:
   void ClearStrategicInitiativeWaitIfNeeded();
   bool IsStrategicInitiativeOverlayActive() const;
   void ApplyPendingSelectionPrompt();
+  UTextBlock *GetSelectionPromptTextBlock() const;
 
   UFUNCTION()
   void HandleStrategicDiceRenderTargetUpdate(class UCanvas *Canvas, int32 Width,

@@ -764,9 +764,9 @@ void USkaldMainHUDWidget::SetAwaitingStrategicInitiative(bool bAwaiting) {
   bAwaitingStrategicInitiative = bAwaiting;
 
   if (bAwaiting) {
-    if (SelectionPrompt) {
-      SelectionPrompt->SetText(FText::GetEmpty());
-      SelectionPrompt->SetVisibility(ESlateVisibility::Collapsed);
+    if (UTextBlock *PromptLabel = GetSelectionPromptTextBlock()) {
+      PromptLabel->SetText(FText::GetEmpty());
+      PromptLabel->SetVisibility(ESlateVisibility::Collapsed);
     }
   } else {
     ApplyPendingSelectionPrompt();
@@ -1049,18 +1049,19 @@ void USkaldMainHUDWidget::ShowSelectionPromptMessage(const FText &Message,
   PendingSelectionPromptText = bShow ? Message : FText::GetEmpty();
   bPendingSelectionPromptVisible = bShow;
 
-  if (!SelectionPrompt) {
+  UTextBlock *PromptLabel = GetSelectionPromptTextBlock();
+  if (!PromptLabel) {
     return;
   }
 
   if (!bShow || bAwaitingStrategicInitiative) {
-    SelectionPrompt->SetText(FText::GetEmpty());
-    SelectionPrompt->SetVisibility(ESlateVisibility::Collapsed);
+    PromptLabel->SetText(FText::GetEmpty());
+    PromptLabel->SetVisibility(ESlateVisibility::Collapsed);
     return;
   }
 
-  SelectionPrompt->SetText(Message);
-  SelectionPrompt->SetVisibility(ESlateVisibility::Visible);
+  PromptLabel->SetText(Message);
+  PromptLabel->SetVisibility(ESlateVisibility::Visible);
 }
 
 void USkaldMainHUDWidget::ShowSelectionErrorMessage(const FText &Message) {
@@ -1069,18 +1070,26 @@ void USkaldMainHUDWidget::ShowSelectionErrorMessage(const FText &Message) {
 }
 
 void USkaldMainHUDWidget::ApplyPendingSelectionPrompt() {
-  if (!SelectionPrompt) {
+  UTextBlock *PromptLabel = GetSelectionPromptTextBlock();
+  if (!PromptLabel) {
     return;
   }
 
   if (!bPendingSelectionPromptVisible || bAwaitingStrategicInitiative) {
-    SelectionPrompt->SetText(FText::GetEmpty());
-    SelectionPrompt->SetVisibility(ESlateVisibility::Collapsed);
+    PromptLabel->SetText(FText::GetEmpty());
+    PromptLabel->SetVisibility(ESlateVisibility::Collapsed);
     return;
   }
 
-  SelectionPrompt->SetText(PendingSelectionPromptText);
-  SelectionPrompt->SetVisibility(ESlateVisibility::Visible);
+  PromptLabel->SetText(PendingSelectionPromptText);
+  PromptLabel->SetVisibility(ESlateVisibility::Visible);
+}
+
+UTextBlock *USkaldMainHUDWidget::GetSelectionPromptTextBlock() const {
+  if (SelectionPromptText) {
+    return SelectionPromptText;
+  }
+  return SelectionPrompt;
 }
 
 ATerritory *USkaldMainHUDWidget::GetCurrentlySelectedTerritory() const {
