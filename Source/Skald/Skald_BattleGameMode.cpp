@@ -875,11 +875,13 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
 
   const int32 AttackerBudget = FMath::Max(0, Battle.ArmyCountSent);
   int32 DefenderBudget = Battle.DefenderArmyCount;
-  if (DefenderBudget <= 0) {
-    if (const FS_Territory *DefSnapshot =
-            CachedTerritoryMap.Find(Battle.TargetTerritoryID)) {
-      DefenderBudget = DefSnapshot->ArmyUnits;
-    }
+  const FS_Territory *DefSnapshot =
+      CachedTerritoryMap.Find(Battle.TargetTerritoryID);
+  if (DefenderBudget <= 0 && DefSnapshot) {
+    DefenderBudget = DefSnapshot->ArmyUnits;
+  }
+  if (Battle.DefenderTerritoryName.IsEmpty() && DefSnapshot) {
+    Battle.DefenderTerritoryName = DefSnapshot->TerritoryName;
   }
   if (DefenderBudget <= 0) {
     DefenderBudget = AttackerBudget;

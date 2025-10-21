@@ -924,6 +924,7 @@ void ASkaldPlayerController::InitializeBattleHUD() {
   }
 
   DetermineControlledBattleSide();
+  UpdateBattleTerritoryLabel();
   HandleActiveFighterChanged(ActiveFighter);
 
   if (bPendingInitiativePrompt) {
@@ -1390,6 +1391,7 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
     Battle.DefenderPlayerID = DefenderPS ? DefenderPS->GetPlayerId() : -1;
     Battle.FromTerritoryID = FromID;
     Battle.TargetTerritoryID = ToID;
+    Battle.DefenderTerritoryName = Target->TerritoryName;
     Battle.ArmyCountSent = ArmySent;
     Battle.IsCapitalAttack = Target->bIsCapital;
     if (AttackerPS) {
@@ -2912,6 +2914,42 @@ void ASkaldPlayerController::UpdateBattleRoundDisplay(
   BattleHudWidget->SetRoundInfo(RoundText, InitiativeText);
 }
 
+void ASkaldPlayerController::UpdateBattleTerritoryLabel() {
+  if (!BattleHudWidget) {
+    return;
+  }
+
+  USkaldGameInstance *GI = CachedGameInstance;
+  if (!GI) {
+    GI = GetGameInstance<USkaldGameInstance>();
+    CachedGameInstance = GI;
+  }
+
+  FText TerritoryLabel = FText::GetEmpty();
+  int32 TargetTerritoryId = 0;
+
+  if (GI) {
+    const FS_BattlePayload &Battle = GI->PendingBattle;
+    TargetTerritoryId = Battle.TargetTerritoryID;
+    if (!Battle.DefenderTerritoryName.IsEmpty()) {
+      TerritoryLabel = FText::FromString(Battle.DefenderTerritoryName);
+    }
+  }
+
+  if (TerritoryLabel.IsEmpty() && TargetTerritoryId > 0) {
+    if (UWorld *World = GetWorld()) {
+      if (AWorldMap *WorldMap = Cast<AWorldMap>(
+              UGameplayStatics::GetActorOfClass(World, AWorldMap::StaticClass()))) {
+        if (ATerritory *Territory = WorldMap->GetTerritoryById(TargetTerritoryId)) {
+          TerritoryLabel = FText::FromString(Territory->TerritoryName);
+        }
+      }
+    }
+  }
+
+  BattleHudWidget->SetTerritoryName(TerritoryLabel);
+}
+
 void ASkaldPlayerController::UpdateBattlePlayersTurnDisplay() {
   if (!BattleHudWidget)
     return;
@@ -2921,6 +2959,8 @@ void ASkaldPlayerController::UpdateBattlePlayersTurnDisplay() {
     GI = GetGameInstance<USkaldGameInstance>();
     CachedGameInstance = GI;
   }
+
+  UpdateBattleTerritoryLabel();
 
   if (!GI) {
     BattleHudWidget->SetPlayersTurnLabel(FText::GetEmpty());

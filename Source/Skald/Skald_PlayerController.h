@@ -559,6 +559,7 @@ private:
   void UpdateBattleHUDSelection();
   void UpdateBattleHUDButtons();
   void UpdateBattleRoundDisplay(int32 RoundNumber, ESkaldFaction InitiativeWinner);
+  void UpdateBattleTerritoryLabel();
   void UpdateBattlePlayersTurnDisplay();
   UFUNCTION()
   void HandleAttackResolved(AFighterPawn *Attacker, AFighterPawn *Defender,

@@ -81,6 +81,11 @@ void UBattleHUDWidget::NativeConstruct() {
     InitiativePromptText->SetVisibility(ESlateVisibility::Collapsed);
   }
 
+  if (TerritoryText) {
+    TerritoryText->SetText(FText::GetEmpty());
+    TerritoryText->SetVisibility(ESlateVisibility::Collapsed);
+  }
+
   if (DiceRollerImage) {
     DiceRollerImage->SetVisibility(ESlateVisibility::Collapsed);
   }
@@ -384,6 +389,15 @@ void UBattleHUDWidget::SetRoundInfo(const FText &RoundLabel,
 void UBattleHUDWidget::SetPlayersTurnLabel(const FText &PlayerLabel) {
   if (PlayersTurnText) {
     PlayersTurnText->SetText(PlayerLabel);
+  }
+}
+
+void UBattleHUDWidget::SetTerritoryName(const FText &TerritoryLabel) {
+  if (TerritoryText) {
+    TerritoryText->SetText(TerritoryLabel);
+    TerritoryText->SetVisibility(TerritoryLabel.IsEmptyOrWhitespace()
+                                     ? ESlateVisibility::Collapsed
+                                     : ESlateVisibility::HitTestInvisible);
   }
 }
 
