@@ -173,6 +173,10 @@ public:
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *InitiativeText;
 
+  /** Text displaying the territory currently being contested. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+  UTextBlock *TerritoryText;
+
   /** Text displaying whose turn is currently active. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *PlayersTurnText;
@@ -223,6 +227,9 @@ public:
 
   /** Update the label that shows whose turn is active. */
   void SetPlayersTurnLabel(const FText &PlayerLabel);
+
+  /** Update the label that shows the contested territory. */
+  void SetTerritoryName(const FText &TerritoryLabel);
 
   /** Update the fighter identifier label and portrait. */
   void SetSelectedFighterName(const FText &Name);

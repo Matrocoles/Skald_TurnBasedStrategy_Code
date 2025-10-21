@@ -1397,10 +1397,14 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
                       PendingPayload.DefenderFaction,
                       PendingPayload.bDefenderIsAI);
 
+    ATerritory *DefTerritory = FindTerritory(PendingPayload.TargetTerritoryID);
     if (PendingPayload.DefenderArmyCount <= 0) {
-      if (ATerritory *DefTerritory = FindTerritory(PendingPayload.TargetTerritoryID)) {
+      if (DefTerritory) {
         PendingPayload.DefenderArmyCount = DefTerritory->ArmyUnits;
       }
+    }
+    if (PendingPayload.DefenderTerritoryName.IsEmpty() && DefTerritory) {
+      PendingPayload.DefenderTerritoryName = DefTerritory->TerritoryName;
     }
     if (PendingPayload.DefenderArmyCount <= 0) {
       PendingPayload.DefenderArmyCount = PendingPayload.ArmyCountSent;

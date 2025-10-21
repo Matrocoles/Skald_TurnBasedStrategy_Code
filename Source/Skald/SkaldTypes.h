@@ -113,6 +113,10 @@ struct SKALD_API FS_BattlePayload
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     int32 TargetTerritoryID = 0;
 
+    /** Display name for the territory being defended. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    FString DefenderTerritoryName;
+
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     int32 ArmyCountSent = 0;
 

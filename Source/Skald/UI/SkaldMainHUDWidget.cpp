@@ -1789,6 +1789,7 @@ void USkaldMainHUDWidget::HandleAttackApproved() {
                       TEXT("HUD_Attack_Defender"));
               Battle.bDefenderIsAI = Target->OwningPlayer->bIsAI;
             }
+            Battle.DefenderTerritoryName = Target->TerritoryName;
             Battle.IsCapitalAttack = Target->bIsCapital;
           }
         }
