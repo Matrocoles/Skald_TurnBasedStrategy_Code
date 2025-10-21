@@ -1715,8 +1715,6 @@ void ASkaldGameMode::BeginArmyPlacementPhase() {
                         *GetNameSafe(ActiveController), *PhaseString));
   }
 
-  const TArray<ASkaldPlayerController *> Controllers =
-      TurnManager->GetControllers();
   int32 ActivePlayerCount = 0;
   for (ASkaldPlayerController *PC : Controllers) {
     if (ASkaldPlayerState *PS =
