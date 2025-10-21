@@ -590,8 +590,6 @@ void USkaldMainHUDWidget::ShowStrategicInitiativeRoll(int32 RollValue,
     return;
   }
 
-  SetAwaitingStrategicInitiative(false);
-
   UObject *DiceResource = nullptr;
   const int32 TextureIndex = RollValue - 1;
   if (DiceFaceTextures.IsValidIndex(TextureIndex)) {
@@ -714,9 +712,41 @@ void USkaldMainHUDWidget::SetAwaitingStrategicInitiative(bool bAwaiting) {
 }
 
 void USkaldMainHUDWidget::ClearStrategicInitiativeWaitIfNeeded() {
-  if (bAwaitingStrategicInitiative) {
-    SetAwaitingStrategicInitiative(false);
+  if (!bAwaitingStrategicInitiative) {
+    return;
   }
+
+  if (IsStrategicInitiativeOverlayActive()) {
+    return;
+  }
+
+  SetAwaitingStrategicInitiative(false);
+}
+
+bool USkaldMainHUDWidget::IsStrategicInitiativeOverlayActive() const {
+  const auto IsWidgetVisible = [](const UWidget *Widget) {
+    if (!Widget) {
+      return false;
+    }
+    const ESlateVisibility Visibility = Widget->GetVisibility();
+    return Visibility != ESlateVisibility::Collapsed &&
+           Visibility != ESlateVisibility::Hidden;
+  };
+
+  if (IsWidgetVisible(InitiativePromptText)) {
+    return true;
+  }
+  if (IsWidgetVisible(RollInitiativeButton)) {
+    return true;
+  }
+  if (IsWidgetVisible(InitiativeDiceImage)) {
+    return true;
+  }
+  if (IsWidgetVisible(InitiativeDiceBoardImage)) {
+    return true;
+  }
+
+  return false;
 }
 
 void USkaldMainHUDWidget::HideStrategicInitiativeDice() {
@@ -737,6 +767,8 @@ void USkaldMainHUDWidget::HideStrategicInitiativeDice() {
   if (InitiativeDiceBoardImage) {
     InitiativeDiceBoardImage->SetVisibility(ESlateVisibility::Collapsed);
   }
+
+  SetAwaitingStrategicInitiative(false);
 }
 
 void USkaldMainHUDWidget::HandleStrategicDiceRenderTargetUpdate(
