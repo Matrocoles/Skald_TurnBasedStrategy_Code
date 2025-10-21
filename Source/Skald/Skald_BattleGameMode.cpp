@@ -881,6 +881,14 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
       DefenderBudget = DefSnapshot->ArmyUnits;
     }
   }
+  if (DefenderBudget <= 0 && GI) {
+    for (const FS_Territory &Snapshot : GI->CachedWorldMapTerritories) {
+      if (Snapshot.TerritoryID == Battle.TargetTerritoryID) {
+        DefenderBudget = Snapshot.ArmyUnits;
+        break;
+      }
+    }
+  }
   if (DefenderBudget <= 0) {
     DefenderBudget = AttackerBudget;
   }
