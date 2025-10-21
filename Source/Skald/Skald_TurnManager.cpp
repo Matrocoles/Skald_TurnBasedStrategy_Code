@@ -8,6 +8,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Misc/PackageName.h"
 #include "Modules/ModuleManager.h"
+#include "Net/OnlineReplStructs.h"
 #include "Net/UnrealNetwork.h"
 #include "Runtime/Launch/Resources/Version.h"
 #include "Skald.h"
@@ -43,6 +44,29 @@ namespace {
 constexpr float BattleResultReturnDelaySeconds = 5.0f;
 FString GetWorldPackageName(const UWorld *World);
 FString ResolveMapPackageFromRegistry(const FString &MapName);
+
+FString BuildPlayerIdentityKey(const ASkaldPlayerState *PlayerState) {
+  if (!PlayerState) {
+    return FString();
+  }
+
+  const FUniqueNetIdRepl &UniqueId = PlayerState->GetUniqueId();
+  if (UniqueId.IsValid()) {
+    return FString::Printf(TEXT("UID:%s"), *UniqueId.ToString());
+  }
+
+  if (!PlayerState->PlayerDisplayName.IsEmpty()) {
+    return FString::Printf(TEXT("NAME:%s"),
+                           *PlayerState->PlayerDisplayName);
+  }
+
+  const FString PlayerName = PlayerState->GetPlayerName();
+  if (!PlayerName.IsEmpty()) {
+    return FString::Printf(TEXT("PNAME:%s"), *PlayerName);
+  }
+
+  return PlayerState->GetName();
+}
 
 FString GetFallbackOverviewMapPackageName()
 {
@@ -1223,6 +1247,25 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
     TravelState.DefenderTerritory = SeededBattle.TargetTerritoryID;
     TravelState.ReturnMap = ResolveCanonicalReturnMapFromWorld(World);
 
+    TravelState.PlayerIdsByUniqueId.Reset();
+    auto RegisterPlayerIdentity = [&](ASkaldPlayerState *PlayerState) {
+      if (!PlayerState) {
+        return;
+      }
+
+      const FString Identity = BuildPlayerIdentityKey(PlayerState);
+      if (!Identity.IsEmpty()) {
+        TravelState.PlayerIdsByUniqueId.FindOrAdd(Identity) =
+            PlayerState->GetPlayerId();
+      }
+    };
+
+    if (GS) {
+      for (APlayerState *PSBase : GS->PlayerArray) {
+        RegisterPlayerIdentity(Cast<ASkaldPlayerState>(PSBase));
+      }
+    }
+
     auto AppendHumanOwnership = [&](ASkaldPlayerState *OwnerPS, int32 TerritoryID) {
       if (OwnerPS && !OwnerPS->bIsAI && TerritoryID > 0) {
         TravelState.HumanOwnedTerritories.AddUnique(TerritoryID);
@@ -1645,6 +1688,7 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
       PendingBattleResolutionRetryHandle);
 
   FGridBattleResolution Resolution = GI->PendingBattleResolution;
+  ASkaldGameState *GameState = GetWorld()->GetGameState<ASkaldGameState>();
 
   const int32 InitialSourceArmy = Source->ArmyUnits;
   const int32 InitialTargetArmy = Target->ArmyUnits;
@@ -1670,11 +1714,27 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
 
   if (Resolution.AttackerSurvivorArmyCost > 0 &&
       Resolution.DefenderSurvivorArmyCost <= 0) {
-    Target->OwningPlayer = Source->OwningPlayer;
+    ASkaldPlayerState *NewOwner = nullptr;
+    if (GameState && Resolution.NewOwnerPlayerID > 0) {
+      NewOwner = GameState->GetPlayerById(Resolution.NewOwnerPlayerID);
+    }
+    if (!NewOwner && GameState) {
+      NewOwner = GameState->GetPlayerById(Battle.AttackerPlayerID);
+    }
+    if (!NewOwner) {
+      NewOwner = Source->OwningPlayer;
+    }
+    Target->OwningPlayer = NewOwner;
     Target->ArmyUnits = Resolution.AttackerSurvivorArmyCost;
+    Resolution.NewOwnerPlayerID = NewOwner ? NewOwner->GetPlayerId() : 0;
   } else {
+    if (!Target->OwningPlayer && GameState) {
+      Target->OwningPlayer = GameState->GetPlayerById(Battle.DefenderPlayerID);
+    }
     int32 DefenderResult = FMath::Max(0, Resolution.DefenderSurvivorArmyCost);
     Target->ArmyUnits = DefenderResult + DefenderUnspent;
+    Resolution.NewOwnerPlayerID =
+        Target->OwningPlayer ? Target->OwningPlayer->GetPlayerId() : 0;
   }
 
   Resolution.AttackerCommittedArmyCost = AttackerCommitted;
@@ -1752,6 +1812,21 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
     FSkaldTravelState UpdatedTravelState = GI->GetTravelState();
     if (UpdatedTravelState.bValid) {
       UpdatedTravelState.CachedTerritories = GI->CachedWorldMapTerritories;
+
+      UpdatedTravelState.PlayerIdsByUniqueId.Reset();
+      if (ASkaldGameState *CurrentGS = GetWorld()->GetGameState<ASkaldGameState>()) {
+        for (APlayerState *PSBase : CurrentGS->PlayerArray) {
+          if (ASkaldPlayerState *PlayerState =
+                  Cast<ASkaldPlayerState>(PSBase)) {
+            const FString Identity = BuildPlayerIdentityKey(PlayerState);
+            if (!Identity.IsEmpty()) {
+              UpdatedTravelState.PlayerIdsByUniqueId.FindOrAdd(Identity) =
+                  PlayerState->GetPlayerId();
+            }
+          }
+        }
+      }
+
       GI->SetTravelState(UpdatedTravelState);
     }
   }
