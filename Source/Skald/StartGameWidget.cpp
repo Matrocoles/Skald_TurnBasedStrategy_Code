@@ -183,6 +183,13 @@ UWidget *UStartGameWidget::GenerateFactionOptionWidget(const FString &Option) {
     TextBlock->SetIsEnabled(!bIsPlaceholder);
     if (bIsPlaceholder) {
       TextBlock->SetColorAndOpacity(FSlateColor(FLinearColor::Gray));
+      if (FactionComboBox && FactionComboBox->IsOpen()) {
+        TextBlock->SetVisibility(ESlateVisibility::Collapsed);
+      } else {
+        TextBlock->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+      }
+    } else {
+      TextBlock->SetVisibility(ESlateVisibility::Visible);
     }
   }
 
