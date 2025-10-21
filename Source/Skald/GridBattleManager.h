@@ -412,6 +412,7 @@ private:
     void FinalizeRoundStart();
     void ScheduleRoundStart(bool bDelayForPresentation);
     bool ShouldPauseForInitiativePrompt() const;
+    void BroadcastBattleConcluded();
 
     bool HasLivingFighters(bool bForAttackers) const;
     bool HasAvailableFighters(bool bForAttackers) const;
@@ -434,6 +435,10 @@ private:
     int32 AttackerSurvivorArmyCost = 0;
     int32 DefenderSurvivorArmyCost = 0;
 
+    ESkaldFaction BattleConclusionWinner = ESkaldFaction::None;
+    int32 BattleConclusionAttackerCasualties = 0;
+    int32 BattleConclusionDefenderCasualties = 0;
+
     int32 AttackerInitialArmyCost = 0;
     int32 DefenderInitialArmyCost = 0;
 
@@ -451,6 +456,9 @@ private:
 
     /** Timer used to delay the AI's initiative roll after the player rolls. */
     FTimerHandle InitiativeAIRollTimer;
+
+    /** Timer used to defer the battle concluded broadcast so VFX/SFX can finish. */
+    FTimerHandle BattleConclusionTimerHandle;
 
     /** Optional pre-supplied initiative roll for attackers. */
     FOptionalInt32 PendingInitiativeRollAttacker;
