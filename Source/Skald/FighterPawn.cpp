@@ -896,12 +896,25 @@ void AFighterPawn::FinalizeQueuedAttack() {
         }
       }
     }
-    if (!Target->IsAlive() && !Target->IsActorBeingDestroyed()) {
-      Target->Destroy();
-    }
   }
 
   ClearQueuedAttackState(true);
+
+  if (Target && !Target->IsAlive() && !Target->IsActorBeingDestroyed()) {
+    if (UWorld *WorldPtr = GetWorld()) {
+      const TWeakObjectPtr<AFighterPawn> TargetPtr = Target;
+      WorldPtr->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateLambda(
+          [TargetPtr]() {
+            if (AFighterPawn *TargetPawn = TargetPtr.Get()) {
+              if (!TargetPawn->IsActorBeingDestroyed()) {
+                TargetPawn->Destroy();
+              }
+            }
+          }));
+    } else {
+      Target->Destroy();
+    }
+  }
 }
 
 void AFighterPawn::CancelQueuedAttack() {
