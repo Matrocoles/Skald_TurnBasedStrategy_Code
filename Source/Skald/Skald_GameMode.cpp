@@ -1832,6 +1832,7 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
       const bool bIsActive = Controller == PC;
       Controller->ShowTurnAnnouncement(PlayerName, bIsActive);
       if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
+        HUD->SetAwaitingStrategicInitiative(false);
         HUD->UpdateTurnBanner(PS->GetPlayerId(), 1);
       }
     }
