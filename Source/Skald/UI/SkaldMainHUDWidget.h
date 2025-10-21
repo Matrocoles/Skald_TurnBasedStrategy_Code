@@ -466,6 +466,7 @@ protected:
 
   void RevealStrategicInitiativeRollButton();
   void HideStrategicInitiativeDice();
+  void ClearStrategicInitiativeWaitIfNeeded();
 
   UFUNCTION()
   void HandleStrategicDiceRenderTargetUpdate(class UCanvas *Canvas, int32 Width,

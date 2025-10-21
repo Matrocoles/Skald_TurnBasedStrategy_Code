@@ -320,6 +320,7 @@ void USkaldMainHUDWidget::UpdateTurnBanner(int32 InCurrentPlayerID,
 }
 
 void USkaldMainHUDWidget::UpdatePhaseBanner(ETurnPhase InPhase) {
+  ClearStrategicInitiativeWaitIfNeeded();
   CurrentPhase = InPhase;
 
   BP_SetPhaseText(CurrentPhase);
@@ -408,6 +409,7 @@ void USkaldMainHUDWidget::RefreshFromState(
   CurrentPlayerID = InCurrentPlayerID;
   TurnNumber = InTurnNumber;
   CurrentPhase = InPhase;
+  ClearStrategicInitiativeWaitIfNeeded();
   CachedPlayers = Players;
 
   BP_SetTurnText(TurnNumber, CurrentPlayerID);
@@ -709,6 +711,12 @@ void USkaldMainHUDWidget::SetAwaitingStrategicInitiative(bool bAwaiting) {
 
   const bool bIsMyTurn = CurrentPlayerID == LocalPlayerID;
   SyncPhaseButtons(bIsMyTurn);
+}
+
+void USkaldMainHUDWidget::ClearStrategicInitiativeWaitIfNeeded() {
+  if (bAwaitingStrategicInitiative) {
+    SetAwaitingStrategicInitiative(false);
+  }
 }
 
 void USkaldMainHUDWidget::HideStrategicInitiativeDice() {
@@ -1390,6 +1398,7 @@ void USkaldMainHUDWidget::HandleTurnIndexChanged(int32 /*NewTurnIndex*/) {
   // Update cached turn state before refreshing widgets.
   CurrentPlayerID = NewPlayerID;
   TurnNumber = NewTurnNumber;
+  ClearStrategicInitiativeWaitIfNeeded();
 
   if (bIsNewRound && RoundStartSound) {
     UGameplayStatics::PlaySound2D(this, RoundStartSound);
