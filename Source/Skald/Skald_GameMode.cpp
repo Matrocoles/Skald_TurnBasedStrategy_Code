@@ -1053,19 +1053,44 @@ void ASkaldGameMode::NormalizePlayerStateIds() {
 
   PlayerDataArray.SetNum(GS->PlayerArray.Num());
 
+  TSet<int32> UsedPlayerIds;
+  int32 NextCandidateId = 1;
+
+  auto AcquirePlayerId = [&](ASkaldPlayerState *PS) -> int32 {
+    if (!PS) {
+      return 0;
+    }
+
+    const int32 ExistingId = PS->GetPlayerId();
+    if (ExistingId > 0 && !UsedPlayerIds.Contains(ExistingId)) {
+      UsedPlayerIds.Add(ExistingId);
+      return ExistingId;
+    }
+
+    while (UsedPlayerIds.Contains(NextCandidateId)) {
+      ++NextCandidateId;
+    }
+
+    const int32 AssignedId = NextCandidateId++;
+    UsedPlayerIds.Add(AssignedId);
+    return AssignedId;
+  };
+
   for (int32 i = 0; i < GS->PlayerArray.Num(); ++i) {
     if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(GS->PlayerArray[i])) {
-      const int32 NewPlayerId = i + 1;
-      PS->SetPlayerId(NewPlayerId);
+      const int32 AssignedId = AcquirePlayerId(PS);
+      if (PS->GetPlayerId() != AssignedId) {
+        PS->SetPlayerId(AssignedId);
+      }
 
       if (PlayerDataArray.IsValidIndex(i)) {
-        PlayerDataArray[i].PlayerID = NewPlayerId;
+        PlayerDataArray[i].PlayerID = AssignedId;
       }
 
       if (ASkaldPlayerController *OwningController =
               Cast<ASkaldPlayerController>(PS->GetOwner())) {
         if (USkaldMainHUDWidget *HUD = OwningController->GetHUDWidget()) {
-          HUD->LocalPlayerID = NewPlayerId;
+          HUD->LocalPlayerID = AssignedId;
           HUD->SyncPhaseButtons(HUD->CurrentPlayerID == HUD->LocalPlayerID);
         }
       }
