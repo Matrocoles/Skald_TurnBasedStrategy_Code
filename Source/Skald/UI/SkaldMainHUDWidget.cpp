@@ -671,9 +671,9 @@ void USkaldMainHUDWidget::ShowStrategicInitiativeRoll(int32 RollValue,
     }
   }
 
-  const float DiceDisplaySize = 90.f;
+  const float DiceDisplaySize = 180.f;
   const float DiceBoardPadding = 24.f;
-  const FVector2D DiceOffset(0.f, 80.f);
+  const FVector2D DiceOffset = FVector2D::ZeroVector;
 
   bool bDisplayedDice = false;
   if (DiceResource) {
@@ -692,8 +692,8 @@ void USkaldMainHUDWidget::ShowStrategicInitiativeRoll(int32 RollValue,
 
     if (UCanvasPanelSlot *DiceSlot =
             Cast<UCanvasPanelSlot>(InitiativeDiceImage->Slot)) {
-      DiceSlot->SetAnchors(FAnchors(0.5f, 0.f));
-      DiceSlot->SetAlignment(FVector2D(0.5f, 0.f));
+      DiceSlot->SetAnchors(FAnchors(0.5f, 0.5f));
+      DiceSlot->SetAlignment(FVector2D(0.5f, 0.5f));
       DiceSlot->SetPosition(DiceOffset);
       DiceSlot->SetSize(FVector2D(DiceDisplaySize, DiceDisplaySize));
     }
@@ -705,10 +705,9 @@ void USkaldMainHUDWidget::ShowStrategicInitiativeRoll(int32 RollValue,
 
       if (UCanvasPanelSlot *BoardSlot =
               Cast<UCanvasPanelSlot>(InitiativeDiceBoardImage->Slot)) {
-        BoardSlot->SetAnchors(FAnchors(0.5f, 0.f));
-        BoardSlot->SetAlignment(FVector2D(0.5f, 0.f));
-        BoardSlot->SetPosition(
-            DiceOffset - FVector2D(0.f, DiceBoardPadding * 0.5f));
+        BoardSlot->SetAnchors(FAnchors(0.5f, 0.5f));
+        BoardSlot->SetAlignment(FVector2D(0.5f, 0.5f));
+        BoardSlot->SetPosition(DiceOffset);
         BoardSlot->SetSize(FVector2D(DiceDisplaySize + DiceBoardPadding,
                                      DiceDisplaySize + DiceBoardPadding));
       }
