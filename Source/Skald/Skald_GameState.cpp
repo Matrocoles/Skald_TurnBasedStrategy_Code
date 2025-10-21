@@ -3,6 +3,7 @@
 #include "Net/UnrealNetwork.h"
 #include "Skald_PlayerController.h"
 #include "Engine/World.h"
+#include "GameFramework/WorldSettings.h"
 #include "SkaldLogging.h"
 
 ASkaldGameState::ASkaldGameState()
@@ -197,5 +198,88 @@ void ASkaldGameState::OnRep_BattlePhase()
             }
         }
     }
+}
+
+void ASkaldGameState::RequestTransientSlowdown(float TargetDilation, float DurationSeconds)
+{
+    if (TargetDilation <= 0.f || DurationSeconds <= 0.f)
+    {
+        return;
+    }
+
+    UWorld* World = GetWorld();
+    if (!World || World->IsPaused())
+    {
+        return;
+    }
+
+    if (AWorldSettings* WorldSettings = World->GetWorldSettings())
+    {
+        const float ClampedTarget = FMath::Clamp(TargetDilation, 0.01f, 1.f);
+        const float CurrentDilation = WorldSettings->GetEffectiveTimeDilation();
+
+        if (!bTimeDilationRequestActive)
+        {
+            OriginalTimeDilation = CurrentDilation > 0.f ? CurrentDilation : 1.f;
+            ActiveTimeDilation = OriginalTimeDilation;
+            bTimeDilationRequestActive = true;
+        }
+
+        const float DesiredDilation = FMath::Min(ActiveTimeDilation, ClampedTarget);
+        ActiveTimeDilation = DesiredDilation;
+
+        if (CurrentDilation - DesiredDilation > KINDA_SMALL_NUMBER)
+        {
+            WorldSettings->SetTimeDilation(DesiredDilation);
+        }
+
+        FTimerManager& TimerManager = World->GetTimerManager();
+        TimerManager.ClearTimer(TimeDilationResetHandle);
+        TimerManager.SetTimer(TimeDilationResetHandle, this, &ASkaldGameState::HandleTimeDilationReset, DurationSeconds, false);
+    }
+}
+
+void ASkaldGameState::HandleTimeDilationReset()
+{
+    if (!bTimeDilationRequestActive)
+    {
+        return;
+    }
+
+    UWorld* World = GetWorld();
+    if (!World)
+    {
+        bTimeDilationRequestActive = false;
+        ActiveTimeDilation = 1.f;
+        OriginalTimeDilation = 1.f;
+        return;
+    }
+
+    AWorldSettings* WorldSettings = World->GetWorldSettings();
+    if (WorldSettings)
+    {
+        const float CurrentDilation = WorldSettings->GetEffectiveTimeDilation();
+        if (FMath::IsNearlyEqual(CurrentDilation, ActiveTimeDilation, KINDA_SMALL_NUMBER))
+        {
+            const float RestoreValue = OriginalTimeDilation > 0.f ? OriginalTimeDilation : 1.f;
+            WorldSettings->SetTimeDilation(RestoreValue);
+        }
+    }
+
+    World->GetTimerManager().ClearTimer(TimeDilationResetHandle);
+    bTimeDilationRequestActive = false;
+    ActiveTimeDilation = 1.f;
+    OriginalTimeDilation = 1.f;
+}
+
+void ASkaldGameState::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    HandleTimeDilationReset();
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(TimeDilationResetHandle);
+    }
+
+    Super::EndPlay(EndPlayReason);
 }
 

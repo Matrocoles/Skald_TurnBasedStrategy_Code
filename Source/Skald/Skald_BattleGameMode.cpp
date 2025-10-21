@@ -1225,6 +1225,7 @@ void ASkald_BattleGameMode::SpawnFighterSide(const TArray<FFighterDefinition> &R
       Pawn->InitializeMaxHealth(Def.Stats.Health);
       Pawn->FighterId = Def.Id;
       Pawn->FighterPortrait = Def.Portrait;
+      Pawn->Faction = Def.Faction;
       Pawn->bIsAttacker = bAsAttacker;
       BattleManager->RegisterFighter(Pawn, bAsAttacker);
     }

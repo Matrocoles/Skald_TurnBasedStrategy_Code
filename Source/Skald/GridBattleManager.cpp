@@ -6,6 +6,7 @@
 #include "GridOverlayComponent.h"
 #include "SkaldLogging.h"
 #include "Skald_GameInstance.h"
+#include "Skald_GameState.h"
 #include "Skald_PlayerState.h"
 #include "GameFramework/GameStateBase.h"
 #include "UObject/UnrealType.h"
@@ -152,6 +153,7 @@ FDiceRollResult UGridBattleManager::ResolveAttackDice(const FFighterStats& Attac
             if (Outcome.bCritical)
             {
                 ++Result.CriticalHitCount;
+                Result.HighestCriticalDamage = FMath::Max(Result.HighestCriticalDamage, Damage);
             }
         }
         else
@@ -161,6 +163,7 @@ FDiceRollResult UGridBattleManager::ResolveAttackDice(const FFighterStats& Attac
     }
 
     Result.EndingHealth = SimulatedHealth;
+    Result.bHighStakesCritical = Result.CriticalHitCount > 0 && Result.EndingHealth <= 0 && Result.StartingHealth > 0;
     return Result;
 }
 
@@ -172,6 +175,10 @@ bool UGridBattleManager::ResolveAttack(FFighter& Attacker, FFighter& Defender, i
     Defender.Stats.Health = FMath::Max(0, Result.EndingHealth);
 
     OutDamage = FMath::Clamp(Result.TotalDamage, 0, StartingHealth);
+    if (Result.bHighStakesCritical)
+    {
+        Result.HighStakesFaction = Attacker.Faction;
+    }
     OutResult = Result;
 
     return Result.EndingHealth > 0;
@@ -610,6 +617,17 @@ void UGridBattleManager::ReportAttackResolution(AFighterPawn* Attacker, AFighter
         TEXT("[Battle] Attack resolved: %s -> %s | Dice=%d Hits=%d Crits=%d Misses=%d Damage=%d RemainingHP=%d"),
         *DescribeFighter(Attacker), *DescribeFighter(Defender), DiceRolled, Result.HitCount, Result.CriticalHitCount,
         Result.MissCount, Result.TotalDamage, Result.EndingHealth);
+
+    if (Result.bHighStakesCritical)
+    {
+        if (UWorld* World = GetWorld())
+        {
+            if (ASkaldGameState* GameState = World->GetGameState<ASkaldGameState>())
+            {
+                GameState->RequestTransientSlowdown(0.2f, 0.25f);
+            }
+        }
+    }
 
     OnAttackResolved.Broadcast(Attacker, Defender, Result);
 }
