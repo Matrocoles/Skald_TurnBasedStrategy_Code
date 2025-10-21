@@ -11,6 +11,8 @@
 #include "Skald_EnumUtils.h"
 #include "Skald_GameInstance.h"
 #include "Skald_PlayerController.h"
+#include "Components/TextBlock.h"
+#include "Styling/SlateColor.h"
 
 namespace {
 
@@ -62,6 +64,8 @@ void UStartGameWidget::NativeConstruct() {
   if (FactionComboBox) {
     FactionComboBox->ClearOptions();
     FactionComboBox->AddOption(FactionPlaceholderOption);
+    FactionComboBox->OnGenerateWidgetEvent.BindUFunction(
+        this, FName("GenerateFactionOptionWidget"));
     if (UEnum *Enum = StaticEnum<ESkaldFaction>()) {
       for (int32 i = 0; i < Enum->NumEnums(); ++i) {
         if (Skald::EnumUtils::IsHiddenEntry(Enum, i)) {
@@ -160,6 +164,29 @@ void UStartGameWidget::OnMainMenu() {
   if (OwningLobbyMenu.IsValid()) {
     OwningLobbyMenu->SetVisibility(ESlateVisibility::Visible);
   }
+}
+
+UWidget *UStartGameWidget::GenerateFactionOptionWidget(const FString &Option) {
+  UTextBlock *TextBlock = nullptr;
+
+  if (FactionComboBox) {
+    TextBlock = NewObject<UTextBlock>(FactionComboBox);
+  }
+
+  if (!TextBlock) {
+    TextBlock = NewObject<UTextBlock>(this);
+  }
+
+  if (TextBlock) {
+    TextBlock->SetText(FText::FromString(Option));
+    const bool bIsPlaceholder = Option == FactionPlaceholderOption;
+    TextBlock->SetIsEnabled(!bIsPlaceholder);
+    if (bIsPlaceholder) {
+      TextBlock->SetColorAndOpacity(FSlateColor(FLinearColor::Gray));
+    }
+  }
+
+  return TextBlock;
 }
 
 void UStartGameWidget::StartGame(bool bMultiplayer, bool bHost) {
