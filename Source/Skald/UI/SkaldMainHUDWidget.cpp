@@ -538,8 +538,6 @@ void USkaldMainHUDWidget::HideEnemyTurnInProgress() {
 
 void USkaldMainHUDWidget::ShowStrategicInitiativePrompt(const FText &PromptText,
                                                         float ButtonDelay) {
-  SetAwaitingStrategicInitiative(true);
-
   if (InitiativePromptText) {
     InitiativePromptText->SetText(PromptText);
     InitiativePromptText->SetVisibility(ESlateVisibility::HitTestInvisible);
@@ -565,6 +563,8 @@ void USkaldMainHUDWidget::ShowStrategicInitiativePrompt(const FText &PromptText,
       }
     }
   }
+
+  SetAwaitingStrategicInitiative(true);
 }
 
 void USkaldMainHUDWidget::HideStrategicInitiativePrompt() {
