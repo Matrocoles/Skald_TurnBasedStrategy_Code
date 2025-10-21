@@ -1479,6 +1479,20 @@ void USkaldMainHUDWidget::SyncPhaseButtons(bool bIsMyTurn) {
   };
 
   if (bAwaitingStrategicInitiative) {
+    // The strategic initiative overlay is only supposed to block interaction
+    // while it is visible. In some race conditions (for example when an AI
+    // opponent wins initiative and completes their automatic deployment before
+    // the local client's UI updates) the overlay may already be hidden while
+    // the cached flag is still set. This prevented the deployment/end turn
+    // buttons from ever becoming visible on the player's turn. If the overlay
+    // is no longer active we drop the stale flag so normal button syncing can
+    // proceed.
+    if (!IsStrategicInitiativeOverlayActive()) {
+      bAwaitingStrategicInitiative = false;
+    }
+  }
+
+  if (bAwaitingStrategicInitiative) {
     SetButtonState(AttackButton, false, false);
     SetButtonState(MoveButton, false, false);
     SetButtonState(DeployButton, false, false);
