@@ -32,6 +32,7 @@ namespace {
 constexpr float StartGameTimeout = 10.f;
 constexpr int32 StartingResources = 100;
 constexpr float RetryInitDelay = 0.01f;
+constexpr float ArmyPlacementAutoAdvanceDelay = 0.15f;
 // Instance variables moved into ASkaldGameMode to avoid cross-instance
 // interference; see header for declarations.
 } // namespace
@@ -1693,6 +1694,7 @@ void ASkaldGameMode::BeginArmyPlacementPhase() {
     return;
   }
 
+  GetWorldTimerManager().ClearTimer(ArmyPlacementAutoAdvanceHandle);
   GetWorldTimerManager().ClearTimer(ArmyPlacementFailsafeHandle);
   bArmyPlacementFailsafeTriggered = false;
 
@@ -1801,6 +1803,7 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
     return;
   }
 
+  GetWorldTimerManager().ClearTimer(ArmyPlacementAutoAdvanceHandle);
   GetWorldTimerManager().ClearTimer(ArmyPlacementFailsafeHandle);
 
   const TArray<ASkaldPlayerController *> Controllers =
@@ -1867,7 +1870,23 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
       WorldMap->AutoPlaceUnitsForAI(PS);
       TurnManager->BroadcastDeployableUnits(PS);
       bArmyPlacementFailsafeTriggered = false;
-      TurnManager->EndCurrentPhase();
+
+      bool bScheduledAutoAdvance = false;
+      if (ArmyPlacementAutoAdvanceDelay > KINDA_SMALL_NUMBER) {
+        if (UWorld *World = GetWorld()) {
+          // Allow a short pause so replicated HUDs can reveal their phase buttons
+          // before the turn advances to the next player.
+          World->GetTimerManager().SetTimer(
+              ArmyPlacementAutoAdvanceHandle, this,
+              &ASkaldGameMode::HandleArmyPlacementAutoAdvance,
+              ArmyPlacementAutoAdvanceDelay, false);
+          bScheduledAutoAdvance = true;
+        }
+      }
+
+      if (!bScheduledAutoAdvance && TurnManager) {
+        TurnManager->EndCurrentPhase();
+      }
       GetWorldTimerManager().SetTimer(ArmyPlacementFailsafeHandle, this,
                                       &ASkaldGameMode::HandleArmyPlacementFailsafe,
                                       2.0f, false);
@@ -1927,6 +1946,20 @@ ATurnManager *ASkaldGameMode::ResolveTurnManager() {
       ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
   TurnManager = World->SpawnActor<ATurnManager>(DesiredClass, SpawnParams);
   return TurnManager;
+}
+
+void ASkaldGameMode::HandleArmyPlacementAutoAdvance() {
+  GetWorldTimerManager().ClearTimer(ArmyPlacementAutoAdvanceHandle);
+
+  if (!TurnManager) {
+    return;
+  }
+
+  if (TurnManager->GetCurrentPhase() != ETurnPhase::ArmyPlacement) {
+    return;
+  }
+
+  TurnManager->EndCurrentPhase();
 }
 
 void ASkaldGameMode::HandleArmyPlacementFailsafe() {
