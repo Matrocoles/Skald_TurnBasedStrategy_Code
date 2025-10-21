@@ -353,9 +353,28 @@ public:
             meta = (BindWidget))
   UTextBlock *PhaseText;
 
+  /** Legacy selection prompt text block kept for backward compatibility. */
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
             meta = (BindWidget))
   UTextBlock *SelectionPrompt;
+
+  /** Optional dedicated text block for selection prompts. */
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
+            meta = (BindWidgetOptional))
+  UTextBlock *SelectionPromptText;
+
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|HUD|Prompts")
+  FText ReinforcementSelectionPromptText;
+
+  /**
+   * Optional overrides for selection prompts/errors keyed by LOCTEXT IDs.
+   *
+   * Supported keys include ReinforcementOwnedCapitalPrompt, AttackPrompt,
+   * MovementPrompt, MoveInvalidSelection, etc. (See SkaldMainHUDWidget.cpp for
+   * the complete list.)
+   */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|HUD|Prompts")
+  TMap<FName, FText> SelectionPromptOverrides;
 
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
             meta = (BindWidget))
@@ -450,6 +469,8 @@ protected:
   FTimerHandle TurnMessageTimerHandle;
   FTimerHandle StrategicInitiativeRollDelayHandle;
   FTimerHandle StrategicInitiativeDiceHideHandle;
+  FText PendingSelectionPromptText;
+  bool bPendingSelectionPromptVisible = false;
 
   // Internal handlers for widget actions
   UFUNCTION()
@@ -468,6 +489,8 @@ protected:
   void HideStrategicInitiativeDice();
   void ClearStrategicInitiativeWaitIfNeeded();
   bool IsStrategicInitiativeOverlayActive() const;
+  void ApplyPendingSelectionPrompt();
+  UTextBlock *GetSelectionPromptTextBlock() const;
 
   UFUNCTION()
   void HandleStrategicDiceRenderTargetUpdate(class UCanvas *Canvas, int32 Width,
@@ -549,9 +572,9 @@ protected:
   TArray<ATerritory *> HighlightedTerritories;
 
   void ClearTerritoryHighlights();
-  void ShowSelectionPromptMessage(const FString &Message,
-                                  bool bShow = true);
-  void ShowSelectionErrorMessage(const FString &Message);
+  void ShowSelectionPromptMessage(const FText &Message, bool bShow = true);
+  void ShowSelectionErrorMessage(const FText &Message);
+  FText ResolveSelectionPromptText(const FName &Key, const FText &Default) const;
 
   ATerritory *GetCurrentlySelectedTerritory() const;
 
