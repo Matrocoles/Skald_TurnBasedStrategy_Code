@@ -2024,6 +2024,12 @@ void ATurnManager::BroadcastCurrentPhase() {
         return;
       }
     }
+    if (ASkaldGameMode *GameMode = W->GetAuthGameMode<ASkaldGameMode>()) {
+      if (!GameMode->IsWorldInitialized() ||
+          GameMode->IsAwaitingStrategicInitiative()) {
+        return;
+      }
+    }
   }
 
   const FString PhaseString = UEnum::GetValueAsString(CurrentPhase);

@@ -2717,6 +2717,7 @@ void ASkaldPlayerController::ShowPendingStrategicInitiativeResult() {
 
   MainHUD->HideStrategicInitiativePrompt();
   MainHUD->ShowStrategicInitiativeRoll(PendingStrategicInitiativeRoll, 2.f);
+  MainHUD->SetAwaitingStrategicInitiative(false);
 
   if (MainHUD->RoundStartSound) {
     UGameplayStatics::PlaySound2D(this, MainHUD->RoundStartSound);
@@ -2752,6 +2753,7 @@ void ASkaldPlayerController::ClientPromptStrategicInitiative_Implementation(
     const FText PromptText = NSLOCTEXT("Skald", "StrategicInitiativePrompt",
                                        "Roll for initiative");
     MainHUD->ShowStrategicInitiativePrompt(PromptText);
+    MainHUD->SetAwaitingStrategicInitiative(true);
   }
 }
 

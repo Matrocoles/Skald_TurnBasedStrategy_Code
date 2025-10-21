@@ -530,6 +530,8 @@ void USkaldMainHUDWidget::HideEnemyTurnInProgress() {
 
 void USkaldMainHUDWidget::ShowStrategicInitiativePrompt(const FText &PromptText,
                                                         float ButtonDelay) {
+  SetAwaitingStrategicInitiative(true);
+
   if (InitiativePromptText) {
     InitiativePromptText->SetText(PromptText);
     InitiativePromptText->SetVisibility(ESlateVisibility::HitTestInvisible);
@@ -585,6 +587,8 @@ void USkaldMainHUDWidget::ShowStrategicInitiativeRoll(int32 RollValue,
     HideStrategicInitiativeDice();
     return;
   }
+
+  SetAwaitingStrategicInitiative(false);
 
   UObject *DiceResource = nullptr;
   const int32 TextureIndex = RollValue - 1;
@@ -694,6 +698,17 @@ void USkaldMainHUDWidget::RevealStrategicInitiativeRollButton() {
     RollInitiativeButton->SetVisibility(ESlateVisibility::Visible);
     RollInitiativeButton->SetIsEnabled(true);
   }
+}
+
+void USkaldMainHUDWidget::SetAwaitingStrategicInitiative(bool bAwaiting) {
+  if (bAwaitingStrategicInitiative == bAwaiting) {
+    return;
+  }
+
+  bAwaitingStrategicInitiative = bAwaiting;
+
+  const bool bIsMyTurn = CurrentPlayerID == LocalPlayerID;
+  SyncPhaseButtons(bIsMyTurn);
 }
 
 void USkaldMainHUDWidget::HideStrategicInitiativeDice() {
@@ -1410,6 +1425,15 @@ void USkaldMainHUDWidget::SyncPhaseButtons(bool bIsMyTurn) {
                                       : ESlateVisibility::Collapsed);
     Button->SetIsEnabled(bShouldEnable && bShouldShow);
   };
+
+  if (bAwaitingStrategicInitiative) {
+    SetButtonState(AttackButton, false, false);
+    SetButtonState(MoveButton, false, false);
+    SetButtonState(DeployButton, false, false);
+    SetButtonState(EndPhaseButton, false, false);
+    SetButtonState(EndTurnButton, false, false);
+    return;
+  }
 
   const bool bShowAttackButton = bIsMyTurn && CurrentPhase == ETurnPhase::Attack;
   SetButtonState(AttackButton, bShowAttackButton, bShowAttackButton);

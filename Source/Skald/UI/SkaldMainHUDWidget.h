@@ -94,6 +94,10 @@ public:
   UPROPERTY(BlueprintReadWrite, Category = "Skald|State")
   ETurnPhase CurrentPhase = ETurnPhase::Reinforcement;
 
+  /** Whether the HUD is waiting on the strategic initiative roll. */
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|State")
+  bool bAwaitingStrategicInitiative = false;
+
   // Selection helpers used by Attack/Move flows
   UPROPERTY(BlueprintReadWrite, Category = "Skald|Selection")
   int32 SelectedSourceID = -1;
@@ -216,6 +220,10 @@ public:
   /** Display the rolled initiative value using the configured dice visuals. */
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD|Initiative")
   void ShowStrategicInitiativeRoll(int32 RollValue, float DisplayDuration = 1.f);
+
+  /** Toggle the HUD state while awaiting the strategic initiative roll. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|HUD|Initiative")
+  void SetAwaitingStrategicInitiative(bool bAwaiting);
 
   /** Show an in-progress enemy turn message without auto-hiding. */
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
