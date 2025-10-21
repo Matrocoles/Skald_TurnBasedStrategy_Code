@@ -360,6 +360,16 @@ public:
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|HUD|Prompts")
   FText ReinforcementSelectionPromptText;
 
+  /**
+   * Optional overrides for selection prompts/errors keyed by LOCTEXT IDs.
+   *
+   * Supported keys include ReinforcementOwnedCapitalPrompt, AttackPrompt,
+   * MovementPrompt, MoveInvalidSelection, etc. (See SkaldMainHUDWidget.cpp for
+   * the complete list.)
+   */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|HUD|Prompts")
+  TMap<FName, FText> SelectionPromptOverrides;
+
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
             meta = (BindWidget))
   UButton *AttackButton;
@@ -557,6 +567,7 @@ protected:
   void ClearTerritoryHighlights();
   void ShowSelectionPromptMessage(const FText &Message, bool bShow = true);
   void ShowSelectionErrorMessage(const FText &Message);
+  FText ResolveSelectionPromptText(const FName &Key, const FText &Default) const;
 
   ATerritory *GetCurrentlySelectedTerritory() const;
 
