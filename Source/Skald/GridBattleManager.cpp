@@ -13,6 +13,8 @@
 
 namespace
 {
+constexpr float BattleConclusionBroadcastDelaySeconds = 1.5f;
+
 FString DescribeFighter(const AFighterPawn* Fighter)
 {
     if (!Fighter)
@@ -1042,10 +1044,39 @@ void UGridBattleManager::EndBattle()
     const int32 AttackerCasualties = AttackerInitialArmyCost - AttackerSurvivorArmyCost;
     const int32 DefenderCasualties = DefenderInitialArmyCost - DefenderSurvivorArmyCost;
 
+    BattleConclusionWinner = Winner;
+    BattleConclusionAttackerCasualties = AttackerCasualties;
+    BattleConclusionDefenderCasualties = DefenderCasualties;
+
     ActiveFighter = nullptr;
     OnActiveFighterChanged.Broadcast(nullptr);
+
+    UWorld* World = GetWorld();
+    if (World && BattleConclusionBroadcastDelaySeconds > 0.f)
+    {
+        World->GetTimerManager().SetTimer(BattleConclusionTimerHandle, this, &UGridBattleManager::BroadcastBattleConcluded,
+            BattleConclusionBroadcastDelaySeconds, false);
+    }
+    else
+    {
+        BroadcastBattleConcluded();
+    }
+}
+
+void UGridBattleManager::BroadcastBattleConcluded()
+{
+    if (!bBattleConcluded)
+    {
+        return;
+    }
+
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(BattleConclusionTimerHandle);
+    }
+
     UE_LOG(LogSkaldBattle, Log, TEXT("[Battle] Battle ended. Winner=%s, AttackerCasualties=%d, DefenderCasualties=%d"),
-        *UEnum::GetValueAsString(Winner), AttackerCasualties, DefenderCasualties);
-    OnBattleEnded.Broadcast(Winner, AttackerCasualties, DefenderCasualties);
+        *UEnum::GetValueAsString(BattleConclusionWinner), BattleConclusionAttackerCasualties, BattleConclusionDefenderCasualties);
+    OnBattleEnded.Broadcast(BattleConclusionWinner, BattleConclusionAttackerCasualties, BattleConclusionDefenderCasualties);
 }
 

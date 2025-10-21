@@ -177,6 +177,9 @@ protected:
   /** Retry handle used when waiting for the battle manager to become available on the battle map. */
   FTimerHandle BattleEndBindingRetryHandle;
 
+  /** Delay handle ensuring the battle result remains visible before returning to the overworld. */
+  FTimerHandle BattleReturnDelayHandle;
+
   /** Cached battle manager that currently has a battle end delegate bound. */
   TWeakObjectPtr<class UGridBattleManager> BoundBattleManager;
 
@@ -192,6 +195,8 @@ protected:
   void AttemptBindBattleEnd(USkaldGameInstance *GameInstance, int32 Attempt = 0);
 
   void ClearBattleEndBinding(USkaldGameInstance *GameInstance);
+
+  void CompleteBattleConclusion();
 
   /** Notify controllers and HUDs of a phase change. */
   void BroadcastCurrentPhase();
@@ -214,4 +219,6 @@ protected:
 
   /** Capture the most recent grid battle resolution before travelling back. */
   bool CapturePendingBattleResolution(USkaldGameInstance *GameInstance);
+
+  bool bBattleReturnPending = false;
 };

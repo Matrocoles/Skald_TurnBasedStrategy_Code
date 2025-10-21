@@ -40,6 +40,7 @@
 #endif
 
 namespace {
+constexpr float BattleResultReturnDelaySeconds = 5.0f;
 FString GetWorldPackageName(const UWorld *World);
 FString ResolveMapPackageFromRegistry(const FString &MapName);
 
@@ -448,6 +449,13 @@ void ATurnManager::EndPlay(const EEndPlayReason::Type EndPlayReason) {
     World->GetTimerManager().ClearTimer(BattleEndBindingRetryHandle);
   }
 
+  if (UWorld *World = GetWorld()) {
+    FTimerManager &TimerManager = World->GetTimerManager();
+    TimerManager.ClearTimer(BattleReturnDelayHandle);
+    TimerManager.ClearTimer(BattleEndBindingRetryHandle);
+  }
+  bBattleReturnPending = false;
+
   Super::EndPlay(EndPlayReason);
 }
 
@@ -463,7 +471,39 @@ void ATurnManager::HandleGridBattleEnded(ESkaldFaction /*WinningFaction*/, int32
     ClearBattleEndBinding(GI);
   }
 
+  if (bBattleReturnPending) {
+    return;
+  }
+
   UWorld *World = GetWorld();
+  if (World) {
+    World->GetTimerManager().ClearTimer(BattleReturnDelayHandle);
+  }
+
+  bBattleReturnPending = true;
+
+  if (World && BattleResultReturnDelaySeconds > 0.f) {
+    World->GetTimerManager().SetTimer(
+        BattleReturnDelayHandle, this, &ATurnManager::CompleteBattleConclusion,
+        BattleResultReturnDelaySeconds, false);
+  } else {
+    CompleteBattleConclusion();
+  }
+}
+
+void ATurnManager::CompleteBattleConclusion() {
+  UWorld *World = GetWorld();
+  if (World) {
+    World->GetTimerManager().ClearTimer(BattleReturnDelayHandle);
+  }
+
+  USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+  if (GI && !GI->bIsInBattleMap) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("CompleteBattleConclusion aborted: battle map already inactive."));
+    bBattleReturnPending = false;
+    return;
+  }
 
   FString ReturnMapName;
   FString ReturnMapSource;
@@ -516,6 +556,7 @@ void ATurnManager::HandleGridBattleEnded(ESkaldFaction /*WinningFaction*/, int32
       UE_LOG(LogSkald, Error,
              TEXT("HandleGridBattleEnded: unable to resolve return map (Pending='%s', GI='%s')."),
              PendingValueForLog, GameInstanceValueForLog);
+      bBattleReturnPending = false;
       return;
     }
   }
@@ -584,6 +625,8 @@ void ATurnManager::HandleGridBattleEnded(ESkaldFaction /*WinningFaction*/, int32
       break;
     }
   }
+
+  bBattleReturnPending = false;
 }
 
 void ATurnManager::HandleBattleMapStateChanged(bool bInBattleMap) {
