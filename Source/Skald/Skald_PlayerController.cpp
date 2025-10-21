@@ -2775,6 +2775,14 @@ void ASkaldPlayerController::ClientDisplayStrategicInitiativeResult_Implementati
   ShowPendingStrategicInitiativeResult();
 }
 
+void ASkaldPlayerController::ClientClearStrategicInitiativeOverlay_Implementation() {
+  ShowMainHUD();
+
+  if (MainHUD) {
+    MainHUD->SetAwaitingStrategicInitiative(false);
+  }
+}
+
 void ASkaldPlayerController::CancelCommandMode() {
   CurrentCommandMode = EBattleCommandMode::None;
   if (UGridOverlayComponent *Grid = FindGridOverlay()) {
