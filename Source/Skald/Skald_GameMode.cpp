@@ -1080,7 +1080,7 @@ void ASkaldGameMode::NormalizePlayerStateIds() {
   if (GI) {
     const FSkaldTravelState &TravelState = GI->GetTravelState();
     if (TravelState.bValid && TravelState.PlayerIdsByUniqueId.Num() > 0) {
-      IdentityMap = TravelState.BuildPlayerIdentityMap();
+      IdentityMap = TravelState.PlayerIdsByUniqueId;
     }
   }
 
@@ -1164,8 +1164,8 @@ void ASkaldGameMode::NormalizePlayerStateIds() {
         if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
           const FString Identity = BuildPlayerIdentityKey(PS);
           if (!Identity.IsEmpty()) {
-            UpdatedTravelState.AddOrUpdatePlayerIdentity(Identity,
-                                                         PS->GetPlayerId());
+            UpdatedTravelState.PlayerIdsByUniqueId.FindOrAdd(Identity) =
+                PS->GetPlayerId();
           }
         }
       }

@@ -1255,8 +1255,8 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
 
       const FString Identity = BuildPlayerIdentityKey(PlayerState);
       if (!Identity.IsEmpty()) {
-        TravelState.AddOrUpdatePlayerIdentity(Identity,
-                                              PlayerState->GetPlayerId());
+        TravelState.PlayerIdsByUniqueId.FindOrAdd(Identity) =
+            PlayerState->GetPlayerId();
       }
     };
 
@@ -1820,8 +1820,8 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
                   Cast<ASkaldPlayerState>(PSBase)) {
             const FString Identity = BuildPlayerIdentityKey(PlayerState);
             if (!Identity.IsEmpty()) {
-              UpdatedTravelState.AddOrUpdatePlayerIdentity(
-                  Identity, PlayerState->GetPlayerId());
+              UpdatedTravelState.PlayerIdsByUniqueId.FindOrAdd(Identity) =
+                  PlayerState->GetPlayerId();
             }
           }
         }
