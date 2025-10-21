@@ -1403,6 +1403,26 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
       }
     }
     if (PendingPayload.DefenderArmyCount <= 0) {
+      auto FindSnapshotArmy =
+          [TargetId = PendingPayload.TargetTerritoryID](const TArray<FS_Territory> &Source) {
+            for (const FS_Territory &Snapshot : Source) {
+              if (Snapshot.TerritoryID == TargetId) {
+                return Snapshot.ArmyUnits;
+              }
+            }
+            return 0;
+          };
+
+      int32 SnapshotArmy = FindSnapshotArmy(TravelState.CachedTerritories);
+      if (SnapshotArmy <= 0 && GI) {
+        SnapshotArmy = FindSnapshotArmy(GI->CachedWorldMapTerritories);
+      }
+
+      if (SnapshotArmy > 0) {
+        PendingPayload.DefenderArmyCount = SnapshotArmy;
+      }
+    }
+    if (PendingPayload.DefenderArmyCount <= 0) {
       PendingPayload.DefenderArmyCount = PendingPayload.ArmyCountSent;
     }
 
