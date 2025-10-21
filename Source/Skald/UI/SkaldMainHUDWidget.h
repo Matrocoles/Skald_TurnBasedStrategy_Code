@@ -467,6 +467,7 @@ protected:
   void RevealStrategicInitiativeRollButton();
   void HideStrategicInitiativeDice();
   void ClearStrategicInitiativeWaitIfNeeded();
+  bool IsStrategicInitiativeOverlayActive() const;
 
   UFUNCTION()
   void HandleStrategicDiceRenderTargetUpdate(class UCanvas *Canvas, int32 Width,
