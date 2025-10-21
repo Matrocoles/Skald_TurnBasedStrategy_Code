@@ -1053,8 +1053,18 @@ void ASkaldGameMode::NormalizePlayerStateIds() {
 
   PlayerDataArray.SetNum(GS->PlayerArray.Num());
 
-  TSet<int32> UsedPlayerIds;
+  TSet<int32> ReservedPlayerIds;
+  TSet<int32> AssignedPlayerIds;
   int32 NextCandidateId = 1;
+
+  for (APlayerState *PSBase : GS->PlayerArray) {
+    if (const ASkaldPlayerState *ExistingPS = Cast<ASkaldPlayerState>(PSBase)) {
+      const int32 ExistingId = ExistingPS->GetPlayerId();
+      if (ExistingId > 0) {
+        ReservedPlayerIds.Add(ExistingId);
+      }
+    }
+  }
 
   auto AcquirePlayerId = [&](ASkaldPlayerState *PS) -> int32 {
     if (!PS) {
@@ -1062,18 +1072,21 @@ void ASkaldGameMode::NormalizePlayerStateIds() {
     }
 
     const int32 ExistingId = PS->GetPlayerId();
-    if (ExistingId > 0 && !UsedPlayerIds.Contains(ExistingId)) {
-      UsedPlayerIds.Add(ExistingId);
+    if (ExistingId > 0 && !AssignedPlayerIds.Contains(ExistingId)) {
+      AssignedPlayerIds.Add(ExistingId);
       return ExistingId;
     }
 
-    while (UsedPlayerIds.Contains(NextCandidateId)) {
-      ++NextCandidateId;
+    int32 CandidateId = NextCandidateId;
+    while (ReservedPlayerIds.Contains(CandidateId) ||
+           AssignedPlayerIds.Contains(CandidateId)) {
+      ++CandidateId;
     }
 
-    const int32 AssignedId = NextCandidateId++;
-    UsedPlayerIds.Add(AssignedId);
-    return AssignedId;
+    NextCandidateId = CandidateId + 1;
+    AssignedPlayerIds.Add(CandidateId);
+    ReservedPlayerIds.Add(CandidateId);
+    return CandidateId;
   };
 
   for (int32 i = 0; i < GS->PlayerArray.Num(); ++i) {
