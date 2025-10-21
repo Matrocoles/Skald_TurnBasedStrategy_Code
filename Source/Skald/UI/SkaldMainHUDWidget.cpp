@@ -42,6 +42,10 @@ USkaldMainHUDWidget::USkaldMainHUDWidget(
     const FObjectInitializer &ObjectInitializer)
     : Super(ObjectInitializer) {
   FloaterWidgetClass = UW_FloatingText::StaticClass();
+  ReinforcementSelectionPromptText =
+      NSLOCTEXT("SkaldHUD", "ReinforcementOwnedCapitalPrompt",
+                "Select an owned capital.");
+  PendingSelectionPromptText = FText::GetEmpty();
 
   static ConstructorHelpers::FClassFinder<UDeployWidget> DeployBP(
       TEXT("/Game/Blueprints/UI/Skald_DeployWidget"));
@@ -344,17 +348,19 @@ void USkaldMainHUDWidget::UpdatePhaseBanner(ETurnPhase InPhase) {
 
   if (!bSelectingForAttack && !bSelectingForMove) {
     if (CurrentPhase == ETurnPhase::Reinforcement) {
-      ShowSelectionPromptMessage(TEXT("Select an owned capital."));
+      ShowSelectionPromptMessage(ReinforcementSelectionPromptText);
     } else if (CurrentPhase == ETurnPhase::ArmyPlacement) {
-      ShowSelectionPromptMessage(TEXT("Select an owned territory."));
+      ShowSelectionPromptMessage(NSLOCTEXT(
+          "SkaldHUD", "ArmyPlacementOwnedTerritoryPrompt",
+          "Select an owned territory."));
     } else if (CurrentPhase == ETurnPhase::Movement) {
-      ShowSelectionPromptMessage(
-          TEXT("Press Move, then select an owned territory."));
+      ShowSelectionPromptMessage(NSLOCTEXT(
+          "SkaldHUD", "MovementPrompt", "Press Move, then select an owned territory."));
     } else if (CurrentPhase == ETurnPhase::Attack) {
-      ShowSelectionPromptMessage(
-          TEXT("Press Attack, then select an owned territory."));
+      ShowSelectionPromptMessage(NSLOCTEXT(
+          "SkaldHUD", "AttackPrompt", "Press Attack, then select an owned territory."));
     } else {
-      ShowSelectionPromptMessage(TEXT(""), false);
+      ShowSelectionPromptMessage(FText::GetEmpty(), false);
     }
   }
 }
@@ -713,6 +719,15 @@ void USkaldMainHUDWidget::SetAwaitingStrategicInitiative(bool bAwaiting) {
 
   bAwaitingStrategicInitiative = bAwaiting;
 
+  if (bAwaiting) {
+    if (SelectionPrompt) {
+      SelectionPrompt->SetText(FText::GetEmpty());
+      SelectionPrompt->SetVisibility(ESlateVisibility::Collapsed);
+    }
+  } else {
+    ApplyPendingSelectionPrompt();
+  }
+
   const bool bIsMyTurn = CurrentPlayerID == LocalPlayerID;
   SyncPhaseButtons(bIsMyTurn);
 }
@@ -974,20 +989,43 @@ void USkaldMainHUDWidget::ClearTerritoryHighlights() {
   HighlightedTerritories.Empty();
 }
 
-void USkaldMainHUDWidget::ShowSelectionPromptMessage(const FString &Message,
+void USkaldMainHUDWidget::ShowSelectionPromptMessage(const FText &Message,
                                                      bool bShow) {
+  PendingSelectionPromptText = bShow ? Message : FText::GetEmpty();
+  bPendingSelectionPromptVisible = bShow;
+
   if (!SelectionPrompt) {
     return;
   }
 
-  SelectionPrompt->SetText(FText::FromString(Message));
-  SelectionPrompt->SetVisibility(bShow ? ESlateVisibility::Visible
-                                       : ESlateVisibility::Collapsed);
+  if (!bShow || bAwaitingStrategicInitiative) {
+    SelectionPrompt->SetText(FText::GetEmpty());
+    SelectionPrompt->SetVisibility(ESlateVisibility::Collapsed);
+    return;
+  }
+
+  SelectionPrompt->SetText(Message);
+  SelectionPrompt->SetVisibility(ESlateVisibility::Visible);
 }
 
-void USkaldMainHUDWidget::ShowSelectionErrorMessage(const FString &Message) {
+void USkaldMainHUDWidget::ShowSelectionErrorMessage(const FText &Message) {
   ShowSelectionPromptMessage(Message);
-  ShowErrorMessage(Message);
+  ShowErrorMessage(Message.ToString());
+}
+
+void USkaldMainHUDWidget::ApplyPendingSelectionPrompt() {
+  if (!SelectionPrompt) {
+    return;
+  }
+
+  if (!bPendingSelectionPromptVisible || bAwaitingStrategicInitiative) {
+    SelectionPrompt->SetText(FText::GetEmpty());
+    SelectionPrompt->SetVisibility(ESlateVisibility::Collapsed);
+    return;
+  }
+
+  SelectionPrompt->SetText(PendingSelectionPromptText);
+  SelectionPrompt->SetVisibility(ESlateVisibility::Visible);
 }
 
 ATerritory *USkaldMainHUDWidget::GetCurrentlySelectedTerritory() const {
@@ -1011,7 +1049,9 @@ void USkaldMainHUDWidget::BeginAttackSelection() {
     ActiveConfirmWidget = nullptr;
   }
 
-  ShowSelectionPromptMessage(TEXT("Select an owned territory to attack from."));
+  ShowSelectionPromptMessage(NSLOCTEXT(
+      "SkaldHUD", "AttackSelectOwnedTerritory",
+      "Select an owned territory to attack from."));
 
   if (ATerritory *Preselected = GetCurrentlySelectedTerritory()) {
     OnTerritoryClickedUI(Preselected);
@@ -1031,12 +1071,15 @@ void USkaldMainHUDWidget::CancelAttackSelection() {
     ActiveConfirmWidget = nullptr;
   }
   if (CurrentPhase == ETurnPhase::Reinforcement) {
-    ShowSelectionPromptMessage(TEXT("Select an owned capital."));
+    ShowSelectionPromptMessage(ReinforcementSelectionPromptText);
   } else if (CurrentPhase == ETurnPhase::ArmyPlacement) {
-    ShowSelectionPromptMessage(TEXT("Select an owned territory."));
+    ShowSelectionPromptMessage(NSLOCTEXT(
+        "SkaldHUD", "CancelAttackArmyPlacementPrompt",
+        "Select an owned territory."));
   } else {
-    ShowSelectionPromptMessage(
-        TEXT("Press Attack, then select an owned territory."));
+    ShowSelectionPromptMessage(NSLOCTEXT(
+        "SkaldHUD", "CancelAttackPrompt",
+        "Press Attack, then select an owned territory."));
   }
   bSelectingForAttack = false;
   SelectedSourceID = -1;
@@ -1049,7 +1092,9 @@ void USkaldMainHUDWidget::BeginMoveSelection() {
   bSelectingForAttack = false;
   SelectedSourceID = -1;
   SelectedTargetID = -1;
-  ShowSelectionPromptMessage(TEXT("Select a territory to move troops from."));
+  ShowSelectionPromptMessage(NSLOCTEXT(
+      "SkaldHUD", "MoveSelectSourceTerritory",
+      "Select a territory to move troops from."));
 
   if (ATerritory *Preselected = GetCurrentlySelectedTerritory()) {
     OnTerritoryClickedUI(Preselected);
@@ -1064,7 +1109,7 @@ void USkaldMainHUDWidget::SubmitMove(int32 FromID, int32 ToID, int32 Troops) {
 void USkaldMainHUDWidget::HandleMoveOutcome(bool bSuccess,
                                             const FString &Message) {
   if (bSuccess) {
-    ShowSelectionPromptMessage(Message);
+    ShowSelectionPromptMessage(FText::FromString(Message));
     return;
   }
 
@@ -1078,10 +1123,11 @@ void USkaldMainHUDWidget::CancelMoveSelection() {
   SelectedSourceID = -1;
   SelectedTargetID = -1;
   if (CurrentPhase == ETurnPhase::Movement) {
-    ShowSelectionPromptMessage(
-        TEXT("Press Move, then select an owned territory."));
+    ShowSelectionPromptMessage(NSLOCTEXT(
+        "SkaldHUD", "CancelMovePrompt",
+        "Press Move, then select an owned territory."));
   } else {
-    ShowSelectionPromptMessage(TEXT(""), false);
+    ShowSelectionPromptMessage(FText::GetEmpty(), false);
   }
 }
 
@@ -1092,7 +1138,9 @@ void USkaldMainHUDWidget::ResetMoveSelectionAfterInvalidAttempt() {
   if (CurrentPhase == ETurnPhase::Movement) {
     bSelectingForMove = true;
     bSelectingForAttack = false;
-    ShowSelectionPromptMessage(TEXT("Select a territory to move troops from."));
+    ShowSelectionPromptMessage(NSLOCTEXT(
+        "SkaldHUD", "ResetMoveSelectSource",
+        "Select a territory to move troops from."));
   } else {
     bSelectingForMove = false;
   }
@@ -1137,10 +1185,9 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
       if (bOwnedByLocal && Territory->ArmyUnits > 1) {
         SelectedSourceID = Territory->TerritoryID;
         Territory->Select();
-        if (SelectionPrompt) {
-          SelectionPrompt->SetText(
-              FText::FromString(TEXT("Choose enemy territory.")));
-        }
+        ShowSelectionPromptMessage(NSLOCTEXT(
+            "SkaldHUD", "ChooseEnemyTerritoryPrompt",
+            "Choose enemy territory."));
         HighlightedTerritories.Empty();
         for (ATerritory *Adj : Territory->AdjacentTerritories) {
           if (Adj && Adj->OwningPlayer != Territory->OwningPlayer) {
@@ -1161,9 +1208,7 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
         });
     if (bIsHighlighted) {
       SelectedTargetID = Territory->TerritoryID;
-      if (SelectionPrompt) {
-        SelectionPrompt->SetVisibility(ESlateVisibility::Collapsed);
-      }
+      ShowSelectionPromptMessage(FText::GetEmpty(), false);
       if (ConfirmAttackWidgetClass) {
         ActiveConfirmWidget = CreateWidget<UConfirmAttackWidget>(
             GetWorld(), ConfirmAttackWidgetClass);
@@ -1207,15 +1252,17 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
     return;
   } else if (bSelectingForMove) {
     if (!bOwnedByLocal) {
-      ShowSelectionErrorMessage(
-          TEXT("You may only move between your own territories."));
+      ShowSelectionErrorMessage(NSLOCTEXT(
+          "SkaldHUD", "MoveOwnTerritoriesOnly",
+          "You may only move between your own territories."));
       return;
     }
 
     if (SelectedSourceID == -1 || Territory->TerritoryID == SelectedSourceID) {
       if (Territory->ArmyUnits <= 1) {
-        ShowSelectionErrorMessage(
-            TEXT("Need more than one unit to move troops."));
+        ShowSelectionErrorMessage(NSLOCTEXT(
+            "SkaldHUD", "MoveNeedMoreTroops",
+            "Need more than one unit to move troops."));
         return;
       }
 
@@ -1251,15 +1298,17 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
       }
 
       if (HighlightedTerritories.Num() == 0) {
-        ShowSelectionErrorMessage(
-            TEXT("No connected friendly territory to move into."));
+        ShowSelectionErrorMessage(NSLOCTEXT(
+            "SkaldHUD", "MoveNoConnectedTerritory",
+            "No connected friendly territory to move into."));
         SelectedSourceID = -1;
         Territory->Deselect();
         return;
       }
 
-      ShowSelectionPromptMessage(
-          TEXT("Select a connected territory to receive troops."));
+      ShowSelectionPromptMessage(NSLOCTEXT(
+          "SkaldHUD", "SelectConnectedTerritoryPrompt",
+          "Select a connected territory to receive troops."));
       return;
     }
 
@@ -1269,7 +1318,9 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
         });
 
     if (!bIsHighlighted) {
-      ShowSelectionErrorMessage(TEXT("Target not valid for movement."));
+      ShowSelectionErrorMessage(NSLOCTEXT(
+          "SkaldHUD", "MoveInvalidTarget",
+          "Target not valid for movement."));
       return;
     }
 
@@ -1278,7 +1329,9 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
     AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
         GetWorld(), AWorldMap::StaticClass()));
     if (!WorldMap) {
-      ShowSelectionErrorMessage(TEXT("World map not found."));
+      ShowSelectionErrorMessage(
+          NSLOCTEXT("SkaldHUD", "MoveWorldMapMissing",
+                    "World map not found."));
       CancelMoveSelection();
       return;
     }
@@ -1286,20 +1339,26 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
     ATerritory *Source = WorldMap->GetTerritoryById(SelectedSourceID);
     ATerritory *Target = WorldMap->GetTerritoryById(SelectedTargetID);
     if (!Source || !Target) {
-      ShowSelectionErrorMessage(TEXT("Invalid territory selection."));
+      ShowSelectionErrorMessage(NSLOCTEXT(
+          "SkaldHUD", "MoveInvalidSelection",
+          "Invalid territory selection."));
       CancelMoveSelection();
       return;
     }
 
     const int32 MaxMovable = Source->ArmyUnits - 1;
     if (MaxMovable <= 0) {
-      ShowSelectionErrorMessage(TEXT("No troops available to move."));
+      ShowSelectionErrorMessage(NSLOCTEXT(
+          "SkaldHUD", "MoveNoTroopsAvailable",
+          "No troops available to move."));
       CancelMoveSelection();
       return;
     }
 
     if (!DeployWidgetClass) {
-      ShowSelectionErrorMessage(TEXT("Deploy widget unavailable."));
+      ShowSelectionErrorMessage(NSLOCTEXT(
+          "SkaldHUD", "MoveDeployWidgetUnavailable",
+          "Deploy widget unavailable."));
       CancelMoveSelection();
       return;
     }
@@ -1312,7 +1371,9 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
     ActiveDeployWidget =
         CreateWidget<UDeployWidget>(GetWorld(), DeployWidgetClass);
     if (!ActiveDeployWidget) {
-      ShowSelectionErrorMessage(TEXT("Could not open deploy UI."));
+      ShowSelectionErrorMessage(NSLOCTEXT(
+          "SkaldHUD", "MoveDeployUICreationFailed",
+          "Could not open deploy UI."));
       CancelMoveSelection();
       return;
     }
@@ -1323,7 +1384,9 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
       FocusWidgetUIOnly(FocusPC, ActiveDeployWidget);
     }
 
-    ShowSelectionPromptMessage(TEXT("Choose how many troops to move."));
+    ShowSelectionPromptMessage(NSLOCTEXT(
+        "SkaldHUD", "ChooseTroopsToMovePrompt",
+        "Choose how many troops to move."));
   } else if (CurrentPhase == ETurnPhase::Reinforcement ||
              CurrentPhase == ETurnPhase::ArmyPlacement) {
     SelectedSourceID = Territory->TerritoryID;
@@ -1350,13 +1413,16 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
     }
     if (CurrentPhase == ETurnPhase::Reinforcement) {
       if (bOwnedByLocal && !Territory->bIsCapital) {
-        ShowSelectionErrorMessage(
-            TEXT("Reinforcements can only be placed on owned capitals."));
+        ShowSelectionErrorMessage(NSLOCTEXT(
+            "SkaldHUD", "ReinforcementCapitalRestriction",
+            "Reinforcements can only be placed on owned capitals."));
       } else if (bOwnedByLocal) {
-        ShowSelectionPromptMessage(TEXT("Select an owned capital."));
+      ShowSelectionPromptMessage(ReinforcementSelectionPromptText);
       }
     } else if (CurrentPhase == ETurnPhase::ArmyPlacement && bOwnedByLocal) {
-      ShowSelectionPromptMessage(TEXT("Select an owned territory."));
+      ShowSelectionPromptMessage(NSLOCTEXT(
+          "SkaldHUD", "ArmyPlacementSelectOwnedTerritory",
+          "Select an owned territory."));
     }
   } else if (CurrentPhase == ETurnPhase::Engineering && bOwnedByLocal &&
              Territory->bIsCapital) {
@@ -1563,10 +1629,7 @@ void USkaldMainHUDWidget::HandleAttackApproved() {
     const FString Error = FString::Printf(
         TEXT("Must send at least %d units to attack a capital."),
         SkaldConstants::CapitalAttackArmyRequirement);
-    if (SelectionPrompt) {
-      SelectionPrompt->SetText(FText::FromString(Error));
-      SelectionPrompt->SetVisibility(ESlateVisibility::Visible);
-    }
+    ShowSelectionPromptMessage(FText::FromString(Error));
     if (GEngine) {
       GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Red, Error);
     }
@@ -1682,8 +1745,9 @@ void USkaldMainHUDWidget::HandleDeployClicked() {
 
   const bool bIsArmyPlacement = CurrentPhase == ETurnPhase::ArmyPlacement;
   if (!bIsArmyPlacement && !Territory->bIsCapital) {
-    ShowSelectionErrorMessage(
-        TEXT("Reinforcements can only be placed on owned capitals."));
+    ShowSelectionErrorMessage(NSLOCTEXT(
+        "SkaldHUD", "ReinforcementCapitalRestriction",
+        "Reinforcements can only be placed on owned capitals."));
     return;
   }
 

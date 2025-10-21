@@ -357,6 +357,9 @@ public:
             meta = (BindWidget))
   UTextBlock *SelectionPrompt;
 
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|HUD|Prompts")
+  FText ReinforcementSelectionPromptText;
+
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
             meta = (BindWidget))
   UButton *AttackButton;
@@ -450,6 +453,8 @@ protected:
   FTimerHandle TurnMessageTimerHandle;
   FTimerHandle StrategicInitiativeRollDelayHandle;
   FTimerHandle StrategicInitiativeDiceHideHandle;
+  FText PendingSelectionPromptText;
+  bool bPendingSelectionPromptVisible = false;
 
   // Internal handlers for widget actions
   UFUNCTION()
@@ -468,6 +473,7 @@ protected:
   void HideStrategicInitiativeDice();
   void ClearStrategicInitiativeWaitIfNeeded();
   bool IsStrategicInitiativeOverlayActive() const;
+  void ApplyPendingSelectionPrompt();
 
   UFUNCTION()
   void HandleStrategicDiceRenderTargetUpdate(class UCanvas *Canvas, int32 Width,
@@ -549,9 +555,8 @@ protected:
   TArray<ATerritory *> HighlightedTerritories;
 
   void ClearTerritoryHighlights();
-  void ShowSelectionPromptMessage(const FString &Message,
-                                  bool bShow = true);
-  void ShowSelectionErrorMessage(const FString &Message);
+  void ShowSelectionPromptMessage(const FText &Message, bool bShow = true);
+  void ShowSelectionErrorMessage(const FText &Message);
 
   ATerritory *GetCurrentlySelectedTerritory() const;
 
