@@ -211,10 +211,10 @@ public:
   void SetTravelPending(bool bInPending);
 
   /** Capture the overworld state so it can be restored after travelling. */
-  bool CacheWorldMapSnapshot(UWorld *WorldContext = nullptr);
+  bool CacheWorldMapSnapshot(UWorld *InWorldContext = nullptr);
 
   /** Attempt to rebuild the overworld from the cached snapshot data. */
-  bool RestoreWorldFromSnapshot(UWorld *WorldContext = nullptr);
+  bool RestoreWorldFromSnapshot(UWorld *InWorldContext = nullptr);
 
   USkaldBattleLevelManager *GetBattleLevelManager() const { return BattleLevelStreamingManager; }
 

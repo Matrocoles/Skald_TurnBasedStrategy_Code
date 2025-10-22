@@ -202,8 +202,8 @@ void USkaldGameInstance::SetTravelPending(bool bInPending) {
   }
 }
 
-bool USkaldGameInstance::CacheWorldMapSnapshot(UWorld *WorldContext) {
-  UWorld *World = WorldContext ? WorldContext : GetWorld();
+bool USkaldGameInstance::CacheWorldMapSnapshot(UWorld *InWorldContext) {
+  UWorld *World = InWorldContext ? InWorldContext : GetWorld();
   if (!World || World->GetNetMode() == NM_Client) {
     return false;
   }
@@ -343,8 +343,8 @@ bool USkaldGameInstance::CacheWorldMapSnapshot(UWorld *WorldContext) {
   return true;
 }
 
-bool USkaldGameInstance::RestoreWorldFromSnapshot(UWorld *WorldContext) {
-  UWorld *World = WorldContext ? WorldContext : GetWorld();
+bool USkaldGameInstance::RestoreWorldFromSnapshot(UWorld *InWorldContext) {
+  UWorld *World = InWorldContext ? InWorldContext : GetWorld();
   if (!World || World->GetNetMode() == NM_Client) {
     return false;
   }
@@ -630,15 +630,15 @@ void USkaldGameInstance::ScheduleSnapshotRetry(UWorld *World) {
     return;
   }
 
-  FTimerManager &TimerManager = World->GetTimerManager();
-  if (TimerManager.IsTimerActive(TerritorySnapshotRetryHandle)) {
+  FTimerManager &WorldTimerManager = World->GetTimerManager();
+  if (WorldTimerManager.IsTimerActive(TerritorySnapshotRetryHandle)) {
     return;
   }
 
   FTimerDelegate RetryDelegate = FTimerDelegate::CreateUObject(
       this, &USkaldGameInstance::HandleCacheWorldMapSnapshotRetry);
-  TimerManager.SetTimer(TerritorySnapshotRetryHandle, RetryDelegate,
-                        SnapshotRetryDelaySeconds, false);
+  WorldTimerManager.SetTimer(TerritorySnapshotRetryHandle, RetryDelegate,
+                             SnapshotRetryDelaySeconds, false);
 }
 
 void USkaldGameInstance::HandleCacheWorldMapSnapshotRetry() {
