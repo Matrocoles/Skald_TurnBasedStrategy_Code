@@ -202,6 +202,29 @@ void USkaldGameInstance::HandleWorldBeginPlay(UWorld *LoadedWorld) {
   if (bPendingBattleResolution && PendingBattleResolution.bValid) {
     RequestPendingBattleResolution(LoadedWorld);
   }
+
+  if (LoadedWorld->GetNetMode() == NM_Client) {
+    return;
+  }
+
+  ASkaldGameMode *GameMode = LoadedWorld->GetAuthGameMode<ASkaldGameMode>();
+  if (!GameMode) {
+    return;
+  }
+
+  const bool bHasPendingSnapshot = GetPendingTravelSnapshot().Num() > 0;
+  const FSkaldTravelState &ActiveTravelState = GetTravelState();
+  const bool bHasTravelCache =
+      ActiveTravelState.bValid && ActiveTravelState.CachedTerritories.Num() > 0;
+  const bool bPendingResume = bResumeTurns || bPendingBattleResolution ||
+                              PendingBattleResolution.bValid;
+
+  if (!GameMode->IsWorldInitialized() &&
+      (bHasPendingSnapshot || bHasTravelCache || bPendingResume)) {
+    FTimerDelegate InitDelegate = FTimerDelegate::CreateUObject(
+        GameMode, &ASkaldGameMode::TryInitializeWorldAndStart);
+    LoadedWorld->GetTimerManager().SetTimerForNextTick(InitDelegate);
+  }
 }
 
 void USkaldGameInstance::SetActiveBattleGameMode(
