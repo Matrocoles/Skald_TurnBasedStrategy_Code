@@ -1290,8 +1290,10 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
 
     if (UWorld *WorldContext = World) {
       if (ASkaldGameMode *GameMode = WorldContext->GetAuthGameMode<ASkaldGameMode>()) {
-        if (GameMode->PlayerDataArray.Num() > 0) {
-          TravelState.PlayerSnapshots = GameMode->PlayerDataArray;
+        const TArray<FS_PlayerData> &PlayerSnapshots =
+            GameMode->GetPlayerDataSnapshots();
+        if (PlayerSnapshots.Num() > 0) {
+          TravelState.PlayerSnapshots = PlayerSnapshots;
         }
       }
     }
