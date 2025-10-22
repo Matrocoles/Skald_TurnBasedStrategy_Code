@@ -506,6 +506,13 @@ void ATurnManager::CompleteBattleConclusion() {
     return;
   }
 
+  if (GI && GI->bTravelPending) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("CompleteBattleConclusion aborted: travel already pending."));
+    bBattleReturnPending = false;
+    return;
+  }
+
   FString ReturnMapName;
   FString ReturnMapSource;
 
