@@ -9,10 +9,12 @@
 #include "Components/PanelSlot.h"
 #include "Components/PanelWidget.h"
 #include "Components/ScrollBox.h"
+#include "Components/ScrollBoxSlot.h"
 #include "Components/SizeBox.h"
 #include "Components/SizeBoxSlot.h"
 #include "Components/SlateWrapperTypes.h"
 #include "Components/TextBlock.h"
+#include "Components/UniformGridPanel.h"
 #include "Components/UniformGridSlot.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
@@ -262,20 +264,12 @@ struct FGridSlotSnapshot
 
 FMargin GetUniformGridSlotPadding(const UUniformGridSlot& Slot)
 {
-#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5)
-    return Slot.GetSlotPadding();
-#else
     return Slot.GetPadding();
-#endif
 }
 
 void SetUniformGridSlotPadding(UUniformGridSlot& Slot, const FMargin& Padding)
 {
-#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5)
-    Slot.SetSlotPadding(Padding);
-#else
     Slot.SetPadding(Padding);
-#endif
 }
 
 struct FUniformGridSlotSnapshot
@@ -433,7 +427,14 @@ void UW_DiceResolutionPanel::InitializeOutcomeScrollContainer()
         if (OutcomeList->GetParent() != OutcomeScrollBox)
         {
             OutcomeScrollBox->ClearChildren();
-            OutcomeScrollBox->AddChild(OutcomeList);
+            if (UPanelSlot* AddedSlot = OutcomeScrollBox->AddChild(OutcomeList))
+            {
+                if (UScrollBoxSlot* ScrollSlot = Cast<UScrollBoxSlot>(AddedSlot))
+                {
+                    ScrollSlot->SetHorizontalAlignment(HAlign_Fill);
+                    ScrollSlot->SetVerticalAlignment(VAlign_Fill);
+                }
+            }
         }
 
         ConfigureOutcomeScrollBox(*OutcomeScrollBox);
@@ -576,7 +577,14 @@ void UW_DiceResolutionPanel::InitializeOutcomeScrollContainer()
 
     ScrollSizer->SetContent(NewScrollBox);
     OutcomeScrollBox = NewScrollBox;
-    OutcomeScrollBox->AddChild(OutcomeList);
+    if (UPanelSlot* AddedSlot = OutcomeScrollBox->AddChild(OutcomeList))
+    {
+        if (UScrollBoxSlot* ScrollSlot = Cast<UScrollBoxSlot>(AddedSlot))
+        {
+            ScrollSlot->SetHorizontalAlignment(HAlign_Fill);
+            ScrollSlot->SetVerticalAlignment(VAlign_Fill);
+        }
+    }
 }
 
 void UW_DiceResolutionPanel::ConfigureOutcomeScrollBox(UScrollBox& ScrollBox) const
