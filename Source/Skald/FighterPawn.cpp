@@ -30,7 +30,7 @@ constexpr float AutoHealthHoldFallbackDelay = 2.f;
 // appears quickly after the player commits to an attack.
 constexpr float QueuedAttackFirstRollDelaySeconds = 0.2f;
 // Consistent pacing between any additional dice in the same queued attack.
-constexpr float QueuedAttackAdditionalRollDelaySeconds = 0.2f;
+constexpr float QueuedAttackAdditionalRollDelaySeconds = 0.5f;
 }
 
 AFighterPawn::AFighterPawn() : MaxHealth(0) {
