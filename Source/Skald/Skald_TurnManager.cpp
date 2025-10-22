@@ -27,6 +27,7 @@
 #include "UObject/Package.h"
 #include "TimerManager.h"
 #include "WorldMap.h"
+#include "Templates/Function.h"
 
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetRegistry/IAssetRegistry.h"
@@ -1633,9 +1634,115 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
     return;
   }
 
-  const FS_BattlePayload Battle = GI->PendingBattle;
-  ATerritory *Source = WorldMap->GetTerritoryById(Battle.FromTerritoryID);
-  ATerritory *Target = WorldMap->GetTerritoryById(Battle.TargetTerritoryID);
+  FS_BattlePayload Battle = GI->PendingBattle;
+  int32 FromTerritoryID = Battle.FromTerritoryID;
+  int32 TargetTerritoryID = Battle.TargetTerritoryID;
+
+  auto ResolveFromSnapshots = [](const TArray<FS_Territory> &Snapshots,
+                                 TFunctionRef<bool(const FS_Territory &)> Predicate)
+      -> int32 {
+    for (const FS_Territory &Snapshot : Snapshots) {
+      if (Predicate(Snapshot)) {
+        return Snapshot.TerritoryID;
+      }
+    }
+    return 0;
+  };
+
+  auto TryResolveMissingIds = [&](FS_BattlePayload &Payload) {
+    if (!GI) {
+      return;
+    }
+
+    const FSkaldTravelState &TravelState = GI->GetTravelState();
+    if (FromTerritoryID <= 0 && TravelState.AttackerTerritory > 0) {
+      FromTerritoryID = TravelState.AttackerTerritory;
+    }
+    if (TargetTerritoryID <= 0 && TravelState.DefenderTerritory > 0) {
+      TargetTerritoryID = TravelState.DefenderTerritory;
+    }
+
+    auto ResolveUsingSnapshots = [&](const TArray<FS_Territory> &Snapshots) {
+      if (Snapshots.Num() == 0) {
+        return;
+      }
+
+      if (TargetTerritoryID <= 0 && !Payload.DefenderTerritoryName.IsEmpty()) {
+        const FString TargetName = Payload.DefenderTerritoryName;
+        const int32 ResolvedTarget = ResolveFromSnapshots(
+            Snapshots, [&TargetName](const FS_Territory &Territory) {
+              return Territory.TerritoryName.Equals(TargetName,
+                                                    ESearchCase::IgnoreCase);
+            });
+        if (ResolvedTarget > 0) {
+          TargetTerritoryID = ResolvedTarget;
+        }
+      }
+
+      if (FromTerritoryID <= 0 && Payload.AttackerPlayerID > 0) {
+        const int32 Candidate = ResolveFromSnapshots(
+            Snapshots, [&](const FS_Territory &Territory) {
+              if (Territory.OwnerPlayerID != Payload.AttackerPlayerID) {
+                return false;
+              }
+              if (TargetTerritoryID > 0) {
+                return Territory.AdjacentIDs.Contains(TargetTerritoryID);
+              }
+              return true;
+            });
+        if (Candidate > 0) {
+          FromTerritoryID = Candidate;
+        }
+      }
+    };
+
+    ResolveUsingSnapshots(TravelState.CachedTerritories);
+    if (FromTerritoryID <= 0 || TargetTerritoryID <= 0) {
+      ResolveUsingSnapshots(GI->CachedWorldMapTerritories);
+    }
+    if (FromTerritoryID <= 0 || TargetTerritoryID <= 0) {
+      ResolveUsingSnapshots(GI->GetPendingTravelSnapshot());
+    }
+  };
+
+  if (FromTerritoryID <= 0 || TargetTerritoryID <= 0) {
+    TryResolveMissingIds(Battle);
+  }
+
+  if ((FromTerritoryID <= 0 || TargetTerritoryID <= 0) &&
+      (PendingBattle.FromTerritoryID > 0 || PendingBattle.TargetTerritoryID > 0)) {
+    if (FromTerritoryID <= 0 && PendingBattle.FromTerritoryID > 0) {
+      FromTerritoryID = PendingBattle.FromTerritoryID;
+    }
+    if (TargetTerritoryID <= 0 && PendingBattle.TargetTerritoryID > 0) {
+      TargetTerritoryID = PendingBattle.TargetTerritoryID;
+    }
+  }
+
+  if (FromTerritoryID <= 0 || TargetTerritoryID <= 0) {
+    UE_LOG(LogSkald, Error,
+           TEXT("ResolveGridBattleResult: Unable to resolve territory ids (From=%d Target=%d)."),
+           FromTerritoryID, TargetTerritoryID);
+    GI->bPendingBattleResolution = false;
+    GI->PendingBattleResolution = FGridBattleResolution();
+    GI->SetTravelPending(false);
+    return;
+  }
+
+  if (Battle.FromTerritoryID != FromTerritoryID ||
+      Battle.TargetTerritoryID != TargetTerritoryID) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("ResolveGridBattleResult: Reconstructed territory ids From=%d Target=%d (Original From=%d Target=%d)."),
+           FromTerritoryID, TargetTerritoryID, Battle.FromTerritoryID,
+           Battle.TargetTerritoryID);
+    Battle.FromTerritoryID = FromTerritoryID;
+    Battle.TargetTerritoryID = TargetTerritoryID;
+    GI->PendingBattle = Battle;
+    PendingBattle = Battle;
+  }
+
+  ATerritory *Source = WorldMap->GetTerritoryById(FromTerritoryID);
+  ATerritory *Target = WorldMap->GetTerritoryById(TargetTerritoryID);
   if (!Source || !Target) {
     DeferResolution(TEXT("Battle territories pending restoration"));
     return;
