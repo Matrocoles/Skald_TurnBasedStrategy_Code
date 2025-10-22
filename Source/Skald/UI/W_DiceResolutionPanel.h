@@ -9,6 +9,7 @@
 
 class UHorizontalBox;
 class UImage;
+class UScrollBox;
 class UTextBlock;
 class UTexture2D;
 class UVerticalBox;
@@ -130,6 +131,10 @@ protected:
     UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
     UVerticalBox* OutcomeList;
 
+    /** Scroll container that presents the outcome list. */
+    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+    UScrollBox* OutcomeScrollBox;
+
     /** Placeholder widget for future resolve progress visuals. */
     UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
     UWidget* ResolveProgressPlaceholder;
@@ -149,6 +154,9 @@ protected:
 private:
     void BroadcastCompletion();
     UTexture2D* ResolveDiceTexture(int32 RollValue) const;
+    void InitializeOutcomeScrollContainer();
+    void ConfigureOutcomeScrollBox(class UScrollBox& ScrollBox) const;
+    float GetOutcomeScrollWindowHeight() const;
 
     /** Copy of the current result used for playback. */
     FDiceRollResult ActiveResult;
