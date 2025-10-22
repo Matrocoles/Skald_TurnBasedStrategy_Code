@@ -1631,8 +1631,11 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
       TargetTerritoryID = TravelState.DefenderTerritory;
     }
 
-    auto ResolveUsingSnapshots = [&](const TArray<FS_Territory> &Snapshots) {
+    auto ResolveUsingSnapshots = [&](const TArray<FS_Territory> &Snapshots,
+                                     const TCHAR *SourceLabel) {
       if (Snapshots.Num() == 0) {
+        UE_LOG(LogSkald, Verbose,
+               TEXT("ResolveGridBattleResult: %s snapshot empty"), SourceLabel);
         return;
       }
 
@@ -1645,6 +1648,9 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
             });
         if (ResolvedTarget > 0) {
           TargetTerritoryID = ResolvedTarget;
+          UE_LOG(LogSkald, Log,
+                 TEXT("ResolveGridBattleResult: Resolved defender '%s' -> %d using %s"),
+                 *TargetName, TargetTerritoryID, SourceLabel);
         }
       }
 
@@ -1661,21 +1667,29 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
             });
         if (Candidate > 0) {
           FromTerritoryID = Candidate;
+          UE_LOG(LogSkald, Log,
+                 TEXT("ResolveGridBattleResult: Resolved attacker territory for PlayerID=%d -> %d using %s"),
+                 Payload.AttackerPlayerID, FromTerritoryID, SourceLabel);
         }
       }
     };
 
-    ResolveUsingSnapshots(TravelState.CachedTerritories);
+    ResolveUsingSnapshots(TravelState.CachedTerritories, TEXT("TravelState"));
     if (FromTerritoryID <= 0 || TargetTerritoryID <= 0) {
-      ResolveUsingSnapshots(GI->CachedWorldMapTerritories);
+      ResolveUsingSnapshots(GI->CachedWorldMapTerritories,
+                            TEXT("CachedWorldMap"));
     }
     if (FromTerritoryID <= 0 || TargetTerritoryID <= 0) {
-      ResolveUsingSnapshots(GI->GetPendingTravelSnapshot());
+      ResolveUsingSnapshots(GI->GetPendingTravelSnapshot(),
+                            TEXT("PendingSnapshot"));
     }
   };
 
   if (FromTerritoryID <= 0 || TargetTerritoryID <= 0) {
     TryResolveMissingIds(Battle);
+    UE_LOG(LogSkald, Verbose,
+           TEXT("ResolveGridBattleResult: After TryResolveMissingIds -> From=%d Target=%d"),
+           FromTerritoryID, TargetTerritoryID);
   }
 
   if ((FromTerritoryID <= 0 || TargetTerritoryID <= 0) &&
@@ -1692,6 +1706,13 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
     UE_LOG(LogSkald, Error,
            TEXT("ResolveGridBattleResult: Unable to resolve territory ids (From=%d Target=%d)."),
            FromTerritoryID, TargetTerritoryID);
+    UE_LOG(LogSkald, Error,
+           TEXT(
+               "ResolveGridBattleResult: TravelStateValid=%d CachedTravel=%d PendingSnapshot=%d PendingBattle From=%d Target=%d"),
+           GI && GI->GetTravelState().bValid ? 1 : 0,
+           GI ? GI->GetTravelState().CachedTerritories.Num() : 0,
+           GI ? GI->GetPendingTravelSnapshot().Num() : 0,
+           PendingBattle.FromTerritoryID, PendingBattle.TargetTerritoryID);
     GI->bPendingBattleResolution = false;
     GI->PendingBattleResolution = FGridBattleResolution();
     GI->SetTravelPending(false);
