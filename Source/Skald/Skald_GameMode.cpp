@@ -1219,6 +1219,7 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
   }
 
   if (bWorldInitialized && bTurnsStarted) {
+    HandleWorldInitializationComplete();
     GetWorldTimerManager().ClearTimer(RetryInitTimerHandle);
     return;
   }
@@ -1311,6 +1312,7 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     } else {
       bWorldInitialized = true;
       bWantsResume = GI && GI->bResumeTurns;
+      HandleWorldInitializationComplete();
     }
   }
 
@@ -1397,6 +1399,7 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
 
     bWorldInitialized = true;
     bTurnsStarted = true;
+    HandleWorldInitializationComplete();
     GetWorldTimerManager().ClearTimer(RetryInitTimerHandle);
     return;
   }
@@ -1602,6 +1605,7 @@ void ASkaldGameMode::ResolveStrategicInitiativePhase() {
   if (bInitialized) {
     bWorldInitialized = true;
     BeginArmyPlacementPhase();
+    HandleWorldInitializationComplete();
   }
 
   FTimerDelegate RetryInit =
@@ -1625,6 +1629,31 @@ void ASkaldGameMode::NotifyStrategicInitiativeRoll(
   }
 }
 
+void ASkaldGameMode::HandleWorldInitializationComplete() {
+  USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+  if (!GI || GI->bIsInBattleMap) {
+    return;
+  }
+
+  const bool bHasPendingResolution =
+      GI->bPendingBattleResolution || GI->PendingBattleResolution.bValid;
+
+  if (bHasPendingResolution) {
+    if (TurnManager) {
+      UE_LOG(LogSkald, Verbose,
+             TEXT("HandleWorldInitializationComplete: resolving deferred battle result."));
+      TurnManager->ResolveGridBattleResult();
+    }
+    return;
+  }
+
+  if (GI->bTravelPending) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("HandleWorldInitializationComplete: clearing travel state after overworld load."));
+    GI->SetTravelPending(false);
+  }
+}
+
 void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
   if (!LoadedGame || !WorldMap) {
     return;
@@ -1632,6 +1661,7 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
 
   bWorldInitialized = true;
   bTurnsStarted = true;
+  HandleWorldInitializationComplete();
 
   if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
     GI->CachedWorldMapTerritories = LoadedGame->Territories;
