@@ -16,6 +16,8 @@
 #include "Math/UnrealMathUtility.h"
 #include "TimerManager.h"
 #include "Math/Vector2D.h"
+#include "Types/SlateEnums.h"
+#include "Widgets/Layout/SScrollBox.h"
 
 namespace
 {
