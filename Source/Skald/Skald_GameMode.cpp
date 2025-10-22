@@ -775,6 +775,42 @@ void ASkaldGameMode::NormalizePlayerStateIds() {
   TSet<int32> AssignedPlayerIds;
   int32 NextCandidateId = 1;
 
+  auto NormaliseName = [](const FString &InName) {
+    FString Result = InName;
+    Result.TrimStartAndEndInline();
+    Result.ToLowerInline();
+    return Result;
+  };
+
+  USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+  const FSkaldTravelState *TravelState =
+      GI ? &GI->GetTravelState() : nullptr;
+
+  TMap<FString, int32> DesiredIdByName;
+  TArray<int32> DesiredHumanIds;
+  TArray<int32> DesiredAIIds;
+
+  if (TravelState && TravelState->bValid &&
+      TravelState->PlayerSnapshots.Num() > 0) {
+    for (const FS_PlayerData &Snapshot : TravelState->PlayerSnapshots) {
+      if (Snapshot.PlayerID <= 0) {
+        continue;
+      }
+
+      ReservedPlayerIds.Add(Snapshot.PlayerID);
+      TArray<int32> &Pool = Snapshot.IsAI ? DesiredAIIds : DesiredHumanIds;
+      Pool.AddUnique(Snapshot.PlayerID);
+
+      if (!Snapshot.PlayerName.IsEmpty()) {
+        const FString Normalised = NormaliseName(Snapshot.PlayerName);
+        if (!Normalised.IsEmpty() &&
+            !DesiredIdByName.Contains(Normalised)) {
+          DesiredIdByName.Add(Normalised, Snapshot.PlayerID);
+        }
+      }
+    }
+  }
+
   for (APlayerState *PSBase : GS->PlayerArray) {
     if (const ASkaldPlayerState *ExistingPS = Cast<ASkaldPlayerState>(PSBase)) {
       const int32 ExistingId = ExistingPS->GetPlayerId();
@@ -784,14 +820,68 @@ void ASkaldGameMode::NormalizePlayerStateIds() {
     }
   }
 
+  auto RemoveFromPool = [](TArray<int32> &Pool, int32 Value) {
+    const int32 Index = Pool.Find(Value);
+    if (Index != INDEX_NONE) {
+      Pool.RemoveAtSwap(Index);
+    }
+  };
+
   auto AcquirePlayerId = [&](ASkaldPlayerState *PS) -> int32 {
     if (!PS) {
       return 0;
     }
 
+    FString DisplayName = NormaliseName(PS->PlayerDisplayName);
+    if (DisplayName.IsEmpty()) {
+      DisplayName = NormaliseName(PS->GetPlayerName());
+    }
+
+    int32 DesiredId = 0;
+    if (!DisplayName.IsEmpty()) {
+      if (int32 *FoundId = DesiredIdByName.Find(DisplayName)) {
+        DesiredId = *FoundId;
+        DesiredIdByName.Remove(DisplayName);
+      }
+    }
+
+    TArray<int32> &Pool = PS->bIsAI ? DesiredAIIds : DesiredHumanIds;
+    if (DesiredId == 0) {
+      for (int32 Index = 0; Index < Pool.Num(); ++Index) {
+        const int32 Candidate = Pool[Index];
+        if (!AssignedPlayerIds.Contains(Candidate)) {
+          DesiredId = Candidate;
+          Pool.RemoveAtSwap(Index);
+          break;
+        }
+      }
+    } else {
+      RemoveFromPool(Pool, DesiredId);
+    }
+
+    if (DesiredId > 0 && !AssignedPlayerIds.Contains(DesiredId)) {
+      AssignedPlayerIds.Add(DesiredId);
+      ReservedPlayerIds.Add(DesiredId);
+      if (PS->bIsAI) {
+        RemoveFromPool(DesiredHumanIds, DesiredId);
+      } else {
+        RemoveFromPool(DesiredAIIds, DesiredId);
+      }
+      return DesiredId;
+    }
+
     const int32 ExistingId = PS->GetPlayerId();
     if (ExistingId > 0 && !AssignedPlayerIds.Contains(ExistingId)) {
       AssignedPlayerIds.Add(ExistingId);
+      ReservedPlayerIds.Add(ExistingId);
+      RemoveFromPool(DesiredHumanIds, ExistingId);
+      RemoveFromPool(DesiredAIIds, ExistingId);
+      for (auto It = DesiredIdByName.CreateIterator(); It; ++It) {
+        if (It.Value() == ExistingId) {
+          It.RemoveCurrent();
+          break;
+        }
+      }
       return ExistingId;
     }
 

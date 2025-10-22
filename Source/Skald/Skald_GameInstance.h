@@ -49,6 +49,10 @@ struct FSkaldTravelState
   UPROPERTY(BlueprintReadWrite, EditAnywhere)
   TArray<FS_Territory> CachedTerritories;
 
+  /** Cached player data captured alongside the travel snapshot. */
+  UPROPERTY(BlueprintReadWrite, EditAnywhere)
+  TArray<FS_PlayerData> PlayerSnapshots;
+
   UPROPERTY(BlueprintReadWrite, EditAnywhere)
   bool bValid = false;
 };
