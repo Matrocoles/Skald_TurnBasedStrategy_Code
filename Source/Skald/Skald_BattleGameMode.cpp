@@ -1180,11 +1180,29 @@ void ASkald_BattleGameMode::SpawnFighterSide(const TArray<FFighterDefinition> &R
       }
     }
 
+    const AFighterPawn *DefaultPawn =
+        DesiredClass->GetDefaultObject<AFighterPawn>();
+    const int32 FootprintSideLength =
+        DefaultPawn ? FMath::Max(DefaultPawn->GetFootprintSideLength(), 1) : 1;
+    const int32 FootprintOffset = FootprintSideLength - 1;
+    const int32 MaxAnchorX = FMath::Max(0, MaxX - FootprintOffset);
+    const int32 MaxAnchorY = FMath::Max(0, MaxY - FootprintOffset);
+
+    if (bAsAttacker) {
+      const int32 MaxEdgeX = FMath::Clamp(Edge - 1, 0, MaxAnchorX);
+      Cell.X = FMath::Clamp(Cell.X, 0, MaxEdgeX);
+    } else {
+      const int32 MinEdgeX = FMath::Clamp(MaxX - (Edge - 1), 0, MaxAnchorX);
+      const int32 MaxEdgeX = MaxAnchorX;
+      Cell.X = FMath::Clamp(Cell.X, MinEdgeX, MaxEdgeX);
+    }
+
+    Cell.Y = FMath::Clamp(Cell.Y, 0, MaxAnchorY);
+
     FVector TerrainLocation =
         Grid ? Grid->GridToWorld(Cell) : FVector::ZeroVector;
     float RequestedHalfHeight = 0.f;
-    if (const AFighterPawn *DefaultPawn =
-            DesiredClass->GetDefaultObject<AFighterPawn>()) {
+    if (DefaultPawn) {
       RequestedHalfHeight = DefaultPawn->GetSimpleCollisionHalfHeight();
 
       if (Grid) {
