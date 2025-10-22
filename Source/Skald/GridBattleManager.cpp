@@ -414,14 +414,6 @@ void UGridBattleManager::StartRound()
     const int32 LivingDefenders = CountFighters(InitiativeOrder, false);
     UE_LOG(LogSkaldBattle, Log, TEXT("[Battle] Starting round %d (Attackers=%d, Defenders=%d)"), CurrentRound, LivingAttackers, LivingDefenders);
 
-    for (AFighterPawn* Fighter : InitiativeOrder)
-    {
-        if (Fighter && Fighter->IsAlive())
-        {
-            Fighter->ResetActivationState();
-        }
-    }
-
     ActiveFighter = nullptr;
     CurrentTurn = 0;
 
@@ -585,6 +577,14 @@ void UGridBattleManager::FinalizeRoundStart()
     if (bBattleConcluded)
     {
         return;
+    }
+
+    for (AFighterPawn* Fighter : InitiativeOrder)
+    {
+        if (Fighter && Fighter->IsAlive())
+        {
+            Fighter->ResetActivationState();
+        }
     }
 
     OnRoundStarted.Broadcast(CurrentRound, InitiativeWinnerFaction);
