@@ -236,10 +236,11 @@ bool USkaldGameInstance::ShouldAttemptTravelResume() const {
   const bool bHasPendingSnapshot = PendingTravelTerritories.Num() > 0;
   const bool bHasTravelCache =
       TravelState.bValid && TravelState.CachedTerritories.Num() > 0;
+  const bool bHasCachedWorldMap = CachedWorldMapTerritories.Num() > 0;
   const bool bHasPendingResolution =
       bPendingBattleResolution || PendingBattleResolution.bValid;
-  return bHasPendingSnapshot || bHasTravelCache || bResumeTurns ||
-         bHasPendingResolution;
+  return bHasPendingSnapshot || bHasTravelCache || bHasCachedWorldMap ||
+         bResumeTurns || bHasPendingResolution;
 }
 
 void USkaldGameInstance::ScheduleTravelResume(UWorld *World) {
