@@ -199,6 +199,19 @@ void USkaldGameInstance::HandleWorldBeginPlay(UWorld *LoadedWorld) {
     return;
   }
 
+  const bool bShouldResume = ShouldAttemptTravelResume();
+  if (bShouldResume) {
+    ScheduleTravelResume(LoadedWorld);
+  } else {
+    if (PendingResumeWorld.IsValid()) {
+      if (UWorld *World = PendingResumeWorld.Get()) {
+        World->GetTimerManager().ClearTimer(PendingResumeRetryHandle);
+      }
+    }
+    PendingResumeWorld.Reset();
+    LoadedWorld->GetTimerManager().ClearTimer(PendingResumeRetryHandle);
+  }
+
   if (bPendingBattleResolution && PendingBattleResolution.bValid) {
     RequestPendingBattleResolution(LoadedWorld);
   }
@@ -212,19 +225,73 @@ void USkaldGameInstance::HandleWorldBeginPlay(UWorld *LoadedWorld) {
     return;
   }
 
-  const bool bHasPendingSnapshot = GetPendingTravelSnapshot().Num() > 0;
-  const FSkaldTravelState &ActiveTravelState = GetTravelState();
-  const bool bHasTravelCache =
-      ActiveTravelState.bValid && ActiveTravelState.CachedTerritories.Num() > 0;
-  const bool bPendingResume = bResumeTurns || bPendingBattleResolution ||
-                              PendingBattleResolution.bValid;
-
-  if (!GameMode->IsWorldInitialized() &&
-      (bHasPendingSnapshot || bHasTravelCache || bPendingResume)) {
+  if (!GameMode->IsWorldInitialized() && bShouldResume) {
     FTimerDelegate InitDelegate = FTimerDelegate::CreateUObject(
         GameMode, &ASkaldGameMode::TryInitializeWorldAndStart);
     LoadedWorld->GetTimerManager().SetTimerForNextTick(InitDelegate);
   }
+}
+
+bool USkaldGameInstance::ShouldAttemptTravelResume() const {
+  const bool bHasPendingSnapshot = PendingTravelTerritories.Num() > 0;
+  const bool bHasTravelCache =
+      TravelState.bValid && TravelState.CachedTerritories.Num() > 0;
+  const bool bHasPendingResolution =
+      bPendingBattleResolution || PendingBattleResolution.bValid;
+  return bHasPendingSnapshot || bHasTravelCache || bResumeTurns ||
+         bHasPendingResolution;
+}
+
+void USkaldGameInstance::ScheduleTravelResume(UWorld *World) {
+  if (!World || World->GetNetMode() == NM_Client) {
+    return;
+  }
+
+  PendingResumeWorld = World;
+  World->GetTimerManager().ClearTimer(PendingResumeRetryHandle);
+
+  FTimerDelegate ResumeDelegate = FTimerDelegate::CreateUObject(
+      this, &USkaldGameInstance::AttemptResumeAfterTravel);
+  World->GetTimerManager().SetTimerForNextTick(ResumeDelegate);
+}
+
+void USkaldGameInstance::AttemptResumeAfterTravel() {
+  UWorld *World = PendingResumeWorld.Get();
+  if (!World || World->GetNetMode() == NM_Client) {
+    PendingResumeWorld.Reset();
+    return;
+  }
+
+  World->GetTimerManager().ClearTimer(PendingResumeRetryHandle);
+
+  if (!ShouldAttemptTravelResume()) {
+    PendingResumeWorld.Reset();
+    return;
+  }
+
+  ASkaldGameMode *GameMode = World->GetAuthGameMode<ASkaldGameMode>();
+  if (!GameMode) {
+    constexpr float RetryDelaySeconds = 0.05f;
+    FTimerDelegate RetryDelegate = FTimerDelegate::CreateUObject(
+        this, &USkaldGameInstance::AttemptResumeAfterTravel);
+    World->GetTimerManager().SetTimer(PendingResumeRetryHandle, RetryDelegate,
+                                      RetryDelaySeconds, false);
+    return;
+  }
+
+  if (!GameMode->IsWorldInitialized()) {
+    GameMode->TryInitializeWorldAndStart();
+    if (!GameMode->IsWorldInitialized()) {
+      constexpr float RetryDelaySeconds = 0.05f;
+      FTimerDelegate RetryDelegate = FTimerDelegate::CreateUObject(
+          this, &USkaldGameInstance::AttemptResumeAfterTravel);
+      World->GetTimerManager().SetTimer(PendingResumeRetryHandle, RetryDelegate,
+                                        RetryDelaySeconds, false);
+      return;
+    }
+  }
+
+  PendingResumeWorld.Reset();
 }
 
 void USkaldGameInstance::SetActiveBattleGameMode(
@@ -423,6 +490,14 @@ void USkaldGameInstance::ResetSessionState() {
   CachedWorldMapTerritories.Empty();
   PendingTravelTerritories.Empty();
   TravelState = FSkaldTravelState();
+
+  if (PendingResumeWorld.IsValid()) {
+    if (UWorld *World = PendingResumeWorld.Get()) {
+      World->GetTimerManager().ClearTimer(PendingResumeRetryHandle);
+    }
+    PendingResumeWorld.Reset();
+  }
+  PendingResumeRetryHandle.Invalidate();
 
   SeedCombatRandomStream(FMath::Rand());
   SavedTurnIndex = 0;
