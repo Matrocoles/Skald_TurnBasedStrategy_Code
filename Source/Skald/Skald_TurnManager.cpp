@@ -1288,6 +1288,30 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
 
     TravelState.CachedTerritories = MoveTemp(TravelSnapshots);
 
+    if (UWorld *WorldContext = World) {
+      if (ASkaldGameMode *GameMode = WorldContext->GetAuthGameMode<ASkaldGameMode>()) {
+        if (GameMode->PlayerDataArray.Num() > 0) {
+          TravelState.PlayerSnapshots = GameMode->PlayerDataArray;
+        }
+      }
+    }
+
+    if (TravelState.PlayerSnapshots.Num() == 0 && GS) {
+      TravelState.PlayerSnapshots.Reserve(GS->PlayerArray.Num());
+      for (APlayerState *BasePS : GS->PlayerArray) {
+        if (ASkaldPlayerState *SkaldPS = Cast<ASkaldPlayerState>(BasePS)) {
+          FS_PlayerData Snapshot;
+          Snapshot.PlayerID = SkaldPS->GetPlayerId();
+          Snapshot.PlayerName = SkaldPS->GetResolvedPlayerName(TEXT("TravelState"));
+          Snapshot.IsAI = SkaldPS->bIsAI;
+          Snapshot.IsEliminated = SkaldPS->IsEliminated;
+          Snapshot.Resources = SkaldPS->Resources;
+          Snapshot.Faction = SkaldPS->Faction;
+          TravelState.PlayerSnapshots.Add(MoveTemp(Snapshot));
+        }
+      }
+    }
+
     if (GI) {
       GI->SetPendingTravelSnapshot(TravelState.CachedTerritories);
     }
