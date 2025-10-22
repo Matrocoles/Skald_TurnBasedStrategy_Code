@@ -259,11 +259,29 @@ struct FGridSlotSnapshot
     FVector2D Nudge = FVector2D::ZeroVector;
 };
 
+FMargin GetUniformGridSlotPadding(const UUniformGridSlot& Slot)
+{
+#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5)
+    return Slot.GetSlotPadding();
+#else
+    return Slot.GetPadding();
+#endif
+}
+
+void SetUniformGridSlotPadding(UUniformGridSlot& Slot, const FMargin& Padding)
+{
+#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5)
+    Slot.SetSlotPadding(Padding);
+#else
+    Slot.SetPadding(Padding);
+#endif
+}
+
 struct FUniformGridSlotSnapshot
 {
     void Capture(const UUniformGridSlot& Slot)
     {
-        Padding = Slot.GetPadding();
+        Padding = GetUniformGridSlotPadding(Slot);
         HorizontalAlignment = Slot.GetHorizontalAlignment();
         VerticalAlignment = Slot.GetVerticalAlignment();
         Row = Slot.GetRow();
@@ -278,7 +296,7 @@ struct FUniformGridSlotSnapshot
             return;
         }
 
-        Slot.SetPadding(Padding);
+        SetUniformGridSlotPadding(Slot, Padding);
         Slot.SetHorizontalAlignment(HorizontalAlignment);
         Slot.SetVerticalAlignment(VerticalAlignment);
         Slot.SetRow(Row);
