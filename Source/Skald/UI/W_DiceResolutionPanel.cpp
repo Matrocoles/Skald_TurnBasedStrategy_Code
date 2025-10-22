@@ -23,7 +23,7 @@ namespace
 constexpr float FirstRevealDelaySeconds = 0.2f;
 constexpr float SubsequentRevealDelaySeconds = 0.25f;
 constexpr float CompletionDelaySeconds = 0.2f;
-constexpr float DiceOutcomeImageSize = 72.f;
+constexpr float DiceOutcomeImageSize = 112.f;
 }
 
 UW_DiceResolutionPanel::UW_DiceResolutionPanel(const FObjectInitializer& ObjectInitializer)
