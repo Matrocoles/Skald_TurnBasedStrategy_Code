@@ -15,9 +15,9 @@
 
 namespace
 {
-constexpr float FirstRevealDelaySeconds = 1.1f;
-constexpr float SubsequentRevealDelaySeconds = 1.3f;
-constexpr float CompletionDelaySeconds = 0.8f;
+constexpr float FirstRevealDelaySeconds = 0.2f;
+constexpr float SubsequentRevealDelaySeconds = 0.25f;
+constexpr float CompletionDelaySeconds = 0.2f;
 }
 
 UW_DiceResolutionPanel::UW_DiceResolutionPanel(const FObjectInitializer& ObjectInitializer)
