@@ -71,9 +71,9 @@ struct FOverlaySlotSnapshot
 {
     void Capture(const UOverlaySlot& Slot)
     {
-        Padding = Slot.Padding;
-        HorizontalAlignment = Slot.HorizontalAlignment;
-        VerticalAlignment = Slot.VerticalAlignment;
+        Padding = Slot.GetPadding();
+        HorizontalAlignment = Slot.GetHorizontalAlignment();
+        VerticalAlignment = Slot.GetVerticalAlignment();
         bValid = true;
     }
 
@@ -99,9 +99,9 @@ struct FBorderSlotSnapshot
 {
     void Capture(const UBorderSlot& Slot)
     {
-        Padding = Slot.Padding;
-        HorizontalAlignment = Slot.HorizontalAlignment;
-        VerticalAlignment = Slot.VerticalAlignment;
+        Padding = Slot.GetPadding();
+        HorizontalAlignment = Slot.GetHorizontalAlignment();
+        VerticalAlignment = Slot.GetVerticalAlignment();
         bValid = true;
     }
 
@@ -127,9 +127,9 @@ struct FSizeBoxSlotSnapshot
 {
     void Capture(const USizeBoxSlot& Slot)
     {
-        Padding = Slot.Padding;
-        HorizontalAlignment = Slot.HorizontalAlignment;
-        VerticalAlignment = Slot.VerticalAlignment;
+        Padding = Slot.GetPadding();
+        HorizontalAlignment = Slot.GetHorizontalAlignment();
+        VerticalAlignment = Slot.GetVerticalAlignment();
         bValid = true;
     }
 
@@ -155,10 +155,10 @@ struct FVerticalBoxSlotSnapshot
 {
     void Capture(const UVerticalBoxSlot& Slot)
     {
-        Padding = Slot.Padding;
-        Size = Slot.Size;
-        HorizontalAlignment = Slot.HorizontalAlignment;
-        VerticalAlignment = Slot.VerticalAlignment;
+        Padding = Slot.GetPadding();
+        Size = Slot.GetSize();
+        HorizontalAlignment = Slot.GetHorizontalAlignment();
+        VerticalAlignment = Slot.GetVerticalAlignment();
         bValid = true;
     }
 
@@ -186,10 +186,10 @@ struct FHorizontalBoxSlotSnapshot
 {
     void Capture(const UHorizontalBoxSlot& Slot)
     {
-        Padding = Slot.Padding;
-        Size = Slot.Size;
-        HorizontalAlignment = Slot.HorizontalAlignment;
-        VerticalAlignment = Slot.VerticalAlignment;
+        Padding = Slot.GetPadding();
+        Size = Slot.GetSize();
+        HorizontalAlignment = Slot.GetHorizontalAlignment();
+        VerticalAlignment = Slot.GetVerticalAlignment();
         bValid = true;
     }
 
@@ -217,15 +217,15 @@ struct FGridSlotSnapshot
 {
     void Capture(const UGridSlot& Slot)
     {
-        Padding = Slot.Padding;
-        HorizontalAlignment = Slot.HorizontalAlignment;
-        VerticalAlignment = Slot.VerticalAlignment;
-        Row = Slot.Row;
-        RowSpan = Slot.RowSpan;
-        Column = Slot.Column;
-        ColumnSpan = Slot.ColumnSpan;
-        Layer = Slot.Layer;
-        Nudge = Slot.Nudge;
+        Padding = Slot.GetPadding();
+        HorizontalAlignment = Slot.GetHorizontalAlignment();
+        VerticalAlignment = Slot.GetVerticalAlignment();
+        Row = Slot.GetRow();
+        RowSpan = Slot.GetRowSpan();
+        Column = Slot.GetColumn();
+        ColumnSpan = Slot.GetColumnSpan();
+        Layer = Slot.GetLayer();
+        Nudge = Slot.GetNudge();
         bValid = true;
     }
 
@@ -263,11 +263,11 @@ struct FUniformGridSlotSnapshot
 {
     void Capture(const UUniformGridSlot& Slot)
     {
-        Padding = Slot.Padding;
-        HorizontalAlignment = Slot.HorizontalAlignment;
-        VerticalAlignment = Slot.VerticalAlignment;
-        Row = Slot.Row;
-        Column = Slot.Column;
+        Padding = Slot.GetSlotPadding();
+        HorizontalAlignment = Slot.GetHorizontalAlignment();
+        VerticalAlignment = Slot.GetVerticalAlignment();
+        Row = Slot.GetRow();
+        Column = Slot.GetColumn();
         bValid = true;
     }
 
@@ -278,7 +278,7 @@ struct FUniformGridSlotSnapshot
             return;
         }
 
-        Slot.SetPadding(Padding);
+        Slot.SetSlotPadding(Padding);
         Slot.SetHorizontalAlignment(HorizontalAlignment);
         Slot.SetVerticalAlignment(VerticalAlignment);
         Slot.SetRow(Row);
