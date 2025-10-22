@@ -28,7 +28,7 @@ constexpr float WidgetMirrorSeparation = 0.5f;
 constexpr float AutoHealthHoldFallbackDelay = 2.f;
 // Delay applied before the first queued attack roll resolves so dice feedback
 // appears quickly after the player commits to an attack.
-constexpr float QueuedAttackFirstRollDelaySeconds = 0.2f;
+constexpr float QueuedAttackFirstRollDelaySeconds = 0.5f;
 // Consistent pacing between any additional dice in the same queued attack.
 constexpr float QueuedAttackAdditionalRollDelaySeconds = 0.5f;
 }
