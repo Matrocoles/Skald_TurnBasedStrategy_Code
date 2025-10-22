@@ -177,6 +177,18 @@ protected:
   bool bWorldInitialized;
 
 private:
+  /** Attempt to resolve the world map actor, retrying until it becomes available. */
+  void RequestWorldMapRetry();
+
+  /** Find the world map actor if available. */
+  bool TryResolveWorldMap();
+
+  /** Callback used to poll for the world map actor while it is still spawning. */
+  void HandleWorldMapRetry();
+
+  /** Timer handle used while polling for a world map actor. */
+  FTimerHandle WorldMapRetryHandle;
+
   /** Timer that triggers auto-start of the turn sequence. */
   FTimerHandle StartGameTimerHandle;
 
