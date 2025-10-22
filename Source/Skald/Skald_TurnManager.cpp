@@ -1228,7 +1228,7 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
     TArray<FS_Territory> TerritorySnapshots;
     bool bUsedCachedFallback = false;
     TSet<int32> HumanOwnedTerritoryIds;
-    const bool bCapturedFromLiveWorld =
+    bool bCapturedFromLiveWorld =
         CaptureWorldSnapshot(TerritorySnapshots, &HumanOwnedTerritoryIds);
 
     if (bCapturedFromLiveWorld) {
