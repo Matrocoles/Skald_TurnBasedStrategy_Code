@@ -62,9 +62,9 @@ static UUniformGridSlot* AddToUniformGridWithPadding(
 
 namespace
 {
-constexpr float FirstRevealDelaySeconds = 0.2f;
-constexpr float SubsequentRevealDelaySeconds = 0.25f;
-constexpr float CompletionDelaySeconds = 0.2f;
+constexpr float FirstRevealDelaySeconds = 0.1f;
+constexpr float SubsequentRevealDelaySeconds = 0.8f;
+constexpr float CompletionDelaySeconds = 0.75f;
 constexpr float DiceOutcomeImageSize = 112.f;
 
 struct FCanvasPanelSlotSnapshot
