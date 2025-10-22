@@ -18,6 +18,7 @@ class ASkald_BattleGameMode;
 class USkaldSaveGame;
 class UNetDriver;
 class UWorld;
+class ASkaldGameMode;
 
 USTRUCT(BlueprintType)
 struct FSkaldTravelState
@@ -254,9 +255,15 @@ private:
   FDelegateHandle PostWorldBeginPlayHandle;
 
   void HandleWorldBeginPlay(UWorld *LoadedWorld);
+  bool ShouldAttemptTravelResume() const;
+  void ScheduleTravelResume(UWorld *World);
+  void AttemptResumeAfterTravel();
   void RequestPendingBattleResolution(UWorld *LoadedWorld);
   void AttemptResolvePendingBattle(int32 Attempt);
   void ResetSessionState();
+
+  TWeakObjectPtr<UWorld> PendingResumeWorld;
+  FTimerHandle PendingResumeRetryHandle;
 
   FTimerHandle PendingBattleResolutionKickoffHandle;
 };
