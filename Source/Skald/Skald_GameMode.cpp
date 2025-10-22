@@ -66,6 +66,40 @@ void ASkaldGameMode::InitGame(const FString &Map, const FString &Options,
                               FString &Error) {
   Super::InitGame(Map, Options, Error);
 
+  // Reset transient state in case the same GameMode instance is reused after
+  // travelling back from a battle. Any lingering timers or cached pointers can
+  // prevent the overworld from reinitialising correctly which in turn blocks
+  // the overview map from loading its territory snapshot.
+  TurnManager = nullptr;
+  WorldMap = nullptr;
+  bTurnsStarted = false;
+  bWorldInitialized = false;
+  bAIPlayersSpawned = false;
+  PlacementIndex = 0;
+  bArmyPlacementFailsafeTriggered = false;
+  ArmyPlacementLeader.Reset();
+  PendingControllers.Reset();
+  PendingStrategicInitiativePlayers.Reset();
+  bAwaitingStrategicInitiativeInput = false;
+  bStrategicInitiativePromptIssued = false;
+
+  if (UWorld *World = GetWorld()) {
+    FTimerManager &TimerManager = World->GetTimerManager();
+    TimerManager.ClearTimer(RetryInitTimerHandle);
+    TimerManager.ClearTimer(WorldMapRetryHandle);
+    TimerManager.ClearTimer(StartGameTimerHandle);
+    TimerManager.ClearTimer(TerritorySnapshotRetryHandle);
+    TimerManager.ClearTimer(ArmyPlacementAutoAdvanceHandle);
+    TimerManager.ClearTimer(ArmyPlacementFailsafeHandle);
+  } else {
+    RetryInitTimerHandle.Invalidate();
+    WorldMapRetryHandle.Invalidate();
+    StartGameTimerHandle.Invalidate();
+    TerritorySnapshotRetryHandle.Invalidate();
+    ArmyPlacementAutoAdvanceHandle.Invalidate();
+    ArmyPlacementFailsafeHandle.Invalidate();
+  }
+
   if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
     GI->SetTravelPending(false);
   }
