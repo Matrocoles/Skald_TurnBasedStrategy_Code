@@ -816,7 +816,7 @@ void AFighterPawn::StartQueuedAttack(AFighterPawn *Target,
 
   if (UWorld *World = GetWorld()) {
     World->GetTimerManager().SetTimer(AttackRollTimerHandle, this,
-                                      &AFighterPawn::ResolveNextAttackRoll, 1.f,
+                                      &AFighterPawn::ResolveNextAttackRoll, 0.2f,
                                       false);
   } else {
     ResolveNextAttackRoll();
