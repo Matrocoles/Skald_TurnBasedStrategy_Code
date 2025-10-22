@@ -17,7 +17,10 @@
 #include "Skald_BattleGameMode.h"
 #include "Skald_BattleLevelManager.h"
 #include "Skald_GameMode.h"
+#include "Skald_GameState.h"
 #include "Skald_PlayerController.h"
+#include "Skald_PlayerState.h"
+#include "Skald_PropertyAccess.h"
 #include "Skald_TurnManager.h"
 #include "TimerManager.h"
 #include "Styling/CoreStyle.h"
@@ -26,6 +29,17 @@
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/SOverlay.h"
 #include "Widgets/Text/STextBlock.h"
+#include "Territory.h"
+#include "WorldMap.h"
+
+using Skald::PropertyAccess::ReadBoolProperty;
+using Skald::PropertyAccess::ReadIntProperty;
+using Skald::PropertyAccess::WriteBoolProperty;
+using Skald::PropertyAccess::WriteIntProperty;
+
+namespace {
+constexpr float SnapshotRetryDelaySeconds = 0.01f;
+}
 
 void USkaldGameInstance::Init() {
   Super::Init();
@@ -188,6 +202,449 @@ void USkaldGameInstance::SetTravelPending(bool bInPending) {
   }
 }
 
+bool USkaldGameInstance::CacheWorldMapSnapshot(UWorld *WorldContext) {
+  UWorld *World = WorldContext ? WorldContext : GetWorld();
+  if (!World || World->GetNetMode() == NM_Client) {
+    return false;
+  }
+
+  if (bIsInBattleMap) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("GameInstance CacheWorldMapSnapshot skipped: currently on battle map"));
+    World->GetTimerManager().ClearTimer(TerritorySnapshotRetryHandle);
+    return false;
+  }
+
+  ASkaldGameMode *GameMode = World->GetAuthGameMode<ASkaldGameMode>();
+  ATurnManager *TurnManager = nullptr;
+  if (GameMode) {
+    if (GameMode->TurnManager && !IsValid(GameMode->TurnManager)) {
+      GameMode->TurnManager = nullptr;
+    }
+    TurnManager = GameMode->TurnManager;
+  }
+
+  if (!TurnManager) {
+    if (AActor *Actor =
+            UGameplayStatics::GetActorOfClass(World, ATurnManager::StaticClass())) {
+      TurnManager = Cast<ATurnManager>(Actor);
+    }
+  }
+
+  AWorldMap *WorldMap = nullptr;
+  if (GameMode) {
+    if (GameMode->WorldMap && !IsValid(GameMode->WorldMap)) {
+      GameMode->WorldMap = nullptr;
+    }
+    WorldMap = GameMode->WorldMap;
+  }
+
+  if (!WorldMap) {
+    if (AWorldMap *FoundMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+            World, AWorldMap::StaticClass()))) {
+      if (IsValid(FoundMap)) {
+        WorldMap = FoundMap;
+      }
+    }
+
+    if (!WorldMap && TurnManager) {
+      if (AWorldMap *CachedMap = TurnManager->GetCachedWorldMapActor()) {
+        if (IsValid(CachedMap)) {
+          WorldMap = CachedMap;
+        }
+      }
+    }
+
+    if (GameMode) {
+      GameMode->WorldMap = WorldMap;
+    }
+  }
+
+  if (WorldMap && !IsValid(WorldMap)) {
+    WorldMap = nullptr;
+    if (GameMode) {
+      GameMode->WorldMap = nullptr;
+    }
+  }
+
+  const int32 PreviousSnapshotCount = CachedWorldMapTerritories.Num();
+
+  if (!WorldMap) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("GameInstance CacheWorldMapSnapshot failed: WorldMap not found (keeping previous %d territories)"),
+           PreviousSnapshotCount);
+    ScheduleSnapshotRetry(World);
+    return false;
+  }
+
+  TArray<FS_Territory> TerritorySnapshots;
+  TerritorySnapshots.Reserve(WorldMap->Territories.Num());
+
+  for (ATerritory *Territory : WorldMap->Territories) {
+    if (!Territory) {
+      continue;
+    }
+
+    FS_Territory TerrData;
+    TerrData.TerritoryID = Territory->TerritoryID;
+    TerrData.TerritoryName = Territory->TerritoryName;
+    TerrData.OwnerPlayerID =
+        Territory->OwningPlayer ? Territory->OwningPlayer->GetPlayerId() : 0;
+    TerrData.IsCapital = Territory->bIsCapital;
+    TerrData.CapitalOwner = TerrData.OwnerPlayerID;
+    TerrData.ArmyUnits = Territory->ArmyUnits;
+    TerrData.ContinentID = Territory->ContinentID;
+    TerrData.AdjacentIDs.Reset();
+    for (ATerritory *Adj : Territory->AdjacentTerritories) {
+      if (Adj) {
+        TerrData.AdjacentIDs.Add(Adj->TerritoryID);
+      }
+    }
+    TerrData.Location = Territory->GetActorLocation();
+    TerrData.HasTreasure = Territory->bHasTreasure;
+    TerrData.TreasureAttachedUnitID =
+        ReadIntProperty(Territory, TEXT("TreasureAttachedUnitID"));
+    TerrData.FortificationLevel =
+        ReadIntProperty(Territory, TEXT("FortificationLevel"));
+    TerrData.Moat = ReadBoolProperty(Territory, TEXT("Moat"));
+    TerrData.WallHealth =
+        ReadIntProperty(Territory, TEXT("WallHealth"));
+    TerrData.BuiltSiegeID = Territory->BuiltSiegeID;
+    TerrData.ConqueredTurn =
+        ReadIntProperty(Territory, TEXT("ConqueredTurn"));
+    TerrData.IsNeutralSpawn =
+        ReadBoolProperty(Territory, TEXT("IsNeutralSpawn"));
+
+    TerritorySnapshots.Add(MoveTemp(TerrData));
+  }
+
+  bool bUsedTurnManagerFallback = false;
+  if (TerritorySnapshots.Num() == 0 && TurnManager) {
+    bUsedTurnManagerFallback =
+        TurnManager->CaptureWorldSnapshot(TerritorySnapshots);
+  }
+
+  if (TerritorySnapshots.Num() == 0) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("GameInstance CacheWorldMapSnapshot produced an empty snapshot; keeping previous %d territories"),
+           PreviousSnapshotCount);
+    ScheduleSnapshotRetry(World);
+    return false;
+  }
+
+  World->GetTimerManager().ClearTimer(TerritorySnapshotRetryHandle);
+  CachedWorldMapTerritories = MoveTemp(TerritorySnapshots);
+
+  UE_LOG(LogSkald, Verbose,
+         TEXT("GameInstance CacheWorldMapSnapshot captured %d territories (previously %d%s)"),
+         CachedWorldMapTerritories.Num(), PreviousSnapshotCount,
+         bUsedTurnManagerFallback ? TEXT(", via turn manager fallback")
+                                  : TEXT(""));
+  return true;
+}
+
+bool USkaldGameInstance::RestoreWorldFromSnapshot(UWorld *WorldContext) {
+  UWorld *World = WorldContext ? WorldContext : GetWorld();
+  if (!World || World->GetNetMode() == NM_Client) {
+    return false;
+  }
+
+  const TArray<FS_Territory> *SnapshotSource = nullptr;
+  const TArray<FS_Territory> &PendingSnapshot = GetPendingTravelSnapshot();
+  if (PendingSnapshot.Num() > 0) {
+    SnapshotSource = &PendingSnapshot;
+  } else if (CachedWorldMapTerritories.Num() > 0) {
+    SnapshotSource = &CachedWorldMapTerritories;
+  }
+
+  if (!SnapshotSource) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("GameInstance RestoreWorldFromSnapshot: No cached territory snapshot available."));
+    bResumeTurns = false;
+    return false;
+  }
+
+  ASkaldGameMode *GameMode = World->GetAuthGameMode<ASkaldGameMode>();
+  if (!GameMode) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("GameInstance RestoreWorldFromSnapshot: GameMode not yet available."));
+    return false;
+  }
+
+  if (GameMode->WorldMap && !IsValid(GameMode->WorldMap)) {
+    GameMode->WorldMap = nullptr;
+  }
+
+  AWorldMap *WorldMap = GameMode->WorldMap;
+  if (!WorldMap) {
+    if (AWorldMap *FoundMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+            World, AWorldMap::StaticClass()))) {
+      if (IsValid(FoundMap)) {
+        WorldMap = FoundMap;
+      }
+    }
+    if (WorldMap) {
+      GameMode->WorldMap = WorldMap;
+    }
+  }
+
+  if (WorldMap && !IsValid(WorldMap)) {
+    GameMode->WorldMap = nullptr;
+    WorldMap = nullptr;
+  }
+
+  if (!WorldMap) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("GameInstance RestoreWorldFromSnapshot: World map not yet available."));
+    return false;
+  }
+
+  ASkaldGameState *GameState = World->GetGameState<ASkaldGameState>();
+  if (!GameState) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("GameInstance RestoreWorldFromSnapshot: GameState missing; retrying later."));
+    return false;
+  }
+
+  TArray<int32> MissingPlayerIds;
+  if (!ValidateSnapshotPlayers(*SnapshotSource, GameState, MissingPlayerIds)) {
+    FString MissingList;
+    for (int32 Index = 0; Index < MissingPlayerIds.Num(); ++Index) {
+      if (Index > 0) {
+        MissingList += TEXT(", ");
+      }
+      MissingList += FString::FromInt(MissingPlayerIds[Index]);
+    }
+
+    UE_LOG(LogSkald, Verbose,
+           TEXT("GameInstance RestoreWorldFromSnapshot: Deferring until PlayerStates registered for IDs [%s]"),
+           *MissingList);
+    return false;
+  }
+
+  if (WorldMap->Territories.Num() == 0) {
+    if (!WorldMap->GenerateTerritoriesFromTable()) {
+      UE_LOG(LogSkald, Error,
+             TEXT("GameInstance RestoreWorldFromSnapshot failed: Unable to generate territories."));
+      return false;
+    }
+  }
+
+  TMap<int32, ATerritory *> TerritoryById;
+  TerritoryById.Reserve(WorldMap->Territories.Num());
+  for (ATerritory *Territory : WorldMap->Territories) {
+    if (!Territory) {
+      continue;
+    }
+    TerritoryById.Add(Territory->TerritoryID, Territory);
+    Territory->AdjacentTerritories.Reset();
+  }
+
+  TMap<int32, FS_PlayerData *> PlayerDataById;
+  TMap<int32, ASkaldPlayerState *> PlayerStateById;
+
+  for (APlayerState *PSBase : GameState->PlayerArray) {
+    if (ASkaldPlayerState *SkaldPS = Cast<ASkaldPlayerState>(PSBase)) {
+      PlayerStateById.Add(SkaldPS->GetPlayerId(), SkaldPS);
+    }
+  }
+
+  for (FS_PlayerData &PlayerData : GameMode->PlayerDataArray) {
+    PlayerDataById.Add(PlayerData.PlayerID, &PlayerData);
+    PlayerData.IsEliminated = true;
+    PlayerData.IsAlive = false;
+    PlayerData.CapitalsOwned = 0;
+    PlayerData.TroopsCount = 0;
+    PlayerData.CapitalTerritoryIDs.Reset();
+  }
+
+  int32 RestoredCount = 0;
+  FS_Territory SampleSnapshot;
+  ATerritory *SampleActor = nullptr;
+  bool bRecordedSample = false;
+  for (const FS_Territory &Snapshot : *SnapshotSource) {
+    ATerritory *const *FoundTerritory = TerritoryById.Find(Snapshot.TerritoryID);
+    if (!FoundTerritory || !*FoundTerritory) {
+      continue;
+    }
+
+    ATerritory *Territory = *FoundTerritory;
+    Territory->TerritoryName = Snapshot.TerritoryName;
+    Territory->ArmyUnits = Snapshot.ArmyUnits;
+    Territory->bIsCapital = Snapshot.IsCapital;
+    Territory->bHasTreasure = Snapshot.HasTreasure;
+    WriteIntProperty(Territory, TEXT("TreasureAttachedUnitID"),
+                     Snapshot.TreasureAttachedUnitID);
+    WriteIntProperty(Territory, TEXT("FortificationLevel"),
+                     Snapshot.FortificationLevel);
+    WriteBoolProperty(Territory, TEXT("Moat"), Snapshot.Moat);
+    WriteIntProperty(Territory, TEXT("WallHealth"), Snapshot.WallHealth);
+    Territory->BuiltSiegeID = Snapshot.BuiltSiegeID;
+    WriteIntProperty(Territory, TEXT("ConqueredTurn"),
+                     Snapshot.ConqueredTurn);
+    WriteBoolProperty(Territory, TEXT("IsNeutralSpawn"),
+                      Snapshot.IsNeutralSpawn);
+    Territory->SetActorLocation(Snapshot.Location);
+    Territory->OwningPlayer =
+        (Snapshot.OwnerPlayerID > 0)
+            ? GameState->GetPlayerById(Snapshot.OwnerPlayerID)
+            : nullptr;
+
+    Territory->AdjacentTerritories.Reset();
+    for (int32 NeighborId : Snapshot.AdjacentIDs) {
+      if (ATerritory *Neighbor = TerritoryById.FindRef(NeighborId)) {
+        Territory->AdjacentTerritories.AddUnique(Neighbor);
+      }
+    }
+
+    Territory->RefreshAppearance();
+
+    if (FS_PlayerData **PlayerDataPtr =
+            PlayerDataById.Find(Snapshot.OwnerPlayerID)) {
+      FS_PlayerData *PlayerData = *PlayerDataPtr;
+      PlayerData->IsEliminated = false;
+      PlayerData->IsAlive = true;
+      PlayerData->TroopsCount += Snapshot.ArmyUnits;
+      if (Snapshot.IsCapital) {
+        PlayerData->CapitalsOwned += 1;
+        PlayerData->CapitalTerritoryIDs.AddUnique(Snapshot.TerritoryID);
+      }
+    }
+
+    ++RestoredCount;
+
+    if (!bRecordedSample) {
+      SampleSnapshot = Snapshot;
+      SampleActor = Territory;
+      bRecordedSample = true;
+    }
+  }
+
+  if (RestoredCount == 0) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("GameInstance RestoreWorldFromSnapshot: Cached snapshot contained no valid territories."));
+    return false;
+  }
+
+  for (TPair<int32, ASkaldPlayerState *> &Entry : PlayerStateById) {
+    ASkaldPlayerState *PlayerState = Entry.Value;
+    if (!PlayerState) {
+      continue;
+    }
+
+    const FS_PlayerData *const *PlayerDataPtr = PlayerDataById.Find(Entry.Key);
+    const bool bShouldBeEliminated =
+        !(PlayerDataPtr && *PlayerDataPtr) || (*PlayerDataPtr)->IsEliminated;
+
+    bool bStateChanged = false;
+    if (PlayerState->IsEliminated != bShouldBeEliminated) {
+      PlayerState->IsEliminated = bShouldBeEliminated;
+      bStateChanged = true;
+    }
+
+    if (bShouldBeEliminated && PlayerState->bHasLockedIn) {
+      PlayerState->bHasLockedIn = false;
+      bStateChanged = true;
+    }
+
+    if (bStateChanged) {
+      PlayerState->ForceNetUpdate();
+    }
+  }
+
+  WorldMap->SpawnedLocations.Reset();
+  for (const FS_Territory &Snapshot : *SnapshotSource) {
+    WorldMap->SpawnedLocations.Add(Snapshot.TerritoryID, Snapshot.Location);
+  }
+
+  if (SnapshotSource == &PendingSnapshot &&
+      CachedWorldMapTerritories.Num() == 0) {
+    CachedWorldMapTerritories = PendingSnapshot;
+  }
+
+  if (WorldMap->SelectedTerritory &&
+      !TerritoryById.Contains(WorldMap->SelectedTerritory->TerritoryID)) {
+    WorldMap->SelectedTerritory = nullptr;
+  }
+
+  GameState->OnPlayersUpdated.Broadcast();
+  GameMode->RefreshHUDs();
+
+  if (bRecordedSample && SampleActor) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("GameInstance RestoreWorldFromSnapshot sample (before): Id=%d Owner=%d Army=%d "
+                "TreasureCarrier=%d Fort=%d Moat=%d Wall=%d Conquered=%d Neutral=%d"),
+           SampleSnapshot.TerritoryID, SampleSnapshot.OwnerPlayerID,
+           SampleSnapshot.ArmyUnits, SampleSnapshot.TreasureAttachedUnitID,
+           SampleSnapshot.FortificationLevel, SampleSnapshot.Moat ? 1 : 0,
+           SampleSnapshot.WallHealth, SampleSnapshot.ConqueredTurn,
+           SampleSnapshot.IsNeutralSpawn ? 1 : 0);
+
+    const int32 PostOwnerId =
+        SampleActor->OwningPlayer ? SampleActor->OwningPlayer->GetPlayerId() : 0;
+    UE_LOG(LogSkald, Verbose,
+           TEXT("GameInstance RestoreWorldFromSnapshot sample (after): Id=%d Owner=%d Army=%d "
+                "TreasureCarrier=%d Fort=%d Moat=%d Wall=%d Conquered=%d Neutral=%d"),
+           SampleActor->TerritoryID, PostOwnerId, SampleActor->ArmyUnits,
+           ReadIntProperty(SampleActor, TEXT("TreasureAttachedUnitID")),
+           ReadIntProperty(SampleActor, TEXT("FortificationLevel")),
+           ReadBoolProperty(SampleActor, TEXT("Moat")) ? 1 : 0,
+           ReadIntProperty(SampleActor, TEXT("WallHealth")),
+           ReadIntProperty(SampleActor, TEXT("ConqueredTurn")),
+           ReadBoolProperty(SampleActor, TEXT("IsNeutralSpawn")) ? 1 : 0);
+  }
+
+  UE_LOG(LogSkald, Log,
+         TEXT("GameInstance RestoreWorldFromSnapshot: Restored %d territories from cached data."),
+         RestoredCount);
+  return true;
+}
+
+bool USkaldGameInstance::ValidateSnapshotPlayers(
+    const TArray<FS_Territory> &Snapshot, ASkaldGameState *GameState,
+    TArray<int32> &OutMissingPlayerIds) const {
+  OutMissingPlayerIds.Reset();
+  if (!GameState) {
+    return false;
+  }
+
+  TSet<int32> RequiredPlayerIds;
+  for (const FS_Territory &Entry : Snapshot) {
+    if (Entry.OwnerPlayerID > 0) {
+      RequiredPlayerIds.Add(Entry.OwnerPlayerID);
+    }
+  }
+
+  for (int32 PlayerId : RequiredPlayerIds) {
+    if (!GameState->GetPlayerById(PlayerId)) {
+      OutMissingPlayerIds.Add(PlayerId);
+    }
+  }
+
+  return OutMissingPlayerIds.Num() == 0;
+}
+
+void USkaldGameInstance::ScheduleSnapshotRetry(UWorld *World) {
+  if (!World) {
+    TerritorySnapshotRetryHandle.Invalidate();
+    return;
+  }
+
+  FTimerManager &TimerManager = World->GetTimerManager();
+  if (TimerManager.IsTimerActive(TerritorySnapshotRetryHandle)) {
+    return;
+  }
+
+  FTimerDelegate RetryDelegate = FTimerDelegate::CreateUObject(
+      this, &USkaldGameInstance::HandleCacheWorldMapSnapshotRetry);
+  TimerManager.SetTimer(TerritorySnapshotRetryHandle, RetryDelegate,
+                        SnapshotRetryDelaySeconds, false);
+}
+
+void USkaldGameInstance::HandleCacheWorldMapSnapshotRetry() {
+  CacheWorldMapSnapshot();
+}
+
 void USkaldGameInstance::HandleWorldBeginPlay(UWorld *LoadedWorld) {
   if (!LoadedWorld || LoadedWorld->GetGameInstance() != this) {
     return;
@@ -347,6 +804,14 @@ void USkaldGameInstance::SetBattleMapActive(bool bInBattleMap) {
 
   bIsInBattleMap = bInBattleMap;
   OnBattleMapStateChanged.Broadcast(bIsInBattleMap);
+
+  if (bIsInBattleMap) {
+    if (UWorld *World = GetWorld()) {
+      World->GetTimerManager().ClearTimer(TerritorySnapshotRetryHandle);
+    } else {
+      TerritorySnapshotRetryHandle.Invalidate();
+    }
+  }
 }
 
 void USkaldGameInstance::SeedCombatRandomStream(int32 Seed) {
@@ -513,6 +978,12 @@ void USkaldGameInstance::ResetSessionState() {
   CachedWorldMapTerritories.Empty();
   PendingTravelTerritories.Empty();
   TravelState = FSkaldTravelState();
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(TerritorySnapshotRetryHandle);
+  } else {
+    TerritorySnapshotRetryHandle.Invalidate();
+  }
 
   if (PendingResumeWorld.IsValid()) {
     if (UWorld *World = PendingResumeWorld.Get()) {

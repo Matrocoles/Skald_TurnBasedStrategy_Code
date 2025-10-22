@@ -39,6 +39,7 @@ class SKALD_API ASkaldGameMode : public AGameModeBase {
   friend class FInitializeWorldSingleInitiativeRollTest;
 #endif // WITH_AUTOMATION_TESTS
   friend struct FSkaldGameModeAutomationAccessor;
+  friend class USkaldGameInstance;
 
 public:
   ASkaldGameMode();
@@ -80,9 +81,6 @@ public:
 
   /** Handle a player confirming their name and faction selection. */
   void HandlePlayerLockedIn(ASkaldPlayerState *PS);
-
-  /** Capture the current overworld territory state for later restoration. */
-  void CacheWorldMapSnapshot();
 
   /** Initiate pre-battle fighter selection for both sides. */
   UFUNCTION(BlueprintCallable, Category="Skald|Battle")
@@ -236,12 +234,6 @@ private:
 
   /** Ensure a turn manager exists, spawning or reusing one as required. */
   ATurnManager *ResolveTurnManager();
-
-  /** Attempt to restore the overworld from the cached travel snapshot. */
-  bool RestoreWorldFromSnapshot();
-
-  /** Timer used to retry snapshot capture when no territories are present yet. */
-  FTimerHandle TerritorySnapshotRetryHandle;
 
   /** Prompt players to roll strategic initiative before world initialization. */
   void BeginStrategicInitiativePhase();

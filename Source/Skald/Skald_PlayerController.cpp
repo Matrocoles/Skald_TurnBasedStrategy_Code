@@ -1416,8 +1416,12 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
     if (!CachedGameMode) {
       CachedGameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
     }
-    if (CachedGameMode) {
-      CachedGameMode->CacheWorldMapSnapshot();
+    if (CachedGameInstance) {
+      CachedGameInstance->CacheWorldMapSnapshot(GetWorld());
+    } else if (UWorld *World = GetWorld()) {
+      if (USkaldGameInstance *GI = World->GetGameInstance<USkaldGameInstance>()) {
+        GI->CacheWorldMapSnapshot(World);
+      }
     }
     TurnManager->TriggerGridBattle(Battle);
     return;

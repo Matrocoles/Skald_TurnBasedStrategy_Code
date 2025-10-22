@@ -19,6 +19,10 @@ class USkaldSaveGame;
 class UNetDriver;
 class UWorld;
 class ASkaldGameMode;
+class AWorldMap;
+class ATerritory;
+class ASkaldGameState;
+class ASkaldPlayerState;
 
 USTRUCT(BlueprintType)
 struct FSkaldTravelState
@@ -206,6 +210,12 @@ public:
   UFUNCTION(BlueprintCallable)
   void SetTravelPending(bool bInPending);
 
+  /** Capture the overworld state so it can be restored after travelling. */
+  bool CacheWorldMapSnapshot(UWorld *WorldContext = nullptr);
+
+  /** Attempt to rebuild the overworld from the cached snapshot data. */
+  bool RestoreWorldFromSnapshot(UWorld *WorldContext = nullptr);
+
   USkaldBattleLevelManager *GetBattleLevelManager() const { return BattleLevelStreamingManager; }
 
   void SetActiveBattleGameMode(ASkald_BattleGameMode *InGameMode);
@@ -254,6 +264,12 @@ private:
   /** Handle invoked when the owning world begins play after travel. */
   FDelegateHandle PostWorldBeginPlayHandle;
 
+  bool ValidateSnapshotPlayers(const TArray<FS_Territory> &Snapshot,
+                               ASkaldGameState *GameState,
+                               TArray<int32> &OutMissingPlayerIds) const;
+  void ScheduleSnapshotRetry(UWorld *World);
+  void HandleCacheWorldMapSnapshotRetry();
+
   void HandleWorldBeginPlay(UWorld *LoadedWorld);
   void HandleDeferredTravelResume(UWorld *LoadedWorld);
   bool ShouldAttemptTravelResume() const;
@@ -268,4 +284,5 @@ private:
   FTimerHandle PendingResumeRetryHandle;
 
   FTimerHandle PendingBattleResolutionKickoffHandle;
+  FTimerHandle TerritorySnapshotRetryHandle;
 };
