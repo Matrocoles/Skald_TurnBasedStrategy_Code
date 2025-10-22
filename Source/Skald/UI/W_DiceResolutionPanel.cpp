@@ -263,7 +263,7 @@ struct FUniformGridSlotSnapshot
 {
     void Capture(const UUniformGridSlot& Slot)
     {
-        Padding = Slot.GetSlotPadding();
+        Padding = Slot.GetPadding();
         HorizontalAlignment = Slot.GetHorizontalAlignment();
         VerticalAlignment = Slot.GetVerticalAlignment();
         Row = Slot.GetRow();
@@ -278,7 +278,7 @@ struct FUniformGridSlotSnapshot
             return;
         }
 
-        Slot.SetSlotPadding(Padding);
+        Slot.SetPadding(Padding);
         Slot.SetHorizontalAlignment(HorizontalAlignment);
         Slot.SetVerticalAlignment(VerticalAlignment);
         Slot.SetRow(Row);
