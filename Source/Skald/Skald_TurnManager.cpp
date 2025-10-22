@@ -1148,14 +1148,12 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
 
     CachedWorldMap = ResolveWorldMap();
 
-    if (ASkaldGameMode *GameMode = World->GetAuthGameMode<ASkaldGameMode>()) {
-      GameMode->CacheWorldMapSnapshot();
-      if (GI) {
-        bGameModeHasSnapshotAfterCall =
-            (GI->CachedWorldMapTerritories.Num() > 0);
-      } else {
-        bGameModeHasSnapshotAfterCall = false;
-      }
+    if (GI) {
+      GI->CacheWorldMapSnapshot(World);
+      bGameModeHasSnapshotAfterCall =
+          (GI->CachedWorldMapTerritories.Num() > 0);
+    } else {
+      bGameModeHasSnapshotAfterCall = false;
     }
   }
   PendingBattle = SeededBattle;
@@ -1769,59 +1767,9 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
   Target->RefreshAppearance();
 
   bool bUpdatedSnapshot = false;
-  if (ASkaldGameMode *GM = GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
-    GM->CacheWorldMapSnapshot();
-    bUpdatedSnapshot = true;
-  } else if (GI) {
-    AWorldMap *WorldMapForSnapshot = WorldMap ? WorldMap : ResolveWorldMap();
-    TArray<FS_Territory> TerritorySnapshots;
-    if (WorldMapForSnapshot) {
-      TerritorySnapshots.Reserve(WorldMapForSnapshot->Territories.Num());
-    }
-
-    auto CaptureSnapshot = [&](ATerritory *Territory) {
-      FS_Territory Snapshot;
-      Snapshot.TerritoryID = Territory->TerritoryID;
-      Snapshot.TerritoryName = Territory->TerritoryName;
-      Snapshot.OwnerPlayerID =
-          Territory->OwningPlayer ? Territory->OwningPlayer->GetPlayerId() : 0;
-      Snapshot.IsCapital = Territory->bIsCapital;
-      Snapshot.CapitalOwner = Snapshot.OwnerPlayerID;
-      Snapshot.ArmyUnits = Territory->ArmyUnits;
-      Snapshot.ContinentID = Territory->ContinentID;
-      Snapshot.Location = Territory->GetActorLocation();
-      Snapshot.HasTreasure = Territory->bHasTreasure;
-      Snapshot.TreasureAttachedUnitID =
-          ReadIntProperty(Territory, TEXT("TreasureAttachedUnitID"));
-      Snapshot.FortificationLevel =
-          ReadIntProperty(Territory, TEXT("FortificationLevel"));
-      Snapshot.Moat = ReadBoolProperty(Territory, TEXT("Moat"));
-      Snapshot.WallHealth = ReadIntProperty(Territory, TEXT("WallHealth"));
-      Snapshot.BuiltSiegeID = Territory->BuiltSiegeID;
-      Snapshot.ConqueredTurn =
-          ReadIntProperty(Territory, TEXT("ConqueredTurn"));
-      Snapshot.IsNeutralSpawn =
-          ReadBoolProperty(Territory, TEXT("IsNeutralSpawn"));
-      Snapshot.AdjacentIDs.Reset();
-      for (ATerritory *Adj : Territory->AdjacentTerritories) {
-        if (Adj) {
-          Snapshot.AdjacentIDs.Add(Adj->TerritoryID);
-        }
-      }
-      return Snapshot;
-    };
-
-    if (WorldMapForSnapshot) {
-      for (ATerritory *Territory : WorldMapForSnapshot->Territories) {
-        if (!Territory) {
-          continue;
-        }
-        TerritorySnapshots.Add(CaptureSnapshot(Territory));
-      }
-    }
-
-    if (TerritorySnapshots.Num() > 0) {
-      GI->CachedWorldMapTerritories = MoveTemp(TerritorySnapshots);
+  if (GI) {
+    bUpdatedSnapshot = GI->CacheWorldMapSnapshot(GetWorld());
+    if (!bUpdatedSnapshot && GI->CachedWorldMapTerritories.Num() > 0) {
       bUpdatedSnapshot = true;
     }
   }
