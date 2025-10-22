@@ -263,6 +263,9 @@ private:
                                      int32 RoundNumber, int32 RollValue,
                                      bool bWonInitiative);
 
+  /** Perform any deferred work that must happen once the overworld is ready. */
+  void HandleWorldInitializationComplete();
+
   /** Track players still needing to confirm the initiative roll. */
   TSet<TWeakObjectPtr<ASkaldPlayerState>> PendingStrategicInitiativePlayers;
 
