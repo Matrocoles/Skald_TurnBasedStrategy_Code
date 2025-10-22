@@ -650,6 +650,11 @@ void USkaldGameInstance::HandleWorldBeginPlay(UWorld *LoadedWorld) {
     return;
   }
 
+  UE_LOG(LogSkald, Log,
+         TEXT("HandleWorldBeginPlay: World=%s NetMode=%d"),
+         *GetNameSafe(LoadedWorld),
+         static_cast<int32>(LoadedWorld->GetNetMode()));
+
   SetTravelPending(false);
 
   if (LoadedWorld->GetNetMode() == NM_Client) {
@@ -659,6 +664,10 @@ void USkaldGameInstance::HandleWorldBeginPlay(UWorld *LoadedWorld) {
   LoadedWorld->GetTimerManager().ClearTimer(PendingResumeDelayHandle);
 
   const bool bShouldResume = ShouldAttemptTravelResume();
+  UE_LOG(LogSkald, Log,
+         TEXT("HandleWorldBeginPlay: ShouldResume=%d PendingSnapshot=%d CachedTravel=%d CachedWorldMap=%d"),
+         bShouldResume ? 1 : 0, PendingTravelTerritories.Num(),
+         TravelState.CachedTerritories.Num(), CachedWorldMapTerritories.Num());
   if (bShouldResume) {
     constexpr float TravelResumeDelaySeconds = 2.0f;
     FTimerDelegate DeferredResume = FTimerDelegate::CreateUObject(
@@ -702,12 +711,22 @@ void USkaldGameInstance::HandleDeferredTravelResume(UWorld *LoadedWorld) {
     return;
   }
 
+  UE_LOG(LogSkald, Log,
+         TEXT("HandleDeferredTravelResume: World=%s NetMode=%d"),
+         *GetNameSafe(LoadedWorld),
+         static_cast<int32>(LoadedWorld->GetNetMode()));
+
   LoadedWorld->GetTimerManager().ClearTimer(PendingResumeDelayHandle);
 
   if (!ShouldAttemptTravelResume()) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("HandleDeferredTravelResume: resume no longer required"));
     return;
   }
 
+  UE_LOG(LogSkald, Verbose,
+         TEXT("HandleDeferredTravelResume: scheduling resume for %s"),
+         *GetNameSafe(LoadedWorld));
   ScheduleTravelResume(LoadedWorld);
 }
 
@@ -718,12 +737,26 @@ bool USkaldGameInstance::ShouldAttemptTravelResume() const {
   const bool bHasCachedWorldMap = CachedWorldMapTerritories.Num() > 0;
   const bool bHasPendingResolution =
       bPendingBattleResolution || PendingBattleResolution.bValid;
-  return bHasPendingSnapshot || bHasTravelCache || bHasCachedWorldMap ||
-         bResumeTurns || bHasPendingResolution;
+  const bool bShouldResume = bHasPendingSnapshot || bHasTravelCache ||
+                             bHasCachedWorldMap || bResumeTurns ||
+                             bHasPendingResolution;
+
+  UE_LOG(LogSkald, Verbose,
+         TEXT(
+             "ShouldAttemptTravelResume: PendingSnapshot=%d TravelCacheValid=%d CachedWorldMap=%d ResumeTurns=%d PendingResolution=%d -> %d"),
+         bHasPendingSnapshot ? 1 : 0, bHasTravelCache ? 1 : 0,
+         bHasCachedWorldMap ? 1 : 0, bResumeTurns ? 1 : 0,
+         bHasPendingResolution ? 1 : 0, bShouldResume ? 1 : 0);
+
+  return bShouldResume;
 }
 
 void USkaldGameInstance::ScheduleTravelResume(UWorld *World) {
   if (!World || World->GetNetMode() == NM_Client) {
+    UE_LOG(LogSkald, Warning,
+           TEXT(
+               "ScheduleTravelResume aborted: World=%s NetMode=%d (expected server)"),
+           *GetNameSafe(World), World ? static_cast<int32>(World->GetNetMode()) : -1);
     return;
   }
 
@@ -733,24 +766,47 @@ void USkaldGameInstance::ScheduleTravelResume(UWorld *World) {
   FTimerDelegate ResumeDelegate = FTimerDelegate::CreateUObject(
       this, &USkaldGameInstance::AttemptResumeAfterTravel);
   World->GetTimerManager().SetTimerForNextTick(ResumeDelegate);
+
+  UE_LOG(LogSkald, Log,
+         TEXT("ScheduleTravelResume: World=%s PendingSnapshot=%d CachedTravel=%d CachedWorldMap=%d"),
+         *GetNameSafe(World), PendingTravelTerritories.Num(),
+         TravelState.CachedTerritories.Num(), CachedWorldMapTerritories.Num());
 }
 
 void USkaldGameInstance::AttemptResumeAfterTravel() {
   UWorld *World = PendingResumeWorld.Get();
   if (!World || World->GetNetMode() == NM_Client) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("AttemptResumeAfterTravel aborted: World=%s NetMode=%d"),
+           *GetNameSafe(World),
+           World ? static_cast<int32>(World->GetNetMode()) : -1);
     PendingResumeWorld.Reset();
     return;
   }
 
+  UE_LOG(LogSkald, Log,
+         TEXT(
+             "AttemptResumeAfterTravel: World=%s PendingSnapshot=%d TravelCache=%d CachedWorldMap=%d ResumeTurns=%d PendingResolution=%d"),
+         *GetNameSafe(World), PendingTravelTerritories.Num(),
+         TravelState.CachedTerritories.Num(), CachedWorldMapTerritories.Num(),
+         bResumeTurns ? 1 : 0,
+         (bPendingBattleResolution || PendingBattleResolution.bValid) ? 1 : 0);
+
   World->GetTimerManager().ClearTimer(PendingResumeRetryHandle);
 
   if (!ShouldAttemptTravelResume()) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("AttemptResumeAfterTravel: resume no longer required"));
     PendingResumeWorld.Reset();
     return;
   }
 
   ASkaldGameMode *GameMode = World->GetAuthGameMode<ASkaldGameMode>();
   if (!GameMode) {
+    UE_LOG(LogSkald, Warning,
+           TEXT(
+               "AttemptResumeAfterTravel: GameMode missing in %s, retrying shortly"),
+           *GetNameSafe(World));
     constexpr float RetryDelaySeconds = 0.05f;
     FTimerDelegate RetryDelegate = FTimerDelegate::CreateUObject(
         this, &USkaldGameInstance::AttemptResumeAfterTravel);
@@ -760,8 +816,13 @@ void USkaldGameInstance::AttemptResumeAfterTravel() {
   }
 
   if (!GameMode->IsWorldInitialized()) {
+    UE_LOG(LogSkald, Log,
+           TEXT("AttemptResumeAfterTravel: initializing world via %s"),
+           *GetNameSafe(GameMode));
     GameMode->TryInitializeWorldAndStart();
     if (!GameMode->IsWorldInitialized()) {
+      UE_LOG(LogSkald, Verbose,
+             TEXT("AttemptResumeAfterTravel: world still not initialized, scheduling retry"));
       constexpr float RetryDelaySeconds = 0.05f;
       FTimerDelegate RetryDelegate = FTimerDelegate::CreateUObject(
           this, &USkaldGameInstance::AttemptResumeAfterTravel);
@@ -771,6 +832,9 @@ void USkaldGameInstance::AttemptResumeAfterTravel() {
     }
   }
 
+  UE_LOG(LogSkald, Log,
+         TEXT("AttemptResumeAfterTravel: resume complete for world %s"),
+         *GetNameSafe(World));
   PendingResumeWorld.Reset();
 }
 
