@@ -264,7 +264,7 @@ struct FGridSlotSnapshot
 
 FMargin GetUniformGridSlotPadding(const UUniformGridSlot& Slot)
 {
-    return Slot.GetPadding();
+    return Slot.SlotPadding;
 }
 
 void SetUniformGridSlotPadding(UUniformGridSlot& Slot, const FMargin& Padding)
@@ -431,8 +431,9 @@ void UW_DiceResolutionPanel::InitializeOutcomeScrollContainer()
             {
                 if (UScrollBoxSlot* ScrollSlot = Cast<UScrollBoxSlot>(AddedSlot))
                 {
+                    ScrollSlot->SetPadding(FMargin(6.f));
                     ScrollSlot->SetHorizontalAlignment(HAlign_Fill);
-                    ScrollSlot->SetVerticalAlignment(VAlign_Fill);
+                    ScrollSlot->SetVerticalAlignment(VAlign_Top);
                 }
             }
         }
@@ -581,8 +582,9 @@ void UW_DiceResolutionPanel::InitializeOutcomeScrollContainer()
     {
         if (UScrollBoxSlot* ScrollSlot = Cast<UScrollBoxSlot>(AddedSlot))
         {
+            ScrollSlot->SetPadding(FMargin(6.f));
             ScrollSlot->SetHorizontalAlignment(HAlign_Fill);
-            ScrollSlot->SetVerticalAlignment(VAlign_Fill);
+            ScrollSlot->SetVerticalAlignment(VAlign_Top);
         }
     }
 }
