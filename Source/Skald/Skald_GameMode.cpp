@@ -1053,19 +1053,57 @@ void ASkaldGameMode::NormalizePlayerStateIds() {
 
   PlayerDataArray.SetNum(GS->PlayerArray.Num());
 
+  TSet<int32> ReservedPlayerIds;
+  TSet<int32> AssignedPlayerIds;
+  int32 NextCandidateId = 1;
+
+  for (APlayerState *PSBase : GS->PlayerArray) {
+    if (const ASkaldPlayerState *ExistingPS = Cast<ASkaldPlayerState>(PSBase)) {
+      const int32 ExistingId = ExistingPS->GetPlayerId();
+      if (ExistingId > 0) {
+        ReservedPlayerIds.Add(ExistingId);
+      }
+    }
+  }
+
+  auto AcquirePlayerId = [&](ASkaldPlayerState *PS) -> int32 {
+    if (!PS) {
+      return 0;
+    }
+
+    const int32 ExistingId = PS->GetPlayerId();
+    if (ExistingId > 0 && !AssignedPlayerIds.Contains(ExistingId)) {
+      AssignedPlayerIds.Add(ExistingId);
+      return ExistingId;
+    }
+
+    int32 CandidateId = NextCandidateId;
+    while (ReservedPlayerIds.Contains(CandidateId) ||
+           AssignedPlayerIds.Contains(CandidateId)) {
+      ++CandidateId;
+    }
+
+    NextCandidateId = CandidateId + 1;
+    AssignedPlayerIds.Add(CandidateId);
+    ReservedPlayerIds.Add(CandidateId);
+    return CandidateId;
+  };
+
   for (int32 i = 0; i < GS->PlayerArray.Num(); ++i) {
     if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(GS->PlayerArray[i])) {
-      const int32 NewPlayerId = i + 1;
-      PS->SetPlayerId(NewPlayerId);
+      const int32 AssignedId = AcquirePlayerId(PS);
+      if (PS->GetPlayerId() != AssignedId) {
+        PS->SetPlayerId(AssignedId);
+      }
 
       if (PlayerDataArray.IsValidIndex(i)) {
-        PlayerDataArray[i].PlayerID = NewPlayerId;
+        PlayerDataArray[i].PlayerID = AssignedId;
       }
 
       if (ASkaldPlayerController *OwningController =
               Cast<ASkaldPlayerController>(PS->GetOwner())) {
         if (USkaldMainHUDWidget *HUD = OwningController->GetHUDWidget()) {
-          HUD->LocalPlayerID = NewPlayerId;
+          HUD->LocalPlayerID = AssignedId;
           HUD->SyncPhaseButtons(HUD->CurrentPlayerID == HUD->LocalPlayerID);
         }
       }
