@@ -193,6 +193,9 @@ private:
   /** Flag to avoid spawning AI players multiple times. */
   bool bAIPlayersSpawned;
 
+  /** Whether an overworld snapshot should be captured after world init completes. */
+  bool bPendingInitialSnapshot = false;
+
   /** Controllers whose PlayerState is not yet valid, queued for retry. */
   TArray<ASkaldPlayerController *> PendingControllers;
 
