@@ -2925,29 +2925,42 @@ void ASkaldPlayerController::UpdateBattleTerritoryLabel() {
     CachedGameInstance = GI;
   }
 
-  FText TerritoryLabel = FText::GetEmpty();
+  FString TerritoryName;
   int32 TargetTerritoryId = 0;
 
   if (GI) {
     const FS_BattlePayload &Battle = GI->PendingBattle;
     TargetTerritoryId = Battle.TargetTerritoryID;
     if (!Battle.DefenderTerritoryName.IsEmpty()) {
-      TerritoryLabel = FText::FromString(Battle.DefenderTerritoryName);
+      TerritoryName = Battle.DefenderTerritoryName;
     }
   }
 
-  if (TerritoryLabel.IsEmpty() && TargetTerritoryId > 0) {
-    if (UWorld *World = GetWorld()) {
-      if (AWorldMap *WorldMap = Cast<AWorldMap>(
-              UGameplayStatics::GetActorOfClass(World, AWorldMap::StaticClass()))) {
-        if (ATerritory *Territory = WorldMap->GetTerritoryById(TargetTerritoryId)) {
-          TerritoryLabel = FText::FromString(Territory->TerritoryName);
+  auto ResolveFromSnapshots = [&](const TArray<FS_Territory> &Snapshots) {
+    if (TerritoryName.IsEmpty() && TargetTerritoryId > 0) {
+      for (const FS_Territory &Snapshot : Snapshots) {
+        if (Snapshot.TerritoryID == TargetTerritoryId &&
+            !Snapshot.TerritoryName.IsEmpty()) {
+          TerritoryName = Snapshot.TerritoryName;
+          return true;
         }
+      }
+    }
+    return false;
+  };
+
+  if (TerritoryName.IsEmpty() && TargetTerritoryId > 0 && GI) {
+    const TArray<FS_Territory> &PendingSnapshot = GI->GetPendingTravelSnapshot();
+    if (!ResolveFromSnapshots(PendingSnapshot)) {
+      if (!ResolveFromSnapshots(GI->CachedWorldMapTerritories)) {
+        ResolveFromSnapshots(GI->GetTravelState().CachedTerritories);
       }
     }
   }
 
-  BattleHudWidget->SetTerritoryName(TerritoryLabel);
+  BattleHudWidget->SetTerritoryName(TerritoryName.IsEmpty()
+                                        ? FText::GetEmpty()
+                                        : FText::FromString(TerritoryName));
 }
 
 void ASkaldPlayerController::UpdateBattlePlayersTurnDisplay() {
