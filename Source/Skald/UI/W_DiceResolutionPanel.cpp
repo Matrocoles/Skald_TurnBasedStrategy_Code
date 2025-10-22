@@ -3,21 +3,27 @@
 #include "Components/HorizontalBoxSlot.h"
 #include "Components/Image.h"
 #include "Components/PanelSlot.h"
+#include "Components/ScrollBox.h"
+#include "Components/SizeBox.h"
+#include "Components/SlateWrapperTypes.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Components/Widget.h"
+#include "Blueprint/WidgetTree.h"
 #include "Engine/Texture2D.h"
 #include "Engine/World.h"
 #include "Math/UnrealMathUtility.h"
+#include "Slate/SlateEnums.h"
 #include "TimerManager.h"
 #include "Math/Vector2D.h"
 
 namespace
 {
-constexpr float FirstRevealDelaySeconds = 1.1f;
-constexpr float SubsequentRevealDelaySeconds = 1.3f;
-constexpr float CompletionDelaySeconds = 0.8f;
+constexpr float FirstRevealDelaySeconds = 0.2f;
+constexpr float SubsequentRevealDelaySeconds = 0.25f;
+constexpr float CompletionDelaySeconds = 0.2f;
+constexpr float DiceOutcomeImageSize = 112.f;
 }
 
 UW_DiceResolutionPanel::UW_DiceResolutionPanel(const FObjectInitializer& ObjectInitializer)
@@ -29,6 +35,7 @@ UW_DiceResolutionPanel::UW_DiceResolutionPanel(const FObjectInitializer& ObjectI
 void UW_DiceResolutionPanel::NativeConstruct()
 {
     Super::NativeConstruct();
+    InitializeOutcomeScrollContainer();
     ResetPanel();
 }
 
@@ -77,6 +84,8 @@ void UW_DiceResolutionPanel::BeginResolution(const FDiceRollResult& Result)
 
 void UW_DiceResolutionPanel::ResetPanel()
 {
+    InitializeOutcomeScrollContainer();
+
     if (UWorld* World = GetWorld())
     {
         FTimerManager& TimerManager = World->GetTimerManager();
@@ -117,6 +126,82 @@ void UW_DiceResolutionPanel::ClearOutcomeEntries()
     {
         OutcomeList->ClearChildren();
     }
+
+    if (OutcomeScrollBox)
+    {
+        OutcomeScrollBox->ScrollToStart();
+    }
+}
+
+void UW_DiceResolutionPanel::InitializeOutcomeScrollContainer()
+{
+    if (!OutcomeList)
+    {
+        OutcomeScrollBox = nullptr;
+        return;
+    }
+
+    if (OutcomeScrollBox)
+    {
+        if (OutcomeList->GetParent() != OutcomeScrollBox)
+        {
+            OutcomeScrollBox->ClearChildren();
+            OutcomeScrollBox->AddChild(OutcomeList);
+        }
+
+        ConfigureOutcomeScrollBox(*OutcomeScrollBox);
+        return;
+    }
+
+    if (UScrollBox* ExistingScroll = Cast<UScrollBox>(OutcomeList->GetParent()))
+    {
+        OutcomeScrollBox = ExistingScroll;
+        ConfigureOutcomeScrollBox(*OutcomeScrollBox);
+        return;
+    }
+
+    if (!WidgetTree)
+    {
+        return;
+    }
+
+    USizeBox* ScrollSizer = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("OutcomeScrollSizer"));
+    UScrollBox* NewScrollBox = WidgetTree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(), TEXT("OutcomeScrollBox"));
+    if (!ScrollSizer || !NewScrollBox)
+    {
+        return;
+    }
+
+    ConfigureOutcomeScrollBox(*NewScrollBox);
+
+    const float WindowHeight = GetOutcomeScrollWindowHeight();
+    ScrollSizer->SetHeightOverride(WindowHeight);
+    ScrollSizer->SetMinDesiredHeight(WindowHeight);
+    ScrollSizer->SetMaxDesiredHeight(WindowHeight);
+
+    if (WidgetTree->ReplaceWidget(OutcomeList, ScrollSizer))
+    {
+        ScrollSizer->SetContent(NewScrollBox);
+        OutcomeScrollBox = NewScrollBox;
+        OutcomeScrollBox->AddChild(OutcomeList);
+    }
+}
+
+void UW_DiceResolutionPanel::ConfigureOutcomeScrollBox(UScrollBox& ScrollBox) const
+{
+    ScrollBox.SetOrientation(EOrientation::Orient_Vertical);
+    ScrollBox.SetScrollBarVisibility(ESlateVisibility::Collapsed);
+    ScrollBox.SetAllowOverscroll(false);
+    ScrollBox.SetAlwaysShowScrollbar(false);
+    ScrollBox.SetAnimateWheelScrolling(false);
+    ScrollBox.SetConsumeMouseWheel(EConsumeMouseWheel::WhenScrollingPossible);
+}
+
+float UW_DiceResolutionPanel::GetOutcomeScrollWindowHeight() const
+{
+    const float EntryPadding = OutcomeEntryPadding.Top + OutcomeEntryPadding.Bottom;
+    const float SingleEntryHeight = DiceOutcomeImageSize + EntryPadding;
+    return SingleEntryHeight * 2.f;
 }
 
 void UW_DiceResolutionPanel::ScheduleNextReveal(float DelaySeconds)
@@ -174,6 +259,7 @@ void UW_DiceResolutionPanel::RevealNextDie()
     if (OutcomeList)
     {
         bool bEntryAdded = false;
+        UWidget* NewlyAddedWidget = nullptr;
 
         if (OutcomeEntryWidgetClass)
         {
@@ -191,6 +277,7 @@ void UW_DiceResolutionPanel::RevealNextDie()
                 }
 
                 bEntryAdded = true;
+                NewlyAddedWidget = EntryWidget;
             }
         }
 
@@ -265,6 +352,20 @@ void UW_DiceResolutionPanel::RevealNextDie()
                 {
                     EntrySlot->SetPadding(OutcomeEntryPadding);
                 }
+
+                NewlyAddedWidget = EntryRow;
+            }
+        }
+
+        if (OutcomeScrollBox)
+        {
+            if (NewlyAddedWidget)
+            {
+                OutcomeScrollBox->ScrollWidgetIntoView(NewlyAddedWidget, false, EDescendantScrollDestination::BottomOrRight);
+            }
+            else
+            {
+                OutcomeScrollBox->ScrollToEnd();
             }
         }
     }
