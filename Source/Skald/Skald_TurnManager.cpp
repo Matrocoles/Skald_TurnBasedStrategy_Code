@@ -454,7 +454,9 @@ void ATurnManager::EndPlay(const EEndPlayReason::Type EndPlayReason) {
     FTimerManager &TimerManager = World->GetTimerManager();
     TimerManager.ClearTimer(BattleReturnDelayHandle);
     TimerManager.ClearTimer(BattleEndBindingRetryHandle);
+    TimerManager.ClearTimer(PhaseBroadcastRetryHandle);
   }
+  bPhaseBroadcastRetryActive = false;
   bBattleReturnPending = false;
 
   Super::EndPlay(EndPlayReason);
@@ -876,7 +878,10 @@ bool ATurnManager::TryResumeSavedTurnState(USkaldGameInstance *GameInstance) {
 
   SyncGameStateTurnIndex();
   Controller->StartTurn();
-  BroadcastCurrentPhase();
+  const bool bBroadcasted = BroadcastCurrentPhase();
+  if (!bBroadcasted) {
+    QueuePhaseBroadcastRetry(CurrentPhase);
+  }
 
   return true;
 }
@@ -2212,17 +2217,17 @@ void ATurnManager::BroadcastResources(ASkaldPlayerState *ForPlayer) {
   OnWorldStateChanged.Broadcast();
 }
 
-void ATurnManager::BroadcastCurrentPhase() {
+bool ATurnManager::BroadcastCurrentPhase() {
   if (const UWorld *W = GetWorld()) {
     if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
       if (GI->bTravelPending || GI->bIsInBattleMap) {
-        return;
+        return false;
       }
     }
     if (ASkaldGameMode *GameMode = W->GetAuthGameMode<ASkaldGameMode>()) {
       if (!GameMode->IsWorldInitialized() ||
           GameMode->IsAwaitingStrategicInitiative()) {
-        return;
+        return false;
       }
     }
   }
@@ -2268,4 +2273,44 @@ void ATurnManager::BroadcastCurrentPhase() {
   }
 
   OnWorldStateChanged.Broadcast();
+
+  if (bPhaseBroadcastRetryActive) {
+    bPhaseBroadcastRetryActive = false;
+    PendingPhaseBroadcast = ETurnPhase::Reinforcement;
+    if (UWorld *World = GetWorld()) {
+      World->GetTimerManager().ClearTimer(PhaseBroadcastRetryHandle);
+    }
+  }
+
+  return true;
+}
+
+void ATurnManager::QueuePhaseBroadcastRetry(ETurnPhase Phase) {
+  if (UWorld *World = GetWorld()) {
+    FTimerManager &TimerManager = World->GetTimerManager();
+    if (bPhaseBroadcastRetryActive &&
+        TimerManager.IsTimerActive(PhaseBroadcastRetryHandle) &&
+        PendingPhaseBroadcast == Phase) {
+      return;
+    }
+
+    PendingPhaseBroadcast = Phase;
+    bPhaseBroadcastRetryActive = true;
+
+    constexpr float RetryDelaySeconds = 0.05f;
+    FTimerDelegate RetryDelegate = FTimerDelegate::CreateWeakLambda(
+        this, [this, Phase]() {
+          bPhaseBroadcastRetryActive = false;
+          if (CurrentPhase != Phase) {
+            return;
+          }
+
+          if (!BroadcastCurrentPhase()) {
+            QueuePhaseBroadcastRetry(Phase);
+          }
+        });
+
+    TimerManager.SetTimer(PhaseBroadcastRetryHandle, RetryDelegate,
+                          RetryDelaySeconds, false);
+  }
 }
