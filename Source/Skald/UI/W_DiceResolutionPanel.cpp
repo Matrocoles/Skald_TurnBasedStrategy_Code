@@ -25,6 +25,7 @@
 #include "Math/Vector2D.h"
 #include "Types/SlateEnums.h"
 #include "Widgets/Layout/SScrollBox.h"
+#include "Runtime/Launch/Resources/Version.h"
 
 namespace
 {
