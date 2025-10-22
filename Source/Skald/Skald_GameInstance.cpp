@@ -199,9 +199,16 @@ void USkaldGameInstance::HandleWorldBeginPlay(UWorld *LoadedWorld) {
     return;
   }
 
+  LoadedWorld->GetTimerManager().ClearTimer(PendingResumeDelayHandle);
+
   const bool bShouldResume = ShouldAttemptTravelResume();
   if (bShouldResume) {
-    ScheduleTravelResume(LoadedWorld);
+    constexpr float TravelResumeDelaySeconds = 2.0f;
+    FTimerDelegate DeferredResume = FTimerDelegate::CreateUObject(
+        this, &USkaldGameInstance::HandleDeferredTravelResume, LoadedWorld);
+    LoadedWorld->GetTimerManager().SetTimer(
+        PendingResumeDelayHandle, DeferredResume, TravelResumeDelaySeconds,
+        false);
   } else {
     if (PendingResumeWorld.IsValid()) {
       if (UWorld *World = PendingResumeWorld.Get()) {
@@ -210,6 +217,7 @@ void USkaldGameInstance::HandleWorldBeginPlay(UWorld *LoadedWorld) {
     }
     PendingResumeWorld.Reset();
     LoadedWorld->GetTimerManager().ClearTimer(PendingResumeRetryHandle);
+    LoadedWorld->GetTimerManager().ClearTimer(PendingResumeDelayHandle);
   }
 
   if (bPendingBattleResolution && PendingBattleResolution.bValid) {
@@ -230,6 +238,20 @@ void USkaldGameInstance::HandleWorldBeginPlay(UWorld *LoadedWorld) {
         GameMode, &ASkaldGameMode::TryInitializeWorldAndStart);
     LoadedWorld->GetTimerManager().SetTimerForNextTick(InitDelegate);
   }
+}
+
+void USkaldGameInstance::HandleDeferredTravelResume(UWorld *LoadedWorld) {
+  if (!LoadedWorld || LoadedWorld->GetGameInstance() != this) {
+    return;
+  }
+
+  LoadedWorld->GetTimerManager().ClearTimer(PendingResumeDelayHandle);
+
+  if (!ShouldAttemptTravelResume()) {
+    return;
+  }
+
+  ScheduleTravelResume(LoadedWorld);
 }
 
 bool USkaldGameInstance::ShouldAttemptTravelResume() const {

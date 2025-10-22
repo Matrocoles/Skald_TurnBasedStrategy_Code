@@ -255,6 +255,7 @@ private:
   FDelegateHandle PostWorldBeginPlayHandle;
 
   void HandleWorldBeginPlay(UWorld *LoadedWorld);
+  void HandleDeferredTravelResume(UWorld *LoadedWorld);
   bool ShouldAttemptTravelResume() const;
   void ScheduleTravelResume(UWorld *World);
   void AttemptResumeAfterTravel();
@@ -263,6 +264,7 @@ private:
   void ResetSessionState();
 
   TWeakObjectPtr<UWorld> PendingResumeWorld;
+  FTimerHandle PendingResumeDelayHandle;
   FTimerHandle PendingResumeRetryHandle;
 
   FTimerHandle PendingBattleResolutionKickoffHandle;
