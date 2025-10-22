@@ -184,6 +184,15 @@ protected:
   /** Delay handle ensuring the battle result remains visible before returning to the overworld. */
   FTimerHandle BattleReturnDelayHandle;
 
+  /** Retry handle used when a phase broadcast must wait for initialization gates to clear. */
+  FTimerHandle PhaseBroadcastRetryHandle;
+
+  /** Tracks whether a broadcast retry has already been scheduled for the current phase. */
+  bool bPhaseBroadcastRetryActive = false;
+
+  /** Phase value that will be re-broadcast once initialization barriers lift. */
+  ETurnPhase PendingPhaseBroadcast = ETurnPhase::Reinforcement;
+
   /** Cached battle manager that currently has a battle end delegate bound. */
   TWeakObjectPtr<class UGridBattleManager> BoundBattleManager;
 
@@ -203,7 +212,10 @@ protected:
   void CompleteBattleConclusion();
 
   /** Notify controllers and HUDs of a phase change. */
-  void BroadcastCurrentPhase();
+  bool BroadcastCurrentPhase();
+
+  /** Schedule a retry when phase broadcasts are gated by travel or initialization state. */
+  void QueuePhaseBroadcastRetry(ETurnPhase Phase);
 
   /**
    * Calculate and apply reinforcements and resource gains for the specified
