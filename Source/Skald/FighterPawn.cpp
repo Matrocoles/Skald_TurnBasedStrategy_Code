@@ -26,6 +26,11 @@ constexpr int32 ActionsPerActivation = 2;
 constexpr float ActivationWidgetScale = 0.1f;
 constexpr float WidgetMirrorSeparation = 0.5f;
 constexpr float AutoHealthHoldFallbackDelay = 2.f;
+// Delay applied before the first queued attack roll resolves so dice feedback
+// appears quickly after the player commits to an attack.
+constexpr float QueuedAttackFirstRollDelaySeconds = 0.2f;
+// Consistent pacing between any additional dice in the same queued attack.
+constexpr float QueuedAttackAdditionalRollDelaySeconds = 0.2f;
 }
 
 AFighterPawn::AFighterPawn() : MaxHealth(0) {
@@ -815,9 +820,9 @@ void AFighterPawn::StartQueuedAttack(AFighterPawn *Target,
   }
 
   if (UWorld *World = GetWorld()) {
-    World->GetTimerManager().SetTimer(AttackRollTimerHandle, this,
-                                      &AFighterPawn::ResolveNextAttackRoll, 0.2f,
-                                      false);
+    World->GetTimerManager().SetTimer(
+        AttackRollTimerHandle, this, &AFighterPawn::ResolveNextAttackRoll,
+        QueuedAttackFirstRollDelaySeconds, false);
   } else {
     ResolveNextAttackRoll();
   }
@@ -865,9 +870,10 @@ void AFighterPawn::ResolveNextAttackRoll() {
 
   if (bHasMoreRolls && bTargetAlive) {
     if (UWorld *WorldPtr = GetWorld()) {
+      const float NextDelay = QueuedAttackAdditionalRollDelaySeconds;
       WorldPtr->GetTimerManager().SetTimer(
           AttackRollTimerHandle, this, &AFighterPawn::ResolveNextAttackRoll,
-          1.f, false);
+          NextDelay, false);
     } else {
       ResolveNextAttackRoll();
     }
