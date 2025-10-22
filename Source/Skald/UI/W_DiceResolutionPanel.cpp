@@ -14,7 +14,6 @@
 #include "Engine/Texture2D.h"
 #include "Engine/World.h"
 #include "Math/UnrealMathUtility.h"
-#include "Slate/SlateEnums.h"
 #include "TimerManager.h"
 #include "Math/Vector2D.h"
 
