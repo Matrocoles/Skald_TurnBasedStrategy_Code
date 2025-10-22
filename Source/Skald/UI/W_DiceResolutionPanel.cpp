@@ -1,6 +1,8 @@
 #include "UI/W_DiceResolutionPanel.h"
+#include "Components/CanvasPanelSlot.h"
 #include "Components/HorizontalBox.h"
 #include "Components/HorizontalBoxSlot.h"
+#include "Components/PanelWidget.h"
 #include "Components/Image.h"
 #include "Components/PanelSlot.h"
 #include "Components/ScrollBox.h"
@@ -178,12 +180,63 @@ void UW_DiceResolutionPanel::InitializeOutcomeScrollContainer()
     ScrollSizer->SetMinDesiredHeight(WindowHeight);
     ScrollSizer->SetMaxDesiredHeight(WindowHeight);
 
-    if (WidgetTree->ReplaceWidget(OutcomeList, ScrollSizer))
+    UPanelWidget* ParentPanel = OutcomeList->GetParent();
+    if (!ParentPanel)
     {
-        ScrollSizer->SetContent(NewScrollBox);
-        OutcomeScrollBox = NewScrollBox;
-        OutcomeScrollBox->AddChild(OutcomeList);
+        return;
     }
+
+    const int32 InsertIndex = ParentPanel->GetChildIndex(OutcomeList);
+
+    FMargin SavedPadding = FMargin(0.f);
+    bool bHasSavedPadding = false;
+
+    FAnchorData SavedCanvasLayout;
+    bool bHasCanvasLayout = false;
+    bool bCanvasAutoSize = false;
+    int32 SavedCanvasZOrder = 0;
+
+    if (UPanelSlot* ExistingSlot = OutcomeList->Slot)
+    {
+        SavedPadding = ExistingSlot->GetPadding();
+        bHasSavedPadding = true;
+
+        if (const UCanvasPanelSlot* ExistingCanvasSlot = Cast<UCanvasPanelSlot>(ExistingSlot))
+        {
+            SavedCanvasLayout = ExistingCanvasSlot->GetLayout();
+            bCanvasAutoSize = ExistingCanvasSlot->GetAutoSize();
+            SavedCanvasZOrder = ExistingCanvasSlot->GetZOrder();
+            bHasCanvasLayout = true;
+        }
+    }
+
+    OutcomeList->RemoveFromParent();
+
+    UPanelSlot* NewSlot = ParentPanel->InsertChildAt(InsertIndex, ScrollSizer);
+    if (!NewSlot)
+    {
+        ParentPanel->InsertChildAt(InsertIndex, OutcomeList);
+        return;
+    }
+
+    if (bHasSavedPadding)
+    {
+        NewSlot->SetPadding(SavedPadding);
+    }
+
+    if (bHasCanvasLayout)
+    {
+        if (UCanvasPanelSlot* NewCanvasSlot = Cast<UCanvasPanelSlot>(NewSlot))
+        {
+            NewCanvasSlot->SetLayout(SavedCanvasLayout);
+            NewCanvasSlot->SetAutoSize(bCanvasAutoSize);
+            NewCanvasSlot->SetZOrder(SavedCanvasZOrder);
+        }
+    }
+
+    ScrollSizer->SetContent(NewScrollBox);
+    OutcomeScrollBox = NewScrollBox;
+    OutcomeScrollBox->AddChild(OutcomeList);
 }
 
 void UW_DiceResolutionPanel::ConfigureOutcomeScrollBox(UScrollBox& ScrollBox) const
