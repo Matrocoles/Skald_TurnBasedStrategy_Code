@@ -54,6 +54,7 @@ ASkaldGameMode::ASkaldGameMode() {
   bTurnsStarted = false;
   bWorldInitialized = false;
   bAIPlayersSpawned = false;
+  bPendingInitialSnapshot = false;
   AIControllerClass = ASkaldAIController::StaticClass();
 
   NextSiegeID = 1;
@@ -75,6 +76,7 @@ void ASkaldGameMode::InitGame(const FString &Map, const FString &Options,
   bTurnsStarted = false;
   bWorldInitialized = false;
   bAIPlayersSpawned = false;
+  bPendingInitialSnapshot = false;
   PlacementIndex = 0;
   bArmyPlacementFailsafeTriggered = false;
   ArmyPlacementLeader.Reset();
@@ -572,8 +574,12 @@ void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
     if (GI->bResumeTurns) {
       UE_LOG(LogSkald, Verbose,
              TEXT("HandlePlayerLockedIn: Skipping snapshot capture while travel state is pending resume."));
-    } else {
+    } else if (bWorldInitialized) {
       GI->CacheWorldMapSnapshot(GetWorld());
+    } else {
+      bPendingInitialSnapshot = true;
+      UE_LOG(LogSkald, Verbose,
+             TEXT("HandlePlayerLockedIn: Deferring overworld snapshot until after initiative and world initialization."));
     }
   }
 
@@ -1244,6 +1250,13 @@ void ASkaldGameMode::HandleWorldInitializationComplete() {
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
   if (!GI || GI->bIsInBattleMap) {
     return;
+  }
+
+  if (bPendingInitialSnapshot || GI->CachedWorldMapTerritories.Num() == 0) {
+    const bool bCapturedSnapshot = GI->CacheWorldMapSnapshot(GetWorld());
+    if (bCapturedSnapshot) {
+      bPendingInitialSnapshot = false;
+    }
   }
 
   const bool bHasPendingResolution =
