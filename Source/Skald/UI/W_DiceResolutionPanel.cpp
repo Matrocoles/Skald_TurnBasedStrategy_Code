@@ -1,12 +1,19 @@
 #include "UI/W_DiceResolutionPanel.h"
+#include "Components/BorderSlot.h"
+#include "Components/CanvasPanelSlot.h"
+#include "Components/GridSlot.h"
 #include "Components/HorizontalBox.h"
 #include "Components/HorizontalBoxSlot.h"
 #include "Components/Image.h"
+#include "Components/OverlaySlot.h"
 #include "Components/PanelSlot.h"
+#include "Components/PanelWidget.h"
 #include "Components/ScrollBox.h"
 #include "Components/SizeBox.h"
+#include "Components/SizeBoxSlot.h"
 #include "Components/SlateWrapperTypes.h"
 #include "Components/TextBlock.h"
+#include "Components/UniformGridSlot.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Components/Widget.h"
@@ -25,6 +32,266 @@ constexpr float FirstRevealDelaySeconds = 0.2f;
 constexpr float SubsequentRevealDelaySeconds = 0.25f;
 constexpr float CompletionDelaySeconds = 0.2f;
 constexpr float DiceOutcomeImageSize = 112.f;
+
+struct FCanvasPanelSlotSnapshot
+{
+    void Capture(const UCanvasPanelSlot& Slot)
+    {
+        Anchors = Slot.GetAnchors();
+        Offsets = Slot.GetOffsets();
+        Alignment = Slot.GetAlignment();
+        bAutoSize = Slot.GetAutoSize();
+        ZOrder = Slot.GetZOrder();
+        bValid = true;
+    }
+
+    void Apply(UCanvasPanelSlot& Slot) const
+    {
+        if (!bValid)
+        {
+            return;
+        }
+
+        Slot.SetAnchors(Anchors);
+        Slot.SetOffsets(Offsets);
+        Slot.SetAlignment(Alignment);
+        Slot.SetAutoSize(bAutoSize);
+        Slot.SetZOrder(ZOrder);
+    }
+
+    bool bValid = false;
+    FAnchors Anchors;
+    FMargin Offsets;
+    FVector2D Alignment;
+    bool bAutoSize = false;
+    int32 ZOrder = 0;
+};
+
+struct FOverlaySlotSnapshot
+{
+    void Capture(const UOverlaySlot& Slot)
+    {
+        Padding = Slot.Padding;
+        HorizontalAlignment = Slot.HorizontalAlignment;
+        VerticalAlignment = Slot.VerticalAlignment;
+        bValid = true;
+    }
+
+    void Apply(UOverlaySlot& Slot) const
+    {
+        if (!bValid)
+        {
+            return;
+        }
+
+        Slot.SetPadding(Padding);
+        Slot.SetHorizontalAlignment(HorizontalAlignment);
+        Slot.SetVerticalAlignment(VerticalAlignment);
+    }
+
+    bool bValid = false;
+    FMargin Padding;
+    EHorizontalAlignment HorizontalAlignment = HAlign_Fill;
+    EVerticalAlignment VerticalAlignment = VAlign_Fill;
+};
+
+struct FBorderSlotSnapshot
+{
+    void Capture(const UBorderSlot& Slot)
+    {
+        Padding = Slot.Padding;
+        HorizontalAlignment = Slot.HorizontalAlignment;
+        VerticalAlignment = Slot.VerticalAlignment;
+        bValid = true;
+    }
+
+    void Apply(UBorderSlot& Slot) const
+    {
+        if (!bValid)
+        {
+            return;
+        }
+
+        Slot.SetPadding(Padding);
+        Slot.SetHorizontalAlignment(HorizontalAlignment);
+        Slot.SetVerticalAlignment(VerticalAlignment);
+    }
+
+    bool bValid = false;
+    FMargin Padding;
+    EHorizontalAlignment HorizontalAlignment = HAlign_Fill;
+    EVerticalAlignment VerticalAlignment = VAlign_Fill;
+};
+
+struct FSizeBoxSlotSnapshot
+{
+    void Capture(const USizeBoxSlot& Slot)
+    {
+        Padding = Slot.Padding;
+        HorizontalAlignment = Slot.HorizontalAlignment;
+        VerticalAlignment = Slot.VerticalAlignment;
+        bValid = true;
+    }
+
+    void Apply(USizeBoxSlot& Slot) const
+    {
+        if (!bValid)
+        {
+            return;
+        }
+
+        Slot.SetPadding(Padding);
+        Slot.SetHorizontalAlignment(HorizontalAlignment);
+        Slot.SetVerticalAlignment(VerticalAlignment);
+    }
+
+    bool bValid = false;
+    FMargin Padding;
+    EHorizontalAlignment HorizontalAlignment = HAlign_Fill;
+    EVerticalAlignment VerticalAlignment = VAlign_Fill;
+};
+
+struct FVerticalBoxSlotSnapshot
+{
+    void Capture(const UVerticalBoxSlot& Slot)
+    {
+        Padding = Slot.Padding;
+        Size = Slot.Size;
+        HorizontalAlignment = Slot.HorizontalAlignment;
+        VerticalAlignment = Slot.VerticalAlignment;
+        bValid = true;
+    }
+
+    void Apply(UVerticalBoxSlot& Slot) const
+    {
+        if (!bValid)
+        {
+            return;
+        }
+
+        Slot.SetPadding(Padding);
+        Slot.SetSize(Size);
+        Slot.SetHorizontalAlignment(HorizontalAlignment);
+        Slot.SetVerticalAlignment(VerticalAlignment);
+    }
+
+    bool bValid = false;
+    FMargin Padding;
+    FSlateChildSize Size;
+    EHorizontalAlignment HorizontalAlignment = HAlign_Fill;
+    EVerticalAlignment VerticalAlignment = VAlign_Fill;
+};
+
+struct FHorizontalBoxSlotSnapshot
+{
+    void Capture(const UHorizontalBoxSlot& Slot)
+    {
+        Padding = Slot.Padding;
+        Size = Slot.Size;
+        HorizontalAlignment = Slot.HorizontalAlignment;
+        VerticalAlignment = Slot.VerticalAlignment;
+        bValid = true;
+    }
+
+    void Apply(UHorizontalBoxSlot& Slot) const
+    {
+        if (!bValid)
+        {
+            return;
+        }
+
+        Slot.SetPadding(Padding);
+        Slot.SetSize(Size);
+        Slot.SetHorizontalAlignment(HorizontalAlignment);
+        Slot.SetVerticalAlignment(VerticalAlignment);
+    }
+
+    bool bValid = false;
+    FMargin Padding;
+    FSlateChildSize Size;
+    EHorizontalAlignment HorizontalAlignment = HAlign_Fill;
+    EVerticalAlignment VerticalAlignment = VAlign_Fill;
+};
+
+struct FGridSlotSnapshot
+{
+    void Capture(const UGridSlot& Slot)
+    {
+        Padding = Slot.Padding;
+        HorizontalAlignment = Slot.HorizontalAlignment;
+        VerticalAlignment = Slot.VerticalAlignment;
+        Row = Slot.Row;
+        RowSpan = Slot.RowSpan;
+        Column = Slot.Column;
+        ColumnSpan = Slot.ColumnSpan;
+        Layer = Slot.Layer;
+        Nudge = Slot.Nudge;
+        bValid = true;
+    }
+
+    void Apply(UGridSlot& Slot) const
+    {
+        if (!bValid)
+        {
+            return;
+        }
+
+        Slot.SetPadding(Padding);
+        Slot.SetHorizontalAlignment(HorizontalAlignment);
+        Slot.SetVerticalAlignment(VerticalAlignment);
+        Slot.SetRow(Row);
+        Slot.SetRowSpan(RowSpan);
+        Slot.SetColumn(Column);
+        Slot.SetColumnSpan(ColumnSpan);
+        Slot.SetLayer(Layer);
+        Slot.SetNudge(Nudge);
+    }
+
+    bool bValid = false;
+    FMargin Padding;
+    EHorizontalAlignment HorizontalAlignment = HAlign_Fill;
+    EVerticalAlignment VerticalAlignment = VAlign_Fill;
+    int32 Row = 0;
+    int32 RowSpan = 1;
+    int32 Column = 0;
+    int32 ColumnSpan = 1;
+    int32 Layer = 0;
+    FVector2D Nudge = FVector2D::ZeroVector;
+};
+
+struct FUniformGridSlotSnapshot
+{
+    void Capture(const UUniformGridSlot& Slot)
+    {
+        Padding = Slot.Padding;
+        HorizontalAlignment = Slot.HorizontalAlignment;
+        VerticalAlignment = Slot.VerticalAlignment;
+        Row = Slot.Row;
+        Column = Slot.Column;
+        bValid = true;
+    }
+
+    void Apply(UUniformGridSlot& Slot) const
+    {
+        if (!bValid)
+        {
+            return;
+        }
+
+        Slot.SetPadding(Padding);
+        Slot.SetHorizontalAlignment(HorizontalAlignment);
+        Slot.SetVerticalAlignment(VerticalAlignment);
+        Slot.SetRow(Row);
+        Slot.SetColumn(Column);
+    }
+
+    bool bValid = false;
+    FMargin Padding;
+    EHorizontalAlignment HorizontalAlignment = HAlign_Fill;
+    EVerticalAlignment VerticalAlignment = VAlign_Fill;
+    int32 Row = 0;
+    int32 Column = 0;
+};
 }
 
 UW_DiceResolutionPanel::UW_DiceResolutionPanel(const FObjectInitializer& ObjectInitializer)
@@ -180,12 +447,117 @@ void UW_DiceResolutionPanel::InitializeOutcomeScrollContainer()
     ScrollSizer->SetMinDesiredHeight(WindowHeight);
     ScrollSizer->SetMaxDesiredHeight(WindowHeight);
 
-    if (WidgetTree->ReplaceWidget(OutcomeList, ScrollSizer))
+    bool bContainerInserted = false;
+
+    if (WidgetTree->RootWidget == OutcomeList)
     {
-        ScrollSizer->SetContent(NewScrollBox);
-        OutcomeScrollBox = NewScrollBox;
-        OutcomeScrollBox->AddChild(OutcomeList);
+        WidgetTree->RootWidget = ScrollSizer;
+        bContainerInserted = true;
     }
+    else if (UPanelWidget* ParentPanel = OutcomeList->GetParent())
+    {
+        const int32 ChildIndex = ParentPanel->GetChildIndex(OutcomeList);
+        if (ChildIndex != INDEX_NONE)
+        {
+            FCanvasPanelSlotSnapshot CanvasSnapshot;
+            FOverlaySlotSnapshot OverlaySnapshot;
+            FBorderSlotSnapshot BorderSnapshot;
+            FSizeBoxSlotSnapshot SizeBoxSnapshot;
+            FVerticalBoxSlotSnapshot VerticalBoxSnapshot;
+            FHorizontalBoxSlotSnapshot HorizontalBoxSnapshot;
+            FGridSlotSnapshot GridSnapshot;
+            FUniformGridSlotSnapshot UniformGridSnapshot;
+
+            if (const UPanelSlot* ExistingSlot = OutcomeList->Slot)
+            {
+                if (const UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(ExistingSlot))
+                {
+                    CanvasSnapshot.Capture(*CanvasSlot);
+                }
+                if (const UOverlaySlot* OverlaySlot = Cast<UOverlaySlot>(ExistingSlot))
+                {
+                    OverlaySnapshot.Capture(*OverlaySlot);
+                }
+                if (const UBorderSlot* BorderSlot = Cast<UBorderSlot>(ExistingSlot))
+                {
+                    BorderSnapshot.Capture(*BorderSlot);
+                }
+                if (const USizeBoxSlot* SizeBoxSlot = Cast<USizeBoxSlot>(ExistingSlot))
+                {
+                    SizeBoxSnapshot.Capture(*SizeBoxSlot);
+                }
+                if (const UVerticalBoxSlot* VerticalSlot = Cast<UVerticalBoxSlot>(ExistingSlot))
+                {
+                    VerticalBoxSnapshot.Capture(*VerticalSlot);
+                }
+                if (const UHorizontalBoxSlot* HorizontalSlot = Cast<UHorizontalBoxSlot>(ExistingSlot))
+                {
+                    HorizontalBoxSnapshot.Capture(*HorizontalSlot);
+                }
+                if (const UGridSlot* GridSlot = Cast<UGridSlot>(ExistingSlot))
+                {
+                    GridSnapshot.Capture(*GridSlot);
+                }
+                if (const UUniformGridSlot* UniformSlot = Cast<UUniformGridSlot>(ExistingSlot))
+                {
+                    UniformGridSnapshot.Capture(*UniformSlot);
+                }
+            }
+
+            OutcomeList->RemoveFromParent();
+
+            if (UPanelSlot* NewSlot = ParentPanel->InsertChildAt(ChildIndex, ScrollSizer))
+            {
+                if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(NewSlot))
+                {
+                    CanvasSnapshot.Apply(*CanvasSlot);
+                }
+                if (UOverlaySlot* OverlaySlot = Cast<UOverlaySlot>(NewSlot))
+                {
+                    OverlaySnapshot.Apply(*OverlaySlot);
+                }
+                if (UBorderSlot* BorderSlot = Cast<UBorderSlot>(NewSlot))
+                {
+                    BorderSnapshot.Apply(*BorderSlot);
+                }
+                if (USizeBoxSlot* SizeSlot = Cast<USizeBoxSlot>(NewSlot))
+                {
+                    SizeBoxSnapshot.Apply(*SizeSlot);
+                }
+                if (UVerticalBoxSlot* VerticalSlot = Cast<UVerticalBoxSlot>(NewSlot))
+                {
+                    VerticalBoxSnapshot.Apply(*VerticalSlot);
+                }
+                if (UHorizontalBoxSlot* HorizontalSlot = Cast<UHorizontalBoxSlot>(NewSlot))
+                {
+                    HorizontalBoxSnapshot.Apply(*HorizontalSlot);
+                }
+                if (UGridSlot* GridSlot = Cast<UGridSlot>(NewSlot))
+                {
+                    GridSnapshot.Apply(*GridSlot);
+                }
+                if (UUniformGridSlot* UniformSlot = Cast<UUniformGridSlot>(NewSlot))
+                {
+                    UniformGridSnapshot.Apply(*UniformSlot);
+                }
+
+                bContainerInserted = true;
+            }
+            else
+            {
+                ParentPanel->InsertChildAt(ChildIndex, OutcomeList);
+            }
+        }
+    }
+
+    if (!bContainerInserted)
+    {
+        return;
+    }
+
+    ScrollSizer->SetContent(NewScrollBox);
+    OutcomeScrollBox = NewScrollBox;
+    OutcomeScrollBox->AddChild(OutcomeList);
 }
 
 void UW_DiceResolutionPanel::ConfigureOutcomeScrollBox(UScrollBox& ScrollBox) const
