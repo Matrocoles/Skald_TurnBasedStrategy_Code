@@ -527,8 +527,13 @@ void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
   if (!WorldMap && !bIsBattleMap) {
     WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
         GetWorld(), AWorldMap::StaticClass()));
+
     if (!WorldMap) {
-      WorldMap = GetWorld()->SpawnActor<AWorldMap>();
+      UE_LOG(LogSkald, Verbose,
+             TEXT("HandlePlayerLockedIn: WorldMap not yet available; deferring initialization."));
+      FTimerDelegate RetryInit =
+          FTimerDelegate::CreateUObject(this, &ASkaldGameMode::TryInitializeWorldAndStart);
+      GetWorldTimerManager().SetTimerForNextTick(RetryInit);
     }
   }
 
