@@ -1224,58 +1224,20 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
     TravelState.DefenderTerritory = SeededBattle.TargetTerritoryID;
     TravelState.ReturnMap = ResolveCanonicalReturnMapFromWorld(World);
 
-    auto AppendHumanOwnership = [&](ASkaldPlayerState *OwnerPS, int32 TerritoryID) {
-      if (OwnerPS && !OwnerPS->bIsAI && TerritoryID > 0) {
-        TravelState.HumanOwnedTerritories.AddUnique(TerritoryID);
-      }
-    };
-
     AWorldMap *WorldMap = ResolveWorldMap();
     TArray<FS_Territory> TerritorySnapshots;
     bool bUsedCachedFallback = false;
-    bool bCapturedFromLiveWorld = false;
-    if (WorldMap) {
-      TerritorySnapshots.Reserve(WorldMap->Territories.Num());
-      for (ATerritory *Territory : WorldMap->Territories) {
-        if (!Territory) {
-          continue;
-        }
+    TSet<int32> HumanOwnedTerritoryIds;
+    const bool bCapturedFromLiveWorld =
+        CaptureWorldSnapshot(TerritorySnapshots, &HumanOwnedTerritoryIds);
 
-        ASkaldPlayerState *OwnerPS = Territory->OwningPlayer;
-        AppendHumanOwnership(OwnerPS, Territory->TerritoryID);
-
-        FS_Territory Snapshot;
-        Snapshot.TerritoryID = Territory->TerritoryID;
-        Snapshot.TerritoryName = Territory->TerritoryName;
-        Snapshot.OwnerPlayerID = OwnerPS ? OwnerPS->GetPlayerId() : 0;
-        Snapshot.IsCapital = Territory->bIsCapital;
-        Snapshot.CapitalOwner = Snapshot.OwnerPlayerID;
-        Snapshot.ArmyUnits = Territory->ArmyUnits;
-        Snapshot.ContinentID = Territory->ContinentID;
-        Snapshot.Location = Territory->GetActorLocation();
-        Snapshot.HasTreasure = Territory->bHasTreasure;
-        Snapshot.TreasureAttachedUnitID =
-            ReadIntProperty(Territory, TEXT("TreasureAttachedUnitID"));
-        Snapshot.FortificationLevel =
-            ReadIntProperty(Territory, TEXT("FortificationLevel"));
-        Snapshot.Moat = ReadBoolProperty(Territory, TEXT("Moat"));
-        Snapshot.WallHealth =
-            ReadIntProperty(Territory, TEXT("WallHealth"));
-        Snapshot.BuiltSiegeID = Territory->BuiltSiegeID;
-        Snapshot.ConqueredTurn =
-            ReadIntProperty(Territory, TEXT("ConqueredTurn"));
-        Snapshot.IsNeutralSpawn =
-            ReadBoolProperty(Territory, TEXT("IsNeutralSpawn"));
-        Snapshot.AdjacentIDs.Reset();
-        for (ATerritory *Adjacent : Territory->AdjacentTerritories) {
-          if (Adjacent) {
-            Snapshot.AdjacentIDs.Add(Adjacent->TerritoryID);
-          }
-        }
-
-        TerritorySnapshots.Add(MoveTemp(Snapshot));
+    if (bCapturedFromLiveWorld) {
+      TravelState.HumanOwnedTerritories.Reserve(
+          TravelState.HumanOwnedTerritories.Num() +
+          HumanOwnedTerritoryIds.Num());
+      for (int32 TerritoryId : HumanOwnedTerritoryIds) {
+        TravelState.HumanOwnedTerritories.AddUnique(TerritoryId);
       }
-      bCapturedFromLiveWorld = TerritorySnapshots.Num() > 0;
     }
 
     const bool bHasFallbackSnapshot =
@@ -1287,7 +1249,9 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
       for (const FS_Territory &Snapshot : TerritorySnapshots) {
         if (Snapshot.OwnerPlayerID > 0 && GS) {
           if (ASkaldPlayerState *OwnerPS = GS->GetPlayerById(Snapshot.OwnerPlayerID)) {
-            AppendHumanOwnership(OwnerPS, Snapshot.TerritoryID);
+            if (OwnerPS && !OwnerPS->bIsAI && Snapshot.TerritoryID > 0) {
+              TravelState.HumanOwnedTerritories.AddUnique(Snapshot.TerritoryID);
+            }
           }
         }
       }
@@ -1944,6 +1908,77 @@ void ATurnManager::ClientBattleResolved_Implementation(
   }
 
   OnWorldStateChanged.Broadcast();
+}
+
+bool ATurnManager::CaptureWorldSnapshot(
+    TArray<FS_Territory> &OutSnapshot,
+    TSet<int32> *OutHumanOwnedTerritories) {
+  OutSnapshot.Reset();
+  if (OutHumanOwnedTerritories) {
+    OutHumanOwnedTerritories->Reset();
+  }
+
+  AWorldMap *WorldMapForSnapshot = CachedWorldMap;
+  if (!IsValid(WorldMapForSnapshot)) {
+    WorldMapForSnapshot = ResolveWorldMap();
+  }
+
+  if (!IsValid(WorldMapForSnapshot) ||
+      WorldMapForSnapshot->Territories.Num() == 0) {
+    return false;
+  }
+
+  UWorld *World = GetWorld();
+  ASkaldGameState *GameState =
+      World ? World->GetGameState<ASkaldGameState>() : nullptr;
+
+  OutSnapshot.Reserve(WorldMapForSnapshot->Territories.Num());
+
+  for (ATerritory *Territory : WorldMapForSnapshot->Territories) {
+    if (!Territory) {
+      continue;
+    }
+
+    FS_Territory Snapshot;
+    Snapshot.TerritoryID = Territory->TerritoryID;
+    Snapshot.TerritoryName = Territory->TerritoryName;
+    ASkaldPlayerState *OwnerPS = Territory->OwningPlayer;
+    Snapshot.OwnerPlayerID = OwnerPS ? OwnerPS->GetPlayerId() : 0;
+    Snapshot.IsCapital = Territory->bIsCapital;
+    Snapshot.CapitalOwner = Snapshot.OwnerPlayerID;
+    Snapshot.ArmyUnits = Territory->ArmyUnits;
+    Snapshot.ContinentID = Territory->ContinentID;
+    Snapshot.Location = Territory->GetActorLocation();
+    Snapshot.HasTreasure = Territory->bHasTreasure;
+    Snapshot.TreasureAttachedUnitID =
+        ReadIntProperty(Territory, TEXT("TreasureAttachedUnitID"));
+    Snapshot.FortificationLevel =
+        ReadIntProperty(Territory, TEXT("FortificationLevel"));
+    Snapshot.Moat = ReadBoolProperty(Territory, TEXT("Moat"));
+    Snapshot.WallHealth = ReadIntProperty(Territory, TEXT("WallHealth"));
+    Snapshot.BuiltSiegeID = Territory->BuiltSiegeID;
+    Snapshot.ConqueredTurn =
+        ReadIntProperty(Territory, TEXT("ConqueredTurn"));
+    Snapshot.IsNeutralSpawn =
+        ReadBoolProperty(Territory, TEXT("IsNeutralSpawn"));
+    Snapshot.AdjacentIDs.Reset();
+    for (ATerritory *Adjacent : Territory->AdjacentTerritories) {
+      if (Adjacent) {
+        Snapshot.AdjacentIDs.Add(Adjacent->TerritoryID);
+      }
+    }
+
+    if (!OwnerPS && GameState && Snapshot.OwnerPlayerID > 0) {
+      OwnerPS = GameState->GetPlayerById(Snapshot.OwnerPlayerID);
+    }
+    if (OutHumanOwnedTerritories && OwnerPS && !OwnerPS->bIsAI) {
+      OutHumanOwnedTerritories->Add(Snapshot.TerritoryID);
+    }
+
+    OutSnapshot.Add(MoveTemp(Snapshot));
+  }
+
+  return OutSnapshot.Num() > 0;
 }
 
 AWorldMap *ATurnManager::ResolveWorldMap() {

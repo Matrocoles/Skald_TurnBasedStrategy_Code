@@ -783,6 +783,12 @@ void ASkaldGameMode::CacheWorldMapSnapshot() {
     TerritorySnapshots.Add(MoveTemp(TerrData));
   }
 
+  bool bUsedTurnManagerFallback = false;
+  if (TerritorySnapshots.Num() == 0 && TurnManager) {
+    bUsedTurnManagerFallback =
+        TurnManager->CaptureWorldSnapshot(TerritorySnapshots);
+  }
+
   if (TerritorySnapshots.Num() == 0) {
     UE_LOG(LogSkald, Warning,
            TEXT("CacheWorldMapSnapshot produced an empty snapshot; keeping previous %d territories"),
@@ -800,8 +806,10 @@ void ASkaldGameMode::CacheWorldMapSnapshot() {
   GI->CachedWorldMapTerritories = MoveTemp(TerritorySnapshots);
 
   UE_LOG(LogSkald, Verbose,
-         TEXT("CacheWorldMapSnapshot captured %d territories (previously %d)"),
-         GI->CachedWorldMapTerritories.Num(), PreviousSnapshotCount);
+         TEXT("CacheWorldMapSnapshot captured %d territories (previously %d%s)"),
+         GI->CachedWorldMapTerritories.Num(), PreviousSnapshotCount,
+         bUsedTurnManagerFallback ? TEXT(", via turn manager fallback")
+                                  : TEXT(""));
 }
 
 bool ASkaldGameMode::RestoreWorldFromSnapshot() {
