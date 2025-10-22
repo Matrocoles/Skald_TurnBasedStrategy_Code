@@ -1,4 +1,5 @@
 #include "UI/W_DiceResolutionPanel.h"
+#include "Components/Border.h"
 #include "Components/BorderSlot.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/GridSlot.h"
@@ -28,6 +29,36 @@
 #include "Types/SlateEnums.h"
 #include "Widgets/Layout/SScrollBox.h"
 #include "Runtime/Launch/Resources/Version.h"
+
+static UUniformGridSlot* AddToUniformGridWithPadding(
+    UWidgetTree* WidgetTree,
+    UUniformGridPanel* Grid,
+    UWidget* Child,
+    int32 Row,
+    int32 Column,
+    const FMargin& Padding)
+{
+    if (!WidgetTree || !Grid || !Child)
+    {
+        return nullptr;
+    }
+
+    UBorder* Wrapper = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
+    if (!Wrapper)
+    {
+        return nullptr;
+    }
+
+    Wrapper->SetPadding(Padding);
+    Wrapper->SetContent(Child);
+    UUniformGridSlot* Slot = Grid->AddChildToUniformGrid(Wrapper, Row, Column);
+    if (Slot)
+    {
+        Slot->SetRow(Row);
+        Slot->SetColumn(Column);
+    }
+    return Slot;
+}
 
 namespace
 {
@@ -262,21 +293,10 @@ struct FGridSlotSnapshot
     FVector2D Nudge = FVector2D::ZeroVector;
 };
 
-FMargin GetUniformGridSlotPadding(const UUniformGridSlot& Slot)
-{
-    return Slot.SlotPadding;
-}
-
-void SetUniformGridSlotPadding(UUniformGridSlot& Slot, const FMargin& Padding)
-{
-    Slot.SetPadding(Padding);
-}
-
 struct FUniformGridSlotSnapshot
 {
     void Capture(const UUniformGridSlot& Slot)
     {
-        Padding = GetUniformGridSlotPadding(Slot);
         HorizontalAlignment = Slot.GetHorizontalAlignment();
         VerticalAlignment = Slot.GetVerticalAlignment();
         Row = Slot.GetRow();
@@ -291,7 +311,6 @@ struct FUniformGridSlotSnapshot
             return;
         }
 
-        SetUniformGridSlotPadding(Slot, Padding);
         Slot.SetHorizontalAlignment(HorizontalAlignment);
         Slot.SetVerticalAlignment(VerticalAlignment);
         Slot.SetRow(Row);
@@ -299,7 +318,6 @@ struct FUniformGridSlotSnapshot
     }
 
     bool bValid = false;
-    FMargin Padding;
     EHorizontalAlignment HorizontalAlignment = HAlign_Fill;
     EVerticalAlignment VerticalAlignment = VAlign_Fill;
     int32 Row = 0;
@@ -527,46 +545,68 @@ void UW_DiceResolutionPanel::InitializeOutcomeScrollContainer()
 
             OutcomeList->RemoveFromParent();
 
-            if (UPanelSlot* NewSlot = ParentPanel->InsertChildAt(ChildIndex, ScrollSizer))
+            bool bInsertedViaUniformGrid = false;
+            if (UUniformGridPanel* UniformGrid = Cast<UUniformGridPanel>(ParentPanel))
             {
-                if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(NewSlot))
-                {
-                    CanvasSnapshot.Apply(*CanvasSlot);
-                }
-                if (UOverlaySlot* OverlaySlot = Cast<UOverlaySlot>(NewSlot))
-                {
-                    OverlaySnapshot.Apply(*OverlaySlot);
-                }
-                if (UBorderSlot* BorderSlot = Cast<UBorderSlot>(NewSlot))
-                {
-                    BorderSnapshot.Apply(*BorderSlot);
-                }
-                if (USizeBoxSlot* SizeSlot = Cast<USizeBoxSlot>(NewSlot))
-                {
-                    SizeBoxSnapshot.Apply(*SizeSlot);
-                }
-                if (UVerticalBoxSlot* VerticalSlot = Cast<UVerticalBoxSlot>(NewSlot))
-                {
-                    VerticalBoxSnapshot.Apply(*VerticalSlot);
-                }
-                if (UHorizontalBoxSlot* HorizontalSlot = Cast<UHorizontalBoxSlot>(NewSlot))
-                {
-                    HorizontalBoxSnapshot.Apply(*HorizontalSlot);
-                }
-                if (UGridSlot* GridSlot = Cast<UGridSlot>(NewSlot))
-                {
-                    GridSnapshot.Apply(*GridSlot);
-                }
-                if (UUniformGridSlot* UniformSlot = Cast<UUniformGridSlot>(NewSlot))
+                const int32 TargetRow = UniformGridSnapshot.bValid ? UniformGridSnapshot.Row : 0;
+                const int32 TargetColumn = UniformGridSnapshot.bValid ? UniformGridSnapshot.Column : 0;
+                if (UUniformGridSlot* UniformSlot = AddToUniformGridWithPadding(
+                        WidgetTree,
+                        UniformGrid,
+                        ScrollSizer,
+                        TargetRow,
+                        TargetColumn,
+                        FMargin()))
                 {
                     UniformGridSnapshot.Apply(*UniformSlot);
+                    bContainerInserted = true;
+                    bInsertedViaUniformGrid = true;
                 }
-
-                bContainerInserted = true;
             }
-            else
+
+            if (!bInsertedViaUniformGrid)
             {
-                ParentPanel->InsertChildAt(ChildIndex, OutcomeList);
+                if (UPanelSlot* NewSlot = ParentPanel->InsertChildAt(ChildIndex, ScrollSizer))
+                {
+                    if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(NewSlot))
+                    {
+                        CanvasSnapshot.Apply(*CanvasSlot);
+                    }
+                    if (UOverlaySlot* OverlaySlot = Cast<UOverlaySlot>(NewSlot))
+                    {
+                        OverlaySnapshot.Apply(*OverlaySlot);
+                    }
+                    if (UBorderSlot* BorderSlot = Cast<UBorderSlot>(NewSlot))
+                    {
+                        BorderSnapshot.Apply(*BorderSlot);
+                    }
+                    if (USizeBoxSlot* SizeSlot = Cast<USizeBoxSlot>(NewSlot))
+                    {
+                        SizeBoxSnapshot.Apply(*SizeSlot);
+                    }
+                    if (UVerticalBoxSlot* VerticalSlot = Cast<UVerticalBoxSlot>(NewSlot))
+                    {
+                        VerticalBoxSnapshot.Apply(*VerticalSlot);
+                    }
+                    if (UHorizontalBoxSlot* HorizontalSlot = Cast<UHorizontalBoxSlot>(NewSlot))
+                    {
+                        HorizontalBoxSnapshot.Apply(*HorizontalSlot);
+                    }
+                    if (UGridSlot* GridSlot = Cast<UGridSlot>(NewSlot))
+                    {
+                        GridSnapshot.Apply(*GridSlot);
+                    }
+                    if (UUniformGridSlot* UniformSlot = Cast<UUniformGridSlot>(NewSlot))
+                    {
+                        UniformGridSnapshot.Apply(*UniformSlot);
+                    }
+
+                    bContainerInserted = true;
+                }
+                else
+                {
+                    ParentPanel->InsertChildAt(ChildIndex, OutcomeList);
+                }
             }
         }
     }
