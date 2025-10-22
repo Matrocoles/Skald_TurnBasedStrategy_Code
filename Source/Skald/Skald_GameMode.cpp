@@ -525,15 +525,10 @@ void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
   const bool bIsBattleMap = GI && GI->bIsInBattleMap;
 
   if (!WorldMap && !bIsBattleMap) {
-    WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
-        GetWorld(), AWorldMap::StaticClass()));
-
-    if (!WorldMap) {
+    if (!TryResolveWorldMap()) {
       UE_LOG(LogSkald, Verbose,
              TEXT("HandlePlayerLockedIn: WorldMap not yet available; deferring initialization."));
-      FTimerDelegate RetryInit =
-          FTimerDelegate::CreateUObject(this, &ASkaldGameMode::TryInitializeWorldAndStart);
-      GetWorldTimerManager().SetTimerForNextTick(RetryInit);
+      RequestWorldMapRetry();
     }
   }
 
@@ -615,6 +610,73 @@ void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
 
   RefreshHUDs();
   TryInitializeWorldAndStart();
+}
+
+bool ASkaldGameMode::TryResolveWorldMap() {
+  if (WorldMap && !IsValid(WorldMap)) {
+    WorldMap = nullptr;
+  }
+
+  if (WorldMap) {
+    return true;
+  }
+
+  UWorld *World = GetWorld();
+  if (!World) {
+    return false;
+  }
+
+  if (AActor *Actor =
+          UGameplayStatics::GetActorOfClass(World, AWorldMap::StaticClass())) {
+    if (AWorldMap *Found = Cast<AWorldMap>(Actor)) {
+      if (IsValid(Found)) {
+        WorldMap = Found;
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+void ASkaldGameMode::RequestWorldMapRetry() {
+  if (WorldMap) {
+    return;
+  }
+
+  if (!GetWorld()) {
+    return;
+  }
+
+  if (!GetWorldTimerManager().IsTimerActive(WorldMapRetryHandle)) {
+    GetWorldTimerManager().SetTimer(WorldMapRetryHandle, this,
+                                    &ASkaldGameMode::HandleWorldMapRetry,
+                                    RetryInitDelay, false);
+  }
+
+  FTimerDelegate ImmediateRetry =
+      FTimerDelegate::CreateUObject(this, &ASkaldGameMode::HandleWorldMapRetry);
+  GetWorldTimerManager().SetTimerForNextTick(ImmediateRetry);
+}
+
+void ASkaldGameMode::HandleWorldMapRetry() {
+  USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+  const bool bIsBattleMap = GI && GI->bIsInBattleMap;
+  if (bIsBattleMap) {
+    GetWorldTimerManager().ClearTimer(WorldMapRetryHandle);
+    return;
+  }
+
+  if (TryResolveWorldMap()) {
+    GetWorldTimerManager().ClearTimer(WorldMapRetryHandle);
+    FTimerDelegate RetryInit = FTimerDelegate::CreateUObject(
+        this, &ASkaldGameMode::TryInitializeWorldAndStart);
+    GetWorldTimerManager().SetTimerForNextTick(RetryInit);
+  } else {
+    GetWorldTimerManager().SetTimer(WorldMapRetryHandle, this,
+                                    &ASkaldGameMode::HandleWorldMapRetry,
+                                    RetryInitDelay, false);
+  }
 }
 
 void ASkaldGameMode::CacheWorldMapSnapshot() {
