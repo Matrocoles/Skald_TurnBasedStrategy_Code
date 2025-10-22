@@ -558,6 +558,10 @@ void ASkaldGameMode::HandlePlayerLockedIn(ASkaldPlayerState *PS) {
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
   const bool bIsBattleMap = GI && GI->bIsInBattleMap;
 
+  if (WorldMap && !IsValid(WorldMap)) {
+    WorldMap = nullptr;
+  }
+
   if (!WorldMap && !bIsBattleMap) {
     if (!TryResolveWorldMap()) {
       UE_LOG(LogSkald, Verbose,
@@ -725,12 +729,28 @@ void ASkaldGameMode::CacheWorldMapSnapshot() {
     return;
   }
 
+  if (WorldMap && !IsValid(WorldMap)) {
+    WorldMap = nullptr;
+  }
+
   if (!WorldMap) {
-    WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
-        GetWorld(), AWorldMap::StaticClass()));
-    if (!WorldMap && TurnManager) {
-      WorldMap = TurnManager->GetCachedWorldMapActor();
+    if (AWorldMap *FoundMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+            GetWorld(), AWorldMap::StaticClass()))) {
+      if (IsValid(FoundMap)) {
+        WorldMap = FoundMap;
+      }
     }
+    if (!WorldMap && TurnManager) {
+      if (AWorldMap *CachedMap = TurnManager->GetCachedWorldMapActor()) {
+        if (IsValid(CachedMap)) {
+          WorldMap = CachedMap;
+        }
+      }
+    }
+  }
+
+  if (WorldMap && !IsValid(WorldMap)) {
+    WorldMap = nullptr;
   }
 
   const int32 PreviousSnapshotCount = GI->CachedWorldMapTerritories.Num();
@@ -833,9 +853,21 @@ bool ASkaldGameMode::RestoreWorldFromSnapshot() {
     return false;
   }
 
+  if (WorldMap && !IsValid(WorldMap)) {
+    WorldMap = nullptr;
+  }
+
   if (!WorldMap) {
-    WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
-        GetWorld(), AWorldMap::StaticClass()));
+    if (AWorldMap *FoundMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+            GetWorld(), AWorldMap::StaticClass()))) {
+      if (IsValid(FoundMap)) {
+        WorldMap = FoundMap;
+      }
+    }
+  }
+
+  if (WorldMap && !IsValid(WorldMap)) {
+    WorldMap = nullptr;
   }
   if (!WorldMap) {
     UE_LOG(LogSkald, Verbose,
