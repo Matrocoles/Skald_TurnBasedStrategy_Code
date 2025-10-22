@@ -129,6 +129,10 @@ public:
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Turn")
   AWorldMap *GetCachedWorldMapActor() const { return CachedWorldMap; }
 
+  /** Capture a snapshot of all territories currently registered on the world map. */
+  bool CaptureWorldSnapshot(TArray<FS_Territory> &OutSnapshot,
+                            TSet<int32> *OutHumanOwnedTerritories = nullptr);
+
   /** Return the number of registered controllers. */
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Turn")
   int32 GetControllerCount() const { return Controllers.Num(); }
