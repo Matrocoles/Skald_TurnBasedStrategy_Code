@@ -1643,6 +1643,12 @@ void ASkaldGameMode::HandleWorldInitializationComplete() {
       UE_LOG(LogSkald, Verbose,
              TEXT("HandleWorldInitializationComplete: resolving deferred battle result."));
       TurnManager->ResolveGridBattleResult();
+    } else {
+      UE_LOG(LogSkald, Verbose,
+             TEXT("HandleWorldInitializationComplete: awaiting turn manager before resolving battle result."));
+      FTimerDelegate RetryDelegate = FTimerDelegate::CreateUObject(
+          this, &ASkaldGameMode::HandleWorldInitializationComplete);
+      GetWorldTimerManager().SetTimerForNextTick(RetryDelegate);
     }
     return;
   }
