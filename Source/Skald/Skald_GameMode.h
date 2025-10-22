@@ -71,6 +71,11 @@ public:
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "GameMode")
   ATurnManager *GetTurnManager() const { return TurnManager; }
 
+  /** Retrieve read-only player data snapshots for external systems. */
+  const TArray<FS_PlayerData> &GetPlayerDataSnapshots() const {
+    return PlayerDataArray;
+  }
+
   /** Whether the world has already been initialised. */
   bool IsWorldInitialized() const { return bWorldInitialized; }
 
