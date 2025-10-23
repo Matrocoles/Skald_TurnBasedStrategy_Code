@@ -9,20 +9,16 @@
 
 UFighterHealthWidget::UFighterHealthWidget(
     const FObjectInitializer &ObjectInitializer)
-    : Super(ObjectInitializer), DisplayedFraction(1.f), TargetFraction(1.f),
-      TargetFillColor(FLinearColor::Green) {
-  HealthBarWidth = 120.f;
-  HealthBarHeight = 14.f;
-  BackgroundColor = FLinearColor(0.f, 0.f, 0.f, 0.65f);
-  BackgroundBrush = *FCoreStyle::Get().GetBrush("WhiteBrush");
-  ProgressBarStyle =
-      FCoreStyle::Get().GetWidgetStyle<FProgressBarStyle>("ProgressBar");
-  HealthLerpSpeed = 12.f;
-  HealthyThreshold = 0.4f;
-  WarningThreshold = 0.19f;
-  HealthyFillColor = FLinearColor(0.133f, 0.698f, 0.298f, 1.f);
-  WarningFillColor = FLinearColor(0.949f, 0.765f, 0.058f, 1.f);
-  CriticalFillColor = FLinearColor(0.835f, 0.066f, 0.066f, 1.f);
+    : Super(ObjectInitializer) {
+  if (HasAnyFlags(RF_ClassDefaultObject) &&
+      GetClass() == UFighterHealthWidget::StaticClass()) {
+    BackgroundBrush = *FCoreStyle::Get().GetBrush("WhiteBrush");
+    ProgressBarStyle =
+        FCoreStyle::Get().GetWidgetStyle<FProgressBarStyle>("ProgressBar");
+  }
+
+  DisplayedFraction = 1.f;
+  TargetFraction = 1.f;
   TargetFillColor = HealthyFillColor;
   // UUserWidget already supports ticking, so no explicit flag setup is needed.
 }
