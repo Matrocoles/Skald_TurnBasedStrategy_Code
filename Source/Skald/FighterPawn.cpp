@@ -913,13 +913,28 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
     return;
   }
 
-  FRandomStream *RandomStream = nullptr;
+  USkaldGameInstance *GameInstance = nullptr;
   if (UWorld *World = GetWorld()) {
-    if (USkaldGameInstance *GameInstance =
-            Cast<USkaldGameInstance>(World->GetGameInstance())) {
-      RandomStream = &GameInstance->CombatRandomStream;
+    GameInstance = Cast<USkaldGameInstance>(World->GetGameInstance());
+  }
+
+  if (GameInstance) {
+    if (UGridBattleManager *BattleManager = GameInstance->GridBattleManager) {
+      if (BattleManager->IsAwaitingAttackPresentation()) {
+        BattleManager->ReportAttackRejected(
+            this, Target,
+            NSLOCTEXT("SkaldBattle", "AttackPresentationPending",
+                      "Attack results are still playing."));
+        return;
+      }
     }
   }
+
+  FRandomStream *RandomStream = nullptr;
+  if (GameInstance) {
+    RandomStream = &GameInstance->CombatRandomStream;
+  }
+
   if (!RandomStream) {
     return;
   }

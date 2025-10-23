@@ -106,6 +106,10 @@ void UGridBattleManager::InitBattle(const TArray<FFighter>& Attackers, const TAr
     LastInitiativeRollDefender = 0;
 
     UE_LOG(LogSkaldBattle, Log, TEXT("[Battle] Initialised battle: Attackers=%d, Defenders=%d"), AttackerTeam.Num(), DefenderTeam.Num());
+
+    PendingAttackPresentationCount = 0;
+    DeferredPresentationFinishes.Reset();
+    bRoundStartDeferred = false;
 }
 
 FDiceRollResult UGridBattleManager::ResolveAttackDice(const FFighterStats& AttackerStats, const FFighterStats& DefenderStats, FRandomStream& RandomStream)
@@ -398,6 +402,15 @@ void UGridBattleManager::StartRound()
         return;
     }
 
+    if (IsAwaitingAttackPresentation())
+    {
+        bRoundStartDeferred = true;
+        UE_LOG(LogSkaldBattle, Verbose, TEXT("[Battle] StartRound deferred while attack presentation is active."));
+        return;
+    }
+
+    bRoundStartDeferred = false;
+
     bTeamsAssigned = true;
 
     ClearInactiveFighters();
@@ -601,6 +614,13 @@ bool UGridBattleManager::ShouldPauseForInitiativePrompt() const
 void UGridBattleManager::AdvanceTurn()
 {
     UE_LOG(LogSkaldBattle, Verbose, TEXT("[Battle] AdvanceTurn called. Active fighter: %s"), *DescribeFighter(ActiveFighter));
+
+    if (IsAwaitingAttackPresentation())
+    {
+        UE_LOG(LogSkaldBattle, Verbose, TEXT("[Battle] AdvanceTurn deferred while attack presentation is active."));
+        return;
+    }
+
     if (ActiveFighter)
     {
         FinishActivation(ActiveFighter, EGridActivationFinishReason::Auto);
@@ -614,6 +634,8 @@ void UGridBattleManager::AdvanceTurn()
 
 void UGridBattleManager::ReportAttackResolution(AFighterPawn* Attacker, AFighterPawn* Defender, const FDiceRollResult& Result)
 {
+    ++PendingAttackPresentationCount;
+
     const int32 DiceRolled = Result.DiceOutcomes.Num();
     UE_LOG(LogSkaldBattle, Log,
         TEXT("[Battle] Attack resolved: %s -> %s | Dice=%d Hits=%d Crits=%d Misses=%d Damage=%d RemainingHP=%d"),
@@ -631,7 +653,13 @@ void UGridBattleManager::ReportAttackResolution(AFighterPawn* Attacker, AFighter
         }
     }
 
+    const bool bHadListeners = OnAttackResolved.IsBound();
     OnAttackResolved.Broadcast(Attacker, Defender, Result);
+
+    if (!bHadListeners)
+    {
+        NotifyAttackPresentationComplete();
+    }
 }
 
 void UGridBattleManager::ReportSimulatedAttackResolution(const FDiceRollResult& Result)
@@ -687,6 +715,14 @@ bool UGridBattleManager::CanActivateFighter(AFighterPawn* Fighter) const
     if (bAwaitingInitiativeRoll)
     {
         UE_LOG(LogSkaldBattle, Verbose, TEXT("[Battle] CanActivateFighter rejected (Awaiting initiative roll) -> %s"),
+            *DescribeFighter(Fighter));
+        return false;
+    }
+
+    if (IsAwaitingAttackPresentation())
+    {
+        UE_LOG(LogSkaldBattle, Verbose,
+            TEXT("[Battle] CanActivateFighter rejected (Awaiting attack presentation) -> %s"),
             *DescribeFighter(Fighter));
         return false;
     }
@@ -776,6 +812,15 @@ void UGridBattleManager::FinishActivation(AFighterPawn* Fighter, EGridActivation
         return;
     }
 
+    if (IsAwaitingAttackPresentation())
+    {
+        EnqueueDeferredPresentationFinish(FighterToFinish, Reason);
+        UE_LOG(LogSkaldBattle, Verbose,
+            TEXT("[Battle] Deferring FinishActivation for %s until attack presentation completes"),
+            *DescribeFighter(FighterToFinish));
+        return;
+    }
+
     const bool bWasActiveFighter = ActiveFighter == FighterToFinish;
 
     if (bWasActiveFighter)
@@ -820,6 +865,82 @@ void UGridBattleManager::HandleDeferredActivationFinalized(TWeakObjectPtr<AFight
     }
 
     FinishActivation(Fighter, Request.Reason);
+}
+
+void UGridBattleManager::EnqueueDeferredPresentationFinish(AFighterPawn* Fighter, EGridActivationFinishReason Reason)
+{
+    if (!Fighter)
+    {
+        // Treat null entries as the active fighter at resolution time.
+        Fighter = ActiveFighter;
+    }
+
+    if (!DeferredPresentationFinishes.IsEmpty())
+    {
+        for (FDeferredPresentationFinish& Existing : DeferredPresentationFinishes)
+        {
+            if (Existing.Fighter == Fighter)
+            {
+                Existing.Reason = Reason;
+                return;
+            }
+        }
+    }
+
+    FDeferredPresentationFinish& Entry = DeferredPresentationFinishes.AddDefaulted_GetRef();
+    Entry.Fighter = Fighter;
+    Entry.Reason = Reason;
+}
+
+void UGridBattleManager::ProcessDeferredPresentationFinishes()
+{
+    if (IsAwaitingAttackPresentation() || DeferredPresentationFinishes.Num() == 0)
+    {
+        return;
+    }
+
+    TArray<FDeferredPresentationFinish> Requests = MoveTemp(DeferredPresentationFinishes);
+    DeferredPresentationFinishes.Reset();
+
+    for (const FDeferredPresentationFinish& Request : Requests)
+    {
+        AFighterPawn* Fighter = Request.Fighter.Get();
+        FinishActivation(Fighter, Request.Reason);
+    }
+}
+
+void UGridBattleManager::NotifyAttackPresentationComplete()
+{
+    if (PendingAttackPresentationCount <= 0)
+    {
+        UE_LOG(LogSkaldBattle, Verbose,
+            TEXT("[Battle] Received attack presentation completion with no pending presentations."));
+        PendingAttackPresentationCount = 0;
+        ProcessDeferredPresentationFinishes();
+        if (bRoundStartDeferred)
+        {
+            bRoundStartDeferred = false;
+            StartRound();
+        }
+        return;
+    }
+
+    --PendingAttackPresentationCount;
+
+    if (PendingAttackPresentationCount > 0)
+    {
+        return;
+    }
+
+    PendingAttackPresentationCount = 0;
+
+    ProcessDeferredPresentationFinishes();
+
+    if (bRoundStartDeferred)
+    {
+        bRoundStartDeferred = false;
+        StartRound();
+    }
 }
 
 void UGridBattleManager::ClearDeferredActivationTracking(TWeakObjectPtr<AFighterPawn> FighterPtr)

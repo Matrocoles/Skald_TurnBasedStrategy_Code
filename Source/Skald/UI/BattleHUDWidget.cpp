@@ -920,6 +920,10 @@ void UBattleHUDWidget::HandleDiceOutcomeRevealed(
                                   RevealIndex);
 }
 
+bool UBattleHUDWidget::IsCombatPresentationActive() const {
+  return bDiceResolutionActive || ActiveFloaters.Num() > 0;
+}
+
 void UBattleHUDWidget::BeginHealthTextHold(AFighterPawn *Fighter,
                                            int32 DisplayValue,
                                            int32 FinalValue) {

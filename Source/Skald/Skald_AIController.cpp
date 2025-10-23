@@ -845,6 +845,12 @@ void ASkaldAIController::ProcessQueuedActivationIntent() {
     return;
   }
 
+  if (CachedBattleManager.IsValid() &&
+      CachedBattleManager->IsAwaitingAttackPresentation()) {
+    ScheduleNextActivationAttempt();
+    return;
+  }
+
   AFighterPawn *Fighter = PendingActivationFighter.Get();
   if (!ShouldContinueActivation(Fighter)) {
     CompleteFighterActivation();
@@ -957,6 +963,14 @@ void ASkaldAIController::HandleBattleMapStateChanged(bool bInBattleMap) {
 
 void ASkaldAIController::ScheduleTryActivateNextFighter() {
   if (CachedBattleManager.IsValid() &&
+      CachedBattleManager->IsAwaitingAttackPresentation()) {
+    if (UWorld *World = GetWorld()) {
+      World->GetTimerManager().ClearTimer(ActivationGapTimerHandle);
+    }
+    return;
+  }
+
+  if (CachedBattleManager.IsValid() &&
       CachedBattleManager->IsAwaitingInitiativeRoll()) {
     if (UWorld *World = GetWorld()) {
       World->GetTimerManager().ClearTimer(ActivationGapTimerHandle);
@@ -998,6 +1012,10 @@ void ASkaldAIController::TryActivateNextFighter() {
 
   if (!CachedBattleManager.IsValid()) {
     SetupBattleAutomation();
+    return;
+  }
+
+  if (CachedBattleManager->IsAwaitingAttackPresentation()) {
     return;
   }
 
