@@ -978,7 +978,7 @@ void UW_DiceResolutionEntryWidget::ConfigureOutcome(const FDiceRollOutcome& Outc
     {
         if (DieTexture)
         {
-            DiceFaceImage->SetBrushFromTexture(DieTexture, true);
+            DiceFaceImage->SetBrushFromTexture(DieTexture, false);
             DiceFaceImage->SetVisibility(ESlateVisibility::HitTestInvisible);
         }
         else
