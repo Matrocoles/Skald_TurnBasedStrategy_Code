@@ -11,6 +11,8 @@ class UStaticMesh;
 class UStaticMeshComponent;
 class UPrimitiveComponent;
 class UMaterialInstanceDynamic;
+class UDecalComponent;
+class UMaterialInterface;
 class UTextRenderComponent;
 
 /**
@@ -23,6 +25,8 @@ class SKALD_API ATerritory : public AActor
 
 public:
     ATerritory();
+
+    virtual void OnConstruction(const FTransform& Transform) override;
 
     virtual void BeginPlay() override;
 
@@ -77,11 +81,14 @@ public:
 
     /** Mark this territory as selected. */
     UFUNCTION(BlueprintCallable, Category = "Territory")
-    void Select();
+    void Select(int32 SelectingPlayerId = INDEX_NONE);
 
     /** Remove selection state from this territory. */
     UFUNCTION(BlueprintCallable, Category = "Territory")
     void Deselect();
+
+    /** True if the local player should currently see selection visuals. */
+    bool IsSelectionVisibleToLocalPlayer() const;
 
     FORCEINLINE int32 GetTerritoryId() const { return TerritoryID; }
 
@@ -131,6 +138,22 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Territory")
     UTextRenderComponent* LabelComponent = nullptr;
 
+    /** Decal used to visualize local selections. */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Territory|Selection")
+    UDecalComponent* SelectionDecal = nullptr;
+
+    /** Material applied to the territory selection decal. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory|Selection")
+    TObjectPtr<UMaterialInterface> SelectionDecalMaterial = nullptr;
+
+    /** Decal dimensions used when highlighting this territory. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory|Selection")
+    FVector SelectionDecalSize = FVector(64.f, 256.f, 256.f);
+
+    /** Vertical offset applied to the selection decal relative to the mesh. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory|Selection")
+    float SelectionDecalVerticalOffset = 0.f;
+
     /** Dynamic material used for highlighting. */
     UPROPERTY()
     UMaterialInstanceDynamic* DynamicMaterial = nullptr;
@@ -141,6 +164,15 @@ protected:
     /** Whether the territory has been selected. */
     bool bIsSelected = false;
 
+    /** Cached identifier of the player who last selected this territory. */
+    int32 LastSelectingPlayerId = INDEX_NONE;
+
     void UpdateTerritoryColor();
     void UpdateLabel();
+
+    void UpdateSelectionDecalTransform();
+    void ApplySelectionDecalMaterial();
+    void SetSelectionDecalVisible(bool bVisible);
+    void UpdateSelectionVisuals(bool bVisible);
+    bool ShouldShowSelectionVisuals(int32 SelectingPlayerId) const;
 };

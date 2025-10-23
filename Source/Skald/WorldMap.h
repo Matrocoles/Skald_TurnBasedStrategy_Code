@@ -92,6 +92,9 @@ public:
   UPROPERTY(BlueprintReadOnly, Category = "WorldMap")
   ATerritory *SelectedTerritory;
 
+  /** Player who initiated the most recent selection. */
+  int32 SelectedByPlayerId = INDEX_NONE;
+
   /** Event fired whenever SelectTerritory chooses a new territory. */
   UPROPERTY(BlueprintAssignable, Category = "WorldMap")
   FWorldMapTerritorySelected OnTerritorySelected;
@@ -110,10 +113,11 @@ public:
 
   /** Handle territory selection. */
   UFUNCTION(BlueprintCallable, Category = "WorldMap")
-  void SelectTerritory(ATerritory *Territory, bool bPlaySelectionSound = true);
+  void SelectTerritory(ATerritory *Territory, bool bPlaySelectionSound = true,
+                       int32 SelectingPlayerId = INDEX_NONE);
 
   UFUNCTION(NetMulticast, Reliable)
-  void MulticastSelectTerritory(int32 TerritoryID);
+  void MulticastSelectTerritory(int32 TerritoryID, int32 SelectingPlayerId);
 
   /** Generate territories from the assigned data table. */
   UFUNCTION(BlueprintCallable, Category = "WorldMap")

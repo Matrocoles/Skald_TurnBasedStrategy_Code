@@ -479,7 +479,8 @@ ATerritory *AWorldMap::GetTerritoryById(int32 TerritoryId) const {
 }
 
 void AWorldMap::SelectTerritory(ATerritory *Territory,
-                                bool bPlaySelectionSound) {
+                                bool bPlaySelectionSound,
+                                int32 SelectingPlayerId) {
   if (!bIsWorldActive && Territory) {
     UE_LOG(LogSkald, Verbose,
            TEXT("WorldMap %s ignoring selection while inactive"),
@@ -487,7 +488,8 @@ void AWorldMap::SelectTerritory(ATerritory *Territory,
     return;
   }
 
-  if (Territory == SelectedTerritory) {
+  if (Territory == SelectedTerritory &&
+      SelectingPlayerId == SelectedByPlayerId) {
     return;
   }
 
@@ -501,13 +503,16 @@ void AWorldMap::SelectTerritory(ATerritory *Territory,
   }
 
   SelectedTerritory = IsValid(Territory) ? Territory : nullptr;
+  SelectedByPlayerId = SelectedTerritory ? SelectingPlayerId : INDEX_NONE;
+
+  bool bShouldPlaySound = false;
   if (SelectedTerritory) {
-    SelectedTerritory->Select();
+    SelectedTerritory->Select(SelectingPlayerId);
+    bShouldPlaySound = bPlaySelectionSound && TerritorySelectedSound &&
+                      GetNetMode() != NM_DedicatedServer &&
+                      SelectedTerritory->IsSelectionVisibleToLocalPlayer();
   }
 
-  const bool bShouldPlaySound =
-      bPlaySelectionSound && TerritorySelectedSound &&
-      GetNetMode() != NM_DedicatedServer;
   if (bShouldPlaySound) {
     UGameplayStatics::PlaySound2D(this, TerritorySelectedSound);
   }
@@ -515,9 +520,10 @@ void AWorldMap::SelectTerritory(ATerritory *Territory,
   OnTerritorySelected.Broadcast(SelectedTerritory);
 }
 
-void AWorldMap::MulticastSelectTerritory_Implementation(int32 TerritoryID) {
+void AWorldMap::MulticastSelectTerritory_Implementation(int32 TerritoryID,
+                                                        int32 SelectingPlayerId) {
   ATerritory *Terr = GetTerritoryById(TerritoryID);
-  SelectTerritory(Terr);
+  SelectTerritory(Terr, true, SelectingPlayerId);
 }
 
 bool AWorldMap::FindPath(ATerritory *From, ATerritory *To,
