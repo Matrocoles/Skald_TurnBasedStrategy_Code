@@ -473,7 +473,7 @@ private:
     int32 LastInitiativeRollDefender = 0;
 
     /** Duration that initiative dice should remain visible. */
-    static constexpr float InitiativePresentationDelay = 4.f;
+    static constexpr float InitiativePresentationDelay = 2.f;
 
     /** Delay before the AI rolls initiative so the player's result can be shown first. */
     static constexpr float InitiativeAIRollDelay = 1.f;
