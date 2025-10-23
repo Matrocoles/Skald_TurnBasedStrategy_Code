@@ -1186,7 +1186,17 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
 
     GI->SavedTurnIndex = CurrentIndex;
     GI->SavedTurnPlayerId = SavedPlayerId;
-    GI->SavedTurnPhase = CurrentPhase;
+
+    ETurnPhase PhaseToResume = CurrentPhase;
+    if (PhaseToResume != ETurnPhase::Attack) {
+      UE_LOG(LogSkald, Verbose,
+             TEXT("TriggerGridBattle: forcing resume phase to Attack (was %s)."),
+             *UEnum::GetValueAsString(PhaseToResume));
+      PhaseToResume = ETurnPhase::Attack;
+      CurrentPhase = ETurnPhase::Attack;
+    }
+
+    GI->SavedTurnPhase = PhaseToResume;
     GI->bResumeTurns = true;
   }
 
