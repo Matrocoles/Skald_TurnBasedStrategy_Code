@@ -174,8 +174,12 @@ void ASkaldAIController::ProcessCurrentPhase() {
     TurnManager->BroadcastResources(PS);
 
     bAppliedReinforcementsThisStep = true;
-    EndTurn();
-    return;
+    if (TurnManager->HasTurnsStarted()) {
+      TurnManager->AdvancePhase();
+    } else {
+      EndTurn();
+      return;
+    }
   } else if (Phase == ETurnPhase::Attack) {
     ATerritory *BestSource = nullptr;
     ATerritory *BestTarget = nullptr;
