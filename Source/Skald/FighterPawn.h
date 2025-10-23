@@ -11,6 +11,8 @@
 class UGridOverlayComponent;
 class UCapsuleComponent;
 class UTexture2D;
+class USoundBase;
+class UAudioComponent;
 class UFighterActivationWidget;
 class UFighterHealthWidget;
 class UCurveFloat;
@@ -66,6 +68,10 @@ public:
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Movement",
             meta = (ClampMin = "0.0"))
   float MovementStopTolerance = 1.f;
+
+  /** Sound to play while this fighter travels between grid cells. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Audio")
+  TObjectPtr<USoundBase> MovementSound = nullptr;
 
   /** Perform an attack against another fighter. */
   UFUNCTION(BlueprintCallable, Category = "Fighter")
@@ -203,6 +209,11 @@ public:
   UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|UI")
   UWidgetComponent *ActivationWidgetBack;
 
+  /** Audio component used to play looping movement audio. */
+  UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|Audio",
+            meta = (AllowPrivateAccess = "true"))
+  UAudioComponent *MovementAudioComponent = nullptr;
+
   /** Widget class used for the activation indicator. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Fighter|UI")
   TSubclassOf<UUserWidget> ActivationWidgetTemplate;
@@ -333,6 +344,12 @@ private:
 
   /** Rotate the fighter to face from one grid cell towards another. */
   void FaceTowardsCells(const FIntPoint &FromCell, const FIntPoint &ToCell);
+
+  /** Update movement audio playback to reflect current settings. */
+  void RefreshMovementAudioComponent();
+
+  /** Helper to toggle movement state and trigger audio changes. */
+  void SetIsMoving(bool bNewIsMoving);
 
   /** Prepare and cache dynamic materials used for hit feedback. */
   void InitializeDisplayMeshMaterials();
