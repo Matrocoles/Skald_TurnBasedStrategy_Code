@@ -2909,10 +2909,20 @@ void ASkaldPlayerController::HighlightClickedCell(UGridOverlayComponent *Grid,
 
 void ASkaldPlayerController::SetSelectedFighter(AFighterPawn *Fighter,
                                                 bool bForce) {
-  if (!bForce && SelectedFighter == Fighter)
+  AFighterPawn *PreviousSelection = SelectedFighter;
+  if (!bForce && PreviousSelection == Fighter)
     return;
 
+  if (PreviousSelection && PreviousSelection != Fighter) {
+    PreviousSelection->SetSelectionIndicatorVisible(false);
+  }
+
   SelectedFighter = Fighter;
+
+  if (SelectedFighter) {
+    SelectedFighter->SetSelectionIndicatorVisible(true);
+  }
+
   UpdateBattleHUDSelection();
   UpdateBattleHUDButtons();
 }
@@ -2921,6 +2931,9 @@ void ASkaldPlayerController::ClearSelectedFighter() {
   if (!SelectedFighter)
     return;
 
+  if (SelectedFighter) {
+    SelectedFighter->SetSelectionIndicatorVisible(false);
+  }
   SelectedFighter = nullptr;
   UpdateBattleHUDSelection();
   UpdateBattleHUDButtons();
