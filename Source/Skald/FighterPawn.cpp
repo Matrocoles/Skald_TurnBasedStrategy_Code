@@ -29,10 +29,12 @@ constexpr float ActivationWidgetScale = 0.1f;
 constexpr float WidgetMirrorSeparation = 0.5f;
 constexpr float AutoHealthHoldFallbackDelay = 2.f;
 // Delay applied before the first queued attack roll resolves so dice feedback
-// appears quickly after the player commits to an attack.
-constexpr float QueuedAttackFirstRollDelaySeconds = 0.24f;
-// Consistent pacing between any additional dice in the same queued attack.
-constexpr float QueuedAttackAdditionalRollDelaySeconds = 0.2f;
+// appears in sync with the slower UI/VFX reveal cadence after the player
+// commits to an attack.
+constexpr float QueuedAttackFirstRollDelaySeconds = 0.48f;
+// Consistent pacing between any additional dice in the same queued attack to
+// mirror the UI reveal spacing.
+constexpr float QueuedAttackAdditionalRollDelaySeconds = 0.4f;
 }
 
 AFighterPawn::AFighterPawn() : MaxHealth(0) {
