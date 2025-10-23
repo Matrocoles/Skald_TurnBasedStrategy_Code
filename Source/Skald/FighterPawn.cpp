@@ -1,5 +1,6 @@
 #include "FighterPawn.h"
 #include "Blueprint/UserWidget.h"
+#include "Components/AudioComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/WidgetComponent.h"
@@ -8,13 +9,14 @@
 #include "Engine/CollisionProfile.h"
 #include "Engine/Texture2D.h"
 #include "EngineUtils.h"
+#include "Curves/CurveFloat.h"
 #include "GridBattleManager.h"
 #include "GridOverlayComponent.h"
-#include "Curves/CurveFloat.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
 #include "Skald_GameInstance.h"
+#include "Sound/SoundBase.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
 #include "UI/FighterActivationWidget.h"
@@ -116,6 +118,13 @@ AFighterPawn::AFighterPawn() : MaxHealth(0) {
   ActivationWidgetBack->SetCanEverAffectNavigation(false);
   ActivationWidgetBack->SetVisibility(false);
 
+  MovementAudioComponent =
+      CreateDefaultSubobject<UAudioComponent>(TEXT("MovementAudioComponent"));
+  MovementAudioComponent->SetupAttachment(CollisionComponent);
+  MovementAudioComponent->SetAutoActivate(false);
+  MovementAudioComponent->bAutoActivate = false;
+  MovementAudioComponent->bAutoDestroy = false;
+
   HealthWidgetTemplate = UFighterHealthWidget::StaticClass();
 
   ActivationWidgetTemplate = UFighterActivationWidget::StaticClass();
@@ -161,6 +170,8 @@ void AFighterPawn::OnConstruction(const FTransform &Transform) {
           : 0.f;
   const float DesiredYaw = bShouldOverride ? SpawnFacingYaw : IncomingSpawnYaw;
   ApplyFacingYaw(DesiredYaw);
+
+  RefreshMovementAudioComponent();
 }
 
 void AFighterPawn::BeginPlay() {
@@ -217,6 +228,8 @@ void AFighterPawn::BeginPlay() {
 
   BroadcastActionsRemaining();
   UpdateActivationIndicator();
+
+  RefreshMovementAudioComponent();
 
   UpdateMeshOffset();
   RefreshDisplayMeshYawOffset();
@@ -295,7 +308,7 @@ void AFighterPawn::Tick(float DeltaSeconds) {
   if (FVector::DistSquared(NextLocation, MovementTargetLocation) <=
       FMath::Square(EffectiveTolerance)) {
     SetActorLocation(MovementTargetLocation);
-    bIsMoving = false;
+    SetIsMoving(false);
     MovementTargetLocation = GetActorLocation();
   }
 }
@@ -714,10 +727,10 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
 
   if (MovementSpeed <= KINDA_SMALL_NUMBER || bAlreadyAtTarget) {
     SetActorLocation(MovementTargetLocation);
-    bIsMoving = false;
     MovementTargetLocation = GetActorLocation();
+    SetIsMoving(false);
   } else {
-    bIsMoving = true;
+    SetIsMoving(true);
   }
   ActionsRemaining = FMath::Max(0, ActionsRemaining - 1);
 
@@ -1367,4 +1380,30 @@ void AFighterPawn::FaceTowardsCells(const FIntPoint &FromCell,
     const FRotator LookRotation = Direction.Rotation();
     ApplyFacingYaw(LookRotation.Yaw + SpawnFacingYawDelta);
   }
+}
+
+void AFighterPawn::RefreshMovementAudioComponent() {
+  if (!MovementAudioComponent) {
+    return;
+  }
+
+  MovementAudioComponent->SetSound(MovementSound);
+
+  const bool bShouldPlay = bIsMoving && MovementSound;
+  if (bShouldPlay) {
+    if (!MovementAudioComponent->IsPlaying()) {
+      MovementAudioComponent->Play();
+    }
+  } else {
+    MovementAudioComponent->Stop();
+  }
+}
+
+void AFighterPawn::SetIsMoving(bool bNewIsMoving) {
+  if (bIsMoving == bNewIsMoving) {
+    return;
+  }
+
+  bIsMoving = bNewIsMoving;
+  RefreshMovementAudioComponent();
 }
