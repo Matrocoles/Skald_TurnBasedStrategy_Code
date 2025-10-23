@@ -1,8 +1,12 @@
 #include "Territory.h"
+#include "Components/DecalComponent.h"
 #include "Components/PrimitiveComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
 #include "Engine/StaticMesh.h"
+#include "Engine/World.h"
+#include "GameFramework/PlayerController.h"
+#include "GameFramework/PlayerState.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
@@ -81,6 +85,18 @@ ATerritory::ATerritory() {
   LabelComponent->SetRelativeLocation(FVector(0.f, 0.f, 100.f));
   LabelComponent->SetText(FText::GetEmpty());
 
+  SelectionDecal = CreateDefaultSubobject<UDecalComponent>(TEXT("SelectionDecal"));
+  if (SelectionDecal) {
+    SelectionDecal->SetupAttachment(RootComponent);
+    SelectionDecal->SetRelativeRotation(FRotator(-90.f, 0.f, 0.f));
+    SelectionDecal->DecalSize = SelectionDecalSize;
+    SelectionDecal->SetRelativeLocation(
+        FVector(0.f, 0.f, SelectionDecalVerticalOffset));
+    SelectionDecal->SetVisibility(false);
+    SelectionDecal->SetHiddenInGame(true);
+    SelectionDecal->SetCanEverAffectNavigation(false);
+  }
+
   OwningPlayer = nullptr;
   Resources = 0;
   TerritoryID = 0;
@@ -90,8 +106,17 @@ ATerritory::ATerritory() {
   ArmyUnits = 0;
 }
 
+void ATerritory::OnConstruction(const FTransform &Transform) {
+  Super::OnConstruction(Transform);
+
+  UpdateSelectionDecalTransform();
+  ApplySelectionDecalMaterial();
+}
+
 void ATerritory::BeginPlay() {
   Super::BeginPlay();
+
+  ApplySelectionDecalMaterial();
 
   if (!CapitalMesh) {
     CapitalMesh = NewObject<UStaticMeshComponent>(this, TEXT("CapitalMesh"));
@@ -163,32 +188,23 @@ void ATerritory::GetLifetimeReplicatedProps(
   DOREPLIFETIME(ATerritory, bHasTreasure);
 }
 
-void ATerritory::Select() {
-  if (bIsSelected) {
-    return;
+void ATerritory::Select(int32 SelectingPlayerId) {
+  const bool bShouldShow = ShouldShowSelectionVisuals(SelectingPlayerId);
+  LastSelectingPlayerId = SelectingPlayerId;
+
+  if (!bIsSelected && bShouldShow && DynamicMaterial) {
+    // Remember the existing color so it can be restored on deselect
+    DynamicMaterial->GetVectorParameterValue(FName("Color"), DefaultColor);
   }
 
   bIsSelected = true;
-  if (MeshComponent) {
-    MeshComponent->SetRenderCustomDepth(true);
-  }
-  if (DynamicMaterial) {
-    // Remember the existing color so it can be restored on deselect
-    DynamicMaterial->GetVectorParameterValue(FName("Color"), DefaultColor);
-    DynamicMaterial->SetVectorParameterValue(FName("Color"),
-                                             FLinearColor::White);
-  }
+  UpdateSelectionVisuals(bShouldShow);
 }
 
 void ATerritory::Deselect() {
   bIsSelected = false;
-  if (MeshComponent) {
-    MeshComponent->SetRenderCustomDepth(false);
-  }
-  if (DynamicMaterial) {
-    // Restore the color that was in use prior to selection
-    DynamicMaterial->SetVectorParameterValue(FName("Color"), DefaultColor);
-  }
+  LastSelectingPlayerId = INDEX_NONE;
+  UpdateSelectionVisuals(false);
   if (AWorldMap *Map = Cast<AWorldMap>(GetOwner())) {
     if (Map->SelectedTerritory == this) {
       Map->SelectedTerritory = nullptr;
@@ -242,7 +258,7 @@ void ATerritory::HandleMouseEnter(UPrimitiveComponent *TouchedComponent) {
     }
   }
 
-  if (!bIsSelected && MeshComponent) {
+  if (!IsSelectionVisibleToLocalPlayer() && MeshComponent) {
     MeshComponent->SetRenderCustomDepth(true);
   }
 }
@@ -254,7 +270,7 @@ void ATerritory::HandleMouseLeave(UPrimitiveComponent *TouchedComponent) {
     }
   }
 
-  if (!bIsSelected && MeshComponent) {
+  if (!IsSelectionVisibleToLocalPlayer() && MeshComponent) {
     MeshComponent->SetRenderCustomDepth(false);
   }
 }
@@ -320,4 +336,94 @@ void ATerritory::UpdateLabel() {
   const FString Text = FString::Printf(TEXT("%s\nOwner: %s\nUnits: %d"),
                                        *TerritoryName, *OwnerName, ArmyUnits);
   LabelComponent->SetText(FText::FromString(Text));
+}
+
+void ATerritory::UpdateSelectionDecalTransform() {
+  if (!SelectionDecal) {
+    return;
+  }
+
+  SelectionDecal->DecalSize = SelectionDecalSize;
+  SelectionDecal->SetRelativeLocation(
+      FVector(0.f, 0.f, SelectionDecalVerticalOffset));
+}
+
+void ATerritory::ApplySelectionDecalMaterial() {
+  if (!SelectionDecal) {
+    return;
+  }
+
+  if (SelectionDecalMaterial) {
+    SelectionDecal->SetDecalMaterial(SelectionDecalMaterial);
+  }
+}
+
+void ATerritory::SetSelectionDecalVisible(bool bVisible) {
+  if (!SelectionDecal) {
+    return;
+  }
+
+  SelectionDecal->SetVisibility(bVisible);
+  SelectionDecal->SetHiddenInGame(!bVisible);
+}
+
+void ATerritory::UpdateSelectionVisuals(bool bVisible) {
+  if (MeshComponent) {
+    MeshComponent->SetRenderCustomDepth(bVisible);
+  }
+
+  if (DynamicMaterial) {
+    if (bVisible) {
+      DynamicMaterial->SetVectorParameterValue(FName("Color"),
+                                               FLinearColor::White);
+    } else {
+      DynamicMaterial->SetVectorParameterValue(FName("Color"), DefaultColor);
+    }
+  }
+
+  SetSelectionDecalVisible(bVisible);
+}
+
+bool ATerritory::ShouldShowSelectionVisuals(int32 SelectingPlayerId) const {
+  if (SelectingPlayerId == INDEX_NONE) {
+    return true;
+  }
+
+  const UWorld *World = GetWorld();
+  if (!World) {
+    return false;
+  }
+
+  for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It;
+       ++It) {
+    const APlayerController *PC = It->Get();
+    if (!PC || !PC->IsLocalController()) {
+      continue;
+    }
+
+    const ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PC->PlayerState);
+    if (!PS) {
+      continue;
+    }
+
+    if (PS->GetPlayerId() == SelectingPlayerId) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+bool ATerritory::IsSelectionVisibleToLocalPlayer() const {
+  if (!bIsSelected) {
+    return false;
+  }
+
+  return ShouldShowSelectionVisuals(LastSelectingPlayerId);
+}
+
+USoundBase *ATerritory::GetSelectionSound() const { return SelectionSound; }
+
+float ATerritory::GetSelectionSoundVolumeMultiplier() const {
+  return FMath::Max(0.f, SelectionSoundVolumeMultiplier);
 }

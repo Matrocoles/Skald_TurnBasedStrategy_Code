@@ -1730,13 +1730,18 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
     return;
   }
 
+  int32 SelectingPlayerId = INDEX_NONE;
+  if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+    SelectingPlayerId = PS->GetPlayerId();
+  }
+
   if (!WorldMap->IsWorldActive() && TerritoryID >= 0) {
     return;
   }
 
   if (TerritoryID < 0) {
-    WorldMap->SelectTerritory(nullptr, false); // server authority
-    WorldMap->MulticastSelectTerritory(-1); // replicate to all clients
+    WorldMap->SelectTerritory(nullptr, false, SelectingPlayerId); // server
+    WorldMap->MulticastSelectTerritory(-1, SelectingPlayerId); // replicate
     return;
   }
 
@@ -1745,8 +1750,8 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
     return;
   }
 
-  WorldMap->SelectTerritory(Terr, false);          // server authority
-  WorldMap->MulticastSelectTerritory(TerritoryID); // replicate to all clients
+  WorldMap->SelectTerritory(Terr, false, SelectingPlayerId); // server authority
+  WorldMap->MulticastSelectTerritory(TerritoryID, SelectingPlayerId);
 }
 
 void ASkaldPlayerController::ClientSelectTerritory_Implementation(
@@ -1763,7 +1768,11 @@ void ASkaldPlayerController::ClientSelectTerritory_Implementation(
 
   ATerritory *Terr =
       TerritoryID >= 0 ? WorldMap->GetTerritoryById(TerritoryID) : nullptr;
-  WorldMap->SelectTerritory(Terr);
+  int32 SelectingPlayerId = INDEX_NONE;
+  if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+    SelectingPlayerId = PS->GetPlayerId();
+  }
+  WorldMap->SelectTerritory(Terr, true, SelectingPlayerId);
   UE_LOG(LogSkald, Log, TEXT("ClientSelectTerritory <- %d"), TerritoryID);
 }
 
