@@ -8,6 +8,7 @@
 #include "TimerManager.h"
 #include "Delegates/Delegate.h"
 #include "Camera/CameraShakeBase.h"
+#include "UObject/WeakObjectPtr.h"
 #include "Skald_PlayerController.generated.h"
 
 class ATurnManager;
@@ -155,13 +156,17 @@ protected:
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "UI")
   TSubclassOf<UUserWidget> VictoryWidgetClass;
 
-  /** Sound to play for the local player when a tactical round begins. */
+  /** Sound to play for the local player when an initiative prompt appears. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Audio")
   USoundBase *BattleRoundStartSound = nullptr;
 
   /** Sound to play for the local player when their world map turn begins. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Audio")
   USoundBase *WorldTurnStartSound = nullptr;
+
+  /** Sound to play for the local player when their grid battle turn begins. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Audio")
+  USoundBase *BattleTurnStartSound = nullptr;
 
   /** Sound to play when the local player wins the initiative roll. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Audio")
@@ -198,6 +203,14 @@ protected:
   /** Optional faction overrides for high-stakes critical audio. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
   TMap<ESkaldFaction, USoundBase *> HighStakesCriticalFactionSounds;
+
+  /** Default audio cue triggered when a die shows a natural six. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
+  USoundBase *DefaultNaturalSixSound = nullptr;
+
+  /** Optional faction overrides for natural six audio. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
+  TMap<ESkaldFaction, USoundBase *> NaturalSixFactionSounds;
 
   /** Audio cue played when a hit lands. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
@@ -612,4 +625,15 @@ private:
 
   /** Whether the main HUD is waiting for the player to roll strategic initiative. */
   bool bAwaitingStrategicInitiativeRoll = false;
+
+  /** Last strategic round index that triggered the initiative prompt audio. */
+  int32 LastStrategicInitiativeSoundRound = INDEX_NONE;
+
+  /** Last grid battle round index that triggered the initiative prompt audio. */
+  int32 LastBattleInitiativeSoundRound = INDEX_NONE;
+
+  /** State used to avoid replaying the grid turn cue when the prompt has not changed. */
+  int32 LastBattleTurnSoundRound = INDEX_NONE;
+  bool bLastBattleTurnSoundWasAttacker = false;
+  int32 LastBattleTurnSoundAvailableCount = INDEX_NONE;
 };

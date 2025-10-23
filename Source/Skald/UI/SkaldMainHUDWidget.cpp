@@ -1595,8 +1595,6 @@ void USkaldMainHUDWidget::HandlePlayersUpdated() {
 }
 
 void USkaldMainHUDWidget::HandleTurnIndexChanged(int32 /*NewTurnIndex*/) {
-  const int32 PreviousTurnNumber = TurnNumber;
-
   // Derive current player ID and approximate turn number from GameState.
   int32 NewPlayerID = -1;
   int32 NewTurnNumber = TurnNumber;
@@ -1611,16 +1609,10 @@ void USkaldMainHUDWidget::HandleTurnIndexChanged(int32 /*NewTurnIndex*/) {
     }
   }
 
-  const bool bIsNewRound = (NewTurnNumber != PreviousTurnNumber);
-
   // Update cached turn state before refreshing widgets.
   CurrentPlayerID = NewPlayerID;
   TurnNumber = NewTurnNumber;
   ClearStrategicInitiativeWaitIfNeeded();
-
-  if (bIsNewRound && RoundStartSound) {
-    UGameplayStatics::PlaySound2D(this, RoundStartSound);
-  }
 
   // Update widget text and cached state.
   BP_SetTurnText(TurnNumber, CurrentPlayerID);
