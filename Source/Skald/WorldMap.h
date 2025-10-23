@@ -111,6 +111,10 @@ public:
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WorldMap|Audio")
   USoundBase *TerritorySelectedSound = nullptr;
 
+  /** Height offset applied to all registered territory selection decals. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WorldMap|Selection")
+  float TerritorySelectionDecalHeightOffset = 0.f;
+
   /**
    * Handle territory selection. Pass -1 for SelectingPlayerId when the
    * selection is not associated with a specific player (equivalent to

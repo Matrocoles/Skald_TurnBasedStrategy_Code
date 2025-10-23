@@ -30,7 +30,16 @@ AWorldMap::AWorldMap() {
   TerritoryClass = ATerritory::StaticClass();
 }
 
-void AWorldMap::BeginPlay() { Super::BeginPlay(); }
+void AWorldMap::BeginPlay() {
+  Super::BeginPlay();
+
+  for (ATerritory *Territory : Territories) {
+    if (IsValid(Territory)) {
+      Territory->SetSelectionDecalAdditionalHeightOffset(
+          TerritorySelectionDecalHeightOffset);
+    }
+  }
+}
 
 void AWorldMap::SetWorldActive(bool bShouldBeActive) {
   if (bIsWorldActive == bShouldBeActive) {
@@ -466,6 +475,8 @@ bool AWorldMap::GenerateTerritoriesFromTable() {
 void AWorldMap::RegisterTerritory(ATerritory *Territory) {
   if (Territory && !Territories.Contains(Territory)) {
     Territory->SetOwner(this);
+    Territory->SetSelectionDecalAdditionalHeightOffset(
+        TerritorySelectionDecalHeightOffset);
     Territories.Add(Territory);
   }
 }
