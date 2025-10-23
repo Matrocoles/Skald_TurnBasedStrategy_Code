@@ -405,6 +405,14 @@ protected:
     UPROPERTY(BlueprintReadOnly, Category="Battle")
     bool bIsAttackerTurn = true;
 
+    /** True when at least one attack resolution is still being presented to the player. */
+    UFUNCTION(BlueprintPure, Category="Battle")
+    bool IsAwaitingAttackPresentation() const { return PendingAttackPresentationCount > 0; }
+
+    /** Notify the battle manager that the latest attack presentation finished playing. */
+    UFUNCTION(BlueprintCallable, Category="Battle")
+    void NotifyAttackPresentationComplete();
+
 private:
     void ResolveInitiativeRollInternal();
     void ScheduleAIRollIfNeeded();
@@ -420,14 +428,23 @@ private:
     void EvaluateRoundProgress(bool bPreviousWasAttacker);
     void ClearInactiveFighters();
 
+    void HandleDeferredActivationFinalized(TWeakObjectPtr<AFighterPawn> FighterPtr);
+    void ClearDeferredActivationTracking(TWeakObjectPtr<AFighterPawn> FighterPtr);
+
+    void EnqueueDeferredPresentationFinish(AFighterPawn* Fighter, EGridActivationFinishReason Reason);
+    void ProcessDeferredPresentationFinishes();
+
     struct FDeferredActivationFinish
     {
         EGridActivationFinishReason Reason = EGridActivationFinishReason::Auto;
         bool bWasAttacker = true;
     };
 
-    void HandleDeferredActivationFinalized(TWeakObjectPtr<AFighterPawn> FighterPtr);
-    void ClearDeferredActivationTracking(TWeakObjectPtr<AFighterPawn> FighterPtr);
+    struct FDeferredPresentationFinish
+    {
+        TWeakObjectPtr<AFighterPawn> Fighter;
+        EGridActivationFinishReason Reason = EGridActivationFinishReason::Auto;
+    };
 
     // Track both counts and costs separately
     int32 AttackerSurvivorUnitCount = 0;
@@ -483,5 +500,14 @@ private:
 
     /** Handles bound to fighter queued-attack completion delegates. */
     TMap<TWeakObjectPtr<AFighterPawn>, FDelegateHandle> DeferredFinishDelegateHandles;
+
+    /** Finish requests waiting for presentation sequences (dice, floaters, VFX) to complete. */
+    TArray<FDeferredPresentationFinish> DeferredPresentationFinishes;
+
+    /** Number of attack presentations that still need to finish before combat can advance. */
+    int32 PendingAttackPresentationCount = 0;
+
+    /** Whether a round start attempt was deferred while waiting on presentation. */
+    bool bRoundStartDeferred = false;
 };
 

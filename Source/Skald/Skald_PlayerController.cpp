@@ -3316,6 +3316,23 @@ void ASkaldPlayerController::HandleDiceResolutionComplete(
   if (!BattleHudWidget) {
     return;
   }
+
+  {
+    USkaldGameInstance *GI = CachedGameInstance;
+    if (!GI) {
+      GI = GetGameInstance<USkaldGameInstance>();
+      CachedGameInstance = GI;
+    }
+
+    if (GI) {
+      PendingPresentationBattleManager = GI->GridBattleManager;
+    }
+  }
+
+  if (PendingPresentationBattleManager.IsValid()) {
+    ++PendingAttackPresentationNotifications;
+    TryDispatchPendingAttackPresentationNotifications();
+  }
 }
 
 void ASkaldPlayerController::HandleDiceOutcomeRevealed(
@@ -3360,6 +3377,60 @@ void ASkaldPlayerController::HandleAttackRejected(AFighterPawn *Attacker,
   }
 
   NotifyActionError(ReasonString);
+}
+
+void ASkaldPlayerController::TryDispatchPendingAttackPresentationNotifications() {
+  if (PendingAttackPresentationNotifications <= 0) {
+    PendingAttackPresentationNotifications = 0;
+    if (UWorld *World = GetWorld()) {
+      World->GetTimerManager().ClearTimer(BattlePresentationMonitorHandle);
+    }
+    return;
+  }
+
+  UGridBattleManager *BattleManager = PendingPresentationBattleManager.Get();
+  if (!BattleManager) {
+    PendingAttackPresentationNotifications = 0;
+    if (UWorld *World = GetWorld()) {
+      World->GetTimerManager().ClearTimer(BattlePresentationMonitorHandle);
+    }
+    PendingPresentationBattleManager.Reset();
+    return;
+  }
+
+  const bool bPresentationActive =
+      BattleHudWidget && BattleHudWidget->IsCombatPresentationActive();
+
+  if (bPresentationActive) {
+    if (UWorld *World = GetWorld()) {
+      FTimerManager &TimerManager = World->GetTimerManager();
+      if (!TimerManager.IsTimerActive(BattlePresentationMonitorHandle)) {
+        TimerManager.SetTimer(BattlePresentationMonitorHandle, this,
+                              &ASkaldPlayerController::HandlePendingPresentationTimerTick,
+                              0.05f, true);
+      }
+    }
+    return;
+  }
+
+  BattleManager->NotifyAttackPresentationComplete();
+  PendingAttackPresentationNotifications =
+      FMath::Max(0, PendingAttackPresentationNotifications - 1);
+
+  if (PendingAttackPresentationNotifications > 0) {
+    TryDispatchPendingAttackPresentationNotifications();
+    return;
+  }
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(BattlePresentationMonitorHandle);
+  }
+
+  PendingPresentationBattleManager.Reset();
+}
+
+void ASkaldPlayerController::HandlePendingPresentationTimerTick() {
+  TryDispatchPendingAttackPresentationNotifications();
 }
 
 bool ASkaldPlayerController::IsFriendlyFighter(const AFighterPawn *Fighter) const {

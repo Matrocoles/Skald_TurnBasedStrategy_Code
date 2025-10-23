@@ -608,6 +608,8 @@ private:
                             const FText &Reason);
   bool IsFriendlyFighter(const AFighterPawn *Fighter) const;
   void DetermineControlledBattleSide();
+  void TryDispatchPendingAttackPresentationNotifications();
+  void HandlePendingPresentationTimerTick();
 
   UPROPERTY()
   TObjectPtr<AFighterPawn> SelectedFighter;
@@ -644,4 +646,13 @@ private:
   int32 LastBattleTurnSoundRound = INDEX_NONE;
   bool bLastBattleTurnSoundWasAttacker = false;
   int32 LastBattleTurnSoundAvailableCount = INDEX_NONE;
+
+  /** Timer that polls for combat presentation completion (dice + floaters). */
+  FTimerHandle BattlePresentationMonitorHandle;
+
+  /** Number of pending presentation completions awaiting acknowledgment. */
+  int32 PendingAttackPresentationNotifications = 0;
+
+  /** Cached battle manager awaiting presentation completion notification. */
+  TWeakObjectPtr<UGridBattleManager> PendingPresentationBattleManager;
 };

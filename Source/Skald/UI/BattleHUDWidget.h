@@ -101,6 +101,10 @@ public:
   UPROPERTY(BlueprintAssignable, Category = "Skald|Battle|Events")
   FOnDiceOutcomeRevealed OnDiceOutcomeRevealed;
 
+  /** Returns true while dice resolutions or combat floaters are still animating. */
+  UFUNCTION(BlueprintPure, Category = "Skald|Battle")
+  bool IsCombatPresentationActive() const;
+
   /** Move action button bound from the blueprint. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
   UButton *MoveButton;
