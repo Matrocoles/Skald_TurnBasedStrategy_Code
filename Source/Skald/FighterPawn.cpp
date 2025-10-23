@@ -132,7 +132,6 @@ AFighterPawn::AFighterPawn() : MaxHealth(0) {
   SelectionDecal->DecalSize = SelectionDecalSizeSingleCell;
   SelectionDecal->SetHiddenInGame(true);
   SelectionDecal->SetVisibility(false);
-  SelectionDecal->SetCollisionEnabled(ECollisionEnabled::NoCollision);
   SelectionDecal->SetCanEverAffectNavigation(false);
 
   MovementAudioComponent =
