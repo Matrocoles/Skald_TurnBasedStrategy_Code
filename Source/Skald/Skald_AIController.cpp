@@ -81,6 +81,7 @@ void ASkaldAIController::BeginPlay() {
 void ASkaldAIController::StartTurn() {
   DecisionIterationCount = 0;
   bAwaitingBattleTransition = false;
+  bAppliedReinforcementsThisStep = false;
   ClearDecisionTimers();
   MakeAIDecision();
 }
@@ -173,6 +174,7 @@ void ASkaldAIController::ProcessCurrentPhase() {
     TurnManager->BroadcastResources(PS);
 
     TurnManager->AdvancePhase();
+    bAppliedReinforcementsThisStep = true;
   } else if (Phase == ETurnPhase::Attack) {
     ATerritory *BestSource = nullptr;
     ATerritory *BestTarget = nullptr;
@@ -321,7 +323,13 @@ void ASkaldAIController::ProcessCurrentPhase() {
   }
 
   BroadcastEnemyTurnStatus(FString(EnemyPlanningMessage));
-  ScheduleNextDecisionStep(EnemyTurnStepDelay);
+  float NextDecisionDelay = EnemyTurnStepDelay;
+  if (bAppliedReinforcementsThisStep) {
+    NextDecisionDelay = ReinforcementPostDeployDelay;
+    bAppliedReinforcementsThisStep = false;
+  }
+
+  ScheduleNextDecisionStep(NextDecisionDelay);
 }
 
 void ASkaldAIController::ScheduleNextDecisionStep(float DelaySeconds) {
