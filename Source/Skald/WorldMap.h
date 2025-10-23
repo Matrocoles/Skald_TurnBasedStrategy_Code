@@ -111,10 +111,14 @@ public:
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WorldMap|Audio")
   USoundBase *TerritorySelectedSound = nullptr;
 
-  /** Handle territory selection. */
+  /**
+   * Handle territory selection. Pass -1 for SelectingPlayerId when the
+   * selection is not associated with a specific player (equivalent to
+   * INDEX_NONE).
+   */
   UFUNCTION(BlueprintCallable, Category = "WorldMap")
   void SelectTerritory(ATerritory *Territory, bool bPlaySelectionSound = true,
-                       int32 SelectingPlayerId = INDEX_NONE);
+                       int32 SelectingPlayerId = -1);
 
   UFUNCTION(NetMulticast, Reliable)
   void MulticastSelectTerritory(int32 TerritoryID, int32 SelectingPlayerId);

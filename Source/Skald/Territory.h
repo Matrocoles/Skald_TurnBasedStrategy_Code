@@ -80,9 +80,12 @@ public:
     bool bHasTreasure = false;
 
 
-    /** Mark this territory as selected. */
+    /**
+     * Mark this territory as selected. Pass -1 to indicate no specific
+     * selecting player (equivalent to INDEX_NONE).
+     */
     UFUNCTION(BlueprintCallable, Category = "Territory")
-    void Select(int32 SelectingPlayerId = INDEX_NONE);
+    void Select(int32 SelectingPlayerId = -1);
 
     /** Remove selection state from this territory. */
     UFUNCTION(BlueprintCallable, Category = "Territory")
