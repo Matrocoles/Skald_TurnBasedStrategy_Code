@@ -14,6 +14,7 @@ class UMaterialInstanceDynamic;
 class UDecalComponent;
 class UMaterialInterface;
 class UTextRenderComponent;
+class USoundBase;
 
 /**
  * Actor representing a single territory on the world map.
@@ -90,6 +91,12 @@ public:
     /** True if the local player should currently see selection visuals. */
     bool IsSelectionVisibleToLocalPlayer() const;
 
+    /** Sound to play when this territory becomes selected locally, if set. */
+    USoundBase *GetSelectionSound() const;
+
+    /** Volume multiplier applied when playing the selection sound. */
+    float GetSelectionSoundVolumeMultiplier() const;
+
     FORCEINLINE int32 GetTerritoryId() const { return TerritoryID; }
 
     /** Check if another territory is adjacent to this one. */
@@ -153,6 +160,14 @@ protected:
     /** Vertical offset applied to the selection decal relative to the mesh. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory|Selection")
     float SelectionDecalVerticalOffset = 0.f;
+
+    /** Optional sound played when this territory becomes selected. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory|Selection")
+    TObjectPtr<USoundBase> SelectionSound = nullptr;
+
+    /** Volume multiplier for the selection sound. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory|Selection", meta = (ClampMin = "0.0"))
+    float SelectionSoundVolumeMultiplier = 1.f;
 
     /** Dynamic material used for highlighting. */
     UPROPERTY()

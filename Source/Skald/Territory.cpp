@@ -421,3 +421,9 @@ bool ATerritory::IsSelectionVisibleToLocalPlayer() const {
 
   return ShouldShowSelectionVisuals(LastSelectingPlayerId);
 }
+
+USoundBase *ATerritory::GetSelectionSound() const { return SelectionSound; }
+
+float ATerritory::GetSelectionSoundVolumeMultiplier() const {
+  return FMath::Max(0.f, SelectionSoundVolumeMultiplier);
+}

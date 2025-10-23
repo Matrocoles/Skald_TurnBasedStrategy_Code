@@ -506,15 +506,25 @@ void AWorldMap::SelectTerritory(ATerritory *Territory,
   SelectedByPlayerId = SelectedTerritory ? SelectingPlayerId : INDEX_NONE;
 
   bool bShouldPlaySound = false;
+  USoundBase *SoundToPlay = nullptr;
+  float VolumeMultiplier = 1.f;
   if (SelectedTerritory) {
     SelectedTerritory->Select(SelectingPlayerId);
-    bShouldPlaySound = bPlaySelectionSound && TerritorySelectedSound &&
+
+    SoundToPlay = SelectedTerritory->GetSelectionSound();
+    if (SoundToPlay) {
+      VolumeMultiplier = SelectedTerritory->GetSelectionSoundVolumeMultiplier();
+    } else {
+      SoundToPlay = TerritorySelectedSound;
+    }
+
+    bShouldPlaySound = bPlaySelectionSound && SoundToPlay &&
                       GetNetMode() != NM_DedicatedServer &&
                       SelectedTerritory->IsSelectionVisibleToLocalPlayer();
   }
 
   if (bShouldPlaySound) {
-    UGameplayStatics::PlaySound2D(this, TerritorySelectedSound);
+    UGameplayStatics::PlaySound2D(this, SoundToPlay, VolumeMultiplier);
   }
 
   OnTerritorySelected.Broadcast(SelectedTerritory);
