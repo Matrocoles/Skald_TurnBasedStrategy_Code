@@ -80,8 +80,6 @@ class SKALD_API AWorldMap : public AActor {
   GENERATED_BODY()
 
 public:
-  enum { DefaultSelectingPlayerId = INDEX_NONE };
-
   AWorldMap();
 
   virtual void BeginPlay() override;
@@ -116,7 +114,7 @@ public:
   /** Handle territory selection. */
   UFUNCTION(BlueprintCallable, Category = "WorldMap")
   void SelectTerritory(ATerritory *Territory, bool bPlaySelectionSound = true,
-                       int32 SelectingPlayerId = DefaultSelectingPlayerId);
+                       int32 SelectingPlayerId = INDEX_NONE);
 
   UFUNCTION(NetMulticast, Reliable)
   void MulticastSelectTerritory(int32 TerritoryID, int32 SelectingPlayerId);
