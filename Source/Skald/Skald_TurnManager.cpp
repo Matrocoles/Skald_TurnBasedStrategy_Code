@@ -1782,6 +1782,44 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
     return;
   }
 
+  auto ResolvePlayerById = [&](int32 PlayerId) -> ASkaldPlayerState * {
+    if (PlayerId <= 0) {
+      return nullptr;
+    }
+    if (ASkaldGameState *GS = GetWorld()->GetGameState<ASkaldGameState>()) {
+      return GS->GetPlayerById(PlayerId);
+    }
+    return nullptr;
+  };
+
+  ASkaldPlayerState *AttackerPS = ResolvePlayerById(Battle.AttackerPlayerID);
+  ASkaldPlayerState *DefenderPS = ResolvePlayerById(Battle.DefenderPlayerID);
+
+  const bool bSourceOwnedByAttacker =
+      (Source && AttackerPS && Source->OwningPlayer == AttackerPS);
+  const bool bTargetOwnedByDefender =
+      (Target && DefenderPS && Target->OwningPlayer == DefenderPS);
+  const bool bSourceOwnedByDefender =
+      (Source && DefenderPS && Source->OwningPlayer == DefenderPS);
+  const bool bTargetOwnedByAttacker =
+      (Target && AttackerPS && Target->OwningPlayer == AttackerPS);
+
+  if (!bSourceOwnedByAttacker && bTargetOwnedByAttacker &&
+      bSourceOwnedByDefender && !bTargetOwnedByDefender) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("ResolveGridBattleResult detected inverted territories; swapping Source/Target (From=%d Target=%d)."),
+           FromTerritoryID, TargetTerritoryID);
+
+    Swap(Source, Target);
+    Swap(FromTerritoryID, TargetTerritoryID);
+    Battle.FromTerritoryID = FromTerritoryID;
+    Battle.TargetTerritoryID = TargetTerritoryID;
+    PendingBattle = Battle;
+    if (GI) {
+      GI->PendingBattle = Battle;
+    }
+  }
+
   GetWorld()->GetTimerManager().ClearTimer(
       PendingBattleResolutionRetryHandle);
 
@@ -2165,6 +2203,26 @@ void ATurnManager::EndCurrentPhase() {
   }
 
   if (bArmyPlacement) {
+    bool bBlockAdvance = false;
+    if (ASkaldGameState *GS = GetWorld()->GetGameState<ASkaldGameState>()) {
+      if (GS->PlayerArray.IsValidIndex(GS->CurrentTurnIndex)) {
+        if (ASkaldPlayerState *ActivePS =
+                Cast<ASkaldPlayerState>(GS->PlayerArray[GS->CurrentTurnIndex])) {
+          if (!ActivePS->bIsAI && ActivePS->DeployableUnits > 0) {
+            bBlockAdvance = true;
+            UE_LOG(LogSkald, Verbose,
+                   TEXT("EndCurrentPhase blocked: Human player %s still has %d units to place."),
+                   *ActivePS->GetResolvedPlayerName(TEXT("EndCurrentPhase_ArmyPlacement")),
+                   ActivePS->DeployableUnits);
+          }
+        }
+      }
+    }
+
+    if (bBlockAdvance) {
+      return;
+    }
+
     if (ASkaldGameMode *GM = GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
       GM->AdvanceArmyPlacement();
     }
