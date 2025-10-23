@@ -94,9 +94,16 @@ private:
   /** Tracks the number of decision steps processed this turn. */
   int32 DecisionIterationCount = 0;
 
+  /** Tracks whether reinforcements were deployed during the current step. */
+  bool bAppliedReinforcementsThisStep = false;
+
   /** Time between AI phase processing steps on the world map. */
   UPROPERTY(EditAnywhere, Category = "Turn|AI", meta = (ClampMin = "0.0"))
   float EnemyTurnStepDelay = 0.75f;
+
+  /** Additional delay after AI reinforcements deploy to allow UI updates. */
+  UPROPERTY(EditAnywhere, Category = "Turn|AI", meta = (ClampMin = "0.0"))
+  float ReinforcementPostDeployDelay = 2.0f;
 
   /** Time between polls while waiting for a battle travel transition. */
   UPROPERTY(EditAnywhere, Category = "Turn|AI", meta = (ClampMin = "0.0"))
