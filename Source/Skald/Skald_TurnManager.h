@@ -141,6 +141,10 @@ public:
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Turn")
   ETurnPhase GetCurrentPhase() const { return CurrentPhase; }
 
+  /** Returns true when the turn sequence has already been initialised. */
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Turn")
+  bool HasTurnsStarted() const { return bHasTurnsStarted; }
+
   /** Event fired when the world state has changed. */
   UPROPERTY(BlueprintAssignable, Category = "Turn")
   FSkaldWorldStateChanged OnWorldStateChanged;
@@ -237,4 +241,7 @@ protected:
   bool CapturePendingBattleResolution(USkaldGameInstance *GameInstance);
 
   bool bBattleReturnPending = false;
+
+  /** Tracks whether StartTurns (or a resume) has successfully kicked off the turn loop. */
+  bool bHasTurnsStarted = false;
 };

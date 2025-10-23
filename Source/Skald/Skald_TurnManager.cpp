@@ -765,6 +765,7 @@ void ATurnManager::StartArmyPlacementPhase() {
 
   CurrentPhase = ETurnPhase::ArmyPlacement;
   CurrentIndex = 0;
+  bHasTurnsStarted = false;
   BroadcastCurrentPhase();
 }
 
@@ -878,6 +879,7 @@ bool ATurnManager::TryResumeSavedTurnState(USkaldGameInstance *GameInstance) {
 
   SyncGameStateTurnIndex();
   Controller->StartTurn();
+  bHasTurnsStarted = true;
   const bool bBroadcasted = BroadcastCurrentPhase();
   if (!bBroadcasted) {
     QueuePhaseBroadcastRetry(CurrentPhase);
@@ -977,6 +979,7 @@ void ATurnManager::StartTurns(ASkaldPlayerController *StartingController) {
 
   SyncGameStateTurnIndex();
   CurrentController->StartTurn();
+  bHasTurnsStarted = true;
   if (ASkaldGameMode *GM = GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
     GM->CheckVictoryConditions();
   }
