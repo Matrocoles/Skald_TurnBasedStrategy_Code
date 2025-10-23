@@ -293,7 +293,10 @@ void AFighterPawn::Tick(float DeltaSeconds) {
 
   UpdateHitFlash(DeltaSeconds);
 
-  if (!bIsMoving) {
+  const bool bShouldRunMovement =
+      bIsMoving && (HasAuthority() || IsLocallyControlled());
+
+  if (!bShouldRunMovement) {
     return;
   }
 
