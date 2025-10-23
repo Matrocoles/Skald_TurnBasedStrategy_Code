@@ -1047,9 +1047,68 @@ void ASkaldPlayerController::HandleActiveFighterChanged(
       Grid->ClearSelectionHighlight();
     }
   }
+
+  if (!NewFighter && IsLocalController() && BattleTurnStartSound) {
+    USkaldGameInstance *GI = CachedGameInstance;
+    if (!GI) {
+      GI = GetGameInstance<USkaldGameInstance>();
+      CachedGameInstance = GI;
+    }
+
+    UGridBattleManager *BattleManager = GI ? GI->GridBattleManager : nullptr;
+    if (BattleManager && !BattleManager->IsAwaitingInitiativeRoll()) {
+      const bool bAttackerTurn = BattleManager->IsAttackerTurn();
+      const bool bFriendlyTurn =
+          (bAttackerTurn && bControlsAttackerSide) ||
+          (!bAttackerTurn && bControlsDefenderSide);
+
+      if (bFriendlyTurn) {
+        int32 AvailableFriendlyFighters = 0;
+
+        if (UWorld *World = GetWorld()) {
+          for (TActorIterator<AFighterPawn> It(World); It; ++It) {
+            AFighterPawn *Candidate = *It;
+            if (!Candidate || !Candidate->IsAlive()) {
+              continue;
+            }
+
+            if (!IsFriendlyFighter(Candidate)) {
+              continue;
+            }
+
+            if (Candidate->bIsAttacker != bAttackerTurn) {
+              continue;
+            }
+
+            if (Candidate->HasActivatedThisRound()) {
+              continue;
+            }
+
+            ++AvailableFriendlyFighters;
+          }
+        }
+
+        if (AvailableFriendlyFighters > 0) {
+          const int32 CurrentRound =
+              FMath::Max(BattleManager->GetCurrentRound(), 1);
+
+          if (LastBattleTurnSoundRound != CurrentRound ||
+              bLastBattleTurnSoundWasAttacker != bAttackerTurn ||
+              LastBattleTurnSoundAvailableCount != AvailableFriendlyFighters) {
+            UGameplayStatics::PlaySound2D(this, BattleTurnStartSound);
+            LastBattleTurnSoundRound = CurrentRound;
+            bLastBattleTurnSoundWasAttacker = bAttackerTurn;
+            LastBattleTurnSoundAvailableCount = AvailableFriendlyFighters;
+          }
+        }
+      }
+    }
+  }
 }
 
 void ASkaldPlayerController::DetectBattleMap() {
+  const bool bWasBattleMap = bIsBattleMap;
+
   bool bDetectedBattleMap = false;
 
   if (!CachedGameInstance) {
@@ -1107,6 +1166,14 @@ void ASkaldPlayerController::DetectBattleMap() {
   }
 
   bIsBattleMap = bDetectedBattleMap;
+
+  if (bIsBattleMap && !bWasBattleMap) {
+    LastStrategicInitiativeSoundRound = INDEX_NONE;
+    LastBattleInitiativeSoundRound = INDEX_NONE;
+    LastBattleTurnSoundRound = INDEX_NONE;
+    bLastBattleTurnSoundWasAttacker = false;
+    LastBattleTurnSoundAvailableCount = INDEX_NONE;
+  }
 
   if (bIsBattleMap) {
     HideOverworldHUDForBattle();
@@ -2584,16 +2651,16 @@ void ASkaldPlayerController::HandleRightClick() {
 
 void ASkaldPlayerController::HandleRoundStarted(int32 RoundNumber,
                                                 ESkaldFaction InitiativeWinner) {
-  if (IsLocalController() && BattleRoundStartSound) {
-    UGameplayStatics::PlaySound2D(this, BattleRoundStartSound);
-  }
-
   if (BattleHudWidget) {
     BattleHudWidget->HideInitiativePrompt();
   }
   DetermineControlledBattleSide();
 
   LastLocalInitiativeRoll = 0;
+
+  LastBattleTurnSoundRound = INDEX_NONE;
+  bLastBattleTurnSoundWasAttacker = false;
+  LastBattleTurnSoundAvailableCount = INDEX_NONE;
 
   LockedActiveFighter = nullptr;
   ClearSelectedFighter();
@@ -2607,6 +2674,14 @@ void ASkaldPlayerController::HandleRoundStarted(int32 RoundNumber,
 void ASkaldPlayerController::HandleInitiativePhaseStarted(int32 RoundNumber) {
   if (!BattleHudWidget) {
     return;
+  }
+
+  if (IsLocalController() && BattleRoundStartSound) {
+    const int32 EffectiveRound = RoundNumber > 0 ? RoundNumber : 1;
+    if (LastBattleInitiativeSoundRound != EffectiveRound) {
+      UGameplayStatics::PlaySound2D(this, BattleRoundStartSound);
+      LastBattleInitiativeSoundRound = EffectiveRound;
+    }
   }
 
   LastLocalInitiativeRoll = 0;
@@ -2727,10 +2802,6 @@ void ASkaldPlayerController::ShowPendingStrategicInitiativeResult() {
   MainHUD->ShowStrategicInitiativeRoll(PendingStrategicInitiativeRoll, 2.f);
   MainHUD->SetAwaitingStrategicInitiative(false);
 
-  if (MainHUD->RoundStartSound) {
-    UGameplayStatics::PlaySound2D(this, MainHUD->RoundStartSound);
-  }
-
   if (bPendingStrategicInitiativeWin && InitiativeWinSound && IsLocalController()) {
     UGameplayStatics::PlaySound2D(this, InitiativeWinSound);
   }
@@ -2756,6 +2827,14 @@ void ASkaldPlayerController::ClientPromptStrategicInitiative_Implementation(
   bAwaitingStrategicInitiativeRoll = true;
 
   ShowMainHUD();
+
+  if (MainHUD && MainHUD->RoundStartSound) {
+    const int32 EffectiveRound = RoundNumber > 0 ? RoundNumber : 1;
+    if (LastStrategicInitiativeSoundRound != EffectiveRound) {
+      UGameplayStatics::PlaySound2D(this, MainHUD->RoundStartSound);
+      LastStrategicInitiativeSoundRound = EffectiveRound;
+    }
+  }
 
   if (MainHUD) {
     const FText PromptText = NSLOCTEXT("Skald", "StrategicInitiativePrompt",
@@ -3063,6 +3142,39 @@ void ASkaldPlayerController::PlayDiceOutcomeFeedback(
                                             .Rotation()
                                       : FRotator::ZeroRotator;
 
+  if (Outcome.RollValue == 6) {
+    USoundBase *NaturalSixSound = nullptr;
+    UNiagaraSystem *NaturalSixEffect = nullptr;
+    if (Attacker && Attacker->Faction != ESkaldFaction::None) {
+      if (USoundBase **FactionSound =
+              NaturalSixFactionSounds.Find(Attacker->Faction)) {
+        NaturalSixSound = *FactionSound;
+      }
+      if (UNiagaraSystem **FactionEffect =
+              NaturalSixFactionEffects.Find(Attacker->Faction)) {
+        NaturalSixEffect = *FactionEffect;
+      }
+    }
+
+    if (!NaturalSixSound) {
+      NaturalSixSound = DefaultNaturalSixSound;
+    }
+
+    if (!NaturalSixEffect) {
+      NaturalSixEffect = DefaultNaturalSixEffect;
+    }
+
+    if (NaturalSixEffect) {
+      UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+          World, NaturalSixEffect, ImpactLocation, ImpactRotation);
+    }
+
+    if (NaturalSixSound) {
+      UGameplayStatics::PlaySoundAtLocation(this, NaturalSixSound,
+                                            ImpactLocation);
+    }
+  }
+
   if (Outcome.bHit) {
     if (HitImpactEffect) {
       UNiagaraFunctionLibrary::SpawnSystemAtLocation(
@@ -3273,6 +3385,11 @@ void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,
   LastLocalInitiativeRoll = 0;
   bControlsAttackerSide = false;
   bControlsDefenderSide = false;
+  LastStrategicInitiativeSoundRound = INDEX_NONE;
+  LastBattleInitiativeSoundRound = INDEX_NONE;
+  LastBattleTurnSoundRound = INDEX_NONE;
+  bLastBattleTurnSoundWasAttacker = false;
+  LastBattleTurnSoundAvailableCount = INDEX_NONE;
 
   if (BattleHudWidget) {
     BattleHudWidget->RemoveFromParent();
