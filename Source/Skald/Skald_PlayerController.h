@@ -212,6 +212,14 @@ protected:
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
   TMap<ESkaldFaction, USoundBase *> NaturalSixFactionSounds;
 
+  /** Default Niagara effect triggered when a die shows a natural six. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
+  UNiagaraSystem *DefaultNaturalSixEffect = nullptr;
+
+  /** Optional faction overrides for natural six effects. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
+  TMap<ESkaldFaction, UNiagaraSystem *> NaturalSixFactionEffects;
+
   /** Audio cue played when a hit lands. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
   USoundBase *HitImpactSound = nullptr;

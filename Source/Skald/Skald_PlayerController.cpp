@@ -3144,15 +3144,29 @@ void ASkaldPlayerController::PlayDiceOutcomeFeedback(
 
   if (Outcome.RollValue == 6) {
     USoundBase *NaturalSixSound = nullptr;
+    UNiagaraSystem *NaturalSixEffect = nullptr;
     if (Attacker && Attacker->Faction != ESkaldFaction::None) {
       if (USoundBase **FactionSound =
               NaturalSixFactionSounds.Find(Attacker->Faction)) {
         NaturalSixSound = *FactionSound;
       }
+      if (UNiagaraSystem **FactionEffect =
+              NaturalSixFactionEffects.Find(Attacker->Faction)) {
+        NaturalSixEffect = *FactionEffect;
+      }
     }
 
     if (!NaturalSixSound) {
       NaturalSixSound = DefaultNaturalSixSound;
+    }
+
+    if (!NaturalSixEffect) {
+      NaturalSixEffect = DefaultNaturalSixEffect;
+    }
+
+    if (NaturalSixEffect) {
+      UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+          World, NaturalSixEffect, ImpactLocation, ImpactRotation);
     }
 
     if (NaturalSixSound) {
