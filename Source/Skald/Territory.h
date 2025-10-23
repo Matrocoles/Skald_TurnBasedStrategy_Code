@@ -25,6 +25,8 @@ class SKALD_API ATerritory : public AActor
     GENERATED_BODY()
 
 public:
+    enum { DefaultSelectingPlayerId = INDEX_NONE };
+
     ATerritory();
 
     virtual void OnConstruction(const FTransform& Transform) override;
@@ -82,7 +84,7 @@ public:
 
     /** Mark this territory as selected. */
     UFUNCTION(BlueprintCallable, Category = "Territory")
-    void Select(int32 SelectingPlayerId = INDEX_NONE);
+    void Select(int32 SelectingPlayerId = DefaultSelectingPlayerId);
 
     /** Remove selection state from this territory. */
     UFUNCTION(BlueprintCallable, Category = "Territory")
