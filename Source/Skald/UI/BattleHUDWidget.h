@@ -258,6 +258,9 @@ public:
                          bool bUseMissStyling = false,
                          float LifetimeOverride = -1.f);
 
+  /** Display a short-lived MISS tag for the supplied defender. */
+  void ShowMissTag(class AFighterPawn *Target);
+
   /** Helper used by attack resolution events to show damage/miss floaters. */
   UFUNCTION(BlueprintCallable, Category="Skald|HUD")
   void ShowAttackResultFloater(class AFighterPawn *Target,

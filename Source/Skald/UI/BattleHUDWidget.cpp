@@ -689,6 +689,45 @@ void UBattleHUDWidget::ShowCombatFloater(const FVector &WorldLocation,
   }
 }
 
+void UBattleHUDWidget::ShowMissTag(AFighterPawn *Target) {
+  if (!Target) {
+    return;
+  }
+
+  const float CapsuleHalfHeight = Target->GetSimpleCollisionHalfHeight();
+  const float AnchorHeight = CapsuleHalfHeight > KINDA_SMALL_NUMBER
+                                 ? CapsuleHalfHeight
+                                 : 88.f;
+  const FVector AnchorLocation =
+      Target->GetActorLocation() +
+      FVector(0.f, 0.f, AnchorHeight + FloaterAnchorHeightOffset);
+
+  const int32 NewEntryIndex = ActiveFloaters.Num();
+  const FText MissLabel =
+      NSLOCTEXT("SkaldBattle", "DiceMissTag", "MISS");
+  ShowCombatFloater(AnchorLocation, MissLabel, MissFloaterColor, 0.9f, true,
+                    0.8f);
+
+  if (!ActiveFloaters.IsValidIndex(NewEntryIndex)) {
+    return;
+  }
+
+  FBattleActiveFloater &Entry = ActiveFloaters[NewEntryIndex];
+  const float DriftDenominator = FMath::Max(FloaterHorizontalDrift, 1.f);
+  const float DriftMagnitude = FMath::RandRange(10.f, 16.f) / DriftDenominator;
+  const float DriftDirection = FMath::RandBool() ? 1.f : -1.f;
+  Entry.HorizontalDirection = DriftDirection * DriftMagnitude;
+  Entry.InitialOffset = FVector2D(FMath::RandRange(-6.f, 6.f),
+                                  FMath::RandRange(-4.f, 4.f));
+  Entry.Scale = 0.9f;
+  Entry.FadeDuration = FMath::Min(Entry.FadeDuration, 0.28f);
+
+  if (UW_FloatingText *Floater = Entry.Floater.Get()) {
+    Floater->UpdateProjection(Entry.AnchorLocation, Entry.InitialOffset,
+                              FloaterClampMargin);
+  }
+}
+
 void UBattleHUDWidget::ShowAttackResultFloater(AFighterPawn *Target,
                                                const FDiceRollResult &Result) {
   if (!Target) {
@@ -868,6 +907,12 @@ void UBattleHUDWidget::HandleDiceOutcomeRevealed(
   if (!bDiceResolutionActive) {
     OnDiceOutcomeRevealed.Broadcast(nullptr, nullptr, Outcome, RevealIndex);
     return;
+  }
+
+  if (!Outcome.bHit) {
+    if (AFighterPawn *Defender = ActiveDiceResolution.Defender.Get()) {
+      ShowMissTag(Defender);
+    }
   }
 
   OnDiceOutcomeRevealed.Broadcast(ActiveDiceResolution.Attacker.Get(),

@@ -28,9 +28,9 @@ constexpr float WidgetMirrorSeparation = 0.5f;
 constexpr float AutoHealthHoldFallbackDelay = 2.f;
 // Delay applied before the first queued attack roll resolves so dice feedback
 // appears quickly after the player commits to an attack.
-constexpr float QueuedAttackFirstRollDelaySeconds = 0.2f;
+constexpr float QueuedAttackFirstRollDelaySeconds = 0.12f;
 // Consistent pacing between any additional dice in the same queued attack.
-constexpr float QueuedAttackAdditionalRollDelaySeconds = 0.8f;
+constexpr float QueuedAttackAdditionalRollDelaySeconds = 0.1f;
 }
 
 AFighterPawn::AFighterPawn() : MaxHealth(0) {
@@ -1004,6 +1004,14 @@ void AFighterPawn::TriggerHitFlash(float DamageRatio) {
   const float InitialValue = HitFlashCurve ? HitFlashCurve->GetFloatValue(0.f)
                                            : 1.f;
   ApplyHitFlash(InitialValue * HitFlashStrength);
+}
+
+void AFighterPawn::PlayImpactFlashForDamage(int32 DamageAmount) {
+  const int32 ClampedDamage = FMath::Max(DamageAmount, 0);
+  const int32 EffectiveMaxHealth = FMath::Max(MaxHealth, 1);
+  const float DamageRatio = static_cast<float>(ClampedDamage) /
+                            static_cast<float>(EffectiveMaxHealth);
+  TriggerHitFlash(DamageRatio);
 }
 
 void AFighterPawn::UpdateHitFlash(float DeltaSeconds) {
