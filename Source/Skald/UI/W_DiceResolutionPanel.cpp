@@ -62,9 +62,9 @@ static UUniformGridSlot* AddToUniformGridWithPadding(
 
 namespace
 {
-constexpr float FirstRevealDelaySeconds = 0.24f;
-constexpr float SubsequentRevealDelaySeconds = 0.2f;
-constexpr float CompletionDelaySeconds = 0.2f;
+constexpr float FirstRevealDelaySeconds = 0.48f;
+constexpr float SubsequentRevealDelaySeconds = 0.4f;
+constexpr float CompletionDelaySeconds = 0.4f;
 constexpr float DiceOutcomeImageSize = 112.f;
 
 struct FCanvasPanelSlotSnapshot
@@ -378,7 +378,7 @@ void UW_DiceResolutionPanel::BeginResolution(const FDiceRollResult& Result)
         return;
     }
 
-    RevealNextDie();
+    ScheduleNextReveal(FirstRevealDelaySeconds);
 }
 
 void UW_DiceResolutionPanel::ResetPanel()
