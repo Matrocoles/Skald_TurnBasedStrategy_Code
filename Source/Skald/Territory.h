@@ -122,6 +122,18 @@ public:
     UFUNCTION()
     void HandleClicked(UPrimitiveComponent* TouchedComponent, FKey ButtonPressed);
 
+    /** Set an additional height offset applied to the selection decal. */
+    UFUNCTION(BlueprintCallable, Category = "Territory|Selection")
+    void SetSelectionDecalAdditionalHeightOffset(float AdditionalOffset);
+
+    /** Retrieve the extra height offset applied to the selection decal. */
+    UFUNCTION(BlueprintPure, Category = "Territory|Selection")
+    float GetSelectionDecalAdditionalHeightOffset() const { return SelectionDecalAdditionalHeightOffset; }
+
+    /** Effective offset used when positioning the selection decal. */
+    UFUNCTION(BlueprintPure, Category = "Territory|Selection")
+    float GetSelectionDecalEffectiveHeightOffset() const;
+
     /** Refresh the visual appearance of this territory. */
     UFUNCTION(BlueprintCallable, Category = "Territory")
     void RefreshAppearance();
@@ -163,6 +175,9 @@ protected:
     /** Vertical offset applied to the selection decal relative to the mesh. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory|Selection")
     float SelectionDecalVerticalOffset = 0.f;
+
+    /** Additional offset supplied externally (e.g. by the world map). */
+    float SelectionDecalAdditionalHeightOffset = 0.f;
 
     /** Optional sound played when this territory becomes selected. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory|Selection")

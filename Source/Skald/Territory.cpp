@@ -293,6 +293,15 @@ void ATerritory::HandleClicked(UPrimitiveComponent *TouchedComponent,
   }
 }
 
+void ATerritory::SetSelectionDecalAdditionalHeightOffset(float AdditionalOffset) {
+  SelectionDecalAdditionalHeightOffset = AdditionalOffset;
+  UpdateSelectionDecalTransform();
+}
+
+float ATerritory::GetSelectionDecalEffectiveHeightOffset() const {
+  return SelectionDecalVerticalOffset + SelectionDecalAdditionalHeightOffset;
+}
+
 void ATerritory::RefreshAppearance() {
   UpdateTerritoryColor();
   UpdateLabel();
@@ -345,7 +354,7 @@ void ATerritory::UpdateSelectionDecalTransform() {
 
   SelectionDecal->DecalSize = SelectionDecalSize;
   SelectionDecal->SetRelativeLocation(
-      FVector(0.f, 0.f, SelectionDecalVerticalOffset));
+      FVector(0.f, 0.f, GetSelectionDecalEffectiveHeightOffset()));
 }
 
 void ATerritory::ApplySelectionDecalMaterial() {
