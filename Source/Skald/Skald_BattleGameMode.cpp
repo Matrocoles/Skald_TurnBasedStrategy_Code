@@ -1159,14 +1159,21 @@ void ASkald_BattleGameMode::SpawnFighterSide(const TArray<FFighterDefinition> &R
       Skald::GridOverlay::FindActiveGridOverlay(GetWorld());
 
   const int32 Edge = 3;
-  const int32 MaxX = UGridBattleManager::GridSize - 1;
-  const int32 MaxY = UGridBattleManager::GridSize - 1;
+  int32 GridWidth = Grid ? Grid->GetWidth() : UGridBattleManager::GridSize;
+  int32 GridHeight = Grid ? Grid->GetHeight() : UGridBattleManager::GridSize;
+
+  if (GridWidth <= 0) {
+    GridWidth = UGridBattleManager::GridSize;
+  }
+
+  if (GridHeight <= 0) {
+    GridHeight = UGridBattleManager::GridSize;
+  }
+
+  const int32 EffectiveEdge = FMath::Clamp(Edge, 1, GridWidth);
 
   for (const FFighterDefinition &Def : Roster) {
-    FIntPoint Cell;
-    Cell.Y = GI->CombatRandomStream.RandRange(0, MaxY);
-    Cell.X = bAsAttacker ? GI->CombatRandomStream.RandRange(0, Edge - 1)
-                         : GI->CombatRandomStream.RandRange(MaxX - (Edge - 1), MaxX);
+    FIntPoint Cell = FIntPoint::ZeroValue;
 
     UClass *DesiredClass = AFighterPawn::StaticClass();
     if (UClass *SelectedClass = Def.MeshClass.Get()) {
@@ -1184,20 +1191,18 @@ void ASkald_BattleGameMode::SpawnFighterSide(const TArray<FFighterDefinition> &R
         DesiredClass->GetDefaultObject<AFighterPawn>();
     const int32 FootprintSideLength =
         DefaultPawn ? FMath::Max(DefaultPawn->GetFootprintSideLength(), 1) : 1;
-    const int32 FootprintOffset = FootprintSideLength - 1;
-    const int32 MaxAnchorX = FMath::Max(0, MaxX - FootprintOffset);
-    const int32 MaxAnchorY = FMath::Max(0, MaxY - FootprintOffset);
+    const int32 MaxAnchorX = FMath::Max(0, GridWidth - FootprintSideLength);
+    const int32 MaxAnchorY = FMath::Max(0, GridHeight - FootprintSideLength);
 
-    if (bAsAttacker) {
-      const int32 MaxEdgeX = FMath::Clamp(Edge - 1, 0, MaxAnchorX);
-      Cell.X = FMath::Clamp(Cell.X, 0, MaxEdgeX);
-    } else {
-      const int32 MinEdgeX = FMath::Clamp(MaxX - (Edge - 1), 0, MaxAnchorX);
-      const int32 MaxEdgeX = MaxAnchorX;
-      Cell.X = FMath::Clamp(Cell.X, MinEdgeX, MaxEdgeX);
-    }
+    const int32 MinSpawnX = bAsAttacker ? 0
+                                        : FMath::Clamp(GridWidth - EffectiveEdge, 0, MaxAnchorX);
+    const int32 MaxSpawnX = bAsAttacker
+                                ? FMath::Clamp(EffectiveEdge - 1, 0, MaxAnchorX)
+                                : MaxAnchorX;
+    const int32 ClampedMaxSpawnX = FMath::Max(MinSpawnX, MaxSpawnX);
 
-    Cell.Y = FMath::Clamp(Cell.Y, 0, MaxAnchorY);
+    Cell.X = GI->CombatRandomStream.RandRange(MinSpawnX, ClampedMaxSpawnX);
+    Cell.Y = GI->CombatRandomStream.RandRange(0, MaxAnchorY);
 
     FVector TerrainLocation =
         Grid ? Grid->GridToWorld(Cell) : FVector::ZeroVector;
