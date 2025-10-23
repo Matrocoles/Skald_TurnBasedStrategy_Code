@@ -3175,19 +3175,23 @@ void ASkaldPlayerController::HandleAttackResolved(AFighterPawn *Attacker,
 void ASkaldPlayerController::HandleDiceResolutionComplete(
     AFighterPawn *Attacker, AFighterPawn *Defender,
     const FDiceRollResult &Result) {
-  if (!BattleHudWidget || !Defender) {
-    return;
+  if (Defender) {
+    Defender->ReleaseHealthDisplayHold();
   }
 
-  BattleHudWidget->ShowAttackResultFloater(Defender, Result);
-
-  Defender->ReleaseHealthDisplayHold();
+  if (!BattleHudWidget) {
+    return;
+  }
 }
 
 void ASkaldPlayerController::HandleDiceOutcomeRevealed(
     AFighterPawn *Attacker, AFighterPawn *Defender,
     const FDiceRollOutcome &Outcome, int32 RevealIndex) {
   PlayDiceOutcomeFeedback(Attacker, Defender, Outcome);
+
+  if (Defender && Outcome.bHit) {
+    Defender->PlayImpactFlashForDamage(Outcome.Damage);
+  }
 
   if (!PlayerCameraManager) {
     return;

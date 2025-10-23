@@ -74,6 +74,9 @@ public:
   /** True while queued attack rolls are still being processed. */
   bool IsResolvingQueuedAttack() const;
 
+  /** Trigger a hit flash scaled by the supplied damage amount. */
+  void PlayImpactFlashForDamage(int32 DamageAmount);
+
   /** Event fired after any queued attack finishes resolving. */
   FOnQueuedAttackFinalized OnQueuedAttackFinalized;
 
