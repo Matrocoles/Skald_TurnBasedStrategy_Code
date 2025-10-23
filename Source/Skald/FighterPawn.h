@@ -307,6 +307,8 @@ private:
   void OnRep_IsCurrentlyActive();
   UFUNCTION()
   void OnRep_MaxHealth();
+  UFUNCTION()
+  void OnRep_IsMoving();
 
   /** Align the visible mesh with the collision capsule. */
   void UpdateMeshOffset();
@@ -407,6 +409,7 @@ private:
   mutable UGridOverlayComponent *CachedGrid = nullptr;
 
   /** True while the fighter is interpolating towards a grid cell. */
+  UPROPERTY(ReplicatedUsing = OnRep_IsMoving)
   bool bIsMoving = false;
 
   /** World-space destination for the current interpolated move. */

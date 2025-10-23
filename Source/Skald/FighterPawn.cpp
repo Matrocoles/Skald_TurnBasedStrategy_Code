@@ -151,6 +151,7 @@ void AFighterPawn::GetLifetimeReplicatedProps(
   DOREPLIFETIME(AFighterPawn, ActionsRemaining);
   DOREPLIFETIME(AFighterPawn, bHasActivatedThisRound);
   DOREPLIFETIME(AFighterPawn, bIsCurrentlyActive);
+  DOREPLIFETIME(AFighterPawn, bIsMoving);
   DOREPLIFETIME(AFighterPawn, GridFootprint);
   DOREPLIFETIME(AFighterPawn, CurrentCell);
   DOREPLIFETIME(AFighterPawn, SpawnFacingYawDelta);
@@ -1234,6 +1235,7 @@ void AFighterPawn::OnRep_GridFootprint() {
 void AFighterPawn::OnRep_HasActivatedThisRound() { UpdateActivationIndicator(); }
 
 void AFighterPawn::OnRep_IsCurrentlyActive() { UpdateActivationIndicator(); }
+void AFighterPawn::OnRep_IsMoving() { RefreshMovementAudioComponent(); }
 
 void AFighterPawn::BroadcastActionsRemaining() {
   OnActionsChanged.Broadcast(ActionsRemaining);
