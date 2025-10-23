@@ -256,6 +256,14 @@ public:
     UFUNCTION(BlueprintCallable, Category="Battle")
     void AdvanceTurn();
 
+    /** True when at least one attack resolution is still being presented to the player. */
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="Battle")
+    bool IsAwaitingAttackPresentation() const { return PendingAttackPresentationCount > 0; }
+
+    /** Notify the battle manager that the latest attack presentation finished playing. */
+    UFUNCTION(BlueprintCallable, Category="Battle")
+    void NotifyAttackPresentationComplete();
+
     /** Check whether the specified fighter can activate on the current side. */
     UFUNCTION(BlueprintCallable, Category="Battle")
     bool CanActivateFighter(AFighterPawn* Fighter) const;
@@ -404,14 +412,6 @@ protected:
     /** True when the attacking side is currently allowed to activate. */
     UPROPERTY(BlueprintReadOnly, Category="Battle")
     bool bIsAttackerTurn = true;
-
-    /** True when at least one attack resolution is still being presented to the player. */
-    UFUNCTION(BlueprintPure, Category="Battle")
-    bool IsAwaitingAttackPresentation() const { return PendingAttackPresentationCount > 0; }
-
-    /** Notify the battle manager that the latest attack presentation finished playing. */
-    UFUNCTION(BlueprintCallable, Category="Battle")
-    void NotifyAttackPresentationComplete();
 
 private:
     void ResolveInitiativeRollInternal();
