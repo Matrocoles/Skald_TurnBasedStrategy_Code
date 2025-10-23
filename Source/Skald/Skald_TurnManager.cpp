@@ -1324,12 +1324,61 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
           Snapshot.PlayerID = SkaldPS->GetPlayerId();
           Snapshot.PlayerName = SkaldPS->GetResolvedPlayerName(TEXT("TravelState"));
           Snapshot.IsAI = SkaldPS->bIsAI;
+          Snapshot.IsHuman = !SkaldPS->bIsAI;
           Snapshot.IsEliminated = SkaldPS->IsEliminated;
           Snapshot.Resources = SkaldPS->Resources;
           Snapshot.Faction = SkaldPS->Faction;
           TravelState.PlayerSnapshots.Add(MoveTemp(Snapshot));
         }
       }
+    }
+
+    if (GS && TravelState.PlayerSnapshots.Num() > 0) {
+      TMap<int32, int32> SnapshotIndexById;
+      SnapshotIndexById.Reserve(TravelState.PlayerSnapshots.Num());
+      for (int32 Index = 0; Index < TravelState.PlayerSnapshots.Num(); ++Index) {
+        const int32 PlayerId = TravelState.PlayerSnapshots[Index].PlayerID;
+        if (PlayerId > 0 && !SnapshotIndexById.Contains(PlayerId)) {
+          SnapshotIndexById.Add(PlayerId, Index);
+        }
+      }
+
+      TSet<int32> ValidPlayerIds;
+      for (APlayerState *BasePS : GS->PlayerArray) {
+        ASkaldPlayerState *SkaldPS = Cast<ASkaldPlayerState>(BasePS);
+        if (!SkaldPS) {
+          continue;
+        }
+
+        const int32 PlayerId = SkaldPS->GetPlayerId();
+        if (PlayerId <= 0) {
+          continue;
+        }
+
+        ValidPlayerIds.Add(PlayerId);
+
+        FS_PlayerData *SnapshotPtr = nullptr;
+        if (int32 *ExistingIndex = SnapshotIndexById.Find(PlayerId)) {
+          SnapshotPtr = &TravelState.PlayerSnapshots[*ExistingIndex];
+        } else {
+          const int32 NewIndex = TravelState.PlayerSnapshots.AddDefaulted();
+          SnapshotPtr = &TravelState.PlayerSnapshots[NewIndex];
+          SnapshotPtr->PlayerID = PlayerId;
+          SnapshotIndexById.Add(PlayerId, NewIndex);
+        }
+
+        SnapshotPtr->PlayerName =
+            SkaldPS->GetResolvedPlayerName(TEXT("TravelState"));
+        SnapshotPtr->IsAI = SkaldPS->bIsAI;
+        SnapshotPtr->IsHuman = !SkaldPS->bIsAI;
+        SnapshotPtr->IsEliminated = SkaldPS->IsEliminated;
+        SnapshotPtr->Resources = SkaldPS->Resources;
+        SnapshotPtr->Faction = SkaldPS->Faction;
+      }
+
+      TravelState.PlayerSnapshots.RemoveAll([&](const FS_PlayerData &Snapshot) {
+        return Snapshot.PlayerID <= 0 || !ValidPlayerIds.Contains(Snapshot.PlayerID);
+      });
     }
 
     if (GI) {
