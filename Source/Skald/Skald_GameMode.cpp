@@ -1191,7 +1191,12 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     }
   }
 
+  if (TurnManager && TurnManager->HasTurnsStarted()) {
+    bTurnsStarted = true;
+  }
+
   if (bWorldInitialized && bReadyToStart && !bTurnsStarted && TurnManager &&
+      !TurnManager->HasTurnsStarted() &&
       TurnManager->GetCurrentPhase() != ETurnPhase::ArmyPlacement &&
       TurnManager->GetControllerCount() > 0) {
     bTurnsStarted = true;
