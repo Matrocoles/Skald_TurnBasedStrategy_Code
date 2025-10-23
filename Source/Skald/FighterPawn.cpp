@@ -134,6 +134,19 @@ AFighterPawn::AFighterPawn() : MaxHealth(0) {
   SelectionDecal->SetVisibility(false);
   SelectionDecal->SetCanEverAffectNavigation(false);
 
+  TargetedDecal =
+      CreateDefaultSubobject<UDecalComponent>(TEXT("TargetedDecal"));
+  TargetedDecal->SetupAttachment(CollisionComponent);
+  TargetedDecal->SetRelativeRotation(FRotator(-90.f, 0.f, 0.f));
+  TargetedDecal->SetRelativeLocation(
+      FVector(0.f, 0.f,
+              -CollisionComponent->GetUnscaledCapsuleHalfHeight() +
+                  TargetedDecalFloorOffset));
+  TargetedDecal->DecalSize = TargetedDecalSizeSingleCell;
+  TargetedDecal->SetHiddenInGame(true);
+  TargetedDecal->SetVisibility(false);
+  TargetedDecal->SetCanEverAffectNavigation(false);
+
   MovementAudioComponent =
       CreateDefaultSubobject<UAudioComponent>(TEXT("MovementAudioComponent"));
   MovementAudioComponent->SetupAttachment(CollisionComponent);
@@ -154,7 +167,9 @@ AFighterPawn::AFighterPawn() : MaxHealth(0) {
   ApplyFootprintScale();
   UpdateMeshOffset();
   UpdateSelectionIndicatorTransform();
+  UpdateTargetedIndicatorTransform();
   RefreshSelectionIndicatorMaterial();
+  RefreshTargetedIndicatorMaterial();
 }
 
 void AFighterPawn::GetLifetimeReplicatedProps(
@@ -183,6 +198,10 @@ void AFighterPawn::OnConstruction(const FTransform &Transform) {
   UpdateSelectionIndicatorSize();
   UpdateSelectionIndicatorTransform();
   RefreshSelectionIndicatorMaterial();
+  UpdateTargetedIndicatorSize();
+  UpdateTargetedIndicatorTransform();
+  RefreshTargetedIndicatorMaterial();
+  SetTargetedIndicatorVisible(false);
   RefreshDisplayMeshYawOffset();
   const float IncomingSpawnYaw = Transform.GetRotation().Rotator().Yaw;
   const bool bShouldOverride = ShouldOverrideSpawnFacingYaw();
@@ -253,7 +272,11 @@ void AFighterPawn::BeginPlay() {
   UpdateSelectionIndicatorSize();
   UpdateSelectionIndicatorTransform();
   RefreshSelectionIndicatorMaterial();
+  UpdateTargetedIndicatorSize();
+  UpdateTargetedIndicatorTransform();
+  RefreshTargetedIndicatorMaterial();
   SetSelectionIndicatorVisible(false);
+  SetTargetedIndicatorVisible(false);
 
   RefreshMovementAudioComponent();
 
@@ -402,6 +425,15 @@ void AFighterPawn::SetSelectionIndicatorVisible(bool bVisible) {
 
   SelectionDecal->SetVisibility(bVisible);
   SelectionDecal->SetHiddenInGame(!bVisible);
+}
+
+void AFighterPawn::SetTargetedIndicatorVisible(bool bVisible) {
+  if (!TargetedDecal) {
+    return;
+  }
+
+  TargetedDecal->SetVisibility(bVisible);
+  TargetedDecal->SetHiddenInGame(!bVisible);
 }
 
 FIntPoint AFighterPawn::GetCurrentCell() const { return CurrentCell; }
@@ -567,6 +599,7 @@ void AFighterPawn::ApplyFootprintScale() {
   }
 
   UpdateSelectionIndicatorSize();
+  UpdateTargetedIndicatorSize();
 }
 
 void AFighterPawn::UpdateSelectionIndicatorSize() {
@@ -597,6 +630,36 @@ void AFighterPawn::RefreshSelectionIndicatorMaterial() {
   }
 
   SelectionDecal->SetDecalMaterial(SelectionDecalMaterial);
+}
+
+void AFighterPawn::UpdateTargetedIndicatorSize() {
+  if (!TargetedDecal) {
+    return;
+  }
+
+  const FVector DesiredSize =
+      GridFootprint == EFighterPawnFootprint::FourCells
+          ? TargetedDecalSizeFourCells
+          : TargetedDecalSizeSingleCell;
+  TargetedDecal->DecalSize = DesiredSize;
+}
+
+void AFighterPawn::UpdateTargetedIndicatorTransform() {
+  if (!TargetedDecal || !CollisionComponent) {
+    return;
+  }
+
+  const float CapsuleHalfHeight = CollisionComponent->GetScaledCapsuleHalfHeight();
+  const float VerticalOffset = -CapsuleHalfHeight + TargetedDecalFloorOffset;
+  TargetedDecal->SetRelativeLocation(FVector(0.f, 0.f, VerticalOffset));
+}
+
+void AFighterPawn::RefreshTargetedIndicatorMaterial() {
+  if (!TargetedDecal) {
+    return;
+  }
+
+  TargetedDecal->SetDecalMaterial(TargetedDecalMaterial);
 }
 
 void AFighterPawn::RefreshDisplayMeshYawOffset() {
@@ -897,6 +960,10 @@ void AFighterPawn::StartQueuedAttack(AFighterPawn *Target,
   bHasProcessedPendingRoll = false;
   bHasPendingDiceResult = true;
 
+  if (AFighterPawn *TargetPawn = PendingAttackTarget.Get()) {
+    TargetPawn->HandleIncomingAttackStarted();
+  }
+
   if (!PendingAttackDiceResult.DiceOutcomes.IsValidIndex(0)) {
     FinalizeQueuedAttack();
     return;
@@ -1021,6 +1088,10 @@ void AFighterPawn::CancelQueuedAttack() {
 }
 
 void AFighterPawn::ClearQueuedAttackState(bool bBroadcastFinalized) {
+  if (AFighterPawn *TargetPawn = PendingAttackTarget.Get()) {
+    TargetPawn->HandleIncomingAttackFinished();
+  }
+
   bHasPendingDiceResult = false;
   PendingAttackDiceResult = FDiceRollResult();
 
@@ -1031,6 +1102,22 @@ void AFighterPawn::ClearQueuedAttackState(bool bBroadcastFinalized) {
 
   if (bBroadcastFinalized) {
     OnQueuedAttackFinalized.Broadcast();
+  }
+}
+
+void AFighterPawn::HandleIncomingAttackStarted() {
+  ++ActiveIncomingAttackCount;
+  SetTargetedIndicatorVisible(true);
+}
+
+void AFighterPawn::HandleIncomingAttackFinished() {
+  if (ActiveIncomingAttackCount > 0) {
+    --ActiveIncomingAttackCount;
+  }
+
+  if (ActiveIncomingAttackCount <= 0) {
+    ActiveIncomingAttackCount = 0;
+    SetTargetedIndicatorVisible(false);
   }
 }
 
@@ -1299,6 +1386,7 @@ void AFighterPawn::OnRep_GridFootprint() {
   ApplyFootprintScale();
   UpdateMeshOffset();
   UpdateSelectionIndicatorTransform();
+  UpdateTargetedIndicatorTransform();
   AlignToCurrentCell();
 }
 
