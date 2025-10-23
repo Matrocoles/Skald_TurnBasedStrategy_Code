@@ -89,6 +89,10 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Fighter|Selection")
   void SetSelectionIndicatorVisible(bool bVisible);
 
+  /** Show or hide the targeted indicator for incoming attacks. */
+  UFUNCTION(BlueprintCallable, Category = "Fighter|Targeting")
+  void SetTargetedIndicatorVisible(bool bVisible);
+
   /** Event fired after any queued attack finishes resolving. */
   FOnQueuedAttackFinalized OnQueuedAttackFinalized;
 
@@ -226,6 +230,26 @@ public:
   /** Additional vertical offset applied to the selection decal. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Selection")
   float SelectionDecalFloorOffset = 0.f;
+
+  /** Decal shown when the fighter is targeted for an incoming attack. */
+  UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|Targeting")
+  UDecalComponent *TargetedDecal;
+
+  /** Material used for the targeted decal. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Targeting")
+  TObjectPtr<UMaterialInterface> TargetedDecalMaterial;
+
+  /** Size used for the targeted decal on single-cell fighters. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Targeting")
+  FVector TargetedDecalSizeSingleCell = FVector(32.f, 160.f, 160.f);
+
+  /** Size used for the targeted decal on four-cell fighters. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Targeting")
+  FVector TargetedDecalSizeFourCells = FVector(64.f, 320.f, 320.f);
+
+  /** Additional vertical offset applied to the targeted decal. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Targeting")
+  float TargetedDecalFloorOffset = 0.f;
 
   /** Widget indicating activation state (front facing). */
   UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|UI")
@@ -369,6 +393,15 @@ private:
   /** Apply the configured material to the selection decal. */
   void RefreshSelectionIndicatorMaterial();
 
+  /** Update the targeted decal size to match the current footprint. */
+  void UpdateTargetedIndicatorSize();
+
+  /** Align the targeted decal with the base of the fighter. */
+  void UpdateTargetedIndicatorTransform();
+
+  /** Apply the configured material to the targeted decal. */
+  void RefreshTargetedIndicatorMaterial();
+
   /** Resolve and cache an activation icon texture. */
   UTexture2D *ResolveActivationIcon(TSoftObjectPtr<UTexture2D> &IconSource,
                                     UTexture2D *&CachedTexture);
@@ -414,6 +447,9 @@ private:
 
   /** Reset queued attack bookkeeping and optionally notify listeners. */
   void ClearQueuedAttackState(bool bBroadcastFinalized);
+
+  void HandleIncomingAttackStarted();
+  void HandleIncomingAttackFinished();
 
   /** Index of the next pending dice outcome to resolve. */
   int32 PendingAttackOutcomeIndex = 0;
@@ -488,6 +524,7 @@ private:
   bool bHitFlashActive = false;
   bool bHasRecordedHealth = false;
   int32 LastKnownHealth = 0;
+  int32 ActiveIncomingAttackCount = 0;
 
 public:
   /** Returns true if the fighter has already activated this round. */
