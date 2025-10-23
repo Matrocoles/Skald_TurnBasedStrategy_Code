@@ -17,6 +17,8 @@ class UFighterActivationWidget;
 class UFighterHealthWidget;
 class UCurveFloat;
 class UMaterialInstanceDynamic;
+class UDecalComponent;
+class UMaterialInterface;
 
 UENUM(BlueprintType)
 enum class EFighterPawnFootprint : uint8 {
@@ -82,6 +84,10 @@ public:
 
   /** Trigger a hit flash scaled by the supplied damage amount. */
   void PlayImpactFlashForDamage(int32 DamageAmount);
+
+  /** Show or hide the fighter's selection indicator. */
+  UFUNCTION(BlueprintCallable, Category = "Fighter|Selection")
+  void SetSelectionIndicatorVisible(bool bVisible);
 
   /** Event fired after any queued attack finishes resolving. */
   FOnQueuedAttackFinalized OnQueuedAttackFinalized;
@@ -200,6 +206,26 @@ public:
   /** Widget class used for the health display. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Fighter|UI")
   TSubclassOf<UUserWidget> HealthWidgetTemplate;
+
+  /** Decal shown when the fighter is selected. */
+  UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|Selection")
+  UDecalComponent *SelectionDecal;
+
+  /** Material used for the selection decal. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Selection")
+  TObjectPtr<UMaterialInterface> SelectionDecalMaterial;
+
+  /** Size used for the selection decal on single-cell fighters. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Selection")
+  FVector SelectionDecalSizeSingleCell = FVector(32.f, 160.f, 160.f);
+
+  /** Size used for the selection decal on four-cell fighters. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Selection")
+  FVector SelectionDecalSizeFourCells = FVector(64.f, 320.f, 320.f);
+
+  /** Additional vertical offset applied to the selection decal. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Selection")
+  float SelectionDecalFloorOffset = 0.f;
 
   /** Widget indicating activation state (front facing). */
   UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|UI")
@@ -333,6 +359,15 @@ private:
 
   /** Update the activation widget to match fighter state. */
   void UpdateActivationIndicator();
+
+  /** Update the selection decal size to match the current footprint. */
+  void UpdateSelectionIndicatorSize();
+
+  /** Align the selection decal with the base of the fighter. */
+  void UpdateSelectionIndicatorTransform();
+
+  /** Apply the configured material to the selection decal. */
+  void RefreshSelectionIndicatorMaterial();
 
   /** Resolve and cache an activation icon texture. */
   UTexture2D *ResolveActivationIcon(TSoftObjectPtr<UTexture2D> &IconSource,

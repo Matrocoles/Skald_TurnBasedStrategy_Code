@@ -2,6 +2,7 @@
 #include "Blueprint/UserWidget.h"
 #include "Components/AudioComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/DecalComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/WidgetComponent.h"
 #include "Containers/Queue.h"
@@ -120,6 +121,20 @@ AFighterPawn::AFighterPawn() : MaxHealth(0) {
   ActivationWidgetBack->SetCanEverAffectNavigation(false);
   ActivationWidgetBack->SetVisibility(false);
 
+  SelectionDecal =
+      CreateDefaultSubobject<UDecalComponent>(TEXT("SelectionDecal"));
+  SelectionDecal->SetupAttachment(CollisionComponent);
+  SelectionDecal->SetRelativeRotation(FRotator(-90.f, 0.f, 0.f));
+  SelectionDecal->SetRelativeLocation(
+      FVector(0.f, 0.f,
+              -CollisionComponent->GetUnscaledCapsuleHalfHeight() +
+                  SelectionDecalFloorOffset));
+  SelectionDecal->DecalSize = SelectionDecalSizeSingleCell;
+  SelectionDecal->SetHiddenInGame(true);
+  SelectionDecal->SetVisibility(false);
+  SelectionDecal->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+  SelectionDecal->SetCanEverAffectNavigation(false);
+
   MovementAudioComponent =
       CreateDefaultSubobject<UAudioComponent>(TEXT("MovementAudioComponent"));
   MovementAudioComponent->SetupAttachment(CollisionComponent);
@@ -139,6 +154,8 @@ AFighterPawn::AFighterPawn() : MaxHealth(0) {
 
   ApplyFootprintScale();
   UpdateMeshOffset();
+  UpdateSelectionIndicatorTransform();
+  RefreshSelectionIndicatorMaterial();
 }
 
 void AFighterPawn::GetLifetimeReplicatedProps(
@@ -164,6 +181,9 @@ void AFighterPawn::OnConstruction(const FTransform &Transform) {
   Super::OnConstruction(Transform);
   ApplyFootprintScale();
   UpdateMeshOffset();
+  UpdateSelectionIndicatorSize();
+  UpdateSelectionIndicatorTransform();
+  RefreshSelectionIndicatorMaterial();
   RefreshDisplayMeshYawOffset();
   const float IncomingSpawnYaw = Transform.GetRotation().Rotator().Yaw;
   const bool bShouldOverride = ShouldOverrideSpawnFacingYaw();
@@ -231,6 +251,10 @@ void AFighterPawn::BeginPlay() {
 
   BroadcastActionsRemaining();
   UpdateActivationIndicator();
+  UpdateSelectionIndicatorSize();
+  UpdateSelectionIndicatorTransform();
+  RefreshSelectionIndicatorMaterial();
+  SetSelectionIndicatorVisible(false);
 
   RefreshMovementAudioComponent();
 
@@ -370,6 +394,15 @@ UGridOverlayComponent *AFighterPawn::GetGrid() const {
   }
 
   return CachedGrid;
+}
+
+void AFighterPawn::SetSelectionIndicatorVisible(bool bVisible) {
+  if (!SelectionDecal) {
+    return;
+  }
+
+  SelectionDecal->SetVisibility(bVisible);
+  SelectionDecal->SetHiddenInGame(!bVisible);
 }
 
 FIntPoint AFighterPawn::GetCurrentCell() const { return CurrentCell; }
@@ -533,6 +566,38 @@ void AFighterPawn::ApplyFootprintScale() {
         GridFootprint == EFighterPawnFootprint::FourCells ? 2.f : 1.f;
     DisplayMesh->SetRelativeScale3D(FVector(Scale));
   }
+
+  UpdateSelectionIndicatorSize();
+}
+
+void AFighterPawn::UpdateSelectionIndicatorSize() {
+  if (!SelectionDecal) {
+    return;
+  }
+
+  const FVector DesiredSize =
+      GridFootprint == EFighterPawnFootprint::FourCells
+          ? SelectionDecalSizeFourCells
+          : SelectionDecalSizeSingleCell;
+  SelectionDecal->DecalSize = DesiredSize;
+}
+
+void AFighterPawn::UpdateSelectionIndicatorTransform() {
+  if (!SelectionDecal || !CollisionComponent) {
+    return;
+  }
+
+  const float CapsuleHalfHeight = CollisionComponent->GetScaledCapsuleHalfHeight();
+  const float VerticalOffset = -CapsuleHalfHeight + SelectionDecalFloorOffset;
+  SelectionDecal->SetRelativeLocation(FVector(0.f, 0.f, VerticalOffset));
+}
+
+void AFighterPawn::RefreshSelectionIndicatorMaterial() {
+  if (!SelectionDecal) {
+    return;
+  }
+
+  SelectionDecal->SetDecalMaterial(SelectionDecalMaterial);
 }
 
 void AFighterPawn::RefreshDisplayMeshYawOffset() {
@@ -1234,6 +1299,7 @@ void AFighterPawn::OnRep_ActionsRemaining() { BroadcastActionsRemaining(); }
 void AFighterPawn::OnRep_GridFootprint() {
   ApplyFootprintScale();
   UpdateMeshOffset();
+  UpdateSelectionIndicatorTransform();
   AlignToCurrentCell();
 }
 
