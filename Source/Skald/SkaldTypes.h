@@ -237,6 +237,40 @@ struct SKALD_API FPrepareForBattlePromptData {
   TSoftObjectPtr<UTexture2D> DefenderFactionEmblem;
 };
 
+/** Snapshot describing which participants have confirmed battle readiness. */
+USTRUCT(BlueprintType)
+struct SKALD_API FSkaldBattleReadyState {
+  GENERATED_BODY()
+
+  /** PlayerID of the attacking participant (INDEX_NONE when not required). */
+  UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
+  int32 AttackerPlayerID = INDEX_NONE;
+
+  /** PlayerID of the defending participant (INDEX_NONE when not required). */
+  UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
+  int32 DefenderPlayerID = INDEX_NONE;
+
+  /** True when the attacking participant has confirmed readiness. */
+  UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
+  bool bAttackerReady = false;
+
+  /** True when the defending participant has confirmed readiness. */
+  UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
+  bool bDefenderReady = false;
+
+  /** Indicates whether the attacking participant is controlled by AI. */
+  UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
+  bool bAttackerIsAI = false;
+
+  /** Indicates whether the defending participant is controlled by AI. */
+  UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
+  bool bDefenderIsAI = false;
+
+  /** Server timestamp (seconds) when this snapshot was last updated. */
+  UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
+  double LastUpdatedTimeSeconds = 0.0;
+};
+
 /** Serialized outcome of a resolved grid battle. */
 USTRUCT(BlueprintType)
 struct SKALD_API FGridBattleResolution

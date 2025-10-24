@@ -33,23 +33,6 @@ public:
 // Broadcast whenever the overall world state changes so HUDs can refresh.
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSkaldWorldStateChanged);
 
-USTRUCT()
-struct SKALD_API FPendingBattleReadyState {
-  GENERATED_BODY()
-
-  UPROPERTY()
-  int32 AttackerPlayerID = INDEX_NONE;
-
-  UPROPERTY()
-  int32 DefenderPlayerID = INDEX_NONE;
-
-  UPROPERTY()
-  bool bAttackerReady = false;
-
-  UPROPERTY()
-  bool bDefenderReady = false;
-};
-
 /**
  * Handles turn sequencing for all registered player controllers.
  */
@@ -131,6 +114,10 @@ public:
   void MulticastPrepareBattleTravel(const FSkaldTravelState &TravelState,
                                     const FS_BattlePayload &BattlePayload);
 
+  /** Multicast notification whenever the pending battle readiness changes. */
+  UFUNCTION(NetMulticast, Reliable)
+  void MulticastOnReadyStateChanged(const FSkaldBattleReadyState &ReadyState);
+
   /** Multicast the battle map active state so clients can update immediately. */
   UFUNCTION(NetMulticast, Reliable)
   void MulticastSetBattleMapActive(bool bInBattleMap);
@@ -172,7 +159,7 @@ public:
 
   /** Mark the specified player as ready to travel to the battle map. */
   UFUNCTION(BlueprintCallable, Category = "Battle")
-  void NotifyPlayerReadyForBattle(int32 PlayerID);
+  void NotifyPlayerReadyForBattle(int32 PlayerID, bool bReady);
 
   /** Event fired when the world state has changed. */
   UPROPERTY(BlueprintAssignable, Category = "Turn")
@@ -200,7 +187,9 @@ protected:
   UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Turn")
   FS_BattlePayload PendingBattle;
   FS_BattlePayload PendingBattlePreparation;
-  FPendingBattleReadyState PendingBattleReadyState;
+  FSkaldBattleReadyState PendingBattleReadyState;
+
+  void CommitPendingBattleReadyState(const TCHAR *Context);
   /** Payload for the next battle waiting on travel/resolution to finish. */
   FS_BattlePayload DeferredPendingBattle;
 

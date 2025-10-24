@@ -5,6 +5,7 @@
 #include "Engine/Level.h"
 #include "EngineUtils.h"
 #include "GridBattleManager.h"
+#include "HAL/PlatformTime.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/PackageName.h"
 #include "Modules/ModuleManager.h"
@@ -1204,11 +1205,13 @@ void ATurnManager::RequestPrepareBattle(const FS_BattlePayload &Battle) {
                           TEXT("Defender"));
 
   PendingBattlePreparation = NormalizedBattle;
-  PendingBattleReadyState = FPendingBattleReadyState();
+  PendingBattleReadyState = FSkaldBattleReadyState();
   PendingBattleReadyState.AttackerPlayerID =
       NormalizedBattle.AttackerPlayerID;
   PendingBattleReadyState.DefenderPlayerID =
       NormalizedBattle.DefenderPlayerID;
+  PendingBattleReadyState.bAttackerIsAI = NormalizedBattle.bAttackerIsAI;
+  PendingBattleReadyState.bDefenderIsAI = NormalizedBattle.bDefenderIsAI;
   PendingBattleReadyState.bAttackerReady =
       (PendingBattleReadyState.AttackerPlayerID == INDEX_NONE) ||
       NormalizedBattle.bAttackerIsAI;
@@ -1216,8 +1219,7 @@ void ATurnManager::RequestPrepareBattle(const FS_BattlePayload &Battle) {
       (PendingBattleReadyState.DefenderPlayerID == INDEX_NONE) ||
       NormalizedBattle.bDefenderIsAI;
 
-  BroadcastPrepareForBattlePrompt(NormalizedBattle,
-                                  TEXT("RequestPrepareBattle"));
+  CommitPendingBattleReadyState(TEXT("RequestPrepareBattle"));
   TryLaunchPreparedBattle();
 }
 
@@ -1672,7 +1674,7 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
   }
 }
 
-void ATurnManager::NotifyPlayerReadyForBattle(int32 PlayerID) {
+void ATurnManager::NotifyPlayerReadyForBattle(int32 PlayerID, bool bReady) {
   const bool bHasPendingBattle =
       PendingBattlePreparation.FromTerritoryID != 0 ||
       PendingBattlePreparation.TargetTerritoryID != 0;
@@ -1682,13 +1684,51 @@ void ATurnManager::NotifyPlayerReadyForBattle(int32 PlayerID) {
     return;
   }
 
-  if (PendingBattleReadyState.AttackerPlayerID == PlayerID) {
-    PendingBattleReadyState.bAttackerReady = true;
-  }
-  if (PendingBattleReadyState.DefenderPlayerID == PlayerID) {
-    PendingBattleReadyState.bDefenderReady = true;
+  const auto ApplyReadyState = [&](int32 ParticipantId, bool bParticipantIsAI,
+                                   bool &bParticipantReady,
+                                   const TCHAR *ParticipantLabel) {
+    if (ParticipantId != PlayerID) {
+      return false;
+    }
+
+    const bool bEffectiveReady = bReady || bParticipantIsAI ||
+                                 ParticipantId == INDEX_NONE;
+    if (bParticipantReady == bEffectiveReady) {
+      UE_LOG(LogSkald, Verbose,
+             TEXT("NotifyPlayerReadyForBattle: %s state unchanged for PlayerID %d (Ready=%s, AI=%s)"),
+             ParticipantLabel, PlayerID,
+             bParticipantReady ? TEXT("true") : TEXT("false"),
+             bParticipantIsAI ? TEXT("true") : TEXT("false"));
+      return false;
+    }
+
+    UE_LOG(LogSkald, Log,
+           TEXT("NotifyPlayerReadyForBattle: %s PlayerID %d ready -> %s (AI=%s, Requested=%s)"),
+           ParticipantLabel, PlayerID, bEffectiveReady ? TEXT("true") : TEXT("false"),
+           bParticipantIsAI ? TEXT("true") : TEXT("false"),
+           bReady ? TEXT("true") : TEXT("false"));
+    bParticipantReady = bEffectiveReady;
+    return true;
+  };
+
+  const bool bAttackerChanged = ApplyReadyState(
+      PendingBattleReadyState.AttackerPlayerID,
+      PendingBattleReadyState.bAttackerIsAI,
+      PendingBattleReadyState.bAttackerReady, TEXT("attacker"));
+
+  const bool bDefenderChanged = ApplyReadyState(
+      PendingBattleReadyState.DefenderPlayerID,
+      PendingBattleReadyState.bDefenderIsAI,
+      PendingBattleReadyState.bDefenderReady, TEXT("defender"));
+
+  if (!bAttackerChanged && !bDefenderChanged) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("NotifyPlayerReadyForBattle: PlayerID %d is not part of the pending battle."),
+           PlayerID);
+    return;
   }
 
+  CommitPendingBattleReadyState(TEXT("NotifyPlayerReadyForBattle"));
   TryLaunchPreparedBattle();
 }
 
@@ -1912,6 +1952,46 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
   }
 }
 
+void ATurnManager::CommitPendingBattleReadyState(const TCHAR *Context) {
+  if (!HasAuthority()) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("%s: CommitPendingBattleReadyState called without authority."),
+           Context ? Context : TEXT("CommitPendingBattleReadyState"));
+    if (UWorld *World = GetWorld()) {
+      PendingBattleReadyState.LastUpdatedTimeSeconds = World->GetTimeSeconds();
+    } else {
+      PendingBattleReadyState.LastUpdatedTimeSeconds = FPlatformTime::Seconds();
+    }
+    return;
+  }
+
+  UWorld *World = GetWorld();
+  ASkaldGameState *GameState =
+      World ? World->GetGameState<ASkaldGameState>() : nullptr;
+
+  if (GameState) {
+    GameState->SetPendingBattleReady(PendingBattleReadyState);
+    PendingBattleReadyState = GameState->GetPendingBattleReady();
+  } else if (World) {
+    PendingBattleReadyState.LastUpdatedTimeSeconds = World->GetTimeSeconds();
+  } else {
+    PendingBattleReadyState.LastUpdatedTimeSeconds = FPlatformTime::Seconds();
+  }
+
+  UE_LOG(LogSkald, Verbose,
+         TEXT("%s: committed ready state (Attacker=%d Ready=%s AI=%s, Defender=%d Ready=%s AI=%s, t=%.3f)"),
+         Context ? Context : TEXT("CommitPendingBattleReadyState"),
+         PendingBattleReadyState.AttackerPlayerID,
+         PendingBattleReadyState.bAttackerReady ? TEXT("true") : TEXT("false"),
+         PendingBattleReadyState.bAttackerIsAI ? TEXT("true") : TEXT("false"),
+         PendingBattleReadyState.DefenderPlayerID,
+         PendingBattleReadyState.bDefenderReady ? TEXT("true") : TEXT("false"),
+         PendingBattleReadyState.bDefenderIsAI ? TEXT("true") : TEXT("false"),
+         PendingBattleReadyState.LastUpdatedTimeSeconds);
+
+  MulticastOnReadyStateChanged(PendingBattleReadyState);
+}
+
 void ATurnManager::TryLaunchPreparedBattle() {
   const bool bHasPendingBattle =
       PendingBattlePreparation.FromTerritoryID != 0 ||
@@ -1920,12 +2000,25 @@ void ATurnManager::TryLaunchPreparedBattle() {
     return;
   }
 
-  const bool bAttackerReady = PendingBattleReadyState.bAttackerReady ||
-                              PendingBattleReadyState.AttackerPlayerID == INDEX_NONE;
-  const bool bDefenderReady = PendingBattleReadyState.bDefenderReady ||
-                              PendingBattleReadyState.DefenderPlayerID == INDEX_NONE;
+  UWorld *World = GetWorld();
+  ASkaldGameState *GameState =
+      World ? World->GetGameState<ASkaldGameState>() : nullptr;
 
-  if (!bAttackerReady || !bDefenderReady) {
+  bool bReadyToLaunch = false;
+  if (GameState) {
+    PendingBattleReadyState = GameState->GetPendingBattleReady();
+    bReadyToLaunch = GameState->AreAllRequiredPartiesReady();
+  } else {
+    const bool bAttackerReady = PendingBattleReadyState.bAttackerReady ||
+                                PendingBattleReadyState.AttackerPlayerID == INDEX_NONE ||
+                                PendingBattleReadyState.bAttackerIsAI;
+    const bool bDefenderReady = PendingBattleReadyState.bDefenderReady ||
+                                PendingBattleReadyState.DefenderPlayerID == INDEX_NONE ||
+                                PendingBattleReadyState.bDefenderIsAI;
+    bReadyToLaunch = bAttackerReady && bDefenderReady;
+  }
+
+  if (!bReadyToLaunch) {
     return;
   }
 
@@ -1937,7 +2030,8 @@ void ATurnManager::TryLaunchPreparedBattle() {
 
   FS_BattlePayload BattleToLaunch = PendingBattlePreparation;
   PendingBattlePreparation = FS_BattlePayload();
-  PendingBattleReadyState = FPendingBattleReadyState();
+  PendingBattleReadyState = FSkaldBattleReadyState();
+  CommitPendingBattleReadyState(TEXT("TryLaunchPreparedBattle_Clear"));
 
   const bool bClearedState = !HasPendingBattlePreparation();
   UE_LOG(LogSkald, Log,
@@ -2013,6 +2107,24 @@ void ATurnManager::MulticastPrepareBattleTravel_Implementation(
     GI->SetPendingReturnMap(TravelState.ReturnMap);
     GI->SetTravelPending(true);
   }
+}
+
+void ATurnManager::MulticastOnReadyStateChanged_Implementation(
+    const FSkaldBattleReadyState &ReadyState) {
+  PendingBattleReadyState = ReadyState;
+
+  UE_LOG(LogSkald, Verbose,
+         TEXT("MulticastOnReadyStateChanged: Attacker=%d Ready=%s AI=%s, Defender=%d Ready=%s AI=%s, t=%.3f"),
+         ReadyState.AttackerPlayerID,
+         ReadyState.bAttackerReady ? TEXT("true") : TEXT("false"),
+         ReadyState.bAttackerIsAI ? TEXT("true") : TEXT("false"),
+         ReadyState.DefenderPlayerID,
+         ReadyState.bDefenderReady ? TEXT("true") : TEXT("false"),
+         ReadyState.bDefenderIsAI ? TEXT("true") : TEXT("false"),
+         ReadyState.LastUpdatedTimeSeconds);
+
+  BroadcastPrepareForBattlePrompt(PendingBattlePreparation,
+                                  TEXT("MulticastOnReadyStateChanged"));
 }
 
 void ATurnManager::MulticastSetBattleMapActive_Implementation(bool bInBattleMap) {
