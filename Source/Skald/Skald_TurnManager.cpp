@@ -1119,16 +1119,105 @@ bool ATurnManager::HasPendingBattlePreparation() const {
 }
 
 void ATurnManager::RequestPrepareBattle(const FS_BattlePayload &Battle) {
-  PendingBattlePreparation = Battle;
-  PendingBattleReadyState = FPendingBattleReadyState();
-  PendingBattleReadyState.AttackerPlayerID = Battle.AttackerPlayerID;
-  PendingBattleReadyState.DefenderPlayerID = Battle.DefenderPlayerID;
-  PendingBattleReadyState.bAttackerReady =
-      (Battle.AttackerPlayerID == INDEX_NONE) || Battle.bAttackerIsAI;
-  PendingBattleReadyState.bDefenderReady =
-      (Battle.DefenderPlayerID == INDEX_NONE) || Battle.bDefenderIsAI;
+  FS_BattlePayload NormalizedBattle = Battle;
 
-  BroadcastPrepareForBattlePrompt(Battle, TEXT("RequestPrepareBattle"));
+  USkaldGameInstance *GameInstance = GetGameInstance<USkaldGameInstance>();
+  ASkaldGameState *GameState = GetWorld() ?
+                                  GetWorld()->GetGameState<ASkaldGameState>()
+                                  : nullptr;
+  AWorldMap *WorldMap = ResolveWorldMap();
+
+  auto ResolveParticipantState = [&](bool bIsAttacker) -> ASkaldPlayerState * {
+    const int32 TerritoryId =
+        bIsAttacker ? NormalizedBattle.FromTerritoryID
+                    : NormalizedBattle.TargetTerritoryID;
+
+    if (WorldMap && TerritoryId > 0) {
+      if (ATerritory *Territory = WorldMap->GetTerritoryById(TerritoryId)) {
+        if (ASkaldPlayerState *Owner = Territory->OwningPlayer) {
+          return Owner;
+        }
+      }
+    }
+
+    const int32 PlayerId = bIsAttacker ? NormalizedBattle.AttackerPlayerID
+                                       : NormalizedBattle.DefenderPlayerID;
+    if (GameState && PlayerId > 0) {
+      if (ASkaldPlayerState *ById = GameState->GetPlayerById(PlayerId)) {
+        return ById;
+      }
+    }
+
+    return nullptr;
+  };
+
+  auto ApplyParticipantDetails =
+      [&](ASkaldPlayerState *Participant, int32 &PlayerId, bool &bIsAI,
+          FString &DisplayName, ESkaldFaction &Faction,
+          TSoftObjectPtr<UTexture2D> &FactionEmblem, const TCHAR *Context) {
+        if (!Participant) {
+          return;
+        }
+
+        const int32 ResolvedId = Participant->GetPlayerId();
+        if (ResolvedId > 0 && ResolvedId != PlayerId) {
+          UE_LOG(LogSkald, Verbose,
+                 TEXT("RequestPrepareBattle: remapping %s PlayerID from %d to %d using %s"),
+                 Context, PlayerId, ResolvedId, *Participant->GetName());
+          PlayerId = ResolvedId;
+        }
+
+        bIsAI = Participant->bIsAI;
+
+        if (DisplayName.IsEmpty()) {
+          DisplayName = Participant->GetResolvedPlayerName(Context);
+        }
+
+        if (Faction == ESkaldFaction::None) {
+          Faction = Participant->Faction;
+        }
+
+        if (GameInstance && !FactionEmblem.ToSoftObjectPath().IsValid() &&
+            Faction != ESkaldFaction::None) {
+          TSoftObjectPtr<UTexture2D> Emblem =
+              GameInstance->GetFactionEmblem(Faction);
+          if (Emblem.ToSoftObjectPath().IsValid()) {
+            FactionEmblem = Emblem;
+          }
+        }
+      };
+
+  ApplyParticipantDetails(ResolveParticipantState(true),
+                          NormalizedBattle.AttackerPlayerID,
+                          NormalizedBattle.bAttackerIsAI,
+                          NormalizedBattle.AttackerDisplayName,
+                          NormalizedBattle.AttackerFaction,
+                          NormalizedBattle.AttackerFactionEmblem,
+                          TEXT("Attacker"));
+
+  ApplyParticipantDetails(ResolveParticipantState(false),
+                          NormalizedBattle.DefenderPlayerID,
+                          NormalizedBattle.bDefenderIsAI,
+                          NormalizedBattle.DefenderDisplayName,
+                          NormalizedBattle.DefenderFaction,
+                          NormalizedBattle.DefenderFactionEmblem,
+                          TEXT("Defender"));
+
+  PendingBattlePreparation = NormalizedBattle;
+  PendingBattleReadyState = FPendingBattleReadyState();
+  PendingBattleReadyState.AttackerPlayerID =
+      NormalizedBattle.AttackerPlayerID;
+  PendingBattleReadyState.DefenderPlayerID =
+      NormalizedBattle.DefenderPlayerID;
+  PendingBattleReadyState.bAttackerReady =
+      (PendingBattleReadyState.AttackerPlayerID == INDEX_NONE) ||
+      NormalizedBattle.bAttackerIsAI;
+  PendingBattleReadyState.bDefenderReady =
+      (PendingBattleReadyState.DefenderPlayerID == INDEX_NONE) ||
+      NormalizedBattle.bDefenderIsAI;
+
+  BroadcastPrepareForBattlePrompt(NormalizedBattle,
+                                  TEXT("RequestPrepareBattle"));
   TryLaunchPreparedBattle();
 }
 
