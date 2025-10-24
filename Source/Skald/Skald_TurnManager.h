@@ -107,9 +107,7 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void SortControllersByInitiative();
 
-  /** Request that both players confirm readiness before travelling to battle.
-   *  Returns true if prompts were dispatched, or false if the request could
-   *  not be queued and the battle was launched immediately instead. */
+  /** Request that both players confirm readiness before travelling to battle. */
   UFUNCTION(BlueprintCallable, Category = "Battle")
   bool RequestPrepareBattle(const FS_BattlePayload &Battle);
 
