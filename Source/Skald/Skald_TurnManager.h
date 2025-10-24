@@ -94,6 +94,9 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Battle")
   void RequestPrepareBattle(const FS_BattlePayload &Battle);
 
+  /** Process a confirmed attack and transition the turn system into the ready phase. */
+  void HandleAttackConfirmed(const FS_BattlePayload &Battle);
+
   /** Transition into the grid based battle mode using the provided payload. */
   UFUNCTION(BlueprintCallable, Category = "Battle")
   virtual void TriggerGridBattle(const FS_BattlePayload &Battle);
@@ -242,7 +245,10 @@ protected:
   void BroadcastPrepareForBattlePrompt(const FS_BattlePayload &Battle,
                                        const TCHAR *LogContext =
                                            TEXT("BroadcastPrepareForBattlePrompt"));
-  void TryLaunchPreparedBattle();
+  void BeginReadyPhase(const FS_BattlePayload &Battle,
+                       const TCHAR *Context = TEXT("BeginReadyPhase"));
+  bool TryAdvanceFromReadyToBattle(const TCHAR *Context =
+                                       TEXT("TryAdvanceFromReadyToBattle"));
 
   /** Schedule a retry when phase broadcasts are gated by travel or initialization state. */
   void QueuePhaseBroadcastRetry(ETurnPhase Phase);

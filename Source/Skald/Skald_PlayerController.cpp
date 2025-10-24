@@ -1555,7 +1555,7 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
         GI->CacheWorldMapSnapshot(World);
       }
     }
-    TurnManager->RequestPrepareBattle(Battle);
+    TurnManager->HandleAttackConfirmed(Battle);
     return;
   }
 
