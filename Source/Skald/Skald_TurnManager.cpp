@@ -1102,9 +1102,9 @@ void ATurnManager::RequestPrepareBattle(const FS_BattlePayload &Battle) {
   PendingBattleReadyState.AttackerPlayerID = Battle.AttackerPlayerID;
   PendingBattleReadyState.DefenderPlayerID = Battle.DefenderPlayerID;
   PendingBattleReadyState.bAttackerReady =
-      (Battle.AttackerPlayerID <= 0) || Battle.bAttackerIsAI;
+      (Battle.AttackerPlayerID == INDEX_NONE) || Battle.bAttackerIsAI;
   PendingBattleReadyState.bDefenderReady =
-      (Battle.DefenderPlayerID <= 0) || Battle.bDefenderIsAI;
+      (Battle.DefenderPlayerID == INDEX_NONE) || Battle.bDefenderIsAI;
 
   BroadcastPrepareForBattlePrompt(Battle);
   TryLaunchPreparedBattle();
@@ -1572,12 +1572,10 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
     const FS_BattlePayload &Battle) {
   const bool bNeedsAttackerConfirmation =
       !PendingBattleReadyState.bAttackerReady &&
-      PendingBattleReadyState.AttackerPlayerID != INDEX_NONE &&
-      PendingBattleReadyState.AttackerPlayerID > 0;
+      PendingBattleReadyState.AttackerPlayerID != INDEX_NONE;
   const bool bNeedsDefenderConfirmation =
       !PendingBattleReadyState.bDefenderReady &&
-      PendingBattleReadyState.DefenderPlayerID != INDEX_NONE &&
-      PendingBattleReadyState.DefenderPlayerID > 0;
+      PendingBattleReadyState.DefenderPlayerID != INDEX_NONE;
 
   for (ASkaldPlayerController *Controller : GetControllers()) {
     if (Controller) {
@@ -1619,11 +1617,9 @@ void ATurnManager::TryLaunchPreparedBattle() {
   }
 
   const bool bAttackerReady = PendingBattleReadyState.bAttackerReady ||
-                              PendingBattleReadyState.AttackerPlayerID == INDEX_NONE ||
-                              PendingBattleReadyState.AttackerPlayerID <= 0;
+                              PendingBattleReadyState.AttackerPlayerID == INDEX_NONE;
   const bool bDefenderReady = PendingBattleReadyState.bDefenderReady ||
-                              PendingBattleReadyState.DefenderPlayerID == INDEX_NONE ||
-                              PendingBattleReadyState.DefenderPlayerID <= 0;
+                              PendingBattleReadyState.DefenderPlayerID == INDEX_NONE;
 
   if (!bAttackerReady || !bDefenderReady) {
     return;
