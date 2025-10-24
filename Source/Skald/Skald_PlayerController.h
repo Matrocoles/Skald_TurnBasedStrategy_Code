@@ -439,14 +439,20 @@ public:
   void ClientClearStrategicInitiativeOverlay();
 
   UFUNCTION(Client, Reliable)
-  void ClientShowPrepareForBattle(const FS_BattlePayload &BattlePayload);
+  void ClientShowPrepareForBattle(int32 AttackerPlayerID,
+                                  int32 AttackingTerritoryID,
+                                  int32 DefenderPlayerID,
+                                  int32 DefendingTerritoryID);
 
   UFUNCTION(Client, Reliable)
   void ClientHidePrepareForBattle();
 
   /** Display the prepare-for-battle dialog on the local HUD without relying on
    *  network RPCs. */
-  void ShowPrepareForBattleDialogLocal(const FS_BattlePayload &BattlePayload);
+  void ShowPrepareForBattleDialogLocal(int32 AttackerPlayerID,
+                                       int32 AttackingTerritoryID,
+                                       int32 DefenderPlayerID,
+                                       int32 DefendingTerritoryID);
 
   /** Hide the prepare-for-battle dialog on the local HUD. */
   void HidePrepareForBattleDialogLocal();
