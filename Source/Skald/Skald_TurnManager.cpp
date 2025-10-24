@@ -1102,9 +1102,9 @@ void ATurnManager::RequestPrepareBattle(const FS_BattlePayload &Battle) {
   PendingBattleReadyState.AttackerPlayerID = Battle.AttackerPlayerID;
   PendingBattleReadyState.DefenderPlayerID = Battle.DefenderPlayerID;
   PendingBattleReadyState.bAttackerReady =
-      (Battle.AttackerPlayerID == INDEX_NONE) || Battle.bAttackerIsAI;
+      (Battle.AttackerPlayerID <= 0) || Battle.bAttackerIsAI;
   PendingBattleReadyState.bDefenderReady =
-      (Battle.DefenderPlayerID == INDEX_NONE) || Battle.bDefenderIsAI;
+      (Battle.DefenderPlayerID <= 0) || Battle.bDefenderIsAI;
 
   BroadcastPrepareForBattlePrompt(Battle);
   TryLaunchPreparedBattle();
@@ -1572,10 +1572,12 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
     const FS_BattlePayload &Battle) {
   const bool bNeedsAttackerConfirmation =
       !PendingBattleReadyState.bAttackerReady &&
-      PendingBattleReadyState.AttackerPlayerID != INDEX_NONE;
+      PendingBattleReadyState.AttackerPlayerID != INDEX_NONE &&
+      PendingBattleReadyState.AttackerPlayerID > 0;
   const bool bNeedsDefenderConfirmation =
       !PendingBattleReadyState.bDefenderReady &&
-      PendingBattleReadyState.DefenderPlayerID != INDEX_NONE;
+      PendingBattleReadyState.DefenderPlayerID != INDEX_NONE &&
+      PendingBattleReadyState.DefenderPlayerID > 0;
 
   for (ASkaldPlayerController *Controller : GetControllers()) {
     if (Controller) {
@@ -1617,9 +1619,11 @@ void ATurnManager::TryLaunchPreparedBattle() {
   }
 
   const bool bAttackerReady = PendingBattleReadyState.bAttackerReady ||
-                              PendingBattleReadyState.AttackerPlayerID == INDEX_NONE;
+                              PendingBattleReadyState.AttackerPlayerID == INDEX_NONE ||
+                              PendingBattleReadyState.AttackerPlayerID <= 0;
   const bool bDefenderReady = PendingBattleReadyState.bDefenderReady ||
-                              PendingBattleReadyState.DefenderPlayerID == INDEX_NONE;
+                              PendingBattleReadyState.DefenderPlayerID == INDEX_NONE ||
+                              PendingBattleReadyState.DefenderPlayerID <= 0;
 
   if (!bAttackerReady || !bDefenderReady) {
     return;
