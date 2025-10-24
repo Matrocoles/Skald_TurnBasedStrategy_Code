@@ -647,6 +647,11 @@ void ATurnManager::HandleBattleMapStateChanged(bool bInBattleMap) {
       ClearBattleEndBinding(GI);
     }
   }
+
+  if (!bInBattleMap) {
+    BroadcastPrepareForBattlePrompt(PendingBattlePreparation,
+                                    TEXT("HandleBattleMapStateChanged"));
+  }
 }
 
 void ATurnManager::AttemptBindBattleEnd(USkaldGameInstance *GameInstance,
@@ -747,6 +752,8 @@ void ATurnManager::RegisterController(ASkaldPlayerController *Controller) {
   if (IsValid(Controller) && !Controllers.Contains(Controller)) {
     Controllers.Add(Controller);
     Controller->SetTurnManager(this);
+    BroadcastPrepareForBattlePrompt(PendingBattlePreparation,
+                                    TEXT("RegisterController"));
   }
 }
 
@@ -884,6 +891,9 @@ bool ATurnManager::TryResumeSavedTurnState(USkaldGameInstance *GameInstance) {
   if (!bBroadcasted) {
     QueuePhaseBroadcastRetry(CurrentPhase);
   }
+
+  BroadcastPrepareForBattlePrompt(PendingBattlePreparation,
+                                  TEXT("TryResumeSavedTurnState"));
 
   return true;
 }
@@ -1118,7 +1128,7 @@ void ATurnManager::RequestPrepareBattle(const FS_BattlePayload &Battle) {
   PendingBattleReadyState.bDefenderReady =
       (Battle.DefenderPlayerID == INDEX_NONE) || Battle.bDefenderIsAI;
 
-  BroadcastPrepareForBattlePrompt(Battle);
+  BroadcastPrepareForBattlePrompt(Battle, TEXT("RequestPrepareBattle"));
   TryLaunchPreparedBattle();
 }
 
@@ -1594,7 +1604,7 @@ void ATurnManager::NotifyPlayerReadyForBattle(int32 PlayerID) {
 }
 
 void ATurnManager::BroadcastPrepareForBattlePrompt(
-    const FS_BattlePayload &Battle) {
+    const FS_BattlePayload &Battle, const TCHAR *LogContext) {
   const bool bNeedsAttackerConfirmation =
       !PendingBattleReadyState.bAttackerReady &&
       PendingBattleReadyState.AttackerPlayerID != INDEX_NONE;
@@ -1602,13 +1612,31 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
       !PendingBattleReadyState.bDefenderReady &&
       PendingBattleReadyState.DefenderPlayerID != INDEX_NONE;
 
-  for (ASkaldPlayerController *Controller : GetControllers()) {
-    if (Controller) {
-      Controller->ClientHidePrepareForBattle();
+  const bool bHasPayload = Battle.FromTerritoryID != 0 ||
+                           Battle.TargetTerritoryID != 0;
+
+  const TArray<ASkaldPlayerController *> ControllerSnapshot = GetControllers();
+  auto HideAllControllers = [&ControllerSnapshot]() {
+    for (ASkaldPlayerController *Controller : ControllerSnapshot) {
+      if (Controller) {
+        Controller->ClientHidePrepareForBattle();
+      }
     }
+  };
+
+  if (!bHasPayload) {
+    if (bNeedsAttackerConfirmation || bNeedsDefenderConfirmation) {
+      UE_LOG(LogSkald, Warning,
+             TEXT("%s: pending battle readiness exists but cached payload is empty."),
+             LogContext);
+    }
+
+    HideAllControllers();
+    return;
   }
 
   if (!bNeedsAttackerConfirmation && !bNeedsDefenderConfirmation) {
+    HideAllControllers();
     return;
   }
 
@@ -1619,7 +1647,7 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
   USkaldGameInstance *GameInstance = GetGameInstance<USkaldGameInstance>();
 
   auto ResolvePlayerName = [&](int32 PlayerId, const FString &CachedName,
-                               const TCHAR *LogContext) -> FText {
+                               const TCHAR *Context) -> FText {
     if (!CachedName.IsEmpty()) {
       return FText::FromString(CachedName);
     }
@@ -1627,7 +1655,7 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
     if (GameState && PlayerId > 0) {
       if (ASkaldPlayerState *PlayerState = GameState->GetPlayerById(PlayerId)) {
         const FString Resolved =
-            PlayerState->GetResolvedPlayerName(LogContext);
+            PlayerState->GetResolvedPlayerName(Context);
         if (!Resolved.IsEmpty()) {
           return FText::FromString(Resolved);
         }
@@ -1636,21 +1664,20 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
 
     if (PlayerId > 0) {
       UE_LOG(LogSkald, Verbose,
-             TEXT("BroadcastPrepareForBattlePrompt: using fallback name for %s (PlayerID %d)"),
-             LogContext, PlayerId);
+             TEXT("%s: using fallback name for %s (PlayerID %d)"), LogContext,
+             Context, PlayerId);
       return FText::Format(
           NSLOCTEXT("SkaldHUD", "Prepare_PlayerIDFallback", "Player #{0}"),
           FText::AsNumber(PlayerId));
     }
 
     UE_LOG(LogSkald, Warning,
-           TEXT("BroadcastPrepareForBattlePrompt: missing player name for %s"),
-           LogContext);
+           TEXT("%s: missing player name for %s"), LogContext, Context);
     return NSLOCTEXT("SkaldHUD", "Prepare_UnknownPlayer", "Unknown Player");
   };
 
   auto ResolveTerritoryName = [&](int32 TerritoryId, const FString &CachedName,
-                                  const TCHAR *LogContext) -> FText {
+                                  const TCHAR *Context) -> FText {
     if (!CachedName.IsEmpty()) {
       return FText::FromString(CachedName);
     }
@@ -1665,23 +1692,22 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
 
     if (TerritoryId != 0) {
       UE_LOG(LogSkald, Verbose,
-             TEXT("BroadcastPrepareForBattlePrompt: using fallback territory ID for %s (ID %d)"),
-             LogContext, TerritoryId);
+             TEXT("%s: using fallback territory ID for %s (ID %d)"),
+             LogContext, Context, TerritoryId);
       return FText::Format(NSLOCTEXT("SkaldHUD", "Prepare_TerritoryIDFallback",
                                      "Territory #{0}"),
                            FText::AsNumber(TerritoryId));
     }
 
     UE_LOG(LogSkald, Warning,
-           TEXT("BroadcastPrepareForBattlePrompt: missing territory data for %s"),
-           LogContext);
+           TEXT("%s: missing territory data for %s"), LogContext, Context);
     return NSLOCTEXT("SkaldHUD", "Prepare_UnknownTerritory",
                      "Unknown Territory");
   };
 
   auto ResolveFactionEmblem =
       [&](const TSoftObjectPtr<UTexture2D> &Source, ESkaldFaction Faction,
-          const TCHAR *LogContext) -> TSoftObjectPtr<UTexture2D> {
+          const TCHAR *Context) -> TSoftObjectPtr<UTexture2D> {
         if (Source.ToSoftObjectPath().IsValid()) {
           return Source;
         }
@@ -1696,8 +1722,8 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
 
         if (Faction != ESkaldFaction::None) {
           UE_LOG(LogSkald, Verbose,
-                 TEXT("BroadcastPrepareForBattlePrompt: missing faction emblem for %s (%s)"),
-                 LogContext,
+                 TEXT("%s: missing faction emblem for %s (%s)"), LogContext,
+                 Context,
                  *StaticEnum<ESkaldFaction>()->GetNameStringByValue(
                      static_cast<int64>(Faction)));
         }
@@ -1729,21 +1755,71 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
       ResolveFactionEmblem(Battle.DefenderFactionEmblem, Battle.DefenderFaction,
                            TEXT("Defender"));
 
-  for (ASkaldPlayerController *Controller : GetControllers()) {
+  bool bAttackerMatched = !bNeedsAttackerConfirmation;
+  bool bDefenderMatched = !bNeedsDefenderConfirmation;
+
+  for (ASkaldPlayerController *Controller : ControllerSnapshot) {
     if (!Controller) {
       continue;
     }
+
     ASkaldPlayerState *PS = Controller->GetPlayerState<ASkaldPlayerState>();
-    const int32 PlayerID = PS ? PS->GetPlayerId() : -1;
-    const bool bIsAttacker =
-        bNeedsAttackerConfirmation &&
+    if (!PS) {
+      UE_LOG(LogSkald, Verbose,
+             TEXT("%s: controller %s has no PlayerState when evaluating prepare-for-battle prompt."),
+             LogContext, *Controller->GetName());
+    }
+
+    const int32 PlayerID = PS ? PS->GetPlayerId() : INDEX_NONE;
+    const bool bMatchesAttackerId =
         PlayerID == PendingBattleReadyState.AttackerPlayerID;
-    const bool bIsDefender =
-        bNeedsDefenderConfirmation &&
+    const bool bMatchesDefenderId =
         PlayerID == PendingBattleReadyState.DefenderPlayerID;
+
+    const bool bIsAttacker = bNeedsAttackerConfirmation && bMatchesAttackerId;
+    const bool bIsDefender = bNeedsDefenderConfirmation && bMatchesDefenderId;
+
     if (bIsAttacker || bIsDefender) {
       Controller->ClientShowPrepareForBattle(PromptData);
+
+      if ((bIsAttacker || bIsDefender) && PS && PS->bIsAI) {
+        UE_LOG(LogSkald, Warning,
+               TEXT("%s: PlayerID %d is AI-controlled while awaiting prepare-for-battle confirmation."),
+               LogContext, PlayerID);
+      }
+
+      if (bIsAttacker) {
+        bAttackerMatched = true;
+      }
+      if (bIsDefender) {
+        bDefenderMatched = true;
+      }
+      continue;
     }
+
+    Controller->ClientHidePrepareForBattle();
+
+    if (bMatchesAttackerId && !bNeedsAttackerConfirmation) {
+      UE_LOG(LogSkald, Log,
+             TEXT("%s: cleared attacker prompt for controller %s (PlayerID %d) because confirmation is no longer required."),
+             LogContext, *Controller->GetName(), PlayerID);
+    } else if (bMatchesDefenderId && !bNeedsDefenderConfirmation) {
+      UE_LOG(LogSkald, Log,
+             TEXT("%s: cleared defender prompt for controller %s (PlayerID %d) because confirmation is no longer required."),
+             LogContext, *Controller->GetName(), PlayerID);
+    }
+  }
+
+  if (bNeedsAttackerConfirmation && !bAttackerMatched) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("%s: pending attacker PlayerID %d has no registered controller."),
+           LogContext, PendingBattleReadyState.AttackerPlayerID);
+  }
+
+  if (bNeedsDefenderConfirmation && !bDefenderMatched) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("%s: pending defender PlayerID %d has no registered controller."),
+           LogContext, PendingBattleReadyState.DefenderPlayerID);
   }
 }
 
