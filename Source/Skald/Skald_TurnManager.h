@@ -113,7 +113,7 @@ public:
 
   /** Transition into the grid based battle mode using the provided payload. */
   UFUNCTION(BlueprintCallable, Category = "Battle")
-  void TriggerGridBattle(const FS_BattlePayload &Battle);
+  virtual void TriggerGridBattle(const FS_BattlePayload &Battle);
 
   /** Apply the outcome of a completed grid battle to the world map. */
   UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Battle")
@@ -149,6 +149,10 @@ public:
   /** Retrieve the cached world map actor, if one is available. */
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Turn")
   AWorldMap *GetCachedWorldMapActor() const { return CachedWorldMap; }
+
+  /** Returns true when a battle preparation is waiting on player readiness. */
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Battle")
+  bool HasPendingBattlePreparation() const;
 
   /** Capture a snapshot of all territories currently registered on the world map. */
   bool CaptureWorldSnapshot(TArray<FS_Territory> &OutSnapshot,

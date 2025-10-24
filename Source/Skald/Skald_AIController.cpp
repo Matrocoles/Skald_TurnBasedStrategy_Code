@@ -181,6 +181,13 @@ void ASkaldAIController::ProcessCurrentPhase() {
       return;
     }
   } else if (Phase == ETurnPhase::Attack) {
+    if (TurnManager->HasPendingBattlePreparation()) {
+      bAwaitingBattleTransition = true;
+      BroadcastEnemyTurnStatus(FString(EnemyBattleTransitionMessage));
+      ScheduleNextDecisionStep(EnemyBattleTransitionPollDelay);
+      return;
+    }
+
     ATerritory *BestSource = nullptr;
     ATerritory *BestTarget = nullptr;
     int32 WeakestStrength = std::numeric_limits<int32>::max();

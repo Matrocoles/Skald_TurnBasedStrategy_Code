@@ -1837,8 +1837,18 @@ void USkaldMainHUDWidget::SyncPhaseButtons(bool bIsMyTurn) {
        CurrentPhase == ETurnPhase::ArmyPlacement);
   SetButtonState(DeployButton, bShowDeployButton, bShowDeployButton);
 
+  bool bHasPendingBattle = false;
+  if (bIsMyTurn) {
+    if (ASkaldPlayerController *PlayerController =
+            Cast<ASkaldPlayerController>(GetOwningPlayer())) {
+      if (ATurnManager *Manager = PlayerController->GetTurnManager()) {
+        bHasPendingBattle = Manager->HasPendingBattlePreparation();
+      }
+    }
+  }
+
   const bool bShowEndPhaseButton =
-      bIsMyTurn && CurrentPhase != ETurnPhase::EndTurn;
+      bIsMyTurn && !bHasPendingBattle && CurrentPhase != ETurnPhase::EndTurn;
   SetButtonState(EndPhaseButton, bShowEndPhaseButton, bShowEndPhaseButton);
 
   const bool bShowEndTurnButton =
