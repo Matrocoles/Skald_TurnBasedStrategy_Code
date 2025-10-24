@@ -1579,7 +1579,11 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
 
   for (ASkaldPlayerController *Controller : GetControllers()) {
     if (Controller) {
-      Controller->ClientHidePrepareForBattle();
+      if (Controller->HasAuthority() && Controller->IsLocalController()) {
+        Controller->HidePrepareForBattleDialogLocal();
+      } else {
+        Controller->ClientHidePrepareForBattle();
+      }
     }
   }
 
@@ -1600,10 +1604,17 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
         bNeedsDefenderConfirmation &&
         PlayerID == PendingBattleReadyState.DefenderPlayerID;
     if (bIsAttacker || bIsDefender) {
-      Controller->ClientShowPrepareForBattle(Battle.AttackerPlayerID,
-                                             Battle.FromTerritoryID,
-                                             Battle.DefenderPlayerID,
-                                             Battle.TargetTerritoryID);
+      if (Controller->HasAuthority() && Controller->IsLocalController()) {
+        Controller->ShowPrepareForBattleDialogLocal(Battle.AttackerPlayerID,
+                                                   Battle.FromTerritoryID,
+                                                   Battle.DefenderPlayerID,
+                                                   Battle.TargetTerritoryID);
+      } else {
+        Controller->ClientShowPrepareForBattle(Battle.AttackerPlayerID,
+                                               Battle.FromTerritoryID,
+                                               Battle.DefenderPlayerID,
+                                               Battle.TargetTerritoryID);
+      }
     }
   }
 }
@@ -1627,7 +1638,11 @@ void ATurnManager::TryLaunchPreparedBattle() {
 
   for (ASkaldPlayerController *Controller : GetControllers()) {
     if (Controller) {
-      Controller->ClientHidePrepareForBattle();
+      if (Controller->HasAuthority() && Controller->IsLocalController()) {
+        Controller->HidePrepareForBattleDialogLocal();
+      } else {
+        Controller->ClientHidePrepareForBattle();
+      }
     }
   }
 
