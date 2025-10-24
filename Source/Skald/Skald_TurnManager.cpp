@@ -744,9 +744,18 @@ void ATurnManager::ClearBattleEndBinding(USkaldGameInstance *GameInstance) {
 }
 
 void ATurnManager::RegisterController(ASkaldPlayerController *Controller) {
+  RegisterControllerInternal(Controller, /*bSuppressPreparePrompt=*/false);
+}
+
+void ATurnManager::RegisterControllerInternal(
+    ASkaldPlayerController *Controller, bool bSuppressPreparePrompt) {
   if (IsValid(Controller) && !Controllers.Contains(Controller)) {
     Controllers.Add(Controller);
     Controller->SetTurnManager(this);
+
+    if (!bSuppressPreparePrompt) {
+      MaybePromptPendingBattleParticipant(Controller);
+    }
   }
 }
 
@@ -1106,6 +1115,7 @@ void ATurnManager::RequestPrepareBattle(const FS_BattlePayload &Battle) {
   PendingBattleReadyState.bDefenderReady =
       (Battle.DefenderPlayerID == INDEX_NONE) || Battle.bDefenderIsAI;
 
+  EnsureBattleParticipantsRegistered();
   BroadcastPrepareForBattlePrompt(Battle);
   TryLaunchPreparedBattle();
 }
@@ -1616,6 +1626,71 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
                                                Battle.TargetTerritoryID);
       }
     }
+  }
+}
+
+bool ATurnManager::HasPendingBattlePreparation() const {
+  return PendingBattlePreparation.FromTerritoryID != 0 ||
+         PendingBattlePreparation.TargetTerritoryID != 0;
+}
+
+void ATurnManager::EnsureBattleParticipantsRegistered() {
+  if (!HasPendingBattlePreparation()) {
+    return;
+  }
+
+  UWorld *World = GetWorld();
+  if (!World) {
+    return;
+  }
+
+  for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator();
+       It; ++It) {
+    ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(*It);
+    if (!PC || Controllers.Contains(PC)) {
+      continue;
+    }
+
+    ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>();
+    if (!PS) {
+      continue;
+    }
+
+    const int32 PlayerID = PS->GetPlayerId();
+    const bool bNeedsAttacker =
+        !PendingBattleReadyState.bAttackerReady &&
+        PendingBattleReadyState.AttackerPlayerID == PlayerID;
+    const bool bNeedsDefender =
+        !PendingBattleReadyState.bDefenderReady &&
+        PendingBattleReadyState.DefenderPlayerID == PlayerID;
+
+    if (bNeedsAttacker || bNeedsDefender) {
+      RegisterControllerInternal(PC, /*bSuppressPreparePrompt=*/true);
+    }
+  }
+}
+
+void ATurnManager::MaybePromptPendingBattleParticipant(
+    ASkaldPlayerController *Controller) {
+  if (!HasPendingBattlePreparation() || !Controller) {
+    return;
+  }
+
+  ASkaldPlayerState *PS = Controller->GetPlayerState<ASkaldPlayerState>();
+  if (!PS) {
+    return;
+  }
+
+  const int32 PlayerID = PS->GetPlayerId();
+  const bool bNeedsAttacker =
+      !PendingBattleReadyState.bAttackerReady &&
+      PendingBattleReadyState.AttackerPlayerID == PlayerID;
+  const bool bNeedsDefender =
+      !PendingBattleReadyState.bDefenderReady &&
+      PendingBattleReadyState.DefenderPlayerID == PlayerID;
+
+  if (bNeedsAttacker || bNeedsDefender) {
+    BroadcastPrepareForBattlePrompt(PendingBattlePreparation);
   }
 }
 

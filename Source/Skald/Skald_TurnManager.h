@@ -248,6 +248,13 @@ protected:
   void BroadcastPrepareForBattlePrompt(const FS_BattlePayload &Battle);
   void TryLaunchPreparedBattle();
 
+private:
+  void RegisterControllerInternal(ASkaldPlayerController *Controller,
+                                  bool bSuppressPreparePrompt);
+  void EnsureBattleParticipantsRegistered();
+  bool HasPendingBattlePreparation() const;
+  void MaybePromptPendingBattleParticipant(ASkaldPlayerController *Controller);
+
   /** Schedule a retry when phase broadcasts are gated by travel or initialization state. */
   void QueuePhaseBroadcastRetry(ETurnPhase Phase);
 
