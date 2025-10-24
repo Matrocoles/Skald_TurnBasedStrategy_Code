@@ -1989,7 +1989,7 @@ void ATurnManager::CommitPendingBattleReadyState(const TCHAR *Context) {
          PendingBattleReadyState.bDefenderIsAI ? TEXT("true") : TEXT("false"),
          PendingBattleReadyState.LastUpdatedTimeSeconds);
 
-  MulticastOnReadyStateChanged(PendingBattleReadyState);
+  MulticastOnReadyStateChanged(PendingBattleReadyState, PendingBattlePreparation);
 }
 
 void ATurnManager::TryLaunchPreparedBattle() {
@@ -2110,8 +2110,10 @@ void ATurnManager::MulticastPrepareBattleTravel_Implementation(
 }
 
 void ATurnManager::MulticastOnReadyStateChanged_Implementation(
-    const FSkaldBattleReadyState &ReadyState) {
+    const FSkaldBattleReadyState &ReadyState,
+    const FS_BattlePayload &BattlePayload) {
   PendingBattleReadyState = ReadyState;
+  PendingBattlePreparation = BattlePayload;
 
   UE_LOG(LogSkald, Verbose,
          TEXT("MulticastOnReadyStateChanged: Attacker=%d Ready=%s AI=%s, Defender=%d Ready=%s AI=%s, t=%.3f"),
@@ -2123,7 +2125,7 @@ void ATurnManager::MulticastOnReadyStateChanged_Implementation(
          ReadyState.bDefenderIsAI ? TEXT("true") : TEXT("false"),
          ReadyState.LastUpdatedTimeSeconds);
 
-  BroadcastPrepareForBattlePrompt(PendingBattlePreparation,
+  BroadcastPrepareForBattlePrompt(BattlePayload,
                                   TEXT("MulticastOnReadyStateChanged"));
 }
 
