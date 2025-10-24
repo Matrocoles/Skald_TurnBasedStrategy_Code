@@ -92,9 +92,10 @@ void UPrepareForBattleWidget::BuildFallbackWidgetTree() {
     TextBlock->SetAutoWrapText(true);
     TextBlock->SetText(Value);
 
-    if (UVerticalBoxSlot *Slot = Root->AddChildToVerticalBox(TextBlock)) {
-      Slot->SetHorizontalAlignment(EHorizontalAlignment::HAlign_Fill);
-      Slot->SetPadding(FMargin(8.f, 4.f));
+    if (UVerticalBoxSlot *TextSlot =
+            Root->AddChildToVerticalBox(TextBlock)) {
+      TextSlot->SetHorizontalAlignment(EHorizontalAlignment::HAlign_Fill);
+      TextSlot->SetPadding(FMargin(8.f, 4.f));
     }
 
     OutText = TextBlock;
@@ -112,10 +113,11 @@ void UPrepareForBattleWidget::BuildFallbackWidgetTree() {
   PrepareForBattleButton = WidgetTree->ConstructWidget<UButton>(
       UButton::StaticClass(), TEXT("PrepareForBattleButton"));
   if (PrepareForBattleButton) {
-    if (UVerticalBoxSlot *Slot =
+    if (UVerticalBoxSlot *ButtonContainerSlot =
             Root->AddChildToVerticalBox(PrepareForBattleButton)) {
-      Slot->SetHorizontalAlignment(EHorizontalAlignment::HAlign_Center);
-      Slot->SetPadding(FMargin(8.f, 12.f, 8.f, 0.f));
+      ButtonContainerSlot->SetHorizontalAlignment(
+          EHorizontalAlignment::HAlign_Center);
+      ButtonContainerSlot->SetPadding(FMargin(8.f, 12.f, 8.f, 0.f));
     }
 
     UTextBlock *ButtonLabel = WidgetTree->ConstructWidget<UTextBlock>(
