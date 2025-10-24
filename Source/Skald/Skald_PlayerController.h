@@ -569,9 +569,17 @@ private:
 
   void BuildPlayerDataArray(TArray<FS_PlayerData> &OutPlayers) const;
 
+protected:
+  /**
+   * Validation helper surfaced for derived types when automation tests are
+   * enabled.  The automation test controller derives from
+   * ASkaldPlayerController so exposing the helper via protected visibility
+   * keeps the production API unchanged while letting tests reuse the logic.
+   */
   bool ValidateAttack(int32 FromID, int32 ToID, int32 ArmySent, bool bUseSiege,
                       FString *OutError);
 
+private:
   bool ValidateMoveRequest(AWorldMap *WorldMap, int32 FromID, int32 ToID,
                            int32 Troops, ATerritory *&OutSource,
                            ATerritory *&OutTarget, FString &OutError) const;
