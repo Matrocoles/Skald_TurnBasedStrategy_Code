@@ -1105,7 +1105,12 @@ TArray<ASkaldPlayerController *> ATurnManager::GetControllers() const {
   return Result;
 }
 
-void ATurnManager::RequestPrepareBattle(const FS_BattlePayload &Battle) {
+bool ATurnManager::RequestPrepareBattle(const FS_BattlePayload &Battle) {
+  UE_LOG(LogSkald, Log,
+         TEXT("RequestPrepareBattle: From=%d Target=%d Army=%d AttackerID=%d DefenderID=%d"),
+         Battle.FromTerritoryID, Battle.TargetTerritoryID, Battle.ArmyCountSent,
+         Battle.AttackerPlayerID, Battle.DefenderPlayerID);
+
   PendingBattlePreparation = Battle;
   PendingBattleReadyState = FPendingBattleReadyState();
   PendingBattleReadyState.AttackerPlayerID = Battle.AttackerPlayerID;
@@ -1116,8 +1121,17 @@ void ATurnManager::RequestPrepareBattle(const FS_BattlePayload &Battle) {
       (Battle.DefenderPlayerID == INDEX_NONE) || Battle.bDefenderIsAI;
 
   EnsureBattleParticipantsRegistered();
-  BroadcastPrepareForBattlePrompt(Battle);
+
+  const bool bPromptDispatched = BroadcastPrepareForBattlePrompt(Battle);
+  if (!bPromptDispatched) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("RequestPrepareBattle: Unable to prompt participants - falling back to immediate battle launch."));
+    ForceLaunchBattleFromPrepareFallback(PendingBattlePreparation);
+    return false;
+  }
+
   TryLaunchPreparedBattle();
+  return true;
 }
 
 void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
@@ -1578,7 +1592,7 @@ void ATurnManager::NotifyPlayerReadyForBattle(int32 PlayerID) {
   TryLaunchPreparedBattle();
 }
 
-void ATurnManager::BroadcastPrepareForBattlePrompt(
+bool ATurnManager::BroadcastPrepareForBattlePrompt(
     const FS_BattlePayload &Battle) {
   const bool bNeedsAttackerConfirmation =
       !PendingBattleReadyState.bAttackerReady &&
@@ -1586,6 +1600,11 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
   const bool bNeedsDefenderConfirmation =
       !PendingBattleReadyState.bDefenderReady &&
       PendingBattleReadyState.DefenderPlayerID != INDEX_NONE;
+
+  UE_LOG(LogSkald, Log,
+         TEXT("BroadcastPrepareForBattlePrompt: PendingBattleReadyState AttackerReady=%s DefenderReady=%s"),
+         PendingBattleReadyState.bAttackerReady ? TEXT("true") : TEXT("false"),
+         PendingBattleReadyState.bDefenderReady ? TEXT("true") : TEXT("false"));
 
   for (ASkaldPlayerController *Controller : GetControllers()) {
     if (Controller) {
@@ -1598,9 +1617,12 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
   }
 
   if (!bNeedsAttackerConfirmation && !bNeedsDefenderConfirmation) {
-    return;
+    UE_LOG(LogSkald, Verbose,
+           TEXT("BroadcastPrepareForBattlePrompt: No confirmation required - both sides already ready or AI."));
+    return true;
   }
 
+  bool bPromptIssued = false;
   for (ASkaldPlayerController *Controller : GetControllers()) {
     if (!Controller) {
       continue;
@@ -1614,13 +1636,30 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
         bNeedsDefenderConfirmation &&
         PlayerID == PendingBattleReadyState.DefenderPlayerID;
     if (bIsAttacker || bIsDefender) {
+      UE_LOG(LogSkald, Log,
+             TEXT("BroadcastPrepareForBattlePrompt: Prompting %s controller %s (PlayerID=%d)"),
+             bIsAttacker && bIsDefender
+                 ? TEXT("attacker/defender")
+                 : (bIsAttacker ? TEXT("attacker") : TEXT("defender")),
+             *GetNameSafe(Controller), PlayerID);
       if (Controller->HasAuthority() && Controller->IsLocalController()) {
         Controller->ShowPrepareForBattleDialogLocal(Battle);
       } else {
         Controller->ClientShowPrepareForBattle(Battle);
       }
+      bPromptIssued = true;
     }
   }
+
+  if (!bPromptIssued) {
+    UE_LOG(
+        LogSkald, Warning,
+        TEXT("BroadcastPrepareForBattlePrompt: No controllers were prompted (AttackerID=%d DefenderID=%d)."),
+        PendingBattleReadyState.AttackerPlayerID,
+        PendingBattleReadyState.DefenderPlayerID);
+  }
+
+  return bPromptIssued;
 }
 
 bool ATurnManager::HasPendingBattlePreparation() const {
@@ -1693,6 +1732,8 @@ void ATurnManager::TryLaunchPreparedBattle() {
       PendingBattlePreparation.FromTerritoryID != 0 ||
       PendingBattlePreparation.TargetTerritoryID != 0;
   if (!bHasPendingBattle) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("TryLaunchPreparedBattle: No pending battle preparation."));
     return;
   }
 
@@ -1702,8 +1743,17 @@ void ATurnManager::TryLaunchPreparedBattle() {
                               PendingBattleReadyState.DefenderPlayerID == INDEX_NONE;
 
   if (!bAttackerReady || !bDefenderReady) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("TryLaunchPreparedBattle: Waiting on readiness (AttackerReady=%s DefenderReady=%s)."),
+           bAttackerReady ? TEXT("true") : TEXT("false"),
+           bDefenderReady ? TEXT("true") : TEXT("false"));
     return;
   }
+
+  UE_LOG(LogSkald, Log,
+         TEXT("TryLaunchPreparedBattle: Launching battle From=%d Target=%d"),
+         PendingBattlePreparation.FromTerritoryID,
+         PendingBattlePreparation.TargetTerritoryID);
 
   for (ASkaldPlayerController *Controller : GetControllers()) {
     if (Controller) {
@@ -1720,6 +1770,16 @@ void ATurnManager::TryLaunchPreparedBattle() {
   PendingBattleReadyState = FPendingBattleReadyState();
 
   TriggerGridBattle(BattleToLaunch);
+}
+
+void ATurnManager::ForceLaunchBattleFromPrepareFallback(
+    const FS_BattlePayload &Battle) {
+  UE_LOG(LogSkald, Warning,
+         TEXT("ForceLaunchBattleFromPrepareFallback: Forcing immediate battle launch for From=%d Target=%d."),
+         Battle.FromTerritoryID, Battle.TargetTerritoryID);
+  PendingBattlePreparation = FS_BattlePayload();
+  PendingBattleReadyState = FPendingBattleReadyState();
+  TriggerGridBattle(Battle);
 }
 
 void ATurnManager::RetryPendingBattleTravel() {
