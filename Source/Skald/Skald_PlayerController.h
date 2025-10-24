@@ -447,16 +447,6 @@ public:
   UFUNCTION(Client, Reliable)
   void ClientHidePrepareForBattle();
 
-  /** Display the prepare-for-battle dialog on the local HUD without relying on
-   *  network RPCs. */
-  void ShowPrepareForBattleDialogLocal(int32 AttackerPlayerID,
-                                       int32 AttackingTerritoryID,
-                                       int32 DefenderPlayerID,
-                                       int32 DefendingTerritoryID);
-
-  /** Hide the prepare-for-battle dialog on the local HUD. */
-  void HidePrepareForBattleDialogLocal();
-
   /** Server-side processing of an attack request. */
   UFUNCTION(Server, Reliable)
   void ServerHandleAttack(int32 FromID, int32 ToID, int32 ArmySent,
