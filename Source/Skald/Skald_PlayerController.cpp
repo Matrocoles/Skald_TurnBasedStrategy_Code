@@ -1438,11 +1438,13 @@ void ASkaldPlayerController::HandlePrepareForBattleReady() {
 }
 
 void ASkaldPlayerController::ShowPrepareForBattleDialogLocal(
-    const FS_BattlePayload &BattlePayload) {
+    int32 AttackerPlayerID, int32 AttackingTerritoryID,
+    int32 DefenderPlayerID, int32 DefendingTerritoryID) {
   ShowMainHUD();
 
   if (MainHUD) {
-    MainHUD->ShowPrepareForBattleDialog(BattlePayload);
+    MainHUD->ShowPrepareForBattleDialog(AttackerPlayerID, AttackingTerritoryID,
+                                        DefenderPlayerID, DefendingTerritoryID);
   } else {
     UE_LOG(LogSkald, Warning,
            TEXT("ShowPrepareForBattleDialogLocal called without MainHUD"));
@@ -2920,8 +2922,10 @@ void ASkaldPlayerController::ClientClearStrategicInitiativeOverlay_Implementatio
 }
 
 void ASkaldPlayerController::ClientShowPrepareForBattle_Implementation(
-    const FS_BattlePayload &BattlePayload) {
-  ShowPrepareForBattleDialogLocal(BattlePayload);
+    int32 AttackerPlayerID, int32 AttackingTerritoryID, int32 DefenderPlayerID,
+    int32 DefendingTerritoryID) {
+  ShowPrepareForBattleDialogLocal(AttackerPlayerID, AttackingTerritoryID,
+                                  DefenderPlayerID, DefendingTerritoryID);
 }
 
 void ASkaldPlayerController::ClientHidePrepareForBattle_Implementation() {
