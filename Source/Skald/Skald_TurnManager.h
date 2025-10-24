@@ -116,7 +116,8 @@ public:
 
   /** Multicast notification whenever the pending battle readiness changes. */
   UFUNCTION(NetMulticast, Reliable)
-  void MulticastOnReadyStateChanged(const FSkaldBattleReadyState &ReadyState);
+  void MulticastOnReadyStateChanged(const FSkaldBattleReadyState &ReadyState,
+                                    const FS_BattlePayload &BattlePayload);
 
   /** Multicast the battle map active state so clients can update immediately. */
   UFUNCTION(NetMulticast, Reliable)
