@@ -1187,7 +1187,10 @@ void ATurnManager::RequestPrepareBattle(const FS_BattlePayload &Battle) {
         }
       };
 
-  ApplyParticipantDetails(ResolveParticipantState(true),
+  ASkaldPlayerState *ResolvedAttackerState = ResolveParticipantState(true);
+  ASkaldPlayerState *ResolvedDefenderState = ResolveParticipantState(false);
+
+  ApplyParticipantDetails(ResolvedAttackerState,
                           NormalizedBattle.AttackerPlayerID,
                           NormalizedBattle.bAttackerIsAI,
                           NormalizedBattle.AttackerDisplayName,
@@ -1195,7 +1198,7 @@ void ATurnManager::RequestPrepareBattle(const FS_BattlePayload &Battle) {
                           NormalizedBattle.AttackerFactionEmblem,
                           TEXT("Attacker"));
 
-  ApplyParticipantDetails(ResolveParticipantState(false),
+  ApplyParticipantDetails(ResolvedDefenderState,
                           NormalizedBattle.DefenderPlayerID,
                           NormalizedBattle.bDefenderIsAI,
                           NormalizedBattle.DefenderDisplayName,
@@ -1209,12 +1212,24 @@ void ATurnManager::RequestPrepareBattle(const FS_BattlePayload &Battle) {
       NormalizedBattle.AttackerPlayerID;
   PendingBattleReadyState.DefenderPlayerID =
       NormalizedBattle.DefenderPlayerID;
+  PendingBattleReadyState.AttackerState = ResolvedAttackerState;
+  PendingBattleReadyState.DefenderState = ResolvedDefenderState;
+  const bool bAttackerAutoReady = NormalizedBattle.bAttackerIsAI ||
+                                  (ResolvedAttackerState &&
+                                   ResolvedAttackerState->bIsAI);
+  const bool bDefenderAutoReady = NormalizedBattle.bDefenderIsAI ||
+                                  (ResolvedDefenderState &&
+                                   ResolvedDefenderState->bIsAI);
+
+  const bool bAttackerIdKnown =
+      PendingBattleReadyState.AttackerPlayerID != INDEX_NONE;
+  const bool bDefenderIdKnown =
+      PendingBattleReadyState.DefenderPlayerID != INDEX_NONE;
+
   PendingBattleReadyState.bAttackerReady =
-      (PendingBattleReadyState.AttackerPlayerID == INDEX_NONE) ||
-      NormalizedBattle.bAttackerIsAI;
+      bAttackerAutoReady || (!bAttackerIdKnown && !ResolvedAttackerState);
   PendingBattleReadyState.bDefenderReady =
-      (PendingBattleReadyState.DefenderPlayerID == INDEX_NONE) ||
-      NormalizedBattle.bDefenderIsAI;
+      bDefenderAutoReady || (!bDefenderIdKnown && !ResolvedDefenderState);
 
   BroadcastPrepareForBattlePrompt(NormalizedBattle,
                                   TEXT("RequestPrepareBattle"));
@@ -1682,10 +1697,19 @@ void ATurnManager::NotifyPlayerReadyForBattle(int32 PlayerID) {
     return;
   }
 
-  if (PendingBattleReadyState.AttackerPlayerID == PlayerID) {
+  const bool bAttackerIdKnown =
+      PendingBattleReadyState.AttackerPlayerID != INDEX_NONE;
+  const bool bDefenderIdKnown =
+      PendingBattleReadyState.DefenderPlayerID != INDEX_NONE;
+
+  if (PendingBattleReadyState.AttackerPlayerID == PlayerID ||
+      (!bAttackerIdKnown && PendingBattleReadyState.AttackerState.IsValid() &&
+       PendingBattleReadyState.AttackerState->GetPlayerId() == PlayerID)) {
     PendingBattleReadyState.bAttackerReady = true;
   }
-  if (PendingBattleReadyState.DefenderPlayerID == PlayerID) {
+  if (PendingBattleReadyState.DefenderPlayerID == PlayerID ||
+      (!bDefenderIdKnown && PendingBattleReadyState.DefenderState.IsValid() &&
+       PendingBattleReadyState.DefenderState->GetPlayerId() == PlayerID)) {
     PendingBattleReadyState.bDefenderReady = true;
   }
 
@@ -1694,12 +1718,58 @@ void ATurnManager::NotifyPlayerReadyForBattle(int32 PlayerID) {
 
 void ATurnManager::BroadcastPrepareForBattlePrompt(
     const FS_BattlePayload &Battle, const TCHAR *LogContext) {
+  UWorld *World = GetWorld();
+  ASkaldGameState *GameState =
+      World ? World->GetGameState<ASkaldGameState>() : nullptr;
+  AWorldMap *WorldMap = ResolveWorldMap();
+  USkaldGameInstance *GameInstance = GetGameInstance<USkaldGameInstance>();
+
+  auto ResolvePlayerStateById = [&](int32 PlayerId) -> ASkaldPlayerState * {
+    if (!GameState || PlayerId <= 0) {
+      return nullptr;
+    }
+    return GameState->GetPlayerById(PlayerId);
+  };
+
+  ASkaldPlayerState *AttackerState =
+      PendingBattleReadyState.AttackerState.Get();
+  if (!AttackerState &&
+      PendingBattleReadyState.AttackerPlayerID != INDEX_NONE) {
+    AttackerState = ResolvePlayerStateById(
+        PendingBattleReadyState.AttackerPlayerID);
+  }
+  if (!AttackerState && WorldMap && Battle.FromTerritoryID > 0) {
+    if (ATerritory *Source = WorldMap->GetTerritoryById(Battle.FromTerritoryID)) {
+      AttackerState = Source ? Source->OwningPlayer : nullptr;
+    }
+  }
+  PendingBattleReadyState.AttackerState = AttackerState;
+
+  ASkaldPlayerState *DefenderState =
+      PendingBattleReadyState.DefenderState.Get();
+  if (!DefenderState &&
+      PendingBattleReadyState.DefenderPlayerID != INDEX_NONE) {
+    DefenderState = ResolvePlayerStateById(
+        PendingBattleReadyState.DefenderPlayerID);
+  }
+  if (!DefenderState && WorldMap && Battle.TargetTerritoryID > 0) {
+    if (ATerritory *Target = WorldMap->GetTerritoryById(Battle.TargetTerritoryID)) {
+      DefenderState = Target ? Target->OwningPlayer : nullptr;
+    }
+  }
+  PendingBattleReadyState.DefenderState = DefenderState;
+
+  const bool bAttackerIsAI =
+      AttackerState ? AttackerState->bIsAI : Battle.bAttackerIsAI;
+  const bool bDefenderIsAI =
+      DefenderState ? DefenderState->bIsAI : Battle.bDefenderIsAI;
+
   const bool bNeedsAttackerConfirmation =
-      !PendingBattleReadyState.bAttackerReady &&
-      PendingBattleReadyState.AttackerPlayerID != INDEX_NONE;
+      !PendingBattleReadyState.bAttackerReady && !bAttackerIsAI &&
+      (PendingBattleReadyState.AttackerPlayerID != INDEX_NONE || AttackerState);
   const bool bNeedsDefenderConfirmation =
-      !PendingBattleReadyState.bDefenderReady &&
-      PendingBattleReadyState.DefenderPlayerID != INDEX_NONE;
+      !PendingBattleReadyState.bDefenderReady && !bDefenderIsAI &&
+      (PendingBattleReadyState.DefenderPlayerID != INDEX_NONE || DefenderState);
 
   const bool bHasPayload = Battle.FromTerritoryID != 0 ||
                            Battle.TargetTerritoryID != 0;
@@ -1728,12 +1798,6 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
     HideAllControllers();
     return;
   }
-
-  UWorld *World = GetWorld();
-  ASkaldGameState *GameState =
-      World ? World->GetGameState<ASkaldGameState>() : nullptr;
-  AWorldMap *WorldMap = ResolveWorldMap();
-  USkaldGameInstance *GameInstance = GetGameInstance<USkaldGameInstance>();
 
   auto ResolvePlayerName = [&](int32 PlayerId, const FString &CachedName,
                                const TCHAR *Context) -> FText {
@@ -1861,17 +1925,23 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
 
     const int32 PlayerID = PS ? PS->GetPlayerId() : INDEX_NONE;
     const bool bMatchesAttackerId =
-        PlayerID == PendingBattleReadyState.AttackerPlayerID;
+        (PlayerID != INDEX_NONE &&
+         PlayerID == PendingBattleReadyState.AttackerPlayerID);
     const bool bMatchesDefenderId =
-        PlayerID == PendingBattleReadyState.DefenderPlayerID;
+        (PlayerID != INDEX_NONE &&
+         PlayerID == PendingBattleReadyState.DefenderPlayerID);
+    const bool bMatchesAttackerState = AttackerState && PS == AttackerState;
+    const bool bMatchesDefenderState = DefenderState && PS == DefenderState;
 
-    const bool bIsAttacker = bNeedsAttackerConfirmation && bMatchesAttackerId;
-    const bool bIsDefender = bNeedsDefenderConfirmation && bMatchesDefenderId;
+    const bool bIsAttacker = bNeedsAttackerConfirmation &&
+                             (bMatchesAttackerId || bMatchesAttackerState);
+    const bool bIsDefender = bNeedsDefenderConfirmation &&
+                             (bMatchesDefenderId || bMatchesDefenderState);
 
     if (bIsAttacker || bIsDefender) {
       Controller->ClientShowPrepareForBattle(PromptData);
 
-      if ((bIsAttacker || bIsDefender) && PS && PS->bIsAI) {
+      if (PS && PS->bIsAI) {
         UE_LOG(LogSkald, Warning,
                TEXT("%s: PlayerID %d is AI-controlled while awaiting prepare-for-battle confirmation."),
                LogContext, PlayerID);
@@ -1901,14 +1971,16 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
 
   if (bNeedsAttackerConfirmation && !bAttackerMatched) {
     UE_LOG(LogSkald, Warning,
-           TEXT("%s: pending attacker PlayerID %d has no registered controller."),
-           LogContext, PendingBattleReadyState.AttackerPlayerID);
+           TEXT("%s: no controller matched attacker confirmation (PlayerID=%d Territory=%d)."),
+           LogContext, PendingBattleReadyState.AttackerPlayerID,
+           Battle.FromTerritoryID);
   }
 
   if (bNeedsDefenderConfirmation && !bDefenderMatched) {
     UE_LOG(LogSkald, Warning,
-           TEXT("%s: pending defender PlayerID %d has no registered controller."),
-           LogContext, PendingBattleReadyState.DefenderPlayerID);
+           TEXT("%s: no controller matched defender confirmation (PlayerID=%d Territory=%d)."),
+           LogContext, PendingBattleReadyState.DefenderPlayerID,
+           Battle.TargetTerritoryID);
   }
 }
 
@@ -1920,10 +1992,17 @@ void ATurnManager::TryLaunchPreparedBattle() {
     return;
   }
 
+  const bool bAttackerIdKnown =
+      PendingBattleReadyState.AttackerPlayerID != INDEX_NONE;
+  const bool bDefenderIdKnown =
+      PendingBattleReadyState.DefenderPlayerID != INDEX_NONE;
+
   const bool bAttackerReady = PendingBattleReadyState.bAttackerReady ||
-                              PendingBattleReadyState.AttackerPlayerID == INDEX_NONE;
+                              (!bAttackerIdKnown &&
+                               !PendingBattleReadyState.AttackerState.IsValid());
   const bool bDefenderReady = PendingBattleReadyState.bDefenderReady ||
-                              PendingBattleReadyState.DefenderPlayerID == INDEX_NONE;
+                              (!bDefenderIdKnown &&
+                               !PendingBattleReadyState.DefenderState.IsValid());
 
   if (!bAttackerReady || !bDefenderReady) {
     return;
