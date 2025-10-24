@@ -1595,16 +1595,16 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
       }
     }
 
-    const bool bPromptQueued = TurnManager->RequestPrepareBattle(Battle);
+    const bool bPrepareQueued = TurnManager->RequestPrepareBattle(Battle);
     UE_LOG(LogSkald, Log,
            TEXT("ServerHandleAttack: RequestPrepareBattle returned %s"),
-           bPromptQueued ? TEXT("true") : TEXT("false"));
-    if (bPromptQueued) {
+           bPrepareQueued ? TEXT("true") : TEXT("false"));
+    if (bPrepareQueued) {
       return;
     }
 
-    // The turn manager already launched the fallback battle when no prompt
-    // could be shown, so there's nothing else to do here.
+    TriggerImmediateBattleFallback(
+        Battle, TEXT("RequestPrepareBattle returned false"));
     return;
   }
 
