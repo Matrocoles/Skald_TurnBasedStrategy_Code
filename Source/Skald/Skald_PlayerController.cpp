@@ -1414,8 +1414,8 @@ bool ASkaldPlayerController::BuildBattlePayloadForAttack(
 
   if (AttackerPS) {
     OutBattle.AttackerFaction = AttackerPS->Faction;
-    OutBattle.AttackerDisplayName = FText::ToString(
-        ResolvePlayerName(AttackerPS, TEXT("BuildBattlePayload_Attacker")));
+    OutBattle.AttackerDisplayName = ResolvePlayerName(
+        AttackerPS, TEXT("BuildBattlePayload_Attacker"));
     OutBattle.bAttackerIsAI = AttackerPS->bIsAI;
   } else {
     OutBattle.AttackerDisplayName.Empty();
@@ -1424,8 +1424,8 @@ bool ASkaldPlayerController::BuildBattlePayloadForAttack(
 
   if (DefenderPS) {
     OutBattle.DefenderFaction = DefenderPS->Faction;
-    OutBattle.DefenderDisplayName = FText::ToString(
-        ResolvePlayerName(DefenderPS, TEXT("BuildBattlePayload_Defender")));
+    OutBattle.DefenderDisplayName = ResolvePlayerName(
+        DefenderPS, TEXT("BuildBattlePayload_Defender"));
     OutBattle.bDefenderIsAI = DefenderPS->bIsAI;
   } else {
     OutBattle.DefenderDisplayName.Empty();
