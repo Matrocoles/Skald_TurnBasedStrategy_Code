@@ -6,6 +6,7 @@
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
+#include "Engine/Texture2D.h"
 #include "Types/SlateEnums.h"
 #include "Types/SlateStructs.h"
 #include "Blueprint/WidgetTree.h"
