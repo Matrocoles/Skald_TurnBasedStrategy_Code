@@ -3,24 +3,10 @@
 #if defined(WITH_AUTOMATION_TESTS)
 #if WITH_AUTOMATION_TESTS
 #include "Tests/SkaldAutomationTestHelpers.h"
-#include "Skald_TurnManager.h"
+#include "TurnManagerTest.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
 #include "Engine/World.h"
-
-UCLASS()
-class SKALD_API ATestTurnManagerNoTravel : public ATurnManager {
-  GENERATED_BODY()
-
-public:
-  bool bTriggerCalled = false;
-  FS_BattlePayload CapturedBattle;
-
-  virtual void TriggerGridBattle(const FS_BattlePayload &Battle) override {
-    bTriggerCalled = true;
-    CapturedBattle = Battle;
-  }
-};
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldTurnManagerPhaseTest, "Skald.TurnManager.PhaseTransitions", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FSkaldTurnManagerPhaseTest::RunTest(const FString& Parameters) {
