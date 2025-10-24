@@ -37,6 +37,23 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSkaldWorldStateChanged);
  * Handles turn sequencing for all registered player controllers.
  */
 UCLASS(Blueprintable, BlueprintType)
+USTRUCT()
+struct SKALD_API FPendingBattleReadyState {
+  GENERATED_BODY()
+
+  UPROPERTY()
+  int32 AttackerPlayerID = INDEX_NONE;
+
+  UPROPERTY()
+  int32 DefenderPlayerID = INDEX_NONE;
+
+  UPROPERTY()
+  bool bAttackerReady = false;
+
+  UPROPERTY()
+  bool bDefenderReady = false;
+};
+
 class SKALD_API ATurnManager : public AActor {
   GENERATED_BODY()
 
@@ -89,6 +106,10 @@ public:
 
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void SortControllersByInitiative();
+
+  /** Request that both players confirm readiness before travelling to battle. */
+  UFUNCTION(BlueprintCallable, Category = "Battle")
+  void RequestPrepareBattle(const FS_BattlePayload &Battle);
 
   /** Transition into the grid based battle mode using the provided payload. */
   UFUNCTION(BlueprintCallable, Category = "Battle")
@@ -145,6 +166,10 @@ public:
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Turn")
   bool HasTurnsStarted() const { return bHasTurnsStarted; }
 
+  /** Mark the specified player as ready to travel to the battle map. */
+  UFUNCTION(BlueprintCallable, Category = "Battle")
+  void NotifyPlayerReadyForBattle(int32 PlayerID);
+
   /** Event fired when the world state has changed. */
   UPROPERTY(BlueprintAssignable, Category = "Turn")
   FSkaldWorldStateChanged OnWorldStateChanged;
@@ -170,6 +195,8 @@ protected:
 
   UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Turn")
   FS_BattlePayload PendingBattle;
+  FS_BattlePayload PendingBattlePreparation;
+  FPendingBattleReadyState PendingBattleReadyState;
   /** Payload for the next battle waiting on travel/resolution to finish. */
   FS_BattlePayload DeferredPendingBattle;
 
@@ -217,6 +244,9 @@ protected:
 
   /** Notify controllers and HUDs of a phase change. */
   bool BroadcastCurrentPhase();
+
+  void BroadcastPrepareForBattlePrompt(const FS_BattlePayload &Battle);
+  void TryLaunchPreparedBattle();
 
   /** Schedule a retry when phase broadcasts are gated by travel or initialization state. */
   void QueuePhaseBroadcastRetry(ETurnPhase Phase);

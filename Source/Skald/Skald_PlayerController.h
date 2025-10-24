@@ -335,6 +335,10 @@ public:
   void HandleAttackRequested(int32 FromID, int32 ToID, int32 ArmySent,
                              bool bUseSiege);
 
+  /** Handle HUD confirmation that the player is ready for battle. */
+  UFUNCTION(BlueprintCallable, Category = "UI")
+  void HandlePrepareForBattleReady();
+
   /** Handle HUD move submissions.
    *  Bound to USkaldMainHUDWidget::OnMoveRequested in the HUD.
    *  Called when a move action is confirmed from a widget.
@@ -434,10 +438,22 @@ public:
   UFUNCTION(Client, Reliable)
   void ClientClearStrategicInitiativeOverlay();
 
+  UFUNCTION(Client, Reliable)
+  void ClientShowPrepareForBattle(int32 AttackerPlayerID,
+                                  int32 AttackingTerritoryID,
+                                  int32 DefenderPlayerID,
+                                  int32 DefendingTerritoryID);
+
+  UFUNCTION(Client, Reliable)
+  void ClientHidePrepareForBattle();
+
   /** Server-side processing of an attack request. */
   UFUNCTION(Server, Reliable)
   void ServerHandleAttack(int32 FromID, int32 ToID, int32 ArmySent,
                           bool bUseSiege);
+
+  UFUNCTION(Server, Reliable)
+  void ServerSetReadyForBattle();
 
   /** Handle HUD siege build requests. */
   UFUNCTION(BlueprintCallable, Category = "UI")
