@@ -14,7 +14,7 @@
 class ATurnManager;
 class UUserWidget;
 class USkaldMainHUDWidget;
-#if WITH_AUTOMATION_TESTS
+#if defined(WITH_AUTOMATION_TESTS) && WITH_AUTOMATION_TESTS
 class ATestPlayerController;
 #endif
 class UChoosePlayerWidget;
@@ -49,7 +49,7 @@ class SKALD_API ASkaldPlayerController : public APlayerController {
   friend class ASkaldGameMode;
   /** Allow the player state to notify us when its player ID changes. */
   friend class ASkaldPlayerState;
-#if WITH_AUTOMATION_TESTS
+#if defined(WITH_AUTOMATION_TESTS) && WITH_AUTOMATION_TESTS
   /** Permit the automation test subclass to access validation helpers. */
   friend class ATestPlayerController;
 #endif
