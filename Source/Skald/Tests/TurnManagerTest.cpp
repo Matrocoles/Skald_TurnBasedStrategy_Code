@@ -1,9 +1,9 @@
+#include "TurnManagerTest.h"
+
 #include "Misc/AutomationTest.h"
 
-#if defined(WITH_AUTOMATION_TESTS)
 #if WITH_AUTOMATION_TESTS
 #include "Tests/SkaldAutomationTestHelpers.h"
-#include "TurnManagerTest.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
 #include "Engine/World.h"
@@ -136,4 +136,3 @@ bool FSkaldTurnManagerPendingBattleClearsTest::RunTest(const FString &Parameters
   return true;
 }
 #endif  // WITH_AUTOMATION_TESTS
-#endif  // defined(WITH_AUTOMATION_TESTS)
