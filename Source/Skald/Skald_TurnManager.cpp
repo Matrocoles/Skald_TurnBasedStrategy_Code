@@ -753,8 +753,17 @@ void ATurnManager::RegisterController(ASkaldPlayerController *Controller) {
   if (IsValid(Controller) && !Controllers.Contains(Controller)) {
     Controllers.Add(Controller);
     Controller->SetTurnManager(this);
-    BroadcastPrepareForBattlePrompt(PendingBattlePreparation,
-                                    TEXT("RegisterController"));
+    if (UWorld *World = GetWorld()) {
+      if (ASkaldGameState *GameState = World->GetGameState<ASkaldGameState>()) {
+        PendingBattleReadyState = GameState->GetPendingBattleReady();
+      }
+    }
+
+    if (PendingBattlePreparation.FromTerritoryID != 0 ||
+        PendingBattlePreparation.TargetTerritoryID != 0) {
+      BroadcastPrepareForBattlePrompt(PendingBattlePreparation,
+                                      TEXT("RegisterController"));
+    }
   }
 }
 
@@ -1119,7 +1128,21 @@ bool ATurnManager::HasPendingBattlePreparation() const {
   return bHasPayload || bHasReadyAssignments;
 }
 
+void ATurnManager::HandleAttackConfirmed(const FS_BattlePayload &Battle) {
+  UE_LOG(LogSkaldReady, Log,
+         TEXT("AttackConfirmed From=%d To=%d Attacker=%d Defender=%d"),
+         Battle.FromTerritoryID, Battle.TargetTerritoryID,
+         Battle.AttackerPlayerID, Battle.DefenderPlayerID);
+
+  BeginReadyPhase(Battle, TEXT("HandleAttackConfirmed"));
+}
+
 void ATurnManager::RequestPrepareBattle(const FS_BattlePayload &Battle) {
+  BeginReadyPhase(Battle, TEXT("RequestPrepareBattle"));
+}
+
+void ATurnManager::BeginReadyPhase(const FS_BattlePayload &Battle,
+                                   const TCHAR *Context) {
   FS_BattlePayload NormalizedBattle = Battle;
 
   USkaldGameInstance *GameInstance = GetGameInstance<USkaldGameInstance>();
@@ -1155,7 +1178,7 @@ void ATurnManager::RequestPrepareBattle(const FS_BattlePayload &Battle) {
   auto ApplyParticipantDetails =
       [&](ASkaldPlayerState *Participant, int32 &PlayerId, bool &bIsAI,
           FString &DisplayName, ESkaldFaction &Faction,
-          TSoftObjectPtr<UTexture2D> &FactionEmblem, const TCHAR *Context) {
+          TSoftObjectPtr<UTexture2D> &FactionEmblem, const TCHAR *ParticipantRole) {
         if (!Participant) {
           return;
         }
@@ -1163,15 +1186,16 @@ void ATurnManager::RequestPrepareBattle(const FS_BattlePayload &Battle) {
         const int32 ResolvedId = Participant->GetPlayerId();
         if (ResolvedId > 0 && ResolvedId != PlayerId) {
           UE_LOG(LogSkald, Verbose,
-                 TEXT("RequestPrepareBattle: remapping %s PlayerID from %d to %d using %s"),
-                 Context, PlayerId, ResolvedId, *Participant->GetName());
+                 TEXT("%s: remapping %s PlayerID from %d to %d using %s"),
+                 Context ? Context : TEXT("BeginReadyPhase"), ParticipantRole,
+                 PlayerId, ResolvedId, *Participant->GetName());
           PlayerId = ResolvedId;
         }
 
         bIsAI = Participant->bIsAI;
 
         if (DisplayName.IsEmpty()) {
-          DisplayName = Participant->GetResolvedPlayerName(Context);
+          DisplayName = Participant->GetResolvedPlayerName(ParticipantRole);
         }
 
         if (Faction == ESkaldFaction::None) {
@@ -1219,8 +1243,17 @@ void ATurnManager::RequestPrepareBattle(const FS_BattlePayload &Battle) {
       (PendingBattleReadyState.DefenderPlayerID == INDEX_NONE) ||
       NormalizedBattle.bDefenderIsAI;
 
-  CommitPendingBattleReadyState(TEXT("RequestPrepareBattle"));
-  TryLaunchPreparedBattle();
+  UE_LOG(LogSkaldReady, Log,
+         TEXT("BeginReadyPhase Attacker=%d Defender=%d From=%d To=%d AI(A=%s,D=%s)"),
+         PendingBattleReadyState.AttackerPlayerID,
+         PendingBattleReadyState.DefenderPlayerID,
+         PendingBattlePreparation.FromTerritoryID,
+         PendingBattlePreparation.TargetTerritoryID,
+         PendingBattleReadyState.bAttackerIsAI ? TEXT("true") : TEXT("false"),
+         PendingBattleReadyState.bDefenderIsAI ? TEXT("true") : TEXT("false"));
+
+  CommitPendingBattleReadyState(Context ? Context : TEXT("BeginReadyPhase"));
+  TryAdvanceFromReadyToBattle(Context ? Context : TEXT("BeginReadyPhase"));
 }
 
 void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
@@ -1679,7 +1712,7 @@ void ATurnManager::NotifyPlayerReadyForBattle(int32 PlayerID, bool bReady) {
       PendingBattlePreparation.FromTerritoryID != 0 ||
       PendingBattlePreparation.TargetTerritoryID != 0;
   if (!bHasPendingBattle) {
-    UE_LOG(LogSkald, Verbose,
+    UE_LOG(LogSkaldReady, Verbose,
            TEXT("NotifyPlayerReadyForBattle ignored: no pending battle."));
     return;
   }
@@ -1694,17 +1727,18 @@ void ATurnManager::NotifyPlayerReadyForBattle(int32 PlayerID, bool bReady) {
     const bool bEffectiveReady = bReady || bParticipantIsAI ||
                                  ParticipantId == INDEX_NONE;
     if (bParticipantReady == bEffectiveReady) {
-      UE_LOG(LogSkald, Verbose,
-             TEXT("NotifyPlayerReadyForBattle: %s state unchanged for PlayerID %d (Ready=%s, AI=%s)"),
-             ParticipantLabel, PlayerID,
+      UE_LOG(LogSkaldReady, Verbose,
+             TEXT("SetReady unchanged PlayerID=%d Role=%s Ready=%s AI=%s Requested=%s"),
+             PlayerID, ParticipantLabel,
              bParticipantReady ? TEXT("true") : TEXT("false"),
-             bParticipantIsAI ? TEXT("true") : TEXT("false"));
+             bParticipantIsAI ? TEXT("true") : TEXT("false"),
+             bReady ? TEXT("true") : TEXT("false"));
       return false;
     }
 
-    UE_LOG(LogSkald, Log,
-           TEXT("NotifyPlayerReadyForBattle: %s PlayerID %d ready -> %s (AI=%s, Requested=%s)"),
-           ParticipantLabel, PlayerID, bEffectiveReady ? TEXT("true") : TEXT("false"),
+    UE_LOG(LogSkaldReady, Log,
+           TEXT("SetReady PlayerID=%d Role=%s Ready=%s AI=%s Requested=%s"),
+           PlayerID, ParticipantLabel, bEffectiveReady ? TEXT("true") : TEXT("false"),
            bParticipantIsAI ? TEXT("true") : TEXT("false"),
            bReady ? TEXT("true") : TEXT("false"));
     bParticipantReady = bEffectiveReady;
@@ -1722,14 +1756,14 @@ void ATurnManager::NotifyPlayerReadyForBattle(int32 PlayerID, bool bReady) {
       PendingBattleReadyState.bDefenderReady, TEXT("defender"));
 
   if (!bAttackerChanged && !bDefenderChanged) {
-    UE_LOG(LogSkald, Warning,
+    UE_LOG(LogSkaldReady, Warning,
            TEXT("NotifyPlayerReadyForBattle: PlayerID %d is not part of the pending battle."),
            PlayerID);
     return;
   }
 
   CommitPendingBattleReadyState(TEXT("NotifyPlayerReadyForBattle"));
-  TryLaunchPreparedBattle();
+  TryAdvanceFromReadyToBattle(TEXT("NotifyPlayerReadyForBattle"));
 }
 
 void ATurnManager::BroadcastPrepareForBattlePrompt(
@@ -1909,6 +1943,12 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
     const bool bIsDefender = bNeedsDefenderConfirmation && bMatchesDefenderId;
 
     if (bIsAttacker || bIsDefender) {
+      const TCHAR *RoleLabel = bIsAttacker ? TEXT("Attacker") : TEXT("Defender");
+      UE_LOG(LogSkaldReady, Log,
+             TEXT("WidgetSpawned PC=%s Role=%s Battle=%d->%d"),
+             *Controller->GetName(), RoleLabel,
+             PendingBattlePreparation.FromTerritoryID,
+             PendingBattlePreparation.TargetTerritoryID);
       Controller->ClientShowPrepareForBattle(PromptData);
 
       if ((bIsAttacker || bIsDefender) && PS && PS->bIsAI) {
@@ -1992,12 +2032,12 @@ void ATurnManager::CommitPendingBattleReadyState(const TCHAR *Context) {
   MulticastOnReadyStateChanged(PendingBattleReadyState, PendingBattlePreparation);
 }
 
-void ATurnManager::TryLaunchPreparedBattle() {
+bool ATurnManager::TryAdvanceFromReadyToBattle(const TCHAR *Context) {
   const bool bHasPendingBattle =
       PendingBattlePreparation.FromTerritoryID != 0 ||
       PendingBattlePreparation.TargetTerritoryID != 0;
   if (!bHasPendingBattle) {
-    return;
+    return false;
   }
 
   UWorld *World = GetWorld();
@@ -2019,7 +2059,7 @@ void ATurnManager::TryLaunchPreparedBattle() {
   }
 
   if (!bReadyToLaunch) {
-    return;
+    return false;
   }
 
   for (ASkaldPlayerController *Controller : GetControllers()) {
@@ -2031,15 +2071,15 @@ void ATurnManager::TryLaunchPreparedBattle() {
   FS_BattlePayload BattleToLaunch = PendingBattlePreparation;
   PendingBattlePreparation = FS_BattlePayload();
   PendingBattleReadyState = FSkaldBattleReadyState();
-  CommitPendingBattleReadyState(TEXT("TryLaunchPreparedBattle_Clear"));
+  CommitPendingBattleReadyState(TEXT("TryAdvanceFromReadyToBattle_Clear"));
 
-  const bool bClearedState = !HasPendingBattlePreparation();
-  UE_LOG(LogSkald, Log,
-         TEXT("TryLaunchPreparedBattle: cleared pending state=%s for battle %d->%d"),
-         bClearedState ? TEXT("true") : TEXT("false"),
-         BattleToLaunch.FromTerritoryID, BattleToLaunch.TargetTerritoryID);
+  UE_LOG(LogSkaldReady, Log,
+         TEXT("AllReady=true -> StartBattleTravel Battle=%d->%d (Context=%s)"),
+         BattleToLaunch.FromTerritoryID, BattleToLaunch.TargetTerritoryID,
+         Context ? Context : TEXT("TryAdvanceFromReadyToBattle"));
 
   TriggerGridBattle(BattleToLaunch);
+  return true;
 }
 
 void ATurnManager::RetryPendingBattleTravel() {
