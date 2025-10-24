@@ -214,6 +214,8 @@ void ASkaldPlayerController::InitializeHUDWidget() {
 
   MainHUD->OnAttackRequested.AddDynamic(
       this, &ASkaldPlayerController::HandleAttackRequested);
+  MainHUD->OnPrepareForBattleReady.AddDynamic(
+      this, &ASkaldPlayerController::HandlePrepareForBattleReady);
   MainHUD->OnMoveRequested.AddDynamic(
       this, &ASkaldPlayerController::HandleMoveRequested);
   MainHUD->OnEndAttackRequested.AddDynamic(
@@ -1431,6 +1433,10 @@ void ASkaldPlayerController::HandleAttackRequested(int32 FromID, int32 ToID,
   ServerHandleAttack(FromID, ToID, ArmySent, bUseSiege);
 }
 
+void ASkaldPlayerController::HandlePrepareForBattleReady() {
+  ServerSetReadyForBattle();
+}
+
 void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
                                                                int32 ToID,
                                                                int32 ArmySent,
@@ -1490,7 +1496,7 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
         GI->CacheWorldMapSnapshot(World);
       }
     }
-    TurnManager->TriggerGridBattle(Battle);
+    TurnManager->RequestPrepareBattle(Battle);
     return;
   }
 
@@ -1543,6 +1549,22 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
       }
     }
   }
+}
+
+void ASkaldPlayerController::ServerSetReadyForBattle_Implementation() {
+  if (!EnsureTurnManager(TEXT("ServerSetReadyForBattle"))) {
+    return;
+  }
+
+  ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
+  const int32 PlayerID = PS ? PS->GetPlayerId() : -1;
+  if (PlayerID < 0) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("ServerSetReadyForBattle called with invalid PlayerID"));
+    return;
+  }
+
+  TurnManager->NotifyPlayerReadyForBattle(PlayerID);
 }
 
 void ASkaldPlayerController::HandleMoveRequested(int32 FromID, int32 ToID,
@@ -2876,6 +2898,26 @@ void ASkaldPlayerController::ClientClearStrategicInitiativeOverlay_Implementatio
 
   if (MainHUD) {
     MainHUD->SetAwaitingStrategicInitiative(false);
+  }
+}
+
+void ASkaldPlayerController::ClientShowPrepareForBattle_Implementation(
+    int32 AttackerPlayerID, int32 AttackingTerritoryID, int32 DefenderPlayerID,
+    int32 DefendingTerritoryID) {
+  ShowMainHUD();
+
+  if (MainHUD) {
+    MainHUD->ShowPrepareForBattleDialog(AttackerPlayerID, AttackingTerritoryID,
+                                        DefenderPlayerID, DefendingTerritoryID);
+  } else {
+    UE_LOG(LogSkald, Warning,
+           TEXT("ClientShowPrepareForBattle called without MainHUD"));
+  }
+}
+
+void ASkaldPlayerController::ClientHidePrepareForBattle_Implementation() {
+  if (MainHUD) {
+    MainHUD->HidePrepareForBattleDialog();
   }
 }
 
