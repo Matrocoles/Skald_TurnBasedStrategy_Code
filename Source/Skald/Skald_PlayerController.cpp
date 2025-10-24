@@ -1402,7 +1402,7 @@ bool ASkaldPlayerController::BuildBattlePayloadForAttack(
   OutBattle.FromTerritoryID = FromID;
   OutBattle.TargetTerritoryID = ToID;
   OutBattle.ArmyCountSent = ArmySent;
-  OutBattle.DefenderTerritoryName = OutTarget->TerritoryName;
+  OutBattle.DefenderTerritoryName = OutTarget->TerritoryName.ToString();
   OutBattle.IsCapitalAttack = OutTarget->bIsCapital;
   OutBattle.DefenderArmyCount = OutTarget->ArmyUnits;
 
@@ -1414,21 +1414,21 @@ bool ASkaldPlayerController::BuildBattlePayloadForAttack(
 
   if (AttackerPS) {
     OutBattle.AttackerFaction = AttackerPS->Faction;
-    OutBattle.AttackerDisplayName =
-        ResolvePlayerName(AttackerPS, TEXT("BuildBattlePayload_Attacker"));
+    OutBattle.AttackerDisplayName = FText::ToString(
+        ResolvePlayerName(AttackerPS, TEXT("BuildBattlePayload_Attacker")));
     OutBattle.bAttackerIsAI = AttackerPS->bIsAI;
   } else {
-    OutBattle.AttackerDisplayName = FText::GetEmpty();
+    OutBattle.AttackerDisplayName.Empty();
     OutBattle.bAttackerIsAI = false;
   }
 
   if (DefenderPS) {
     OutBattle.DefenderFaction = DefenderPS->Faction;
-    OutBattle.DefenderDisplayName =
-        ResolvePlayerName(DefenderPS, TEXT("BuildBattlePayload_Defender"));
+    OutBattle.DefenderDisplayName = FText::ToString(
+        ResolvePlayerName(DefenderPS, TEXT("BuildBattlePayload_Defender")));
     OutBattle.bDefenderIsAI = DefenderPS->bIsAI;
   } else {
-    OutBattle.DefenderDisplayName = FText::GetEmpty();
+    OutBattle.DefenderDisplayName.Empty();
     OutBattle.bDefenderIsAI = false;
   }
 
