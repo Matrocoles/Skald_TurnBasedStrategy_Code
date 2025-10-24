@@ -187,7 +187,7 @@ public:
 
   /** Resolve the configured emblem for a given faction, if one exists. */
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "UI")
-  TSoftObjectPtr<UTexture2D> GetFactionEmblem(ESkaldFaction Faction) const;
+  TSoftObjectPtr<UTexture2D> GetFactionEmblem(ESkaldFaction InFaction) const;
 
   /** Deploy widget instance owned by the game instance for Slate insertion. */
   UPROPERTY(Transient)
