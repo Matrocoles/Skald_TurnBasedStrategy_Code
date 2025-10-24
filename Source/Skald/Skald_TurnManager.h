@@ -33,10 +33,6 @@ public:
 // Broadcast whenever the overall world state changes so HUDs can refresh.
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSkaldWorldStateChanged);
 
-/**
- * Handles turn sequencing for all registered player controllers.
- */
-UCLASS(Blueprintable, BlueprintType)
 USTRUCT()
 struct SKALD_API FPendingBattleReadyState {
   GENERATED_BODY()
@@ -54,6 +50,10 @@ struct SKALD_API FPendingBattleReadyState {
   bool bDefenderReady = false;
 };
 
+/**
+ * Handles turn sequencing for all registered player controllers.
+ */
+UCLASS(Blueprintable, BlueprintType)
 class SKALD_API ATurnManager : public AActor {
   GENERATED_BODY()
 
