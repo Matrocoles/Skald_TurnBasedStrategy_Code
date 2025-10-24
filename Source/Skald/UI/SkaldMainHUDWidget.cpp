@@ -647,10 +647,8 @@ void USkaldMainHUDWidget::HideStrategicInitiativePrompt() {
   }
 }
 
-void USkaldMainHUDWidget::ShowPrepareForBattleDialog(int32 AttackerPlayerID,
-                                                     int32 AttackingTerritoryID,
-                                                     int32 DefenderPlayerID,
-                                                     int32 DefendingTerritoryID) {
+void USkaldMainHUDWidget::ShowPrepareForBattleDialog(
+    const FPrepareForBattlePromptData &PromptData) {
   bPrepareForBattleReadySent = false;
 
   if (ActivePrepareForBattleWidget) {
@@ -673,27 +671,108 @@ void USkaldMainHUDWidget::ShowPrepareForBattleDialog(int32 AttackerPlayerID,
     return;
   }
 
-  const FText AttackerPlayerText = FText::Format(
-      NSLOCTEXT("SkaldHUD", "Prepare_AttackerPlayerID",
-                "Attacking Player ID: {0}"),
-      FText::AsNumber(AttackerPlayerID));
-  const FText AttackerTerritoryText = FText::Format(
-      NSLOCTEXT("SkaldHUD", "Prepare_AttackerTerritoryID",
-                "Attacking Territory ID: {0}"),
-      FText::AsNumber(AttackingTerritoryID));
-  const FText DefenderPlayerText = FText::Format(
-      NSLOCTEXT("SkaldHUD", "Prepare_DefenderPlayerID",
-                "Defending Player ID: {0}"),
-      FText::AsNumber(DefenderPlayerID));
-  const FText DefenderTerritoryText = FText::Format(
-      NSLOCTEXT("SkaldHUD", "Prepare_DefenderTerritoryID",
-                "Defending Territory ID: {0}"),
-      FText::AsNumber(DefendingTerritoryID));
+  auto BuildPlayerDisplayText = [&](const FText &Preferred, int32 PlayerId,
+                                    const TCHAR *LogContext) -> FText {
+    if (!Preferred.IsEmptyOrWhitespace()) {
+      return Preferred;
+    }
+
+    if (PlayerId > 0) {
+      UE_LOG(LogSkald, Verbose,
+             TEXT("ShowPrepareForBattleDialog: falling back to player ID for %s (ID %d)"),
+             LogContext, PlayerId);
+      return FText::Format(
+          NSLOCTEXT("SkaldHUD", "Prepare_PlayerIDFallback", "Player #{0}"),
+          FText::AsNumber(PlayerId));
+    }
+
+    UE_LOG(LogSkald, Warning,
+           TEXT("ShowPrepareForBattleDialog: missing player name and ID for %s"),
+           LogContext);
+    return NSLOCTEXT("SkaldHUD", "Prepare_UnknownPlayer", "Unknown Player");
+  };
+
+  auto BuildTerritoryDisplayText = [&](const FText &Preferred, int32 TerritoryId,
+                                       const TCHAR *LogContext) -> FText {
+    if (!Preferred.IsEmptyOrWhitespace()) {
+      return Preferred;
+    }
+
+    if (TerritoryId != 0) {
+      UE_LOG(LogSkald, Verbose,
+             TEXT("ShowPrepareForBattleDialog: falling back to territory ID for %s (ID %d)"),
+             LogContext, TerritoryId);
+      return FText::Format(NSLOCTEXT("SkaldHUD", "Prepare_TerritoryIDFallback",
+                                     "Territory #{0}"),
+                           FText::AsNumber(TerritoryId));
+    }
+
+    UE_LOG(LogSkald, Warning,
+           TEXT("ShowPrepareForBattleDialog: missing territory data for %s"),
+           LogContext);
+    return NSLOCTEXT("SkaldHUD", "Prepare_UnknownTerritory",
+                     "Unknown Territory");
+  };
+
+  auto ResolveFactionTexture = [&](const TSoftObjectPtr<UTexture2D> &Source,
+                                   ESkaldFaction Faction,
+                                   const TCHAR *LogContext) -> UTexture2D * {
+    TSoftObjectPtr<UTexture2D> Candidate = Source;
+    if (!Candidate.ToSoftObjectPath().IsValid() && GameInstance &&
+        Faction != ESkaldFaction::None) {
+      Candidate = GameInstance->GetFactionEmblem(Faction);
+    }
+
+    if (!Candidate.ToSoftObjectPath().IsValid()) {
+      if (Faction != ESkaldFaction::None) {
+        UE_LOG(LogSkald, Verbose,
+               TEXT("ShowPrepareForBattleDialog: no faction emblem path for %s (%s)"),
+               LogContext,
+               *StaticEnum<ESkaldFaction>()->GetNameStringByValue(
+                   static_cast<int64>(Faction)));
+      }
+      return nullptr;
+    }
+
+    if (UTexture2D *Existing = Candidate.Get()) {
+      return Existing;
+    }
+
+    UTexture2D *Loaded = Candidate.LoadSynchronous();
+    if (!Loaded) {
+      UE_LOG(LogSkald, Warning,
+             TEXT("ShowPrepareForBattleDialog: failed to load faction emblem for %s from path %s"),
+             LogContext, *Candidate.ToSoftObjectPath().ToString());
+    }
+    return Loaded;
+  };
+
+  const FText AttackerPlayerText = BuildPlayerDisplayText(
+      PromptData.AttackerDisplayName, PromptData.AttackerPlayerID,
+      TEXT("Attacker"));
+  const FText DefenderPlayerText = BuildPlayerDisplayText(
+      PromptData.DefenderDisplayName, PromptData.DefenderPlayerID,
+      TEXT("Defender"));
+  const FText AttackerTerritoryText = BuildTerritoryDisplayText(
+      PromptData.AttackingTerritoryName, PromptData.AttackingTerritoryID,
+      TEXT("AttackingTerritory"));
+  const FText DefenderTerritoryText = BuildTerritoryDisplayText(
+      PromptData.DefendingTerritoryName, PromptData.DefendingTerritoryID,
+      TEXT("DefendingTerritory"));
+
+  UTexture2D *AttackerEmblem = ResolveFactionTexture(
+      PromptData.AttackerFactionEmblem, PromptData.AttackerFaction,
+      TEXT("Attacker"));
+  UTexture2D *DefenderEmblem = ResolveFactionTexture(
+      PromptData.DefenderFactionEmblem, PromptData.DefenderFaction,
+      TEXT("Defender"));
 
   ActivePrepareForBattleWidget->SetupBattleDetails(AttackerPlayerText,
                                                    AttackerTerritoryText,
+                                                   AttackerEmblem,
                                                    DefenderPlayerText,
-                                                   DefenderTerritoryText);
+                                                   DefenderTerritoryText,
+                                                   DefenderEmblem);
   ActivePrepareForBattleWidget->OnPrepareButtonClicked.AddDynamic(
       this, &USkaldMainHUDWidget::HandlePrepareForBattleClicked);
   if (ActivePrepareForBattleWidget->PrepareForBattleButton) {

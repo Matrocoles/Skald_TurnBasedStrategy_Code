@@ -225,10 +225,8 @@ public:
 
   /** Display the prepare for battle confirmation widget. */
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD|Battle")
-  void ShowPrepareForBattleDialog(int32 AttackerPlayerID,
-                                  int32 AttackingTerritoryID,
-                                  int32 DefenderPlayerID,
-                                  int32 DefendingTerritoryID);
+  void ShowPrepareForBattleDialog(
+      const FPrepareForBattlePromptData &PromptData);
 
   /** Hide the prepare for battle widget if active. */
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD|Battle")

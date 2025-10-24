@@ -537,7 +537,7 @@ void ASkaldPlayerController::ServerInitPlayerState_Implementation(
     PS->SetPlayerName(Name);
     PS->Faction = Faction;
 
-    if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+    if (USkaldGameInstance *GI = Cast<USkaldGameInstance>(GetGameInstance())) {
       GI->AIPlayersToSpawn = NumAIPlayers;
     }
 
@@ -1464,6 +1464,7 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
     Battle.DefenderPlayerID = DefenderPS ? DefenderPS->GetPlayerId() : -1;
     Battle.FromTerritoryID = FromID;
     Battle.TargetTerritoryID = ToID;
+    Battle.AttackerTerritoryName = Source->TerritoryName;
     Battle.DefenderTerritoryName = Target->TerritoryName;
     Battle.ArmyCountSent = ArmySent;
     Battle.IsCapitalAttack = Target->bIsCapital;
@@ -1478,6 +1479,18 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
       Battle.DefenderDisplayName =
           ResolvePlayerName(DefenderPS, TEXT("ServerHandleAttack_Defender"));
       Battle.bDefenderIsAI = DefenderPS->bIsAI;
+    }
+    if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+      if (!Battle.AttackerFactionEmblem.ToSoftObjectPath().IsValid() &&
+          Battle.AttackerFaction != ESkaldFaction::None) {
+        Battle.AttackerFactionEmblem =
+            GI->GetFactionEmblem(Battle.AttackerFaction);
+      }
+      if (!Battle.DefenderFactionEmblem.ToSoftObjectPath().IsValid() &&
+          Battle.DefenderFaction != ESkaldFaction::None) {
+        Battle.DefenderFactionEmblem =
+            GI->GetFactionEmblem(Battle.DefenderFaction);
+      }
     }
     if (bUseSiege && CachedGameMode) {
       const int32 SiegeID = CachedGameMode->ConsumeSiege(FromID);
@@ -2902,13 +2915,11 @@ void ASkaldPlayerController::ClientClearStrategicInitiativeOverlay_Implementatio
 }
 
 void ASkaldPlayerController::ClientShowPrepareForBattle_Implementation(
-    int32 AttackerPlayerID, int32 AttackingTerritoryID, int32 DefenderPlayerID,
-    int32 DefendingTerritoryID) {
+    const FPrepareForBattlePromptData &PromptData) {
   ShowMainHUD();
 
   if (MainHUD) {
-    MainHUD->ShowPrepareForBattleDialog(AttackerPlayerID, AttackingTerritoryID,
-                                        DefenderPlayerID, DefendingTerritoryID);
+    MainHUD->ShowPrepareForBattleDialog(PromptData);
   } else {
     UE_LOG(LogSkald, Warning,
            TEXT("ClientShowPrepareForBattle called without MainHUD"));

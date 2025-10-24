@@ -1,6 +1,7 @@
 #include "UI/PrepareForBattleWidget.h"
 #include "Components/Button.h"
 #include "Components/ButtonSlot.h"
+#include "Components/Image.h"
 #include "Components/SlateWrapperTypes.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
@@ -32,16 +33,19 @@ void UPrepareForBattleWidget::SynchronizeProperties() {
 }
 
 void UPrepareForBattleWidget::SetupBattleDetails(
-    const FText &InAttackingPlayerID, const FText &InAttackingTerritoryID,
-    const FText &InDefendingPlayerID, const FText &InDefendingTerritoryID) {
+    const FText &InAttackingPlayerName, const FText &InAttackingTerritoryName,
+    UTexture2D *InAttackingFactionIcon, const FText &InDefendingPlayerName,
+    const FText &InDefendingTerritoryName, UTexture2D *InDefendingFactionIcon) {
   if (WidgetTree && !WidgetTree->RootWidget) {
     BuildFallbackWidgetTree();
   }
 
-  AttackingPlayerIDText = InAttackingPlayerID;
-  AttackingTerritoryIDText = InAttackingTerritoryID;
-  DefendingPlayerIDText = InDefendingPlayerID;
-  DefendingTerritoryIDText = InDefendingTerritoryID;
+  AttackingPlayerNameText = InAttackingPlayerName;
+  AttackingTerritoryNameText = InAttackingTerritoryName;
+  DefendingPlayerNameText = InDefendingPlayerName;
+  DefendingTerritoryNameText = InDefendingTerritoryName;
+  AttackingFactionTexture = InAttackingFactionIcon;
+  DefendingFactionTexture = InDefendingFactionIcon;
   RefreshTextWidgets();
 }
 
@@ -50,18 +54,41 @@ void UPrepareForBattleWidget::HandlePrepareButtonClicked() {
 }
 
 void UPrepareForBattleWidget::RefreshTextWidgets() {
-  if (AttackingPlayerID) {
-    AttackingPlayerID->SetText(AttackingPlayerIDText);
+  if (AttackingPlayerName) {
+    AttackingPlayerName->SetText(AttackingPlayerNameText);
   }
-  if (AttackingTerritoryID) {
-    AttackingTerritoryID->SetText(AttackingTerritoryIDText);
+  if (AttackingTerritoryName) {
+    AttackingTerritoryName->SetText(AttackingTerritoryNameText);
   }
-  if (DefendingPlayerID) {
-    DefendingPlayerID->SetText(DefendingPlayerIDText);
+  if (DefendingPlayerName) {
+    DefendingPlayerName->SetText(DefendingPlayerNameText);
   }
-  if (DefendingTerritoryID) {
-    DefendingTerritoryID->SetText(DefendingTerritoryIDText);
+  if (DefendingTerritoryName) {
+    DefendingTerritoryName->SetText(DefendingTerritoryNameText);
   }
+
+  auto ApplyFactionEmblem = [](UImage *ImageWidget,
+                               const TWeakObjectPtr<UTexture2D> &Texture) {
+    if (!ImageWidget) {
+      return;
+    }
+
+    if (Texture.IsValid()) {
+      FSlateBrush Brush;
+      Brush.SetResourceObject(Texture.Get());
+      if (UTexture2D *Resolved = Texture.Get()) {
+        Brush.ImageSize = FVector2D(Resolved->GetSizeX(), Resolved->GetSizeY());
+      }
+      ImageWidget->SetBrush(Brush);
+      ImageWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
+    } else {
+      ImageWidget->SetBrush(FSlateBrush());
+      ImageWidget->SetVisibility(ESlateVisibility::Collapsed);
+    }
+  };
+
+  ApplyFactionEmblem(AttackingFactionEmblem, AttackingFactionTexture);
+  ApplyFactionEmblem(DefendingFactionEmblem, DefendingFactionTexture);
 }
 
 void UPrepareForBattleWidget::BuildFallbackWidgetTree() {
@@ -79,36 +106,70 @@ void UPrepareForBattleWidget::BuildFallbackWidgetTree() {
 
   WidgetTree->RootWidget = Root;
 
-  auto AddLabeledText = [this, Root](const TCHAR *Name, const FText &Value,
-                                     UTextBlock *&OutText) {
-    UTextBlock *TextBlock = WidgetTree->ConstructWidget<UTextBlock>(
-        UTextBlock::StaticClass(), FName(Name));
-    if (!TextBlock) {
-      OutText = nullptr;
+  auto AddFactionSection = [&](const TCHAR *Prefix, const FText &PlayerText,
+                               const FText &TerritoryText,
+                               UTextBlock *&OutPlayerText,
+                               UTextBlock *&OutTerritoryText,
+                               UImage *&OutEmblemImage) {
+    UVerticalBox *Section = WidgetTree->ConstructWidget<UVerticalBox>(
+        UVerticalBox::StaticClass(), FName(*FString::Printf(TEXT("%sSection"), Prefix)));
+    if (!Section) {
+      OutPlayerText = nullptr;
+      OutTerritoryText = nullptr;
+      OutEmblemImage = nullptr;
       return;
     }
 
-    TextBlock->SetJustification(ETextJustify::Center);
-    TextBlock->SetAutoWrapText(true);
-    TextBlock->SetText(Value);
-
-    if (UVerticalBoxSlot *TextSlot =
-            Root->AddChildToVerticalBox(TextBlock)) {
-      TextSlot->SetHorizontalAlignment(EHorizontalAlignment::HAlign_Fill);
-      TextSlot->SetPadding(FMargin(8.f, 4.f));
+    if (UVerticalBoxSlot *SectionSlot =
+            Root->AddChildToVerticalBox(Section)) {
+      SectionSlot->SetHorizontalAlignment(EHorizontalAlignment::HAlign_Fill);
+      SectionSlot->SetPadding(FMargin(8.f, 6.f));
     }
 
-    OutText = TextBlock;
+    auto AddText = [&](const TCHAR *Name, const FText &Value,
+                       UTextBlock *&OutText) {
+      UTextBlock *TextBlock = WidgetTree->ConstructWidget<UTextBlock>(
+          UTextBlock::StaticClass(), FName(Name));
+      if (!TextBlock) {
+        OutText = nullptr;
+        return;
+      }
+
+      TextBlock->SetJustification(ETextJustify::Center);
+      TextBlock->SetAutoWrapText(true);
+      TextBlock->SetText(Value);
+
+      if (UVerticalBoxSlot *TextSlot =
+              Section->AddChildToVerticalBox(TextBlock)) {
+        TextSlot->SetHorizontalAlignment(EHorizontalAlignment::HAlign_Fill);
+        TextSlot->SetPadding(FMargin(4.f, 2.f));
+      }
+
+      OutText = TextBlock;
+    };
+
+    OutEmblemImage = WidgetTree->ConstructWidget<UImage>(
+        UImage::StaticClass(), FName(*FString::Printf(TEXT("%sEmblem"), Prefix)));
+    if (OutEmblemImage) {
+      OutEmblemImage->SetVisibility(ESlateVisibility::Collapsed);
+      if (UVerticalBoxSlot *ImageSlot =
+              Section->AddChildToVerticalBox(OutEmblemImage)) {
+        ImageSlot->SetHorizontalAlignment(EHorizontalAlignment::HAlign_Center);
+        ImageSlot->SetPadding(FMargin(4.f, 2.f));
+      }
+    }
+
+    AddText(*FString::Printf(TEXT("%sPlayer"), Prefix), PlayerText, OutPlayerText);
+    AddText(*FString::Printf(TEXT("%sTerritory"), Prefix), TerritoryText,
+            OutTerritoryText);
   };
 
-  AddLabeledText(TEXT("AttackingPlayer"), AttackingPlayerIDText,
-                 AttackingPlayerID);
-  AddLabeledText(TEXT("AttackingTerritory"), AttackingTerritoryIDText,
-                 AttackingTerritoryID);
-  AddLabeledText(TEXT("DefendingPlayer"), DefendingPlayerIDText,
-                 DefendingPlayerID);
-  AddLabeledText(TEXT("DefendingTerritory"), DefendingTerritoryIDText,
-                 DefendingTerritoryID);
+  AddFactionSection(TEXT("Attacking"), AttackingPlayerNameText,
+                    AttackingTerritoryNameText, AttackingPlayerName,
+                    AttackingTerritoryName, AttackingFactionEmblem);
+  AddFactionSection(TEXT("Defending"), DefendingPlayerNameText,
+                    DefendingTerritoryNameText, DefendingPlayerName,
+                    DefendingTerritoryName, DefendingFactionEmblem);
 
   PrepareForBattleButton = WidgetTree->ConstructWidget<UButton>(
       UButton::StaticClass(), TEXT("PrepareForBattleButton"));
