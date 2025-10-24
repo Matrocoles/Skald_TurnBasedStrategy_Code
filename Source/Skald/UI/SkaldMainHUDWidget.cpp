@@ -773,6 +773,9 @@ void USkaldMainHUDWidget::ShowPrepareForBattleDialog(
                                                    DefenderPlayerText,
                                                    DefenderTerritoryText,
                                                    DefenderEmblem);
+  ActivePrepareForBattleWidget->SetVisibility(ESlateVisibility::Visible);
+  ActivePrepareForBattleWidget->SetRenderOpacity(1.f);
+  ActivePrepareForBattleWidget->SetIsEnabled(true);
   ActivePrepareForBattleWidget->OnPrepareButtonClicked.AddDynamic(
       this, &USkaldMainHUDWidget::HandlePrepareForBattleClicked);
   if (ActivePrepareForBattleWidget->PrepareForBattleButton) {
