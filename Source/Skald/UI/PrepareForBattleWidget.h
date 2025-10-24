@@ -76,5 +76,8 @@ protected:
   void HandlePrepareButtonClicked();
 
   void RefreshTextWidgets();
+
+  /** Builds a minimal widget tree when no Blueprint is provided. */
+  void BuildFallbackWidgetTree();
 };
 
