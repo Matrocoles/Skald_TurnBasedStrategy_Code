@@ -65,7 +65,7 @@ bool FSkaldPlayerControllerValidationFeedbackTest::RunTest(const FString &)
     TestEqual(TEXT("Pending battle error surfaced"), HUD->LastError, ExpectedAttackError);
 
     FString ValidationError;
-    const bool bValidationResult = PC->ValidateAttack(1, 2, 1, false, &ValidationError);
+    const bool bValidationResult = PC->TestValidateAttack(1, 2, 1, false, &ValidationError);
     TestFalse(TEXT("ValidateAttack should fail when battle pending"), bValidationResult);
     TestEqual(TEXT("ValidateAttack error matches"), ValidationError, ExpectedAttackError);
 
