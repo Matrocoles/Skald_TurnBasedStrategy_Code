@@ -225,7 +225,7 @@ public:
 
   /** Display the prepare for battle confirmation widget. */
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD|Battle")
-  void ShowPrepareForBattleDialog(const FS_BattlePayload &BattlePayload);
+  bool ShowPrepareForBattleDialog(const FS_BattlePayload &BattlePayload);
 
   /** Hide the prepare for battle widget if active. */
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD|Battle")

@@ -647,7 +647,7 @@ void USkaldMainHUDWidget::HideStrategicInitiativePrompt() {
   }
 }
 
-void USkaldMainHUDWidget::ShowPrepareForBattleDialog(
+bool USkaldMainHUDWidget::ShowPrepareForBattleDialog(
     const FS_BattlePayload &BattlePayload) {
   bPrepareForBattleReadySent = false;
 
@@ -660,7 +660,7 @@ void USkaldMainHUDWidget::ShowPrepareForBattleDialog(
   if (!PrepareForBattleWidgetClass) {
     UE_LOG(LogSkald, Warning,
            TEXT("ShowPrepareForBattleDialog: PrepareForBattleWidgetClass null"));
-    return;
+    return false;
   }
 
   ActivePrepareForBattleWidget = CreateWidget<UPrepareForBattleWidget>(
@@ -668,16 +668,33 @@ void USkaldMainHUDWidget::ShowPrepareForBattleDialog(
   if (!ActivePrepareForBattleWidget) {
     UE_LOG(LogSkald, Warning,
            TEXT("ShowPrepareForBattleDialog: failed to create widget"));
-    return;
+    return false;
   }
+
+  UE_LOG(LogSkald, Log,
+         TEXT("ShowPrepareForBattleDialog: Created widget %s for battle From=%d Target=%d"),
+         *GetNameSafe(ActivePrepareForBattleWidget),
+         BattlePayload.FromTerritoryID, BattlePayload.TargetTerritoryID);
 
   ActivePrepareForBattleWidget->SetupBattleDetailsFromPayload(BattlePayload);
   ActivePrepareForBattleWidget->OnPrepareButtonClicked.AddDynamic(
       this, &USkaldMainHUDWidget::HandlePrepareForBattleClicked);
   if (ActivePrepareForBattleWidget->PrepareForBattleButton) {
     ActivePrepareForBattleWidget->PrepareForBattleButton->SetIsEnabled(true);
+    UE_LOG(LogSkald, Verbose,
+           TEXT("ShowPrepareForBattleDialog: Enabled Prepare button on widget %s"),
+           *GetNameSafe(ActivePrepareForBattleWidget->PrepareForBattleButton));
+  } else {
+    UE_LOG(LogSkald, Warning,
+           TEXT("ShowPrepareForBattleDialog: PrepareForBattleButton missing on widget %s"),
+           *GetNameSafe(ActivePrepareForBattleWidget));
   }
   ActivePrepareForBattleWidget->AddToViewport(20);
+  UE_LOG(LogSkald, Log,
+         TEXT("ShowPrepareForBattleDialog: Widget %s added to viewport"),
+         *GetNameSafe(ActivePrepareForBattleWidget));
+
+  return true;
 }
 
 void USkaldMainHUDWidget::HidePrepareForBattleDialog() {

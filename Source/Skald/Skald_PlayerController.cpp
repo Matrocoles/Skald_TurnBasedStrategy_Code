@@ -1374,6 +1374,107 @@ bool ASkaldPlayerController::ValidateAttack(int32 FromID, int32 ToID,
   return true;
 }
 
+bool ASkaldPlayerController::BuildBattlePayloadForAttack(
+    int32 FromID, int32 ToID, int32 ArmySent, bool bUseSiege,
+    ATerritory *&OutSource, ATerritory *&OutTarget, FS_BattlePayload &OutBattle) {
+  OutSource = nullptr;
+  OutTarget = nullptr;
+  OutBattle = FS_BattlePayload();
+
+  AWorldMap *WorldMap = Cast<AWorldMap>(
+      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
+  if (!WorldMap) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("BuildBattlePayloadForAttack: World map missing for attack From=%d To=%d"),
+           FromID, ToID);
+    return false;
+  }
+
+  OutSource = WorldMap->GetTerritoryById(FromID);
+  OutTarget = WorldMap->GetTerritoryById(ToID);
+  if (!OutSource || !OutTarget) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("BuildBattlePayloadForAttack: Failed to resolve source (%d) or target (%d) territory"),
+           FromID, ToID);
+    return false;
+  }
+
+  OutBattle.FromTerritoryID = FromID;
+  OutBattle.TargetTerritoryID = ToID;
+  OutBattle.ArmyCountSent = ArmySent;
+  OutBattle.DefenderTerritoryName = OutTarget->TerritoryName;
+  OutBattle.IsCapitalAttack = OutTarget->bIsCapital;
+  OutBattle.DefenderArmyCount = OutTarget->ArmyUnits;
+
+  ASkaldPlayerState *AttackerPS = OutSource->OwningPlayer;
+  ASkaldPlayerState *DefenderPS = OutTarget->OwningPlayer;
+
+  OutBattle.AttackerPlayerID = AttackerPS ? AttackerPS->GetPlayerId() : INDEX_NONE;
+  OutBattle.DefenderPlayerID = DefenderPS ? DefenderPS->GetPlayerId() : INDEX_NONE;
+
+  if (AttackerPS) {
+    OutBattle.AttackerFaction = AttackerPS->Faction;
+    OutBattle.AttackerDisplayName =
+        ResolvePlayerName(AttackerPS, TEXT("BuildBattlePayload_Attacker"));
+    OutBattle.bAttackerIsAI = AttackerPS->bIsAI;
+  } else {
+    OutBattle.AttackerDisplayName = FText::GetEmpty();
+    OutBattle.bAttackerIsAI = false;
+  }
+
+  if (DefenderPS) {
+    OutBattle.DefenderFaction = DefenderPS->Faction;
+    OutBattle.DefenderDisplayName =
+        ResolvePlayerName(DefenderPS, TEXT("BuildBattlePayload_Defender"));
+    OutBattle.bDefenderIsAI = DefenderPS->bIsAI;
+  } else {
+    OutBattle.DefenderDisplayName = FText::GetEmpty();
+    OutBattle.bDefenderIsAI = false;
+  }
+
+  if (bUseSiege) {
+    int32 SiegeID = INDEX_NONE;
+    if (!CachedGameMode) {
+      CachedGameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
+    }
+    if (CachedGameMode) {
+      SiegeID = CachedGameMode->ConsumeSiege(FromID);
+    }
+    if (SiegeID <= 0 && OutSource->BuiltSiegeID > 0) {
+      SiegeID = OutSource->BuiltSiegeID;
+      OutSource->BuiltSiegeID = 0;
+    }
+    if (SiegeID > 0) {
+      OutBattle.AssignedSiegeIDs.Add(SiegeID);
+    }
+  }
+
+  UE_LOG(LogSkald, Log,
+         TEXT("BuildBattlePayloadForAttack: Prepared payload From=%d To=%d Army=%d AttackerID=%d DefenderID=%d"),
+         OutBattle.FromTerritoryID, OutBattle.TargetTerritoryID,
+         OutBattle.ArmyCountSent, OutBattle.AttackerPlayerID,
+         OutBattle.DefenderPlayerID);
+
+  return true;
+}
+
+void ASkaldPlayerController::TriggerImmediateBattleFallback(
+    const FS_BattlePayload &BattlePayload, const TCHAR *Reason) {
+  if (!TurnManager) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("TriggerImmediateBattleFallback called without TurnManager (Reason=%s)"),
+           Reason ? Reason : TEXT("Unknown"));
+    return;
+  }
+
+  UE_LOG(LogSkald, Warning,
+         TEXT("TriggerImmediateBattleFallback: Reason=%s From=%d Target=%d"),
+         Reason ? Reason : TEXT("Unknown"), BattlePayload.FromTerritoryID,
+         BattlePayload.TargetTerritoryID);
+
+  TurnManager->ForceLaunchBattleFromPrepareFallback(BattlePayload);
+}
+
 bool ASkaldPlayerController::ValidateMoveRequest(
     AWorldMap *WorldMap, int32 FromID, int32 ToID, int32 Troops,
     ATerritory *&OutSource, ATerritory *&OutTarget, FString &OutError) const {
@@ -1442,10 +1543,16 @@ void ASkaldPlayerController::ShowPrepareForBattleDialogLocal(
   ShowMainHUD();
 
   if (MainHUD) {
-    MainHUD->ShowPrepareForBattleDialog(BattlePayload);
+    const bool bShown = MainHUD->ShowPrepareForBattleDialog(BattlePayload);
+    if (!bShown) {
+      UE_LOG(LogSkald, Warning,
+             TEXT("ShowPrepareForBattleDialogLocal: HUD failed to show prepare widget, requesting fallback."));
+      ServerRequestImmediateBattleFallback(BattlePayload);
+    }
   } else {
     UE_LOG(LogSkald, Warning,
            TEXT("ShowPrepareForBattleDialogLocal called without MainHUD"));
+    ServerRequestImmediateBattleFallback(BattlePayload);
   }
 }
 
@@ -1459,54 +1566,27 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
                                                                int32 ToID,
                                                                int32 ArmySent,
                                                                bool bUseSiege) {
+  UE_LOG(LogSkald, Log,
+         TEXT("ServerHandleAttack: Received request From=%d To=%d Army=%d UseSiege=%s"),
+         FromID, ToID, ArmySent, bUseSiege ? TEXT("true") : TEXT("false"));
   FString Error;
   if (!ValidateAttack(FromID, ToID, ArmySent, bUseSiege, &Error)) {
     NotifyActionError(Error);
     return;
   }
 
-  AWorldMap *WorldMap = Cast<AWorldMap>(
-      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
-  ATerritory *Source = WorldMap ? WorldMap->GetTerritoryById(FromID) : nullptr;
-  ATerritory *Target = WorldMap ? WorldMap->GetTerritoryById(ToID) : nullptr;
-  if (!Source || !Target) {
+  ATerritory *Source = nullptr;
+  ATerritory *Target = nullptr;
+  FS_BattlePayload Battle;
+  if (!BuildBattlePayloadForAttack(FromID, ToID, ArmySent, bUseSiege, Source, Target,
+                                   Battle)) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("ServerHandleAttack: Failed to build battle payload for From=%d To=%d"),
+           FromID, ToID);
     return;
   }
 
-  ASkaldPlayerState *AttackerPS = Source->OwningPlayer;
-  ASkaldPlayerState *DefenderPS = Target->OwningPlayer;
-
   if (TurnManager) {
-    FS_BattlePayload Battle;
-    Battle.AttackerPlayerID = AttackerPS ? AttackerPS->GetPlayerId() : -1;
-    Battle.DefenderPlayerID = DefenderPS ? DefenderPS->GetPlayerId() : -1;
-    Battle.FromTerritoryID = FromID;
-    Battle.TargetTerritoryID = ToID;
-    Battle.DefenderTerritoryName = Target->TerritoryName;
-    Battle.ArmyCountSent = ArmySent;
-    Battle.IsCapitalAttack = Target->bIsCapital;
-    if (AttackerPS) {
-      Battle.AttackerFaction = AttackerPS->Faction;
-      Battle.AttackerDisplayName =
-          ResolvePlayerName(AttackerPS, TEXT("ServerHandleAttack_Attacker"));
-      Battle.bAttackerIsAI = AttackerPS->bIsAI;
-    }
-    if (DefenderPS) {
-      Battle.DefenderFaction = DefenderPS->Faction;
-      Battle.DefenderDisplayName =
-          ResolvePlayerName(DefenderPS, TEXT("ServerHandleAttack_Defender"));
-      Battle.bDefenderIsAI = DefenderPS->bIsAI;
-    }
-    if (bUseSiege && CachedGameMode) {
-      const int32 SiegeID = CachedGameMode->ConsumeSiege(FromID);
-      if (SiegeID > 0) {
-        Battle.AssignedSiegeIDs.Add(SiegeID);
-      }
-    }
-    Battle.DefenderArmyCount = Target ? Target->ArmyUnits : 0;
-    if (!CachedGameMode) {
-      CachedGameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
-    }
     if (CachedGameInstance) {
       CachedGameInstance->CacheWorldMapSnapshot(GetWorld());
     } else if (UWorld *World = GetWorld()) {
@@ -1514,15 +1594,25 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
         GI->CacheWorldMapSnapshot(World);
       }
     }
-    TurnManager->RequestPrepareBattle(Battle);
+
+    const bool bPrepareQueued = TurnManager->RequestPrepareBattle(Battle);
+    UE_LOG(LogSkald, Log,
+           TEXT("ServerHandleAttack: RequestPrepareBattle returned %s"),
+           bPrepareQueued ? TEXT("true") : TEXT("false"));
+    if (bPrepareQueued) {
+      return;
+    }
+
+    TriggerImmediateBattleFallback(
+        Battle, TEXT("RequestPrepareBattle returned false"));
     return;
   }
 
   int32 AttackingForces = ArmySent;
   int32 DefendingForces = Target->ArmyUnits;
-  if (bUseSiege && CachedGameMode) {
-    CachedGameMode->ConsumeSiege(FromID);
-  }
+
+  UE_LOG(LogSkald, Warning,
+         TEXT("ServerHandleAttack: TurnManager missing - resolving battle immediately."));
 
   Source->ArmyUnits -= ArmySent;
 
@@ -1547,7 +1637,7 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
   }
 
   if (DefendingForces <= 0) {
-    Target->OwningPlayer = AttackerPS;
+    Target->OwningPlayer = Source->OwningPlayer;
     Target->ArmyUnits = AttackingForces;
   } else {
     Target->ArmyUnits = DefendingForces;
@@ -1561,7 +1651,8 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
       if (USkaldMainHUDWidget *HUD =
               Controller ? Controller->GetHUDWidget() : nullptr) {
         const FString OwnerName =
-            ResolvePlayerName(Target->OwningPlayer, TEXT("ServerHandleAttack_Update"));
+            ResolvePlayerName(Target->OwningPlayer,
+                              TEXT("ServerHandleAttack_Update"));
         HUD->UpdateTerritoryInfo(Target->TerritoryName, OwnerName,
                                  Target->ArmyUnits);
       }
@@ -1582,7 +1673,35 @@ void ASkaldPlayerController::ServerSetReadyForBattle_Implementation() {
     return;
   }
 
+  UE_LOG(LogSkald, Log,
+         TEXT("ServerSetReadyForBattle: Marking PlayerID %d as ready"),
+         PlayerID);
   TurnManager->NotifyPlayerReadyForBattle(PlayerID);
+}
+
+void ASkaldPlayerController::ServerRequestImmediateBattleFallback_Implementation(
+    const FS_BattlePayload &BattlePayload) {
+  UE_LOG(LogSkald, Warning,
+         TEXT("ServerRequestImmediateBattleFallback: Received request for From=%d To=%d from controller %s"),
+         BattlePayload.FromTerritoryID, BattlePayload.TargetTerritoryID,
+         *GetNameSafe(this));
+
+  if (!EnsureTurnManager(TEXT("ServerRequestImmediateBattleFallback"))) {
+    return;
+  }
+
+  const FS_BattlePayload &Pending =
+      TurnManager->GetPendingBattlePreparation();
+  if (Pending.FromTerritoryID != BattlePayload.FromTerritoryID ||
+      Pending.TargetTerritoryID != BattlePayload.TargetTerritoryID) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("ServerRequestImmediateBattleFallback: Payload mismatch. Pending From=%d To=%d"),
+           Pending.FromTerritoryID, Pending.TargetTerritoryID);
+    return;
+  }
+
+  TriggerImmediateBattleFallback(BattlePayload,
+                                 TEXT("Client reported prepare widget failure"));
 }
 
 void ASkaldPlayerController::HandleMoveRequested(int32 FromID, int32 ToID,

@@ -109,11 +109,18 @@ public:
 
   /** Request that both players confirm readiness before travelling to battle. */
   UFUNCTION(BlueprintCallable, Category = "Battle")
-  void RequestPrepareBattle(const FS_BattlePayload &Battle);
+  bool RequestPrepareBattle(const FS_BattlePayload &Battle);
 
   /** Transition into the grid based battle mode using the provided payload. */
   UFUNCTION(BlueprintCallable, Category = "Battle")
   void TriggerGridBattle(const FS_BattlePayload &Battle);
+
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Battle")
+  const FS_BattlePayload &GetPendingBattlePreparation() const {
+    return PendingBattlePreparation;
+  }
+
+  void ForceLaunchBattleFromPrepareFallback(const FS_BattlePayload &Battle);
 
   /** Apply the outcome of a completed grid battle to the world map. */
   UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Battle")
@@ -245,7 +252,7 @@ protected:
   /** Notify controllers and HUDs of a phase change. */
   bool BroadcastCurrentPhase();
 
-  void BroadcastPrepareForBattlePrompt(const FS_BattlePayload &Battle);
+  bool BroadcastPrepareForBattlePrompt(const FS_BattlePayload &Battle);
   void TryLaunchPreparedBattle();
 
 private:

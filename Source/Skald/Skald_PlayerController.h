@@ -459,6 +459,9 @@ public:
   UFUNCTION(Server, Reliable)
   void ServerSetReadyForBattle();
 
+  UFUNCTION(Server, Reliable)
+  void ServerRequestImmediateBattleFallback(const FS_BattlePayload &BattlePayload);
+
   /** Handle HUD siege build requests. */
   UFUNCTION(BlueprintCallable, Category = "UI")
   void HandleBuildSiegeRequested(int32 TerritoryID, ESiegeWeapon SiegeType);
@@ -571,6 +574,14 @@ private:
 
   bool ValidateAttack(int32 FromID, int32 ToID, int32 ArmySent, bool bUseSiege,
                       FString *OutError);
+
+  bool BuildBattlePayloadForAttack(int32 FromID, int32 ToID, int32 ArmySent,
+                                   bool bUseSiege, ATerritory *&OutSource,
+                                   ATerritory *&OutTarget,
+                                   FS_BattlePayload &OutBattle);
+
+  void TriggerImmediateBattleFallback(const FS_BattlePayload &BattlePayload,
+                                      const TCHAR *Reason);
 
   bool ValidateMoveRequest(AWorldMap *WorldMap, int32 FromID, int32 ToID,
                            int32 Troops, ATerritory *&OutSource,
