@@ -244,6 +244,13 @@ void ASkaldPlayerController::InitializeHUDWidget() {
     ShowPendingStrategicInitiativeResult();
   }
 
+  if (bPendingReadyPrompt) {
+    UE_LOG(LogSkaldReady, Verbose,
+           TEXT("InitializeHUDWidget detected pending ready prompt for %s; attempting to display."),
+           *GetName());
+    TryShowPendingReadyPrompt();
+  }
+
   // Notify the game mode that the HUD is now ready so world start checks can
   // proceed only after widgets are initialized.
   if (CachedGameMode) {
@@ -349,6 +356,8 @@ void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
     CachedGameInstance->OnBattleMapStateChanged.RemoveDynamic(
         this, &ASkaldPlayerController::HandleBattleMapStateChanged);
   }
+
+  ResetPendingReadyPromptState();
 
   if (MainHUD) {
     MainHUD->RemoveFromParent();
@@ -2951,22 +2960,211 @@ void ASkaldPlayerController::ClientClearStrategicInitiativeOverlay_Implementatio
   }
 }
 
+void ASkaldPlayerController::RegisterPendingReadyPromptRetry() {
+  UWorld *World = GetWorld();
+  if (!World) {
+    UE_LOG(LogSkaldReady, Warning,
+           TEXT("Unable to register ready prompt retry for %s because the world is missing."),
+           *GetName());
+    return;
+  }
+
+  FTimerManager &TimerManager = World->GetTimerManager();
+  if (TimerManager.IsTimerActive(PendingReadyPromptRetryHandle)) {
+    return;
+  }
+
+  UE_LOG(LogSkaldReady, Verbose,
+         TEXT("Scheduling prepare-for-battle prompt retry while waiting for HUD on %s."),
+         *GetName());
+
+  TimerManager.SetTimer(PendingReadyPromptRetryHandle, this,
+                        &ASkaldPlayerController::HandlePendingReadyPromptRetry,
+                        0.25f, true);
+}
+
+void ASkaldPlayerController::HandlePendingReadyPromptRetry() {
+  if (!bPendingReadyPrompt) {
+    UE_LOG(LogSkaldReady, Verbose,
+           TEXT("Pending ready prompt retry fired for %s with no cached prompt; clearing state."),
+           *GetName());
+    ResetPendingReadyPromptState();
+    return;
+  }
+
+  if (!MainHUD) {
+    UE_LOG(LogSkaldReady, Verbose,
+           TEXT("Pending ready prompt retry awaiting HUD initialization for %s."),
+           *GetName());
+    InitializeHUDWidget();
+    return;
+  }
+
+  TryShowPendingReadyPrompt();
+}
+
+bool ASkaldPlayerController::TryShowPendingReadyPrompt() {
+  if (!bPendingReadyPrompt || !MainHUD) {
+    return false;
+  }
+
+  if (!ShouldDisplayPrepareForBattlePrompt(PendingReadyPrompt)) {
+    UE_LOG(LogSkaldReady, Log,
+           TEXT("Discarding cached prepare-for-battle prompt for %s because ready state changed."),
+           *GetName());
+    ResetPendingReadyPromptState();
+    return true;
+  }
+
+  const FPrepareForBattlePromptData PromptCopy = PendingReadyPrompt;
+  ResetPendingReadyPromptState();
+  MainHUD->ShowPrepareForBattleDialog(PromptCopy);
+  UE_LOG(LogSkaldReady, Verbose,
+         TEXT("Displayed cached prepare-for-battle prompt for %s after HUD became available."),
+         *GetName());
+  return true;
+}
+
+bool ASkaldPlayerController::ShouldDisplayPrepareForBattlePrompt(
+    const FPrepareForBattlePromptData &PromptData) {
+  ASkaldPlayerState *LocalPS = GetPlayerState<ASkaldPlayerState>();
+  if (!LocalPS) {
+    UE_LOG(LogSkaldReady, Verbose,
+           TEXT("Prepare-for-battle prompt defaulting to display for %s because PlayerState is unavailable."),
+           *GetName());
+    return true;
+  }
+
+  const int32 LocalPlayerID = LocalPS->GetPlayerId();
+  const bool bMatchesAttacker = PromptData.AttackerPlayerID == LocalPlayerID;
+  const bool bMatchesDefender = PromptData.DefenderPlayerID == LocalPlayerID;
+
+  if (!bMatchesAttacker && !bMatchesDefender) {
+    UE_LOG(LogSkaldReady, Verbose,
+           TEXT("Skipping prepare-for-battle prompt for %s (PlayerID %d) because they are not a participant."),
+           *GetName(), LocalPlayerID);
+    return false;
+  }
+
+  ASkaldGameState *GameState = CachedGameState;
+  if (!GameState) {
+    if (UWorld *World = GetWorld()) {
+      GameState = World->GetGameState<ASkaldGameState>();
+      if (GameState) {
+        CachedGameState = GameState;
+      }
+    }
+  }
+
+  if (!GameState) {
+    UE_LOG(LogSkaldReady, Verbose,
+           TEXT("Prepare-for-battle prompt proceeding for %s because GameState is unavailable."),
+           *GetName());
+    return true;
+  }
+
+  const FSkaldBattleReadyState &ReadyState = GameState->GetPendingBattleReady();
+
+  if (bMatchesAttacker) {
+    if (ReadyState.AttackerPlayerID != LocalPlayerID) {
+      UE_LOG(LogSkaldReady, Verbose,
+             TEXT("Skipping prepare prompt for %s: ready state attacker ID %d no longer matches."),
+             *GetName(), ReadyState.AttackerPlayerID);
+      return false;
+    }
+    if (ReadyState.bAttackerIsAI) {
+      UE_LOG(LogSkaldReady, Verbose,
+             TEXT("Skipping prepare prompt for %s because attacker is AI-controlled."),
+             *GetName());
+      return false;
+    }
+    if (ReadyState.bAttackerReady) {
+      UE_LOG(LogSkaldReady, Verbose,
+             TEXT("Skipping prepare prompt for %s because attacker already readied."),
+             *GetName());
+      return false;
+    }
+  }
+
+  if (bMatchesDefender) {
+    if (ReadyState.DefenderPlayerID != LocalPlayerID) {
+      UE_LOG(LogSkaldReady, Verbose,
+             TEXT("Skipping prepare prompt for %s: ready state defender ID %d no longer matches."),
+             *GetName(), ReadyState.DefenderPlayerID);
+      return false;
+    }
+    if (ReadyState.bDefenderIsAI) {
+      UE_LOG(LogSkaldReady, Verbose,
+             TEXT("Skipping prepare prompt for %s because defender is AI-controlled."),
+             *GetName());
+      return false;
+    }
+    if (ReadyState.bDefenderReady) {
+      UE_LOG(LogSkaldReady, Verbose,
+             TEXT("Skipping prepare prompt for %s because defender already readied."),
+             *GetName());
+      return false;
+    }
+  }
+
+  return true;
+}
+
+void ASkaldPlayerController::ResetPendingReadyPromptState() {
+  bPendingReadyPrompt = false;
+  PendingReadyPrompt = FPrepareForBattlePromptData();
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(PendingReadyPromptRetryHandle);
+  }
+}
+
 void ASkaldPlayerController::ClientShowPrepareForBattle_Implementation(
     const FPrepareForBattlePromptData &PromptData) {
+  if (!MainHUD) {
+    InitializeHUDWidget();
+  }
+
   ShowMainHUD();
 
   if (MainHUD) {
+    if (!ShouldDisplayPrepareForBattlePrompt(PromptData)) {
+      UE_LOG(LogSkaldReady, Log,
+             TEXT("Discarding prepare-for-battle prompt for %s; ready state no longer requires confirmation."),
+             *GetName());
+      ResetPendingReadyPromptState();
+      return;
+    }
+
     MainHUD->ShowPrepareForBattleDialog(PromptData);
-  } else {
-    UE_LOG(LogSkald, Warning,
-           TEXT("ClientShowPrepareForBattle called without MainHUD"));
+    UE_LOG(LogSkaldReady, Verbose,
+           TEXT("Displayed prepare-for-battle prompt for %s immediately."),
+           *GetName());
+    ResetPendingReadyPromptState();
+    return;
   }
+
+  ResetPendingReadyPromptState();
+  PendingReadyPrompt = PromptData;
+  bPendingReadyPrompt = true;
+  UE_LOG(LogSkaldReady, Verbose,
+         TEXT("MainHUD not yet available for %s; caching prepare-for-battle prompt."),
+         *GetName());
+  RegisterPendingReadyPromptRetry();
 }
 
 void ASkaldPlayerController::ClientHidePrepareForBattle_Implementation() {
   if (MainHUD) {
     MainHUD->HidePrepareForBattleDialog();
   }
+
+  if (bPendingReadyPrompt) {
+    UE_LOG(LogSkaldReady, Verbose,
+           TEXT("Clearing cached prepare-for-battle prompt for %s due to hide notification."),
+           *GetName());
+  }
+
+  ResetPendingReadyPromptState();
 }
 
 void ASkaldPlayerController::CancelCommandMode() {

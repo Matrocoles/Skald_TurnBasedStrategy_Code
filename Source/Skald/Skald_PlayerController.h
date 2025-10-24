@@ -524,6 +524,13 @@ protected:
   /** Helper to update cached state whenever the replicated turn manager changes. */
   void ApplyTurnManager(ATurnManager *Manager);
 
+  void RegisterPendingReadyPromptRetry();
+  void HandlePendingReadyPromptRetry();
+  bool TryShowPendingReadyPrompt();
+  bool ShouldDisplayPrepareForBattlePrompt(
+      const FPrepareForBattlePromptData &PromptData);
+  void ResetPendingReadyPromptState();
+
 private:
   /** Display the stored strategic initiative roll if one is pending. */
   void ShowPendingStrategicInitiativeResult();
@@ -664,6 +671,12 @@ private:
   /** Whether the main HUD is waiting for the player to roll strategic initiative. */
   bool bAwaitingStrategicInitiativeRoll = false;
 
+  /** Cached prompt data that should be displayed once the HUD is available. */
+  FPrepareForBattlePromptData PendingReadyPrompt;
+
+  /** Whether a prepare-for-battle prompt is awaiting HUD initialization. */
+  bool bPendingReadyPrompt = false;
+
   /** Last strategic round index that triggered the initiative prompt audio. */
   int32 LastStrategicInitiativeSoundRound = INDEX_NONE;
 
@@ -677,6 +690,9 @@ private:
 
   /** Timer that polls for combat presentation completion (dice + floaters). */
   FTimerHandle BattlePresentationMonitorHandle;
+
+  /** Timer used to retry showing a pending prepare-for-battle prompt. */
+  FTimerHandle PendingReadyPromptRetryHandle;
 
   /** Number of pending presentation completions awaiting acknowledgment. */
   int32 PendingAttackPresentationNotifications = 0;
