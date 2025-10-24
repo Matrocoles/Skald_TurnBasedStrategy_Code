@@ -122,11 +122,11 @@ bool FSkaldTurnManagerPendingBattleClearsTest::RunTest(const FString &Parameters
   TestTrue(TEXT("Pending battle after request"),
            TM->HasPendingBattlePreparation());
 
-  TM->NotifyPlayerReadyForBattle(1);
+  TM->NotifyPlayerReadyForBattle(1, true);
   TestTrue(TEXT("Still pending after single ready"),
            TM->HasPendingBattlePreparation());
 
-  TM->NotifyPlayerReadyForBattle(2);
+  TM->NotifyPlayerReadyForBattle(2, true);
 
   TestTrue(TEXT("TriggerGridBattle invoked"), TM->bTriggerCalled);
   TestEqual(TEXT("Battle payload forwarded"),

@@ -457,7 +457,7 @@ public:
                           bool bUseSiege);
 
   UFUNCTION(Server, Reliable)
-  void ServerSetReadyForBattle();
+  void ServerSetReadyForBattle(bool bReady);
 
   /** Handle HUD siege build requests. */
   UFUNCTION(BlueprintCallable, Category = "UI")

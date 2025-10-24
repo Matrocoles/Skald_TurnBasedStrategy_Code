@@ -1466,7 +1466,7 @@ void ASkaldPlayerController::HandleAttackRequested(int32 FromID, int32 ToID,
 }
 
 void ASkaldPlayerController::HandlePrepareForBattleReady() {
-  ServerSetReadyForBattle();
+  ServerSetReadyForBattle(true);
 }
 
 void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
@@ -1601,7 +1601,7 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
   }
 }
 
-void ASkaldPlayerController::ServerSetReadyForBattle_Implementation() {
+void ASkaldPlayerController::ServerSetReadyForBattle_Implementation(bool bReady) {
   if (!EnsureTurnManager(TEXT("ServerSetReadyForBattle"))) {
     return;
   }
@@ -1614,7 +1614,7 @@ void ASkaldPlayerController::ServerSetReadyForBattle_Implementation() {
     return;
   }
 
-  TurnManager->NotifyPlayerReadyForBattle(PlayerID);
+  TurnManager->NotifyPlayerReadyForBattle(PlayerID, bReady);
 }
 
 void ASkaldPlayerController::HandleMoveRequested(int32 FromID, int32 ToID,

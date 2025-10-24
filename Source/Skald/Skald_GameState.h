@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/GameStateBase.h"
 #include "GridBattleManager.h" // for FFighterDefinition (ensure it’s a USTRUCT)
+#include "SkaldTypes.h"
 #include "TimerManager.h"
 #include "Skald_GameState.generated.h"
 
@@ -54,6 +55,11 @@ public:
     UPROPERTY(BlueprintAssignable, Category="GameState|Events")
     FFighterRosterUpdated OnFighterRosterUpdated;
 
+    /** Cached snapshot of the pending battle readiness state. */
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_PendingBattleReady,
+              Category="GameState|Battle")
+    FSkaldBattleReadyState PendingBattleReadyState;
+
     // ---- Battle Summary (replicated) ----
     /** Winner of the last completed battle. */
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_BattleSummary, Category="GameState|Battle")
@@ -103,6 +109,20 @@ public:
      */
     void NotifyBattleSummaryChanged();
 
+    /** Server-only helper to update the replicated pending battle readiness. */
+    void SetPendingBattleReady(const FSkaldBattleReadyState& NewState);
+
+    /** Returns true when all human-controlled parties have readied up. */
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="GameState|Battle")
+    bool AreAllRequiredPartiesReady() const;
+
+    /** Accessor for replicated pending battle readiness state. */
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="GameState|Battle")
+    const FSkaldBattleReadyState& GetPendingBattleReady() const
+    {
+        return PendingBattleReadyState;
+    }
+
     /** Request a short-lived global slowdown for cinematic feedback. */
     void RequestTransientSlowdown(float TargetDilation, float DurationSeconds);
 
@@ -123,6 +143,9 @@ protected:
 
     UFUNCTION()
     void OnRep_BattleSummary();
+
+    UFUNCTION()
+    void OnRep_PendingBattleReady();
 
     /** Keep CurrentTurnIndex in bounds after roster changes. */
     void ClampTurnIndex();

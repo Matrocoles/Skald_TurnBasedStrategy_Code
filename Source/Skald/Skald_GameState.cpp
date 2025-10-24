@@ -1,6 +1,7 @@
 #include "Skald_GameState.h"
 #include "Skald_PlayerState.h"
 #include "Net/UnrealNetwork.h"
+#include "HAL/PlatformTime.h"
 #include "Skald_PlayerController.h"
 #include "Engine/World.h"
 #include "GameFramework/WorldSettings.h"
@@ -23,6 +24,7 @@ void ASkaldGameState::GetLifetimeReplicatedProps(
     DOREPLIFETIME(ASkaldGameState, LastAttackerCasualties);
     DOREPLIFETIME(ASkaldGameState, LastDefenderCasualties);
     DOREPLIFETIME(ASkaldGameState, BattlePhase);
+    DOREPLIFETIME(ASkaldGameState, PendingBattleReadyState);
 }
 
 void ASkaldGameState::AddPlayerState(APlayerState* PlayerState)
@@ -105,9 +107,63 @@ void ASkaldGameState::NotifyBattleSummaryChanged()
     OnRep_BattleSummary();
 }
 
+void ASkaldGameState::SetPendingBattleReady(const FSkaldBattleReadyState& NewState)
+{
+    if (!HasAuthority())
+    {
+        UE_LOG(LogSkaldBattle, Warning,
+               TEXT("SetPendingBattleReady called without authority."));
+        return;
+    }
+
+    PendingBattleReadyState = NewState;
+
+    if (UWorld* World = GetWorld())
+    {
+        PendingBattleReadyState.LastUpdatedTimeSeconds = World->GetTimeSeconds();
+    }
+    else
+    {
+        PendingBattleReadyState.LastUpdatedTimeSeconds = FPlatformTime::Seconds();
+    }
+
+    OnRep_PendingBattleReady();
+}
+
+bool ASkaldGameState::AreAllRequiredPartiesReady() const
+{
+    const bool bAttackerRequiresConfirmation =
+        PendingBattleReadyState.AttackerPlayerID != INDEX_NONE &&
+        !PendingBattleReadyState.bAttackerIsAI;
+
+    const bool bDefenderRequiresConfirmation =
+        PendingBattleReadyState.DefenderPlayerID != INDEX_NONE &&
+        !PendingBattleReadyState.bDefenderIsAI;
+
+    const bool bAttackerReady = !bAttackerRequiresConfirmation ||
+                                PendingBattleReadyState.bAttackerReady;
+    const bool bDefenderReady = !bDefenderRequiresConfirmation ||
+                                PendingBattleReadyState.bDefenderReady;
+
+    return bAttackerReady && bDefenderReady;
+}
+
 void ASkaldGameState::OnRep_BattleSummary()
 {
     OnBattleSummaryUpdated.Broadcast();
+}
+
+void ASkaldGameState::OnRep_PendingBattleReady()
+{
+    UE_LOG(LogSkaldBattle, Verbose,
+           TEXT("GameState pending battle ready state updated: Attacker=%d Ready=%s AI=%s, Defender=%d Ready=%s AI=%s (t=%.3f)"),
+           PendingBattleReadyState.AttackerPlayerID,
+           PendingBattleReadyState.bAttackerReady ? TEXT("true") : TEXT("false"),
+           PendingBattleReadyState.bAttackerIsAI ? TEXT("true") : TEXT("false"),
+           PendingBattleReadyState.DefenderPlayerID,
+           PendingBattleReadyState.bDefenderReady ? TEXT("true") : TEXT("false"),
+           PendingBattleReadyState.bDefenderIsAI ? TEXT("true") : TEXT("false"),
+           PendingBattleReadyState.LastUpdatedTimeSeconds);
 }
 
 void ASkaldGameState::ClampTurnIndex()
