@@ -92,8 +92,9 @@ void USkaldGameInstance::Shutdown() {
 }
 
 TSoftObjectPtr<UTexture2D>
-USkaldGameInstance::GetFactionEmblem(ESkaldFaction Faction) const {
-  if (const TSoftObjectPtr<UTexture2D> *Found = FactionEmblemMap.Find(Faction)) {
+USkaldGameInstance::GetFactionEmblem(ESkaldFaction InFaction) const {
+  if (const TSoftObjectPtr<UTexture2D> *Found =
+          FactionEmblemMap.Find(InFaction)) {
     return *Found;
   }
 
