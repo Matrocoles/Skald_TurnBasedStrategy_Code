@@ -7,7 +7,7 @@
 #include "Components/VerticalBoxSlot.h"
 #include "Types/SlateEnums.h"
 #include "Types/SlateStructs.h"
-#include "Blueprint/WidgetTree.h"
+#include "WidgetTree.h"
 
 void UPrepareForBattleWidget::NativeOnInitialized() {
   Super::NativeOnInitialized();
