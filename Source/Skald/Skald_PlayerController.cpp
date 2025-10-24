@@ -1402,7 +1402,7 @@ bool ASkaldPlayerController::BuildBattlePayloadForAttack(
   OutBattle.FromTerritoryID = FromID;
   OutBattle.TargetTerritoryID = ToID;
   OutBattle.ArmyCountSent = ArmySent;
-  OutBattle.DefenderTerritoryName = OutTarget->TerritoryName.ToString();
+  OutBattle.DefenderTerritoryName = OutTarget->TerritoryName;
   OutBattle.IsCapitalAttack = OutTarget->bIsCapital;
   OutBattle.DefenderArmyCount = OutTarget->ArmyUnits;
 
