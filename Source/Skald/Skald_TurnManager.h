@@ -48,12 +48,6 @@ struct SKALD_API FPendingBattleReadyState {
 
   UPROPERTY()
   bool bDefenderReady = false;
-
-  /** Cached attacker state used when player IDs are unavailable. */
-  TWeakObjectPtr<ASkaldPlayerState> AttackerState;
-
-  /** Cached defender state used when player IDs are unavailable. */
-  TWeakObjectPtr<ASkaldPlayerState> DefenderState;
 };
 
 /**
