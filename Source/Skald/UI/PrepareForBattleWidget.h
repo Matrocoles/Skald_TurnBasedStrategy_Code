@@ -2,6 +2,7 @@
 
 #include "Blueprint/UserWidget.h"
 #include "CoreMinimal.h"
+#include "SkaldTypes.h"
 #include "PrepareForBattleWidget.generated.h"
 
 class UButton;
@@ -29,6 +30,10 @@ public:
                           const FText &InAttackingTerritoryID,
                           const FText &InDefendingPlayerID,
                           const FText &InDefendingTerritoryID);
+
+  /** Populate the widget using a freshly constructed battle payload. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Battle")
+  void SetupBattleDetailsFromPayload(const FS_BattlePayload &BattlePayload);
 
   /** Text block displaying the attacking player's ID. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))

@@ -647,10 +647,8 @@ void USkaldMainHUDWidget::HideStrategicInitiativePrompt() {
   }
 }
 
-void USkaldMainHUDWidget::ShowPrepareForBattleDialog(int32 AttackerPlayerID,
-                                                     int32 AttackingTerritoryID,
-                                                     int32 DefenderPlayerID,
-                                                     int32 DefendingTerritoryID) {
+void USkaldMainHUDWidget::ShowPrepareForBattleDialog(
+    const FS_BattlePayload &BattlePayload) {
   bPrepareForBattleReadySent = false;
 
   if (ActivePrepareForBattleWidget) {
@@ -673,27 +671,7 @@ void USkaldMainHUDWidget::ShowPrepareForBattleDialog(int32 AttackerPlayerID,
     return;
   }
 
-  const FText AttackerPlayerText = FText::Format(
-      NSLOCTEXT("SkaldHUD", "Prepare_AttackerPlayerID",
-                "Attacking Player ID: {0}"),
-      FText::AsNumber(AttackerPlayerID));
-  const FText AttackerTerritoryText = FText::Format(
-      NSLOCTEXT("SkaldHUD", "Prepare_AttackerTerritoryID",
-                "Attacking Territory ID: {0}"),
-      FText::AsNumber(AttackingTerritoryID));
-  const FText DefenderPlayerText = FText::Format(
-      NSLOCTEXT("SkaldHUD", "Prepare_DefenderPlayerID",
-                "Defending Player ID: {0}"),
-      FText::AsNumber(DefenderPlayerID));
-  const FText DefenderTerritoryText = FText::Format(
-      NSLOCTEXT("SkaldHUD", "Prepare_DefenderTerritoryID",
-                "Defending Territory ID: {0}"),
-      FText::AsNumber(DefendingTerritoryID));
-
-  ActivePrepareForBattleWidget->SetupBattleDetails(AttackerPlayerText,
-                                                   AttackerTerritoryText,
-                                                   DefenderPlayerText,
-                                                   DefenderTerritoryText);
+  ActivePrepareForBattleWidget->SetupBattleDetailsFromPayload(BattlePayload);
   ActivePrepareForBattleWidget->OnPrepareButtonClicked.AddDynamic(
       this, &USkaldMainHUDWidget::HandlePrepareForBattleClicked);
   if (ActivePrepareForBattleWidget->PrepareForBattleButton) {
