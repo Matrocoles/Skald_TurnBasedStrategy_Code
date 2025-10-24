@@ -249,7 +249,9 @@ protected:
   /** Notify controllers and HUDs of a phase change. */
   bool BroadcastCurrentPhase();
 
-  void BroadcastPrepareForBattlePrompt(const FS_BattlePayload &Battle);
+  void BroadcastPrepareForBattlePrompt(const FS_BattlePayload &Battle,
+                                       const TCHAR *LogContext =
+                                           TEXT("BroadcastPrepareForBattlePrompt"));
   void TryLaunchPreparedBattle();
 
   /** Schedule a retry when phase broadcasts are gated by travel or initialization state. */
