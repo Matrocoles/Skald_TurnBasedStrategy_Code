@@ -256,11 +256,17 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
                TurnManager->GetControllerCount());
       }
     } else {
-      // Defer final registration until the turn manager is available. Only
-      // queue retries when running in multiplayer.
-      if (bIsMultiplayer) {
-        PendingControllers.AddUnique(PC);
-      }
+      // Defer final registration until the turn manager is available. Ensure
+      // the controller remains in the pending list so we can retry once the
+      // manager finishes spawning in both single- and multiplayer sessions.
+      PendingControllers.AddUnique(PC);
+
+      // Retry on the next tick so late-spawned managers still capture the
+      // controller without requiring manual refreshes.
+      FTimerDelegate RetryDelegate =
+          FTimerDelegate::CreateUObject(this, &ASkaldGameMode::RegisterPlayer,
+                                        PC);
+      GetWorldTimerManager().SetTimerForNextTick(RetryDelegate);
       return;
     }
 
