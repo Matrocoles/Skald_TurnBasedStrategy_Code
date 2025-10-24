@@ -8,13 +8,10 @@
 #include "Types/SlateEnums.h"
 #include "Types/SlateStructs.h"
 #include "Blueprint/WidgetTree.h"
-#include "SkaldLogging.h"
 
 void UPrepareForBattleWidget::NativeOnInitialized() {
   Super::NativeOnInitialized();
 
-  UE_LOG(LogSkald, Verbose, TEXT("PrepareForBattleWidget::NativeOnInitialized %s"),
-         *GetNameSafe(this));
   EnsureWidgetTreeInitialized();
   BindPrepareButton();
   RefreshTextWidgets();
@@ -23,8 +20,6 @@ void UPrepareForBattleWidget::NativeOnInitialized() {
 void UPrepareForBattleWidget::NativeConstruct() {
   Super::NativeConstruct();
 
-  UE_LOG(LogSkald, Verbose, TEXT("PrepareForBattleWidget::NativeConstruct %s"),
-         *GetNameSafe(this));
   EnsureWidgetTreeInitialized();
   BindPrepareButton();
   RefreshTextWidgets();
@@ -49,9 +44,6 @@ void UPrepareForBattleWidget::SetupBattleDetails(
 
 void UPrepareForBattleWidget::SetupBattleDetailsFromPayload(
     const FS_BattlePayload &BattlePayload) {
-  UE_LOG(LogSkald, Log,
-         TEXT("PrepareForBattleWidget::SetupBattleDetailsFromPayload for From=%d Target=%d"),
-         BattlePayload.FromTerritoryID, BattlePayload.TargetTerritoryID);
   const FText AttackerPlayerText = !BattlePayload.AttackerDisplayName.IsEmpty()
                                        ? FText::Format(
                                              NSLOCTEXT("SkaldHUD",
@@ -106,9 +98,6 @@ void UPrepareForBattleWidget::SetupBattleDetailsFromPayload(
 
 void UPrepareForBattleWidget::EnsureWidgetTreeInitialized() {
   if (WidgetTree && !WidgetTree->RootWidget) {
-    UE_LOG(LogSkald, Warning,
-           TEXT("PrepareForBattleWidget::EnsureWidgetTreeInitialized building fallback tree for %s"),
-           *GetNameSafe(this));
     BuildFallbackWidgetTree();
   }
 }
@@ -124,20 +113,10 @@ void UPrepareForBattleWidget::BindPrepareButton() {
           this, &UPrepareForBattleWidget::HandlePrepareButtonClicked)) {
     PrepareForBattleButton->OnClicked.AddDynamic(
         this, &UPrepareForBattleWidget::HandlePrepareButtonClicked);
-    UE_LOG(LogSkald, Verbose,
-           TEXT("PrepareForBattleWidget::BindPrepareButton bound click handler on %s"),
-           *GetNameSafe(PrepareForBattleButton));
-  } else if (!PrepareForBattleButton) {
-    UE_LOG(LogSkald, Warning,
-           TEXT("PrepareForBattleWidget::BindPrepareButton missing button for %s"),
-           *GetNameSafe(this));
   }
 }
 
 void UPrepareForBattleWidget::HandlePrepareButtonClicked() {
-  UE_LOG(LogSkald, Log,
-         TEXT("PrepareForBattleWidget::HandlePrepareButtonClicked broadcasting ready from %s"),
-         *GetNameSafe(this));
   OnPrepareButtonClicked.Broadcast();
 }
 
@@ -160,10 +139,6 @@ void UPrepareForBattleWidget::BuildFallbackWidgetTree() {
   if (!WidgetTree) {
     return;
   }
-
-  UE_LOG(LogSkald, Warning,
-         TEXT("PrepareForBattleWidget::BuildFallbackWidgetTree constructing runtime tree for %s"),
-         *GetNameSafe(this));
 
   WidgetTree->RootWidget = nullptr;
 
