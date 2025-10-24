@@ -1607,13 +1607,20 @@ bool ATurnManager::BroadcastPrepareForBattlePrompt(
          PendingBattleReadyState.bDefenderReady ? TEXT("true") : TEXT("false"));
 
   for (ASkaldPlayerController *Controller : GetControllers()) {
-    if (Controller) {
-      if (Controller->HasAuthority() && Controller->IsLocalController()) {
-        Controller->HidePrepareForBattleDialogLocal();
-      } else {
-        Controller->ClientHidePrepareForBattle();
-      }
+    if (!Controller) {
+      continue;
     }
+
+    const ENetMode NetMode = Controller->GetNetMode();
+    if (NetMode == NM_Standalone) {
+      Controller->HidePrepareForBattleDialogLocal();
+      continue;
+    }
+
+    if (Controller->HasAuthority()) {
+      Controller->HidePrepareForBattleDialogLocal();
+    }
+    Controller->ClientHidePrepareForBattle();
   }
 
   if (!bNeedsAttackerConfirmation && !bNeedsDefenderConfirmation) {
@@ -1642,9 +1649,13 @@ bool ATurnManager::BroadcastPrepareForBattlePrompt(
                  ? TEXT("attacker/defender")
                  : (bIsAttacker ? TEXT("attacker") : TEXT("defender")),
              *GetNameSafe(Controller), PlayerID);
-      if (Controller->HasAuthority() && Controller->IsLocalController()) {
+      const ENetMode NetMode = Controller->GetNetMode();
+      if (NetMode == NM_Standalone) {
         Controller->ShowPrepareForBattleDialogLocal(Battle);
       } else {
+        if (Controller->HasAuthority()) {
+          Controller->ShowPrepareForBattleDialogLocal(Battle);
+        }
         Controller->ClientShowPrepareForBattle(Battle);
       }
       bPromptIssued = true;
@@ -1756,13 +1767,20 @@ void ATurnManager::TryLaunchPreparedBattle() {
          PendingBattlePreparation.TargetTerritoryID);
 
   for (ASkaldPlayerController *Controller : GetControllers()) {
-    if (Controller) {
-      if (Controller->HasAuthority() && Controller->IsLocalController()) {
-        Controller->HidePrepareForBattleDialogLocal();
-      } else {
-        Controller->ClientHidePrepareForBattle();
-      }
+    if (!Controller) {
+      continue;
     }
+
+    const ENetMode NetMode = Controller->GetNetMode();
+    if (NetMode == NM_Standalone) {
+      Controller->HidePrepareForBattleDialogLocal();
+      continue;
+    }
+
+    if (Controller->HasAuthority()) {
+      Controller->HidePrepareForBattleDialogLocal();
+    }
+    Controller->ClientHidePrepareForBattle();
   }
 
   FS_BattlePayload BattleToLaunch = PendingBattlePreparation;
