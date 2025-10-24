@@ -42,6 +42,60 @@ void UPrepareForBattleWidget::SetupBattleDetails(
   RefreshTextWidgets();
 }
 
+void UPrepareForBattleWidget::SetupBattleDetailsFromPayload(
+    const FS_BattlePayload &BattlePayload) {
+  const FText AttackerPlayerText = !BattlePayload.AttackerDisplayName.IsEmpty()
+                                       ? FText::Format(
+                                             NSLOCTEXT("SkaldHUD",
+                                                       "Prepare_AttackerName",
+                                                       "Attacking Player: {0}"),
+                                             FText::FromString(
+                                                 BattlePayload.AttackerDisplayName))
+                                       : FText::Format(
+                                             NSLOCTEXT("SkaldHUD",
+                                                       "Prepare_AttackerPlayerID",
+                                                       "Attacking Player ID: {0}"),
+                                             FText::AsNumber(
+                                                 BattlePayload.AttackerPlayerID));
+
+  const FText AttackerTerritoryText = FText::Format(
+      NSLOCTEXT("SkaldHUD", "Prepare_AttackerTerritoryID",
+                "Attacking Territory ID: {0}"),
+      FText::AsNumber(BattlePayload.FromTerritoryID));
+
+  const FText DefenderPlayerText = !BattlePayload.DefenderDisplayName.IsEmpty()
+                                       ? FText::Format(
+                                             NSLOCTEXT("SkaldHUD",
+                                                       "Prepare_DefenderName",
+                                                       "Defending Player: {0}"),
+                                             FText::FromString(
+                                                 BattlePayload.DefenderDisplayName))
+                                       : FText::Format(
+                                             NSLOCTEXT("SkaldHUD",
+                                                       "Prepare_DefenderPlayerID",
+                                                       "Defending Player ID: {0}"),
+                                             FText::AsNumber(
+                                                 BattlePayload.DefenderPlayerID));
+
+  const FText DefenderTerritoryText = !BattlePayload.DefenderTerritoryName.IsEmpty()
+                                          ? FText::Format(NSLOCTEXT(
+                                                                "SkaldHUD",
+                                                                "Prepare_DefenderTerritoryName",
+                                                                "Defending Territory: {0}"),
+                                                          FText::FromString(
+                                                              BattlePayload.
+                                                                  DefenderTerritoryName))
+                                          : FText::Format(
+                                                NSLOCTEXT("SkaldHUD",
+                                                          "Prepare_DefenderTerritoryID",
+                                                          "Defending Territory ID: {0}"),
+                                                FText::AsNumber(
+                                                    BattlePayload.TargetTerritoryID));
+
+  SetupBattleDetails(AttackerPlayerText, AttackerTerritoryText,
+                     DefenderPlayerText, DefenderTerritoryText);
+}
+
 void UPrepareForBattleWidget::EnsureWidgetTreeInitialized() {
   if (WidgetTree && !WidgetTree->RootWidget) {
     BuildFallbackWidgetTree();

@@ -1615,15 +1615,9 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
         PlayerID == PendingBattleReadyState.DefenderPlayerID;
     if (bIsAttacker || bIsDefender) {
       if (Controller->HasAuthority() && Controller->IsLocalController()) {
-        Controller->ShowPrepareForBattleDialogLocal(Battle.AttackerPlayerID,
-                                                   Battle.FromTerritoryID,
-                                                   Battle.DefenderPlayerID,
-                                                   Battle.TargetTerritoryID);
+        Controller->ShowPrepareForBattleDialogLocal(Battle);
       } else {
-        Controller->ClientShowPrepareForBattle(Battle.AttackerPlayerID,
-                                               Battle.FromTerritoryID,
-                                               Battle.DefenderPlayerID,
-                                               Battle.TargetTerritoryID);
+        Controller->ClientShowPrepareForBattle(Battle);
       }
     }
   }
