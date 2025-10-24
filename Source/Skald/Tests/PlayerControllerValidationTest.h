@@ -29,5 +29,10 @@ public:
     {
         MainHUD = InHUD;
     }
+
+    bool TestValidateAttack(int32 FromID, int32 ToID, int32 ArmySent, bool bUseSiege, FString* OutError)
+    {
+        return ValidateAttack(FromID, ToID, ArmySent, bUseSiege, OutError);
+    }
 };
 
