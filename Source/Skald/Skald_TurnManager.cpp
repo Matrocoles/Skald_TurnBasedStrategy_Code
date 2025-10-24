@@ -1096,6 +1096,18 @@ TArray<ASkaldPlayerController *> ATurnManager::GetControllers() const {
   return Result;
 }
 
+bool ATurnManager::HasPendingBattlePreparation() const {
+  const bool bHasPayload = PendingBattlePreparation.FromTerritoryID != 0 ||
+                           PendingBattlePreparation.TargetTerritoryID != 0;
+  const bool bHasReadyAssignments =
+      PendingBattleReadyState.AttackerPlayerID != INDEX_NONE ||
+      PendingBattleReadyState.DefenderPlayerID != INDEX_NONE ||
+      PendingBattleReadyState.bAttackerReady ||
+      PendingBattleReadyState.bDefenderReady;
+
+  return bHasPayload || bHasReadyAssignments;
+}
+
 void ATurnManager::RequestPrepareBattle(const FS_BattlePayload &Battle) {
   PendingBattlePreparation = Battle;
   PendingBattleReadyState = FPendingBattleReadyState();
@@ -1761,6 +1773,12 @@ void ATurnManager::TryLaunchPreparedBattle() {
   FS_BattlePayload BattleToLaunch = PendingBattlePreparation;
   PendingBattlePreparation = FS_BattlePayload();
   PendingBattleReadyState = FPendingBattleReadyState();
+
+  const bool bClearedState = !HasPendingBattlePreparation();
+  UE_LOG(LogSkald, Log,
+         TEXT("TryLaunchPreparedBattle: cleared pending state=%s for battle %d->%d"),
+         bClearedState ? TEXT("true") : TEXT("false"),
+         BattleToLaunch.FromTerritoryID, BattleToLaunch.TargetTerritoryID);
 
   TriggerGridBattle(BattleToLaunch);
 }
@@ -2471,6 +2489,12 @@ void ATurnManager::AdvancePhase() {
 
 void ATurnManager::EndCurrentPhase() {
   const bool bArmyPlacement = CurrentPhase == ETurnPhase::ArmyPlacement;
+
+  if (HasPendingBattlePreparation()) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("EndCurrentPhase blocked: pending battle preparation awaiting readiness."));
+    return;
+  }
 
   if (!bArmyPlacement) {
     if (const UWorld *W = GetWorld()) {

@@ -64,6 +64,11 @@ FString ResolvePlayerName(const ASkaldPlayerState *PlayerState,
   return PlayerState->GetResolvedPlayerName(Context);
 }
 
+constexpr const TCHAR *PendingBattleAttackError =
+    TEXT("A battle is already being prepared. Please wait for it to begin.");
+constexpr const TCHAR *PendingBattlePhaseError =
+    TEXT("Cannot end the phase while a battle is awaiting confirmation.");
+
 bool IsCursorOverInteractableSlateWidget() {
   if (!FSlateApplication::IsInitialized()) {
     return false;
@@ -1276,6 +1281,11 @@ void ASkaldPlayerController::EndTurn() {
 
 void ASkaldPlayerController::EndPhase() {
   if (!HasAuthority()) {
+    if (TurnManager && TurnManager->HasPendingBattlePreparation()) {
+      NotifyActionError_Implementation(PendingBattlePhaseError);
+      return;
+    }
+
     ServerEndPhase();
     return;
   }
@@ -1289,6 +1299,15 @@ void ASkaldPlayerController::ServerEndPhase_Implementation() {
 
 void ASkaldPlayerController::HandleEndPhaseInternal() {
   if (!EnsureTurnManager(TEXT("EndPhase"))) {
+    return;
+  }
+
+  if (TurnManager->HasPendingBattlePreparation()) {
+    if (IsLocalController()) {
+      NotifyActionError_Implementation(PendingBattlePhaseError);
+    } else {
+      NotifyActionError(PendingBattlePhaseError);
+    }
     return;
   }
 
@@ -1331,6 +1350,13 @@ void ASkaldPlayerController::HandleEndPhaseInternal() {
 bool ASkaldPlayerController::ValidateAttack(int32 FromID, int32 ToID,
                                             int32 ArmySent, bool bUseSiege,
                                             FString *OutError) {
+  if (TurnManager && TurnManager->HasPendingBattlePreparation()) {
+    if (OutError) {
+      *OutError = PendingBattleAttackError;
+    }
+    return false;
+  }
+
   AWorldMap *WorldMap = Cast<AWorldMap>(
       UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
   if (!WorldMap) {
@@ -1424,6 +1450,12 @@ void ASkaldPlayerController::HandleAttackRequested(int32 FromID, int32 ToID,
                                                    bool bUseSiege) {
   UE_LOG(LogSkald, Log, TEXT("HUD attack from %d to %d with %d"), FromID, ToID,
          ArmySent);
+
+  if (TurnManager && TurnManager->HasPendingBattlePreparation()) {
+    NotifyActionError_Implementation(PendingBattleAttackError);
+    return;
+  }
+
   FString Error;
   if (!ValidateAttack(FromID, ToID, ArmySent, bUseSiege, &Error)) {
     NotifyActionError(Error);
@@ -1441,6 +1473,11 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
                                                                int32 ToID,
                                                                int32 ArmySent,
                                                                bool bUseSiege) {
+  if (TurnManager && TurnManager->HasPendingBattlePreparation()) {
+    NotifyActionError(PendingBattleAttackError);
+    return;
+  }
+
   FString Error;
   if (!ValidateAttack(FromID, ToID, ArmySent, bUseSiege, &Error)) {
     NotifyActionError(Error);

@@ -8,6 +8,20 @@
 #include "Skald_PlayerState.h"
 #include "Engine/World.h"
 
+UCLASS()
+class SKALD_API ATestTurnManagerNoTravel : public ATurnManager {
+  GENERATED_BODY()
+
+public:
+  bool bTriggerCalled = false;
+  FS_BattlePayload CapturedBattle;
+
+  virtual void TriggerGridBattle(const FS_BattlePayload &Battle) override {
+    bTriggerCalled = true;
+    CapturedBattle = Battle;
+  }
+};
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldTurnManagerPhaseTest, "Skald.TurnManager.PhaseTransitions", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FSkaldTurnManagerPhaseTest::RunTest(const FString& Parameters) {
   Skald::Tests::FScopedAutomationTestWorld TestWorld;
@@ -86,6 +100,52 @@ bool FSkaldTurnManagerInitiativeTest::RunTest(const FString& Parameters) {
   TestEqual(TEXT("Controller count"), Controllers.Num(), 2);
   TestTrue(TEXT("Highest initiative first"), Controllers[0] == PC2);
   TestTrue(TEXT("Lowest initiative second"), Controllers[1] == PC1);
+
+  return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldTurnManagerPendingBattleClearsTest,
+                                 "Skald.TurnManager.PendingBattleClears",
+                                 EAutomationTestFlags::EditorContext |
+                                     EAutomationTestFlags::EngineFilter)
+bool FSkaldTurnManagerPendingBattleClearsTest::RunTest(const FString &Parameters) {
+  Skald::Tests::FScopedAutomationTestWorld TestWorld;
+  UWorld *World = TestWorld.Get();
+  TestNotNull(TEXT("World created"), World);
+  if (!World) {
+    return false;
+  }
+
+  ATestTurnManagerNoTravel *TM = World->SpawnActor<ATestTurnManagerNoTravel>();
+  TestNotNull(TEXT("TurnManager"), TM);
+  if (!TM) {
+    return false;
+  }
+
+  TestFalse(TEXT("No pending battle initially"), TM->HasPendingBattlePreparation());
+
+  FS_BattlePayload Battle;
+  Battle.AttackerPlayerID = 1;
+  Battle.DefenderPlayerID = 2;
+  Battle.FromTerritoryID = 10;
+  Battle.TargetTerritoryID = 20;
+  Battle.bAttackerIsAI = false;
+  Battle.bDefenderIsAI = false;
+
+  TM->RequestPrepareBattle(Battle);
+  TestTrue(TEXT("Pending battle after request"),
+           TM->HasPendingBattlePreparation());
+
+  TM->NotifyPlayerReadyForBattle(1);
+  TestTrue(TEXT("Still pending after single ready"),
+           TM->HasPendingBattlePreparation());
+
+  TM->NotifyPlayerReadyForBattle(2);
+
+  TestTrue(TEXT("TriggerGridBattle invoked"), TM->bTriggerCalled);
+  TestEqual(TEXT("Battle payload forwarded"),
+            TM->CapturedBattle.FromTerritoryID, Battle.FromTerritoryID);
+  TestFalse(TEXT("Pending battle cleared"), TM->HasPendingBattlePreparation());
 
   return true;
 }
