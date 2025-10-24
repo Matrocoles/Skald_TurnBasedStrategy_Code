@@ -23,6 +23,7 @@ class AWorldMap;
 class ATerritory;
 class ASkaldGameState;
 class ASkaldPlayerState;
+class UTexture2D;
 
 USTRUCT(BlueprintType)
 struct FSkaldTravelState
@@ -179,6 +180,14 @@ public:
   /** Widget class used when showing the deploy overlay via the viewport. */
   UPROPERTY(EditDefaultsOnly, Category = "UI")
   TSubclassOf<UUserWidget> DeployWidgetClass;
+
+  /** Optional faction emblem textures keyed by faction enum. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
+  TMap<ESkaldFaction, TSoftObjectPtr<UTexture2D>> FactionEmblemMap;
+
+  /** Resolve the configured emblem for a given faction, if one exists. */
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "UI")
+  TSoftObjectPtr<UTexture2D> GetFactionEmblem(ESkaldFaction Faction) const;
 
   /** Deploy widget instance owned by the game instance for Slate insertion. */
   UPROPERTY(Transient)

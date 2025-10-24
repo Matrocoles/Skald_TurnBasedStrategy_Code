@@ -1440,11 +1440,10 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
       return nullptr;
     };
 
-    auto ResolveParticipant = [&](int32 TerritoryId,
-                                   ASkaldPlayerState *ExistingPS,
-                                   int32 &OutPlayerID, FString &OutName,
-                                   ESkaldFaction &OutFaction, bool &bOutIsAI)
-        -> ASkaldPlayerState * {
+    auto ResolveParticipant =
+        [&](int32 TerritoryId, ASkaldPlayerState *ExistingPS, int32 &OutPlayerID,
+            FString &OutName, ESkaldFaction &OutFaction, bool &bOutIsAI,
+            TSoftObjectPtr<UTexture2D> &OutEmblem) -> ASkaldPlayerState * {
       ASkaldPlayerState *Resolved = ExistingPS;
       if (!Resolved) {
         if (ATerritory *Territory = FindTerritory(TerritoryId)) {
@@ -1459,6 +1458,13 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
         OutName = Resolved->GetResolvedPlayerName(TEXT("TriggerGridBattle"));
         OutFaction = Resolved->Faction;
         bOutIsAI = Resolved->bIsAI;
+        if (!OutEmblem.ToSoftObjectPath().IsValid() &&
+            OutFaction != ESkaldFaction::None) {
+          if (USkaldGameInstance *LocalGI =
+                  GetGameInstance<USkaldGameInstance>()) {
+            OutEmblem = LocalGI->GetFactionEmblem(OutFaction);
+          }
+        }
       }
       return Resolved;
     };
@@ -1467,14 +1473,21 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
                       PendingPayload.AttackerPlayerID,
                       PendingPayload.AttackerDisplayName,
                       PendingPayload.AttackerFaction,
-                      PendingPayload.bAttackerIsAI);
+                      PendingPayload.bAttackerIsAI,
+                      PendingPayload.AttackerFactionEmblem);
     ResolveParticipant(PendingPayload.TargetTerritoryID, nullptr,
                       PendingPayload.DefenderPlayerID,
                       PendingPayload.DefenderDisplayName,
                       PendingPayload.DefenderFaction,
-                      PendingPayload.bDefenderIsAI);
+                      PendingPayload.bDefenderIsAI,
+                      PendingPayload.DefenderFactionEmblem);
 
+    ATerritory *AttackTerritory =
+        FindTerritory(PendingPayload.FromTerritoryID);
     ATerritory *DefTerritory = FindTerritory(PendingPayload.TargetTerritoryID);
+    if (PendingPayload.AttackerTerritoryName.IsEmpty() && AttackTerritory) {
+      PendingPayload.AttackerTerritoryName = AttackTerritory->TerritoryName;
+    }
     if (PendingPayload.DefenderArmyCount <= 0) {
       if (DefTerritory) {
         PendingPayload.DefenderArmyCount = DefTerritory->ArmyUnits;
@@ -1587,6 +1600,123 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
     return;
   }
 
+  UWorld *World = GetWorld();
+  ASkaldGameState *GameState =
+      World ? World->GetGameState<ASkaldGameState>() : nullptr;
+  AWorldMap *WorldMap = ResolveWorldMap();
+  USkaldGameInstance *GameInstance = GetGameInstance<USkaldGameInstance>();
+
+  auto ResolvePlayerName = [&](int32 PlayerId, const FString &CachedName,
+                               const TCHAR *LogContext) -> FText {
+    if (!CachedName.IsEmpty()) {
+      return FText::FromString(CachedName);
+    }
+
+    if (GameState && PlayerId > 0) {
+      if (ASkaldPlayerState *PlayerState = GameState->GetPlayerById(PlayerId)) {
+        const FString Resolved =
+            PlayerState->GetResolvedPlayerName(LogContext);
+        if (!Resolved.IsEmpty()) {
+          return FText::FromString(Resolved);
+        }
+      }
+    }
+
+    if (PlayerId > 0) {
+      UE_LOG(LogSkald, Verbose,
+             TEXT("BroadcastPrepareForBattlePrompt: using fallback name for %s (PlayerID %d)"),
+             LogContext, PlayerId);
+      return FText::Format(
+          NSLOCTEXT("SkaldHUD", "Prepare_PlayerIDFallback", "Player #{0}"),
+          FText::AsNumber(PlayerId));
+    }
+
+    UE_LOG(LogSkald, Warning,
+           TEXT("BroadcastPrepareForBattlePrompt: missing player name for %s"),
+           LogContext);
+    return NSLOCTEXT("SkaldHUD", "Prepare_UnknownPlayer", "Unknown Player");
+  };
+
+  auto ResolveTerritoryName = [&](int32 TerritoryId, const FString &CachedName,
+                                  const TCHAR *LogContext) -> FText {
+    if (!CachedName.IsEmpty()) {
+      return FText::FromString(CachedName);
+    }
+
+    if (WorldMap && TerritoryId != 0) {
+      if (ATerritory *Territory = WorldMap->GetTerritoryById(TerritoryId)) {
+        if (Territory && !Territory->TerritoryName.IsEmpty()) {
+          return FText::FromString(Territory->TerritoryName);
+        }
+      }
+    }
+
+    if (TerritoryId != 0) {
+      UE_LOG(LogSkald, Verbose,
+             TEXT("BroadcastPrepareForBattlePrompt: using fallback territory ID for %s (ID %d)"),
+             LogContext, TerritoryId);
+      return FText::Format(NSLOCTEXT("SkaldHUD", "Prepare_TerritoryIDFallback",
+                                     "Territory #{0}"),
+                           FText::AsNumber(TerritoryId));
+    }
+
+    UE_LOG(LogSkald, Warning,
+           TEXT("BroadcastPrepareForBattlePrompt: missing territory data for %s"),
+           LogContext);
+    return NSLOCTEXT("SkaldHUD", "Prepare_UnknownTerritory",
+                     "Unknown Territory");
+  };
+
+  auto ResolveFactionEmblem =
+      [&](const TSoftObjectPtr<UTexture2D> &Source, ESkaldFaction Faction,
+          const TCHAR *LogContext) -> TSoftObjectPtr<UTexture2D> {
+        if (Source.ToSoftObjectPath().IsValid()) {
+          return Source;
+        }
+
+        if (Faction != ESkaldFaction::None && GameInstance) {
+          TSoftObjectPtr<UTexture2D> Emblem =
+              GameInstance->GetFactionEmblem(Faction);
+          if (Emblem.ToSoftObjectPath().IsValid()) {
+            return Emblem;
+          }
+        }
+
+        if (Faction != ESkaldFaction::None) {
+          UE_LOG(LogSkald, Verbose,
+                 TEXT("BroadcastPrepareForBattlePrompt: missing faction emblem for %s (%s)"),
+                 LogContext,
+                 *StaticEnum<ESkaldFaction>()->GetNameStringByValue(
+                     static_cast<int64>(Faction)));
+        }
+
+        return TSoftObjectPtr<UTexture2D>();
+      };
+
+  FPrepareForBattlePromptData PromptData;
+  PromptData.AttackerPlayerID = Battle.AttackerPlayerID;
+  PromptData.DefenderPlayerID = Battle.DefenderPlayerID;
+  PromptData.AttackingTerritoryID = Battle.FromTerritoryID;
+  PromptData.DefendingTerritoryID = Battle.TargetTerritoryID;
+  PromptData.AttackerFaction = Battle.AttackerFaction;
+  PromptData.DefenderFaction = Battle.DefenderFaction;
+  PromptData.AttackerDisplayName = ResolvePlayerName(
+      Battle.AttackerPlayerID, Battle.AttackerDisplayName, TEXT("Attacker"));
+  PromptData.DefenderDisplayName = ResolvePlayerName(
+      Battle.DefenderPlayerID, Battle.DefenderDisplayName, TEXT("Defender"));
+  PromptData.AttackingTerritoryName = ResolveTerritoryName(
+      Battle.FromTerritoryID, Battle.AttackerTerritoryName,
+      TEXT("AttackingTerritory"));
+  PromptData.DefendingTerritoryName = ResolveTerritoryName(
+      Battle.TargetTerritoryID, Battle.DefenderTerritoryName,
+      TEXT("DefendingTerritory"));
+  PromptData.AttackerFactionEmblem =
+      ResolveFactionEmblem(Battle.AttackerFactionEmblem, Battle.AttackerFaction,
+                           TEXT("Attacker"));
+  PromptData.DefenderFactionEmblem =
+      ResolveFactionEmblem(Battle.DefenderFactionEmblem, Battle.DefenderFaction,
+                           TEXT("Defender"));
+
   for (ASkaldPlayerController *Controller : GetControllers()) {
     if (!Controller) {
       continue;
@@ -1600,10 +1730,7 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
         bNeedsDefenderConfirmation &&
         PlayerID == PendingBattleReadyState.DefenderPlayerID;
     if (bIsAttacker || bIsDefender) {
-      Controller->ClientShowPrepareForBattle(Battle.AttackerPlayerID,
-                                             Battle.FromTerritoryID,
-                                             Battle.DefenderPlayerID,
-                                             Battle.TargetTerritoryID);
+      Controller->ClientShowPrepareForBattle(PromptData);
     }
   }
 }

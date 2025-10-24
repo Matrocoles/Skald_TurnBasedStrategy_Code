@@ -439,10 +439,7 @@ public:
   void ClientClearStrategicInitiativeOverlay();
 
   UFUNCTION(Client, Reliable)
-  void ClientShowPrepareForBattle(int32 AttackerPlayerID,
-                                  int32 AttackingTerritoryID,
-                                  int32 DefenderPlayerID,
-                                  int32 DefendingTerritoryID);
+  void ClientShowPrepareForBattle(const FPrepareForBattlePromptData &PromptData);
 
   UFUNCTION(Client, Reliable)
   void ClientHidePrepareForBattle();

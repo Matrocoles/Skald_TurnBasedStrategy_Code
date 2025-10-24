@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "SkaldTypes.generated.h"
 
+class UTexture2D;
+
 // Keep generated.h last among includes in this header!
 
 // Gameplay-wide constants
@@ -113,6 +115,10 @@ struct SKALD_API FS_BattlePayload
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     int32 TargetTerritoryID = 0;
 
+    /** Display name for the territory the attacker is moving from. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    FString AttackerTerritoryName;
+
     /** Display name for the territory being defended. */
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     FString DefenderTerritoryName;
@@ -139,6 +145,14 @@ struct SKALD_API FS_BattlePayload
     /** Faction the defender was using on the world map. */
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     ESkaldFaction DefenderFaction = ESkaldFaction::None;
+
+    /** Optional faction emblem representing the attacker. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    TSoftObjectPtr<UTexture2D> AttackerFactionEmblem;
+
+    /** Optional faction emblem representing the defender. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    TSoftObjectPtr<UTexture2D> DefenderFactionEmblem;
 
     /** True when the attacking player was controlled by AI at the time of travel. */
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
@@ -167,6 +181,60 @@ struct SKALD_API FS_BattlePayload
     /** Map name to travel back to once the battle concludes. */
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     FString ReturnMap;
+};
+
+/** Data broadcast to clients when prompting them to prepare for battle. */
+USTRUCT(BlueprintType)
+struct SKALD_API FPrepareForBattlePromptData {
+  GENERATED_BODY()
+
+  /** Unique ID of the attacking player. */
+  UPROPERTY(BlueprintReadWrite, EditAnywhere)
+  int32 AttackerPlayerID = INDEX_NONE;
+
+  /** Unique ID of the defending player. */
+  UPROPERTY(BlueprintReadWrite, EditAnywhere)
+  int32 DefenderPlayerID = INDEX_NONE;
+
+  /** ID of the territory initiating the attack. */
+  UPROPERTY(BlueprintReadWrite, EditAnywhere)
+  int32 AttackingTerritoryID = 0;
+
+  /** ID of the territory being attacked. */
+  UPROPERTY(BlueprintReadWrite, EditAnywhere)
+  int32 DefendingTerritoryID = 0;
+
+  /** Localised display name for the attacking player. */
+  UPROPERTY(BlueprintReadWrite, EditAnywhere)
+  FText AttackerDisplayName;
+
+  /** Localised display name for the defending player. */
+  UPROPERTY(BlueprintReadWrite, EditAnywhere)
+  FText DefenderDisplayName;
+
+  /** Localised title for the attacking territory. */
+  UPROPERTY(BlueprintReadWrite, EditAnywhere)
+  FText AttackingTerritoryName;
+
+  /** Localised title for the defending territory. */
+  UPROPERTY(BlueprintReadWrite, EditAnywhere)
+  FText DefendingTerritoryName;
+
+  /** Faction used by the attacking player. */
+  UPROPERTY(BlueprintReadWrite, EditAnywhere)
+  ESkaldFaction AttackerFaction = ESkaldFaction::None;
+
+  /** Faction used by the defending player. */
+  UPROPERTY(BlueprintReadWrite, EditAnywhere)
+  ESkaldFaction DefenderFaction = ESkaldFaction::None;
+
+  /** Optional emblem for the attacking player's faction. */
+  UPROPERTY(BlueprintReadWrite, EditAnywhere)
+  TSoftObjectPtr<UTexture2D> AttackerFactionEmblem;
+
+  /** Optional emblem for the defending player's faction. */
+  UPROPERTY(BlueprintReadWrite, EditAnywhere)
+  TSoftObjectPtr<UTexture2D> DefenderFactionEmblem;
 };
 
 /** Serialized outcome of a resolved grid battle. */

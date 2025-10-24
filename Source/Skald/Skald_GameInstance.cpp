@@ -91,6 +91,15 @@ void USkaldGameInstance::Shutdown() {
   Super::Shutdown();
 }
 
+TSoftObjectPtr<UTexture2D>
+USkaldGameInstance::GetFactionEmblem(ESkaldFaction Faction) const {
+  if (const TSoftObjectPtr<UTexture2D> *Found = FactionEmblemMap.Find(Faction)) {
+    return *Found;
+  }
+
+  return TSoftObjectPtr<UTexture2D>();
+}
+
 void USkaldGameInstance::SetTravelState(const FSkaldTravelState &InState) {
   TravelState = InState;
   TravelState.bValid = true;

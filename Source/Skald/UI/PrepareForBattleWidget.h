@@ -6,6 +6,8 @@
 
 class UButton;
 class UTextBlock;
+class UImage;
+class UTexture2D;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FPrepareForBattleClicked);
 
@@ -24,26 +26,36 @@ public:
 
   /** Configure the text displayed for each participant/territory pair. */
   UFUNCTION(BlueprintCallable, Category = "Skald|Battle")
-  void SetupBattleDetails(const FText &InAttackingPlayerID,
-                          const FText &InAttackingTerritoryID,
-                          const FText &InDefendingPlayerID,
-                          const FText &InDefendingTerritoryID);
+  void SetupBattleDetails(const FText &InAttackingPlayerName,
+                          const FText &InAttackingTerritoryName,
+                          UTexture2D *InAttackingFactionIcon,
+                          const FText &InDefendingPlayerName,
+                          const FText &InDefendingTerritoryName,
+                          UTexture2D *InDefendingFactionIcon);
 
-  /** Text block displaying the attacking player's ID. */
+  /** Text block displaying the attacking player's name. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
-  UTextBlock *AttackingPlayerID;
+  UTextBlock *AttackingPlayerName;
 
-  /** Text block displaying the attacking territory's ID. */
+  /** Text block displaying the attacking territory's title. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
-  UTextBlock *AttackingTerritoryID;
+  UTextBlock *AttackingTerritoryName;
 
-  /** Text block displaying the defending player's ID. */
+  /** Text block displaying the defending player's name. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
-  UTextBlock *DefendingPlayerID;
+  UTextBlock *DefendingPlayerName;
 
-  /** Text block displaying the defending territory's ID. */
+  /** Text block displaying the defending territory's title. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
-  UTextBlock *DefendingTerritoryID;
+  UTextBlock *DefendingTerritoryName;
+
+  /** Image used to display the attacking faction emblem. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UImage *AttackingFactionEmblem;
+
+  /** Image used to display the defending faction emblem. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UImage *DefendingFactionEmblem;
 
   /** Button that marks the local player as ready. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
@@ -55,21 +67,23 @@ public:
 
   /** Default text displayed for the attacking player's ID field. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Battle")
-  FText AttackingPlayerIDText = FText::FromString(TEXT("Attacker Player ID"));
+  FText AttackingPlayerNameText =
+      FText::FromString(TEXT("Attacking Player"));
 
   /** Default text displayed for the attacking territory field. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Battle")
-  FText AttackingTerritoryIDText =
-      FText::FromString(TEXT("Attacking Territory ID"));
+  FText AttackingTerritoryNameText =
+      FText::FromString(TEXT("Attacking Territory"));
 
-  /** Default text displayed for the defending player's ID field. */
+  /** Default text displayed for the defending player's name field. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Battle")
-  FText DefendingPlayerIDText = FText::FromString(TEXT("Defender Player ID"));
+  FText DefendingPlayerNameText =
+      FText::FromString(TEXT("Defending Player"));
 
   /** Default text displayed for the defending territory field. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Battle")
-  FText DefendingTerritoryIDText =
-      FText::FromString(TEXT("Defending Territory ID"));
+  FText DefendingTerritoryNameText =
+      FText::FromString(TEXT("Defending Territory"));
 
 protected:
   UFUNCTION()
@@ -79,5 +93,9 @@ protected:
 
   /** Builds a minimal widget tree when no Blueprint is provided. */
   void BuildFallbackWidgetTree();
+
+  /** Cached texture references used when updating emblem widgets. */
+  TWeakObjectPtr<UTexture2D> AttackingFactionTexture;
+  TWeakObjectPtr<UTexture2D> DefendingFactionTexture;
 };
 
