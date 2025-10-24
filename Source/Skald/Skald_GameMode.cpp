@@ -223,14 +223,15 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
   }
 
   if (!PS) {
-    // Player state may not yet be replicated in multiplayer; queue a retry
-    // next tick while the controller remains valid. In singleplayer, assume
-    // the state will be ready without queuing retries.
-    if (bIsMultiplayer) {
-      PendingControllers.AddUnique(PC);
+    // Player state replication can lag behind controller creation in both
+    // singleplayer and multiplayer sessions. Keep the controller pending and
+    // retry registration on the next tick until the state becomes available.
+    PendingControllers.AddUnique(PC);
+
+    if (UWorld *World = GetWorld()) {
       FTimerDelegate RetryDelegate = FTimerDelegate::CreateUObject(
           this, &ASkaldGameMode::RegisterPlayer, PC);
-      GetWorldTimerManager().SetTimerForNextTick(RetryDelegate);
+      World->GetTimerManager().SetTimerForNextTick(RetryDelegate);
     }
     return;
   }
