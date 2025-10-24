@@ -20,7 +20,6 @@ class SKALD_API UPrepareForBattleWidget : public UUserWidget {
 
 public:
   virtual void NativeOnInitialized() override;
-  virtual void NativeConstruct() override;
   virtual void SynchronizeProperties() override;
 
   /** Configure the text displayed for each participant/territory pair. */
@@ -73,9 +72,6 @@ public:
       FText::FromString(TEXT("Defending Territory ID"));
 
 protected:
-  void EnsureWidgetTreeInitialized();
-  void BindPrepareButton();
-
   UFUNCTION()
   void HandlePrepareButtonClicked();
 

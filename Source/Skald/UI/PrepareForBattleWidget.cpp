@@ -12,16 +12,17 @@
 void UPrepareForBattleWidget::NativeOnInitialized() {
   Super::NativeOnInitialized();
 
-  EnsureWidgetTreeInitialized();
-  BindPrepareButton();
-  RefreshTextWidgets();
-}
+  if (WidgetTree && !WidgetTree->RootWidget) {
+    BuildFallbackWidgetTree();
+  }
 
-void UPrepareForBattleWidget::NativeConstruct() {
-  Super::NativeConstruct();
+  if (PrepareForBattleButton &&
+      !PrepareForBattleButton->OnClicked.IsAlreadyBound(
+          this, &UPrepareForBattleWidget::HandlePrepareButtonClicked)) {
+    PrepareForBattleButton->OnClicked.AddDynamic(
+        this, &UPrepareForBattleWidget::HandlePrepareButtonClicked);
+  }
 
-  EnsureWidgetTreeInitialized();
-  BindPrepareButton();
   RefreshTextWidgets();
 }
 
@@ -33,33 +34,15 @@ void UPrepareForBattleWidget::SynchronizeProperties() {
 void UPrepareForBattleWidget::SetupBattleDetails(
     const FText &InAttackingPlayerID, const FText &InAttackingTerritoryID,
     const FText &InDefendingPlayerID, const FText &InDefendingTerritoryID) {
-  EnsureWidgetTreeInitialized();
+  if (WidgetTree && !WidgetTree->RootWidget) {
+    BuildFallbackWidgetTree();
+  }
 
   AttackingPlayerIDText = InAttackingPlayerID;
   AttackingTerritoryIDText = InAttackingTerritoryID;
   DefendingPlayerIDText = InDefendingPlayerID;
   DefendingTerritoryIDText = InDefendingTerritoryID;
   RefreshTextWidgets();
-}
-
-void UPrepareForBattleWidget::EnsureWidgetTreeInitialized() {
-  if (WidgetTree && !WidgetTree->RootWidget) {
-    BuildFallbackWidgetTree();
-  }
-}
-
-void UPrepareForBattleWidget::BindPrepareButton() {
-  if (!PrepareForBattleButton && WidgetTree) {
-    // Ensure the fallback tree keeps a valid button reference.
-    EnsureWidgetTreeInitialized();
-  }
-
-  if (PrepareForBattleButton &&
-      !PrepareForBattleButton->OnClicked.IsAlreadyBound(
-          this, &UPrepareForBattleWidget::HandlePrepareButtonClicked)) {
-    PrepareForBattleButton->OnClicked.AddDynamic(
-        this, &UPrepareForBattleWidget::HandlePrepareButtonClicked);
-  }
 }
 
 void UPrepareForBattleWidget::HandlePrepareButtonClicked() {
