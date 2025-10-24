@@ -1096,6 +1096,20 @@ TArray<ASkaldPlayerController *> ATurnManager::GetControllers() const {
   return Result;
 }
 
+void ATurnManager::RequestPrepareBattle(const FS_BattlePayload &Battle) {
+  PendingBattlePreparation = Battle;
+  PendingBattleReadyState = FPendingBattleReadyState();
+  PendingBattleReadyState.AttackerPlayerID = Battle.AttackerPlayerID;
+  PendingBattleReadyState.DefenderPlayerID = Battle.DefenderPlayerID;
+  PendingBattleReadyState.bAttackerReady =
+      (Battle.AttackerPlayerID <= 0) || Battle.bAttackerIsAI;
+  PendingBattleReadyState.bDefenderReady =
+      (Battle.DefenderPlayerID <= 0) || Battle.bDefenderIsAI;
+
+  BroadcastPrepareForBattlePrompt(Battle);
+  TryLaunchPreparedBattle();
+}
+
 void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
   FS_BattlePayload SeededBattle = Battle;
   SeededBattle.RandomSeed = FMath::Rand();
@@ -1532,6 +1546,100 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
       }
     }
   }
+}
+
+void ATurnManager::NotifyPlayerReadyForBattle(int32 PlayerID) {
+  const bool bHasPendingBattle =
+      PendingBattlePreparation.FromTerritoryID != 0 ||
+      PendingBattlePreparation.TargetTerritoryID != 0;
+  if (!bHasPendingBattle) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("NotifyPlayerReadyForBattle ignored: no pending battle."));
+    return;
+  }
+
+  if (PendingBattleReadyState.AttackerPlayerID == PlayerID) {
+    PendingBattleReadyState.bAttackerReady = true;
+  }
+  if (PendingBattleReadyState.DefenderPlayerID == PlayerID) {
+    PendingBattleReadyState.bDefenderReady = true;
+  }
+
+  TryLaunchPreparedBattle();
+}
+
+void ATurnManager::BroadcastPrepareForBattlePrompt(
+    const FS_BattlePayload &Battle) {
+  const bool bNeedsAttackerConfirmation =
+      !PendingBattleReadyState.bAttackerReady &&
+      PendingBattleReadyState.AttackerPlayerID != INDEX_NONE &&
+      PendingBattleReadyState.AttackerPlayerID > 0;
+  const bool bNeedsDefenderConfirmation =
+      !PendingBattleReadyState.bDefenderReady &&
+      PendingBattleReadyState.DefenderPlayerID != INDEX_NONE &&
+      PendingBattleReadyState.DefenderPlayerID > 0;
+
+  for (ASkaldPlayerController *Controller : GetControllers()) {
+    if (Controller) {
+      Controller->ClientHidePrepareForBattle();
+    }
+  }
+
+  if (!bNeedsAttackerConfirmation && !bNeedsDefenderConfirmation) {
+    return;
+  }
+
+  for (ASkaldPlayerController *Controller : GetControllers()) {
+    if (!Controller) {
+      continue;
+    }
+    ASkaldPlayerState *PS = Controller->GetPlayerState<ASkaldPlayerState>();
+    const int32 PlayerID = PS ? PS->GetPlayerId() : -1;
+    const bool bIsAttacker =
+        bNeedsAttackerConfirmation &&
+        PlayerID == PendingBattleReadyState.AttackerPlayerID;
+    const bool bIsDefender =
+        bNeedsDefenderConfirmation &&
+        PlayerID == PendingBattleReadyState.DefenderPlayerID;
+    if (bIsAttacker || bIsDefender) {
+      Controller->ClientShowPrepareForBattle(Battle.AttackerPlayerID,
+                                             Battle.FromTerritoryID,
+                                             Battle.DefenderPlayerID,
+                                             Battle.TargetTerritoryID);
+    }
+  }
+}
+
+void ATurnManager::TryLaunchPreparedBattle() {
+  const bool bHasPendingBattle =
+      PendingBattlePreparation.FromTerritoryID != 0 ||
+      PendingBattlePreparation.TargetTerritoryID != 0;
+  if (!bHasPendingBattle) {
+    return;
+  }
+
+  const bool bAttackerReady = PendingBattleReadyState.bAttackerReady ||
+                              PendingBattleReadyState.AttackerPlayerID == INDEX_NONE ||
+                              PendingBattleReadyState.AttackerPlayerID <= 0;
+  const bool bDefenderReady = PendingBattleReadyState.bDefenderReady ||
+                              PendingBattleReadyState.DefenderPlayerID == INDEX_NONE ||
+                              PendingBattleReadyState.DefenderPlayerID <= 0;
+
+  if (!bAttackerReady || !bDefenderReady) {
+    return;
+  }
+
+  for (ASkaldPlayerController *Controller : GetControllers()) {
+    if (Controller) {
+      Controller->ClientHidePrepareForBattle();
+    }
+  }
+
+  FS_BattlePayload BattleToLaunch = PendingBattlePreparation;
+  PendingBattlePreparation = FS_BattlePayload();
+  PendingBattleReadyState = FPendingBattleReadyState();
+
+  TriggerGridBattle(BattleToLaunch);
 }
 
 void ATurnManager::RetryPendingBattleTravel() {

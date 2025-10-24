@@ -27,6 +27,7 @@
 #include "Skald_TurnManager.h"
 #include "Territory.h"
 #include "UI/ConfirmAttackWidget.h"
+#include "UI/PrepareForBattleWidget.h"
 #include "UI/DeployWidget.h"
 #include "UI/CombatFloaterPoolSubsystem.h"
 #include "UI/W_FloatingText.h"
@@ -96,6 +97,17 @@ USkaldMainHUDWidget::USkaldMainHUDWidget(
     UE_LOG(
         LogSkald, Error,
         TEXT("SkaldMainHUDWidget: failed to find confirm attack widget class"));
+  }
+
+  static ConstructorHelpers::FClassFinder<UPrepareForBattleWidget>
+      PrepareForBattleBP(
+          TEXT("/Game/Blueprints/UI/Skald_PrepareForBattleWidget"));
+  if (PrepareForBattleBP.Succeeded()) {
+    PrepareForBattleWidgetClass = PrepareForBattleBP.Class;
+  } else {
+    UE_LOG(LogSkald, Warning,
+           TEXT("SkaldMainHUDWidget: failed to find prepare for battle widget"));
+    PrepareForBattleWidgetClass = UPrepareForBattleWidget::StaticClass();
   }
 }
 
@@ -635,6 +647,70 @@ void USkaldMainHUDWidget::HideStrategicInitiativePrompt() {
   }
 }
 
+void USkaldMainHUDWidget::ShowPrepareForBattleDialog(int32 AttackerPlayerID,
+                                                     int32 AttackingTerritoryID,
+                                                     int32 DefenderPlayerID,
+                                                     int32 DefendingTerritoryID) {
+  bPrepareForBattleReadySent = false;
+
+  if (ActivePrepareForBattleWidget) {
+    ActivePrepareForBattleWidget->OnPrepareButtonClicked.RemoveAll(this);
+    ActivePrepareForBattleWidget->RemoveFromParent();
+    ActivePrepareForBattleWidget = nullptr;
+  }
+
+  if (!PrepareForBattleWidgetClass) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("ShowPrepareForBattleDialog: PrepareForBattleWidgetClass null"));
+    return;
+  }
+
+  ActivePrepareForBattleWidget = CreateWidget<UPrepareForBattleWidget>(
+      GetWorld(), PrepareForBattleWidgetClass);
+  if (!ActivePrepareForBattleWidget) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("ShowPrepareForBattleDialog: failed to create widget"));
+    return;
+  }
+
+  const FText AttackerPlayerText = FText::Format(
+      NSLOCTEXT("SkaldHUD", "Prepare_AttackerPlayerID",
+                "Attacking Player ID: {0}"),
+      FText::AsNumber(AttackerPlayerID));
+  const FText AttackerTerritoryText = FText::Format(
+      NSLOCTEXT("SkaldHUD", "Prepare_AttackerTerritoryID",
+                "Attacking Territory ID: {0}"),
+      FText::AsNumber(AttackingTerritoryID));
+  const FText DefenderPlayerText = FText::Format(
+      NSLOCTEXT("SkaldHUD", "Prepare_DefenderPlayerID",
+                "Defending Player ID: {0}"),
+      FText::AsNumber(DefenderPlayerID));
+  const FText DefenderTerritoryText = FText::Format(
+      NSLOCTEXT("SkaldHUD", "Prepare_DefenderTerritoryID",
+                "Defending Territory ID: {0}"),
+      FText::AsNumber(DefendingTerritoryID));
+
+  ActivePrepareForBattleWidget->SetupBattleDetails(AttackerPlayerText,
+                                                   AttackerTerritoryText,
+                                                   DefenderPlayerText,
+                                                   DefenderTerritoryText);
+  ActivePrepareForBattleWidget->OnPrepareButtonClicked.AddDynamic(
+      this, &USkaldMainHUDWidget::HandlePrepareForBattleClicked);
+  if (ActivePrepareForBattleWidget->PrepareForBattleButton) {
+    ActivePrepareForBattleWidget->PrepareForBattleButton->SetIsEnabled(true);
+  }
+  ActivePrepareForBattleWidget->AddToViewport(20);
+}
+
+void USkaldMainHUDWidget::HidePrepareForBattleDialog() {
+  if (ActivePrepareForBattleWidget) {
+    ActivePrepareForBattleWidget->OnPrepareButtonClicked.RemoveAll(this);
+    ActivePrepareForBattleWidget->RemoveFromParent();
+    ActivePrepareForBattleWidget = nullptr;
+  }
+  bPrepareForBattleReadySent = false;
+}
+
 void USkaldMainHUDWidget::ShowStrategicInitiativeRoll(int32 RollValue,
                                                       float DisplayDuration) {
   if (!InitiativeDiceImage) {
@@ -1135,6 +1211,7 @@ void USkaldMainHUDWidget::CancelAttackSelection() {
     ActiveConfirmWidget->RemoveFromParent();
     ActiveConfirmWidget = nullptr;
   }
+  HidePrepareForBattleDialog();
   if (CurrentPhase == ETurnPhase::Reinforcement) {
     const FText Prompt = ResolveSelectionPromptText(
         SkaldSelectionPromptKeys::ReinforcementOwnedCapitalPrompt,
@@ -1743,51 +1820,21 @@ void USkaldMainHUDWidget::HandleAttackApproved() {
 
   SubmitAttack(SourceID, TargetID, ArmyCount, bUseSiegeForNextAttack);
 
-  const bool bUseSiege = bUseSiegeForNextAttack;
   bUseSiegeForNextAttack = false;
+}
 
-  // Trigger the battle immediately
-  if (APlayerController *PC = GetOwningPlayer()) {
-    if (ASkaldPlayerController *SPC = Cast<ASkaldPlayerController>(PC)) {
-      if (ATurnManager *TM = SPC->GetTurnManager()) {
-        FS_BattlePayload Battle;
-        Battle.FromTerritoryID = SourceID;
-        Battle.TargetTerritoryID = TargetID;
-        Battle.ArmyCountSent = ArmyCount;
-        if (AWorldMap *WorldMap =
-                Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
-                    GetWorld(), AWorldMap::StaticClass()))) {
-          if (ATerritory *Source = WorldMap->GetTerritoryById(SourceID)) {
-            if (IsValid(Source->OwningPlayer)) {
-              Battle.AttackerPlayerID = Source->OwningPlayer->GetPlayerId();
-              Battle.AttackerFaction = Source->OwningPlayer->Faction;
-              Battle.AttackerDisplayName =
-                  Source->OwningPlayer->GetResolvedPlayerName(
-                      TEXT("HUD_Attack_Attacker"));
-              Battle.bAttackerIsAI = Source->OwningPlayer->bIsAI;
-            }
-            if (bUseSiege && Source->BuiltSiegeID > 0) {
-              Battle.AssignedSiegeIDs.Add(Source->BuiltSiegeID);
-              Source->BuiltSiegeID = 0;
-            }
-          }
-          if (ATerritory *Target = WorldMap->GetTerritoryById(TargetID)) {
-            if (IsValid(Target->OwningPlayer)) {
-              Battle.DefenderPlayerID = Target->OwningPlayer->GetPlayerId();
-              Battle.DefenderFaction = Target->OwningPlayer->Faction;
-              Battle.DefenderDisplayName =
-                  Target->OwningPlayer->GetResolvedPlayerName(
-                      TEXT("HUD_Attack_Defender"));
-              Battle.bDefenderIsAI = Target->OwningPlayer->bIsAI;
-            }
-            Battle.DefenderTerritoryName = Target->TerritoryName;
-            Battle.IsCapitalAttack = Target->bIsCapital;
-          }
-        }
-        TM->TriggerGridBattle(Battle);
-      }
-    }
+void USkaldMainHUDWidget::HandlePrepareForBattleClicked() {
+  if (bPrepareForBattleReadySent) {
+    return;
   }
+
+  bPrepareForBattleReadySent = true;
+  if (ActivePrepareForBattleWidget &&
+      ActivePrepareForBattleWidget->PrepareForBattleButton) {
+    ActivePrepareForBattleWidget->PrepareForBattleButton->SetIsEnabled(false);
+  }
+
+  OnPrepareForBattleReady.Broadcast();
 }
 
 void USkaldMainHUDWidget::HandleDeployClicked() {

@@ -14,6 +14,7 @@ class UTextBlock;
 class UVerticalBox;
 class ATerritory;
 class UConfirmAttackWidget;
+class UPrepareForBattleWidget;
 class UDeployWidget;
 class UWidget;
 class SWidget;
@@ -154,6 +155,11 @@ public:
   UPROPERTY(BlueprintAssignable, Category = "Skald|Events")
   FSkaldEndMovementRequested OnEndMovementRequested;
 
+  /** Delegate fired when the local player marks themselves as ready. */
+  DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSkaldPrepareForBattleReady);
+  UPROPERTY(BlueprintAssignable, Category = "Skald|Events")
+  FSkaldPrepareForBattleReady OnPrepareForBattleReady;
+
   /** Delegate fired when the strategic initiative roll button is pressed. */
   DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnStrategicInitiativeRollRequested);
   UPROPERTY(BlueprintAssignable, Category = "Skald|Events")
@@ -216,6 +222,17 @@ public:
   /** Hide the strategic initiative roll prompt and associated button. */
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD|Initiative")
   void HideStrategicInitiativePrompt();
+
+  /** Display the prepare for battle confirmation widget. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|HUD|Battle")
+  void ShowPrepareForBattleDialog(int32 AttackerPlayerID,
+                                  int32 AttackingTerritoryID,
+                                  int32 DefenderPlayerID,
+                                  int32 DefendingTerritoryID);
+
+  /** Hide the prepare for battle widget if active. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|HUD|Battle")
+  void HidePrepareForBattleDialog();
 
   /** Display the rolled initiative value using the configured dice visuals. */
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD|Initiative")
@@ -453,6 +470,9 @@ public:
   TSubclassOf<UConfirmAttackWidget> ConfirmAttackWidgetClass;
 
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Widgets")
+  TSubclassOf<UPrepareForBattleWidget> PrepareForBattleWidgetClass;
+
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Widgets")
   TSubclassOf<UDeployWidget> DeployWidgetClass;
 
 protected:
@@ -511,10 +531,18 @@ protected:
   UFUNCTION()
   void HandleAttackApproved();
 
+  UFUNCTION()
+  void HandlePrepareForBattleClicked();
+
   void ClearDeployWidget();
 
   UPROPERTY()
   UConfirmAttackWidget *ActiveConfirmWidget = nullptr;
+
+  UPROPERTY()
+  UPrepareForBattleWidget *ActivePrepareForBattleWidget = nullptr;
+
+  bool bPrepareForBattleReadySent = false;
 
   /** Class used when requesting floaters from the subsystem. */
   UPROPERTY(EditAnywhere, Category = "Skald|HUD|Floaters")
