@@ -1139,8 +1139,12 @@ void UGridOverlayComponent::ApplyObstacleToGrid(UGridObstacleComponent *Obstacle
 
   if (AActor *Owner = Obstacle->GetOwner()) {
     const FBox Bounds = Owner->GetComponentsBoundingBox(true);
-    const FIntPoint Min = WorldToGrid(Bounds.Min);
-    const FIntPoint Max = WorldToGrid(Bounds.Max);
+    FIntPoint Min;
+    FIntPoint Max;
+    if (!Obstacle->GetCustomGridFootprint(this, Min, Max)) {
+      Min = WorldToGrid(Bounds.Min);
+      Max = WorldToGrid(Bounds.Max);
+    }
     for (int32 Y = Min.Y; Y <= Max.Y; ++Y) {
       for (int32 X = Min.X; X <= Max.X; ++X) {
         const FIntPoint Cell(X, Y);
