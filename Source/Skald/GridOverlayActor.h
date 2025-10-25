@@ -90,6 +90,14 @@ protected:
   UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Obstacles", meta = (EditCondition = "bSpawnRandomObstacles"), DisplayName = "Misc Obstacles")
   FGridObstacleSpawnList MiscObstacles;
 
+  /** Tree themed environment props. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Obstacles", meta = (EditCondition = "bSpawnRandomObstacles"), DisplayName = "Environment Trees")
+  FGridObstacleSpawnList EnvironmentTrees;
+
+  /** Cliff themed environment props. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Obstacles", meta = (EditCondition = "bSpawnRandomObstacles"), DisplayName = "Environment Cliffs")
+  FGridObstacleSpawnList EnvironmentCliffs;
+
   /** Optional deterministic seed override for obstacle placement. */
   UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid|Obstacles", meta = (EditCondition = "bSpawnRandomObstacles"))
   bool bOverrideObstacleSpawnSeed = false;
