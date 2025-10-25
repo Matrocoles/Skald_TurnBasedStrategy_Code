@@ -155,12 +155,12 @@ bool FArmyPlacementInitiativeOrderTest::RunTest(const FString &Parameters) {
 
   ControllerA->ServerDeployUnits(TerritoryA->TerritoryID, 40);
   TestEqual(TEXT("PlayerA spent units"), StateA->DeployableUnits, 0);
-  ControllerA->EndPhase();
+  ControllerA->EndTurn();
   TestEqual(TEXT("Second player receives placement turn"), GameState->CurrentTurnIndex, IndexB);
 
   ControllerB->ServerDeployUnits(TerritoryB->TerritoryID, 40);
   TestEqual(TEXT("PlayerB spent units"), StateB->DeployableUnits, 0);
-  ControllerB->EndPhase();
+  ControllerB->EndTurn();
 
   TestEqual(TEXT("Turn advanced to reinforcement"), TurnManager->GetCurrentPhase(),
             ETurnPhase::Reinforcement);
@@ -255,7 +255,7 @@ bool FAIArmyPlacementAutoAdvanceTest::RunTest(const FString &Parameters) {
 
   HumanController->ServerDeployUnits(TerritoryHuman->TerritoryID, 40);
   TestEqual(TEXT("Human spent deployable units"), HumanState->DeployableUnits, 0);
-  HumanController->EndPhase();
+  HumanController->EndTurn();
 
   TestEqual(TEXT("Main turn advanced to reinforcement"), TurnManager->GetCurrentPhase(),
             ETurnPhase::Reinforcement);
@@ -361,7 +361,7 @@ bool FAIArmyPlacementFailsafeRespectsHumanTest::RunTest(
             40);
 
   HumanController->ServerDeployUnits(TerritoryHuman->TerritoryID, 40);
-  HumanController->EndPhase();
+  HumanController->EndTurn();
 
   TestEqual(TEXT("Turns advance after human finishes"),
             TurnManager->GetCurrentPhase(), ETurnPhase::Reinforcement);

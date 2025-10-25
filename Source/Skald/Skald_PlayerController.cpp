@@ -68,6 +68,8 @@ constexpr const TCHAR *PendingBattleAttackError =
     TEXT("A battle is already being prepared. Please wait for it to begin.");
 constexpr const TCHAR *PendingBattlePhaseError =
     TEXT("Cannot end the phase while a battle is awaiting confirmation.");
+constexpr const TCHAR *ArmyPlacementPhaseError =
+    TEXT("Army placement must be finished by ending your turn.");
 
 bool IsCursorOverInteractableSlateWidget() {
   if (!FSlateApplication::IsInitialized()) {
@@ -1285,6 +1287,12 @@ void ASkaldPlayerController::EndTurn() {
     return;
   }
 
+  const ETurnPhase Phase = TurnManager->GetCurrentPhase();
+  if (Phase == ETurnPhase::ArmyPlacement) {
+    TurnManager->EndCurrentPhase();
+    return;
+  }
+
   TurnManager->AdvanceTurn();
 }
 
@@ -1292,6 +1300,11 @@ void ASkaldPlayerController::EndPhase() {
   if (!HasAuthority()) {
     if (TurnManager && TurnManager->HasPendingBattlePreparation()) {
       NotifyActionError_Implementation(PendingBattlePhaseError);
+      return;
+    }
+
+    if (TurnManager && TurnManager->GetCurrentPhase() == ETurnPhase::ArmyPlacement) {
+      NotifyActionError_Implementation(ArmyPlacementPhaseError);
       return;
     }
 
@@ -1347,10 +1360,12 @@ void ASkaldPlayerController::HandleEndPhaseInternal() {
 
   ETurnPhase Phase = TurnManager->GetCurrentPhase();
   if (Phase == ETurnPhase::ArmyPlacement) {
-    if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
-      PS->DeployableUnits = 0;
-      TurnManager->BroadcastDeployableUnits(PS);
+    if (IsLocalController()) {
+      NotifyActionError_Implementation(ArmyPlacementPhaseError);
+    } else {
+      NotifyActionError(ArmyPlacementPhaseError);
     }
+    return;
   }
 
   TurnManager->EndCurrentPhase();
