@@ -1,5 +1,5 @@
 #include "GridOverlayActor.h"
-#include "Algo/RandomShuffle.h"
+#include "Algo/Shuffle.h"
 #include "CollisionQueryParams.h"
 #include "Components/SceneComponent.h"
 #include "Engine/EngineTypes.h"
