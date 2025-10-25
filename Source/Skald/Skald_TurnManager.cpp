@@ -2069,23 +2069,26 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
     const bool bIsDefender = bNeedsDefenderConfirmation && bMatchesDefenderId;
 
     if (bIsAttacker || bIsDefender) {
+      const bool bParticipantIsAI = PS && PS->bIsAI;
       const TCHAR *RoleLabel = bIsAttacker ? TEXT("Attacker") : TEXT("Defender");
-      UE_LOG(LogSkaldReady, Log,
-             TEXT("WidgetSpawned PC=%s Role=%s Battle=%d->%d"),
-             *Controller->GetName(), RoleLabel,
-             PendingBattlePreparation.FromTerritoryID,
-             PendingBattlePreparation.TargetTerritoryID);
-      const ENetMode NetMode = Controller->GetNetMode();
-      if (NetMode == NM_Standalone) {
-        Controller->ShowPrepareForBattlePromptLocal(PromptData);
-      } else {
-        Controller->ClientShowPrepareForBattle(PromptData);
-      }
 
-      if ((bIsAttacker || bIsDefender) && PS && PS->bIsAI) {
-        UE_LOG(LogSkald, Warning,
-               TEXT("%s: PlayerID %d is AI-controlled while awaiting prepare-for-battle confirmation."),
-               LogContext, PlayerID);
+      if (bParticipantIsAI) {
+        UE_LOG(LogSkaldReady, Log,
+               TEXT("%s: skipping prepare prompt for AI-controlled %s (Controller=%s PlayerID=%d)."),
+               LogContext, RoleLabel, *Controller->GetName(), PlayerID);
+      } else {
+        UE_LOG(LogSkaldReady, Log,
+               TEXT("WidgetSpawned PC=%s Role=%s Battle=%d->%d"),
+               *Controller->GetName(), RoleLabel,
+               PendingBattlePreparation.FromTerritoryID,
+               PendingBattlePreparation.TargetTerritoryID);
+
+        const ENetMode NetMode = Controller->GetNetMode();
+        if (NetMode == NM_Standalone) {
+          Controller->ShowPrepareForBattlePromptLocal(PromptData);
+        } else {
+          Controller->ClientShowPrepareForBattle(PromptData);
+        }
       }
 
       if (bIsAttacker) {
