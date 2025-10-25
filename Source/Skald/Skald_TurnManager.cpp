@@ -1237,6 +1237,9 @@ void ATurnManager::BeginReadyPhase(const FS_BattlePayload &Battle,
          NormalizedBattle.bDefenderIsAI ? TEXT("true") : TEXT("false"));
 
   PendingBattlePreparation = NormalizedBattle;
+  const TCHAR *ResolvedContext =
+      Context ? Context : TEXT("BeginReadyPhase");
+
   PendingBattleReadyState = FSkaldBattleReadyState();
   PendingBattleReadyState.AttackerPlayerID =
       NormalizedBattle.AttackerPlayerID;
@@ -1245,11 +1248,25 @@ void ATurnManager::BeginReadyPhase(const FS_BattlePayload &Battle,
   PendingBattleReadyState.bAttackerIsAI = NormalizedBattle.bAttackerIsAI;
   PendingBattleReadyState.bDefenderIsAI = NormalizedBattle.bDefenderIsAI;
   PendingBattleReadyState.bAttackerReady =
-      (PendingBattleReadyState.AttackerPlayerID == INDEX_NONE) ||
-      NormalizedBattle.bAttackerIsAI;
+      PendingBattleReadyState.AttackerPlayerID == INDEX_NONE;
   PendingBattleReadyState.bDefenderReady =
-      (PendingBattleReadyState.DefenderPlayerID == INDEX_NONE) ||
-      NormalizedBattle.bDefenderIsAI;
+      PendingBattleReadyState.DefenderPlayerID == INDEX_NONE;
+
+  if (PendingBattleReadyState.bAttackerIsAI &&
+      PendingBattleReadyState.AttackerPlayerID != INDEX_NONE) {
+    UE_LOG(LogSkaldReady, Verbose,
+           TEXT("%s: attacker AI waiting for player confirmation."),
+           ResolvedContext);
+  }
+
+  if (PendingBattleReadyState.bDefenderIsAI &&
+      PendingBattleReadyState.DefenderPlayerID != INDEX_NONE) {
+    UE_LOG(LogSkaldReady, Verbose,
+           TEXT("%s: defender AI waiting for player confirmation."),
+           ResolvedContext);
+  }
+
+  TryAutoReadyAI(ResolvedContext);
 
   UE_LOG(LogSkaldReady, Log,
          TEXT("BeginReadyPhase Attacker=%d Defender=%d From=%d To=%d AI(A=%s,D=%s)"),
@@ -1260,8 +1277,8 @@ void ATurnManager::BeginReadyPhase(const FS_BattlePayload &Battle,
          PendingBattleReadyState.bAttackerIsAI ? TEXT("true") : TEXT("false"),
          PendingBattleReadyState.bDefenderIsAI ? TEXT("true") : TEXT("false"));
 
-  CommitPendingBattleReadyState(Context ? Context : TEXT("BeginReadyPhase"));
-  TryAdvanceFromReadyToBattle(Context ? Context : TEXT("BeginReadyPhase"));
+  CommitPendingBattleReadyState(ResolvedContext);
+  TryAdvanceFromReadyToBattle(ResolvedContext);
 }
 
 void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
@@ -1715,6 +1732,68 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
   }
 }
 
+bool ATurnManager::TryAutoReadyAI(const TCHAR *Context) {
+  const TCHAR *ResolvedContext = Context ? Context : TEXT("TryAutoReadyAI");
+
+  const bool bHumanPending =
+      (!PendingBattleReadyState.bAttackerIsAI &&
+       PendingBattleReadyState.AttackerPlayerID != INDEX_NONE &&
+       !PendingBattleReadyState.bAttackerReady) ||
+      (!PendingBattleReadyState.bDefenderIsAI &&
+       PendingBattleReadyState.DefenderPlayerID != INDEX_NONE &&
+       !PendingBattleReadyState.bDefenderReady);
+
+  if (bHumanPending) {
+    UE_LOG(LogSkaldReady, Verbose,
+           TEXT("%s: AI auto-ready deferred while waiting for player confirmation."),
+           ResolvedContext);
+    return false;
+  }
+
+  bool bChanged = false;
+  const auto AutoReadyParticipant = [&](int32 ParticipantId, bool bParticipantIsAI,
+                                        bool &bParticipantReady,
+                                        const TCHAR *ParticipantLabel) {
+    if (!bParticipantIsAI || ParticipantId == INDEX_NONE || bParticipantReady) {
+      return false;
+    }
+
+    UE_LOG(LogSkaldReady, Log,
+           TEXT("%s: auto-readying AI %s (PlayerID=%d)."), ResolvedContext,
+           ParticipantLabel, ParticipantId);
+    bParticipantReady = true;
+    return true;
+  };
+
+  bChanged |= AutoReadyParticipant(
+      PendingBattleReadyState.AttackerPlayerID,
+      PendingBattleReadyState.bAttackerIsAI,
+      PendingBattleReadyState.bAttackerReady, TEXT("attacker"));
+
+  bChanged |= AutoReadyParticipant(
+      PendingBattleReadyState.DefenderPlayerID,
+      PendingBattleReadyState.bDefenderIsAI,
+      PendingBattleReadyState.bDefenderReady, TEXT("defender"));
+
+  if (!bChanged) {
+    const bool bHasAIParticipant =
+        (PendingBattleReadyState.bAttackerIsAI &&
+         PendingBattleReadyState.AttackerPlayerID != INDEX_NONE) ||
+        (PendingBattleReadyState.bDefenderIsAI &&
+         PendingBattleReadyState.DefenderPlayerID != INDEX_NONE);
+
+    if (bHasAIParticipant) {
+      UE_LOG(LogSkaldReady, Verbose,
+             TEXT("%s: AI participants already awaiting confirmation."),
+             ResolvedContext);
+    }
+
+    return false;
+  }
+
+  return true;
+}
+
 void ATurnManager::NotifyPlayerReadyForBattle(int32 PlayerID, bool bReady) {
   const bool bHasPendingBattle =
       PendingBattlePreparation.FromTerritoryID != 0 ||
@@ -1732,8 +1811,7 @@ void ATurnManager::NotifyPlayerReadyForBattle(int32 PlayerID, bool bReady) {
       return false;
     }
 
-    const bool bEffectiveReady = bReady || bParticipantIsAI ||
-                                 ParticipantId == INDEX_NONE;
+    const bool bEffectiveReady = bReady || ParticipantId == INDEX_NONE;
     if (bParticipantReady == bEffectiveReady) {
       UE_LOG(LogSkaldReady, Verbose,
              TEXT("SetReady unchanged PlayerID=%d Role=%s Ready=%s AI=%s Requested=%s"),
@@ -1763,12 +1841,41 @@ void ATurnManager::NotifyPlayerReadyForBattle(int32 PlayerID, bool bReady) {
       PendingBattleReadyState.bDefenderIsAI,
       PendingBattleReadyState.bDefenderReady, TEXT("defender"));
 
+  auto ResetAIReadiness = [&](bool bChangedParticipantReady,
+                              bool bOtherParticipantIsAI, bool &bOtherParticipantReady,
+                              const TCHAR *OtherLabel) {
+    if (bChangedParticipantReady || !bOtherParticipantIsAI ||
+        !bOtherParticipantReady) {
+      return false;
+    }
+
+    UE_LOG(LogSkaldReady, Log,
+           TEXT("NotifyPlayerReadyForBattle: clearing AI %s readiness until player reconfirms."),
+           OtherLabel);
+    bOtherParticipantReady = false;
+    return true;
+  };
+
+  if (bAttackerChanged && !PendingBattleReadyState.bAttackerIsAI) {
+    ResetAIReadiness(PendingBattleReadyState.bAttackerReady,
+                     PendingBattleReadyState.bDefenderIsAI,
+                     PendingBattleReadyState.bDefenderReady, TEXT("defender"));
+  }
+
+  if (bDefenderChanged && !PendingBattleReadyState.bDefenderIsAI) {
+    ResetAIReadiness(PendingBattleReadyState.bDefenderReady,
+                     PendingBattleReadyState.bAttackerIsAI,
+                     PendingBattleReadyState.bAttackerReady, TEXT("attacker"));
+  }
+
   if (!bAttackerChanged && !bDefenderChanged) {
     UE_LOG(LogSkaldReady, Warning,
            TEXT("NotifyPlayerReadyForBattle: PlayerID %d is not part of the pending battle."),
            PlayerID);
     return;
   }
+
+  TryAutoReadyAI(TEXT("NotifyPlayerReadyForBattle"));
 
   CommitPendingBattleReadyState(TEXT("NotifyPlayerReadyForBattle"));
   TryAdvanceFromReadyToBattle(TEXT("NotifyPlayerReadyForBattle"));
@@ -2074,11 +2181,9 @@ bool ATurnManager::TryAdvanceFromReadyToBattle(const TCHAR *Context) {
     bReadyToLaunch = GameState->AreAllRequiredPartiesReady();
   } else {
     const bool bAttackerReady = PendingBattleReadyState.bAttackerReady ||
-                                PendingBattleReadyState.AttackerPlayerID == INDEX_NONE ||
-                                PendingBattleReadyState.bAttackerIsAI;
+                                PendingBattleReadyState.AttackerPlayerID == INDEX_NONE;
     const bool bDefenderReady = PendingBattleReadyState.bDefenderReady ||
-                                PendingBattleReadyState.DefenderPlayerID == INDEX_NONE ||
-                                PendingBattleReadyState.bDefenderIsAI;
+                                PendingBattleReadyState.DefenderPlayerID == INDEX_NONE;
     bReadyToLaunch = bAttackerReady && bDefenderReady;
   }
 

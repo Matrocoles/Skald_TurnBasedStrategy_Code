@@ -135,4 +135,50 @@ bool FSkaldTurnManagerPendingBattleClearsTest::RunTest(const FString &Parameters
 
   return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldTurnManagerAIWaitsForPlayerTest,
+                                 "Skald.TurnManager.AIWaitsForPlayerReady",
+                                 EAutomationTestFlags::EditorContext |
+                                     EAutomationTestFlags::EngineFilter)
+bool FSkaldTurnManagerAIWaitsForPlayerTest::RunTest(const FString &Parameters) {
+  Skald::Tests::FScopedAutomationTestWorld TestWorld;
+  UWorld *World = TestWorld.Get();
+  TestNotNull(TEXT("World created"), World);
+  if (!World) {
+    return false;
+  }
+
+  ATestTurnManagerNoTravel *TM = World->SpawnActor<ATestTurnManagerNoTravel>();
+  TestNotNull(TEXT("TurnManager"), TM);
+  if (!TM) {
+    return false;
+  }
+
+  FS_BattlePayload Battle;
+  Battle.AttackerPlayerID = 1;
+  Battle.DefenderPlayerID = 2;
+  Battle.FromTerritoryID = 10;
+  Battle.TargetTerritoryID = 20;
+  Battle.bAttackerIsAI = false;
+  Battle.bDefenderIsAI = true;
+
+  TM->RequestPrepareBattle(Battle);
+
+  const FSkaldBattleReadyState InitialState = TM->GetPendingReadyState();
+  TestFalse(TEXT("Defender AI waits for player readiness"),
+            InitialState.bDefenderReady);
+  TestFalse(TEXT("Human attacker starts unready"), InitialState.bAttackerReady);
+  TestTrue(TEXT("Pending battle awaiting confirmations"),
+           TM->HasPendingBattlePreparation());
+  TestFalse(TEXT("Battle has not been triggered before confirmations"),
+            TM->bTriggerCalled);
+
+  TM->NotifyPlayerReadyForBattle(1, true);
+
+  TestTrue(TEXT("Battle triggers once player confirms"), TM->bTriggerCalled);
+  TestFalse(TEXT("Pending battle clears after trigger"),
+            TM->HasPendingBattlePreparation());
+
+  return true;
+}
 #endif  // WITH_AUTOMATION_TESTS

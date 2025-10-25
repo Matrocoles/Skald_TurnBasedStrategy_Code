@@ -15,6 +15,10 @@ public:
   /** Stores the payload used when triggering a battle. */
   FS_BattlePayload CapturedBattle;
 
+  const FSkaldBattleReadyState &GetPendingReadyState() const {
+    return PendingBattleReadyState;
+  }
+
   virtual void TriggerGridBattle(const FS_BattlePayload &Battle) override {
     bTriggerCalled = true;
     CapturedBattle = Battle;

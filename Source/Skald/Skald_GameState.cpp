@@ -132,18 +132,13 @@ void ASkaldGameState::SetPendingBattleReady(const FSkaldBattleReadyState& NewSta
 
 bool ASkaldGameState::AreAllRequiredPartiesReady() const
 {
-    const bool bAttackerRequiresConfirmation =
-        PendingBattleReadyState.AttackerPlayerID != INDEX_NONE &&
-        !PendingBattleReadyState.bAttackerIsAI;
+    const bool bAttackerReady =
+        PendingBattleReadyState.AttackerPlayerID == INDEX_NONE ||
+        PendingBattleReadyState.bAttackerReady;
 
-    const bool bDefenderRequiresConfirmation =
-        PendingBattleReadyState.DefenderPlayerID != INDEX_NONE &&
-        !PendingBattleReadyState.bDefenderIsAI;
-
-    const bool bAttackerReady = !bAttackerRequiresConfirmation ||
-                                PendingBattleReadyState.bAttackerReady;
-    const bool bDefenderReady = !bDefenderRequiresConfirmation ||
-                                PendingBattleReadyState.bDefenderReady;
+    const bool bDefenderReady =
+        PendingBattleReadyState.DefenderPlayerID == INDEX_NONE ||
+        PendingBattleReadyState.bDefenderReady;
 
     return bAttackerReady && bDefenderReady;
 }
