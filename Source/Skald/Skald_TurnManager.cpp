@@ -1228,6 +1228,14 @@ void ATurnManager::BeginReadyPhase(const FS_BattlePayload &Battle,
                           NormalizedBattle.DefenderFactionEmblem,
                           TEXT("Defender"));
 
+  UE_LOG(LogSkaldReady, Verbose,
+         TEXT("%s: caching battle participants for ready state (Attacker=%d AI=%s, Defender=%d AI=%s)"),
+         Context ? Context : TEXT("BeginReadyPhase"),
+         NormalizedBattle.AttackerPlayerID,
+         NormalizedBattle.bAttackerIsAI ? TEXT("true") : TEXT("false"),
+         NormalizedBattle.DefenderPlayerID,
+         NormalizedBattle.bDefenderIsAI ? TEXT("true") : TEXT("false"));
+
   PendingBattlePreparation = NormalizedBattle;
   PendingBattleReadyState = FSkaldBattleReadyState();
   PendingBattleReadyState.AttackerPlayerID =
