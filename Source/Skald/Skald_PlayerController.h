@@ -227,6 +227,22 @@ protected:
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
   TMap<ESkaldFaction, UNiagaraSystem *> NaturalSixFactionEffects;
 
+  /** Default Niagara effect triggered when a fighter dies. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
+  UNiagaraSystem *DefaultFighterDeathEffect = nullptr;
+
+  /** Optional faction overrides for fighter death effects. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
+  TMap<ESkaldFaction, UNiagaraSystem *> FighterDeathFactionEffects;
+
+  /** Default splatter Niagara effect spawned after a fighter dies. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
+  UNiagaraSystem *DefaultFighterDeathSplatterEffect = nullptr;
+
+  /** Optional faction overrides for fighter death splatter effects. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
+  TMap<ESkaldFaction, UNiagaraSystem *> FighterDeathSplatterFactionEffects;
+
   /** Audio cue played when a hit lands. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
   USoundBase *HitImpactSound = nullptr;
@@ -633,6 +649,11 @@ private:
                           const FDiceRollResult &Result);
   void PlayDiceOutcomeFeedback(AFighterPawn *Attacker, AFighterPawn *Defender,
                                const FDiceRollOutcome &Outcome);
+  void TriggerFighterDeathFeedback(AFighterPawn *Fighter);
+  UNiagaraSystem *ResolveFighterDeathEffect(ESkaldFaction Faction) const;
+  UNiagaraSystem *ResolveFighterDeathSplatterEffect(ESkaldFaction Faction) const;
+  void SpawnTimedNiagaraSystem(UNiagaraSystem *Effect, const FVector &Location,
+                               float LifetimeSeconds);
   void TriggerHighStakesCritFeedback(AFighterPawn *Attacker,
                                      AFighterPawn *Defender,
                                      const FDiceRollResult &Result);

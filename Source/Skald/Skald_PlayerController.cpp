@@ -16,6 +16,7 @@
 #include "InputCoreTypes.h"
 #include "Internationalization/Text.h"
 #include "Kismet/GameplayStatics.h"
+#include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
 #include "Camera/PlayerCameraManager.h"
@@ -68,6 +69,10 @@ constexpr const TCHAR *PendingBattleAttackError =
     TEXT("A battle is already being prepared. Please wait for it to begin.");
 constexpr const TCHAR *PendingBattlePhaseError =
     TEXT("Cannot end the phase while a battle is awaiting confirmation.");
+
+constexpr float FighterDeathEffectHeightOffset = 120.f;
+constexpr float FighterDeathSplatterLifetimeSeconds = 4.5f;
+constexpr float FighterDeathSplatterHeightOffset = 5.f;
 
 bool IsCursorOverInteractableSlateWidget() {
   if (!FSlateApplication::IsInitialized()) {
@@ -3560,6 +3565,105 @@ void ASkaldPlayerController::PlayDiceOutcomeFeedback(
   }
 }
 
+void ASkaldPlayerController::TriggerFighterDeathFeedback(AFighterPawn *Fighter) {
+  if (!Fighter) {
+    return;
+  }
+
+  UWorld *World = GetWorld();
+  if (!World) {
+    return;
+  }
+
+  if (UNiagaraSystem *DeathEffect =
+          ResolveFighterDeathEffect(Fighter->Faction)) {
+    const FVector EffectLocation =
+        Fighter->GetActorLocation() +
+        FVector(0.f, 0.f, FighterDeathEffectHeightOffset);
+    const FRotator EffectRotation = Fighter->GetActorRotation();
+    UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+        World, DeathEffect, EffectLocation, EffectRotation);
+  }
+
+  if (UNiagaraSystem *SplatterEffect =
+          ResolveFighterDeathSplatterEffect(Fighter->Faction)) {
+    FVector SplatterLocation = Fighter->GetActorLocation();
+    if (UGridOverlayComponent *Grid = Fighter->GetGrid()) {
+      const FIntPoint AnchorCell = Fighter->GetCurrentCell();
+      SplatterLocation = Grid->GridToWorld(AnchorCell);
+    }
+    SplatterLocation.Z += FighterDeathSplatterHeightOffset;
+    SpawnTimedNiagaraSystem(SplatterEffect, SplatterLocation,
+                            FighterDeathSplatterLifetimeSeconds);
+  }
+}
+
+UNiagaraSystem *
+ASkaldPlayerController::ResolveFighterDeathEffect(ESkaldFaction Faction) const {
+  if (Faction != ESkaldFaction::None) {
+    if (UNiagaraSystem *const *FactionEffect =
+            FighterDeathFactionEffects.Find(Faction)) {
+      if (*FactionEffect) {
+        return *FactionEffect;
+      }
+    }
+  }
+
+  return DefaultFighterDeathEffect;
+}
+
+UNiagaraSystem *ASkaldPlayerController::ResolveFighterDeathSplatterEffect(
+    ESkaldFaction Faction) const {
+  if (Faction != ESkaldFaction::None) {
+    if (UNiagaraSystem *const *FactionEffect =
+            FighterDeathSplatterFactionEffects.Find(Faction)) {
+      if (*FactionEffect) {
+        return *FactionEffect;
+      }
+    }
+  }
+
+  return DefaultFighterDeathSplatterEffect;
+}
+
+void ASkaldPlayerController::SpawnTimedNiagaraSystem(UNiagaraSystem *Effect,
+                                                     const FVector &Location,
+                                                     float LifetimeSeconds) {
+  if (!Effect || LifetimeSeconds <= 0.f) {
+    return;
+  }
+
+  UWorld *World = GetWorld();
+  if (!World) {
+    return;
+  }
+
+  UNiagaraComponent *NiagaraComponent =
+      UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+          World, Effect, Location, FRotator::ZeroRotator, FVector::OneVector,
+          /*bAutoDestroy=*/false, /*bAutoActivate=*/true,
+          ENCPoolMethod::ManualRelease);
+  if (!NiagaraComponent) {
+    return;
+  }
+
+  NiagaraComponent->SetAutoDestroy(false);
+
+  const TWeakObjectPtr<UNiagaraComponent> ComponentPtr(NiagaraComponent);
+
+  FTimerDelegate CleanupDelegate;
+  CleanupDelegate.BindLambda([ComponentPtr]() {
+    if (UNiagaraComponent *Component = ComponentPtr.Get()) {
+      Component->Deactivate();
+      Component->DestroyComponent();
+    }
+  });
+
+  FTimerHandle CleanupHandle;
+  World->GetTimerManager().SetTimer(CleanupHandle, CleanupDelegate,
+                                    LifetimeSeconds, false);
+}
+
 void ASkaldPlayerController::TriggerHighStakesCritFeedback(
     AFighterPawn *Attacker, AFighterPawn *Defender,
     const FDiceRollResult &Result) {
@@ -3620,6 +3724,10 @@ void ASkaldPlayerController::HandleAttackResolved(AFighterPawn *Attacker,
                                                   AFighterPawn *Defender,
                                                   const FDiceRollResult &Result) {
   PlayAttackFeedback(Attacker, Defender, Result);
+
+  if (Defender && Result.StartingHealth > 0 && Result.EndingHealth <= 0) {
+    TriggerFighterDeathFeedback(Defender);
+  }
 
   if (Result.bHighStakesCritical) {
     TriggerHighStakesCritFeedback(Attacker, Defender, Result);
