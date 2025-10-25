@@ -194,6 +194,7 @@ protected:
   FSkaldBattleReadyState PendingBattleReadyState;
 
   void CommitPendingBattleReadyState(const TCHAR *Context);
+  bool TryAutoReadyAI(const TCHAR *Context);
   /** Payload for the next battle waiting on travel/resolution to finish. */
   FS_BattlePayload DeferredPendingBattle;
 
