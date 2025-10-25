@@ -184,7 +184,7 @@ void AGridOverlayActor::SpawnRandomObstacles() {
     return;
   }
 
-  RandomStream.Shuffle(PotentialAnchors);
+  Algo::Shuffle(PotentialAnchors, RandomStream);
 
   if (PotentialAnchors.Num() < TotalSpawnCount) {
     int32 CellsRemaining = PotentialAnchors.Num();
