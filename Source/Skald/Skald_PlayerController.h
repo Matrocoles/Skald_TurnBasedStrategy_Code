@@ -536,6 +536,8 @@ protected:
   bool ShouldDisplayPrepareForBattlePrompt(
       const FPrepareForBattlePromptData &PromptData);
   void ResetPendingReadyPromptState();
+  void ShowPrepareForBattlePromptLocal_Internal(
+      const FPrepareForBattlePromptData &PromptData);
 
 private:
   /** Display the stored strategic initiative roll if one is pending. */

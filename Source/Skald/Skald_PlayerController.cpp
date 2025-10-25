@@ -3148,6 +3148,24 @@ void ASkaldPlayerController::ResetPendingReadyPromptState() {
 
 void ASkaldPlayerController::ShowPrepareForBattlePromptLocal(
     const FPrepareForBattlePromptData &PromptData) {
+  const bool bShouldDeferLocalAuthorityPrompt = IsLocalController() && HasAuthority();
+
+  if (bShouldDeferLocalAuthorityPrompt) {
+    if (UWorld *World = GetWorld()) {
+      const FPrepareForBattlePromptData PromptCopy = PromptData;
+      World->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateWeakLambda(
+          this, [this, PromptCopy]() {
+            ShowPrepareForBattlePromptLocal_Internal(PromptCopy);
+          }));
+      return;
+    }
+  }
+
+  ShowPrepareForBattlePromptLocal_Internal(PromptData);
+}
+
+void ASkaldPlayerController::ShowPrepareForBattlePromptLocal_Internal(
+    const FPrepareForBattlePromptData &PromptData) {
   if (!MainHUD) {
     InitializeHUDWidget();
   }
