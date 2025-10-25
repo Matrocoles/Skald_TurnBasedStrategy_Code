@@ -92,7 +92,8 @@ void AGridOverlayActor::SpawnRandomObstacles() {
   }
 
   const TArray<const FGridObstacleSpawnList *> ObstacleLists = {
-      &LargeObstacles, &MediumObstacles, &SmallObstacles, &MiscObstacles};
+      &LargeObstacles, &MediumObstacles, &SmallObstacles, &MiscObstacles,
+      &EnvironmentTrees, &EnvironmentCliffs};
 
   bool bHasSpawnCandidates = false;
   for (const FGridObstacleSpawnList *List : ObstacleLists) {
