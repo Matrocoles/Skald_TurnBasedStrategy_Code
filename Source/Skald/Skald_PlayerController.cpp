@@ -3078,6 +3078,13 @@ bool ASkaldPlayerController::ShouldDisplayPrepareForBattlePrompt(
     const bool bReadyStateHasAttackerId =
         ReadyState.AttackerPlayerID > INDEX_NONE;
 
+    if (!bReadyStateHasAttackerId) {
+      UE_LOG(LogSkaldReady, Verbose,
+             TEXT("Skipping prepare prompt for %s because attacker readiness data was cleared."),
+             *GetName());
+      return false;
+    }
+
     if (bReadyStateHasAttackerId && ReadyState.AttackerPlayerID != LocalPlayerID) {
       UE_LOG(LogSkaldReady, Warning,
              TEXT("Skipping prepare prompt for %s: ready state attacker ID %d no longer matches local PlayerID %d."),
@@ -3101,6 +3108,13 @@ bool ASkaldPlayerController::ShouldDisplayPrepareForBattlePrompt(
   if (bMatchesDefender) {
     const bool bReadyStateHasDefenderId =
         ReadyState.DefenderPlayerID > INDEX_NONE;
+
+    if (!bReadyStateHasDefenderId) {
+      UE_LOG(LogSkaldReady, Verbose,
+             TEXT("Skipping prepare prompt for %s because defender readiness data was cleared."),
+             *GetName());
+      return false;
+    }
 
     if (bReadyStateHasDefenderId && ReadyState.DefenderPlayerID != LocalPlayerID) {
       UE_LOG(LogSkaldReady, Warning,
