@@ -3080,28 +3080,27 @@ bool ASkaldPlayerController::ShouldDisplayPrepareForBattlePrompt(
 
     if (!bReadyStateHasAttackerId) {
       UE_LOG(LogSkaldReady, Verbose,
-             TEXT("Skipping prepare prompt for %s because attacker readiness data was cleared."),
+             TEXT("Proceeding with prepare prompt for %s because attacker readiness data is not yet available."),
              *GetName());
-      return false;
-    }
-
-    if (bReadyStateHasAttackerId && ReadyState.AttackerPlayerID != LocalPlayerID) {
-      UE_LOG(LogSkaldReady, Warning,
-             TEXT("Skipping prepare prompt for %s: ready state attacker ID %d no longer matches local PlayerID %d."),
-             *GetName(), ReadyState.AttackerPlayerID, LocalPlayerID);
-      return false;
-    }
-    if (bReadyStateHasAttackerId && ReadyState.bAttackerIsAI) {
-      UE_LOG(LogSkaldReady, Verbose,
-             TEXT("Skipping prepare prompt for %s because attacker is AI-controlled."),
-             *GetName());
-      return false;
-    }
-    if (bReadyStateHasAttackerId && ReadyState.bAttackerReady) {
-      UE_LOG(LogSkaldReady, Verbose,
-             TEXT("Skipping prepare prompt for %s because attacker already readied."),
-             *GetName());
-      return false;
+    } else {
+      if (ReadyState.AttackerPlayerID != LocalPlayerID) {
+        UE_LOG(LogSkaldReady, Warning,
+               TEXT("Skipping prepare prompt for %s: ready state attacker ID %d no longer matches local PlayerID %d."),
+               *GetName(), ReadyState.AttackerPlayerID, LocalPlayerID);
+        return false;
+      }
+      if (ReadyState.bAttackerIsAI) {
+        UE_LOG(LogSkaldReady, Verbose,
+               TEXT("Skipping prepare prompt for %s because attacker is AI-controlled."),
+               *GetName());
+        return false;
+      }
+      if (ReadyState.bAttackerReady) {
+        UE_LOG(LogSkaldReady, Verbose,
+               TEXT("Skipping prepare prompt for %s because attacker already readied."),
+               *GetName());
+        return false;
+      }
     }
   }
 
@@ -3111,28 +3110,27 @@ bool ASkaldPlayerController::ShouldDisplayPrepareForBattlePrompt(
 
     if (!bReadyStateHasDefenderId) {
       UE_LOG(LogSkaldReady, Verbose,
-             TEXT("Skipping prepare prompt for %s because defender readiness data was cleared."),
+             TEXT("Proceeding with prepare prompt for %s because defender readiness data is not yet available."),
              *GetName());
-      return false;
-    }
-
-    if (bReadyStateHasDefenderId && ReadyState.DefenderPlayerID != LocalPlayerID) {
-      UE_LOG(LogSkaldReady, Warning,
-             TEXT("Skipping prepare prompt for %s: ready state defender ID %d no longer matches local PlayerID %d."),
-             *GetName(), ReadyState.DefenderPlayerID, LocalPlayerID);
-      return false;
-    }
-    if (bReadyStateHasDefenderId && ReadyState.bDefenderIsAI) {
-      UE_LOG(LogSkaldReady, Verbose,
-             TEXT("Skipping prepare prompt for %s because defender is AI-controlled."),
-             *GetName());
-      return false;
-    }
-    if (bReadyStateHasDefenderId && ReadyState.bDefenderReady) {
-      UE_LOG(LogSkaldReady, Verbose,
-             TEXT("Skipping prepare prompt for %s because defender already readied."),
-             *GetName());
-      return false;
+    } else {
+      if (ReadyState.DefenderPlayerID != LocalPlayerID) {
+        UE_LOG(LogSkaldReady, Warning,
+               TEXT("Skipping prepare prompt for %s: ready state defender ID %d no longer matches local PlayerID %d."),
+               *GetName(), ReadyState.DefenderPlayerID, LocalPlayerID);
+        return false;
+      }
+      if (ReadyState.bDefenderIsAI) {
+        UE_LOG(LogSkaldReady, Verbose,
+               TEXT("Skipping prepare prompt for %s because defender is AI-controlled."),
+               *GetName());
+        return false;
+      }
+      if (ReadyState.bDefenderReady) {
+        UE_LOG(LogSkaldReady, Verbose,
+               TEXT("Skipping prepare prompt for %s because defender already readied."),
+               *GetName());
+        return false;
+      }
     }
   }
 
