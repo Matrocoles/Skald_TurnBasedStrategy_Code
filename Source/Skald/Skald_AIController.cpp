@@ -215,6 +215,10 @@ void ASkaldAIController::ProcessCurrentPhase() {
       HandleAttackRequested(BestSource->TerritoryID, BestTarget->TerritoryID,
                             ArmySent, false);
 
+      if (TurnManager && TurnManager->HasPendingBattlePreparation()) {
+        bAwaitingBattleTransition = true;
+      }
+
       if (const USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
         if (GI->bTravelPending) {
           bAwaitingBattleTransition = true;
@@ -394,6 +398,10 @@ void ASkaldAIController::ClearEnemyTurnStatus() {
 bool ASkaldAIController::ShouldPauseForBattleTransition() const {
   if (!bAwaitingBattleTransition) {
     return false;
+  }
+
+  if (TurnManager && TurnManager->HasPendingBattlePreparation()) {
+    return true;
   }
 
   if (const USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
