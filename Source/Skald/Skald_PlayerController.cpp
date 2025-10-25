@@ -71,9 +71,6 @@ constexpr const TCHAR *PendingBattlePhaseError =
     TEXT("Cannot end the phase while a battle is awaiting confirmation.");
 
 constexpr float FighterDeathEffectHeightOffset = 120.f;
-constexpr float FighterDeathSplatterLifetimeSeconds = 4.5f;
-constexpr float FighterDeathSplatterHeightOffset = 5.f;
-
 bool IsCursorOverInteractableSlateWidget() {
   if (!FSlateApplication::IsInitialized()) {
     return false;
@@ -3538,6 +3535,20 @@ void ASkaldPlayerController::PlayDiceOutcomeFeedback(
           World, NaturalSixEffect, ImpactLocation, ImpactRotation);
     }
 
+    if (UNiagaraSystem *NaturalSixDecalEffect =
+            ResolveNaturalSixDecalEffect(Attacker ? Attacker->Faction
+                                                  : ESkaldFaction::None)) {
+      FVector DecalLocation = Defender->GetActorLocation();
+      if (UGridOverlayComponent *Grid = Defender->GetGrid()) {
+        const FIntPoint AnchorCell = Defender->GetCurrentCell();
+        DecalLocation = Grid->GridToWorld(AnchorCell);
+      }
+      DecalLocation.Z += NaturalSixDecalHeightOffset;
+      SpawnTimedNiagaraSystem(NaturalSixDecalEffect, DecalLocation,
+                              NaturalSixDecalLifetimeSeconds,
+                              NaturalSixDecalScale);
+    }
+
     if (NaturalSixSound) {
       UGameplayStatics::PlaySoundAtLocation(this, NaturalSixSound,
                                             ImpactLocation);
@@ -3548,6 +3559,18 @@ void ASkaldPlayerController::PlayDiceOutcomeFeedback(
     if (HitImpactEffect) {
       UNiagaraFunctionLibrary::SpawnSystemAtLocation(
           World, HitImpactEffect, ImpactLocation, ImpactRotation);
+    }
+    if (UNiagaraSystem *HitDecalEffect =
+            ResolveHitDecalEffect(Defender ? Defender->Faction
+                                           : ESkaldFaction::None)) {
+      FVector DecalLocation = Defender->GetActorLocation();
+      if (UGridOverlayComponent *Grid = Defender->GetGrid()) {
+        const FIntPoint AnchorCell = Defender->GetCurrentCell();
+        DecalLocation = Grid->GridToWorld(AnchorCell);
+      }
+      DecalLocation.Z += HitDecalHeightOffset;
+      SpawnTimedNiagaraSystem(HitDecalEffect, DecalLocation,
+                              HitDecalLifetimeSeconds, HitDecalScale);
     }
     if (HitImpactSound) {
       UGameplayStatics::PlaySoundAtLocation(this, HitImpactSound,
@@ -3594,7 +3617,8 @@ void ASkaldPlayerController::TriggerFighterDeathFeedback(AFighterPawn *Fighter) 
     }
     SplatterLocation.Z += FighterDeathSplatterHeightOffset;
     SpawnTimedNiagaraSystem(SplatterEffect, SplatterLocation,
-                            FighterDeathSplatterLifetimeSeconds);
+                            FighterDeathSplatterLifetimeSeconds,
+                            FighterDeathSplatterScale);
   }
 }
 
@@ -3626,9 +3650,38 @@ UNiagaraSystem *ASkaldPlayerController::ResolveFighterDeathSplatterEffect(
   return DefaultFighterDeathSplatterEffect;
 }
 
+UNiagaraSystem *
+ASkaldPlayerController::ResolveHitDecalEffect(ESkaldFaction Faction) const {
+  if (Faction != ESkaldFaction::None) {
+    if (UNiagaraSystem *const *FactionEffect =
+            HitDecalFactionEffects.Find(Faction)) {
+      if (*FactionEffect) {
+        return *FactionEffect;
+      }
+    }
+  }
+
+  return DefaultHitDecalEffect;
+}
+
+UNiagaraSystem *ASkaldPlayerController::ResolveNaturalSixDecalEffect(
+    ESkaldFaction Faction) const {
+  if (Faction != ESkaldFaction::None) {
+    if (UNiagaraSystem *const *FactionEffect =
+            NaturalSixDecalFactionEffects.Find(Faction)) {
+      if (*FactionEffect) {
+        return *FactionEffect;
+      }
+    }
+  }
+
+  return DefaultNaturalSixDecalEffect;
+}
+
 void ASkaldPlayerController::SpawnTimedNiagaraSystem(UNiagaraSystem *Effect,
                                                      const FVector &Location,
-                                                     float LifetimeSeconds) {
+                                                     float LifetimeSeconds,
+                                                     const FVector &Scale) {
   if (!Effect || LifetimeSeconds <= 0.f) {
     return;
   }
@@ -3640,7 +3693,7 @@ void ASkaldPlayerController::SpawnTimedNiagaraSystem(UNiagaraSystem *Effect,
 
   UNiagaraComponent *NiagaraComponent =
       UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-          World, Effect, Location, FRotator::ZeroRotator, FVector::OneVector,
+          World, Effect, Location, FRotator::ZeroRotator, Scale,
           /*bAutoDestroy=*/false, /*bAutoActivate=*/true,
           ENCPoolMethod::ManualRelease);
   if (!NiagaraComponent) {
