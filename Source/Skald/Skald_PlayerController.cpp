@@ -3146,7 +3146,7 @@ void ASkaldPlayerController::ResetPendingReadyPromptState() {
   }
 }
 
-void ASkaldPlayerController::ClientShowPrepareForBattle_Implementation(
+void ASkaldPlayerController::ShowPrepareForBattlePromptLocal(
     const FPrepareForBattlePromptData &PromptData) {
   if (!MainHUD) {
     InitializeHUDWidget();
@@ -3180,7 +3180,12 @@ void ASkaldPlayerController::ClientShowPrepareForBattle_Implementation(
   RegisterPendingReadyPromptRetry();
 }
 
-void ASkaldPlayerController::ClientHidePrepareForBattle_Implementation() {
+void ASkaldPlayerController::ClientShowPrepareForBattle_Implementation(
+    const FPrepareForBattlePromptData &PromptData) {
+  ShowPrepareForBattlePromptLocal(PromptData);
+}
+
+void ASkaldPlayerController::HidePrepareForBattlePromptLocal() {
   if (MainHUD) {
     MainHUD->HidePrepareForBattleDialog();
   }
@@ -3192,6 +3197,10 @@ void ASkaldPlayerController::ClientHidePrepareForBattle_Implementation() {
   }
 
   ResetPendingReadyPromptState();
+}
+
+void ASkaldPlayerController::ClientHidePrepareForBattle_Implementation() {
+  HidePrepareForBattlePromptLocal();
 }
 
 void ASkaldPlayerController::CancelCommandMode() {
