@@ -3036,6 +3036,14 @@ bool ASkaldPlayerController::ShouldDisplayPrepareForBattlePrompt(
   }
 
   const int32 LocalPlayerID = LocalPS->GetPlayerId();
+  if (LocalPlayerID <= 0) {
+    UE_LOG(
+        LogSkaldReady, Verbose,
+        TEXT("Prepare-for-battle prompt proceeding for %s because PlayerID %d is not yet assigned."),
+        *GetName(), LocalPlayerID);
+    return true;
+  }
+
   const bool bMatchesAttacker = PromptData.AttackerPlayerID == LocalPlayerID;
   const bool bMatchesDefender = PromptData.DefenderPlayerID == LocalPlayerID;
 
@@ -3066,19 +3074,22 @@ bool ASkaldPlayerController::ShouldDisplayPrepareForBattlePrompt(
   const FSkaldBattleReadyState &ReadyState = GameState->GetPendingBattleReady();
 
   if (bMatchesAttacker) {
-    if (ReadyState.AttackerPlayerID != LocalPlayerID) {
+    const bool bReadyStateHasAttackerId =
+        ReadyState.AttackerPlayerID > INDEX_NONE;
+
+    if (bReadyStateHasAttackerId && ReadyState.AttackerPlayerID != LocalPlayerID) {
       UE_LOG(LogSkaldReady, Verbose,
              TEXT("Skipping prepare prompt for %s: ready state attacker ID %d no longer matches."),
              *GetName(), ReadyState.AttackerPlayerID);
       return false;
     }
-    if (ReadyState.bAttackerIsAI) {
+    if (bReadyStateHasAttackerId && ReadyState.bAttackerIsAI) {
       UE_LOG(LogSkaldReady, Verbose,
              TEXT("Skipping prepare prompt for %s because attacker is AI-controlled."),
              *GetName());
       return false;
     }
-    if (ReadyState.bAttackerReady) {
+    if (bReadyStateHasAttackerId && ReadyState.bAttackerReady) {
       UE_LOG(LogSkaldReady, Verbose,
              TEXT("Skipping prepare prompt for %s because attacker already readied."),
              *GetName());
@@ -3087,19 +3098,22 @@ bool ASkaldPlayerController::ShouldDisplayPrepareForBattlePrompt(
   }
 
   if (bMatchesDefender) {
-    if (ReadyState.DefenderPlayerID != LocalPlayerID) {
+    const bool bReadyStateHasDefenderId =
+        ReadyState.DefenderPlayerID > INDEX_NONE;
+
+    if (bReadyStateHasDefenderId && ReadyState.DefenderPlayerID != LocalPlayerID) {
       UE_LOG(LogSkaldReady, Verbose,
              TEXT("Skipping prepare prompt for %s: ready state defender ID %d no longer matches."),
              *GetName(), ReadyState.DefenderPlayerID);
       return false;
     }
-    if (ReadyState.bDefenderIsAI) {
+    if (bReadyStateHasDefenderId && ReadyState.bDefenderIsAI) {
       UE_LOG(LogSkaldReady, Verbose,
              TEXT("Skipping prepare prompt for %s because defender is AI-controlled."),
              *GetName());
       return false;
     }
-    if (ReadyState.bDefenderReady) {
+    if (bReadyStateHasDefenderId && ReadyState.bDefenderReady) {
       UE_LOG(LogSkaldReady, Verbose,
              TEXT("Skipping prepare prompt for %s because defender already readied."),
              *GetName());
