@@ -227,6 +227,26 @@ protected:
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
   TMap<ESkaldFaction, UNiagaraSystem *> NaturalSixFactionEffects;
 
+  /** Default decal-style Niagara effect for natural six results. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
+  UNiagaraSystem *DefaultNaturalSixDecalEffect = nullptr;
+
+  /** Optional faction overrides for natural six decal effects. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
+  TMap<ESkaldFaction, UNiagaraSystem *> NaturalSixDecalFactionEffects;
+
+  /** Lifetime of the spawned natural six decal Niagara system. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
+  float NaturalSixDecalLifetimeSeconds = 0.f;
+
+  /** Scale applied to spawned natural six decal Niagara systems. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
+  FVector NaturalSixDecalScale = FVector::OneVector;
+
+  /** Vertical offset applied to natural six decal Niagara systems. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
+  float NaturalSixDecalHeightOffset = 5.f;
+
   /** Default Niagara effect triggered when a fighter dies. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
   UNiagaraSystem *DefaultFighterDeathEffect = nullptr;
@@ -243,9 +263,41 @@ protected:
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
   TMap<ESkaldFaction, UNiagaraSystem *> FighterDeathSplatterFactionEffects;
 
+  /** Lifetime applied to spawned fighter death splatter Niagara systems. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
+  float FighterDeathSplatterLifetimeSeconds = 4.5f;
+
+  /** Scale applied to spawned fighter death splatter Niagara systems. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
+  FVector FighterDeathSplatterScale = FVector::OneVector;
+
+  /** Vertical offset applied to fighter death splatter Niagara systems. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
+  float FighterDeathSplatterHeightOffset = 5.f;
+
   /** Audio cue played when a hit lands. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
   USoundBase *HitImpactSound = nullptr;
+
+  /** Default decal-style Niagara effect triggered when a hit lands. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
+  UNiagaraSystem *DefaultHitDecalEffect = nullptr;
+
+  /** Optional faction overrides for hit decal Niagara effects. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
+  TMap<ESkaldFaction, UNiagaraSystem *> HitDecalFactionEffects;
+
+  /** Lifetime applied to spawned hit decal Niagara systems. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
+  float HitDecalLifetimeSeconds = 0.f;
+
+  /** Scale applied to spawned hit decal Niagara systems. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
+  FVector HitDecalScale = FVector::OneVector;
+
+  /** Vertical offset applied to hit decal Niagara systems. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
+  float HitDecalHeightOffset = 5.f;
 
   /** Audio cue played when an attack misses. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
@@ -652,8 +704,10 @@ private:
   void TriggerFighterDeathFeedback(AFighterPawn *Fighter);
   UNiagaraSystem *ResolveFighterDeathEffect(ESkaldFaction Faction) const;
   UNiagaraSystem *ResolveFighterDeathSplatterEffect(ESkaldFaction Faction) const;
+  UNiagaraSystem *ResolveHitDecalEffect(ESkaldFaction Faction) const;
+  UNiagaraSystem *ResolveNaturalSixDecalEffect(ESkaldFaction Faction) const;
   void SpawnTimedNiagaraSystem(UNiagaraSystem *Effect, const FVector &Location,
-                               float LifetimeSeconds);
+                               float LifetimeSeconds, const FVector &Scale);
   void TriggerHighStakesCritFeedback(AFighterPawn *Attacker,
                                      AFighterPawn *Defender,
                                      const FDiceRollResult &Result);
