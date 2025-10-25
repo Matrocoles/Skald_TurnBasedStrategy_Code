@@ -451,6 +451,12 @@ public:
   UFUNCTION(Client, Reliable)
   void ClientHidePrepareForBattle();
 
+  /** Local entry points so standalone/authority controllers can trigger the
+   *  prepare-for-battle flow without relying on client RPC delivery. */
+  void ShowPrepareForBattlePromptLocal(
+      const FPrepareForBattlePromptData &PromptData);
+  void HidePrepareForBattlePromptLocal();
+
   /** Server-side processing of an attack request. */
   UFUNCTION(Server, Reliable)
   void ServerHandleAttack(int32 FromID, int32 ToID, int32 ArmySent,
@@ -530,6 +536,8 @@ protected:
   bool ShouldDisplayPrepareForBattlePrompt(
       const FPrepareForBattlePromptData &PromptData);
   void ResetPendingReadyPromptState();
+  void ShowPrepareForBattlePromptLocal_Internal(
+      const FPrepareForBattlePromptData &PromptData);
 
 private:
   /** Display the stored strategic initiative roll if one is pending. */

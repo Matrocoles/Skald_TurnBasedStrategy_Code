@@ -3146,7 +3146,25 @@ void ASkaldPlayerController::ResetPendingReadyPromptState() {
   }
 }
 
-void ASkaldPlayerController::ClientShowPrepareForBattle_Implementation(
+void ASkaldPlayerController::ShowPrepareForBattlePromptLocal(
+    const FPrepareForBattlePromptData &PromptData) {
+  const bool bShouldDeferLocalAuthorityPrompt = IsLocalController() && HasAuthority();
+
+  if (bShouldDeferLocalAuthorityPrompt) {
+    if (UWorld *World = GetWorld()) {
+      const FPrepareForBattlePromptData PromptCopy = PromptData;
+      World->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateWeakLambda(
+          this, [this, PromptCopy]() {
+            ShowPrepareForBattlePromptLocal_Internal(PromptCopy);
+          }));
+      return;
+    }
+  }
+
+  ShowPrepareForBattlePromptLocal_Internal(PromptData);
+}
+
+void ASkaldPlayerController::ShowPrepareForBattlePromptLocal_Internal(
     const FPrepareForBattlePromptData &PromptData) {
   if (!MainHUD) {
     InitializeHUDWidget();
@@ -3180,7 +3198,12 @@ void ASkaldPlayerController::ClientShowPrepareForBattle_Implementation(
   RegisterPendingReadyPromptRetry();
 }
 
-void ASkaldPlayerController::ClientHidePrepareForBattle_Implementation() {
+void ASkaldPlayerController::ClientShowPrepareForBattle_Implementation(
+    const FPrepareForBattlePromptData &PromptData) {
+  ShowPrepareForBattlePromptLocal(PromptData);
+}
+
+void ASkaldPlayerController::HidePrepareForBattlePromptLocal() {
   if (MainHUD) {
     MainHUD->HidePrepareForBattleDialog();
   }
@@ -3192,6 +3215,10 @@ void ASkaldPlayerController::ClientHidePrepareForBattle_Implementation() {
   }
 
   ResetPendingReadyPromptState();
+}
+
+void ASkaldPlayerController::ClientHidePrepareForBattle_Implementation() {
+  HidePrepareForBattlePromptLocal();
 }
 
 void ASkaldPlayerController::CancelCommandMode() {

@@ -1787,11 +1787,22 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
                            Battle.TargetTerritoryID != 0;
 
   const TArray<ASkaldPlayerController *> ControllerSnapshot = GetControllers();
-  auto HideAllControllers = [&ControllerSnapshot]() {
+  auto HidePromptForController = [](ASkaldPlayerController *Controller) {
+    if (!Controller) {
+      return;
+    }
+
+    const ENetMode NetMode = Controller->GetNetMode();
+    if (NetMode == NM_Standalone) {
+      Controller->HidePrepareForBattlePromptLocal();
+    } else {
+      Controller->ClientHidePrepareForBattle();
+    }
+  };
+
+  auto HideAllControllers = [&ControllerSnapshot, &HidePromptForController]() {
     for (ASkaldPlayerController *Controller : ControllerSnapshot) {
-      if (Controller) {
-        Controller->ClientHidePrepareForBattle();
-      }
+      HidePromptForController(Controller);
     }
   };
 
@@ -1957,7 +1968,12 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
              *Controller->GetName(), RoleLabel,
              PendingBattlePreparation.FromTerritoryID,
              PendingBattlePreparation.TargetTerritoryID);
-      Controller->ClientShowPrepareForBattle(PromptData);
+      const ENetMode NetMode = Controller->GetNetMode();
+      if (NetMode == NM_Standalone) {
+        Controller->ShowPrepareForBattlePromptLocal(PromptData);
+      } else {
+        Controller->ClientShowPrepareForBattle(PromptData);
+      }
 
       if ((bIsAttacker || bIsDefender) && PS && PS->bIsAI) {
         UE_LOG(LogSkald, Warning,
@@ -1974,7 +1990,7 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
       continue;
     }
 
-    Controller->ClientHidePrepareForBattle();
+    HidePromptForController(Controller);
 
     if (bMatchesAttackerId && !bNeedsAttackerConfirmation) {
       UE_LOG(LogSkald, Log,
@@ -2071,7 +2087,14 @@ bool ATurnManager::TryAdvanceFromReadyToBattle(const TCHAR *Context) {
   }
 
   for (ASkaldPlayerController *Controller : GetControllers()) {
-    if (Controller) {
+    if (!Controller) {
+      continue;
+    }
+
+    const ENetMode NetMode = Controller->GetNetMode();
+    if (NetMode == NM_Standalone) {
+      Controller->HidePrepareForBattlePromptLocal();
+    } else {
       Controller->ClientHidePrepareForBattle();
     }
   }
