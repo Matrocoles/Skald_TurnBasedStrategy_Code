@@ -1132,6 +1132,79 @@ void UGridOverlayComponent::RegisterObstacle(UGridObstacleComponent *Obstacle) {
   ApplyObstacleToGrid(Obstacle);
 }
 
+void UGridOverlayComponent::UnregisterObstacle(UGridObstacleComponent *Obstacle) {
+  if (!Obstacle) {
+    return;
+  }
+
+  PendingObstacles.RemoveAll(
+      [Obstacle](const TWeakObjectPtr<UGridObstacleComponent> &WeakObstacle) {
+        return WeakObstacle.Get() == Obstacle;
+      });
+
+  const int32 RemovedCount = Obstacles.RemoveSingleSwap(Obstacle);
+  if (RemovedCount <= 0 || !bHasInitializedGrid) {
+    return;
+  }
+
+  TArray<FIntPoint> ClearedCells;
+
+  if (AActor *Owner = Obstacle->GetOwner()) {
+    FIntPoint Min = FIntPoint::ZeroValue;
+    FIntPoint Max = FIntPoint::ZeroValue;
+    bool bHasCustomFootprint = Obstacle->GetCustomGridFootprint(this, Min, Max);
+
+    if (!bHasCustomFootprint) {
+      const FBox Bounds = Owner->GetComponentsBoundingBox(true);
+      if (Bounds.IsValid) {
+        const FIntPoint RawMin = WorldToGrid(Bounds.Min);
+        const FIntPoint RawMax = WorldToGrid(Bounds.Max);
+        Min.X = FMath::Min(RawMin.X, RawMax.X);
+        Min.Y = FMath::Min(RawMin.Y, RawMax.Y);
+        Max.X = FMath::Max(RawMin.X, RawMax.X);
+        Max.Y = FMath::Max(RawMin.Y, RawMax.Y);
+      } else {
+        const FIntPoint Anchor = WorldToGrid(Owner->GetActorLocation());
+        Min = Anchor;
+        Max = Anchor;
+      }
+    }
+
+    for (int32 Y = Min.Y; Y <= Max.Y; ++Y) {
+      for (int32 X = Min.X; X <= Max.X; ++X) {
+        const FIntPoint Cell(X, Y);
+        if (!IsValidGrid(Cell)) {
+          continue;
+        }
+
+        ClearedCells.Add(Cell);
+
+        const int32 Idx = Index(Cell);
+        if (Obstacle->bBlocksMovement && Cells.IsValidIndex(Idx)) {
+          Cells[Idx] = false;
+        }
+        if (Obstacle->bBlocksLineOfSight && ObscuredCells.IsValidIndex(Idx)) {
+          ObscuredCells[Idx] = false;
+        }
+      }
+    }
+  }
+
+  for (int32 Index = Obstacles.Num() - 1; Index >= 0; --Index) {
+    UGridObstacleComponent *RemainingObstacle = Obstacles[Index];
+    if (!IsValid(RemainingObstacle)) {
+      Obstacles.RemoveAtSwap(Index);
+      continue;
+    }
+
+    ApplyObstacleToGrid(RemainingObstacle);
+  }
+
+  for (const FIntPoint &Cell : ClearedCells) {
+    UpdateBaseGridVisual(Cell);
+  }
+}
+
 void UGridOverlayComponent::ApplyObstacleToGrid(UGridObstacleComponent *Obstacle) {
   if (!Obstacle || !bHasInitializedGrid) {
     return;

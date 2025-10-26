@@ -358,6 +358,10 @@ void AGridOverlayActor::SpawnRandomObstacles() {
         }
 
         if (bHasConflict) {
+          if (UGridObstacleComponent *ObstacleComponent =
+                  SpawnedActor->FindComponentByClass<UGridObstacleComponent>()) {
+            GridComponent->UnregisterObstacle(ObstacleComponent);
+          }
           SpawnedActor->Destroy();
           continue;
         }
