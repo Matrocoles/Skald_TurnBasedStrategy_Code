@@ -369,6 +369,8 @@ public:
     void ReportSimulatedAttackResolution(const FDiceRollResult& Result);
     void ReportAttackRejected(AFighterPawn* Attacker, AFighterPawn* Defender, const FText& Reason);
 
+    bool RegisterPendingFighterDeath(AFighterPawn* Fighter);
+
     /** Table containing fighter definitions. */
     UPROPERTY(EditDefaultsOnly, Category="Data")
     UDataTable* FighterDefinitions = nullptr;
@@ -433,6 +435,7 @@ private:
 
     void EnqueueDeferredPresentationFinish(AFighterPawn* Fighter, EGridActivationFinishReason Reason);
     void ProcessDeferredPresentationFinishes();
+    void ProcessPendingFighterDeaths();
 
     struct FDeferredActivationFinish
     {
@@ -503,6 +506,9 @@ private:
 
     /** Finish requests waiting for presentation sequences (dice, floaters, VFX) to complete. */
     TArray<FDeferredPresentationFinish> DeferredPresentationFinishes;
+
+    /** Fighters awaiting destruction until attack presentations conclude. */
+    TArray<TWeakObjectPtr<AFighterPawn>> PendingFighterDeaths;
 
     /** Number of attack presentations that still need to finish before combat can advance. */
     int32 PendingAttackPresentationCount = 0;

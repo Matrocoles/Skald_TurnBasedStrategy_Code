@@ -681,6 +681,23 @@ void UGridBattleManager::ReportAttackRejected(AFighterPawn* Attacker, AFighterPa
     OnAttackRejected.Broadcast(Attacker, Defender, Reason);
 }
 
+bool UGridBattleManager::RegisterPendingFighterDeath(AFighterPawn* Fighter)
+{
+    if (!Fighter)
+    {
+        return false;
+    }
+
+    PendingFighterDeaths.AddUnique(Fighter);
+
+    if (!IsAwaitingAttackPresentation())
+    {
+        ProcessPendingFighterDeaths();
+    }
+
+    return true;
+}
+
 bool UGridBattleManager::CanActivateFighter(AFighterPawn* Fighter) const
 {
     if (bBattleConcluded || !Fighter)
@@ -909,6 +926,49 @@ void UGridBattleManager::ProcessDeferredPresentationFinishes()
     }
 }
 
+void UGridBattleManager::ProcessPendingFighterDeaths()
+{
+    if (PendingFighterDeaths.Num() == 0)
+    {
+        return;
+    }
+
+    TArray<TWeakObjectPtr<AFighterPawn>> FightersToHandle = MoveTemp(PendingFighterDeaths);
+    PendingFighterDeaths.Reset();
+
+    for (const TWeakObjectPtr<AFighterPawn>& FighterPtr : FightersToHandle)
+    {
+        AFighterPawn* Fighter = FighterPtr.Get();
+        if (!Fighter)
+        {
+            continue;
+        }
+
+        if (Fighter->IsActorBeingDestroyed())
+        {
+            continue;
+        }
+
+        if (UWorld* World = Fighter->GetWorld())
+        {
+            const TWeakObjectPtr<AFighterPawn> LocalPtr = Fighter;
+            World->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateLambda([LocalPtr]()
+            {
+                if (AFighterPawn* FighterPawn = LocalPtr.Get())
+                {
+                    if (!FighterPawn->IsActorBeingDestroyed())
+                    {
+                        FighterPawn->Destroy();
+                    }
+                }
+            }));
+            continue;
+        }
+
+        Fighter->Destroy();
+    }
+}
+
 void UGridBattleManager::NotifyAttackPresentationComplete()
 {
     if (PendingAttackPresentationCount <= 0)
@@ -917,6 +977,7 @@ void UGridBattleManager::NotifyAttackPresentationComplete()
             TEXT("[Battle] Received attack presentation completion with no pending presentations."));
         PendingAttackPresentationCount = 0;
         ProcessDeferredPresentationFinishes();
+        ProcessPendingFighterDeaths();
         if (bRoundStartDeferred)
         {
             bRoundStartDeferred = false;
@@ -935,6 +996,7 @@ void UGridBattleManager::NotifyAttackPresentationComplete()
     PendingAttackPresentationCount = 0;
 
     ProcessDeferredPresentationFinishes();
+    ProcessPendingFighterDeaths();
 
     if (bRoundStartDeferred)
     {
