@@ -253,6 +253,11 @@ void ASkaldPlayerController::InitializeHUDWidget() {
     TryShowPendingReadyPrompt();
   }
 
+  // Ensure the freshly constructed HUD reflects the current world/turn state
+  // even if no world state change has been broadcast since the player joined
+  // (e.g. after loading a save game mid-turn).
+  HandleWorldStateChanged();
+
   // Notify the game mode that the HUD is now ready so world start checks can
   // proceed only after widgets are initialized.
   if (CachedGameMode) {
@@ -600,6 +605,11 @@ void ASkaldPlayerController::ApplyTurnManager(ATurnManager *Manager) {
     if (IsLocalPlayerController() && GetLocalPlayer() != nullptr) {
       InitializeFighterSelectionIfNeeded();
     }
+
+    // When the turn manager becomes available (including after loading a
+    // saved game) immediately synchronise the HUD so players can interact with
+    // the correct phase buttons without waiting for the next broadcast.
+    HandleWorldStateChanged();
   }
 }
 
