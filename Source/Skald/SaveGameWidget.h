@@ -54,8 +54,6 @@ private:
     /** Shared implementation for the individual save slot handlers. */
     void HandleSaveSlot(int32 SlotIndex);
 
-    void BindButton(UButton* Button, void (USaveGameWidget::*Handler)());
-    void UnbindButton(UButton* Button, void (USaveGameWidget::*Handler)());
     void ReturnToOwningMenu();
 
     UPROPERTY()
