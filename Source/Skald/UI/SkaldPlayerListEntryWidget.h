@@ -5,6 +5,9 @@
 #include "SkaldTypes.h"
 #include "SkaldPlayerListEntryWidget.generated.h"
 
+class UTextBlock;
+class UWidget;
+
 /**
  * Base widget used for entries in the strategic HUD player list.
  *
@@ -41,5 +44,45 @@ protected:
   /** Blueprint hook for updating the visual representation of the entry. */
   UFUNCTION(BlueprintImplementableEvent, Category = "Skald|PlayerList")
   void OnPlayerDataUpdated();
+
+  /** Optional text block automatically populated with the player's display name. */
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|PlayerList|Bindings",
+            meta = (BindWidgetOptional))
+  UTextBlock *PlayerNameText = nullptr;
+
+  /** Optional text block automatically populated with the faction display name. */
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|PlayerList|Bindings",
+            meta = (BindWidgetOptional))
+  UTextBlock *FactionNameText = nullptr;
+
+  /** Optional text block automatically populated with the owned territory count. */
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|PlayerList|Bindings",
+            meta = (BindWidgetOptional))
+  UTextBlock *TerritoryCountText = nullptr;
+
+  /** Optional text block automatically populated with the capital count. */
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|PlayerList|Bindings",
+            meta = (BindWidgetOptional))
+  UTextBlock *CapitalCountText = nullptr;
+
+  /** Optional text block automatically populated with the player's troop count. */
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|PlayerList|Bindings",
+            meta = (BindWidgetOptional))
+  UTextBlock *TroopCountText = nullptr;
+
+  /** Optional text block automatically populated with the player's resource total. */
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|PlayerList|Bindings",
+            meta = (BindWidgetOptional))
+  UTextBlock *ResourceCountText = nullptr;
+
+  /** Optional widget toggled visible when the player is controlled by AI. */
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|PlayerList|Bindings",
+            meta = (BindWidgetOptional))
+  UWidget *AIIndicatorWidget = nullptr;
+
+  /** Optional widget toggled visible when the player has been eliminated. */
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|PlayerList|Bindings",
+            meta = (BindWidgetOptional))
+  UWidget *EliminatedIndicatorWidget = nullptr;
 };
 
