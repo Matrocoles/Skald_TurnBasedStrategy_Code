@@ -2185,6 +2185,70 @@ void ASkaldPlayerController::BuildPlayerDataArray(
     return;
   }
 
+  TMap<int32, int32> TerritoryCounts;
+  auto AccumulateOwner = [&TerritoryCounts](int32 OwnerPlayerId) {
+    if (OwnerPlayerId > 0) {
+      TerritoryCounts.FindOrAdd(OwnerPlayerId) += 1;
+    }
+  };
+
+  bool bResolvedTerritories = false;
+  if (AWorldMap *WorldMap = CachedWorldMap.Get()) {
+    for (ATerritory *Territory : WorldMap->Territories) {
+      if (Territory && Territory->OwningPlayer) {
+        AccumulateOwner(Territory->OwningPlayer->GetPlayerId());
+        bResolvedTerritories = true;
+      }
+    }
+  }
+
+  if (!bResolvedTerritories) {
+    if (UWorld *World = GetWorld()) {
+      if (AWorldMap *WorldMap =
+              Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+                  World, AWorldMap::StaticClass()))) {
+        for (ATerritory *Territory : WorldMap->Territories) {
+          if (Territory && Territory->OwningPlayer) {
+            AccumulateOwner(Territory->OwningPlayer->GetPlayerId());
+            bResolvedTerritories = true;
+          }
+        }
+      }
+    }
+  }
+
+  if (!bResolvedTerritories) {
+    const USkaldGameInstance *GameInstance = CachedGameInstance;
+    if (!GameInstance) {
+      GameInstance = GetGameInstance<USkaldGameInstance>();
+    }
+
+    if (GameInstance) {
+      auto AccumulateFromSnapshots =
+          [&AccumulateOwner, &bResolvedTerritories](
+              const TArray<FS_Territory> &Snapshots) {
+            bool bFoundData = false;
+            for (const FS_Territory &Snapshot : Snapshots) {
+              if (Snapshot.OwnerPlayerID > 0) {
+                AccumulateOwner(Snapshot.OwnerPlayerID);
+                bFoundData = true;
+              }
+            }
+            if (bFoundData) {
+              bResolvedTerritories = true;
+            }
+          };
+
+      AccumulateFromSnapshots(GameInstance->GetPendingTravelSnapshot());
+      if (!bResolvedTerritories) {
+        AccumulateFromSnapshots(GameInstance->CachedWorldMapTerritories);
+      }
+      if (!bResolvedTerritories) {
+        AccumulateFromSnapshots(GameInstance->GetTravelState().CachedTerritories);
+      }
+    }
+  }
+
   for (APlayerState *PSBase : CachedGameState->PlayerArray) {
     if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
       FS_PlayerData Data;
@@ -2194,6 +2258,7 @@ void ASkaldPlayerController::BuildPlayerDataArray(
       Data.Faction = PS->Faction;
       Data.Resources = PS->Resources;
       Data.IsEliminated = PS->IsEliminated;
+      Data.TerritoriesOwned = TerritoryCounts.FindRef(Data.PlayerID);
       OutPlayers.Add(Data);
     }
   }

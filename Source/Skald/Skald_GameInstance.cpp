@@ -465,6 +465,7 @@ bool USkaldGameInstance::RestoreWorldFromSnapshot(UWorld *InWorldContext) {
     PlayerData.IsAlive = false;
     PlayerData.CapitalsOwned = 0;
     PlayerData.TroopsCount = 0;
+    PlayerData.TerritoriesOwned = 0;
     PlayerData.CapitalTerritoryIDs.Reset();
   }
 
@@ -514,6 +515,7 @@ bool USkaldGameInstance::RestoreWorldFromSnapshot(UWorld *InWorldContext) {
       FS_PlayerData *PlayerData = *PlayerDataPtr;
       PlayerData->IsEliminated = false;
       PlayerData->IsAlive = true;
+      PlayerData->TerritoriesOwned += 1;
       PlayerData->TroopsCount += Snapshot.ArmyUnits;
       if (Snapshot.IsCapital) {
         PlayerData->CapitalsOwned += 1;

@@ -6,6 +6,7 @@
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/Widget.h"
+#include "Blueprint/UserWidget.h"
 #include "Containers/Queue.h"
 #include "Containers/Set.h"
 #include "FighterPawn.h"
@@ -32,6 +33,7 @@
 #include "UI/CombatFloaterPoolSubsystem.h"
 #include "UI/W_FloatingText.h"
 #include "UI/W_DiceResolutionPanel.h"
+#include "UI/SkaldPlayerListEntryWidget.h"
 #include "UI/SkaldUIHelpers.h"
 #include "UObject/ConstructorHelpers.h"
 #include "WorldMap.h"
@@ -503,25 +505,43 @@ void USkaldMainHUDWidget::RebuildPlayerList(
   PlayerListBox->ClearChildren();
 
   UEnum *FactionEnum = StaticEnum<ESkaldFaction>();
+  const bool bUseCustomEntries = PlayerListEntryWidgetClass != nullptr;
 
   for (const FS_PlayerData &Player : Players) {
     if (Player.IsEliminated) {
       continue;
     }
+
+    const FString FactionName = FactionEnum
+                                    ? FactionEnum
+                                          ->GetDisplayNameTextByValue(
+                                              static_cast<int64>(Player.Faction))
+                                          .ToString()
+                                    : TEXT("Unknown");
+    const int32 TerritoryCount = Player.TerritoriesOwned;
+
+    if (bUseCustomEntries) {
+      USkaldPlayerListEntryWidget *EntryWidget =
+          CreateWidget<USkaldPlayerListEntryWidget>(GetOwningPlayer(),
+                                                    PlayerListEntryWidgetClass);
+      if (!EntryWidget) {
+        continue;
+      }
+
+      EntryWidget->SetupPlayerEntry(Player, TerritoryCount);
+      PlayerListBox->AddChild(EntryWidget);
+      continue;
+    }
+
     UTextBlock *Entry = NewObject<UTextBlock>(PlayerListBox);
     if (!Entry) {
       continue;
     }
 
-    FString FactionName = FactionEnum
-                              ? FactionEnum
-                                    ->GetDisplayNameTextByValue(
-                                        static_cast<int64>(Player.Faction))
-                                    .ToString()
-                              : TEXT("Unknown");
-    FString Line =
-        FString::Printf(TEXT("%s (%s)%s"), *Player.PlayerName, *FactionName,
-                        Player.IsAI ? TEXT(" [AI]") : TEXT(""));
+    FString Line = FString::Printf(TEXT("%s (%s) - Territories: %d%s"),
+                                   *Player.PlayerName, *FactionName,
+                                   TerritoryCount,
+                                   Player.IsAI ? TEXT(" [AI]") : TEXT(""));
     Entry->SetText(FText::FromString(Line));
     PlayerListBox->AddChildToVerticalBox(Entry);
   }

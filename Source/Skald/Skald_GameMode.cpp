@@ -1492,6 +1492,7 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
     Data.IsAlive = false;
     Data.CapitalsOwned = 0;
     Data.TroopsCount = 0;
+    Data.TerritoriesOwned = 0;
     PlayerDataArray.Add(Data);
 
     if (TurnManager) {
@@ -1577,6 +1578,7 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
       FS_PlayerData *PlayerData = *PlayerDataPtr;
       PlayerData->IsEliminated = false;
       PlayerData->IsAlive = true;
+      PlayerData->TerritoriesOwned += 1;
       PlayerData->TroopsCount += TerrData.ArmyUnits;
       if (TerrData.IsCapital) {
         PlayerData->CapitalsOwned += 1;

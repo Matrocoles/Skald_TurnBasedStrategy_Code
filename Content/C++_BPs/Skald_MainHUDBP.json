@@ -8,17 +8,8 @@
       "Purpose": "Container for dynamically generated player entries"
     }
   },
-  "Events": {
-    "BP_RebuildPlayerList": {
-      "Parameters": {
-        "Players": "Array of FS_PlayerData"
-      },
-      "Steps": [
-        "Clear children of PlayerListBox",
-        "For each player in Players:",
-        "  - Create a TextBlock showing PlayerName and faction",
-        "  - Add the TextBlock to PlayerListBox"
-      ]
-    }
-  }
+  "Notes": [
+    "Assign PlayerListEntryWidgetClass to a Blueprint subclass of SkaldPlayerListEntryWidget to fully control the appearance of each entry (fonts, layout, icons).",
+    "When no custom entry widget is provided the native HUD will fall back to spawning simple text blocks that list the player's display name, faction, and territory count."
+  ]
 }
