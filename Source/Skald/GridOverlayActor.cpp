@@ -3,6 +3,7 @@
 #include "Engine/EngineTypes.h"
 #include "Engine/World.h"
 #include "GridObstacleActor.h"
+#include "GridObstacleComponent.h"
 #include "GridOverlayComponent.h"
 #include "Math/RotationMatrix.h"
 #include "CollisionQueryParams.h"
@@ -231,6 +232,61 @@ void AGridOverlayActor::SpawnRandomObstacles() {
   }
 
   TArray<FIntPoint> AvailableCells = CandidateCells.Array();
+  TSet<FIntPoint> ReservedCells;
+
+  const auto ComputeBlockedCells = [GridComponent](AGridObstacleActor *Obstacle,
+                                                   TArray<FIntPoint> &OutCells) -> bool {
+    if (!Obstacle || !GridComponent) {
+      return false;
+    }
+
+    FIntPoint Min = FIntPoint::ZeroValue;
+    FIntPoint Max = FIntPoint::ZeroValue;
+    bool bHasCustomFootprint = false;
+
+    if (const UGridObstacleComponent *ObstacleComponent =
+            Obstacle->FindComponentByClass<UGridObstacleComponent>()) {
+      bHasCustomFootprint = ObstacleComponent->GetCustomGridFootprint(GridComponent, Min, Max);
+    }
+
+    if (!bHasCustomFootprint) {
+      const FBox Bounds = Obstacle->GetComponentsBoundingBox(true);
+      if (Bounds.IsValid) {
+        const FIntPoint RawMin = GridComponent->WorldToGrid(Bounds.Min);
+        const FIntPoint RawMax = GridComponent->WorldToGrid(Bounds.Max);
+        Min.X = FMath::Min(RawMin.X, RawMax.X);
+        Min.Y = FMath::Min(RawMin.Y, RawMax.Y);
+        Max.X = FMath::Max(RawMin.X, RawMax.X);
+        Max.Y = FMath::Max(RawMin.Y, RawMax.Y);
+      } else {
+        const FIntPoint Anchor = GridComponent->WorldToGrid(Obstacle->GetActorLocation());
+        Min = Anchor;
+        Max = Anchor;
+      }
+    }
+
+    bool bAllCellsValid = true;
+    for (int32 Y = Min.Y; Y <= Max.Y; ++Y) {
+      for (int32 X = Min.X; X <= Max.X; ++X) {
+        const FIntPoint Cell(X, Y);
+        if (!GridComponent->IsCellInBounds(Cell)) {
+          bAllCellsValid = false;
+          break;
+        }
+        OutCells.Add(Cell);
+      }
+      if (!bAllCellsValid) {
+        break;
+      }
+    }
+
+    if (!bAllCellsValid) {
+      OutCells.Reset();
+      return false;
+    }
+
+    return OutCells.Num() > 0;
+  };
 
   for (const FObstacleSpawnPlan &Plan : SpawnPlans) {
     if (!Plan.Settings || !Plan.Settings->HasCandidates()) {
@@ -242,7 +298,13 @@ void AGridOverlayActor::SpawnRandomObstacles() {
       continue;
     }
 
-    for (int32 SpawnIndex = 0; SpawnIndex < Plan.Count && AvailableCells.Num() > 0; ++SpawnIndex) {
+    int32 SuccessfulSpawnCount = 0;
+    int32 Attempts = 0;
+    const int32 MaxAttempts = FMath::Max(AvailableCells.Num() * 4, 0);
+
+    while (SuccessfulSpawnCount < Plan.Count && AvailableCells.Num() > 0 && Attempts < MaxAttempts) {
+      Attempts++;
+
       const int32 CellIndex = RandomStream.RandRange(0, AvailableCells.Num() - 1);
       const FIntPoint Cell = AvailableCells[CellIndex];
       AvailableCells.RemoveAtSwap(CellIndex);
@@ -260,7 +322,8 @@ void AGridOverlayActor::SpawnRandomObstacles() {
 
       FHitResult HitResult;
       FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(SpawnRandomObstacles), false, this);
-      const bool bHitGround = World->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECC_WorldStatic, QueryParams);
+      const bool bHitGround =
+          World->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECC_WorldStatic, QueryParams);
 
       FVector SpawnLocation = bHitGround ? HitResult.Location : CellLocation;
       const float HeightOffset = RandomStream.FRandRange(ClampedMinHeightOffset, ClampedMaxHeightOffset);
@@ -268,19 +331,48 @@ void AGridOverlayActor::SpawnRandomObstacles() {
 
       FRotator SpawnRotation = FRotator::ZeroRotator;
       if (bHitGround) {
-        const FVector SurfaceNormal = HitResult.Normal.IsNearlyZero()
-                                          ? FVector::UpVector
-                                          : HitResult.Normal.GetSafeNormal();
+        const FVector SurfaceNormal =
+            HitResult.Normal.IsNearlyZero() ? FVector::UpVector : HitResult.Normal.GetSafeNormal();
         SpawnRotation = FRotationMatrix::MakeFromZ(SurfaceNormal).Rotator();
       }
 
       FActorSpawnParameters SpawnParams;
       SpawnParams.Owner = this;
-      SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+      SpawnParams.SpawnCollisionHandlingOverride =
+          ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
 
-      if (AGridObstacleActor *SpawnedActor = World->SpawnActor<AGridObstacleActor>(ObstacleClass, SpawnLocation, SpawnRotation, SpawnParams)) {
+      TArray<FIntPoint> BlockedCells;
+      if (AGridObstacleActor *SpawnedActor =
+              World->SpawnActor<AGridObstacleActor>(ObstacleClass, SpawnLocation, SpawnRotation, SpawnParams)) {
+        const bool bHasBlockedCells = ComputeBlockedCells(SpawnedActor, BlockedCells);
+
+        bool bHasConflict = !bHasBlockedCells;
+        if (!bHasConflict) {
+          for (const FIntPoint &BlockedCell : BlockedCells) {
+            if (ReservedCells.Contains(BlockedCell) || GridComponent->IsOccupied(BlockedCell) ||
+                GridComponent->IsObscured(BlockedCell)) {
+              bHasConflict = true;
+              break;
+            }
+          }
+        }
+
+        if (bHasConflict) {
+          SpawnedActor->Destroy();
+          continue;
+        }
+
+        for (const FIntPoint &BlockedCell : BlockedCells) {
+          ReservedCells.Add(BlockedCell);
+          AvailableCells.RemoveSingleSwap(BlockedCell);
+        }
+
         SpawnedObstacleActors.Add(SpawnedActor);
-        SpawnedObstacleCells.Add(Cell);
+        for (const FIntPoint &BlockedCell : BlockedCells) {
+          SpawnedObstacleCells.Add(BlockedCell);
+        }
+
+        SuccessfulSpawnCount++;
       }
     }
   }
