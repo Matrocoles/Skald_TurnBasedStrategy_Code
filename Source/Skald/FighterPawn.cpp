@@ -1071,21 +1071,35 @@ void AFighterPawn::FinalizeQueuedAttack() {
     }
   }
 
+  const bool bTargetShouldBeDestroyed =
+      Target && !Target->IsAlive() && !Target->IsActorBeingDestroyed();
+
   ClearQueuedAttackState(true);
 
-  if (Target && !Target->IsAlive() && !Target->IsActorBeingDestroyed()) {
-    if (UWorld *WorldPtr = GetWorld()) {
-      const TWeakObjectPtr<AFighterPawn> TargetPtr = Target;
-      WorldPtr->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateLambda(
-          [TargetPtr]() {
-            if (AFighterPawn *TargetPawn = TargetPtr.Get()) {
-              if (!TargetPawn->IsActorBeingDestroyed()) {
-                TargetPawn->Destroy();
+  if (bTargetShouldBeDestroyed) {
+    bool bHandledByBattleManager = false;
+
+    if (USkaldGameInstance *GI = Cast<USkaldGameInstance>(GetGameInstance())) {
+      if (UGridBattleManager *BattleManager = GI->GridBattleManager) {
+        bHandledByBattleManager =
+            BattleManager->RegisterPendingFighterDeath(Target);
+      }
+    }
+
+    if (!bHandledByBattleManager) {
+      if (UWorld *WorldPtr = GetWorld()) {
+        const TWeakObjectPtr<AFighterPawn> TargetPtr = Target;
+        WorldPtr->GetTimerManager().SetTimerForNextTick(
+            FTimerDelegate::CreateLambda([TargetPtr]() {
+              if (AFighterPawn *TargetPawn = TargetPtr.Get()) {
+                if (!TargetPawn->IsActorBeingDestroyed()) {
+                  TargetPawn->Destroy();
+                }
               }
-            }
-          }));
-    } else {
-      Target->Destroy();
+            }));
+      } else {
+        Target->Destroy();
+      }
     }
   }
 }
