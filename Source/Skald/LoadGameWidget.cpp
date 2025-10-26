@@ -8,6 +8,7 @@
 #include "SkaldSaveGame.h"
 #include "Skald_GameInstance.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
+#include "Templates/UnrealTemplate.h"
 #include "UI/InGameMenuWidget.h"
 #include "LobbyMenuWidget.h"
 
@@ -25,28 +26,20 @@ void ULoadGameWidget::NativeConstruct()
 {
     Super::NativeConstruct();
 
-    if (Slot0Button)
-    {
-        Slot0Button->OnClicked.AddDynamic(this, &ULoadGameWidget::OnLoadSlot0);
-        Slot0Button->SetVisibility(UGameplayStatics::DoesSaveGameExist(SlotNames[0], 0) ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
-    }
+    InitialiseSlotButton(Slot0Button, 0, &ULoadGameWidget::OnLoadSlot0);
+    InitialiseSlotButton(Slot1Button, 1, &ULoadGameWidget::OnLoadSlot1);
+    InitialiseSlotButton(Slot2Button, 2, &ULoadGameWidget::OnLoadSlot2);
+    BindButton(MainMenuButton, &ULoadGameWidget::OnMainMenu);
+}
 
-    if (Slot1Button)
-    {
-        Slot1Button->OnClicked.AddDynamic(this, &ULoadGameWidget::OnLoadSlot1);
-        Slot1Button->SetVisibility(UGameplayStatics::DoesSaveGameExist(SlotNames[1], 0) ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
-    }
+void ULoadGameWidget::NativeDestruct()
+{
+    UnbindButton(Slot0Button, &ULoadGameWidget::OnLoadSlot0);
+    UnbindButton(Slot1Button, &ULoadGameWidget::OnLoadSlot1);
+    UnbindButton(Slot2Button, &ULoadGameWidget::OnLoadSlot2);
+    UnbindButton(MainMenuButton, &ULoadGameWidget::OnMainMenu);
 
-    if (Slot2Button)
-    {
-        Slot2Button->OnClicked.AddDynamic(this, &ULoadGameWidget::OnLoadSlot2);
-        Slot2Button->SetVisibility(UGameplayStatics::DoesSaveGameExist(SlotNames[2], 0) ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
-    }
-
-    if (MainMenuButton)
-    {
-        MainMenuButton->OnClicked.AddDynamic(this, &ULoadGameWidget::OnMainMenu);
-    }
+    Super::NativeDestruct();
 }
 
 void ULoadGameWidget::OnLoadSlot0()
@@ -66,32 +59,16 @@ void ULoadGameWidget::OnLoadSlot2()
 
 void ULoadGameWidget::OnMainMenu()
 {
-    RemoveFromParent();
-
-    // Ensure no other widgets linger on the viewport and steal input
-    TArray<UUserWidget*> Widgets;
-    UWidgetBlueprintLibrary::GetAllWidgetsOfClass(this, Widgets, UUserWidget::StaticClass(), /*TopLevelOnly*/ true);
-    for (UUserWidget* Widget : Widgets)
-    {
-        if (Widget && Widget != OwningMenu.Get())
-        {
-            Widget->RemoveFromParent();
-        }
-    }
-
-    if (OwningMenu.IsValid())
-    {
-        if (UInGameMenuWidget* Menu = Cast<UInGameMenuWidget>(OwningMenu.Get()))
-        {
-            Menu->HandleSubMenuClosed(this);
-        }
-        // Re-enable the menu once the load-game widget closes
-        OwningMenu->SetVisibility(ESlateVisibility::Visible);
-    }
+    CleanupAndReturnToMenu();
 }
 
 void ULoadGameWidget::HandleLoadSlot(int32 SlotIndex)
 {
+    if (!IsValidSlotIndex(SlotIndex))
+    {
+        return;
+    }
+
     USkaldSaveGame* LoadedGame = Cast<USkaldSaveGame>(UGameplayStatics::LoadGameFromSlot(SlotNames[SlotIndex], 0));
     if (LoadedGame)
     {
@@ -116,5 +93,71 @@ void ULoadGameWidget::HandleLoadSlot(int32 SlotIndex)
     {
         UE_LOG(LogSkald, Error, TEXT("Failed to load save slot %s"), SlotNames[SlotIndex]);
     }
+}
+
+void ULoadGameWidget::BindButton(UButton* Button, void (ULoadGameWidget::*Handler)())
+{
+    if (Button)
+    {
+        Button->OnClicked.AddDynamic(this, Handler);
+    }
+}
+
+void ULoadGameWidget::UnbindButton(UButton* Button, void (ULoadGameWidget::*Handler)())
+{
+    if (Button)
+    {
+        Button->OnClicked.RemoveDynamic(this, Handler);
+    }
+}
+
+void ULoadGameWidget::InitialiseSlotButton(UButton* Button, int32 SlotIndex, void (ULoadGameWidget::*Handler)())
+{
+    if (!Button)
+    {
+        return;
+    }
+
+    if (!IsValidSlotIndex(SlotIndex))
+    {
+        Button->SetVisibility(ESlateVisibility::Collapsed);
+        return;
+    }
+
+    BindButton(Button, Handler);
+    const bool bHasSave = UGameplayStatics::DoesSaveGameExist(SlotNames[SlotIndex], 0);
+    Button->SetVisibility(bHasSave ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+}
+
+void ULoadGameWidget::CleanupAndReturnToMenu()
+{
+    RemoveFromParent();
+
+    // Ensure no other widgets linger on the viewport and steal input
+    TArray<UUserWidget*> Widgets;
+    UWidgetBlueprintLibrary::GetAllWidgetsOfClass(this, Widgets, UUserWidget::StaticClass(), /*TopLevelOnly*/ true);
+    for (UUserWidget* Widget : Widgets)
+    {
+        if (Widget && Widget != OwningMenu.Get())
+        {
+            Widget->RemoveFromParent();
+        }
+    }
+
+    if (OwningMenu.IsValid())
+    {
+        if (UInGameMenuWidget* Menu = Cast<UInGameMenuWidget>(OwningMenu.Get()))
+        {
+            Menu->HandleSubMenuClosed(this);
+        }
+
+        // Re-enable the menu once the load-game widget closes
+        OwningMenu->SetVisibility(ESlateVisibility::Visible);
+    }
+}
+
+bool ULoadGameWidget::IsValidSlotIndex(int32 SlotIndex) const
+{
+    return ensure(SlotIndex >= 0 && SlotIndex < UE_ARRAY_COUNT(SlotNames));
 }
 
