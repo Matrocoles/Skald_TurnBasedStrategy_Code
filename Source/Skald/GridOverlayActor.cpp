@@ -1,5 +1,5 @@
 #include "GridOverlayActor.h"
-#include "Algo/RandomShuffle.h"
+#include "Algo/Shuffle.h"
 #include "CollisionQueryParams.h"
 #include "Components/SceneComponent.h"
 #include "Engine/EngineTypes.h"
@@ -184,7 +184,7 @@ void AGridOverlayActor::SpawnRandomObstacles() {
     return;
   }
 
-  Algo::RandomShuffle(PotentialAnchors, RandomStream);
+  Algo::Shuffle(PotentialAnchors, RandomStream);
 
   if (PotentialAnchors.Num() < TotalSpawnCount) {
     int32 CellsRemaining = PotentialAnchors.Num();
