@@ -12,6 +12,7 @@ class UButton;
 class UImage;
 class UTextBlock;
 class UVerticalBox;
+class USkaldPlayerListEntryWidget;
 class ATerritory;
 class UConfirmAttackWidget;
 class UPrepareForBattleWidget;
@@ -415,6 +416,10 @@ public:
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
             meta = (BindWidget))
   UVerticalBox *PlayerListBox;
+
+  /** Optional widget class used when spawning player list entries. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skald|Widgets")
+  TSubclassOf<USkaldPlayerListEntryWidget> PlayerListEntryWidgetClass;
 
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
             meta = (BindWidget))
