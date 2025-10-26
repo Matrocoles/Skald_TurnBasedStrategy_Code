@@ -1596,7 +1596,7 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
       GI->bResumeTurns = LoadedGame->bTurnsStarted;
 
       if (GI->bResumeTurns) {
-        bResumedTurns = TurnManager->TryResumeSavedTurnState(GI);
+        bResumedTurns = TurnManager->AttemptResumeSavedTurnState();
         if (!bResumedTurns) {
           GI->bResumeTurns = false;
         }
