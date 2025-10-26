@@ -17,6 +17,17 @@ void UGridObstacleComponent::BeginPlay() {
   }
 }
 
+void UGridObstacleComponent::OnComponentDestroyed(bool bDestroyingHierarchy) {
+  if (UWorld *World = GetWorld()) {
+    if (UGridOverlayComponent *Grid =
+            Skald::GridOverlay::FindActiveGridOverlay(World)) {
+      Grid->UnregisterObstacle(this);
+    }
+  }
+
+  Super::OnComponentDestroyed(bDestroyingHierarchy);
+}
+
 bool UGridObstacleComponent::GetCustomGridFootprint(const UGridOverlayComponent *Grid,
                                                     FIntPoint &OutMin,
                                                     FIntPoint &OutMax) const {

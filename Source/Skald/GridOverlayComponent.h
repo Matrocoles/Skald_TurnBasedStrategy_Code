@@ -146,6 +146,9 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Grid")
   void RegisterObstacle(UGridObstacleComponent *Obstacle);
 
+  /** Remove an obstacle component so the grid no longer treats it as blocking. */
+  void UnregisterObstacle(UGridObstacleComponent *Obstacle);
+
   /** Clear any static obstacle state associated with the given cell. */
   void ClearStaticObstacleAtCell(const FIntPoint &GridCoord);
 

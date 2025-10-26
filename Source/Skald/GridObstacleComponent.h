@@ -18,6 +18,7 @@ public:
   UGridObstacleComponent();
 
   virtual void BeginPlay() override;
+  virtual void OnComponentDestroyed(bool bDestroyingHierarchy) override;
 
   /** Whether this obstacle blocks unit movement. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid")
