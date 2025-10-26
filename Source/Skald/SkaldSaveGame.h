@@ -32,6 +32,22 @@ public:
     UPROPERTY(BlueprintReadWrite, Category="SaveGame", SaveGame)
     int32 CurrentPlayerIndex = 0;
 
+    /** Saved turn manager index for the active controller. */
+    UPROPERTY(BlueprintReadWrite, Category="SaveGame", SaveGame)
+    int32 SavedTurnIndex = 0;
+
+    /** Identifier of the player whose turn was active when saving. */
+    UPROPERTY(BlueprintReadWrite, Category="SaveGame", SaveGame)
+    int32 SavedTurnPlayerID = 0;
+
+    /** Phase that was active when the game was saved. */
+    UPROPERTY(BlueprintReadWrite, Category="SaveGame", SaveGame)
+    ETurnPhase SavedTurnPhase = ETurnPhase::Reinforcement;
+
+    /** Tracks whether turns had started when the game was saved. */
+    UPROPERTY(BlueprintReadWrite, Category="SaveGame", SaveGame)
+    bool bTurnsStarted = false;
+
     /** Stored territory state data. */
     UPROPERTY(BlueprintReadWrite, Category="SaveGame", SaveGame)
     TArray<FS_Territory> Territories;

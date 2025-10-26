@@ -1586,8 +1586,61 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
 
   if (TurnManager) {
     TurnManager->SortControllersByInitiative();
-    for (int32 i = 0; i < LoadedGame->CurrentPlayerIndex; ++i) {
-      TurnManager->AdvanceTurn();
+
+    USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+    bool bResumedTurns = false;
+    if (GI) {
+      GI->SavedTurnIndex = LoadedGame->SavedTurnIndex;
+      GI->SavedTurnPlayerId = LoadedGame->SavedTurnPlayerID;
+      GI->SavedTurnPhase = LoadedGame->SavedTurnPhase;
+      GI->bResumeTurns = LoadedGame->bTurnsStarted;
+
+      if (GI->bResumeTurns) {
+        bResumedTurns = TurnManager->TryResumeSavedTurnState(GI);
+        if (!bResumedTurns) {
+          GI->bResumeTurns = false;
+        }
+      }
+    }
+
+    if (!bResumedTurns) {
+      if (GI) {
+        GI->bResumeTurns = false;
+      }
+
+      if (!TurnManager->HasTurnsStarted()) {
+        TurnManager->StartTurns();
+      }
+
+      const TArray<ASkaldPlayerController *> Controllers =
+          TurnManager->GetControllers();
+      if (Controllers.Num() > 0) {
+        int32 TargetIndex = LoadedGame->SavedTurnIndex;
+        if (!Controllers.IsValidIndex(TargetIndex)) {
+          if (LoadedGame->SavedTurnPlayerID > 0) {
+            TargetIndex = Controllers.IndexOfByPredicate(
+                [LoadedGame](ASkaldPlayerController *Controller) {
+                  if (!Controller) {
+                    return false;
+                  }
+                  if (ASkaldPlayerState *PS =
+                          Controller->GetPlayerState<ASkaldPlayerState>()) {
+                    return PS->GetPlayerId() == LoadedGame->SavedTurnPlayerID;
+                  }
+                  return false;
+                });
+          }
+
+          if (!Controllers.IsValidIndex(TargetIndex)) {
+            TargetIndex = FMath::Clamp(LoadedGame->CurrentPlayerIndex, 0,
+                                       Controllers.Num() - 1);
+          }
+        }
+
+        for (int32 i = 0; i < TargetIndex; ++i) {
+          TurnManager->AdvanceTurn();
+        }
+      }
     }
   }
 }
@@ -2436,8 +2489,37 @@ void ASkaldGameMode::FillSaveGame(USkaldSaveGame *SaveGameObject) const {
 
   // Store basic turn information.
   SaveGameObject->TurnNumber = 0; // Turn tracking not yet implemented
+  SaveGameObject->SavedTurnPhase = ETurnPhase::Reinforcement;
+  SaveGameObject->SavedTurnIndex = 0;
+  SaveGameObject->SavedTurnPlayerID = 0;
+  SaveGameObject->bTurnsStarted = false;
+  if (const ATurnManager *Manager = GetTurnManager()) {
+    SaveGameObject->SavedTurnPhase = Manager->GetCurrentPhase();
+    SaveGameObject->SavedTurnIndex = Manager->GetCurrentControllerIndex();
+    SaveGameObject->bTurnsStarted = Manager->HasTurnsStarted();
+
+    const TArray<ASkaldPlayerController *> Controllers =
+        Manager->GetControllers();
+    if (Controllers.IsValidIndex(SaveGameObject->SavedTurnIndex)) {
+      if (ASkaldPlayerController *ActiveController =
+              Controllers[SaveGameObject->SavedTurnIndex]) {
+        if (ASkaldPlayerState *ActiveState =
+                ActiveController->GetPlayerState<ASkaldPlayerState>()) {
+          SaveGameObject->SavedTurnPlayerID = ActiveState->GetPlayerId();
+        }
+      }
+    }
+  }
+
   if (const ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
     SaveGameObject->CurrentPlayerIndex = GS->CurrentTurnIndex;
+    if (SaveGameObject->SavedTurnPlayerID <= 0 &&
+        GS->PlayerArray.IsValidIndex(GS->CurrentTurnIndex)) {
+      if (const ASkaldPlayerState *ActiveState =
+              Cast<ASkaldPlayerState>(GS->PlayerArray[GS->CurrentTurnIndex])) {
+        SaveGameObject->SavedTurnPlayerID = ActiveState->GetPlayerId();
+      }
+    }
   }
 
   // Preserve current camera position and zoom so the view can be restored
