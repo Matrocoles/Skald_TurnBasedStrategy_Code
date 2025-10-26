@@ -607,6 +607,9 @@ protected:
   void ShowPrepareForBattlePromptLocal_Internal(
       const FPrepareForBattlePromptData &PromptData);
 
+  /** Set up the main HUD widget for the local player. */
+  virtual void InitializeHUDWidget();
+
 private:
   /** Display the stored strategic initiative roll if one is pending. */
   void ShowPendingStrategicInitiativeResult();
@@ -615,9 +618,6 @@ private:
 
   /** Cache references to key game singletons and bind delegates. */
   void CacheGameReferences();
-
-  /** Set up the main HUD widget for the local player. */
-  void InitializeHUDWidget();
 
   /** Create the faction selection widget for the local player. */
   void InitializeChoosePlayerWidget();
