@@ -81,7 +81,7 @@ void ASkaldAIController::BeginPlay() {
 void ASkaldAIController::StartTurn() {
   DecisionIterationCount = 0;
   bAwaitingBattleTransition = false;
-  bAppliedReinforcementsThisStep = false;
+  bPendingPhaseAdvance = false;
   ClearDecisionTimers();
   MakeAIDecision();
 }
@@ -89,6 +89,7 @@ void ASkaldAIController::StartTurn() {
 void ASkaldAIController::EndTurn() {
   ClearDecisionTimers();
   bAwaitingBattleTransition = false;
+  bPendingPhaseAdvance = false;
   ClearEnemyTurnStatus();
   Super::EndTurn();
 }
@@ -101,6 +102,11 @@ void ASkaldAIController::ProcessCurrentPhase() {
            TEXT("ProcessCurrentPhase called without a valid TurnManager"));
     EndTurn();
     return;
+  }
+
+  if (bPendingPhaseAdvance) {
+    bPendingPhaseAdvance = false;
+    TurnManager->AdvancePhase();
   }
 
   if (bAwaitingBattleTransition) {
@@ -141,13 +147,11 @@ void ASkaldAIController::ProcessCurrentPhase() {
 
   const ETurnPhase Phase = TurnManager->GetCurrentPhase();
   if (Phase == ETurnPhase::Revolt) {
-    UE_LOG(LogSkald, Log,
-           TEXT("AI decision encountered Revolt phase; ending turn"));
+    UE_LOG(LogSkald, Log, TEXT("AI decision completed in %d steps"),
+           DecisionIterationCount);
     EndTurn();
     return;
   }
-
-  const ETurnPhase PrevPhase = Phase;
 
   if (Phase == ETurnPhase::ArmyPlacement) {
     ClearEnemyTurnStatus();
@@ -173,13 +177,14 @@ void ASkaldAIController::ProcessCurrentPhase() {
     TurnManager->BroadcastDeployableUnits(PS);
     TurnManager->BroadcastResources(PS);
 
-    bAppliedReinforcementsThisStep = true;
     if (TurnManager->HasTurnsStarted()) {
-      TurnManager->AdvancePhase();
+      const float ReinforcementDelay =
+          FMath::Max(EnemyTurnStepDelay, ReinforcementPostDeployDelay);
+      SchedulePhaseAdvance(ReinforcementDelay);
     } else {
       EndTurn();
-      return;
     }
+    return;
   } else if (Phase == ETurnPhase::Attack) {
     if (TurnManager->HasPendingBattlePreparation()) {
       bAwaitingBattleTransition = true;
@@ -226,12 +231,18 @@ void ASkaldAIController::ProcessCurrentPhase() {
       }
     }
 
-    if (!bAwaitingBattleTransition) {
-      TurnManager->AdvancePhase();
+    if (bAwaitingBattleTransition) {
+      BroadcastEnemyTurnStatus(FString(EnemyBattleTransitionMessage));
+      ScheduleNextDecisionStep(EnemyBattleTransitionPollDelay);
+      return;
     }
+
+    SchedulePhaseAdvance(EnemyTurnStepDelay);
+    return;
   } else if (Phase == ETurnPhase::Engineering ||
              Phase == ETurnPhase::Treasure) {
-    TurnManager->AdvancePhase();
+    SchedulePhaseAdvance(EnemyTurnStepDelay);
+    return;
   } else if (Phase == ETurnPhase::Movement) {
     auto CountEnemyNeighbors = [PS](ATerritory *Territory) {
       int32 Count = 0;
@@ -304,9 +315,11 @@ void ASkaldAIController::ProcessCurrentPhase() {
       }
     }
 
-    TurnManager->AdvancePhase();
+    SchedulePhaseAdvance(EnemyTurnStepDelay);
+    return;
   } else if (Phase == ETurnPhase::EndTurn) {
-    TurnManager->AdvancePhase();
+    SchedulePhaseAdvance(EnemyTurnStepDelay);
+    return;
   } else {
     UE_LOG(LogSkald, Warning,
            TEXT("ProcessCurrentPhase encountered unexpected phase %s"),
@@ -315,37 +328,6 @@ void ASkaldAIController::ProcessCurrentPhase() {
     return;
   }
 
-  const ETurnPhase CurrentPhase = TurnManager->GetCurrentPhase();
-
-  if (bAwaitingBattleTransition) {
-    BroadcastEnemyTurnStatus(FString(EnemyBattleTransitionMessage));
-    ScheduleNextDecisionStep(EnemyBattleTransitionPollDelay);
-    return;
-  }
-
-  if (CurrentPhase == ETurnPhase::Revolt) {
-    UE_LOG(LogSkald, Log, TEXT("AI decision completed in %d steps"),
-           DecisionIterationCount);
-    EndTurn();
-    return;
-  }
-
-  if (CurrentPhase == PrevPhase) {
-    UE_LOG(LogSkald, Warning,
-           TEXT("ProcessCurrentPhase phase %s did not advance; ending turn"),
-           *UEnum::GetValueAsString(CurrentPhase));
-    EndTurn();
-    return;
-  }
-
-  BroadcastEnemyTurnStatus(FString(EnemyPlanningMessage));
-  float NextDecisionDelay = EnemyTurnStepDelay;
-  if (bAppliedReinforcementsThisStep) {
-    NextDecisionDelay = ReinforcementPostDeployDelay;
-    bAppliedReinforcementsThisStep = false;
-  }
-
-  ScheduleNextDecisionStep(NextDecisionDelay);
 }
 
 void ASkaldAIController::ScheduleNextDecisionStep(float DelaySeconds) {
@@ -355,6 +337,12 @@ void ASkaldAIController::ScheduleNextDecisionStep(float DelaySeconds) {
                                       &ASkaldAIController::ProcessCurrentPhase,
                                       FMath::Max(DelaySeconds, 0.f), false);
   }
+}
+
+void ASkaldAIController::SchedulePhaseAdvance(float DelaySeconds) {
+  bPendingPhaseAdvance = true;
+  BroadcastEnemyTurnStatus(FString(EnemyPlanningMessage));
+  ScheduleNextDecisionStep(DelaySeconds);
 }
 
 void ASkaldAIController::ClearDecisionTimers() {
