@@ -34,6 +34,7 @@ private:
 
   void ProcessCurrentPhase();
   void ScheduleNextDecisionStep(float DelaySeconds);
+  void SchedulePhaseAdvance(float DelaySeconds);
   void ClearDecisionTimers();
   void BroadcastEnemyTurnStatus(const FString &Message);
   void ClearEnemyTurnStatus();
@@ -94,8 +95,8 @@ private:
   /** Tracks the number of decision steps processed this turn. */
   int32 DecisionIterationCount = 0;
 
-  /** Tracks whether reinforcements were deployed during the current step. */
-  bool bAppliedReinforcementsThisStep = false;
+  /** Tracks whether a phase advance should occur on the next decision step. */
+  bool bPendingPhaseAdvance = false;
 
   /** Time between AI phase processing steps on the world map. */
   UPROPERTY(EditAnywhere, Category = "Turn|AI", meta = (ClampMin = "0.0"))
