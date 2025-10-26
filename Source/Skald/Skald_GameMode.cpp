@@ -1876,10 +1876,10 @@ int32 ASkaldGameMode::ResolveExpectedControllerCount() const {
     for (const APlayerState *PlayerStateBase : GS->PlayerArray) {
       const ASkaldPlayerState *PS =
           Cast<ASkaldPlayerState>(PlayerStateBase);
-      const ASkaldPlayerController *Owner =
+      const ASkaldPlayerController *ControllerOwner =
           PS ? Cast<ASkaldPlayerController>(PS->GetOwner()) : nullptr;
-      if (Owner) {
-        UniqueControllers.Add(Owner);
+      if (ControllerOwner) {
+        UniqueControllers.Add(ControllerOwner);
       }
     }
     ExpectedCount = UniqueControllers.Num();
