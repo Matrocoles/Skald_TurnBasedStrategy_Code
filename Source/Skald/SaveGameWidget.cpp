@@ -25,18 +25,48 @@ void USaveGameWidget::NativeConstruct()
 {
     Super::NativeConstruct();
 
-    BindButton(Slot0Button, &USaveGameWidget::OnSaveSlot0);
-    BindButton(Slot1Button, &USaveGameWidget::OnSaveSlot1);
-    BindButton(Slot2Button, &USaveGameWidget::OnSaveSlot2);
-    BindButton(MainMenuButton, &USaveGameWidget::OnMainMenu);
+    if (Slot0Button)
+    {
+        Slot0Button->OnClicked.AddDynamic(this, &USaveGameWidget::OnSaveSlot0);
+    }
+
+    if (Slot1Button)
+    {
+        Slot1Button->OnClicked.AddDynamic(this, &USaveGameWidget::OnSaveSlot1);
+    }
+
+    if (Slot2Button)
+    {
+        Slot2Button->OnClicked.AddDynamic(this, &USaveGameWidget::OnSaveSlot2);
+    }
+
+    if (MainMenuButton)
+    {
+        MainMenuButton->OnClicked.AddDynamic(this, &USaveGameWidget::OnMainMenu);
+    }
 }
 
 void USaveGameWidget::NativeDestruct()
 {
-    UnbindButton(Slot0Button, &USaveGameWidget::OnSaveSlot0);
-    UnbindButton(Slot1Button, &USaveGameWidget::OnSaveSlot1);
-    UnbindButton(Slot2Button, &USaveGameWidget::OnSaveSlot2);
-    UnbindButton(MainMenuButton, &USaveGameWidget::OnMainMenu);
+    if (Slot0Button)
+    {
+        Slot0Button->OnClicked.RemoveDynamic(this, &USaveGameWidget::OnSaveSlot0);
+    }
+
+    if (Slot1Button)
+    {
+        Slot1Button->OnClicked.RemoveDynamic(this, &USaveGameWidget::OnSaveSlot1);
+    }
+
+    if (Slot2Button)
+    {
+        Slot2Button->OnClicked.RemoveDynamic(this, &USaveGameWidget::OnSaveSlot2);
+    }
+
+    if (MainMenuButton)
+    {
+        MainMenuButton->OnClicked.RemoveDynamic(this, &USaveGameWidget::OnMainMenu);
+    }
 
     Super::NativeDestruct();
 }
@@ -78,22 +108,6 @@ void USaveGameWidget::HandleSaveSlot(int32 SlotIndex)
     else
     {
         UE_LOG(LogSkald, Error, TEXT("Failed to save slot %s"), SlotNames[SlotIndex]);
-    }
-}
-
-void USaveGameWidget::BindButton(UButton* Button, void (USaveGameWidget::*Handler)())
-{
-    if (Button)
-    {
-        Button->OnClicked.AddDynamic(this, Handler);
-    }
-}
-
-void USaveGameWidget::UnbindButton(UButton* Button, void (USaveGameWidget::*Handler)())
-{
-    if (Button)
-    {
-        Button->OnClicked.RemoveDynamic(this, Handler);
     }
 }
 
