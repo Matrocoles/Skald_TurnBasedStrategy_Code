@@ -197,6 +197,20 @@ void ASkaldPlayerController::InitializeHUDWidget() {
     return;
   }
 
+  if (!IsLocalPlayerController()) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("InitializeHUDWidget skipped: controller %s is not local."),
+           *GetName());
+    return;
+  }
+
+  if (!GetLocalPlayer()) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("InitializeHUDWidget skipped: controller %s has no local player."),
+           *GetName());
+    return;
+  }
+
   MainHUD = CreateWidget<USkaldMainHUDWidget>(this, MainHUDClass);
   if (!MainHUD) {
     return;
