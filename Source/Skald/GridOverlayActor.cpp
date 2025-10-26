@@ -1,14 +1,12 @@
 #include "GridOverlayActor.h"
-#include "Algo/RandomShuffle.h"
-#include "CollisionQueryParams.h"
 #include "Components/SceneComponent.h"
 #include "Engine/EngineTypes.h"
-#include "Engine/HitResult.h"
 #include "Engine/World.h"
 #include "GridObstacleActor.h"
-#include "GridObstacleComponent.h"
 #include "GridOverlayComponent.h"
 #include "Math/RotationMatrix.h"
+#include "CollisionQueryParams.h"
+#include "Engine/HitResult.h"
 
 namespace {
 constexpr float kSmallHeightEpsilon = 0.01f;
@@ -165,29 +163,53 @@ void AGridOverlayActor::SpawnRandomObstacles() {
   const float ClampedMinHeightOffset = FMath::Min(MinObstacleHeightOffset, MaxObstacleHeightOffset);
   const float ClampedMaxHeightOffset = FMath::Max(MinObstacleHeightOffset, MaxObstacleHeightOffset);
 
-  TArray<FIntPoint> PotentialAnchors;
-  PotentialAnchors.Reserve(MaxCells);
-  for (int32 CellY = 0; CellY < GridHeight; ++CellY) {
-    for (int32 CellX = ReservedColumns; CellX < GridWidth - ReservedColumns; ++CellX) {
-      const FIntPoint Cell(CellX, CellY);
-      if (!GridComponent->IsCellInBounds(Cell)) {
-        continue;
-      }
-      if (GridComponent->IsOccupied(Cell) || GridComponent->IsObscured(Cell)) {
-        continue;
-      }
-      PotentialAnchors.Add(Cell);
+  TSet<FIntPoint> CandidateCells;
+  CandidateCells.Reserve(TotalSpawnCount);
+
+  const int32 MaxIterations = TotalSpawnCount * 10;
+  int32 IterationCount = 0;
+  while (CandidateCells.Num() < TotalSpawnCount && IterationCount < MaxIterations) {
+    IterationCount++;
+
+    const int32 MinCellX = ReservedColumns;
+    const int32 MaxCellX = GridWidth - ReservedColumns - 1;
+    if (MaxCellX < MinCellX) {
+      break;
     }
+
+    const int32 CellX = RandomStream.RandRange(MinCellX, MaxCellX);
+    const int32 CellY = RandomStream.RandRange(0, GridHeight - 1);
+    const FIntPoint Cell(CellX, CellY);
+
+    if (!GridComponent->IsCellInBounds(Cell)) {
+      continue;
+    }
+
+    if (ReservedColumns > 0) {
+      const bool bInAttackerLane = CellX < ReservedColumns;
+      const bool bInDefenderLane = CellX >= GridWidth - ReservedColumns;
+      if (bInAttackerLane || bInDefenderLane) {
+        continue;
+      }
+    }
+
+    if (CandidateCells.Contains(Cell)) {
+      continue;
+    }
+
+    if (GridComponent->IsOccupied(Cell) || GridComponent->IsObscured(Cell)) {
+      continue;
+    }
+
+    CandidateCells.Add(Cell);
   }
 
-  if (PotentialAnchors.Num() == 0) {
+  if (CandidateCells.Num() == 0) {
     return;
   }
 
-  Algo::RandomShuffle(PotentialAnchors, RandomStream);
-
-  if (PotentialAnchors.Num() < TotalSpawnCount) {
-    int32 CellsRemaining = PotentialAnchors.Num();
+  if (CandidateCells.Num() < TotalSpawnCount) {
+    int32 CellsRemaining = CandidateCells.Num();
     for (FObstacleSpawnPlan &Plan : SpawnPlans) {
       if (CellsRemaining <= 0) {
         Plan.Count = 0;
@@ -208,51 +230,7 @@ void AGridOverlayActor::SpawnRandomObstacles() {
     return;
   }
 
-  struct FObstacleFootprint {
-    FIntPoint MinOffset = FIntPoint::ZeroValue;
-    FIntPoint MaxOffset = FIntPoint::ZeroValue;
-  };
-
-  TMap<const UClass *, FObstacleFootprint> FootprintCache;
-  FootprintCache.Reserve(32);
-
-  auto GetFootprint = [&](const TSubclassOf<AGridObstacleActor> &ObstacleClass)
-                          -> const FObstacleFootprint & {
-    static const FObstacleFootprint DefaultFootprint;
-    const UClass *ClassPtr = ObstacleClass.Get();
-    if (!ClassPtr) {
-      return DefaultFootprint;
-    }
-
-    if (const FObstacleFootprint *ExistingFootprint = FootprintCache.Find(ClassPtr)) {
-      return *ExistingFootprint;
-    }
-
-    FObstacleFootprint ComputedFootprint;
-    if (const AGridObstacleActor *DefaultActor = ClassPtr->GetDefaultObject<AGridObstacleActor>()) {
-      if (const UGridObstacleComponent *ObstacleComponent =
-              DefaultActor->FindComponentByClass<UGridObstacleComponent>()) {
-        if (ObstacleComponent->bOverrideBlockedCells) {
-          ComputedFootprint.MinOffset.X = FMath::Min(ObstacleComponent->CustomBlockedCellsMin.X,
-                                                    ObstacleComponent->CustomBlockedCellsMax.X);
-          ComputedFootprint.MinOffset.Y = FMath::Min(ObstacleComponent->CustomBlockedCellsMin.Y,
-                                                    ObstacleComponent->CustomBlockedCellsMax.Y);
-          ComputedFootprint.MaxOffset.X = FMath::Max(ObstacleComponent->CustomBlockedCellsMin.X,
-                                                    ObstacleComponent->CustomBlockedCellsMax.X);
-          ComputedFootprint.MaxOffset.Y = FMath::Max(ObstacleComponent->CustomBlockedCellsMin.Y,
-                                                    ObstacleComponent->CustomBlockedCellsMax.Y);
-        }
-      }
-    }
-
-    return FootprintCache.Add(ClassPtr, ComputedFootprint);
-  };
-
-  TArray<FIntPoint> FootprintCells;
-  FootprintCells.Reserve(8);
-
-  TSet<FIntPoint> ReservedFootprintCells;
-  ReservedFootprintCells.Reserve(TotalSpawnCount * 4);
+  TArray<FIntPoint> AvailableCells = CandidateCells.Array();
 
   for (const FObstacleSpawnPlan &Plan : SpawnPlans) {
     if (!Plan.Settings || !Plan.Settings->HasCandidates()) {
@@ -264,10 +242,10 @@ void AGridOverlayActor::SpawnRandomObstacles() {
       continue;
     }
 
-    for (int32 SpawnIndex = 0; SpawnIndex < Plan.Count; ++SpawnIndex) {
-      if (ReservedFootprintCells.Num() >= PotentialAnchors.Num()) {
-        break;
-      }
+    for (int32 SpawnIndex = 0; SpawnIndex < Plan.Count && AvailableCells.Num() > 0; ++SpawnIndex) {
+      const int32 CellIndex = RandomStream.RandRange(0, AvailableCells.Num() - 1);
+      const FIntPoint Cell = AvailableCells[CellIndex];
+      AvailableCells.RemoveAtSwap(CellIndex);
 
       const int32 ClassIndex = RandomStream.RandRange(0, Candidates.Num() - 1);
       const TSubclassOf<AGridObstacleActor> ObstacleClass = Candidates[ClassIndex];
@@ -275,99 +253,34 @@ void AGridOverlayActor::SpawnRandomObstacles() {
         continue;
       }
 
-      const FObstacleFootprint &Footprint = GetFootprint(ObstacleClass);
+      const FVector CellLocation = GridComponent->GridToWorld(Cell);
+      const FVector TraceOffset = FVector::UpVector * FMath::Max(ObstacleTraceHeight, kSmallHeightEpsilon);
+      const FVector TraceStart = CellLocation + TraceOffset;
+      const FVector TraceEnd = CellLocation - TraceOffset;
 
-      bool bSpawnedObstacle = false;
-      for (const FIntPoint &AnchorCell : PotentialAnchors) {
-        FootprintCells.Reset();
+      FHitResult HitResult;
+      FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(SpawnRandomObstacles), false, this);
+      const bool bHitGround = World->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECC_WorldStatic, QueryParams);
 
-        const int32 MinCellX = AnchorCell.X + Footprint.MinOffset.X;
-        const int32 MaxCellX = AnchorCell.X + Footprint.MaxOffset.X;
-        const int32 MinCellY = AnchorCell.Y + Footprint.MinOffset.Y;
-        const int32 MaxCellY = AnchorCell.Y + Footprint.MaxOffset.Y;
+      FVector SpawnLocation = bHitGround ? HitResult.Location : CellLocation;
+      const float HeightOffset = RandomStream.FRandRange(ClampedMinHeightOffset, ClampedMaxHeightOffset);
+      SpawnLocation.Z += HeightOffset;
 
-        for (int32 CellX = MinCellX; CellX <= MaxCellX; ++CellX) {
-          for (int32 CellY = MinCellY; CellY <= MaxCellY; ++CellY) {
-            FootprintCells.Emplace(CellX, CellY);
-          }
-        }
-
-        if (!FootprintCells.Contains(AnchorCell)) {
-          FootprintCells.Add(AnchorCell);
-        }
-
-        bool bBlocked = false;
-        for (const FIntPoint &FootprintCell : FootprintCells) {
-          if (!GridComponent->IsCellInBounds(FootprintCell)) {
-            bBlocked = true;
-            break;
-          }
-
-          if (ReservedColumns > 0) {
-            const bool bInAttackerLane = FootprintCell.X < ReservedColumns;
-            const bool bInDefenderLane = FootprintCell.X >= GridWidth - ReservedColumns;
-            if (bInAttackerLane || bInDefenderLane) {
-              bBlocked = true;
-              break;
-            }
-          }
-
-          if (ReservedFootprintCells.Contains(FootprintCell)) {
-            bBlocked = true;
-            break;
-          }
-
-          if (GridComponent->IsOccupied(FootprintCell) || GridComponent->IsObscured(FootprintCell)) {
-            bBlocked = true;
-            break;
-          }
-        }
-
-        if (bBlocked) {
-          continue;
-        }
-
-        const FVector CellLocation = GridComponent->GridToWorld(AnchorCell);
-        const FVector TraceOffset = FVector::UpVector * FMath::Max(ObstacleTraceHeight, kSmallHeightEpsilon);
-        const FVector TraceStart = CellLocation + TraceOffset;
-        const FVector TraceEnd = CellLocation - TraceOffset;
-
-        FHitResult HitResult;
-        FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(SpawnRandomObstacles), false, this);
-        const bool bHitGround =
-            World->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECC_WorldStatic, QueryParams);
-
-        FVector SpawnLocation = bHitGround ? HitResult.Location : CellLocation;
-        const float HeightOffset = RandomStream.FRandRange(ClampedMinHeightOffset, ClampedMaxHeightOffset);
-        SpawnLocation.Z += HeightOffset;
-
-        FRotator SpawnRotation = FRotator::ZeroRotator;
-        if (bHitGround) {
-          const FVector SurfaceNormal = HitResult.Normal.IsNearlyZero()
-                                            ? FVector::UpVector
-                                            : HitResult.Normal.GetSafeNormal();
-          SpawnRotation = FRotationMatrix::MakeFromZ(SurfaceNormal).Rotator();
-        }
-
-        FActorSpawnParameters SpawnParams;
-        SpawnParams.Owner = this;
-        SpawnParams.SpawnCollisionHandlingOverride =
-            ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-
-        if (AGridObstacleActor *SpawnedActor =
-                World->SpawnActor<AGridObstacleActor>(ObstacleClass, SpawnLocation, SpawnRotation, SpawnParams)) {
-          SpawnedObstacleActors.Add(SpawnedActor);
-          for (const FIntPoint &FootprintCell : FootprintCells) {
-            ReservedFootprintCells.Add(FootprintCell);
-            SpawnedObstacleCells.Add(FootprintCell);
-          }
-          bSpawnedObstacle = true;
-          break;
-        }
+      FRotator SpawnRotation = FRotator::ZeroRotator;
+      if (bHitGround) {
+        const FVector SurfaceNormal = HitResult.Normal.IsNearlyZero()
+                                          ? FVector::UpVector
+                                          : HitResult.Normal.GetSafeNormal();
+        SpawnRotation = FRotationMatrix::MakeFromZ(SurfaceNormal).Rotator();
       }
 
-      if (!bSpawnedObstacle) {
-        break;
+      FActorSpawnParameters SpawnParams;
+      SpawnParams.Owner = this;
+      SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+
+      if (AGridObstacleActor *SpawnedActor = World->SpawnActor<AGridObstacleActor>(ObstacleClass, SpawnLocation, SpawnRotation, SpawnParams)) {
+        SpawnedObstacleActors.Add(SpawnedActor);
+        SpawnedObstacleCells.Add(Cell);
       }
     }
   }
