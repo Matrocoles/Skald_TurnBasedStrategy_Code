@@ -36,6 +36,7 @@ public:
 
 protected:
     virtual void NativeConstruct() override;
+    virtual void NativeDestruct() override;
 
     UFUNCTION(BlueprintCallable)
     void OnLoadSlot0();
@@ -52,6 +53,12 @@ protected:
 private:
     /** Shared implementation for the individual load slot handlers. */
     void HandleLoadSlot(int32 SlotIndex);
+
+    void BindButton(UButton* Button, void (ULoadGameWidget::*Handler)());
+    void UnbindButton(UButton* Button, void (ULoadGameWidget::*Handler)());
+    void InitialiseSlotButton(UButton* Button, int32 SlotIndex, void (ULoadGameWidget::*Handler)());
+    void CleanupAndReturnToMenu();
+    bool IsValidSlotIndex(int32 SlotIndex) const;
 
     UPROPERTY()
     /** Weak reference back to the lobby so it can be re-enabled when closing. */
