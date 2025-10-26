@@ -1368,6 +1368,27 @@ bool ASkaldPlayerController::ValidateAttack(int32 FromID, int32 ToID,
     return false;
   }
 
+  if (!TurnManager) {
+    if (OutError) {
+      *OutError = TEXT("Turn system unavailable");
+    }
+    return false;
+  }
+
+  if (!IsMyTurn()) {
+    if (OutError) {
+      *OutError = TEXT("It is not your turn");
+    }
+    return false;
+  }
+
+  if (TurnManager->GetCurrentPhase() != ETurnPhase::Attack) {
+    if (OutError) {
+      *OutError = TEXT("Attacks can only be made during the attack phase");
+    }
+    return false;
+  }
+
   AWorldMap *WorldMap = Cast<AWorldMap>(
       UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
   if (!WorldMap) {
@@ -1382,6 +1403,21 @@ bool ASkaldPlayerController::ValidateAttack(int32 FromID, int32 ToID,
   if (!Source || !Target) {
     if (OutError) {
       *OutError = TEXT("Invalid territory selection");
+    }
+    return false;
+  }
+
+  ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
+  if (!PS) {
+    if (OutError) {
+      *OutError = TEXT("Missing player state");
+    }
+    return false;
+  }
+
+  if (Source->OwningPlayer != PS) {
+    if (OutError) {
+      *OutError = TEXT("You may only attack from territories you control");
     }
     return false;
   }
@@ -1744,6 +1780,34 @@ void ASkaldPlayerController::ServerDeployUnits_Implementation(int32 TerritoryID,
     return;
   }
 
+  if (!TurnManager) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("ServerDeployUnits: TurnManager not available for %s"),
+           *GetName());
+    NotifyActionError(TEXT("Cannot deploy units right now"));
+    return;
+  }
+
+  if (!IsMyTurn()) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("ServerDeployUnits: %s attempted to deploy out of turn"),
+           *GetName());
+    NotifyActionError(TEXT("You may only deploy units during your turn"));
+    return;
+  }
+
+  const ETurnPhase CurrentPhase = TurnManager->GetCurrentPhase();
+  const bool bIsArmyPlacementPhase = CurrentPhase == ETurnPhase::ArmyPlacement;
+  const bool bIsReinforcementPhase = CurrentPhase == ETurnPhase::Reinforcement;
+  if (!bIsArmyPlacementPhase && !bIsReinforcementPhase) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("ServerDeployUnits: %s attempted to deploy during phase %d"),
+           *GetName(), static_cast<int32>(CurrentPhase));
+    NotifyActionError(
+        TEXT("Units can only be deployed during Army Placement or Reinforcement"));
+    return;
+  }
+
   AWorldMap *WorldMap = Cast<AWorldMap>(
       UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
   if (!WorldMap) {
@@ -1769,8 +1833,6 @@ void ASkaldPlayerController::ServerDeployUnits_Implementation(int32 TerritoryID,
     return;
   }
 
-  const bool bIsArmyPlacementPhase =
-      (TurnManager && TurnManager->GetCurrentPhase() == ETurnPhase::ArmyPlacement);
   if (!bIsArmyPlacementPhase && !Terr->bIsCapital) {
     UE_LOG(LogSkald, Warning,
            TEXT("ServerDeployUnits: Territory %d is not a capital"),
