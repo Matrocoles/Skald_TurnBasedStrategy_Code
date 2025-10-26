@@ -216,6 +216,9 @@ private:
   /** Failsafe to ensure AI army placement advances the phase. */
   FTimerHandle ArmyPlacementFailsafeHandle;
 
+  /** Retry handle used when army placement starts before all controllers register. */
+  FTimerHandle ArmyPlacementStartupRetryHandle;
+
   /** Guard to avoid logging the failsafe warning multiple times. */
   bool bArmyPlacementFailsafeTriggered = false;
 
@@ -242,6 +245,9 @@ private:
 
   /** Ensure a turn manager exists, spawning or reusing one as required. */
   ATurnManager *ResolveTurnManager();
+
+  /** Determine how many controllers should participate in army placement. */
+  int32 ResolveExpectedControllerCount() const;
 
   /** Prompt players to roll strategic initiative before world initialization. */
   void BeginStrategicInitiativePhase();

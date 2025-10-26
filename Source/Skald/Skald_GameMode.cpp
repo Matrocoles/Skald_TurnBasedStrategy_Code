@@ -92,12 +92,14 @@ void ASkaldGameMode::InitGame(const FString &Map, const FString &Options,
     TimerManager.ClearTimer(StartGameTimerHandle);
     TimerManager.ClearTimer(ArmyPlacementAutoAdvanceHandle);
     TimerManager.ClearTimer(ArmyPlacementFailsafeHandle);
+    TimerManager.ClearTimer(ArmyPlacementStartupRetryHandle);
   } else {
     RetryInitTimerHandle.Invalidate();
     WorldMapRetryHandle.Invalidate();
     StartGameTimerHandle.Invalidate();
     ArmyPlacementAutoAdvanceHandle.Invalidate();
     ArmyPlacementFailsafeHandle.Invalidate();
+    ArmyPlacementStartupRetryHandle.Invalidate();
   }
 
   if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
@@ -1605,6 +1607,35 @@ void ASkaldGameMode::BeginArmyPlacementPhase() {
 
   const TArray<ASkaldPlayerController *> Controllers =
       TurnManager->GetControllers();
+  const int32 ExpectedControllerCount =
+      FMath::Max(ResolveExpectedControllerCount(), Controllers.Num());
+
+  const bool bWaitingOnControllers =
+      PendingControllers.Num() > 0 ||
+      (ExpectedControllerCount > 0 &&
+       Controllers.Num() < ExpectedControllerCount);
+
+  if (bWaitingOnControllers) {
+    if (UWorld *World = GetWorld()) {
+      FTimerManager &TimerManager = World->GetTimerManager();
+      const bool bRetryScheduled =
+          TimerManager.IsTimerActive(ArmyPlacementStartupRetryHandle) ||
+          TimerManager.IsTimerPending(ArmyPlacementStartupRetryHandle);
+      if (!bRetryScheduled) {
+        UE_LOG(LogSkald, Log,
+               TEXT("BeginArmyPlacementPhase: waiting for controllers "
+                    "Registered=%d Expected=%d Pending=%d"),
+               Controllers.Num(), ExpectedControllerCount,
+               PendingControllers.Num());
+        TimerManager.SetTimer(ArmyPlacementStartupRetryHandle, this,
+                              &ASkaldGameMode::BeginArmyPlacementPhase,
+                              RetryInitDelay, false);
+      }
+    }
+    return;
+  }
+
+  GetWorldTimerManager().ClearTimer(ArmyPlacementStartupRetryHandle);
   ASkaldPlayerController *ActiveController =
       Controllers.Num() > 0 ? Controllers[0] : nullptr;
   const FString PhaseString =
@@ -1709,6 +1740,35 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
 
   const TArray<ASkaldPlayerController *> Controllers =
       TurnManager->GetControllers();
+  const int32 ExpectedControllerCount =
+      FMath::Max(ResolveExpectedControllerCount(), Controllers.Num());
+
+  const bool bWaitingOnControllers =
+      PendingControllers.Num() > 0 ||
+      (ExpectedControllerCount > 0 &&
+       Controllers.Num() < ExpectedControllerCount);
+
+  if (bWaitingOnControllers) {
+    if (UWorld *World = GetWorld()) {
+      FTimerManager &TimerManager = World->GetTimerManager();
+      const bool bRetryScheduled =
+          TimerManager.IsTimerActive(ArmyPlacementStartupRetryHandle) ||
+          TimerManager.IsTimerPending(ArmyPlacementStartupRetryHandle);
+      if (!bRetryScheduled) {
+        UE_LOG(LogSkald, Log,
+               TEXT("AdvanceArmyPlacement: waiting for controllers Registered=%d "
+                    "Expected=%d Pending=%d"),
+               Controllers.Num(), ExpectedControllerCount,
+               PendingControllers.Num());
+        TimerManager.SetTimer(ArmyPlacementStartupRetryHandle, this,
+                              &ASkaldGameMode::AdvanceArmyPlacement,
+                              RetryInitDelay, false);
+      }
+    }
+    return;
+  }
+
+  GetWorldTimerManager().ClearTimer(ArmyPlacementStartupRetryHandle);
   const int32 NumControllers = Controllers.Num();
 
   ++PlacementIndex;
@@ -1806,6 +1866,30 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
   ArmyPlacementLeader.Reset();
   bTurnsStarted = true;
   TurnManager->StartTurns(StartingController);
+}
+
+int32 ASkaldGameMode::ResolveExpectedControllerCount() const {
+  int32 ExpectedCount = 0;
+
+  if (const ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
+    TSet<const ASkaldPlayerController *> UniqueControllers;
+    for (const APlayerState *PlayerStateBase : GS->PlayerArray) {
+      const ASkaldPlayerState *PS =
+          Cast<ASkaldPlayerState>(PlayerStateBase);
+      const ASkaldPlayerController *Owner =
+          PS ? Cast<ASkaldPlayerController>(PS->GetOwner()) : nullptr;
+      if (Owner) {
+        UniqueControllers.Add(Owner);
+      }
+    }
+    ExpectedCount = UniqueControllers.Num();
+  }
+
+  if (ExpectedCount <= 0 && TurnManager) {
+    ExpectedCount = TurnManager->GetControllerCount();
+  }
+
+  return ExpectedCount;
 }
 
 ATurnManager *ASkaldGameMode::ResolveTurnManager() {
