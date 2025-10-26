@@ -366,6 +366,46 @@ void UGridOverlayComponent::RefreshGridDataFromOrigin() {
   RebuildBaseGridInstances();
 }
 
+void UGridOverlayComponent::SampleCellAt(const FIntPoint &GridCoord, float TraceHalfHeight,
+                                         UWorld *World) {
+  if (!IsValidGrid(GridCoord)) {
+    return;
+  }
+
+  const int32 Idx = Index(GridCoord);
+  if (!CellHeights.IsValidIndex(Idx) || !CellRotations.IsValidIndex(Idx)) {
+    return;
+  }
+
+  UWorld *EffectiveWorld = World ? World : GetWorld();
+  if (!EffectiveWorld) {
+    return;
+  }
+
+  const FVector LocalCenter =
+      FVector((GridCoord.X + 0.5f) * CellSize, (GridCoord.Y + 0.5f) * CellSize, 0.f);
+  const FVector WorldCenter =
+      CachedGridTransform.TransformPositionNoScale(LocalCenter);
+
+  const FVector TraceOffset(0.f, 0.f, TraceHalfHeight);
+  const FVector Start = WorldCenter + TraceOffset;
+  const FVector End = WorldCenter - TraceOffset;
+
+  FHitResult Hit;
+  if (EffectiveWorld->LineTraceSingleByChannel(Hit, Start, End, ECC_WorldStatic)) {
+    CellHeights[Idx] = Hit.Location.Z;
+    CellRotations[Idx] =
+        FRotationMatrix::MakeFromZ(Hit.Normal.GetSafeNormal()).ToQuat();
+
+    if (Cast<ULandscapeComponent>(Hit.GetComponent())) {
+      HandleLandscapeHit(Hit, GridCoord, Idx);
+    }
+  } else {
+    CellHeights[Idx] = WorldCenter.Z;
+    CellRotations[Idx] = FQuat::Identity;
+  }
+}
+
 void UGridOverlayComponent::SampleEnvironmentAtOrigin() {
   if (Width <= 0 || Height <= 0) {
     return;
@@ -376,40 +416,9 @@ void UGridOverlayComponent::SampleEnvironmentAtOrigin() {
     return;
   }
 
-  const FTransform TraceTransform(CachedGridTransform.GetRotation(),
-                                  CachedGridTransform.GetLocation(),
-                                  FVector::OneVector);
-
   for (int32 Y = 0; Y < Height; ++Y) {
     for (int32 X = 0; X < Width; ++X) {
-      const int32 Idx = Index(FIntPoint(X, Y));
-      const FVector LocalCenter =
-          FVector((X + 0.5f) * CellSize, (Y + 0.5f) * CellSize, 0.f);
-      const FVector WorldCenter =
-          TraceTransform.TransformPositionNoScale(LocalCenter);
-      const FVector TraceOffset(0.f, 0.f, SamplingTraceHalfHeight);
-      const FVector Start = WorldCenter + TraceOffset;
-      const FVector End = WorldCenter - TraceOffset;
-      FHitResult Hit;
-      if (World->LineTraceSingleByChannel(Hit, Start, End, ECC_WorldStatic)) {
-        if (CellHeights.IsValidIndex(Idx)) {
-          CellHeights[Idx] = Hit.Location.Z;
-        }
-        if (CellRotations.IsValidIndex(Idx)) {
-          CellRotations[Idx] =
-              FRotationMatrix::MakeFromZ(Hit.Normal.GetSafeNormal()).ToQuat();
-        }
-        if (Cast<ULandscapeComponent>(Hit.GetComponent())) {
-          HandleLandscapeHit(Hit, FIntPoint(X, Y), Idx);
-        }
-      } else {
-        if (CellHeights.IsValidIndex(Idx)) {
-          CellHeights[Idx] = WorldCenter.Z;
-        }
-        if (CellRotations.IsValidIndex(Idx)) {
-          CellRotations[Idx] = FQuat::Identity;
-        }
-      }
+      SampleCellAt(FIntPoint(X, Y), SamplingTraceHalfHeight, World);
     }
   }
 }
@@ -1219,6 +1228,11 @@ void UGridOverlayComponent::ApplyObstacleToGrid(UGridObstacleComponent *Obstacle
       Min = WorldToGrid(Bounds.Min);
       Max = WorldToGrid(Bounds.Max);
     }
+    const bool bResampleCells = Obstacle->HasCustomTraceHalfHeight();
+    const float EffectiveTraceHalfHeight =
+        Obstacle->GetTraceHalfHeightOrDefault(SamplingTraceHalfHeight);
+    UWorld *World = bResampleCells ? GetWorld() : nullptr;
+
     for (int32 Y = Min.Y; Y <= Max.Y; ++Y) {
       for (int32 X = Min.X; X <= Max.X; ++X) {
         const FIntPoint Cell(X, Y);
@@ -1228,6 +1242,10 @@ void UGridOverlayComponent::ApplyObstacleToGrid(UGridObstacleComponent *Obstacle
         const int32 Idx = Index(Cell);
         if (!Cells.IsValidIndex(Idx) || !ObscuredCells.IsValidIndex(Idx)) {
           continue;
+        }
+
+        if (bResampleCells) {
+          SampleCellAt(Cell, EffectiveTraceHalfHeight, World);
         }
         if (Obstacle->bClimbable) {
           CellHeights[Idx] = Bounds.Max.Z;

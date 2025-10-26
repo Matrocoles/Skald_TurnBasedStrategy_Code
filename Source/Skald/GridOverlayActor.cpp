@@ -318,7 +318,18 @@ void AGridOverlayActor::SpawnRandomObstacles() {
       }
 
       const FVector CellLocation = GridComponent->GridToWorld(Cell);
-      const FVector TraceOffset = FVector::UpVector * FMath::Max(ObstacleTraceHeight, kSmallHeightEpsilon);
+
+      float EffectiveTraceHalfHeight = ObstacleTraceHeight;
+      if (const AGridObstacleActor *DefaultObstacle = ObstacleClass->GetDefaultObject<AGridObstacleActor>()) {
+        if (const UGridObstacleComponent *DefaultObstacleComponent =
+                DefaultObstacle->FindComponentByClass<UGridObstacleComponent>()) {
+          EffectiveTraceHalfHeight =
+              DefaultObstacleComponent->GetTraceHalfHeightOrDefault(ObstacleTraceHeight);
+        }
+      }
+
+      const FVector TraceOffset =
+          FVector::UpVector * FMath::Max(EffectiveTraceHalfHeight, kSmallHeightEpsilon);
       const FVector TraceStart = CellLocation + TraceOffset;
       const FVector TraceEnd = CellLocation - TraceOffset;
 

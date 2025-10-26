@@ -419,6 +419,9 @@ protected:
   UPROPERTY()
   TArray<UGridObstacleComponent *> Obstacles;
 
+  /** Sample a grid cell using the provided trace half-height. */
+  void SampleCellAt(const FIntPoint &GridCoord, float TraceHalfHeight, UWorld *World = nullptr);
+
   /** Process a landscape hit to potentially flag a cell as blocked. */
   void HandleLandscapeHit(const FHitResult &Hit, const FIntPoint &Cell,
                           int32 CellIndex);
