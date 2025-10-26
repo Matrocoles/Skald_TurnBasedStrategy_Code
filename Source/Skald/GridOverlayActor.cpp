@@ -234,9 +234,11 @@ void AGridOverlayActor::SpawnRandomObstacles() {
   TArray<FIntPoint> AvailableCells = CandidateCells.Array();
   TSet<FIntPoint> ReservedCells;
 
-  const auto ComputeBlockedCells = [GridComponent](AGridObstacleActor *Obstacle,
-                                                   TArray<FIntPoint> &OutCells) -> bool {
-    if (!Obstacle || !GridComponent) {
+  UGridOverlayComponent *const LocalGridComponent = GridComponent;
+
+  const auto ComputeBlockedCells = [LocalGridComponent](AGridObstacleActor *Obstacle,
+                                                        TArray<FIntPoint> &OutCells) -> bool {
+    if (!Obstacle || !LocalGridComponent) {
       return false;
     }
 
@@ -246,20 +248,20 @@ void AGridOverlayActor::SpawnRandomObstacles() {
 
     if (const UGridObstacleComponent *ObstacleComponent =
             Obstacle->FindComponentByClass<UGridObstacleComponent>()) {
-      bHasCustomFootprint = ObstacleComponent->GetCustomGridFootprint(GridComponent, Min, Max);
+      bHasCustomFootprint = ObstacleComponent->GetCustomGridFootprint(LocalGridComponent, Min, Max);
     }
 
     if (!bHasCustomFootprint) {
       const FBox Bounds = Obstacle->GetComponentsBoundingBox(true);
       if (Bounds.IsValid) {
-        const FIntPoint RawMin = GridComponent->WorldToGrid(Bounds.Min);
-        const FIntPoint RawMax = GridComponent->WorldToGrid(Bounds.Max);
+        const FIntPoint RawMin = LocalGridComponent->WorldToGrid(Bounds.Min);
+        const FIntPoint RawMax = LocalGridComponent->WorldToGrid(Bounds.Max);
         Min.X = FMath::Min(RawMin.X, RawMax.X);
         Min.Y = FMath::Min(RawMin.Y, RawMax.Y);
         Max.X = FMath::Max(RawMin.X, RawMax.X);
         Max.Y = FMath::Max(RawMin.Y, RawMax.Y);
       } else {
-        const FIntPoint Anchor = GridComponent->WorldToGrid(Obstacle->GetActorLocation());
+        const FIntPoint Anchor = LocalGridComponent->WorldToGrid(Obstacle->GetActorLocation());
         Min = Anchor;
         Max = Anchor;
       }
@@ -269,7 +271,7 @@ void AGridOverlayActor::SpawnRandomObstacles() {
     for (int32 Y = Min.Y; Y <= Max.Y; ++Y) {
       for (int32 X = Min.X; X <= Max.X; ++X) {
         const FIntPoint Cell(X, Y);
-        if (!GridComponent->IsCellInBounds(Cell)) {
+        if (!LocalGridComponent->IsCellInBounds(Cell)) {
           bAllCellsValid = false;
           break;
         }
