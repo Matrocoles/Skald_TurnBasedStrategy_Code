@@ -32,7 +32,12 @@ bool UGridObstacleComponent::GetCustomGridFootprint(const UGridOverlayComponent 
     return false;
   }
 
-  const FIntPoint Anchor = Grid->WorldToGrid(Owner->GetActorLocation());
+  const FBox Bounds = Owner->GetComponentsBoundingBox(true);
+  const FVector AnchorLocation = Bounds.IsValid
+                                     ? Bounds.GetCenter()
+                                     : Owner->GetActorLocation();
+
+  const FIntPoint Anchor = Grid->WorldToGrid(AnchorLocation);
   const FIntPoint RawMin = Anchor + CustomBlockedCellsMin;
   const FIntPoint RawMax = Anchor + CustomBlockedCellsMax;
 
