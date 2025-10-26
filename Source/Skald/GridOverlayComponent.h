@@ -278,6 +278,11 @@ public:
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Display")
   FLinearColor OccupiedCellColor = FLinearColor(0.1f, 0.3f, 0.8f, 0.65f);
 
+  /** Half-length of the vertical trace used when sampling the environment. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Sampling",
+            meta = (ClampMin = "0.0"))
+  float SamplingTraceHalfHeight = 10000.f;
+
   /** Tint applied when a fighter is selected. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Highlight")
   FLinearColor SelectionHighlightColor = FLinearColor(1.f, 1.f, 0.25f, 0.85f);
