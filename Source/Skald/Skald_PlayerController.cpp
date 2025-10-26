@@ -1220,6 +1220,13 @@ void ASkaldPlayerController::HandleWorldBeginPlay(UWorld *LoadedWorld) {
   }
 
   DetectBattleMap();
+
+  if (!bIsBattleMap) {
+    InitializeHUDWidget();
+    ShowOverworldHUD();
+    TryBindWorldMap();
+  }
+
   InitializeFighterSelectionIfNeeded();
 }
 
