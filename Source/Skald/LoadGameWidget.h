@@ -54,9 +54,9 @@ private:
     /** Shared implementation for the individual load slot handlers. */
     void HandleLoadSlot(int32 SlotIndex);
 
-    void BindButton(UButton* Button, void (ULoadGameWidget::*Handler)());
-    void UnbindButton(UButton* Button, void (ULoadGameWidget::*Handler)());
-    void InitialiseSlotButton(UButton* Button, int32 SlotIndex, void (ULoadGameWidget::*Handler)());
+    void BindButton(UButton* Button, FName HandlerName);
+    void UnbindButton(UButton* Button, FName HandlerName);
+    void InitialiseSlotButton(UButton* Button, int32 SlotIndex, FName HandlerName);
     void CleanupAndReturnToMenu();
     bool IsValidSlotIndex(int32 SlotIndex) const;
 

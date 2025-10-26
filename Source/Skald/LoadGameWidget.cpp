@@ -4,6 +4,7 @@
 #include "Components/Button.h"
 #include "Kismet/GameplayStatics.h"
 #include "SlotNameConstants.h"
+#include "UObject/ScriptDelegates.h"
 #include "GameFramework/PlayerController.h"
 #include "SkaldSaveGame.h"
 #include "Skald_GameInstance.h"
@@ -26,18 +27,18 @@ void ULoadGameWidget::NativeConstruct()
 {
     Super::NativeConstruct();
 
-    InitialiseSlotButton(Slot0Button, 0, &ULoadGameWidget::OnLoadSlot0);
-    InitialiseSlotButton(Slot1Button, 1, &ULoadGameWidget::OnLoadSlot1);
-    InitialiseSlotButton(Slot2Button, 2, &ULoadGameWidget::OnLoadSlot2);
-    BindButton(MainMenuButton, &ULoadGameWidget::OnMainMenu);
+    InitialiseSlotButton(Slot0Button, 0, GET_FUNCTION_NAME_CHECKED(ULoadGameWidget, OnLoadSlot0));
+    InitialiseSlotButton(Slot1Button, 1, GET_FUNCTION_NAME_CHECKED(ULoadGameWidget, OnLoadSlot1));
+    InitialiseSlotButton(Slot2Button, 2, GET_FUNCTION_NAME_CHECKED(ULoadGameWidget, OnLoadSlot2));
+    BindButton(MainMenuButton, GET_FUNCTION_NAME_CHECKED(ULoadGameWidget, OnMainMenu));
 }
 
 void ULoadGameWidget::NativeDestruct()
 {
-    UnbindButton(Slot0Button, &ULoadGameWidget::OnLoadSlot0);
-    UnbindButton(Slot1Button, &ULoadGameWidget::OnLoadSlot1);
-    UnbindButton(Slot2Button, &ULoadGameWidget::OnLoadSlot2);
-    UnbindButton(MainMenuButton, &ULoadGameWidget::OnMainMenu);
+    UnbindButton(Slot0Button, GET_FUNCTION_NAME_CHECKED(ULoadGameWidget, OnLoadSlot0));
+    UnbindButton(Slot1Button, GET_FUNCTION_NAME_CHECKED(ULoadGameWidget, OnLoadSlot1));
+    UnbindButton(Slot2Button, GET_FUNCTION_NAME_CHECKED(ULoadGameWidget, OnLoadSlot2));
+    UnbindButton(MainMenuButton, GET_FUNCTION_NAME_CHECKED(ULoadGameWidget, OnMainMenu));
 
     Super::NativeDestruct();
 }
@@ -95,23 +96,27 @@ void ULoadGameWidget::HandleLoadSlot(int32 SlotIndex)
     }
 }
 
-void ULoadGameWidget::BindButton(UButton* Button, void (ULoadGameWidget::*Handler)())
+void ULoadGameWidget::BindButton(UButton* Button, FName HandlerName)
 {
     if (Button)
     {
-        Button->OnClicked.AddDynamic(this, Handler);
+        FScriptDelegate Delegate;
+        Delegate.BindUFunction(this, HandlerName);
+        Button->OnClicked.AddUnique(Delegate);
     }
 }
 
-void ULoadGameWidget::UnbindButton(UButton* Button, void (ULoadGameWidget::*Handler)())
+void ULoadGameWidget::UnbindButton(UButton* Button, FName HandlerName)
 {
     if (Button)
     {
-        Button->OnClicked.RemoveDynamic(this, Handler);
+        FScriptDelegate Delegate;
+        Delegate.BindUFunction(this, HandlerName);
+        Button->OnClicked.Remove(Delegate);
     }
 }
 
-void ULoadGameWidget::InitialiseSlotButton(UButton* Button, int32 SlotIndex, void (ULoadGameWidget::*Handler)())
+void ULoadGameWidget::InitialiseSlotButton(UButton* Button, int32 SlotIndex, FName HandlerName)
 {
     if (!Button)
     {
@@ -124,7 +129,7 @@ void ULoadGameWidget::InitialiseSlotButton(UButton* Button, int32 SlotIndex, voi
         return;
     }
 
-    BindButton(Button, Handler);
+    BindButton(Button, HandlerName);
     const bool bHasSave = UGameplayStatics::DoesSaveGameExist(SlotNames[SlotIndex], 0);
     Button->SetVisibility(bHasSave ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 }
