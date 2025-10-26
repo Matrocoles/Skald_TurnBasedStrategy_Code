@@ -153,6 +153,10 @@ public:
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Turn")
   int32 GetControllerCount() const { return Controllers.Num(); }
 
+  /** Retrieve the index of the currently active controller. */
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Turn")
+  int32 GetCurrentControllerIndex() const { return CurrentIndex; }
+
   /** Retrieve the current phase of play. */
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Turn")
   ETurnPhase GetCurrentPhase() const { return CurrentPhase; }
