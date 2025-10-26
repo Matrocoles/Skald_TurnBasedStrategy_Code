@@ -22,6 +22,8 @@ public:
   virtual void StartTurn() override;
   virtual void EndTurn() override;
 
+  virtual void InitializeHUDWidget() override;
+
   /** Execute the AI's decision making for the current turn. */
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void MakeAIDecision();

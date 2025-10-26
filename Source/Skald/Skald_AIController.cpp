@@ -78,6 +78,12 @@ void ASkaldAIController::BeginPlay() {
   }
 }
 
+void ASkaldAIController::InitializeHUDWidget() {
+  UE_LOG(LogSkald, Verbose,
+         TEXT("ASkaldAIController %s does not create a HUD widget."),
+         *GetName());
+}
+
 void ASkaldAIController::StartTurn() {
   DecisionIterationCount = 0;
   bAwaitingBattleTransition = false;
