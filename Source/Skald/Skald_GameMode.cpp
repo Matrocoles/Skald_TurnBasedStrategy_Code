@@ -27,12 +27,27 @@
 #include "UObject/Package.h"
 #include "UObject/UnrealType.h"
 #include "WorldMap.h"
+#include "Containers/Set.h"
 
 namespace {
 constexpr float StartGameTimeout = 10.f;
 constexpr int32 StartingResources = 100;
 constexpr float RetryInitDelay = 0.01f;
 constexpr float ArmyPlacementAutoAdvanceDelay = 0.15f;
+const TArray<FString> FantasyAINames = {
+    TEXT("Aeloria Swiftwind"), TEXT("Borin Stonefist"),
+    TEXT("Caelynn Starwhisper"), TEXT("Durgan Ironmantle"),
+    TEXT("Elowen Nightbloom"), TEXT("Faelar Moonshadow"),
+    TEXT("Garrick Stormspear"), TEXT("Halia Emberforge"),
+    TEXT("Ilyrion Dawnseeker"), TEXT("Jorvan Frostguard"),
+    TEXT("Kaelin Ravensong"), TEXT("Lirra Sunveil"),
+    TEXT("Maelor Runebound"), TEXT("Nyssa Thornheart"),
+    TEXT("Orin Blackflame"), TEXT("Pyria Windwalker"),
+    TEXT("Quorin Silvercrest"), TEXT("Rhydan Wolfshield"),
+    TEXT("Sylas Duskreaver"), TEXT("Thalia Brightblade"),
+    TEXT("Vaelis Stormbinder"), TEXT("Wrenna Shadeleaf"),
+    TEXT("Xandar Starforge"), TEXT("Ysolde Whisperwind"),
+    TEXT("Zarek Ironbloom")};
 // Instance variables moved into ASkaldGameMode to avoid cross-instance
 // interference; see header for declarations.
 } // namespace
@@ -476,8 +491,51 @@ void ASkaldGameMode::PopulateAIPlayers() {
     }
 
     AIState->bIsAI = true;
-    AIState->PlayerDisplayName =
-        FString::Printf(TEXT("AI_%d"), GS->PlayerArray.Num());
+
+    TSet<FString> UsedDisplayNames;
+    for (APlayerState *ExistingPSBase : GS->PlayerArray) {
+      if (!ExistingPSBase) {
+        continue;
+      }
+
+      if (ASkaldPlayerState *ExistingSkaldState =
+              Cast<ASkaldPlayerState>(ExistingPSBase)) {
+        if (!ExistingSkaldState->PlayerDisplayName.IsEmpty()) {
+          UsedDisplayNames.Add(ExistingSkaldState->PlayerDisplayName);
+        }
+      } else {
+        const FString ExistingName = ExistingPSBase->GetPlayerName();
+        if (!ExistingName.IsEmpty()) {
+          UsedDisplayNames.Add(ExistingName);
+        }
+      }
+    }
+
+    TArray<FString> AvailableNames;
+    AvailableNames.Reserve(FantasyAINames.Num());
+    for (const FString &CandidateName : FantasyAINames) {
+      if (!UsedDisplayNames.Contains(CandidateName)) {
+        AvailableNames.Add(CandidateName);
+      }
+    }
+
+    FString SelectedName;
+    if (AvailableNames.Num() > 0) {
+      const int32 NameIndex = GI
+                                  ? GI->CombatRandomStream.RandRange(
+                                        0, AvailableNames.Num() - 1)
+                                  : FMath::RandRange(0, AvailableNames.Num() - 1);
+      SelectedName = AvailableNames[NameIndex];
+    }
+
+    if (SelectedName.IsEmpty()) {
+      int32 Suffix = GS->PlayerArray.Num();
+      do {
+        SelectedName = FString::Printf(TEXT("AI_%d"), Suffix++);
+      } while (UsedDisplayNames.Contains(SelectedName));
+    }
+
+    AIState->PlayerDisplayName = SelectedName;
     AIState->SetPlayerName(AIState->PlayerDisplayName);
 
     ESkaldFaction AssignedFaction = ESkaldFaction::None;
