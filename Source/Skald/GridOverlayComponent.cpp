@@ -387,8 +387,9 @@ void UGridOverlayComponent::SampleEnvironmentAtOrigin() {
           FVector((X + 0.5f) * CellSize, (Y + 0.5f) * CellSize, 0.f);
       const FVector WorldCenter =
           TraceTransform.TransformPositionNoScale(LocalCenter);
-      const FVector Start = WorldCenter + FVector(0.f, 0.f, 10000.f);
-      const FVector End = WorldCenter - FVector(0.f, 0.f, 10000.f);
+      const FVector TraceOffset(0.f, 0.f, SamplingTraceHalfHeight);
+      const FVector Start = WorldCenter + TraceOffset;
+      const FVector End = WorldCenter - TraceOffset;
       FHitResult Hit;
       if (World->LineTraceSingleByChannel(Hit, Start, End, ECC_WorldStatic)) {
         if (CellHeights.IsValidIndex(Idx)) {
