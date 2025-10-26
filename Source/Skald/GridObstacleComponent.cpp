@@ -60,3 +60,11 @@ bool UGridObstacleComponent::GetCustomGridFootprint(const UGridOverlayComponent 
   return true;
 }
 
+bool UGridObstacleComponent::HasCustomTraceHalfHeight() const {
+  return ObstacleTraceHalfHeight > 0.f;
+}
+
+float UGridObstacleComponent::GetTraceHalfHeightOrDefault(float DefaultTraceHalfHeight) const {
+  return HasCustomTraceHalfHeight() ? ObstacleTraceHalfHeight : DefaultTraceHalfHeight;
+}
+

@@ -36,6 +36,10 @@ public:
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid", meta = (InlineEditConditionToggle))
   bool bOverrideBlockedCells = false;
 
+  /** Optional half-height override for traces performed around this obstacle. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid", meta = (ClampMin = "0.0"))
+  float ObstacleTraceHalfHeight = 0.f;
+
   /** Minimum cell offset from the actor location when overriding the blocked area. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid", meta = (EditCondition = "bOverrideBlockedCells"))
   FIntPoint CustomBlockedCellsMin = FIntPoint::ZeroValue;
@@ -47,5 +51,11 @@ public:
   /** Calculate a custom grid footprint when manual overrides are enabled. */
   bool GetCustomGridFootprint(const UGridOverlayComponent *Grid, FIntPoint &OutMin,
                               FIntPoint &OutMax) const;
+
+  /** True if this obstacle defines a custom trace half-height. */
+  bool HasCustomTraceHalfHeight() const;
+
+  /** Resolve the trace half-height, falling back to the provided default. */
+  float GetTraceHalfHeightOrDefault(float DefaultTraceHalfHeight) const;
 };
 
