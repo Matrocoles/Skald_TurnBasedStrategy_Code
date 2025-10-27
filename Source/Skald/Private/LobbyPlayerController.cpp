@@ -104,7 +104,7 @@ void ALobbyPlayerController::HandleTitleScreenDismissed()
 
 void ALobbyPlayerController::RequestPlayerCount(int32 PlayerCount)
 {
-    if (IsLocalController())
+    if (IsLocalController() && IsLocalPlayerLobbyHost())
     {
         ServerSetPlayerCount(PlayerCount);
     }
@@ -112,7 +112,7 @@ void ALobbyPlayerController::RequestPlayerCount(int32 PlayerCount)
 
 void ALobbyPlayerController::RequestAICount(int32 AICount)
 {
-    if (IsLocalController())
+    if (IsLocalController() && IsLocalPlayerLobbyHost())
     {
         ServerSetAICount(AICount);
     }
@@ -144,7 +144,7 @@ void ALobbyPlayerController::RequestDisplayNameUpdate(const FString& DisplayName
 
 void ALobbyPlayerController::RequestLaunch()
 {
-    if (IsLocalController())
+    if (IsLocalController() && IsLocalPlayerLobbyHost())
     {
         ServerLaunchMatch();
     }
@@ -152,7 +152,7 @@ void ALobbyPlayerController::RequestLaunch()
 
 void ALobbyPlayerController::ServerSetPlayerCount_Implementation(int32 PlayerCount)
 {
-    if (!IsLocalController())
+    if (!IsLobbyHostOnServer())
     {
         return;
     }
@@ -165,7 +165,7 @@ void ALobbyPlayerController::ServerSetPlayerCount_Implementation(int32 PlayerCou
 
 void ALobbyPlayerController::ServerSetAICount_Implementation(int32 AICount)
 {
-    if (!IsLocalController())
+    if (!IsLobbyHostOnServer())
     {
         return;
     }
@@ -211,7 +211,7 @@ void ALobbyPlayerController::ServerSetDisplayName_Implementation(const FString& 
 
 void ALobbyPlayerController::ServerLaunchMatch_Implementation()
 {
-    if (!IsLocalController())
+    if (!IsLobbyHostOnServer())
     {
         return;
     }
@@ -220,4 +220,59 @@ void ALobbyPlayerController::ServerLaunchMatch_Implementation()
     {
         GM->TryLaunchMatch(this);
     }
+}
+
+bool ALobbyPlayerController::IsLocalPlayerLobbyHost() const
+{
+    if (const UWorld* World = GetWorld())
+    {
+        if (const ALobbyGameState* LobbyState = World->GetGameState<ALobbyGameState>())
+        {
+            if (const ASkaldPlayerState* PlayerState = GetPlayerState<ASkaldPlayerState>())
+            {
+                const int32 SlotIndex = LobbyState->FindSlotIndexForPlayer(PlayerState->GetPlayerId());
+                if (SlotIndex != INDEX_NONE)
+                {
+                    if (const FLobbyPlayerSlot* Slot = LobbyState->GetSlot(SlotIndex))
+                    {
+                        return Slot->bIsActive && !Slot->bIsAI && SlotIndex == 0;
+                    }
+                }
+            }
+        }
+        else if (HasAuthority() || World->GetNetMode() == NM_Standalone)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool ALobbyPlayerController::IsLobbyHostOnServer() const
+{
+    if (const UWorld* World = GetWorld())
+    {
+        if (World->GetNetMode() == NM_Standalone)
+        {
+            return true;
+        }
+
+        if (const ALobbyGameState* LobbyState = World->GetGameState<ALobbyGameState>())
+        {
+            if (const ASkaldPlayerState* PlayerState = GetPlayerState<ASkaldPlayerState>())
+            {
+                const int32 SlotIndex = LobbyState->FindSlotIndexForPlayer(PlayerState->GetPlayerId());
+                if (SlotIndex == 0)
+                {
+                    if (const FLobbyPlayerSlot* Slot = LobbyState->GetSlot(SlotIndex))
+                    {
+                        return Slot->bIsActive && !Slot->bIsAI;
+                    }
+                }
+            }
+        }
+    }
+
+    return false;
 }
