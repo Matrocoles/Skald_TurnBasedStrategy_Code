@@ -100,6 +100,8 @@ ALobbyGameMode::ALobbyGameMode()
     , bSlotConfigurationLocked(false)
 {
     bUseSeamlessTravel = true;
+    GameStateClass = ALobbyGameState::StaticClass();
+    PlayerStateClass = ASkaldPlayerState::StaticClass();
     AuthoritySlots.SetNum(MaxLobbySlots);
     for (FLobbyPlayerSlot& Slot : AuthoritySlots)
     {
