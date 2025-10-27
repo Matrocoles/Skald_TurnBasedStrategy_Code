@@ -1029,10 +1029,13 @@ void USkaldGameInstance::ResetSessionState() {
   // Clear any per-session state so a fresh lobby is created.
   JoinAddress.Empty();
   AIPlayersToSpawn = 1;
+  bIsMultiplayer = false;
+  bIsHost = false;
   TakenFactions.Empty();
   if (Faction != ESkaldFaction::None) {
     TakenFactions.Add(Faction);
   }
+  PendingLobbyAIPlayers.Reset();
   OnFactionsUpdated.Broadcast();
 
   PendingBattle = FS_BattlePayload();

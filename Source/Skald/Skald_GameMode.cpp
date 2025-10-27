@@ -412,6 +412,12 @@ void ASkaldGameMode::PopulateAIPlayers() {
     GS->OnPlayersUpdated.Broadcast();
   }
 
+  TArray<FSkaldAIPlayerConfig> PendingLobbyAI;
+  if (GI)
+  {
+    PendingLobbyAI = GI->PendingLobbyAIPlayers;
+  }
+
   const int32 MaxSpawnAttempts = TargetAI * 2;
   int32 SpawnAttempts = 0;
   TArray<ASkaldPlayerState *> NewlySpawnedAI;
@@ -511,6 +517,22 @@ void ASkaldGameMode::PopulateAIPlayers() {
       }
     }
 
+    const bool bHasLobbyPreset = PendingLobbyAI.Num() > 0;
+    FSkaldAIPlayerConfig LobbyPreset;
+    if (bHasLobbyPreset)
+    {
+        LobbyPreset = PendingLobbyAI[0];
+        PendingLobbyAI.RemoveAt(0);
+        if (!LobbyPreset.DisplayName.IsEmpty())
+        {
+            UsedDisplayNames.Add(LobbyPreset.DisplayName);
+        }
+        if (LobbyPreset.Faction != ESkaldFaction::None)
+        {
+            UsedFactions.Add(LobbyPreset.Faction);
+        }
+    }
+
     TArray<FString> AvailableNames;
     AvailableNames.Reserve(FantasyAINames.Num());
     for (const FString &CandidateName : FantasyAINames) {
@@ -520,7 +542,9 @@ void ASkaldGameMode::PopulateAIPlayers() {
     }
 
     FString SelectedName;
-    if (AvailableNames.Num() > 0) {
+    if (bHasLobbyPreset && !LobbyPreset.DisplayName.IsEmpty()) {
+      SelectedName = LobbyPreset.DisplayName;
+    } else if (AvailableNames.Num() > 0) {
       const int32 NameIndex = GI
                                   ? GI->CombatRandomStream.RandRange(
                                         0, AvailableNames.Num() - 1)
@@ -535,11 +559,18 @@ void ASkaldGameMode::PopulateAIPlayers() {
       } while (UsedDisplayNames.Contains(SelectedName));
     }
 
+    UsedDisplayNames.Add(SelectedName);
+
     AIState->PlayerDisplayName = SelectedName;
     AIState->SetPlayerName(AIState->PlayerDisplayName);
 
     ESkaldFaction AssignedFaction = ESkaldFaction::None;
-    if (ReservedFactions.Num() > 0) {
+    if (bHasLobbyPreset && LobbyPreset.Faction != ESkaldFaction::None) {
+      AssignedFaction = LobbyPreset.Faction;
+      ReservedFactions.Remove(AssignedFaction);
+      RemainingReserved.Remove(AssignedFaction);
+      Available.Remove(AssignedFaction);
+    } else if (ReservedFactions.Num() > 0) {
       AssignedFaction = ReservedFactions[0];
       ReservedFactions.RemoveAt(0);
       RemainingReserved.Remove(AssignedFaction);
@@ -601,6 +632,11 @@ void ASkaldGameMode::PopulateAIPlayers() {
            TEXT("PopulateAIPlayers spawned only %d/%d AI players after %d "
                 "attempts"),
            ExistingAI, TargetAI, SpawnAttempts);
+  }
+
+  if (GI)
+  {
+    GI->PendingLobbyAIPlayers.Reset();
   }
 }
 

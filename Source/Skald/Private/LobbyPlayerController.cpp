@@ -1,6 +1,11 @@
 #include "LobbyPlayerController.h"
 #include "Blueprint/UserWidget.h"
+#include "LobbyGameMode.h"
+#include "LobbyGameState.h"
 #include "LobbyMenuWidget.h"
+#include "LobbySessionWidget.h"
+#include "Skald_GameInstance.h"
+#include "Skald_PlayerState.h"
 #include "UI/TitleScreenWidget.h"
 #include "UI/SkaldUIHelpers.h"
 
@@ -8,6 +13,7 @@ ALobbyPlayerController::ALobbyPlayerController()
 {
     LobbyWidgetClass = ULobbyMenuWidget::StaticClass();
     TitleScreenWidgetClass = UTitleScreenWidget::StaticClass();
+    LobbySessionWidgetClass = ULobbySessionWidget::StaticClass();
 }
 
 void ALobbyPlayerController::BeginPlay()
@@ -21,38 +27,68 @@ void ALobbyPlayerController::BeginPlay()
 
 void ALobbyPlayerController::InitLobbyUI()
 {
-    if (LobbyWidgetInstance || !LobbyWidgetClass) { return; }
+    USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>();
+    const bool bInMultiplayerLobby = GI && GI->bIsMultiplayer;
 
-    LobbyWidgetInstance = CreateWidget<ULobbyMenuWidget>(this, LobbyWidgetClass);
-    if (!LobbyWidgetInstance) { return; }
-
-    LobbyWidgetInstance->AddToViewport();
-    LobbyWidgetInstance->SetVisibility(ESlateVisibility::Hidden);
-
-    bool bShowingTitleScreen = false;
-    if (!TitleScreenWidgetInstance && TitleScreenWidgetClass)
+    if (bInMultiplayerLobby)
     {
-        TitleScreenWidgetInstance = CreateWidget<UTitleScreenWidget>(this, TitleScreenWidgetClass);
-        if (TitleScreenWidgetInstance)
+        if (!LobbySessionWidgetInstance && LobbySessionWidgetClass)
         {
-            TitleScreenWidgetInstance->OnDismissed.AddDynamic(this, &ALobbyPlayerController::HandleTitleScreenDismissed);
-            TitleScreenWidgetInstance->AddToViewport(1);
-            FocusWidgetUIOnly(this, TitleScreenWidgetInstance);
-            bShowingTitleScreen = true;
+            LobbySessionWidgetInstance = CreateWidget<ULobbySessionWidget>(this, LobbySessionWidgetClass);
+            if (LobbySessionWidgetInstance)
+            {
+                LobbySessionWidgetInstance->AddToViewport();
+                FocusWidgetUIOnly(this, LobbySessionWidgetInstance);
+            }
+        }
+
+        if (LobbyWidgetInstance)
+        {
+            LobbyWidgetInstance->RemoveFromParent();
+            LobbyWidgetInstance = nullptr;
         }
     }
-
-    if (!bShowingTitleScreen)
+    else
     {
-        LobbyWidgetInstance->SetVisibility(ESlateVisibility::Visible);
-        FocusWidgetUIOnly(this, LobbyWidgetInstance);
+        if (!LobbyWidgetInstance && LobbyWidgetClass)
+        {
+            LobbyWidgetInstance = CreateWidget<ULobbyMenuWidget>(this, LobbyWidgetClass);
+            if (LobbyWidgetInstance)
+            {
+                LobbyWidgetInstance->AddToViewport();
+                LobbyWidgetInstance->SetVisibility(ESlateVisibility::Hidden);
+            }
+        }
+
+        bool bShowingTitleScreen = false;
+        if (!TitleScreenWidgetInstance && TitleScreenWidgetClass)
+        {
+            TitleScreenWidgetInstance = CreateWidget<UTitleScreenWidget>(this, TitleScreenWidgetClass);
+            if (TitleScreenWidgetInstance)
+            {
+                TitleScreenWidgetInstance->OnDismissed.AddDynamic(this, &ALobbyPlayerController::HandleTitleScreenDismissed);
+                TitleScreenWidgetInstance->AddToViewport(1);
+                FocusWidgetUIOnly(this, TitleScreenWidgetInstance);
+                bShowingTitleScreen = true;
+            }
+        }
+
+        if (!bShowingTitleScreen && LobbyWidgetInstance)
+        {
+            LobbyWidgetInstance->SetVisibility(ESlateVisibility::Visible);
+            FocusWidgetUIOnly(this, LobbyWidgetInstance);
+        }
+
+        if (LobbySessionWidgetInstance)
+        {
+            LobbySessionWidgetInstance->RemoveFromParent();
+            LobbySessionWidgetInstance = nullptr;
+        }
     }
 
     bShowMouseCursor = true;
     bEnableClickEvents = true;
     bEnableMouseOverEvents = true;
-
-    // Wiring fighter selection happens inside the lobby widget init (see Change 4).
 }
 
 void ALobbyPlayerController::HandleTitleScreenDismissed()
@@ -63,5 +99,125 @@ void ALobbyPlayerController::HandleTitleScreenDismissed()
     {
         LobbyWidgetInstance->SetVisibility(ESlateVisibility::Visible);
         FocusWidgetUIOnly(this, LobbyWidgetInstance);
+    }
+}
+
+void ALobbyPlayerController::RequestPlayerCount(int32 PlayerCount)
+{
+    if (IsLocalController())
+    {
+        ServerSetPlayerCount(PlayerCount);
+    }
+}
+
+void ALobbyPlayerController::RequestAICount(int32 AICount)
+{
+    if (IsLocalController())
+    {
+        ServerSetAICount(AICount);
+    }
+}
+
+void ALobbyPlayerController::ToggleReadyState(bool bReady)
+{
+    if (IsLocalController())
+    {
+        ServerSetReady(bReady);
+    }
+}
+
+void ALobbyPlayerController::RequestFactionSelection(ESkaldFaction Faction)
+{
+    if (IsLocalController())
+    {
+        ServerSetFaction(Faction);
+    }
+}
+
+void ALobbyPlayerController::RequestDisplayNameUpdate(const FString& DisplayName)
+{
+    if (IsLocalController())
+    {
+        ServerSetDisplayName(DisplayName);
+    }
+}
+
+void ALobbyPlayerController::RequestLaunch()
+{
+    if (IsLocalController())
+    {
+        ServerLaunchMatch();
+    }
+}
+
+void ALobbyPlayerController::ServerSetPlayerCount_Implementation(int32 PlayerCount)
+{
+    if (!IsLocalController())
+    {
+        return;
+    }
+
+    if (ALobbyGameMode* GM = GetWorld() ? GetWorld()->GetAuthGameMode<ALobbyGameMode>() : nullptr)
+    {
+        GM->SetTotalSlots(PlayerCount);
+    }
+}
+
+void ALobbyPlayerController::ServerSetAICount_Implementation(int32 AICount)
+{
+    if (!IsLocalController())
+    {
+        return;
+    }
+
+    if (ALobbyGameMode* GM = GetWorld() ? GetWorld()->GetAuthGameMode<ALobbyGameMode>() : nullptr)
+    {
+        GM->SetAISlots(AICount);
+    }
+}
+
+void ALobbyPlayerController::ServerSetReady_Implementation(bool bReady)
+{
+    if (ALobbyGameMode* GM = GetWorld() ? GetWorld()->GetAuthGameMode<ALobbyGameMode>() : nullptr)
+    {
+        if (ASkaldPlayerState* PS = GetPlayerState<ASkaldPlayerState>())
+        {
+            GM->SetPlayerReady(PS->GetPlayerId(), bReady);
+        }
+    }
+}
+
+void ALobbyPlayerController::ServerSetFaction_Implementation(ESkaldFaction Faction)
+{
+    if (ALobbyGameMode* GM = GetWorld() ? GetWorld()->GetAuthGameMode<ALobbyGameMode>() : nullptr)
+    {
+        if (ASkaldPlayerState* PS = GetPlayerState<ASkaldPlayerState>())
+        {
+            GM->SetPlayerFaction(PS->GetPlayerId(), Faction);
+        }
+    }
+}
+
+void ALobbyPlayerController::ServerSetDisplayName_Implementation(const FString& DisplayName)
+{
+    if (ALobbyGameMode* GM = GetWorld() ? GetWorld()->GetAuthGameMode<ALobbyGameMode>() : nullptr)
+    {
+        if (ASkaldPlayerState* PS = GetPlayerState<ASkaldPlayerState>())
+        {
+            GM->SetPlayerDisplayName(PS->GetPlayerId(), DisplayName);
+        }
+    }
+}
+
+void ALobbyPlayerController::ServerLaunchMatch_Implementation()
+{
+    if (!IsLocalController())
+    {
+        return;
+    }
+
+    if (ALobbyGameMode* GM = GetWorld() ? GetWorld()->GetAuthGameMode<ALobbyGameMode>() : nullptr)
+    {
+        GM->TryLaunchMatch(this);
     }
 }

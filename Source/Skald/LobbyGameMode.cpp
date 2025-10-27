@@ -1,16 +1,481 @@
 #include "LobbyGameMode.h"
-#include "LobbyMenuWidget.h"
-#include "Blueprint/UserWidget.h"
+
+#include "Algo/RandomShuffle.h"
+#include "LobbyGameState.h"
+#include "Skald_GameInstance.h"
+#include "Skald_PlayerState.h"
+#include "SkaldLogging.h"
+#include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerController.h"
+#include "Kismet/GameplayStatics.h"
+#include "Net/UnrealNetwork.h"
+
+namespace
+{
+constexpr int32 MinLobbySlots = 2;
+constexpr int32 MaxLobbySlots = 4;
+
+TArray<ESkaldFaction> BuildFactionPool()
+{
+    TArray<ESkaldFaction> Result;
+    if (UEnum* Enum = StaticEnum<ESkaldFaction>())
+    {
+        for (int32 Index = 0; Index < Enum->NumEnums(); ++Index)
+        {
+            const int64 Value = Enum->GetValueByIndex(Index);
+            if (!Enum->IsValidEnumValue(Value))
+            {
+                continue;
+            }
+
+            const FString Name = Enum->GetNameStringByIndex(Index);
+            if (Name.EndsWith(TEXT("_MAX")))
+            {
+                continue;
+            }
+
+            const ESkaldFaction Faction = static_cast<ESkaldFaction>(Value);
+            if (Faction != ESkaldFaction::None)
+            {
+                Result.Add(Faction);
+            }
+        }
+    }
+
+    return Result;
+}
+
+TArray<FString> BuildAINames()
+{
+    return {
+        TEXT("Arin the Bold"),        TEXT("Ser Kaelis"),
+        TEXT("Mira Stormweaver"),     TEXT("Thalen Duskborn"),
+        TEXT("Eira Wolfsong"),        TEXT("Garruk Ironfist"),
+        TEXT("Lyra Dawnsong"),        TEXT("Vorik the Stalwart"),
+        TEXT("Selene Emberfall"),     TEXT("Hadrin Frostbane"),
+        TEXT("Kaelen Nightbloom"),    TEXT("Vessa Dragonsworn"),
+        TEXT("Orin Stoneshield"),     TEXT("Nyra Shadowstep"),
+        TEXT("Borin Thunderhand"),    TEXT("Talia Ravensdottir"),
+        TEXT("Fenric Ashwalker"),     TEXT("Seris Moonwhisper"),
+        TEXT("Rothgar Flamebrand"),   TEXT("Elira Wyrmguard"),
+        TEXT("Calen Starborn"),       TEXT("Lysa Snowblade"),
+        TEXT("Dorian Stormrend"),     TEXT("Velka Ironheart")};
+}
+} // namespace
 
 ALobbyGameMode::ALobbyGameMode()
-    : LobbyWidgetClass(ULobbyMenuWidget::StaticClass())
+    : CachedLobbyState(nullptr)
+    , AuthorityTotalSlots(MinLobbySlots)
+    , AuthorityAISlots(0)
 {
+    bUseSeamlessTravel = true;
+    AuthoritySlots.SetNum(MaxLobbySlots);
+    for (FLobbyPlayerSlot& Slot : AuthoritySlots)
+    {
+        Slot.PlayerId = INDEX_NONE;
+    }
 }
 
 void ALobbyGameMode::BeginPlay()
 {
     Super::BeginPlay();
-    // REMOVE UI creation here; UI is now created in ALobbyPlayerController::BeginPlay() on the local client.
+
+    CachedLobbyState = GetGameState<ALobbyGameState>();
+    if (!CachedLobbyState)
+    {
+        UE_LOG(LogSkald, Error, TEXT("LobbyGameMode missing LobbyGameState."));
+        return;
+    }
+
+    AuthoritySlots.SetNum(MaxLobbySlots);
+    RefreshReplicatedLobbyState();
+}
+
+void ALobbyGameMode::PostLogin(APlayerController* NewPlayer)
+{
+    Super::PostLogin(NewPlayer);
+
+    ASkaldPlayerState* PlayerState = NewPlayer ? NewPlayer->GetPlayerState<ASkaldPlayerState>() : nullptr;
+    if (!PlayerState)
+    {
+        return;
+    }
+
+    AssignPlayerToSlot(PlayerState);
+    RefreshReplicatedLobbyState();
+}
+
+void ALobbyGameMode::Logout(AController* Exiting)
+{
+    const ASkaldPlayerState* PlayerState = Exiting ? Exiting->GetPlayerState<ASkaldPlayerState>() : nullptr;
+    const int32 PlayerId = PlayerState ? PlayerState->GetPlayerId() : INDEX_NONE;
+    if (PlayerId != INDEX_NONE)
+    {
+        RemovePlayerFromSlots(PlayerId);
+    }
+
+    Super::Logout(Exiting);
+
+    RefreshReplicatedLobbyState();
+}
+
+void ALobbyGameMode::SetTotalSlots(int32 InTotalSlots)
+{
+    AuthorityTotalSlots = FMath::Clamp(InTotalSlots, MinLobbySlots, MaxLobbySlots);
+    AuthorityAISlots = FMath::Clamp(AuthorityAISlots, 0, AuthorityTotalSlots - 1);
+    RefreshReplicatedLobbyState();
+}
+
+void ALobbyGameMode::SetAISlots(int32 InAISlots)
+{
+    AuthorityAISlots = FMath::Clamp(InAISlots, 0, AuthorityTotalSlots - 1);
+    RefreshReplicatedLobbyState();
+}
+
+void ALobbyGameMode::AssignPlayerToSlot(ASkaldPlayerState* PlayerState)
+{
+    if (!PlayerState)
+    {
+        return;
+    }
+
+    // Ensure existing assignment removed before reassigning.
+    RemovePlayerFromSlots(PlayerState->GetPlayerId());
+
+    const int32 HumanSlots = AuthorityTotalSlots - AuthorityAISlots;
+    for (int32 Index = 0; Index < HumanSlots; ++Index)
+    {
+        FLobbyPlayerSlot& Slot = AuthoritySlots[Index];
+        if (Slot.PlayerId == INDEX_NONE)
+        {
+            Slot.bIsActive = true;
+            Slot.bIsAI = false;
+            Slot.PlayerId = PlayerState->GetPlayerId();
+            Slot.DisplayName = PlayerState->PlayerDisplayName.IsEmpty() ? PlayerState->GetPlayerName() : PlayerState->PlayerDisplayName;
+            Slot.Faction = PlayerState->Faction;
+            Slot.bIsReady = false;
+            return;
+        }
+    }
+
+    // No free slot; kick the player.
+    if (AController* OwningController = PlayerState->GetOwner<AController>())
+    {
+        OwningController->ClientMessage(TEXT("Lobby is full."));
+        OwningController->ClientTravel(TEXT("/Game/Blueprints/Maps/Skald_Lobby"), TRAVEL_Absolute);
+    }
+}
+
+void ALobbyGameMode::SetPlayerReady(int32 PlayerId, bool bReady)
+{
+    for (FLobbyPlayerSlot& Slot : AuthoritySlots)
+    {
+        if (Slot.PlayerId == PlayerId)
+        {
+            Slot.bIsReady = bReady;
+            break;
+        }
+    }
+
+    RefreshReplicatedLobbyState();
+}
+
+bool ALobbyGameMode::SetPlayerFaction(int32 PlayerId, ESkaldFaction Faction)
+{
+    if (Faction == ESkaldFaction::None)
+    {
+        return false;
+    }
+
+    // Ensure faction not already taken by another active slot.
+    for (const FLobbyPlayerSlot& Slot : AuthoritySlots)
+    {
+        if (Slot.PlayerId != PlayerId && Slot.bIsActive && Slot.Faction == Faction)
+        {
+            return false;
+        }
+    }
+
+    bool bUpdated = false;
+    for (FLobbyPlayerSlot& Slot : AuthoritySlots)
+    {
+        if (Slot.PlayerId == PlayerId)
+        {
+            Slot.Faction = Faction;
+            bUpdated = true;
+            break;
+        }
+    }
+
+    if (bUpdated)
+    {
+        if (AGameStateBase* GS = GetGameState<AGameStateBase>())
+        {
+            for (APlayerState* PSBase : GS->PlayerArray)
+            {
+                if (ASkaldPlayerState* PlayerState = Cast<ASkaldPlayerState>(PSBase))
+                {
+                    if (PlayerState->GetPlayerId() == PlayerId)
+                    {
+                        PlayerState->Faction = Faction;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>())
+        {
+            GI->TakenFactions.Empty();
+            for (const FLobbyPlayerSlot& Slot : AuthoritySlots)
+            {
+                if (Slot.bIsActive && Slot.Faction != ESkaldFaction::None)
+                {
+                    GI->TakenFactions.AddUnique(Slot.Faction);
+                }
+            }
+            GI->OnFactionsUpdated.Broadcast();
+        }
+
+        RefreshReplicatedLobbyState();
+    }
+
+    return bUpdated;
+}
+
+void ALobbyGameMode::SetPlayerDisplayName(int32 PlayerId, const FString& DisplayName)
+{
+    for (FLobbyPlayerSlot& Slot : AuthoritySlots)
+    {
+        if (Slot.PlayerId == PlayerId)
+        {
+            Slot.DisplayName = DisplayName;
+            if (AGameStateBase* GS = GetGameState<AGameStateBase>())
+            {
+                for (APlayerState* PSBase : GS->PlayerArray)
+                {
+                    if (ASkaldPlayerState* PlayerState = Cast<ASkaldPlayerState>(PSBase))
+                    {
+                        if (PlayerState->GetPlayerId() == PlayerId)
+                        {
+                            PlayerState->PlayerDisplayName = DisplayName;
+                            PlayerState->SetPlayerName(DisplayName);
+                            break;
+                        }
+                    }
+                }
+            }
+            break;
+        }
+    }
+
+    RefreshReplicatedLobbyState();
+}
+
+void ALobbyGameMode::TryLaunchMatch(APlayerController* RequestingController)
+{
+    if (!CachedLobbyState)
+    {
+        return;
+    }
+
+    if (!CachedLobbyState->AreAllSlotsReady())
+    {
+        if (RequestingController)
+        {
+            RequestingController->ClientMessage(TEXT("All players must be ready."));
+        }
+        return;
+    }
+
+    if (USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>())
+    {
+        GI->AIPlayersToSpawn = AuthorityAISlots;
+        GI->TakenFactions.Empty();
+        GI->PendingLobbyAIPlayers.Reset();
+
+        if (AGameStateBase* GameState = GetGameState<AGameStateBase>())
+        {
+            for (APlayerState* PlayerStateBase : GameState->PlayerArray)
+            {
+                if (ASkaldPlayerState* PlayerState = Cast<ASkaldPlayerState>(PlayerStateBase))
+                {
+                    const int32 SlotIndex = CachedLobbyState ? CachedLobbyState->FindSlotIndexForPlayer(PlayerState->GetPlayerId()) : INDEX_NONE;
+                    if (SlotIndex != INDEX_NONE && AuthoritySlots.IsValidIndex(SlotIndex))
+                    {
+                        const FLobbyPlayerSlot& Slot = AuthoritySlots[SlotIndex];
+                        PlayerState->Faction = Slot.Faction;
+                        PlayerState->PlayerDisplayName = Slot.DisplayName;
+                        PlayerState->SetPlayerName(Slot.DisplayName);
+                        GI->TakenFactions.AddUnique(Slot.Faction);
+                    }
+                }
+            }
+        }
+
+        for (const FLobbyPlayerSlot& Slot : AuthoritySlots)
+        {
+            if (!Slot.bIsActive || !Slot.bIsAI)
+            {
+                continue;
+            }
+
+            FSkaldAIPlayerConfig Config;
+            Config.DisplayName = Slot.DisplayName;
+            Config.Faction = Slot.Faction;
+            GI->PendingLobbyAIPlayers.Add(Config);
+            if (Slot.Faction != ESkaldFaction::None)
+            {
+                GI->TakenFactions.AddUnique(Slot.Faction);
+            }
+        }
+    }
+
+    if (USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>())
+    {
+        GI->bIsMultiplayer = true;
+        GI->bIsHost = true;
+    }
+
+    UGameplayStatics::OpenLevel(this, FName(TEXT("/Game/Blueprints/Maps/OverviewMap")), true, TEXT("listen"));
+}
+
+FString ALobbyGameMode::GenerateUniqueAIName(TSet<FString>& UsedNames) const
+{
+    TArray<FString> Names = BuildAINames();
+    Algo::RandomShuffle(Names);
+
+    for (const FString& Candidate : Names)
+    {
+        if (!UsedNames.Contains(Candidate))
+        {
+            UsedNames.Add(Candidate);
+            return Candidate;
+        }
+    }
+
+    int32 Suffix = 1;
+    FString Generated;
+    do
+    {
+        Generated = FString::Printf(TEXT("AI_%d"), Suffix++);
+    } while (UsedNames.Contains(Generated));
+
+    UsedNames.Add(Generated);
+    return Generated;
+}
+
+ESkaldFaction ALobbyGameMode::GenerateUniqueAIFaction(TArray<ESkaldFaction>& TakenFactions) const
+{
+    TArray<ESkaldFaction> Pool = BuildFactionPool();
+    for (const ESkaldFaction Existing : TakenFactions)
+    {
+        Pool.Remove(Existing);
+    }
+
+    if (Pool.Num() == 0)
+    {
+        return ESkaldFaction::None;
+    }
+
+    const int32 Index = FMath::RandRange(0, Pool.Num() - 1);
+    const ESkaldFaction Selected = Pool[Index];
+    TakenFactions.Add(Selected);
+    return Selected;
+}
+
+void ALobbyGameMode::RefreshReplicatedLobbyState()
+{
+    if (!CachedLobbyState)
+    {
+        CachedLobbyState = GetGameState<ALobbyGameState>();
+        if (!CachedLobbyState)
+        {
+            return;
+        }
+    }
+
+    AuthoritySlots.SetNum(MaxLobbySlots);
+
+    // Initialize slot metadata.
+    const int32 HumanSlots = FMath::Clamp(AuthorityTotalSlots - AuthorityAISlots, 1, MaxLobbySlots);
+    const int32 AISlots = FMath::Clamp(AuthorityAISlots, 0, MaxLobbySlots - 1);
+
+    TSet<FString> UsedNames;
+    TArray<ESkaldFaction> TakenFactions;
+
+    // Track any existing player names/factions.
+    for (FLobbyPlayerSlot& Slot : AuthoritySlots)
+    {
+        if (Slot.bIsActive && !Slot.bIsAI && !Slot.DisplayName.IsEmpty())
+        {
+            UsedNames.Add(Slot.DisplayName);
+        }
+        if (Slot.bIsActive && Slot.Faction != ESkaldFaction::None)
+        {
+            TakenFactions.AddUnique(Slot.Faction);
+        }
+    }
+
+    for (int32 Index = 0; Index < MaxLobbySlots; ++Index)
+    {
+        FLobbyPlayerSlot& Slot = AuthoritySlots[Index];
+        Slot.bIsActive = Index < AuthorityTotalSlots;
+        Slot.bIsReady = Slot.bIsActive ? Slot.bIsReady : false;
+
+        if (!Slot.bIsActive)
+        {
+            Slot.bIsAI = false;
+            Slot.PlayerId = INDEX_NONE;
+            Slot.DisplayName.Reset();
+            Slot.Faction = ESkaldFaction::None;
+            continue;
+        }
+
+        if (Index >= HumanSlots)
+        {
+            Slot.bIsAI = true;
+            Slot.PlayerId = INDEX_NONE;
+            if (Slot.DisplayName.IsEmpty())
+            {
+                Slot.DisplayName = GenerateUniqueAIName(UsedNames);
+            }
+            if (Slot.Faction == ESkaldFaction::None)
+            {
+                Slot.Faction = GenerateUniqueAIFaction(TakenFactions);
+            }
+            Slot.bIsReady = true;
+        }
+        else
+        {
+            Slot.bIsAI = false;
+            if (Slot.PlayerId == INDEX_NONE)
+            {
+                Slot.DisplayName.Reset();
+                Slot.Faction = ESkaldFaction::None;
+                Slot.bIsReady = false;
+            }
+        }
+    }
+
+    CachedLobbyState->LobbySlots = AuthoritySlots;
+    CachedLobbyState->TotalSlots = AuthorityTotalSlots;
+    CachedLobbyState->ReservedAISlots = AuthorityAISlots;
+    CachedLobbyState->ForceNetUpdate();
+    CachedLobbyState->OnLobbySlotsUpdated.Broadcast();
+}
+
+void ALobbyGameMode::RemovePlayerFromSlots(int32 PlayerId)
+{
+    for (FLobbyPlayerSlot& Slot : AuthoritySlots)
+    {
+        if (Slot.PlayerId == PlayerId)
+        {
+            Slot.PlayerId = INDEX_NONE;
+            Slot.DisplayName.Reset();
+            Slot.Faction = ESkaldFaction::None;
+            Slot.bIsReady = false;
+        }
+    }
 }
 
