@@ -249,6 +249,8 @@ void ULobbySessionWidget::BuildLayout()
                     Combo->AddOption(Option);
                 }
 
+                Combo->RefreshOptions();
+
                 if (!CurrentSelection.IsEmpty())
                 {
                     if (ExistingOptions.Contains(CurrentSelection))
