@@ -228,9 +228,9 @@ bool ALobbyPlayerController::IsLocalPlayerLobbyHost() const
     {
         if (const ALobbyGameState* LobbyState = World->GetGameState<ALobbyGameState>())
         {
-            if (const ASkaldPlayerState* PlayerState = GetPlayerState<ASkaldPlayerState>())
+            if (const ASkaldPlayerState* LocalPlayerState = GetPlayerState<ASkaldPlayerState>())
             {
-                const int32 SlotIndex = LobbyState->FindSlotIndexForPlayer(PlayerState->GetPlayerId());
+                const int32 SlotIndex = LobbyState->FindSlotIndexForPlayer(LocalPlayerState->GetPlayerId());
                 if (SlotIndex != INDEX_NONE)
                 {
                     if (const FLobbyPlayerSlot* Slot = LobbyState->GetSlot(SlotIndex))
@@ -260,9 +260,9 @@ bool ALobbyPlayerController::IsLobbyHostOnServer() const
 
         if (const ALobbyGameState* LobbyState = World->GetGameState<ALobbyGameState>())
         {
-            if (const ASkaldPlayerState* PlayerState = GetPlayerState<ASkaldPlayerState>())
+            if (const ASkaldPlayerState* LocalPlayerState = GetPlayerState<ASkaldPlayerState>())
             {
-                const int32 SlotIndex = LobbyState->FindSlotIndexForPlayer(PlayerState->GetPlayerId());
+                const int32 SlotIndex = LobbyState->FindSlotIndexForPlayer(LocalPlayerState->GetPlayerId());
                 if (SlotIndex == 0)
                 {
                     if (const FLobbyPlayerSlot* Slot = LobbyState->GetSlot(SlotIndex))
