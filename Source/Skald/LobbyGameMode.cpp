@@ -365,7 +365,18 @@ void ALobbyGameMode::TryLaunchMatch(APlayerController* RequestingController)
         GI->bIsHost = true;
     }
 
-    UGameplayStatics::OpenLevel(this, FName(TEXT("/Game/Blueprints/Maps/OverviewMap")), true, TEXT("listen"));
+    if (UWorld* World = GetWorld())
+    {
+        const FString TargetMap = TEXT("/Game/Blueprints/Maps/OverviewMap?listen");
+        if (World->IsNetMode(NM_Standalone))
+        {
+            UGameplayStatics::OpenLevel(this, FName(TEXT("/Game/Blueprints/Maps/OverviewMap")), true, TEXT("listen"));
+        }
+        else
+        {
+            World->ServerTravel(TargetMap, /*bAbsolute=*/false);
+        }
+    }
 }
 
 FString ALobbyGameMode::GenerateUniqueAIName(TSet<FString>& UsedNames) const
