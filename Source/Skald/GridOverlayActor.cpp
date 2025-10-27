@@ -79,8 +79,8 @@ void AGridOverlayActor::SpawnRandomObstacles() {
   }
 
   const int32 GridWidth = GridComponent->GetWidth();
-  const int32 GridHeight = GridComponent->GetHeight();
-  if (GridWidth <= 0 || GridHeight <= 0) {
+  const int32 GridLength = GridComponent->GetLength();
+  if (GridWidth <= 0 || GridLength <= 0) {
     return;
   }
 
@@ -108,7 +108,7 @@ void AGridOverlayActor::SpawnRandomObstacles() {
     return;
   }
 
-  const int32 MaxCells = UsableColumns * GridHeight;
+  const int32 MaxCells = UsableColumns * GridLength;
   if (MaxCells <= 0) {
     return;
   }
@@ -179,7 +179,7 @@ void AGridOverlayActor::SpawnRandomObstacles() {
     }
 
     const int32 CellX = RandomStream.RandRange(MinCellX, MaxCellX);
-    const int32 CellY = RandomStream.RandRange(0, GridHeight - 1);
+    const int32 CellY = RandomStream.RandRange(0, GridLength - 1);
     const FIntPoint Cell(CellX, CellY);
 
     if (!GridComponent->IsCellInBounds(Cell)) {

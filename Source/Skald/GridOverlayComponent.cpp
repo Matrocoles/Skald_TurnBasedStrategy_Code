@@ -117,9 +117,15 @@ UGridOverlayComponent::UGridOverlayComponent() {
 
 int32 UGridOverlayComponent::GetWidth() const { return Width; }
 
+int32 UGridOverlayComponent::GetLength() const { return Length; }
+
 int32 UGridOverlayComponent::GetHeight() const { return Height; }
 
 float UGridOverlayComponent::GetCellSize() const { return CellSize; }
+
+TArray<FGridCell3D> UGridOverlayComponent::GetGeneratedCells() const {
+  return GeneratedCells;
+}
 
 FVector UGridOverlayComponent::GetOrigin() const { return Origin; }
 
@@ -291,7 +297,7 @@ void UGridOverlayComponent::BeginPlay() {
 
   RefreshOriginFromOwner(false);
 
-  const int32 TotalCells = Width * Height;
+  const int32 TotalCells = Width * Length;
   Cells.Init(false, TotalCells);
   ObscuredCells.Init(false, TotalCells);
   DynamicOccupiedCells.Init(false, TotalCells);
@@ -333,13 +339,17 @@ void UGridOverlayComponent::BeginPlay() {
 }
 
 void UGridOverlayComponent::RefreshGridDataFromOrigin() {
-  const int32 TotalCells = Width * Height;
+  const int32 TotalCells = Width * Length;
   if (TotalCells <= 0) {
     Cells.Empty();
     ObscuredCells.Empty();
     CellHeights.Empty();
     CellRotations.Empty();
     DynamicOccupiedCells.Empty();
+    ColumnMaxHeights.Empty();
+    ColumnHasClimbable.Empty();
+    ColumnTouchesTerrain.Empty();
+    GeneratedCells.Empty();
     RebuildBaseGridInstances();
     return;
   }
@@ -350,6 +360,9 @@ void UGridOverlayComponent::RefreshGridDataFromOrigin() {
   CellRotations.Init(FQuat::Identity, TotalCells);
 
   DynamicOccupiedCells.Init(false, TotalCells);
+  ColumnMaxHeights.Init(Origin.Z, TotalCells);
+  ColumnHasClimbable.Init(false, TotalCells);
+  ColumnTouchesTerrain.Init(false, TotalCells);
 
   SampleEnvironmentAtOrigin();
 
@@ -364,6 +377,7 @@ void UGridOverlayComponent::RefreshGridDataFromOrigin() {
   }
 
   RebuildBaseGridInstances();
+  BuildGeneratedCells();
 }
 
 void UGridOverlayComponent::SampleCellAt(const FIntPoint &GridCoord, float TraceHalfHeight,
@@ -397,17 +411,29 @@ void UGridOverlayComponent::SampleCellAt(const FIntPoint &GridCoord, float Trace
     CellRotations[Idx] =
         FRotationMatrix::MakeFromZ(Hit.Normal.GetSafeNormal()).ToQuat();
 
+    if (ColumnMaxHeights.IsValidIndex(Idx)) {
+      ColumnMaxHeights[Idx] =
+          FMath::Max(ColumnMaxHeights[Idx], CellHeights[Idx] + CellSize);
+    }
+
     if (Cast<ULandscapeComponent>(Hit.GetComponent())) {
       HandleLandscapeHit(Hit, GridCoord, Idx);
+      if (ColumnTouchesTerrain.IsValidIndex(Idx)) {
+        ColumnTouchesTerrain[Idx] = true;
+      }
     }
   } else {
     CellHeights[Idx] = WorldCenter.Z;
     CellRotations[Idx] = FQuat::Identity;
+    if (ColumnMaxHeights.IsValidIndex(Idx)) {
+      ColumnMaxHeights[Idx] =
+          FMath::Max(ColumnMaxHeights[Idx], CellHeights[Idx] + CellSize);
+    }
   }
 }
 
 void UGridOverlayComponent::SampleEnvironmentAtOrigin() {
-  if (Width <= 0 || Height <= 0) {
+  if (Width <= 0 || Length <= 0) {
     return;
   }
 
@@ -416,7 +442,7 @@ void UGridOverlayComponent::SampleEnvironmentAtOrigin() {
     return;
   }
 
-  for (int32 Y = 0; Y < Height; ++Y) {
+  for (int32 Y = 0; Y < Length; ++Y) {
     for (int32 X = 0; X < Width; ++X) {
       SampleCellAt(FIntPoint(X, Y), SamplingTraceHalfHeight, World);
     }
@@ -443,7 +469,7 @@ FVector UGridOverlayComponent::GridToWorld(const FIntPoint &GridCoord) const {
 
 bool UGridOverlayComponent::IsValidGrid(const FIntPoint &GridCoord) const {
   return GridCoord.X >= 0 && GridCoord.X < Width && GridCoord.Y >= 0 &&
-         GridCoord.Y < Height;
+         GridCoord.Y < Length;
 }
 
 int32 UGridOverlayComponent::Index(const FIntPoint &GridCoord) const {
@@ -867,7 +893,7 @@ void UGridOverlayComponent::RebuildBaseGridInstances() {
     return;
   }
 
-  const int32 TotalCells = Width * Height;
+  const int32 TotalCells = Width * Length;
   if (TotalCells <= 0) {
     if (bUseDecalBaseGrid) {
       ClearBaseGridDecals();
@@ -901,7 +927,7 @@ void UGridOverlayComponent::RebuildBaseGridInstances() {
     const float EffectiveCellSize = FMath::Max(CellSize, KINDA_SMALL_NUMBER);
     const float HalfSize = 0.5f * EffectiveCellSize * BaseGridDecalSizeMultiplier;
 
-    for (int32 Y = 0; Y < Height; ++Y) {
+    for (int32 Y = 0; Y < Length; ++Y) {
       for (int32 X = 0; X < Width; ++X) {
         const FIntPoint Cell(X, Y);
         const int32 ArrayIndex = Index(Cell);
@@ -989,9 +1015,9 @@ void UGridOverlayComponent::RebuildBaseGridInstances() {
   const float EffectiveCellSize = FMath::Max(CellSize, KINDA_SMALL_NUMBER);
   const FVector InstanceScale(EffectiveCellSize / 100.f, EffectiveCellSize / 100.f, 1.f);
 
-  for (int32 Y = 0; Y < Height; ++Y) {
-    for (int32 X = 0; X < Width; ++X) {
-      const FIntPoint Cell(X, Y);
+    for (int32 Y = 0; Y < Length; ++Y) {
+      for (int32 X = 0; X < Width; ++X) {
+        const FIntPoint Cell(X, Y);
       const FVector WorldCenter =
           GridToWorld(Cell) + FVector(0.f, 0.f, GridHeightOffset);
       const int32 ArrayIndex = Index(Cell);
@@ -1247,10 +1273,19 @@ void UGridOverlayComponent::ApplyObstacleToGrid(UGridObstacleComponent *Obstacle
         if (bResampleCells) {
           SampleCellAt(Cell, EffectiveTraceHalfHeight, World);
         }
+
+        if (ColumnMaxHeights.IsValidIndex(Idx)) {
+          ColumnMaxHeights[Idx] =
+              FMath::Max(ColumnMaxHeights[Idx], Bounds.Max.Z);
+        }
+
         if (Obstacle->bClimbable) {
           CellHeights[Idx] = Bounds.Max.Z;
           Cells[Idx] = false;
           ObscuredCells[Idx] = false;
+          if (ColumnHasClimbable.IsValidIndex(Idx)) {
+            ColumnHasClimbable[Idx] = true;
+          }
         } else {
           if (Obstacle->bBlocksMovement) {
             Cells[Idx] = true;
@@ -1263,6 +1298,8 @@ void UGridOverlayComponent::ApplyObstacleToGrid(UGridObstacleComponent *Obstacle
       }
     }
   }
+
+  BuildGeneratedCells();
 }
 
 void UGridOverlayComponent::ClearStaticObstacleAtCell(
@@ -1278,8 +1315,15 @@ void UGridOverlayComponent::ClearStaticObstacleAtCell(
   if (ObscuredCells.IsValidIndex(Idx)) {
     ObscuredCells[Idx] = false;
   }
+  if (ColumnHasClimbable.IsValidIndex(Idx)) {
+    ColumnHasClimbable[Idx] = false;
+  }
+  if (ColumnMaxHeights.IsValidIndex(Idx) && CellHeights.IsValidIndex(Idx)) {
+    ColumnMaxHeights[Idx] = CellHeights[Idx] + CellSize;
+  }
 
   UpdateBaseGridVisual(GridCoord);
+  BuildGeneratedCells();
 }
 
 void UGridOverlayComponent::HandleLandscapeHit(const FHitResult &Hit,
@@ -1300,6 +1344,96 @@ void UGridOverlayComponent::HandleLandscapeHit(const FHitResult &Hit,
     }
     UpdateBaseGridVisual(Cell);
   }
+
+  if (ColumnTouchesTerrain.IsValidIndex(CellIndex)) {
+    ColumnTouchesTerrain[CellIndex] = true;
+  }
+}
+
+void UGridOverlayComponent::BuildGeneratedCells() {
+  GeneratedCells.Reset();
+
+  if (Width <= 0 || Length <= 0 || Height <= 0) {
+    return;
+  }
+
+  const float EffectiveCellSize = FMath::Max(CellSize, KINDA_SMALL_NUMBER);
+  GeneratedCells.Reserve(Width * Length * Height);
+
+  for (int32 Y = 0; Y < Length; ++Y) {
+    for (int32 X = 0; X < Width; ++X) {
+      const FIntPoint Cell(X, Y);
+      const int32 ColumnIndex = Index(Cell);
+      if (!CellHeights.IsValidIndex(ColumnIndex)) {
+        continue;
+      }
+
+      const float BaseHeight = CellHeights[ColumnIndex];
+      const float MaxHeight = ColumnMaxHeights.IsValidIndex(ColumnIndex)
+                                  ? ColumnMaxHeights[ColumnIndex]
+                                  : (BaseHeight + EffectiveCellSize);
+      const float ColumnSpan =
+          FMath::Max(MaxHeight - BaseHeight, EffectiveCellSize);
+      const int32 Layers =
+          FMath::Clamp(FMath::CeilToInt(ColumnSpan / EffectiveCellSize), 1, Height);
+
+      const bool bBlocked = Cells.IsValidIndex(ColumnIndex) && Cells[ColumnIndex];
+      const bool bObscured =
+          ObscuredCells.IsValidIndex(ColumnIndex) && ObscuredCells[ColumnIndex];
+      const bool bAllowsClimb = ColumnHasClimbable.IsValidIndex(ColumnIndex) &&
+                                ColumnHasClimbable[ColumnIndex];
+
+      FVector BaseCenter = GridToWorld(Cell);
+      BaseCenter.Z = BaseHeight;
+
+      for (int32 Layer = 0; Layer < Layers; ++Layer) {
+        FGridCell3D GeneratedCell;
+        GeneratedCell.GridCoord = FIntVector(X, Y, Layer);
+        const float FloorHeight = BaseHeight + Layer * EffectiveCellSize;
+        GeneratedCell.FloorHeight = FloorHeight;
+        GeneratedCell.CeilingHeight = FloorHeight + EffectiveCellSize;
+
+        FVector LayerCenter = BaseCenter;
+        LayerCenter.Z = FloorHeight + 0.5f * EffectiveCellSize;
+        GeneratedCell.Center = LayerCenter;
+        GeneratedCell.bBlocked = bBlocked;
+        GeneratedCell.bObscured = bObscured;
+        GeneratedCell.bAllowsClimb = bAllowsClimb;
+
+        GeneratedCells.Add(GeneratedCell);
+      }
+    }
+  }
+}
+
+bool UGridOverlayComponent::CanTraverseVertical(const FIntPoint &From,
+                                                const FIntPoint &To) const {
+  const float FromHeight = GetCellHeight(From);
+  const float ToHeight = GetCellHeight(To);
+  const float HeightDelta = FMath::Abs(ToHeight - FromHeight);
+
+  if (HeightDelta <= KINDA_SMALL_NUMBER) {
+    return true;
+  }
+
+  const float MaxVertical = CellSize * FMath::Max(Height, 1);
+  if (HeightDelta > MaxVertical) {
+    return false;
+  }
+
+  const int32 FromIndex = Index(From);
+  const int32 ToIndex = Index(To);
+
+  const bool bFromClimbable = ColumnHasClimbable.IsValidIndex(FromIndex) &&
+                              ColumnHasClimbable[FromIndex];
+  const bool bToClimbable = ColumnHasClimbable.IsValidIndex(ToIndex) &&
+                            ColumnHasClimbable[ToIndex];
+  const bool bFromTerrain = ColumnTouchesTerrain.IsValidIndex(FromIndex) &&
+                            ColumnTouchesTerrain[FromIndex];
+  const bool bToTerrain = ColumnTouchesTerrain.IsValidIndex(ToIndex) &&
+                          ColumnTouchesTerrain[ToIndex];
+
+  return bFromClimbable || bToClimbable || bFromTerrain || bToTerrain;
 }
 
 void UGridOverlayComponent::HighlightMovement(AFighterPawn *Fighter) {
@@ -1371,6 +1505,9 @@ void UGridOverlayComponent::HighlightMovement(AFighterPawn *Fighter) {
       if (Visited.Contains(Next)) {
         continue;
       }
+      if (!CanTraverseVertical(Cell, Next)) {
+        continue;
+      }
       if (!CanOccupyAnchor(Next)) {
         continue;
       }
@@ -1432,7 +1569,7 @@ void UGridOverlayComponent::HighlightAttack(AFighterPawn *Fighter) {
   }
 
   const int32 GridWidth = GetWidth();
-  const int32 GridHeight = GetHeight();
+  const int32 GridHeight = GetLength();
 
   for (int32 Y = 0; Y < GridHeight; ++Y) {
     for (int32 X = 0; X < GridWidth; ++X) {
