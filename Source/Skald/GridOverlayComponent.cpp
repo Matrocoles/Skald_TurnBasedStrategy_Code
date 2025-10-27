@@ -303,6 +303,9 @@ void UGridOverlayComponent::BeginPlay() {
   DynamicOccupiedCells.Init(false, TotalCells);
   CellHeights.Init(Origin.Z, TotalCells);
   CellRotations.Init(FQuat::Identity, TotalCells);
+  ColumnMaxHeights.Init(Origin.Z, TotalCells);
+  ColumnHasClimbable.Init(false, TotalCells);
+  ColumnTouchesTerrain.Init(false, TotalCells);
   if (bUseDecalBaseGrid) {
     BaseGridInstanceIndices.Empty();
     ClearBaseGridDecals();
@@ -327,6 +330,8 @@ void UGridOverlayComponent::BeginPlay() {
   }
 
   RebuildBaseGridInstances();
+
+  BuildGeneratedCells();
 
   if (PendingOccupancyUpdates.Num() > 0) {
     const TArray<FPendingGridOccupancyUpdate> OccupancyToApply =
