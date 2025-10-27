@@ -793,7 +793,7 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
           if (Visited.Contains(Next)) {
             continue;
           }
-          if (Grid && !Grid->CanTraverseVerticalCells(Cell, Next)) {
+          if (Grid && !Grid->CanTraverseVertical(Cell, Next)) {
             continue;
           }
           if (!CanOccupyAnchor(Next)) {
