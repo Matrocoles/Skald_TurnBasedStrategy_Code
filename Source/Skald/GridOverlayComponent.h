@@ -5,32 +5,6 @@
 #include "GridBattleManager.h"
 #include "GridOverlayComponent.generated.h"
 
-USTRUCT(BlueprintType)
-struct FGridCell3D {
-  GENERATED_BODY()
-
-  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid")
-  FIntVector GridCoord = FIntVector::ZeroValue;
-
-  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid")
-  FVector Center = FVector::ZeroVector;
-
-  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid")
-  float FloorHeight = 0.f;
-
-  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid")
-  float CeilingHeight = 0.f;
-
-  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid")
-  bool bBlocked = false;
-
-  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid")
-  bool bObscured = false;
-
-  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid")
-  bool bAllowsClimb = false;
-};
-
 class AFighterPawn;
 class UGridObstacleComponent;
 struct FHitResult;
@@ -90,9 +64,6 @@ public:
 
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Grid")
   int32 GetWidth() const;
-
-  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Grid")
-  int32 GetLength() const;
 
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Grid")
   int32 GetHeight() const;
@@ -170,10 +141,6 @@ public:
   /** Rebuild the persistent grid overlay instances. */
   UFUNCTION(BlueprintCallable, Category = "Grid")
   void RebuildGridVisuals();
-
-  /** Access the generated 3D grid cells. */
-  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Grid")
-  TArray<FGridCell3D> GetGeneratedCells() const;
 
   /** Register an obstacle component so it can affect grid behaviour. */
   UFUNCTION(BlueprintCallable, Category = "Grid")
@@ -352,13 +319,9 @@ protected:
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid")
   int32 Width = UGridBattleManager::GridSize;
 
-  /** Length of the grid in cells (Y axis). */
+  /** Height of the grid in cells. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid")
-  int32 Length = UGridBattleManager::GridSize;
-
-  /** Height of the grid in cells (Z axis). */
-  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid", meta = (ClampMin = "1"))
-  int32 Height = 1;
+  int32 Height = UGridBattleManager::GridSize;
 
   /** Size of one cell in world units. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid")
@@ -388,18 +351,6 @@ protected:
   /** Cached world-space rotation for each grid cell. */
   UPROPERTY()
   TArray<FQuat> CellRotations;
-
-  /** Maximum sampled height for each grid column. */
-  UPROPERTY()
-  TArray<float> ColumnMaxHeights;
-
-  /** Whether a grid column overlaps a climbable obstacle. */
-  UPROPERTY()
-  TArray<bool> ColumnHasClimbable;
-
-  /** Whether a grid column touches sampled terrain. */
-  UPROPERTY()
-  TArray<bool> ColumnTouchesTerrain;
 
   /** Guard to ensure placement randomisation is only applied once. */
   bool bHasRandomizedPlacement = false;
@@ -446,16 +397,6 @@ protected:
   /** Tracks cells currently occupied by dynamic actors. */
   UPROPERTY(Transient)
   TArray<bool> DynamicOccupiedCells;
-
-  /** Generated 3D grid cells. */
-  UPROPERTY(Transient)
-  TArray<FGridCell3D> GeneratedCells;
-
-  /** Determine if movement between two cells is allowed vertically. */
-  bool CanTraverseVertical(const FIntPoint &From, const FIntPoint &To) const;
-
-  /** Regenerate cached 3D grid cells. */
-  void BuildGeneratedCells();
 
   /** Obstacles awaiting registration until the grid has initialised. */
   UPROPERTY(Transient)
