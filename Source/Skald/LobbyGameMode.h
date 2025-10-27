@@ -75,5 +75,8 @@ protected:
 
     /** Number of AI slots requested by the host. */
     int32 AuthorityAISlots;
+
+    /** Once true the host can no longer change slot counts. */
+    bool bSlotConfigurationLocked = false;
 };
 

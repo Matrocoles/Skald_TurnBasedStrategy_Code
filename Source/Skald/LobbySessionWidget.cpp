@@ -356,18 +356,19 @@ void ULobbySessionWidget::RefreshSlot(int32 SlotIndex, const FLobbyPlayerSlot& S
 void ULobbySessionWidget::UpdateHostControls(int32 TotalSlots, int32 AISlots, bool bAllReady)
 {
     const bool bIsHost = CachedController && CachedController->HasAuthority();
+    const bool bConfigurationLocked = CachedGameState && CachedGameState->bSlotConfigurationLocked;
 
     if (PlayerCountSpinBox)
     {
         PlayerCountSpinBox->SetValue(static_cast<float>(TotalSlots));
-        PlayerCountSpinBox->SetIsEnabled(bIsHost);
+        PlayerCountSpinBox->SetIsEnabled(bIsHost && !bConfigurationLocked);
     }
 
     if (AICountSpinBox)
     {
         AICountSpinBox->SetMaxValue(static_cast<float>(FMath::Max(0, TotalSlots - 1)));
         AICountSpinBox->SetValue(static_cast<float>(AISlots));
-        AICountSpinBox->SetIsEnabled(bIsHost);
+        AICountSpinBox->SetIsEnabled(bIsHost && !bConfigurationLocked);
     }
 
     if (LaunchButton)

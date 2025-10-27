@@ -67,6 +67,7 @@ ALobbyGameMode::ALobbyGameMode()
     : CachedLobbyState(nullptr)
     , AuthorityTotalSlots(MinLobbySlots)
     , AuthorityAISlots(0)
+    , bSlotConfigurationLocked(false)
 {
     bUseSeamlessTravel = true;
     AuthoritySlots.SetNum(MaxLobbySlots);
@@ -102,6 +103,18 @@ void ALobbyGameMode::PostLogin(APlayerController* NewPlayer)
     }
 
     AssignPlayerToSlot(PlayerState);
+
+    if (!bSlotConfigurationLocked)
+    {
+        if (AGameStateBase* GS = GetGameState<AGameStateBase>())
+        {
+            if (GS->PlayerArray.Num() > 1)
+            {
+                bSlotConfigurationLocked = true;
+            }
+        }
+    }
+
     RefreshReplicatedLobbyState();
 }
 
@@ -121,6 +134,12 @@ void ALobbyGameMode::Logout(AController* Exiting)
 
 void ALobbyGameMode::SetTotalSlots(int32 InTotalSlots)
 {
+    if (bSlotConfigurationLocked)
+    {
+        UE_LOG(LogSkald, Warning, TEXT("Slot configuration locked; ignoring SetTotalSlots."));
+        return;
+    }
+
     AuthorityTotalSlots = FMath::Clamp(InTotalSlots, MinLobbySlots, MaxLobbySlots);
     AuthorityAISlots = FMath::Clamp(AuthorityAISlots, 0, AuthorityTotalSlots - 1);
     RefreshReplicatedLobbyState();
@@ -128,6 +147,12 @@ void ALobbyGameMode::SetTotalSlots(int32 InTotalSlots)
 
 void ALobbyGameMode::SetAISlots(int32 InAISlots)
 {
+    if (bSlotConfigurationLocked)
+    {
+        UE_LOG(LogSkald, Warning, TEXT("Slot configuration locked; ignoring SetAISlots."));
+        return;
+    }
+
     AuthorityAISlots = FMath::Clamp(InAISlots, 0, AuthorityTotalSlots - 1);
     RefreshReplicatedLobbyState();
 }
@@ -461,6 +486,7 @@ void ALobbyGameMode::RefreshReplicatedLobbyState()
     CachedLobbyState->LobbySlots = AuthoritySlots;
     CachedLobbyState->TotalSlots = AuthorityTotalSlots;
     CachedLobbyState->ReservedAISlots = AuthorityAISlots;
+    CachedLobbyState->bSlotConfigurationLocked = bSlotConfigurationLocked;
     CachedLobbyState->ForceNetUpdate();
     CachedLobbyState->OnLobbySlotsUpdated.Broadcast();
 }

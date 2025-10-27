@@ -30,6 +30,10 @@ public:
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_AISlots, Category = "Lobby")
     int32 ReservedAISlots = 0;
 
+    /** True once another player has joined, preventing further slot reconfiguration. */
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_SlotConfigurationLocked, Category = "Lobby")
+    bool bSlotConfigurationLocked = false;
+
     /** Fired whenever the replicated lobby data changes. */
     UPROPERTY(BlueprintAssignable, Category = "Lobby|Events")
     FLobbySlotsUpdated OnLobbySlotsUpdated;
@@ -53,6 +57,9 @@ protected:
 
     UFUNCTION()
     void OnRep_AISlots();
+
+    UFUNCTION()
+    void OnRep_SlotConfigurationLocked();
 
     void BroadcastSlotsUpdated();
 };
