@@ -232,8 +232,38 @@ void ULobbySessionWidget::BuildLayout()
             const int32 PlaceholderIndex = Combo->FindOptionIndex(FactionPlaceholder);
             if (PlaceholderIndex == INDEX_NONE)
             {
-                Combo->InsertOptionAt(0, FactionPlaceholder);
-                Combo->RefreshOptions();
+                const FString CurrentSelection = Combo->GetSelectedOption();
+
+                TArray<FString> ExistingOptions;
+                ExistingOptions.Reserve(Combo->GetOptionCount());
+                for (int32 OptionIndex = 0; OptionIndex < Combo->GetOptionCount(); ++OptionIndex)
+                {
+                    ExistingOptions.Add(Combo->GetOptionAtIndex(OptionIndex));
+                }
+
+                Combo->ClearOptions();
+                Combo->AddOption(FactionPlaceholder);
+
+                for (const FString& Option : ExistingOptions)
+                {
+                    Combo->AddOption(Option);
+                }
+
+                if (!CurrentSelection.IsEmpty())
+                {
+                    if (ExistingOptions.Contains(CurrentSelection))
+                    {
+                        Combo->SetSelectedOption(CurrentSelection);
+                    }
+                    else
+                    {
+                        Combo->SetSelectedOption(FactionPlaceholder);
+                    }
+                }
+                else
+                {
+                    Combo->SetSelectedOption(FactionPlaceholder);
+                }
             }
         };
 
