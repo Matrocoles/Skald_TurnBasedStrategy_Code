@@ -101,8 +101,8 @@ private:
   bool bPendingPhaseAdvance = false;
 
   /** Time between AI phase processing steps on the world map. */
-  UPROPERTY(EditAnywhere, Category = "Turn|AI", meta = (ClampMin = "0.0"))
-  float EnemyTurnStepDelay = 0.75f;
+  UPROPERTY(EditAnywhere, Category = "Turn|AI", meta = (ClampMin = "5.0"))
+  float EnemyTurnStepDelay = 5.0f;
 
   /** Additional delay after AI reinforcements deploy to allow UI updates. */
   UPROPERTY(EditAnywhere, Category = "Turn|AI", meta = (ClampMin = "0.0"))

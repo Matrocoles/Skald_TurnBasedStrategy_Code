@@ -52,9 +52,12 @@ void ASkaldAIController::BeginPlay() {
 
   if (const USkaldGameUserSettings *Settings =
           USkaldGameUserSettings::GetSkaldGameUserSettings()) {
-    EnemyTurnStepDelay = Settings->GetEnemyTurnStepDelay();
-    BattleActionDelay = Settings->GetBattleActionDelay();
-    BattleActionDelay = FMath::Max(1.0f, BattleActionDelay);
+    EnemyTurnStepDelay =
+        FMath::Max(Settings->GetEnemyTurnStepDelay(),
+                   USkaldGameUserSettings::MinimumEnemyTurnStepDelay);
+    BattleActionDelay =
+        FMath::Max(Settings->GetBattleActionDelay(),
+                   USkaldGameUserSettings::MinimumBattleActionDelay);
   }
 
   USkaldGameInstance *GameInstance = GetGameInstance<USkaldGameInstance>();
