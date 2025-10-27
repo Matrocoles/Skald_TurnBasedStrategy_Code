@@ -369,6 +369,10 @@ public:
     void ReportSimulatedAttackResolution(const FDiceRollResult& Result);
     void ReportAttackRejected(AFighterPawn* Attacker, AFighterPawn* Defender, const FText& Reason);
 
+    /** Snapshot of the current initiative ordering. */
+    UFUNCTION(BlueprintCallable, Category="Battle|Turn")
+    TArray<AFighterPawn*> GetInitiativeOrderSnapshot() const;
+
     bool RegisterPendingFighterDeath(AFighterPawn* Fighter);
 
     /** Table containing fighter definitions. */

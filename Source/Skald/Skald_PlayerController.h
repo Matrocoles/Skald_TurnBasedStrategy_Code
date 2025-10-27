@@ -27,6 +27,7 @@ class USkaldGameInstance;
 class UFighterSelectionWidget;
 class AWorldMap;
 class AFighterPawn;
+class AActor;
 class UGridOverlayComponent;
 class UWorld;
 class ASkald_BattleGameMode;
@@ -699,6 +700,12 @@ private:
   void UpdateBattleRoundDisplay(int32 RoundNumber, ESkaldFaction InitiativeWinner);
   void UpdateBattleTerritoryLabel();
   void UpdateBattlePlayersTurnDisplay();
+  void RefreshLockedInFighterList();
+  void RefreshLockedInFighterTurnStates();
+  void RegisterObservedFighter(AFighterPawn *Fighter);
+  void HandleActorSpawned(AActor *SpawnedActor);
+  void UpdateLockedInSelectionHighlight();
+  void UpdateLockedInActiveHighlight();
   UFUNCTION()
   void HandleAttackResolved(AFighterPawn *Attacker, AFighterPawn *Defender,
                             const FDiceRollResult &Result);
@@ -730,6 +737,10 @@ private:
   UFUNCTION()
   void HandleAttackRejected(AFighterPawn *Attacker, AFighterPawn *Defender,
                             const FText &Reason);
+  UFUNCTION()
+  void HandleLockedInEntrySelected(AFighterPawn *Fighter);
+  UFUNCTION()
+  void HandleTrackedFighterDestroyed(AActor *DestroyedActor);
   bool IsFriendlyFighter(const AFighterPawn *Fighter) const;
   void DetermineControlledBattleSide();
   void TryDispatchPendingAttackPresentationNotifications();
@@ -740,6 +751,12 @@ private:
 
   UPROPERTY()
   TObjectPtr<AFighterPawn> LockedActiveFighter;
+
+  /** Friendly fighters tracked for HUD list synchronization. */
+  TSet<TWeakObjectPtr<AFighterPawn>> ObservedFriendlyFighters;
+
+  /** Delegate handle used to watch for fighter spawns. */
+  FDelegateHandle FighterSpawnedHandle;
 
   bool bControlsAttackerSide = false;
   bool bControlsDefenderSide = false;

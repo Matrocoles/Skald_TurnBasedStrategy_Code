@@ -379,6 +379,14 @@ void ASkaldPlayerController::BeginPlay() {
 
   CacheGameReferences();
 
+  if (UWorld *World = GetWorld()) {
+    if (!FighterSpawnedHandle.IsValid()) {
+      FighterSpawnedHandle = World->AddOnActorSpawnedHandler(
+          FOnActorSpawned::FDelegate::CreateUObject(
+              this, &ASkaldPlayerController::HandleActorSpawned));
+    }
+  }
+
   DetectBattleMap();
 
   if (ASkaldGameState *SGS =
@@ -460,6 +468,21 @@ void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
   if (BattleHudWidget) {
     BattleHudWidget->RemoveFromParent();
     BattleHudWidget = nullptr;
+  }
+
+  for (const TWeakObjectPtr<AFighterPawn> &TrackedFighter : ObservedFriendlyFighters) {
+    if (AFighterPawn *Fighter = TrackedFighter.Get()) {
+      Fighter->OnDestroyed.RemoveDynamic(
+          this, &ASkaldPlayerController::HandleTrackedFighterDestroyed);
+    }
+  }
+  ObservedFriendlyFighters.Reset();
+
+  if (UWorld *World = GetWorld()) {
+    if (FighterSpawnedHandle.IsValid()) {
+      World->RemoveOnActorSpawnedHandler(FighterSpawnedHandle);
+      FighterSpawnedHandle.Reset();
+    }
   }
 
   if (BattleResultWidget) {
@@ -1003,6 +1026,8 @@ void ASkaldPlayerController::InitializeBattleHUD() {
           this, &ASkaldPlayerController::HandleDiceResolutionComplete);
       BattleHudWidget->OnDiceOutcomeRevealed.AddDynamic(
           this, &ASkaldPlayerController::HandleDiceOutcomeRevealed);
+      BattleHudWidget->OnLockedInFighterEntrySelected.AddDynamic(
+          this, &ASkaldPlayerController::HandleLockedInEntrySelected);
       BattleHudWidget->SetEndTurnVisibility(false);
       BattleHudWidget->SetActivateEnabled(false);
       BattleHudWidget->SetEndTurnEnabled(false);
@@ -1055,6 +1080,7 @@ void ASkaldPlayerController::InitializeBattleHUD() {
   }
 
   DetermineControlledBattleSide();
+  RefreshLockedInFighterList();
   UpdateBattleTerritoryLabel();
   HandleActiveFighterChanged(ActiveFighter);
 
@@ -1235,6 +1261,147 @@ void ASkaldPlayerController::HandleActiveFighterChanged(
       }
     }
   }
+
+  UpdateLockedInActiveHighlight();
+  RefreshLockedInFighterTurnStates();
+}
+
+void ASkaldPlayerController::HandleActorSpawned(AActor *SpawnedActor) {
+  if (!SpawnedActor || !BattleHudWidget) {
+    return;
+  }
+
+  if (AFighterPawn *Fighter = Cast<AFighterPawn>(SpawnedActor)) {
+    if (!Fighter->IsAlive()) {
+      return;
+    }
+
+    if (IsFriendlyFighter(Fighter)) {
+      RegisterObservedFighter(Fighter);
+      RefreshLockedInFighterList();
+    }
+  }
+}
+
+void ASkaldPlayerController::RegisterObservedFighter(AFighterPawn *Fighter) {
+  if (!Fighter || !IsFriendlyFighter(Fighter)) {
+    return;
+  }
+
+  if (ObservedFriendlyFighters.Contains(Fighter)) {
+    return;
+  }
+
+  Fighter->OnDestroyed.AddDynamic(
+      this, &ASkaldPlayerController::HandleTrackedFighterDestroyed);
+  ObservedFriendlyFighters.Add(Fighter);
+}
+
+void ASkaldPlayerController::HandleTrackedFighterDestroyed(
+    AActor *DestroyedActor) {
+  AFighterPawn *DestroyedFighter = Cast<AFighterPawn>(DestroyedActor);
+  if (!DestroyedFighter) {
+    return;
+  }
+
+  if (ObservedFriendlyFighters.Contains(DestroyedFighter)) {
+    DestroyedFighter->OnDestroyed.RemoveDynamic(
+        this, &ASkaldPlayerController::HandleTrackedFighterDestroyed);
+    ObservedFriendlyFighters.Remove(DestroyedFighter);
+  }
+
+  RefreshLockedInFighterList();
+}
+
+void ASkaldPlayerController::RefreshLockedInFighterList() {
+  if (!BattleHudWidget) {
+    return;
+  }
+
+  USkaldGameInstance *GI = CachedGameInstance;
+  if (!GI) {
+    GI = GetGameInstance<USkaldGameInstance>();
+    CachedGameInstance = GI;
+  }
+
+  TArray<AFighterPawn *> OrderedFighters;
+  if (GI && GI->GridBattleManager) {
+    OrderedFighters = GI->GridBattleManager->GetInitiativeOrderSnapshot();
+  }
+
+  TArray<AFighterPawn *> FriendlyFighters;
+  FriendlyFighters.Reserve(OrderedFighters.Num());
+
+  auto ConsiderFighter = [&](AFighterPawn *Fighter) {
+    if (!Fighter || !Fighter->IsAlive()) {
+      return;
+    }
+    if (!IsFriendlyFighter(Fighter)) {
+      return;
+    }
+    FriendlyFighters.AddUnique(Fighter);
+  };
+
+  for (AFighterPawn *Fighter : OrderedFighters) {
+    ConsiderFighter(Fighter);
+  }
+
+  if (UWorld *World = GetWorld()) {
+    for (TActorIterator<AFighterPawn> It(World); It; ++It) {
+      ConsiderFighter(*It);
+    }
+  }
+
+  for (AFighterPawn *Fighter : FriendlyFighters) {
+    RegisterObservedFighter(Fighter);
+  }
+
+  for (auto It = ObservedFriendlyFighters.CreateIterator(); It; ++It) {
+    AFighterPawn *Tracked = It->Get();
+    const bool bValid = Tracked && Tracked->IsAlive() && IsFriendlyFighter(Tracked);
+    if (!bValid) {
+      if (Tracked) {
+        Tracked->OnDestroyed.RemoveDynamic(
+            this, &ASkaldPlayerController::HandleTrackedFighterDestroyed);
+      }
+      It.RemoveCurrent();
+    }
+  }
+
+  BattleHudWidget->SetLockedInFighters(FriendlyFighters);
+  UpdateLockedInActiveHighlight();
+  UpdateLockedInSelectionHighlight();
+  BattleHudWidget->RefreshLockedInFighterTurnStates();
+}
+
+void ASkaldPlayerController::RefreshLockedInFighterTurnStates() {
+  if (BattleHudWidget) {
+    BattleHudWidget->RefreshLockedInFighterTurnStates();
+  }
+}
+
+void ASkaldPlayerController::UpdateLockedInSelectionHighlight() {
+  if (BattleHudWidget) {
+    BattleHudWidget->SetHighlightedLockedInFighter(SelectedFighter.Get());
+  }
+}
+
+void ASkaldPlayerController::UpdateLockedInActiveHighlight() {
+  if (BattleHudWidget) {
+    BattleHudWidget->SetActiveLockedInFighter(LockedActiveFighter.Get());
+  }
+}
+
+void ASkaldPlayerController::HandleLockedInEntrySelected(AFighterPawn *Fighter) {
+  if (!Fighter || !IsFriendlyFighter(Fighter)) {
+    return;
+  }
+
+  SetSelectedFighter(Fighter, true);
+  if (UGridOverlayComponent *Grid = FindGridOverlay()) {
+    Grid->HighlightSelection(Fighter);
+  }
+  UpdateLockedInSelectionHighlight();
 }
 
 void ASkaldPlayerController::DetectBattleMap() {
@@ -3008,6 +3175,7 @@ void ASkaldPlayerController::HandleRoundStarted(int32 RoundNumber,
   UpdateBattlePlayersTurnDisplay();
   UpdateBattleHUDSelection();
   UpdateBattleHUDButtons();
+  RefreshLockedInFighterList();
 }
 
 void ASkaldPlayerController::HandleInitiativePhaseStarted(int32 RoundNumber) {
@@ -3525,6 +3693,7 @@ void ASkaldPlayerController::SetSelectedFighter(AFighterPawn *Fighter,
 
   UpdateBattleHUDSelection();
   UpdateBattleHUDButtons();
+  UpdateLockedInSelectionHighlight();
 }
 
 void ASkaldPlayerController::ClearSelectedFighter() {
@@ -3537,6 +3706,7 @@ void ASkaldPlayerController::ClearSelectedFighter() {
   SelectedFighter = nullptr;
   UpdateBattleHUDSelection();
   UpdateBattleHUDButtons();
+  UpdateLockedInSelectionHighlight();
 }
 
 void ASkaldPlayerController::UpdateBattleHUDSelection() {
@@ -4054,6 +4224,8 @@ void ASkaldPlayerController::HandleAttackResolved(AFighterPawn *Attacker,
   if (MainHUD) {
     MainHUD->QueueDiceResolution(Attacker, Defender, Result);
   }
+
+  RefreshLockedInFighterList();
 }
 
 void ASkaldPlayerController::HandleDiceResolutionComplete(
@@ -4217,6 +4389,7 @@ void ASkaldPlayerController::DetermineControlledBattleSide() {
 void ASkaldPlayerController::HandlePlayerIdUpdated() {
   DetermineControlledBattleSide();
   UpdateBattleHUDButtons();
+  RefreshLockedInFighterList();
 }
 
 void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,
@@ -4234,10 +4407,21 @@ void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,
   bLastBattleTurnSoundWasAttacker = false;
   LastBattleTurnSoundAvailableCount = INDEX_NONE;
 
+  for (const TWeakObjectPtr<AFighterPawn> &TrackedFighter : ObservedFriendlyFighters) {
+    if (AFighterPawn *Fighter = TrackedFighter.Get()) {
+      Fighter->OnDestroyed.RemoveDynamic(
+          this, &ASkaldPlayerController::HandleTrackedFighterDestroyed);
+    }
+  }
+  ObservedFriendlyFighters.Reset();
+
   if (BattleHudWidget) {
     BattleHudWidget->RemoveFromParent();
     BattleHudWidget = nullptr;
   }
+
+  UpdateLockedInActiveHighlight();
+  UpdateLockedInSelectionHighlight();
 
   bool bPlayerWon = false;
   bool bPlayerLost = false;
