@@ -1053,8 +1053,12 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
 
   const bool bHasPendingTravelSnapshot =
       GI && GI->GetPendingTravelSnapshot().Num() > 0;
+  const bool bHasCachedWorldSnapshot =
+      GI && GI->CachedWorldMapTerritories.Num() > 0;
+  const bool bHasRestorableSnapshot =
+      bHasPendingTravelSnapshot || bHasCachedWorldSnapshot;
   bool bWantsResume = GI && GI->bResumeTurns;
-  if (GI && !bWantsResume && !bHasPendingTravelSnapshot &&
+  if (GI && !bWantsResume && !bHasRestorableSnapshot &&
       (GI->SavedTurnIndex != 0 ||
        GI->SavedTurnPhase != ETurnPhase::Reinforcement)) {
     GI->SavedTurnIndex = 0;
@@ -1104,12 +1108,15 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
   }
 
   const bool bNeedsSnapshotRestore =
-      !bWorldInitialized && (bWantsResume || bHasPendingTravelSnapshot);
+      !bWorldInitialized && (bWantsResume || bHasRestorableSnapshot);
 
   if (bNeedsSnapshotRestore) {
     const bool bRestored = GI && GI->RestoreWorldFromSnapshot(GetWorld());
     if (!bRestored) {
-      if (GI && (GI->bResumeTurns || bHasPendingTravelSnapshot)) {
+      const bool bShouldRetryRestore =
+          GI && (GI->bResumeTurns || GI->GetPendingTravelSnapshot().Num() > 0 ||
+                 GI->CachedWorldMapTerritories.Num() > 0);
+      if (bShouldRetryRestore) {
         FTimerDelegate RetryInit = FTimerDelegate::CreateUObject(
             this, &ASkaldGameMode::TryInitializeWorldAndStart);
         GetWorldTimerManager().ClearTimer(RetryInitTimerHandle);
