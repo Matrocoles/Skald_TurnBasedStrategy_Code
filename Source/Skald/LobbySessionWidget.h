@@ -16,6 +16,33 @@ class UVerticalBox;
 class ALobbyGameState;
 class ALobbyPlayerController;
 
+USTRUCT()
+struct FLobbySlotWidgets
+{
+    GENERATED_BODY()
+
+    UPROPERTY()
+    UBorder* Container = nullptr;
+
+    UPROPERTY()
+    UTextBlock* Title = nullptr;
+
+    UPROPERTY()
+    UEditableTextBox* NameEdit = nullptr;
+
+    UPROPERTY()
+    UComboBoxString* FactionCombo = nullptr;
+
+    UPROPERTY()
+    UButton* ReadyButton = nullptr;
+
+    UPROPERTY()
+    UTextBlock* ReadyLabel = nullptr;
+
+    UPROPERTY()
+    UTextBlock* StatusText = nullptr;
+};
+
 /** Multiplayer lobby widget showing player slots and host controls. */
 UCLASS()
 class SKALD_API ULobbySessionWidget : public UUserWidget
@@ -29,29 +56,6 @@ public:
     virtual void NativeDestruct() override;
 
 protected:
-    struct FLobbySlotWidgets
-    {
-        UPROPERTY()
-        UBorder* Container = nullptr;
-
-        UPROPERTY()
-        UTextBlock* Title = nullptr;
-
-        UPROPERTY()
-        UEditableTextBox* NameEdit = nullptr;
-
-        UPROPERTY()
-        UComboBoxString* FactionCombo = nullptr;
-
-        UPROPERTY()
-        UButton* ReadyButton = nullptr;
-
-        UPROPERTY()
-        UTextBlock* ReadyLabel = nullptr;
-
-        UPROPERTY()
-        UTextBlock* StatusText = nullptr;
-    };
 
     /** Root panel for the entire widget. */
     UPROPERTY()
