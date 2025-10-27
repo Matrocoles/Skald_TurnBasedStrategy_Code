@@ -186,8 +186,11 @@ void ALobbyGameMode::AssignPlayerToSlot(ASkaldPlayerState* PlayerState)
     // No free slot; kick the player.
     if (AController* OwningController = PlayerState->GetOwner<AController>())
     {
-        OwningController->ClientMessage(TEXT("Lobby is full."));
-        OwningController->ClientTravel(TEXT("/Game/Blueprints/Maps/Skald_Lobby"), TRAVEL_Absolute);
+        if (APlayerController* OwningPlayerController = Cast<APlayerController>(OwningController))
+        {
+            OwningPlayerController->ClientMessage(TEXT("Lobby is full."));
+            OwningPlayerController->ClientTravel(TEXT("/Game/Blueprints/Maps/Skald_Lobby"), TRAVEL_Absolute);
+        }
     }
 }
 
@@ -319,9 +322,9 @@ void ALobbyGameMode::TryLaunchMatch(APlayerController* RequestingController)
         GI->TakenFactions.Empty();
         GI->PendingLobbyAIPlayers.Reset();
 
-        if (AGameStateBase* GameState = GetGameState<AGameStateBase>())
+        if (AGameStateBase* LocalGameState = GetGameState<AGameStateBase>())
         {
-            for (APlayerState* PlayerStateBase : GameState->PlayerArray)
+            for (APlayerState* PlayerStateBase : LocalGameState->PlayerArray)
             {
                 if (ASkaldPlayerState* PlayerState = Cast<ASkaldPlayerState>(PlayerStateBase))
                 {

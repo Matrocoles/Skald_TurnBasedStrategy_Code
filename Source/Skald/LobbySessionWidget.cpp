@@ -175,9 +175,9 @@ void ULobbySessionWidget::BuildLayout()
         SlotWidget.StatusText = StatusText;
         ReadyRow->AddChildToHorizontalBox(StatusText);
 
-        UHorizontalBoxSlot* SlotSlot = SlotsPanel->AddChildToHorizontalBox(Border);
-        SlotSlot->SetPadding(FMargin(4.f));
-        SlotSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+        UHorizontalBoxSlot* SlotContainer = SlotsPanel->AddChildToHorizontalBox(Border);
+        SlotContainer->SetPadding(FMargin(4.f));
+        SlotContainer->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
     }
 
     HostControls = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("HostControls"));
@@ -270,10 +270,10 @@ void ULobbySessionWidget::RefreshFromState()
     {
         for (int32 Index = 0; Index < SlotWidgets.Num(); ++Index)
         {
-            const FLobbyPlayerSlot* Slot = CachedGameState->GetSlot(Index);
-            if (Slot)
+            const FLobbyPlayerSlot* SlotData = CachedGameState->GetSlot(Index);
+            if (SlotData)
             {
-                RefreshSlot(Index, *Slot, LocalSlotIndex);
+                RefreshSlot(Index, *SlotData, LocalSlotIndex);
             }
         }
 
@@ -283,7 +283,7 @@ void ULobbySessionWidget::RefreshFromState()
     bIsUpdatingFromState = false;
 }
 
-void ULobbySessionWidget::RefreshSlot(int32 SlotIndex, const FLobbyPlayerSlot& Slot, int32 LocalSlotIndex)
+void ULobbySessionWidget::RefreshSlot(int32 SlotIndex, const FLobbyPlayerSlot& SlotData, int32 LocalSlotIndex)
 {
     if (!SlotWidgets.IsValidIndex(SlotIndex))
     {
@@ -296,25 +296,25 @@ void ULobbySessionWidget::RefreshSlot(int32 SlotIndex, const FLobbyPlayerSlot& S
         return;
     }
 
-    Widgets.Container->SetBrushColor(Slot.bIsActive ? ActiveSlotColor : InactiveSlotColor);
+    Widgets.Container->SetBrushColor(SlotData.bIsActive ? ActiveSlotColor : InactiveSlotColor);
 
     const bool bIsLocal = SlotIndex == LocalSlotIndex;
-    const bool bIsAI = Slot.bIsAI;
+    const bool bIsAI = SlotData.bIsAI;
 
     if (Widgets.NameEdit)
     {
-        Widgets.NameEdit->SetIsEnabled(Slot.bIsActive && !bIsAI && bIsLocal);
-        Widgets.NameEdit->SetText(FText::FromString(Slot.DisplayName));
+        Widgets.NameEdit->SetIsEnabled(SlotData.bIsActive && !bIsAI && bIsLocal);
+        Widgets.NameEdit->SetText(FText::FromString(SlotData.DisplayName));
     }
 
     if (Widgets.FactionCombo)
     {
         Widgets.FactionCombo->ClearSelection();
-        if (Slot.Faction != ESkaldFaction::None)
+        if (SlotData.Faction != ESkaldFaction::None)
         {
             if (UEnum* Enum = StaticEnum<ESkaldFaction>())
             {
-                const FString Name = Enum->GetNameStringByValue(static_cast<int64>(Slot.Faction));
+                const FString Name = Enum->GetNameStringByValue(static_cast<int64>(SlotData.Faction));
                 Widgets.FactionCombo->SetSelectedOption(Name);
             }
         }
@@ -323,19 +323,19 @@ void ULobbySessionWidget::RefreshSlot(int32 SlotIndex, const FLobbyPlayerSlot& S
             Widgets.FactionCombo->SetSelectedOption(FactionPlaceholder);
         }
 
-        Widgets.FactionCombo->SetIsEnabled(Slot.bIsActive && !bIsAI && bIsLocal);
+        Widgets.FactionCombo->SetIsEnabled(SlotData.bIsActive && !bIsAI && bIsLocal);
     }
 
     if (Widgets.ReadyButton && Widgets.ReadyLabel)
     {
-        Widgets.ReadyButton->SetVisibility(Slot.bIsActive && !bIsAI ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+        Widgets.ReadyButton->SetVisibility(SlotData.bIsActive && !bIsAI ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
         Widgets.ReadyButton->SetIsEnabled(bIsLocal && !bIsAI);
-        Widgets.ReadyLabel->SetText(Slot.bIsReady ? NSLOCTEXT("Lobby", "Unready", "Unready") : NSLOCTEXT("Lobby", "ReadyAction", "Ready"));
+        Widgets.ReadyLabel->SetText(SlotData.bIsReady ? NSLOCTEXT("Lobby", "Unready", "Unready") : NSLOCTEXT("Lobby", "ReadyAction", "Ready"));
     }
 
     if (Widgets.StatusText)
     {
-        if (!Slot.bIsActive)
+        if (!SlotData.bIsActive)
         {
             Widgets.StatusText->SetText(NSLOCTEXT("Lobby", "Inactive", "Inactive"));
             Widgets.StatusText->SetColorAndOpacity(FSlateColor(FLinearColor::Gray));
@@ -347,8 +347,8 @@ void ULobbySessionWidget::RefreshSlot(int32 SlotIndex, const FLobbyPlayerSlot& S
         }
         else
         {
-            Widgets.StatusText->SetText(Slot.bIsReady ? NSLOCTEXT("Lobby", "ReadyStatus", "Ready") : NSLOCTEXT("Lobby", "NotReadyStatus", "Not Ready"));
-            Widgets.StatusText->SetColorAndOpacity(FSlateColor(Slot.bIsReady ? ReadyColor : NotReadyColor));
+            Widgets.StatusText->SetText(SlotData.bIsReady ? NSLOCTEXT("Lobby", "ReadyStatus", "Ready") : NSLOCTEXT("Lobby", "NotReadyStatus", "Not Ready"));
+            Widgets.StatusText->SetColorAndOpacity(FSlateColor(SlotData.bIsReady ? ReadyColor : NotReadyColor));
         }
     }
 }
@@ -430,9 +430,9 @@ void ULobbySessionWidget::HandleReadyClicked(int32 SlotIndex)
         return;
     }
 
-    if (const FLobbyPlayerSlot* Slot = CachedGameState->GetSlot(SlotIndex))
+    if (const FLobbyPlayerSlot* SlotData = CachedGameState->GetSlot(SlotIndex))
     {
-        CachedController->ToggleReadyState(!Slot->bIsReady);
+        CachedController->ToggleReadyState(!SlotData->bIsReady);
     }
 }
 
