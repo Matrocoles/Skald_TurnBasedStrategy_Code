@@ -15,6 +15,35 @@ namespace
 constexpr int32 MinLobbySlots = 2;
 constexpr int32 MaxLobbySlots = 4;
 
+FString ResolveLobbyDisplayName(ASkaldPlayerState* PlayerState,
+                                const FString& Candidate)
+{
+    FString Resolved = Candidate;
+    if (Resolved.IsEmpty() && PlayerState)
+    {
+        Resolved = PlayerState->PlayerDisplayName;
+    }
+    if (Resolved.IsEmpty() && PlayerState)
+    {
+        Resolved = PlayerState->GetPlayerName();
+    }
+    if (Resolved.IsEmpty() && PlayerState)
+    {
+        const int32 PlayerId = PlayerState->GetPlayerId();
+        if (PlayerId > 0)
+        {
+            Resolved = FString::Printf(TEXT("Player %d"), PlayerId);
+        }
+    }
+    if (Resolved.IsEmpty())
+    {
+        Resolved = TEXT("Player");
+    }
+
+    Resolved.TrimStartAndEndInline();
+    return Resolved;
+}
+
 TArray<ESkaldFaction> BuildFactionPool()
 {
     TArray<ESkaldFaction> Result;
@@ -176,7 +205,16 @@ void ALobbyGameMode::AssignPlayerToSlot(ASkaldPlayerState* PlayerState)
             Slot.bIsActive = true;
             Slot.bIsAI = false;
             Slot.PlayerId = PlayerState->GetPlayerId();
-            Slot.DisplayName = PlayerState->PlayerDisplayName.IsEmpty() ? PlayerState->GetPlayerName() : PlayerState->PlayerDisplayName;
+            const FString ResolvedName = ResolveLobbyDisplayName(PlayerState, Slot.DisplayName);
+            Slot.DisplayName = ResolvedName;
+            if (PlayerState->PlayerDisplayName != ResolvedName)
+            {
+                PlayerState->PlayerDisplayName = ResolvedName;
+            }
+            if (PlayerState->GetPlayerName() != ResolvedName)
+            {
+                PlayerState->SetPlayerName(ResolvedName);
+            }
             Slot.Faction = PlayerState->Faction;
             Slot.bIsReady = false;
             return;
@@ -277,7 +315,7 @@ void ALobbyGameMode::SetPlayerDisplayName(int32 PlayerId, const FString& Display
     {
         if (Slot.PlayerId == PlayerId)
         {
-            Slot.DisplayName = DisplayName;
+            ASkaldPlayerState* MatchedPlayerState = nullptr;
             if (AGameStateBase* GS = GetGameState<AGameStateBase>())
             {
                 for (APlayerState* PSBase : GS->PlayerArray)
@@ -286,11 +324,22 @@ void ALobbyGameMode::SetPlayerDisplayName(int32 PlayerId, const FString& Display
                     {
                         if (PlayerState->GetPlayerId() == PlayerId)
                         {
-                            PlayerState->PlayerDisplayName = DisplayName;
-                            PlayerState->SetPlayerName(DisplayName);
+                            MatchedPlayerState = PlayerState;
                             break;
                         }
                     }
+                }
+            }
+
+            const FString ResolvedName = ResolveLobbyDisplayName(MatchedPlayerState, DisplayName);
+            Slot.DisplayName = ResolvedName;
+
+            if (MatchedPlayerState)
+            {
+                MatchedPlayerState->PlayerDisplayName = ResolvedName;
+                if (MatchedPlayerState->GetPlayerName() != ResolvedName)
+                {
+                    MatchedPlayerState->SetPlayerName(ResolvedName);
                 }
             }
             break;
@@ -331,10 +380,15 @@ void ALobbyGameMode::TryLaunchMatch(APlayerController* RequestingController)
                     const int32 SlotIndex = CachedLobbyState ? CachedLobbyState->FindSlotIndexForPlayer(PlayerState->GetPlayerId()) : INDEX_NONE;
                     if (SlotIndex != INDEX_NONE && AuthoritySlots.IsValidIndex(SlotIndex))
                     {
-                        const FLobbyPlayerSlot& Slot = AuthoritySlots[SlotIndex];
+                        FLobbyPlayerSlot& Slot = AuthoritySlots[SlotIndex];
+                        const FString ResolvedName = ResolveLobbyDisplayName(PlayerState, Slot.DisplayName);
+                        Slot.DisplayName = ResolvedName;
                         PlayerState->Faction = Slot.Faction;
-                        PlayerState->PlayerDisplayName = Slot.DisplayName;
-                        PlayerState->SetPlayerName(Slot.DisplayName);
+                        PlayerState->PlayerDisplayName = ResolvedName;
+                        if (PlayerState->GetPlayerName() != ResolvedName)
+                        {
+                            PlayerState->SetPlayerName(ResolvedName);
+                        }
                         GI->TakenFactions.AddUnique(Slot.Faction);
                     }
                 }
