@@ -58,28 +58,116 @@ public:
 protected:
 
     /** Root panel for the entire widget. */
-    UPROPERTY()
+    UPROPERTY(meta=(BindWidgetOptional))
     UVerticalBox* RootPanel = nullptr;
 
     /** Horizontal container holding the four slot panels. */
-    UPROPERTY()
+    UPROPERTY(meta=(BindWidgetOptional))
     UHorizontalBox* SlotsPanel = nullptr;
 
     /** Host controls for player/AI counts and launching. */
-    UPROPERTY()
+    UPROPERTY(meta=(BindWidgetOptional))
     UHorizontalBox* HostControls = nullptr;
 
-    UPROPERTY()
+    UPROPERTY(meta=(BindWidgetOptional))
     USpinBox* PlayerCountSpinBox = nullptr;
 
-    UPROPERTY()
+    UPROPERTY(meta=(BindWidgetOptional))
     USpinBox* AICountSpinBox = nullptr;
 
-    UPROPERTY()
+    UPROPERTY(meta=(BindWidgetOptional))
     UButton* LaunchButton = nullptr;
 
-    UPROPERTY()
+    UPROPERTY(meta=(BindWidgetOptional))
     UTextBlock* LaunchLabel = nullptr;
+
+    /** Slot 0 widget bindings for the designer. */
+    UPROPERTY(meta=(BindWidgetOptional))
+    UBorder* Slot0Container = nullptr;
+
+    UPROPERTY(meta=(BindWidgetOptional))
+    UTextBlock* Slot0Title = nullptr;
+
+    UPROPERTY(meta=(BindWidgetOptional))
+    UEditableTextBox* Slot0NameEdit = nullptr;
+
+    UPROPERTY(meta=(BindWidgetOptional))
+    UComboBoxString* Slot0FactionCombo = nullptr;
+
+    UPROPERTY(meta=(BindWidgetOptional))
+    UButton* Slot0ReadyButton = nullptr;
+
+    UPROPERTY(meta=(BindWidgetOptional))
+    UTextBlock* Slot0ReadyLabel = nullptr;
+
+    UPROPERTY(meta=(BindWidgetOptional))
+    UTextBlock* Slot0StatusText = nullptr;
+
+    /** Slot 1 widget bindings for the designer. */
+    UPROPERTY(meta=(BindWidgetOptional))
+    UBorder* Slot1Container = nullptr;
+
+    UPROPERTY(meta=(BindWidgetOptional))
+    UTextBlock* Slot1Title = nullptr;
+
+    UPROPERTY(meta=(BindWidgetOptional))
+    UEditableTextBox* Slot1NameEdit = nullptr;
+
+    UPROPERTY(meta=(BindWidgetOptional))
+    UComboBoxString* Slot1FactionCombo = nullptr;
+
+    UPROPERTY(meta=(BindWidgetOptional))
+    UButton* Slot1ReadyButton = nullptr;
+
+    UPROPERTY(meta=(BindWidgetOptional))
+    UTextBlock* Slot1ReadyLabel = nullptr;
+
+    UPROPERTY(meta=(BindWidgetOptional))
+    UTextBlock* Slot1StatusText = nullptr;
+
+    /** Slot 2 widget bindings for the designer. */
+    UPROPERTY(meta=(BindWidgetOptional))
+    UBorder* Slot2Container = nullptr;
+
+    UPROPERTY(meta=(BindWidgetOptional))
+    UTextBlock* Slot2Title = nullptr;
+
+    UPROPERTY(meta=(BindWidgetOptional))
+    UEditableTextBox* Slot2NameEdit = nullptr;
+
+    UPROPERTY(meta=(BindWidgetOptional))
+    UComboBoxString* Slot2FactionCombo = nullptr;
+
+    UPROPERTY(meta=(BindWidgetOptional))
+    UButton* Slot2ReadyButton = nullptr;
+
+    UPROPERTY(meta=(BindWidgetOptional))
+    UTextBlock* Slot2ReadyLabel = nullptr;
+
+    UPROPERTY(meta=(BindWidgetOptional))
+    UTextBlock* Slot2StatusText = nullptr;
+
+    /** Slot 3 widget bindings for the designer. */
+    UPROPERTY(meta=(BindWidgetOptional))
+    UBorder* Slot3Container = nullptr;
+
+    UPROPERTY(meta=(BindWidgetOptional))
+    UTextBlock* Slot3Title = nullptr;
+
+    UPROPERTY(meta=(BindWidgetOptional))
+    UEditableTextBox* Slot3NameEdit = nullptr;
+
+    UPROPERTY(meta=(BindWidgetOptional))
+    UComboBoxString* Slot3FactionCombo = nullptr;
+
+    UPROPERTY(meta=(BindWidgetOptional))
+    UButton* Slot3ReadyButton = nullptr;
+
+    UPROPERTY(meta=(BindWidgetOptional))
+    UTextBlock* Slot3ReadyLabel = nullptr;
+
+    UPROPERTY(meta=(BindWidgetOptional))
+    UTextBlock* Slot3StatusText = nullptr;
 
     /** Cached slot widgets for updating. */
     UPROPERTY()

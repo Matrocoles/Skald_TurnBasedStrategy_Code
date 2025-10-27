@@ -70,152 +70,304 @@ void ULobbySessionWidget::BuildLayout()
         return;
     }
 
-    RootPanel = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("RootPanel"));
-    WidgetTree->RootWidget = RootPanel;
+    SlotWidgets.SetNum(4);
 
-    SlotsPanel = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("SlotsPanel"));
-    RootPanel->AddChild(SlotsPanel);
+    const bool bNeedsProgrammaticLayout = !RootPanel || !SlotsPanel || !HostControls;
 
-    for (int32 Index = 0; Index < SlotWidgets.Num(); ++Index)
+    if (bNeedsProgrammaticLayout)
     {
-        FLobbySlotWidgets& SlotWidget = SlotWidgets[Index];
+        RootPanel = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("RootPanel"));
+        WidgetTree->RootWidget = RootPanel;
 
-        UBorder* Border = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
-        Border->SetPadding(FMargin(8.f));
-        Border->SetBrushColor(InactiveSlotColor);
-        SlotWidget.Container = Border;
+        SlotsPanel = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("SlotsPanel"));
+        RootPanel->AddChild(SlotsPanel);
 
-        UVerticalBox* SlotBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-        Border->SetContent(SlotBox);
-
-        UTextBlock* Title = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-        Title->SetText(FText::Format(NSLOCTEXT("Lobby", "SlotTitle", "Player {0}"), FText::AsNumber(Index + 1)));
-        Title->SetJustification(ETextJustify::Center);
-        SlotWidget.Title = Title;
-        SlotBox->AddChildToVerticalBox(Title);
-
-        UEditableTextBox* NameEdit = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass());
-        NameEdit->SetHintText(NSLOCTEXT("Lobby", "NameHint", "Display Name"));
-        switch (Index)
+        for (int32 Index = 0; Index < SlotWidgets.Num(); ++Index)
         {
-        case 0:
-            NameEdit->OnTextCommitted.AddDynamic(this, &ULobbySessionWidget::HandleNameCommittedSlot0);
-            break;
-        case 1:
-            NameEdit->OnTextCommitted.AddDynamic(this, &ULobbySessionWidget::HandleNameCommittedSlot1);
-            break;
-        case 2:
-            NameEdit->OnTextCommitted.AddDynamic(this, &ULobbySessionWidget::HandleNameCommittedSlot2);
-            break;
-        case 3:
-            NameEdit->OnTextCommitted.AddDynamic(this, &ULobbySessionWidget::HandleNameCommittedSlot3);
-            break;
-        default:
-            break;
-        }
-        SlotWidget.NameEdit = NameEdit;
-        SlotBox->AddChildToVerticalBox(NameEdit);
+            UBorder* Border = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
+            Border->SetPadding(FMargin(8.f));
+            Border->SetBrushColor(InactiveSlotColor);
 
-        UComboBoxString* FactionCombo = WidgetTree->ConstructWidget<UComboBoxString>(UComboBoxString::StaticClass());
-        RebuildFactionOptions(FactionCombo);
-        FactionCombo->SetSelectedOption(FactionPlaceholder);
-        switch (Index)
+            UVerticalBox* SlotBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
+            Border->SetContent(SlotBox);
+
+            UTextBlock* Title = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+            Title->SetText(FText::Format(NSLOCTEXT("Lobby", "SlotTitle", "Player {0}"), FText::AsNumber(Index + 1)));
+            Title->SetJustification(ETextJustify::Center);
+            SlotBox->AddChildToVerticalBox(Title);
+
+            UEditableTextBox* NameEdit = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass());
+            NameEdit->SetHintText(NSLOCTEXT("Lobby", "NameHint", "Display Name"));
+            SlotBox->AddChildToVerticalBox(NameEdit);
+
+            UComboBoxString* FactionCombo = WidgetTree->ConstructWidget<UComboBoxString>(UComboBoxString::StaticClass());
+            RebuildFactionOptions(FactionCombo);
+            FactionCombo->SetSelectedOption(FactionPlaceholder);
+            SlotBox->AddChildToVerticalBox(FactionCombo);
+
+            UHorizontalBox* ReadyRow = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
+            SlotBox->AddChildToVerticalBox(ReadyRow);
+
+            UButton* ReadyButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
+            UHorizontalBoxSlot* ReadyButtonSlot = ReadyRow->AddChildToHorizontalBox(ReadyButton);
+            ReadyButtonSlot->SetPadding(FMargin(0.f, 4.f, 12.f, 0.f));
+
+            UTextBlock* ReadyLabel = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+            ReadyLabel->SetText(NSLOCTEXT("Lobby", "Ready", "Ready"));
+            ReadyButton->SetContent(ReadyLabel);
+
+            UTextBlock* StatusText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+            StatusText->SetText(NSLOCTEXT("Lobby", "StatusNotReady", "Not Ready"));
+            ReadyRow->AddChildToHorizontalBox(StatusText);
+
+            UHorizontalBoxSlot* SlotContainer = SlotsPanel->AddChildToHorizontalBox(Border);
+            SlotContainer->SetPadding(FMargin(4.f));
+            SlotContainer->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+
+            switch (Index)
+            {
+            case 0:
+                Slot0Container = Border;
+                Slot0Title = Title;
+                Slot0NameEdit = NameEdit;
+                Slot0FactionCombo = FactionCombo;
+                Slot0ReadyButton = ReadyButton;
+                Slot0ReadyLabel = ReadyLabel;
+                Slot0StatusText = StatusText;
+                break;
+            case 1:
+                Slot1Container = Border;
+                Slot1Title = Title;
+                Slot1NameEdit = NameEdit;
+                Slot1FactionCombo = FactionCombo;
+                Slot1ReadyButton = ReadyButton;
+                Slot1ReadyLabel = ReadyLabel;
+                Slot1StatusText = StatusText;
+                break;
+            case 2:
+                Slot2Container = Border;
+                Slot2Title = Title;
+                Slot2NameEdit = NameEdit;
+                Slot2FactionCombo = FactionCombo;
+                Slot2ReadyButton = ReadyButton;
+                Slot2ReadyLabel = ReadyLabel;
+                Slot2StatusText = StatusText;
+                break;
+            case 3:
+                Slot3Container = Border;
+                Slot3Title = Title;
+                Slot3NameEdit = NameEdit;
+                Slot3FactionCombo = FactionCombo;
+                Slot3ReadyButton = ReadyButton;
+                Slot3ReadyLabel = ReadyLabel;
+                Slot3StatusText = StatusText;
+                break;
+            default:
+                break;
+            }
+        }
+
+        HostControls = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("HostControls"));
+        RootPanel->AddChild(HostControls);
+
+        auto AddLabel = [this](UHorizontalBox* Target, const FText& InText)
         {
-        case 0:
-            FactionCombo->OnSelectionChanged.AddDynamic(this, &ULobbySessionWidget::HandleFactionSelectedSlot0);
-            break;
-        case 1:
-            FactionCombo->OnSelectionChanged.AddDynamic(this, &ULobbySessionWidget::HandleFactionSelectedSlot1);
-            break;
-        case 2:
-            FactionCombo->OnSelectionChanged.AddDynamic(this, &ULobbySessionWidget::HandleFactionSelectedSlot2);
-            break;
-        case 3:
-            FactionCombo->OnSelectionChanged.AddDynamic(this, &ULobbySessionWidget::HandleFactionSelectedSlot3);
-            break;
-        default:
-            break;
-        }
-        SlotWidget.FactionCombo = FactionCombo;
-        SlotBox->AddChildToVerticalBox(FactionCombo);
+            UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+            Label->SetText(InText);
+            Label->SetMargin(FMargin(8.f, 12.f, 8.f, 0.f));
+            Target->AddChildToHorizontalBox(Label);
+            return Label;
+        };
 
-        UHorizontalBox* ReadyRow = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
-        SlotBox->AddChildToVerticalBox(ReadyRow);
+        AddLabel(HostControls, NSLOCTEXT("Lobby", "PlayerCount", "Players:"));
 
-        UButton* ReadyButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
-        switch (Index)
-        {
-        case 0:
-            ReadyButton->OnClicked.AddDynamic(this, &ULobbySessionWidget::HandleReadyClickedSlot0);
-            break;
-        case 1:
-            ReadyButton->OnClicked.AddDynamic(this, &ULobbySessionWidget::HandleReadyClickedSlot1);
-            break;
-        case 2:
-            ReadyButton->OnClicked.AddDynamic(this, &ULobbySessionWidget::HandleReadyClickedSlot2);
-            break;
-        case 3:
-            ReadyButton->OnClicked.AddDynamic(this, &ULobbySessionWidget::HandleReadyClickedSlot3);
-            break;
-        default:
-            break;
-        }
-        SlotWidget.ReadyButton = ReadyButton;
+        PlayerCountSpinBox = WidgetTree->ConstructWidget<USpinBox>(USpinBox::StaticClass());
+        PlayerCountSpinBox->SetMinValue(2.f);
+        PlayerCountSpinBox->SetMaxValue(4.f);
+        PlayerCountSpinBox->SetDelta(1.f);
+        HostControls->AddChildToHorizontalBox(PlayerCountSpinBox);
 
-        UTextBlock* ReadyLabel = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-        ReadyLabel->SetText(NSLOCTEXT("Lobby", "Ready", "Ready"));
-        SlotWidget.ReadyLabel = ReadyLabel;
-        ReadyButton->SetContent(ReadyLabel);
+        AddLabel(HostControls, NSLOCTEXT("Lobby", "AICount", "AI:"));
 
-        UHorizontalBoxSlot* ReadyButtonSlot = ReadyRow->AddChildToHorizontalBox(ReadyButton);
-        ReadyButtonSlot->SetPadding(FMargin(0.f, 4.f, 12.f, 0.f));
+        AICountSpinBox = WidgetTree->ConstructWidget<USpinBox>(USpinBox::StaticClass());
+        AICountSpinBox->SetMinValue(0.f);
+        AICountSpinBox->SetMaxValue(3.f);
+        AICountSpinBox->SetDelta(1.f);
+        HostControls->AddChildToHorizontalBox(AICountSpinBox);
 
-        UTextBlock* StatusText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-        StatusText->SetText(NSLOCTEXT("Lobby", "StatusNotReady", "Not Ready"));
-        SlotWidget.StatusText = StatusText;
-        ReadyRow->AddChildToHorizontalBox(StatusText);
-
-        UHorizontalBoxSlot* SlotContainer = SlotsPanel->AddChildToHorizontalBox(Border);
-        SlotContainer->SetPadding(FMargin(4.f));
-        SlotContainer->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+        LaunchButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
+        LaunchLabel = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+        LaunchLabel->SetText(NSLOCTEXT("Lobby", "Launch", "Launch Game"));
+        LaunchButton->SetContent(LaunchLabel);
+        HostControls->AddChildToHorizontalBox(LaunchButton);
+    }
+    else if (RootPanel)
+    {
+        WidgetTree->RootWidget = RootPanel;
     }
 
-    HostControls = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("HostControls"));
-    RootPanel->AddChild(HostControls);
-
-    auto AddLabel = [this](UHorizontalBox* Target, const FText& InText)
+    auto ConfigureSlot = [this](int32 Index, UBorder* Container, UTextBlock* Title, UEditableTextBox* NameEdit, UComboBoxString* FactionCombo, UButton* ReadyButton, UTextBlock* ReadyLabel, UTextBlock* StatusText)
     {
-        UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-        Label->SetText(InText);
-        Label->SetMargin(FMargin(8.f, 12.f, 8.f, 0.f));
-        Target->AddChildToHorizontalBox(Label);
-        return Label;
+        if (!SlotWidgets.IsValidIndex(Index))
+        {
+            return;
+        }
+
+        FLobbySlotWidgets& SlotWidget = SlotWidgets[Index];
+        SlotWidget.Container = Container;
+        SlotWidget.Title = Title;
+        SlotWidget.NameEdit = NameEdit;
+        SlotWidget.FactionCombo = FactionCombo;
+        SlotWidget.ReadyButton = ReadyButton;
+        SlotWidget.ReadyLabel = ReadyLabel;
+        SlotWidget.StatusText = StatusText;
+
+        auto EnsurePlaceholder = [](UComboBoxString* Combo)
+        {
+            if (!Combo)
+            {
+                return;
+            }
+
+            const int32 PlaceholderIndex = Combo->FindOptionIndex(FactionPlaceholder);
+            if (PlaceholderIndex == INDEX_NONE)
+            {
+                Combo->InsertOptionAt(0, FactionPlaceholder);
+                Combo->RefreshOptions();
+            }
+        };
+
+        EnsurePlaceholder(FactionCombo);
+
+        switch (Index)
+        {
+        case 0:
+            if (NameEdit)
+            {
+                NameEdit->OnTextCommitted.RemoveDynamic(this, &ULobbySessionWidget::HandleNameCommittedSlot0);
+                NameEdit->OnTextCommitted.AddDynamic(this, &ULobbySessionWidget::HandleNameCommittedSlot0);
+            }
+            if (FactionCombo)
+            {
+                if (FactionCombo->GetOptionCount() <= 1)
+                {
+                    RebuildFactionOptions(FactionCombo);
+                }
+                if (FactionCombo->GetSelectedOption().IsEmpty())
+                {
+                    FactionCombo->SetSelectedOption(FactionPlaceholder);
+                }
+                FactionCombo->OnSelectionChanged.RemoveDynamic(this, &ULobbySessionWidget::HandleFactionSelectedSlot0);
+                FactionCombo->OnSelectionChanged.AddDynamic(this, &ULobbySessionWidget::HandleFactionSelectedSlot0);
+            }
+            if (ReadyButton)
+            {
+                ReadyButton->OnClicked.RemoveDynamic(this, &ULobbySessionWidget::HandleReadyClickedSlot0);
+                ReadyButton->OnClicked.AddDynamic(this, &ULobbySessionWidget::HandleReadyClickedSlot0);
+            }
+            break;
+        case 1:
+            if (NameEdit)
+            {
+                NameEdit->OnTextCommitted.RemoveDynamic(this, &ULobbySessionWidget::HandleNameCommittedSlot1);
+                NameEdit->OnTextCommitted.AddDynamic(this, &ULobbySessionWidget::HandleNameCommittedSlot1);
+            }
+            if (FactionCombo)
+            {
+                if (FactionCombo->GetOptionCount() <= 1)
+                {
+                    RebuildFactionOptions(FactionCombo);
+                }
+                if (FactionCombo->GetSelectedOption().IsEmpty())
+                {
+                    FactionCombo->SetSelectedOption(FactionPlaceholder);
+                }
+                FactionCombo->OnSelectionChanged.RemoveDynamic(this, &ULobbySessionWidget::HandleFactionSelectedSlot1);
+                FactionCombo->OnSelectionChanged.AddDynamic(this, &ULobbySessionWidget::HandleFactionSelectedSlot1);
+            }
+            if (ReadyButton)
+            {
+                ReadyButton->OnClicked.RemoveDynamic(this, &ULobbySessionWidget::HandleReadyClickedSlot1);
+                ReadyButton->OnClicked.AddDynamic(this, &ULobbySessionWidget::HandleReadyClickedSlot1);
+            }
+            break;
+        case 2:
+            if (NameEdit)
+            {
+                NameEdit->OnTextCommitted.RemoveDynamic(this, &ULobbySessionWidget::HandleNameCommittedSlot2);
+                NameEdit->OnTextCommitted.AddDynamic(this, &ULobbySessionWidget::HandleNameCommittedSlot2);
+            }
+            if (FactionCombo)
+            {
+                if (FactionCombo->GetOptionCount() <= 1)
+                {
+                    RebuildFactionOptions(FactionCombo);
+                }
+                if (FactionCombo->GetSelectedOption().IsEmpty())
+                {
+                    FactionCombo->SetSelectedOption(FactionPlaceholder);
+                }
+                FactionCombo->OnSelectionChanged.RemoveDynamic(this, &ULobbySessionWidget::HandleFactionSelectedSlot2);
+                FactionCombo->OnSelectionChanged.AddDynamic(this, &ULobbySessionWidget::HandleFactionSelectedSlot2);
+            }
+            if (ReadyButton)
+            {
+                ReadyButton->OnClicked.RemoveDynamic(this, &ULobbySessionWidget::HandleReadyClickedSlot2);
+                ReadyButton->OnClicked.AddDynamic(this, &ULobbySessionWidget::HandleReadyClickedSlot2);
+            }
+            break;
+        case 3:
+            if (NameEdit)
+            {
+                NameEdit->OnTextCommitted.RemoveDynamic(this, &ULobbySessionWidget::HandleNameCommittedSlot3);
+                NameEdit->OnTextCommitted.AddDynamic(this, &ULobbySessionWidget::HandleNameCommittedSlot3);
+            }
+            if (FactionCombo)
+            {
+                if (FactionCombo->GetOptionCount() <= 1)
+                {
+                    RebuildFactionOptions(FactionCombo);
+                }
+                if (FactionCombo->GetSelectedOption().IsEmpty())
+                {
+                    FactionCombo->SetSelectedOption(FactionPlaceholder);
+                }
+                FactionCombo->OnSelectionChanged.RemoveDynamic(this, &ULobbySessionWidget::HandleFactionSelectedSlot3);
+                FactionCombo->OnSelectionChanged.AddDynamic(this, &ULobbySessionWidget::HandleFactionSelectedSlot3);
+            }
+            if (ReadyButton)
+            {
+                ReadyButton->OnClicked.RemoveDynamic(this, &ULobbySessionWidget::HandleReadyClickedSlot3);
+                ReadyButton->OnClicked.AddDynamic(this, &ULobbySessionWidget::HandleReadyClickedSlot3);
+            }
+            break;
+        default:
+            break;
+        }
     };
 
-    AddLabel(HostControls, NSLOCTEXT("Lobby", "PlayerCount", "Players:"));
+    ConfigureSlot(0, Slot0Container, Slot0Title, Slot0NameEdit, Slot0FactionCombo, Slot0ReadyButton, Slot0ReadyLabel, Slot0StatusText);
+    ConfigureSlot(1, Slot1Container, Slot1Title, Slot1NameEdit, Slot1FactionCombo, Slot1ReadyButton, Slot1ReadyLabel, Slot1StatusText);
+    ConfigureSlot(2, Slot2Container, Slot2Title, Slot2NameEdit, Slot2FactionCombo, Slot2ReadyButton, Slot2ReadyLabel, Slot2StatusText);
+    ConfigureSlot(3, Slot3Container, Slot3Title, Slot3NameEdit, Slot3FactionCombo, Slot3ReadyButton, Slot3ReadyLabel, Slot3StatusText);
 
-    PlayerCountSpinBox = WidgetTree->ConstructWidget<USpinBox>(USpinBox::StaticClass());
-    PlayerCountSpinBox->SetMinValue(2.f);
-    PlayerCountSpinBox->SetMaxValue(4.f);
-    PlayerCountSpinBox->SetDelta(1.f);
-    PlayerCountSpinBox->OnValueCommitted.AddDynamic(this, &ULobbySessionWidget::HandlePlayerCountCommitted);
-    HostControls->AddChildToHorizontalBox(PlayerCountSpinBox);
+    if (PlayerCountSpinBox)
+    {
+        PlayerCountSpinBox->OnValueCommitted.RemoveDynamic(this, &ULobbySessionWidget::HandlePlayerCountCommitted);
+        PlayerCountSpinBox->OnValueCommitted.AddDynamic(this, &ULobbySessionWidget::HandlePlayerCountCommitted);
+    }
 
-    AddLabel(HostControls, NSLOCTEXT("Lobby", "AICount", "AI:"));
+    if (AICountSpinBox)
+    {
+        AICountSpinBox->OnValueCommitted.RemoveDynamic(this, &ULobbySessionWidget::HandleAICountCommitted);
+        AICountSpinBox->OnValueCommitted.AddDynamic(this, &ULobbySessionWidget::HandleAICountCommitted);
+    }
 
-    AICountSpinBox = WidgetTree->ConstructWidget<USpinBox>(USpinBox::StaticClass());
-    AICountSpinBox->SetMinValue(0.f);
-    AICountSpinBox->SetMaxValue(3.f);
-    AICountSpinBox->SetDelta(1.f);
-    AICountSpinBox->OnValueCommitted.AddDynamic(this, &ULobbySessionWidget::HandleAICountCommitted);
-    HostControls->AddChildToHorizontalBox(AICountSpinBox);
-
-    LaunchButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
-    LaunchButton->OnClicked.AddDynamic(this, &ULobbySessionWidget::HandleLaunchClicked);
-    LaunchLabel = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-    LaunchLabel->SetText(NSLOCTEXT("Lobby", "Launch", "Launch Game"));
-    LaunchButton->SetContent(LaunchLabel);
-    HostControls->AddChildToHorizontalBox(LaunchButton);
+    if (LaunchButton)
+    {
+        LaunchButton->OnClicked.RemoveDynamic(this, &ULobbySessionWidget::HandleLaunchClicked);
+        LaunchButton->OnClicked.AddDynamic(this, &ULobbySessionWidget::HandleLaunchClicked);
+    }
 }
 
 void ULobbySessionWidget::RebuildFactionOptions(UComboBoxString* Combo) const
