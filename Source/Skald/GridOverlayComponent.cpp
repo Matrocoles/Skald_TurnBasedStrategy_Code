@@ -421,11 +421,12 @@ void UGridOverlayComponent::SampleCellAt(const FIntPoint &GridCoord, float Trace
           FMath::Max(ColumnMaxHeights[Idx], CellHeights[Idx] + CellSize);
     }
 
+    if (ColumnTouchesTerrain.IsValidIndex(Idx)) {
+      ColumnTouchesTerrain[Idx] = true;
+    }
+
     if (Cast<ULandscapeComponent>(Hit.GetComponent())) {
       HandleLandscapeHit(Hit, GridCoord, Idx);
-      if (ColumnTouchesTerrain.IsValidIndex(Idx)) {
-        ColumnTouchesTerrain[Idx] = true;
-      }
     }
   } else {
     CellHeights[Idx] = WorldCenter.Z;
