@@ -1013,18 +1013,18 @@ bool ASkald_BattleGameMode::RelocateControllersNearBattleGrid(
 
   if (Grid) {
     const int32 Width = Grid->GetWidth();
-    const int32 Length = Grid->GetLength();
+    const int32 Height = Grid->GetHeight();
     const float CellSize = Grid->GetCellSize();
 
     BaseLocation = Grid->GetOrigin();
     HighestSurfaceZ = FMath::Max(HighestSurfaceZ, BaseLocation.Z);
 
-    if (Width > 0 && Length > 0 && CellSize > KINDA_SMALL_NUMBER) {
+    if (Width > 0 && Height > 0 && CellSize > KINDA_SMALL_NUMBER) {
       BaseLocation.X += (static_cast<float>(Width) * CellSize) * 0.5f;
-      BaseLocation.Y += (static_cast<float>(Length) * CellSize) * 0.5f;
+      BaseLocation.Y += (static_cast<float>(Height) * CellSize) * 0.5f;
       bHasLocation = true;
 
-      for (int32 Y = 0; Y < Length; ++Y) {
+      for (int32 Y = 0; Y < Height; ++Y) {
         for (int32 X = 0; X < Width; ++X) {
           const float CellHeight = Grid->GetCellHeight(FIntPoint(X, Y));
           HighestSurfaceZ = FMath::Max(HighestSurfaceZ, CellHeight);
@@ -1160,14 +1160,14 @@ void ASkald_BattleGameMode::SpawnFighterSide(const TArray<FFighterDefinition> &R
 
   const int32 Edge = 3;
   int32 GridWidth = Grid ? Grid->GetWidth() : UGridBattleManager::GridSize;
-  int32 GridLength = Grid ? Grid->GetLength() : UGridBattleManager::GridSize;
+  int32 GridHeight = Grid ? Grid->GetHeight() : UGridBattleManager::GridSize;
 
   if (GridWidth <= 0) {
     GridWidth = UGridBattleManager::GridSize;
   }
 
-  if (GridLength <= 0) {
-    GridLength = UGridBattleManager::GridSize;
+  if (GridHeight <= 0) {
+    GridHeight = UGridBattleManager::GridSize;
   }
 
   const int32 EffectiveEdge = FMath::Clamp(Edge, 1, GridWidth);
@@ -1192,7 +1192,7 @@ void ASkald_BattleGameMode::SpawnFighterSide(const TArray<FFighterDefinition> &R
     const int32 FootprintSideLength =
         DefaultPawn ? FMath::Max(DefaultPawn->GetFootprintSideLength(), 1) : 1;
     const int32 MaxAnchorX = FMath::Max(0, GridWidth - FootprintSideLength);
-    const int32 MaxAnchorY = FMath::Max(0, GridLength - FootprintSideLength);
+    const int32 MaxAnchorY = FMath::Max(0, GridHeight - FootprintSideLength);
 
     const int32 MinSpawnX = bAsAttacker ? 0
                                         : FMath::Clamp(GridWidth - EffectiveEdge, 0, MaxAnchorX);
