@@ -63,6 +63,9 @@ protected:
     /** Remove the player from any assigned slot. */
     void RemovePlayerFromSlots(int32 PlayerId);
 
+    /** Collapse any gaps in the human-controlled lobby slots. */
+    void CompactHumanSlots();
+
     /** Cached pointer to the lobby game state. */
     UPROPERTY(Transient)
     ALobbyGameState* CachedLobbyState;

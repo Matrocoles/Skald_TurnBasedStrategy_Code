@@ -385,12 +385,16 @@ void ULobbySessionWidget::BuildLayout()
 
     if (PlayerCountSpinBox)
     {
+        PlayerCountSpinBox->OnValueChanged.RemoveDynamic(this, &ULobbySessionWidget::HandlePlayerCountChanged);
+        PlayerCountSpinBox->OnValueChanged.AddDynamic(this, &ULobbySessionWidget::HandlePlayerCountChanged);
         PlayerCountSpinBox->OnValueCommitted.RemoveDynamic(this, &ULobbySessionWidget::HandlePlayerCountCommitted);
         PlayerCountSpinBox->OnValueCommitted.AddDynamic(this, &ULobbySessionWidget::HandlePlayerCountCommitted);
     }
 
     if (AICountSpinBox)
     {
+        AICountSpinBox->OnValueChanged.RemoveDynamic(this, &ULobbySessionWidget::HandleAICountChanged);
+        AICountSpinBox->OnValueChanged.AddDynamic(this, &ULobbySessionWidget::HandleAICountChanged);
         AICountSpinBox->OnValueCommitted.RemoveDynamic(this, &ULobbySessionWidget::HandleAICountCommitted);
         AICountSpinBox->OnValueCommitted.AddDynamic(this, &ULobbySessionWidget::HandleAICountCommitted);
     }
@@ -539,7 +543,7 @@ void ULobbySessionWidget::RefreshSlot(int32 SlotIndex, const FLobbyPlayerSlot& S
 
 void ULobbySessionWidget::UpdateHostControls(int32 TotalSlots, int32 AISlots, bool bAllReady)
 {
-    const bool bIsHost = CachedController && CachedController->HasAuthority();
+    const bool bIsHost = CachedController && CachedController->IsLocalPlayerLobbyHost();
     const bool bConfigurationLocked = CachedGameState && CachedGameState->bSlotConfigurationLocked;
 
     if (PlayerCountSpinBox)
@@ -587,13 +591,29 @@ void ULobbySessionWidget::HandleLobbySlotsUpdated()
 
 void ULobbySessionWidget::HandlePlayerCountCommitted(float Value, ETextCommit::Type CommitType)
 {
+    if (CommitType == ETextCommit::OnEnter)
+    {
+        HandlePlayerCountChanged(Value);
+    }
+}
+
+void ULobbySessionWidget::HandleAICountCommitted(float Value, ETextCommit::Type CommitType)
+{
+    if (CommitType == ETextCommit::OnEnter)
+    {
+        HandleAICountChanged(Value);
+    }
+}
+
+void ULobbySessionWidget::HandlePlayerCountChanged(float Value)
+{
     if (!bIsUpdatingFromState && CachedController)
     {
         CachedController->RequestPlayerCount(FMath::RoundToInt(Value));
     }
 }
 
-void ULobbySessionWidget::HandleAICountCommitted(float Value, ETextCommit::Type CommitType)
+void ULobbySessionWidget::HandleAICountChanged(float Value)
 {
     if (!bIsUpdatingFromState && CachedController)
     {

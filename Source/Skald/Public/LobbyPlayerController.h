@@ -7,6 +7,7 @@ class ULobbyMenuWidget;
 class UTitleScreenWidget;
 class ULobbySessionWidget;
 class ALobbyGameMode;
+class ALobbyGameState;
 
 UCLASS()
 class SKALD_API ALobbyPlayerController : public APlayerController
@@ -39,6 +40,10 @@ public:
     /** Called by UI when the host presses Launch Game. */
     UFUNCTION(BlueprintCallable, Category = "Lobby")
     void RequestLaunch();
+
+    /** Returns true when this local player occupies the authoritative lobby host slot. */
+    UFUNCTION(BlueprintPure, Category = "Lobby")
+    bool IsLocalPlayerLobbyHost() const;
 
 protected:
     UPROPERTY(EditDefaultsOnly, Category="UI")
@@ -81,4 +86,7 @@ protected:
 
     UFUNCTION(Server, Reliable)
     void ServerLaunchMatch();
+
+    /** Server-side validation to ensure only the lobby host can modify lobby state. */
+    bool IsLobbyHostOnServer() const;
 };

@@ -201,6 +201,12 @@ protected:
     UFUNCTION()
     void HandleAICountCommitted(float Value, ETextCommit::Type CommitType);
 
+    UFUNCTION()
+    void HandlePlayerCountChanged(float Value);
+
+    UFUNCTION()
+    void HandleAICountChanged(float Value);
+
     void HandleReadyClicked(int32 SlotIndex);
     void HandleFactionSelected(int32 SlotIndex, const FString& SelectedItem, ESelectInfo::Type SelectionType);
     void HandleNameCommitted(int32 SlotIndex, const FText& Text, ETextCommit::Type CommitType);

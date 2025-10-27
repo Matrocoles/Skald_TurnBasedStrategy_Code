@@ -491,6 +491,9 @@ void ALobbyGameMode::RefreshReplicatedLobbyState()
 
     AuthoritySlots.SetNum(MaxLobbySlots);
 
+    // Ensure human-controlled seats remain in the lowest indices so host lookups stay valid.
+    CompactHumanSlots();
+
     // Initialize slot metadata.
     const int32 HumanSlots = FMath::Clamp(AuthorityTotalSlots - AuthorityAISlots, 1, MaxLobbySlots);
     const int32 AISlots = FMath::Clamp(AuthorityAISlots, 0, MaxLobbySlots - 1);
@@ -562,6 +565,7 @@ void ALobbyGameMode::RefreshReplicatedLobbyState()
 
 void ALobbyGameMode::RemovePlayerFromSlots(int32 PlayerId)
 {
+    bool bRemoved = false;
     for (FLobbyPlayerSlot& Slot : AuthoritySlots)
     {
         if (Slot.PlayerId == PlayerId)
@@ -570,7 +574,54 @@ void ALobbyGameMode::RemovePlayerFromSlots(int32 PlayerId)
             Slot.DisplayName.Reset();
             Slot.Faction = ESkaldFaction::None;
             Slot.bIsReady = false;
+            Slot.bIsAI = false;
+            bRemoved = true;
         }
+    }
+
+    if (bRemoved)
+    {
+        CompactHumanSlots();
+    }
+}
+
+void ALobbyGameMode::CompactHumanSlots()
+{
+    if (AuthoritySlots.Num() == 0)
+    {
+        return;
+    }
+
+    const int32 MaxHumans = FMath::Clamp(AuthorityTotalSlots - AuthorityAISlots, 1, AuthoritySlots.Num());
+    TArray<FLobbyPlayerSlot> OccupiedSlots;
+    OccupiedSlots.Reserve(MaxHumans);
+
+    for (int32 Index = 0; Index < MaxHumans; ++Index)
+    {
+        const FLobbyPlayerSlot& Slot = AuthoritySlots[Index];
+        if (Slot.PlayerId != INDEX_NONE)
+        {
+            OccupiedSlots.Add(Slot);
+        }
+    }
+
+    for (int32 Index = 0; Index < MaxHumans; ++Index)
+    {
+        FLobbyPlayerSlot& Slot = AuthoritySlots[Index];
+        if (OccupiedSlots.IsValidIndex(Index))
+        {
+            Slot = OccupiedSlots[Index];
+        }
+        else
+        {
+            Slot.PlayerId = INDEX_NONE;
+            Slot.DisplayName.Reset();
+            Slot.Faction = ESkaldFaction::None;
+            Slot.bIsReady = false;
+        }
+
+        Slot.bIsAI = false;
+        Slot.bIsActive = Index < AuthorityTotalSlots;
     }
 }
 
