@@ -27,8 +27,8 @@ void USettingsWidget::NativeConstruct()
 
     PendingResolution = FIntPoint::ZeroValue;
     PendingQuality = 0;
-    PendingEnemyTurnDelay = 0.75f;
-    PendingBattleActionDelay = 1.0f;
+    PendingEnemyTurnDelay = USkaldGameUserSettings::DefaultEnemyTurnStepDelay;
+    PendingBattleActionDelay = USkaldGameUserSettings::DefaultBattleActionDelay;
 
     if (ApplyButton)
     {
@@ -85,8 +85,12 @@ void USettingsWidget::NativeConstruct()
 
     if (USkaldGameUserSettings* SkaldSettings = USkaldGameUserSettings::GetSkaldGameUserSettings())
     {
-        PendingEnemyTurnDelay = SkaldSettings->GetEnemyTurnStepDelay();
-        PendingBattleActionDelay = SkaldSettings->GetBattleActionDelay();
+        PendingEnemyTurnDelay = FMath::Max(
+            SkaldSettings->GetEnemyTurnStepDelay(),
+            USkaldGameUserSettings::MinimumEnemyTurnStepDelay);
+        PendingBattleActionDelay = FMath::Max(
+            SkaldSettings->GetBattleActionDelay(),
+            USkaldGameUserSettings::MinimumBattleActionDelay);
     }
 
     if (EnemyTurnDelaySlider)
@@ -208,11 +212,23 @@ void USettingsWidget::HandleAudioChanged(float Value)
 
 void USettingsWidget::HandleEnemyTurnDelayChanged(float Value)
 {
-    PendingEnemyTurnDelay = FMath::Max(0.0f, Value);
+    PendingEnemyTurnDelay = FMath::Max(
+        USkaldGameUserSettings::MinimumEnemyTurnStepDelay, Value);
+    if (EnemyTurnDelaySlider &&
+        !FMath::IsNearlyEqual(EnemyTurnDelaySlider->GetValue(), PendingEnemyTurnDelay))
+    {
+        EnemyTurnDelaySlider->SetValue(PendingEnemyTurnDelay);
+    }
 }
 
 void USettingsWidget::HandleBattleActionDelayChanged(float Value)
 {
-    PendingBattleActionDelay = FMath::Max(1.0f, Value);
+    PendingBattleActionDelay = FMath::Max(
+        USkaldGameUserSettings::MinimumBattleActionDelay, Value);
+    if (BattleActionDelaySlider &&
+        !FMath::IsNearlyEqual(BattleActionDelaySlider->GetValue(), PendingBattleActionDelay))
+    {
+        BattleActionDelaySlider->SetValue(PendingBattleActionDelay);
+    }
 }
 

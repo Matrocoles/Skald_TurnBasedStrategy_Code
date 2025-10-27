@@ -1,12 +1,6 @@
 #include "Skald_GameUserSettings.h"
 #include "Engine/Engine.h"
 
-namespace
-{
-constexpr float DefaultEnemyTurnStepDelay = 0.75f;
-constexpr float DefaultBattleActionDelay = 1.0f;
-}
-
 USkaldGameUserSettings::USkaldGameUserSettings()
     : EnemyTurnStepDelay(DefaultEnemyTurnStepDelay),
       BattleActionDelay(DefaultBattleActionDelay) {}
@@ -25,12 +19,12 @@ USkaldGameUserSettings *USkaldGameUserSettings::GetSkaldGameUserSettings()
 
 void USkaldGameUserSettings::SetEnemyTurnStepDelay(float InDelay)
 {
-  EnemyTurnStepDelay = FMath::Max(0.0f, InDelay);
+  EnemyTurnStepDelay = FMath::Max(MinimumEnemyTurnStepDelay, InDelay);
 }
 
 void USkaldGameUserSettings::SetBattleActionDelay(float InDelay)
 {
-  BattleActionDelay = FMath::Max(1.0f, InDelay);
+  BattleActionDelay = FMath::Max(MinimumBattleActionDelay, InDelay);
 }
 
 void USkaldGameUserSettings::SetToDefaults()
