@@ -793,7 +793,7 @@ bool ASkaldAIController::TryMoveTowardsNearestEnemy(AFighterPawn *Fighter) {
         continue;
       }
 
-      if (Grid && !Grid->CanTraverseVertical(Cell, Next)) {
+      if (Grid && !Grid->CanTraverseVerticalCells(Cell, Next)) {
         continue;
       }
 

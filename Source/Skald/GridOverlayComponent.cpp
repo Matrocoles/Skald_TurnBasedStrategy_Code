@@ -535,6 +535,11 @@ bool UGridOverlayComponent::HasLineOfSight(const FIntPoint &Start,
   return true;
 }
 
+bool UGridOverlayComponent::CanTraverseVerticalCells(const FIntPoint &From,
+                                                     const FIntPoint &To) const {
+  return CanTraverseVertical(From, To);
+}
+
 float UGridOverlayComponent::GetCellHeight(const FIntPoint &GridCoord) const {
   if (!IsValidGrid(GridCoord)) {
     return Origin.Z;
