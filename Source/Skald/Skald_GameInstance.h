@@ -58,6 +58,18 @@ struct FSkaldTravelState
   bool bValid = false;
 };
 
+USTRUCT(BlueprintType)
+struct FSkaldAIPlayerConfig
+{
+  GENERATED_BODY()
+
+  UPROPERTY(BlueprintReadWrite, EditAnywhere)
+  FString DisplayName;
+
+  UPROPERTY(BlueprintReadWrite, EditAnywhere)
+  ESkaldFaction Faction = ESkaldFaction::None;
+};
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSkaldFactionsUpdated);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSkaldBattleMapStateChanged,
                                             bool,
@@ -184,6 +196,10 @@ public:
   /** Optional faction emblem textures keyed by faction enum. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
   TMap<ESkaldFaction, TSoftObjectPtr<UTexture2D>> FactionEmblemMap;
+
+  /** AI players defined by the multiplayer lobby prior to match start. */
+  UPROPERTY(BlueprintReadWrite, Category = "Lobby")
+  TArray<FSkaldAIPlayerConfig> PendingLobbyAIPlayers;
 
   /** Resolve the configured emblem for a given faction, if one exists. */
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "UI")

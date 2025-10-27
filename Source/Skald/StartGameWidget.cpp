@@ -265,10 +265,14 @@ void UStartGameWidget::TravelToGameplayMap(APlayerController *PC,
     return;
   }
 
-  const FName LevelName(TEXT("/Game/Blueprints/Maps/OverviewMap"));
+  const FName LobbyLevel(TEXT("/Game/Blueprints/Maps/Skald_Lobby"));
+  const FName GameplayLevel(TEXT("/Game/Blueprints/Maps/OverviewMap"));
+  const FName TargetLevel = bMultiplayer ? LobbyLevel : GameplayLevel;
+
   FString Options;
   if (bMultiplayer) {
     Options = TEXT("listen");
   }
-  UGameplayStatics::OpenLevel(PC, LevelName, true, Options);
+
+  UGameplayStatics::OpenLevel(PC, TargetLevel, true, Options);
 }
