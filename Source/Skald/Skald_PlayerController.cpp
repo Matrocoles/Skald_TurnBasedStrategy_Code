@@ -300,6 +300,63 @@ void ASkaldPlayerController::InitializeChoosePlayerWidget() {
   SetIgnoreLookInput(true);
 }
 
+bool ASkaldPlayerController::ShouldAutoLockInFromLobby() const {
+  if (!CachedGameInstance || !CachedGameInstance->bIsMultiplayer) {
+    return false;
+  }
+
+  if (const ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+    const bool bHasName = !PS->PlayerDisplayName.IsEmpty();
+    const bool bHasFaction = PS->Faction != ESkaldFaction::None;
+    if (bHasName && bHasFaction) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+void ASkaldPlayerController::AutoInitializeFromLobbySelection() {
+  if (bHasInitialized) {
+    return;
+  }
+
+  FString DesiredName;
+  ESkaldFaction DesiredFaction = ESkaldFaction::None;
+  int32 DesiredAIPlayers = CachedGameInstance ? CachedGameInstance->AIPlayersToSpawn : 0;
+
+  if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+    if (!PS->PlayerDisplayName.IsEmpty()) {
+      DesiredName = PS->PlayerDisplayName;
+    } else {
+      DesiredName = PS->GetPlayerName();
+    }
+
+    if (PS->Faction != ESkaldFaction::None) {
+      DesiredFaction = PS->Faction;
+    }
+  }
+
+  if (DesiredName.IsEmpty() && CachedGameInstance) {
+    DesiredName = CachedGameInstance->DisplayName;
+  }
+
+  if (DesiredFaction == ESkaldFaction::None && CachedGameInstance) {
+    DesiredFaction = CachedGameInstance->Faction;
+  }
+
+  if (DesiredName.IsEmpty() || DesiredFaction == ESkaldFaction::None) {
+    InitializeChoosePlayerWidget();
+    return;
+  }
+
+  if (!CachedGameMode || !CachedGameMode->IsWorldInitialized()) {
+    ServerInitPlayerState(DesiredName, DesiredFaction, DesiredAIPlayers);
+  }
+
+  HandleFactionLockedIn();
+}
+
 void ASkaldPlayerController::BeginPlay() {
   Super::BeginPlay();
 
@@ -348,7 +405,11 @@ void ASkaldPlayerController::BeginPlay() {
       }
     }
     if (CachedGameInstance && CachedGameInstance->bIsMultiplayer) {
-      InitializeChoosePlayerWidget();
+      if (ShouldAutoLockInFromLobby()) {
+        AutoInitializeFromLobbySelection();
+      } else {
+        InitializeChoosePlayerWidget();
+      }
     } else if (CachedGameInstance && !bHasInitialized) {
       if (!CachedGameMode || !CachedGameMode->IsWorldInitialized()) {
         ServerInitPlayerState(CachedGameInstance->DisplayName,
@@ -546,6 +607,11 @@ void ASkaldPlayerController::TryBindWorldMap() {
 void ASkaldPlayerController::OnRep_PlayerState() {
   Super::OnRep_PlayerState();
 
+  if (!bHasInitialized && CachedGameInstance &&
+      CachedGameInstance->bIsMultiplayer && ShouldAutoLockInFromLobby()) {
+    AutoInitializeFromLobbySelection();
+  }
+
   if (!MainHUD) {
     return;
   }
@@ -565,15 +631,38 @@ void ASkaldPlayerController::ServerInitPlayerState_Implementation(
          *Name, static_cast<int32>(Faction), NumAIPlayers);
 
   if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+    FString EffectiveName = Name;
+    if (EffectiveName.IsEmpty()) {
+      EffectiveName = PS->PlayerDisplayName.IsEmpty() ? PS->GetPlayerName()
+                                                     : PS->PlayerDisplayName;
+    }
+
+    ESkaldFaction EffectiveFaction =
+        Faction != ESkaldFaction::None ? Faction : PS->Faction;
+
     UE_LOG(LogSkald, Log,
            TEXT("ServerInitPlayerState_Implementation: PlayerState=%s"),
            *PS->GetName());
-    PS->PlayerDisplayName = Name;
-    PS->SetPlayerName(Name);
-    PS->Faction = Faction;
+    if (!EffectiveName.IsEmpty()) {
+      PS->PlayerDisplayName = EffectiveName;
+      PS->SetPlayerName(EffectiveName);
+    }
+
+    if (EffectiveFaction != ESkaldFaction::None) {
+      PS->Faction = EffectiveFaction;
+    }
 
     if (USkaldGameInstance *GI = Cast<USkaldGameInstance>(GetGameInstance())) {
-      GI->AIPlayersToSpawn = NumAIPlayers;
+      if (!GI->bIsMultiplayer || IsLocalController()) {
+        GI->AIPlayersToSpawn = NumAIPlayers;
+      }
+      if (!EffectiveName.IsEmpty()) {
+        GI->DisplayName = EffectiveName;
+      }
+      if (EffectiveFaction != ESkaldFaction::None) {
+        GI->Faction = EffectiveFaction;
+        GI->TakenFactions.AddUnique(EffectiveFaction);
+      }
     }
 
     if (ASkaldGameMode *GM = GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {

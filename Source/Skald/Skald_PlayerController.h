@@ -622,6 +622,12 @@ private:
   /** Create the faction selection widget for the local player. */
   void InitializeChoosePlayerWidget();
 
+  /** Determine whether lobby data already contains the local player's choices. */
+  bool ShouldAutoLockInFromLobby() const;
+
+  /** Initialize the player state using lobby selections instead of the legacy widget. */
+  void AutoInitializeFromLobbySelection();
+
   void InitializeBattleHUD();
   void ShowOverworldHUD();
   void HideOverworldHUDForBattle();
