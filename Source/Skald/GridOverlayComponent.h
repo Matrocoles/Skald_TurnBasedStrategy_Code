@@ -134,6 +134,9 @@ public:
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Grid")
   bool HasLineOfSight(const FIntPoint &Start, const FIntPoint &End) const;
 
+  /** Determine if movement between two cells is allowed vertically. */
+  bool CanTraverseVerticalCells(const FIntPoint &From, const FIntPoint &To) const;
+
   /** Get the cached height for a grid cell. */
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Grid")
   float GetCellHeight(const FIntPoint &GridCoord) const;
