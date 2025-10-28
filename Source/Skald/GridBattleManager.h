@@ -5,6 +5,7 @@
 #include "Engine/DataTable.h"
 #include "GameFramework/Actor.h"
 #include "SkaldTypes.h"
+#include "Abilities/SkaldAbilityTypes.h"
 #include "Engine/Texture2D.h"
 #include "TimerManager.h"
 #include "Delegates/Delegate.h"
@@ -181,6 +182,14 @@ struct FFighterDefinition : public FTableRowBase
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Fighter")
     TSoftObjectPtr<UTexture2D> Portrait;
+
+    /** Passive ability granted via the fighter's faction. */
+    UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category="Fighter|Abilities")
+    FSkaldAbilityDefinition PassiveAbility;
+
+    /** Active ability mapped to the fighter's cost tier. */
+    UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category="Fighter|Abilities")
+    FSkaldAbilityDefinition ActiveAbility;
 };
 
 USTRUCT(BlueprintType)

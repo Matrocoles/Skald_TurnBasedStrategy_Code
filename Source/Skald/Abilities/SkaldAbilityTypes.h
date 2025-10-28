@@ -6,6 +6,8 @@
 
 class UNiagaraSystem;
 class USoundBase;
+class UAnimMontage;
+class UTexture2D;
 
 /** Slots exposed through the existing Ability1/2/3 input bindings. */
 UENUM(BlueprintType)
@@ -48,13 +50,13 @@ struct FSkaldAbilityVisuals
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visuals")
     TSoftObjectPtr<USoundBase> Sound;
 
-    /** Optional name of an animation montage to trigger. */
+    /** Optional animation montage triggered on the owning fighter. */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visuals")
-    FName MontageName;
+    TSoftObjectPtr<UAnimMontage> Montage;
 
     bool HasAnyVisuals() const
     {
-        return !NiagaraEffect.IsNull() || !Sound.IsNull() || MontageName != NAME_None;
+        return !NiagaraEffect.IsNull() || !Sound.IsNull() || !Montage.IsNull();
     }
 };
 
@@ -106,6 +108,10 @@ struct FSkaldAbilityDefinition
     /** Optional audio/visual payload spawned when the ability resolves. */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Ability")
     FSkaldAbilityVisuals Visuals;
+
+    /** Optional icon used when presenting the ability in HUD widgets. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Ability")
+    TSoftObjectPtr<UTexture2D> AbilityIcon;
 
     /** Human readable shorthand of the cost, e.g. "Action" or "Free". */
     FText BuildCostLabel() const;

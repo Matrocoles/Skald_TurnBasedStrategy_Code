@@ -1,6 +1,9 @@
 #include "Abilities/SkaldAbilityComponent.h"
 
 #include "Abilities/SkaldAbilityTypes.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Containers/Set.h"
 #include "FighterPawn.h"
 #include "Kismet/GameplayStatics.h"
@@ -89,33 +92,15 @@ void USkaldAbilityComponent::HandleActivationStarted()
 
 bool USkaldAbilityComponent::TryBeginAbility(ESkaldAbilitySlot Slot, FText& OutFailureReason)
 {
-    if (!bHasInitialisedLoadout)
+    if (!CanActivateAbility(Slot, &OutFailureReason))
     {
-        OutFailureReason = NSLOCTEXT("SkaldAbilities", "AbilityNotInitialised", "Ability loadout not ready.");
         return false;
     }
 
     FSkaldAbilityState* State = AbilitySlots.Find(Slot);
-    if (!State || !State->Definition.IsValid())
+    if (!State)
     {
         OutFailureReason = NSLOCTEXT("SkaldAbilities", "AbilityUnavailable", "No ability is assigned to that slot.");
-        return false;
-    }
-
-    if (State->Definition.bOncePerBattle && State->bHasBeenUsed)
-    {
-        OutFailureReason = NSLOCTEXT("SkaldAbilities", "AbilityOncePerBattle", "This ability can only be used once per battle.");
-        return false;
-    }
-
-    if (State->bIsOnCooldown)
-    {
-        OutFailureReason = NSLOCTEXT("SkaldAbilities", "AbilityOnCooldown", "Ability is on cooldown.");
-        return false;
-    }
-
-    if (!CanPayCost(State->Definition, OutFailureReason))
-    {
         return false;
     }
 
@@ -145,6 +130,32 @@ bool USkaldAbilityComponent::TryBeginAbility(ESkaldAbilitySlot Slot, FText& OutF
 
     BroadcastStateChanged();
     return true;
+}
+
+bool USkaldAbilityComponent::CanActivateAbility(ESkaldAbilitySlot Slot, FText* OutFailureReason) const
+{
+    FText LocalReason;
+    FText& Failure = OutFailureReason ? *OutFailureReason : LocalReason;
+
+    if (!bHasInitialisedLoadout)
+    {
+        Failure = NSLOCTEXT("SkaldAbilities", "AbilityNotInitialised", "Ability loadout not ready.");
+        return false;
+    }
+
+    const FSkaldAbilityState* State = AbilitySlots.Find(Slot);
+    if (!State || !State->Definition.IsValid())
+    {
+        Failure = NSLOCTEXT("SkaldAbilities", "AbilityUnavailable", "No ability is assigned to that slot.");
+        return false;
+    }
+
+    if (!CanTriggerAbility(*State, Failure))
+    {
+        return false;
+    }
+
+    return CanPayCost(State->Definition, Failure);
 }
 
 void USkaldAbilityComponent::GetAbilityStates(TArray<FSkaldAbilityState>& OutStates) const
@@ -238,6 +249,23 @@ bool USkaldAbilityComponent::ConsumeCost(const FSkaldAbilityDefinition& Definiti
     }
 }
 
+bool USkaldAbilityComponent::CanTriggerAbility(const FSkaldAbilityState& State, FText& OutError) const
+{
+    if (State.Definition.bOncePerBattle && State.bHasBeenUsed)
+    {
+        OutError = NSLOCTEXT("SkaldAbilities", "AbilityOncePerBattle", "This ability can only be used once per battle.");
+        return false;
+    }
+
+    if (State.bIsOnCooldown)
+    {
+        OutError = NSLOCTEXT("SkaldAbilities", "AbilityOnCooldown", "Ability is on cooldown.");
+        return false;
+    }
+
+    return true;
+}
+
 void USkaldAbilityComponent::HandleAbilityTriggeredLocal(const FSkaldAbilityDefinition& Definition)
 {
     PlayAbilityFeedback(Definition);
@@ -261,6 +289,20 @@ void USkaldAbilityComponent::PlayAbilityFeedback(const FSkaldAbilityDefinition& 
     if (!Visuals.HasAnyVisuals())
     {
         return;
+    }
+
+    if (!Visuals.Montage.IsNull())
+    {
+        if (UAnimMontage* Montage = Visuals.Montage.LoadSynchronous())
+        {
+            if (USkeletalMeshComponent* SkeletalMesh = Fighter->FindComponentByClass<USkeletalMeshComponent>())
+            {
+                if (UAnimInstance* AnimInstance = SkeletalMesh->GetAnimInstance())
+                {
+                    AnimInstance->Montage_Play(Montage);
+                }
+            }
+        }
     }
 
     if (!Visuals.NiagaraEffect.IsNull())

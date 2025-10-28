@@ -64,6 +64,42 @@ void UBattleHUDWidget::NativeConstruct() {
     RollInitiativeButton->SetIsEnabled(true);
   }
 
+  if (AbilityButton1) {
+    AbilityButton1->OnClicked.AddDynamic(
+        this, &UBattleHUDWidget::HandleAbilityButtonPressedSlot1);
+    AbilityButton1->SetVisibility(ESlateVisibility::Collapsed);
+  }
+  if (AbilityButton2) {
+    AbilityButton2->OnClicked.AddDynamic(
+        this, &UBattleHUDWidget::HandleAbilityButtonPressedSlot2);
+    AbilityButton2->SetVisibility(ESlateVisibility::Collapsed);
+  }
+  if (AbilityButton3) {
+    AbilityButton3->OnClicked.AddDynamic(
+        this, &UBattleHUDWidget::HandleAbilityButtonPressedSlot3);
+    AbilityButton3->SetVisibility(ESlateVisibility::Collapsed);
+  }
+
+  if (AbilityIcon1) {
+    AbilityIcon1->SetVisibility(ESlateVisibility::Collapsed);
+  }
+  if (AbilityIcon2) {
+    AbilityIcon2->SetVisibility(ESlateVisibility::Collapsed);
+  }
+  if (AbilityIcon3) {
+    AbilityIcon3->SetVisibility(ESlateVisibility::Collapsed);
+  }
+
+  if (AbilityLabel1) {
+    AbilityLabel1->SetVisibility(ESlateVisibility::Collapsed);
+  }
+  if (AbilityLabel2) {
+    AbilityLabel2->SetVisibility(ESlateVisibility::Collapsed);
+  }
+  if (AbilityLabel3) {
+    AbilityLabel3->SetVisibility(ESlateVisibility::Collapsed);
+  }
+
   if (DiceResolutionPanel) {
     DiceResolutionPanel->OnResolutionComplete.AddDynamic(
         this, &UBattleHUDWidget::HandleDicePanelResolved);
@@ -122,6 +158,19 @@ void UBattleHUDWidget::NativeDestruct() {
     DiceRollerRenderTarget->OnCanvasRenderTargetUpdate.RemoveDynamic(
         this, &UBattleHUDWidget::HandleDiceRenderTargetUpdate);
     DiceRollerRenderTarget = nullptr;
+  }
+
+  if (AbilityButton1) {
+    AbilityButton1->OnClicked.RemoveDynamic(
+        this, &UBattleHUDWidget::HandleAbilityButtonPressedSlot1);
+  }
+  if (AbilityButton2) {
+    AbilityButton2->OnClicked.RemoveDynamic(
+        this, &UBattleHUDWidget::HandleAbilityButtonPressedSlot2);
+  }
+  if (AbilityButton3) {
+    AbilityButton3->OnClicked.RemoveDynamic(
+        this, &UBattleHUDWidget::HandleAbilityButtonPressedSlot3);
   }
 
   if (ASkaldPlayerController *SkaldController =
@@ -561,6 +610,18 @@ void UBattleHUDWidget::HandleInitiativeRollPressed() {
   OnInitiativeRollRequested.Broadcast();
 }
 
+void UBattleHUDWidget::HandleAbilityButtonPressedSlot1() {
+  OnAbilitySlotPressed.Broadcast(ESkaldAbilitySlot::Ability1);
+}
+
+void UBattleHUDWidget::HandleAbilityButtonPressedSlot2() {
+  OnAbilitySlotPressed.Broadcast(ESkaldAbilitySlot::Ability2);
+}
+
+void UBattleHUDWidget::HandleAbilityButtonPressedSlot3() {
+  OnAbilitySlotPressed.Broadcast(ESkaldAbilitySlot::Ability3);
+}
+
 void UBattleHUDWidget::RevealInitiativeRollButton() {
   if (RollInitiativeButton) {
     RollInitiativeButton->SetVisibility(ESlateVisibility::Visible);
@@ -587,6 +648,7 @@ void UBattleHUDWidget::HandleActionsChanged(int32 NewActions) {
   }
 
   UpdateActionButtonVisibility();
+  RefreshAbilityDisplay();
 }
 
 void UBattleHUDWidget::HandleAbilityComponentUpdated(
@@ -645,6 +707,7 @@ void UBattleHUDWidget::RefreshAbilityDisplay() {
     PassiveAbilityDefinition = FSkaldAbilityDefinition();
     OnAbilityDisplayChanged.Broadcast(PassiveAbilityDefinition,
                                       AbilitySlotDefinitions);
+    UpdateAbilityButtons();
     return;
   }
 
@@ -662,12 +725,148 @@ void UBattleHUDWidget::RefreshAbilityDisplay() {
       Display.CooldownRemaining = State->CooldownRemaining;
       Display.bHasBeenUsed = State->bHasBeenUsed;
       Display.bIsOnCooldown = State->bIsOnCooldown;
+      Display.bCanActivate = AbilityComp->CanActivateAbility(AbilitySlot);
       AbilitySlotDefinitions.Add(Display);
     }
   }
 
   OnAbilityDisplayChanged.Broadcast(PassiveAbilityDefinition,
                                     AbilitySlotDefinitions);
+  UpdateAbilityButtons();
+}
+
+void UBattleHUDWidget::UpdateAbilityButtons() {
+  UpdateAbilityButtonForSlot(ESkaldAbilitySlot::Ability1, AbilityButton1,
+                             AbilityIcon1, AbilityLabel1);
+  UpdateAbilityButtonForSlot(ESkaldAbilitySlot::Ability2, AbilityButton2,
+                             AbilityIcon2, AbilityLabel2);
+  UpdateAbilityButtonForSlot(ESkaldAbilitySlot::Ability3, AbilityButton3,
+                             AbilityIcon3, AbilityLabel3);
+}
+
+void UBattleHUDWidget::UpdateAbilityButtonForSlot(ESkaldAbilitySlot Slot,
+                                                  UButton *Button,
+                                                  UImage *IconWidget,
+                                                  UTextBlock *LabelWidget) {
+  if (!Button) {
+    if (IconWidget) {
+      IconWidget->SetVisibility(ESlateVisibility::Collapsed);
+    }
+    if (LabelWidget) {
+      LabelWidget->SetVisibility(ESlateVisibility::Collapsed);
+    }
+    return;
+  }
+
+  const FBattleAbilitySlotDisplay *Display = FindAbilityDisplay(Slot);
+  if (!Display) {
+    Button->SetVisibility(ESlateVisibility::Collapsed);
+    Button->SetIsEnabled(false);
+    Button->SetToolTipText(FText::GetEmpty());
+    if (IconWidget) {
+      IconWidget->SetBrushFromTexture(nullptr);
+      IconWidget->SetVisibility(ESlateVisibility::Collapsed);
+    }
+    if (LabelWidget) {
+      LabelWidget->SetText(FText::GetEmpty());
+      LabelWidget->SetVisibility(ESlateVisibility::Collapsed);
+    }
+    return;
+  }
+
+  Button->SetVisibility(ESlateVisibility::Visible);
+  Button->SetIsEnabled(Display->bCanActivate);
+
+  const FSkaldAbilityDefinition &Definition = Display->Definition;
+
+  if (IconWidget) {
+    UTexture2D *IconTexture = nullptr;
+    if (!Definition.AbilityIcon.IsNull()) {
+      IconTexture = Definition.AbilityIcon.Get();
+      if (!IconTexture) {
+        IconTexture = Definition.AbilityIcon.LoadSynchronous();
+      }
+    }
+
+    if (IconTexture) {
+      IconWidget->SetBrushFromTexture(IconTexture);
+      IconWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
+    } else {
+      IconWidget->SetBrushFromTexture(nullptr);
+      IconWidget->SetVisibility(ESlateVisibility::Collapsed);
+    }
+  }
+
+  const FText AbilityName = !Definition.AbilityName.IsEmpty()
+                               ? Definition.AbilityName
+                               : Definition.AbilityDescription;
+
+  if (LabelWidget) {
+    const bool bHasName = !Definition.AbilityName.IsEmpty();
+    LabelWidget->SetText(Definition.AbilityName);
+    LabelWidget->SetVisibility(bHasName ? ESlateVisibility::HitTestInvisible
+                                        : ESlateVisibility::Collapsed);
+  }
+
+  FText CostLabel = Definition.BuildCostLabel();
+  TArray<FText> TooltipLines;
+  if (!Definition.AbilityDescription.IsEmpty()) {
+    TooltipLines.Add(Definition.AbilityDescription);
+  }
+  if (Definition.CooldownRounds > 0) {
+    if (Display->bIsOnCooldown && Display->CooldownRemaining > 0) {
+      TooltipLines.Add(FText::Format(
+          NSLOCTEXT("SkaldBattleHUD", "AbilityTooltipCooldownRemaining",
+                     "Cooldown: {0} rounds remaining"),
+          FText::AsNumber(Display->CooldownRemaining)));
+    } else {
+      TooltipLines.Add(FText::Format(
+          NSLOCTEXT("SkaldBattleHUD", "AbilityTooltipCooldown",
+                     "Cooldown: {0} rounds"),
+          FText::AsNumber(Definition.CooldownRounds)));
+    }
+  }
+  if (Definition.bOncePerBattle) {
+    TooltipLines.Add(NSLOCTEXT("SkaldBattleHUD", "AbilityTooltipOncePerBattle",
+                               "Limited: Once per battle"));
+  }
+
+  FText BodyText = TooltipLines.Num() > 0
+                       ? FText::Join(FText::FromString(TEXT("\n")), TooltipLines)
+                       : FText::GetEmpty();
+
+  const bool bHasCostLabel = !CostLabel.IsEmpty();
+  const bool bHasBodyText = !BodyText.IsEmpty();
+  FText TooltipText;
+  if (bHasCostLabel && bHasBodyText) {
+    TooltipText = FText::Format(NSLOCTEXT("SkaldBattleHUD", "AbilityTooltipFull",
+                                         "{0}\nCost: {1}\n{2}"),
+                                AbilityName, CostLabel, BodyText);
+  } else if (bHasCostLabel) {
+    TooltipText = FText::Format(NSLOCTEXT("SkaldBattleHUD",
+                                          "AbilityTooltipNameCost",
+                                          "{0}\nCost: {1}"),
+                                AbilityName, CostLabel);
+  } else if (bHasBodyText) {
+    TooltipText = FText::Format(NSLOCTEXT("SkaldBattleHUD",
+                                          "AbilityTooltipNameDescription",
+                                          "{0}\n{1}"),
+                                AbilityName, BodyText);
+  } else {
+    TooltipText = AbilityName;
+  }
+
+  Button->SetToolTipText(TooltipText);
+}
+
+const FBattleAbilitySlotDisplay *
+UBattleHUDWidget::FindAbilityDisplay(ESkaldAbilitySlot Slot) const {
+  for (const FBattleAbilitySlotDisplay &Display : AbilitySlotDefinitions) {
+    if (Display.Slot == Slot) {
+      return &Display;
+    }
+  }
+  return nullptr;
 }
 
 void UBattleHUDWidget::SetRoundInfo(const FText &RoundLabel,

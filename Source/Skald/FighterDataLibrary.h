@@ -3,6 +3,7 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "GridBattleManager.h" // for FFighterDefinition
 #include "SkaldTypes.h"
+#include "Abilities/SkaldAbilityTypes.h"
 #include "FighterDataLibrary.generated.h"
 
 /** Utility functions for accessing fighter data tables. */
