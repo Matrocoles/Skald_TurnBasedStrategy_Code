@@ -265,6 +265,22 @@ void UGridBattleManager::UnregisterFighter(AFighterPawn* Fighter)
     EvaluateRoundProgress(bWasAttacker);
 }
 
+TArray<AFighterPawn*> UGridBattleManager::GetInitiativeOrderSnapshot() const
+{
+    TArray<AFighterPawn*> Snapshot;
+    Snapshot.Reserve(InitiativeOrder.Num());
+
+    for (AFighterPawn* Fighter : InitiativeOrder)
+    {
+        if (IsValid(Fighter))
+        {
+            Snapshot.Add(Fighter);
+        }
+    }
+
+    return Snapshot;
+}
+
 TArray<FFighterDefinition> UGridBattleManager::GetFightersForFaction(ESkaldFaction Faction) const
 {
     TArray<FFighterDefinition> Out;

@@ -10,6 +10,7 @@ class UButton;
 class UImage;
 class UCanvasRenderTarget2D;
 class UTextBlock;
+class UScrollBox;
 class AFighterPawn;
 class UGridOverlayComponent;
 class UTexture2D;
@@ -17,6 +18,7 @@ class USoundBase;
 class UCombatFloaterPoolSubsystem;
 class UW_DiceResolutionPanel;
 class UW_FloatingText;
+class ULockedInFighterEntryWidget;
 
 USTRUCT(BlueprintType)
 struct SKALD_API FSkaldFloaterStyle {
@@ -95,11 +97,16 @@ public:
   DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(
       FOnDiceOutcomeRevealed, AFighterPawn *, Attacker, AFighterPawn *, Defender,
       const FDiceRollOutcome &, Outcome, int32, RevealIndex);
+  DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnLockedInFighterEntrySelected,
+                                              AFighterPawn *, Fighter);
   UPROPERTY(BlueprintAssignable, Category = "Skald|Battle|Events")
   FOnResolutionComplete OnResolutionComplete;
 
   UPROPERTY(BlueprintAssignable, Category = "Skald|Battle|Events")
   FOnDiceOutcomeRevealed OnDiceOutcomeRevealed;
+
+  UPROPERTY(BlueprintAssignable, Category = "Skald|Battle|Events")
+  FOnLockedInFighterEntrySelected OnLockedInFighterEntrySelected;
 
   /** Returns true while dice resolutions or combat floaters are still animating. */
   UFUNCTION(BlueprintPure, Category = "Skald|Battle")
@@ -201,6 +208,34 @@ public:
   UPROPERTY(Transient)
   TObjectPtr<UCanvasRenderTarget2D> DiceRollerRenderTarget;
 
+  /** Scroll box containing locked-in fighter entries. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UScrollBox *ScrollBox_LockedInFightersList;
+
+  /** Widget class used for locked-in fighter list entries. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skald|Battle")
+  TSubclassOf<ULockedInFighterEntryWidget> LockedInFighterEntryClass;
+
+  /** Populate the locked-in fighter list with the provided fighters. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Battle")
+  void SetLockedInFighters(const TArray<AFighterPawn *> &Fighters);
+
+  /** Clear the locked-in fighter list and associated bindings. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Battle")
+  void ClearLockedInFighterList();
+
+  /** Highlight the entry representing the selected fighter. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Battle")
+  void SetHighlightedLockedInFighter(AFighterPawn *Fighter);
+
+  /** Highlight the entry for the fighter whose activation is in progress. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Battle")
+  void SetActiveLockedInFighter(AFighterPawn *Fighter);
+
+  /** Refresh dimming state for all entries based on turn completion. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Battle")
+  void RefreshLockedInFighterTurnStates();
+
   /** Panel that reveals per-die outcomes in sequence. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UW_DiceResolutionPanel *DiceResolutionPanel;
@@ -293,6 +328,13 @@ public:
       AFighterPawn *Attacker, AFighterPawn *Defender, const FDiceRollResult &Result) const;
 
 private:
+  void PruneInvalidLockedInEntries();
+  ULockedInFighterEntryWidget *FindLockedInEntry(AFighterPawn *Fighter) const;
+  ULockedInFighterEntryWidget *FindOrCreateLockedInEntry(AFighterPawn *Fighter);
+  void HandleLockedInEntryClicked(AFighterPawn *Fighter);
+  void HandleLockedInEntryRemoved(AFighterPawn *Fighter);
+  void RemoveLockedInEntry(AFighterPawn *Fighter);
+
   /** Callback when MoveButton is pressed. */
   UFUNCTION()
   void HandleMovePressed();
@@ -449,6 +491,19 @@ private:
 
   /** Whether action buttons are allowed to be displayed. */
   bool bActionButtonsUnlocked = false;
+
+  /** Map of tracked fighters to their entry widgets. */
+  TMap<TWeakObjectPtr<AFighterPawn>, TObjectPtr<ULockedInFighterEntryWidget>>
+      LockedInFighterEntries;
+
+  /** Ordered array of fighters displayed in the list. */
+  TArray<TWeakObjectPtr<AFighterPawn>> LockedInFighterOrder;
+
+  /** Currently highlighted fighter entry (selection). */
+  TWeakObjectPtr<AFighterPawn> HighlightedLockedInFighter;
+
+  /** Fighter currently taking its activation. */
+  TWeakObjectPtr<AFighterPawn> ActiveLockedInFighter;
 
   /** Fighter currently bound to the HUD. */
   UPROPERTY()
