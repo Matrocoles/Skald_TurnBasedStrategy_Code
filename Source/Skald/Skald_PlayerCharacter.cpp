@@ -198,6 +198,11 @@ void ASkald_PlayerCharacter::Turn(float Value)
         {
                 if (!FMath::IsNearlyZero(Value))
                 {
+                        if (bBattleCameraLocked)
+                        {
+                                bHasManuallyRotatedWhileLocked = true;
+                        }
+
                         DesiredBattleRotation.Yaw = FRotator::NormalizeAxis(
                                 DesiredBattleRotation.Yaw + (Value * BattleMouseYawSpeed));
                 }
@@ -384,6 +389,7 @@ void ASkald_PlayerCharacter::FocusCameraOnActor(AActor* FocusActor)
 
         LockedBattleActor = FocusActor;
         bBattleCameraLocked = true;
+        bHasManuallyRotatedWhileLocked = false;
         BattleCameraVelocity = FVector::ZeroVector;
 
         DesiredBattleZoom = FMath::Clamp(LockedBattleZoom, MinBattleZoom, MaxBattleZoom);
@@ -431,7 +437,7 @@ void ASkald_PlayerCharacter::UpdateBattleCamera(float DeltaTime)
                         const FVector NewLocation = FMath::VInterpTo(GetActorLocation(), TargetLocation, DeltaTime, BattleLockInterpSpeed);
                         SetActorLocation(NewLocation);
 
-                        if (bAutoFaceLockTarget)
+                        if (bAutoFaceLockTarget && !bHasManuallyRotatedWhileLocked)
                         {
                                 DesiredBattleRotation.Yaw = FocusActor->GetActorRotation().Yaw;
                         }
@@ -468,6 +474,7 @@ void ASkald_PlayerCharacter::ClearBattleCameraLock()
         bBattleCameraLocked = false;
         LockedBattleActor = nullptr;
         BattleCameraVelocity = FVector::ZeroVector;
+        bHasManuallyRotatedWhileLocked = false;
 
         DesiredBattleZoom = FMath::Clamp(DefaultBattleZoom, MinBattleZoom, MaxBattleZoom);
         const float ClampedPitch = FMath::Clamp(DefaultBattlePitch, MinBattlePitch, MaxBattlePitch);
