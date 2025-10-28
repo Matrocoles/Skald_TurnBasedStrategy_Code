@@ -63,7 +63,9 @@ ASkaldGameMode::ASkaldGameMode() {
   PlayerStateClass = ASkaldPlayerState::StaticClass();
   PlayerControllerClass = ASkaldPlayerController::StaticClass();
   DefaultPawnClass = ASkald_PlayerCharacter::StaticClass();
+#if WITH_SERVER_CODE
   ReplicationDriverClass = USkaldReplicationDriver::StaticClass();
+#endif // WITH_SERVER_CODE
 
   TurnManager = nullptr;
   TurnManagerClass = ATurnManager::StaticClass();
