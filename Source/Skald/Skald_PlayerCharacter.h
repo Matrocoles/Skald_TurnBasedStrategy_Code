@@ -227,6 +227,9 @@ private:
         /** Smoothed velocity applied when panning the battle camera. */
         FVector BattleCameraVelocity = FVector::ZeroVector;
 
+        /** Tracks if the player has manually rotated the camera while locked on. */
+        bool bHasManuallyRotatedWhileLocked = false;
+
         /** Convert the configured relative lock offset into world space. */
         FVector GetBattleLockWorldOffset(const AActor* FocusActor) const;
 
