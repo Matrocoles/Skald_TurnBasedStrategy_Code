@@ -28,6 +28,18 @@ struct FSkaldAbilityState
     bool bIsOnCooldown = false;
 };
 
+USTRUCT()
+struct FSkaldReplicatedAbilitySlotState
+{
+    GENERATED_BODY()
+
+    UPROPERTY()
+    ESkaldAbilitySlot Slot = ESkaldAbilitySlot::Ability1;
+
+    UPROPERTY()
+    FSkaldAbilityState State;
+};
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSkaldAbilityComponentUpdated, USkaldAbilityComponent*, AbilityComponent);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FSkaldAbilityTriggered, USkaldAbilityComponent*, AbilityComponent, const FSkaldAbilityDefinition&, AbilityDefinition);
 
@@ -99,8 +111,12 @@ protected:
     FSkaldAbilityDefinition PassiveAbility;
 
     /** Mapping from input slots to their ability state. */
-    UPROPERTY(ReplicatedUsing = OnRep_AbilitySlots)
+    UPROPERTY()
     TMap<ESkaldAbilitySlot, FSkaldAbilityState> AbilitySlots;
+
+    /** Lightweight replicated view of slot -> state pairs. */
+    UPROPERTY(ReplicatedUsing = OnRep_AbilitySlots)
+    TArray<FSkaldReplicatedAbilitySlotState> ReplicatedAbilitySlots;
 
     /** Default reaction availability refreshed every round. */
     UPROPERTY(EditDefaultsOnly, Category = "Ability")
@@ -117,5 +133,7 @@ protected:
     /** Slots stored to maintain deterministic iteration order. */
     UPROPERTY()
     TArray<ESkaldAbilitySlot> SlotOrder;
+
+    void UpdateReplicatedAbilitySlots();
 };
 
