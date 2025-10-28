@@ -24,11 +24,13 @@
 #include "Skald_TurnManager.h"
 #include "Territory.h"
 #include "TimerManager.h"
+#include "GameFramework/WorldSettings.h"
 #include "UI/SkaldMainHUDWidget.h"
 #include "UObject/Package.h"
 #include "UObject/UnrealType.h"
 #include "WorldMap.h"
 #include "Containers/Set.h"
+#include "Misc/EngineVersionComparison.h"
 
 namespace {
 constexpr float StartGameTimeout = 10.f;
@@ -63,9 +65,9 @@ ASkaldGameMode::ASkaldGameMode() {
   PlayerStateClass = ASkaldPlayerState::StaticClass();
   PlayerControllerClass = ASkaldPlayerController::StaticClass();
   DefaultPawnClass = ASkald_PlayerCharacter::StaticClass();
-#if WITH_SERVER_CODE
+#if WITH_SERVER_CODE && UE_VERSION_OLDER_THAN(5, 5, 0)
   ReplicationDriverClass = USkaldReplicationDriver::StaticClass();
-#endif // WITH_SERVER_CODE
+#endif // WITH_SERVER_CODE && UE_VERSION_OLDER_THAN(5, 5, 0)
 
   TurnManager = nullptr;
   TurnManagerClass = ATurnManager::StaticClass();
@@ -85,6 +87,15 @@ ASkaldGameMode::ASkaldGameMode() {
 void ASkaldGameMode::InitGame(const FString &Map, const FString &Options,
                               FString &Error) {
   Super::InitGame(Map, Options, Error);
+
+#if WITH_SERVER_CODE && !UE_VERSION_OLDER_THAN(5, 5, 0)
+  if (UWorld *World = GetWorld()) {
+    if (AWorldSettings *WorldSettings = World->GetWorldSettings()) {
+      WorldSettings->SetReplicationDriverClass(
+          USkaldReplicationDriver::StaticClass());
+    }
+  }
+#endif // WITH_SERVER_CODE && !UE_VERSION_OLDER_THAN(5, 5, 0)
 
   // Reset transient state in case the same GameMode instance is reused after
   // travelling back from a battle. Any lingering timers or cached pointers can
