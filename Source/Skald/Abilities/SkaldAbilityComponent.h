@@ -6,6 +6,7 @@
 
 class AFighterPawn;
 class UNiagaraSystem;
+struct FFighterStats;
 
 USTRUCT(BlueprintType)
 struct FSkaldAbilityState
