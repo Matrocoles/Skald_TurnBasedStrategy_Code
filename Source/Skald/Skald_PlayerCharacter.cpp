@@ -318,6 +318,8 @@ void ASkald_PlayerCharacter::SetBattleCameraActive(bool bActive)
         {
                 if (!bBattleCameraDetached)
                 {
+                        CachedBoomRelativeLocation = CameraBoom->GetRelativeLocation();
+                        bCachedAbsoluteLocation = CameraBoom->IsUsingAbsoluteLocation();
                         CameraBoom->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
                         bBattleCameraDetached = true;
                 }
@@ -332,8 +334,6 @@ void ASkald_PlayerCharacter::SetBattleCameraActive(bool bActive)
                 bCachedCameraLag = CameraBoom->bEnableCameraLag;
                 CachedCameraLagSpeed = CameraBoom->CameraLagSpeed;
                 bCachedDoCollisionTest = CameraBoom->bDoCollisionTest;
-                CachedBoomRelativeLocation = CameraBoom->GetRelativeLocation();
-                bCachedAbsoluteLocation = CameraBoom->IsUsingAbsoluteLocation();
 
                 bUseControllerRotationYaw = false;
                 bUseControllerRotationPitch = false;
