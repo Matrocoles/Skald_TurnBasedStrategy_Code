@@ -386,15 +386,17 @@ void ASkald_PlayerCharacter::FocusCameraOnActor(AActor* FocusActor)
         bBattleCameraLocked = true;
         BattleCameraVelocity = FVector::ZeroVector;
 
+        DesiredBattleZoom = FMath::Clamp(LockedBattleZoom, MinBattleZoom, MaxBattleZoom);
+
         if (bAutoFaceLockTarget)
         {
-                FVector ToTarget = FocusActor->GetActorLocation() - GetActorLocation();
-                ToTarget.Z = 0.f;
-                if (!ToTarget.IsNearlyZero())
-                {
-                        DesiredBattleRotation.Yaw = ToTarget.Rotation().Yaw;
-                }
+                const FRotator TargetRotation = FocusActor->GetActorRotation();
+                DesiredBattleRotation.Yaw = TargetRotation.Yaw;
         }
+
+        const float ClampedPitch = FMath::Clamp(LockedBattlePitch, MinBattlePitch, MaxBattlePitch);
+        DesiredBattleRotation.Pitch = ClampedPitch;
+        DesiredBattleRotation.Roll = 0.f;
 }
 
 void ASkald_PlayerCharacter::ClearCameraFocus()
@@ -425,10 +427,14 @@ void ASkald_PlayerCharacter::UpdateBattleCamera(float DeltaTime)
         {
                 if (AActor* FocusActor = LockedBattleActor.Get())
                 {
-                        FVector TargetLocation = FocusActor->GetActorLocation() + BattleLockOffset;
-                        TargetLocation.Z = GetActorLocation().Z + BattleLockOffset.Z;
+                        const FVector TargetLocation = FocusActor->GetActorLocation() + GetBattleLockWorldOffset(FocusActor);
                         const FVector NewLocation = FMath::VInterpTo(GetActorLocation(), TargetLocation, DeltaTime, BattleLockInterpSpeed);
                         SetActorLocation(NewLocation);
+
+                        if (bAutoFaceLockTarget)
+                        {
+                                DesiredBattleRotation.Yaw = FocusActor->GetActorRotation().Yaw;
+                        }
                 }
                 else
                 {
@@ -462,5 +468,24 @@ void ASkald_PlayerCharacter::ClearBattleCameraLock()
         bBattleCameraLocked = false;
         LockedBattleActor = nullptr;
         BattleCameraVelocity = FVector::ZeroVector;
+
+        DesiredBattleZoom = FMath::Clamp(DefaultBattleZoom, MinBattleZoom, MaxBattleZoom);
+        const float ClampedPitch = FMath::Clamp(DefaultBattlePitch, MinBattlePitch, MaxBattlePitch);
+        DesiredBattleRotation.Pitch = ClampedPitch;
+        DesiredBattleRotation.Roll = 0.f;
+}
+
+FVector ASkald_PlayerCharacter::GetBattleLockWorldOffset(const AActor* FocusActor) const
+{
+        if (!FocusActor)
+        {
+                return FVector::ZeroVector;
+        }
+
+        const FVector Forward = FocusActor->GetActorForwardVector();
+        const FVector Right = FocusActor->GetActorRightVector();
+        const FVector Up = FVector::UpVector;
+
+        return Forward * BattleLockRelativeOffset.X + Right * BattleLockRelativeOffset.Y + Up * BattleLockRelativeOffset.Z;
 }
 

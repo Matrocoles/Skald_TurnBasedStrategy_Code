@@ -123,9 +123,9 @@ protected:
         UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Camera", meta=(AllowPrivateAccess="true"))
         UCameraComponent* FollowCamera;
 
-        /** Base zoom distance applied when enabling the battle camera. */
+        /** Base zoom distance applied when enabling the battle camera or when no lock target is active. */
         UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Battle")
-        float DefaultBattleZoom = 1400.f;
+        float DefaultBattleZoom = 650.f;
 
         /** Default downward pitch applied to the battle camera. */
         UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Battle")
@@ -157,7 +157,7 @@ protected:
 
         /** Minimum allowed zoom distance when using the battle camera. */
         UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Battle")
-        float MinBattleZoom = 600.f;
+        float MinBattleZoom = 250.f;
 
         /** Maximum allowed zoom distance when using the battle camera. */
         UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Battle")
@@ -183,9 +183,17 @@ protected:
         UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Battle")
         float BattleCameraLagSpeed = 12.f;
 
-        /** Optional positional offset applied when locking onto a fighter. */
+        /** Zoom distance applied whenever the camera locks onto a fighter. */
         UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Battle")
-        FVector BattleLockOffset = FVector::ZeroVector;
+        float LockedBattleZoom = 425.f;
+
+        /** Pitch used for the immersive over-the-shoulder lock-on view. */
+        UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Battle")
+        float LockedBattlePitch = -20.f;
+
+        /** Relative offset from the focused fighter used while locked on (X=forward, Y=right, Z=up). */
+        UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Battle")
+        FVector BattleLockRelativeOffset = FVector(-425.f, 0.f, 220.f);
 
         /** Whether to automatically yaw the camera to face the lock target. */
         UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Battle")
@@ -218,6 +226,9 @@ private:
 
         /** Smoothed velocity applied when panning the battle camera. */
         FVector BattleCameraVelocity = FVector::ZeroVector;
+
+        /** Convert the configured relative lock offset into world space. */
+        FVector GetBattleLockWorldOffset(const AActor* FocusActor) const;
 
         /** Stores current movement input for battle camera panning. */
         FVector2D BattleMoveInput = FVector2D::ZeroVector;
