@@ -27,7 +27,6 @@
 #include "GameFramework/WorldSettings.h"
 #include "UI/SkaldMainHUDWidget.h"
 #include "UObject/Package.h"
-#include "UObject/SoftObjectPath.h"
 #include "UObject/UnrealType.h"
 #include "WorldMap.h"
 #include "Containers/Set.h"
@@ -59,9 +58,7 @@ const TArray<FString> FantasyAINames = {
 using Skald::PropertyAccess::ReadBoolProperty;
 using Skald::PropertyAccess::ReadIntProperty;
 using Skald::PropertyAccess::WriteBoolProperty;
-using Skald::PropertyAccess::WriteClassProperty;
 using Skald::PropertyAccess::WriteIntProperty;
-using Skald::PropertyAccess::WriteSoftClassPathProperty;
 
 ASkaldGameMode::ASkaldGameMode() {
   GameStateClass = ASkaldGameState::StaticClass();
@@ -94,44 +91,8 @@ void ASkaldGameMode::InitGame(const FString &Map, const FString &Options,
 #if WITH_SERVER_CODE && !UE_VERSION_OLDER_THAN(5, 5, 0) && defined(UE_WITH_IRIS) && UE_WITH_IRIS
   if (UWorld *World = GetWorld()) {
     if (AWorldSettings *WorldSettings = World->GetWorldSettings()) {
-      bool bAppliedReplicationDriver = false;
-      UClass *ReplicationDriver = USkaldReplicationDriver::StaticClass();
-
-      const FName ClassPropertyCandidates[] = {
-          TEXT("ReplicationDriverClass"),
-          TEXT("DefaultReplicationDriverClass"),
-          TEXT("NetReplicationDriverClass"),
-      };
-
-      for (const FName &PropertyName : ClassPropertyCandidates) {
-        if (WriteClassProperty(WorldSettings, PropertyName, ReplicationDriver)) {
-          bAppliedReplicationDriver = true;
-          break;
-        }
-      }
-
-      if (!bAppliedReplicationDriver) {
-        const FName SoftClassPropertyCandidates[] = {
-            TEXT("ReplicationDriverClassName"),
-            TEXT("DefaultReplicationDriverClassName"),
-        };
-
-        const FSoftClassPath ReplicationDriverPath(ReplicationDriver);
-        for (const FName &PropertyName : SoftClassPropertyCandidates) {
-          if (WriteSoftClassPathProperty(WorldSettings, PropertyName,
-                                         ReplicationDriverPath)) {
-            bAppliedReplicationDriver = true;
-            break;
-          }
-        }
-      }
-
-      if (!bAppliedReplicationDriver) {
-        UE_LOG(LogSkald, Warning,
-               TEXT("Unable to assign replication driver on %s; using GameMode fallback."),
-               *WorldSettings->GetPathName());
-        ReplicationDriverClass = ReplicationDriver;
-      }
+      WorldSettings->SetReplicationDriverClass(
+          USkaldReplicationDriver::StaticClass());
     }
   }
 #endif // WITH_SERVER_CODE && !UE_VERSION_OLDER_THAN(5, 5, 0) && UE_WITH_IRIS
