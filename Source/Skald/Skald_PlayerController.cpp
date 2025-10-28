@@ -2731,7 +2731,7 @@ void ASkaldPlayerController::UpdateBattleCameraMode() {
     return;
   }
 
-  if (LockedActiveFighter && LockedActiveFighter->IsAlive()) {
+  if (LockedActiveFighter.IsValid() && LockedActiveFighter->IsAlive()) {
     CameraPawn->FocusCameraOnActor(LockedActiveFighter.Get());
   } else {
     CameraPawn->ClearCameraFocus();
