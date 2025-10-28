@@ -1039,6 +1039,10 @@ void ASkaldPlayerController::InitializeBattleHUD() {
           this, &ASkaldPlayerController::HandleDiceOutcomeRevealed);
       BattleHudWidget->OnLockedInFighterEntrySelected.AddDynamic(
           this, &ASkaldPlayerController::HandleLockedInEntrySelected);
+      OnSelectedFighterChanged.RemoveDynamic(
+          BattleHudWidget, &UBattleHUDWidget::HandleSelectedFighterChanged);
+      OnSelectedFighterChanged.AddDynamic(
+          BattleHudWidget, &UBattleHUDWidget::HandleSelectedFighterChanged);
       BattleHudWidget->SetEndTurnVisibility(false);
       BattleHudWidget->SetActivateEnabled(false);
       BattleHudWidget->SetEndTurnEnabled(false);
@@ -1088,6 +1092,10 @@ void ASkaldPlayerController::InitializeBattleHUD() {
 
     bPendingInitiativePrompt = GI->GridBattleManager->IsAwaitingInitiativeRoll();
     PendingInitiativeRound = CurrentRound;
+  }
+
+  if (BattleHudWidget) {
+    BattleHudWidget->HandleSelectedFighterChanged(SelectedFighter.Get());
   }
 
   DetermineControlledBattleSide();
@@ -3744,6 +3752,8 @@ void ASkaldPlayerController::SetSelectedFighter(AFighterPawn *Fighter,
     SelectedFighter->SetSelectionIndicatorVisible(true);
   }
 
+  OnSelectedFighterChanged.Broadcast(SelectedFighter);
+
   UpdateBattleHUDSelection();
   UpdateBattleHUDButtons();
   UpdateLockedInSelectionHighlight();
@@ -3757,6 +3767,7 @@ void ASkaldPlayerController::ClearSelectedFighter() {
     SelectedFighter->SetSelectionIndicatorVisible(false);
   }
   SelectedFighter = nullptr;
+  OnSelectedFighterChanged.Broadcast(nullptr);
   UpdateBattleHUDSelection();
   UpdateBattleHUDButtons();
   UpdateLockedInSelectionHighlight();

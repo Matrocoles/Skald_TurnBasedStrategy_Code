@@ -89,6 +89,13 @@ public:
   UFUNCTION()
   void OnRep_TurnManager();
 
+  DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSelectedFighterChanged,
+                                              AFighterPawn *, Fighter);
+
+  /** Fired whenever the controller selects a new fighter in battle. */
+  UPROPERTY(BlueprintAssignable, Category = "Skald|Battle|Events")
+  FOnSelectedFighterChanged OnSelectedFighterChanged;
+
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void ShowTurnAnnouncement(const FString &PlayerName, bool bIsMyTurn);
 

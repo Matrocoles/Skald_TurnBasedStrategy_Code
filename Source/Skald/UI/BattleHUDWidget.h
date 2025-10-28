@@ -228,6 +228,10 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Skald|Battle")
   void SetHighlightedLockedInFighter(AFighterPawn *Fighter);
 
+  /** Keep the locked-in list highlight in sync with controller selection changes. */
+  UFUNCTION()
+  void HandleSelectedFighterChanged(AFighterPawn *Fighter);
+
   /** Highlight the entry for the fighter whose activation is in progress. */
   UFUNCTION(BlueprintCallable, Category = "Skald|Battle")
   void SetActiveLockedInFighter(AFighterPawn *Fighter);

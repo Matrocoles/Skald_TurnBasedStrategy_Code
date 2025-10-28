@@ -1,5 +1,6 @@
 #include "UI/BattleHUDWidget.h"
 #include "SkaldLogging.h"
+#include "Skald_PlayerController.h"
 #include "Components/Button.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/CanvasPanelSlot.h"
@@ -123,6 +124,12 @@ void UBattleHUDWidget::NativeDestruct() {
     DiceRollerRenderTarget = nullptr;
   }
 
+  if (ASkaldPlayerController *SkaldController =
+          Cast<ASkaldPlayerController>(GetOwningPlayer())) {
+    SkaldController->OnSelectedFighterChanged.RemoveDynamic(
+        this, &UBattleHUDWidget::HandleSelectedFighterChanged);
+  }
+
   ClearLockedInFighterList();
 
   while (ActiveFloaters.Num() > 0) {
@@ -223,6 +230,10 @@ void UBattleHUDWidget::SetHighlightedLockedInFighter(AFighterPawn *Fighter) {
       Entry->SetIsSelected(bIsSelected);
     }
   }
+}
+
+void UBattleHUDWidget::HandleSelectedFighterChanged(AFighterPawn *Fighter) {
+  SetHighlightedLockedInFighter(Fighter);
 }
 
 void UBattleHUDWidget::SetActiveLockedInFighter(AFighterPawn *Fighter) {
