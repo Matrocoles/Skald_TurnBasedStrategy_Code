@@ -1426,10 +1426,11 @@ void AFighterPawn::OnRep_Stats(const FFighterStats &OldStats) {
     UpdateHealthDisplay(Stats.Health);
   }
 
-  RefreshAbilityLoadout();
 }
 
-void AFighterPawn::OnRep_Faction() { RefreshAbilityLoadout(); }
+void AFighterPawn::OnRep_Faction() {
+  // Ability state is replicated directly; clients avoid rebuilding their loadout.
+}
 
 void AFighterPawn::OnRep_MaxHealth() { UpdateHealthDisplay(Stats.Health); }
 
@@ -1454,9 +1455,11 @@ void AFighterPawn::BroadcastActionsRemaining() {
 }
 
 void AFighterPawn::RefreshAbilityLoadout() {
-  if (AbilityComponent) {
-    AbilityComponent->RefreshAbilityLoadout(Stats, Faction);
+  if (!AbilityComponent || !HasAuthority()) {
+    return;
   }
+
+  AbilityComponent->RefreshAbilityLoadout(Stats, Faction);
 }
 
 void AFighterPawn::EnsureActivationWidget() {
