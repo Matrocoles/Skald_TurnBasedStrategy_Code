@@ -1,7 +1,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/SoftObjectPath.h"
 #include "UObject/UnrealType.h"
 
 namespace Skald::PropertyAccess {
@@ -56,41 +55,6 @@ inline void WriteBoolProperty(UObject *Object, const FName PropertyName,
           FindFProperty<FBoolProperty>(Object->GetClass(), PropertyName)) {
     Property->SetPropertyValue_InContainer(Object, bValue);
   }
-}
-
-inline bool WriteClassProperty(UObject *Object, const FName PropertyName,
-                               UClass *ClassValue) {
-  if (!Object || !ClassValue) {
-    return false;
-  }
-
-  if (FClassProperty *Property =
-          FindFProperty<FClassProperty>(Object->GetClass(), PropertyName)) {
-    Property->SetPropertyValue_InContainer(Object, ClassValue);
-    return true;
-  }
-
-  return false;
-}
-
-inline bool WriteSoftClassPathProperty(UObject *Object,
-                                       const FName PropertyName,
-                                       const FSoftClassPath &ClassPath) {
-  if (!Object) {
-    return false;
-  }
-
-  if (FStructProperty *Property =
-          FindFProperty<FStructProperty>(Object->GetClass(), PropertyName)) {
-    if (Property->Struct &&
-        Property->Struct->GetFName() == NAME_SoftClassPath) {
-      void *ValueAddress = Property->ContainerPtrToValuePtr<void>(Object);
-      Property->CopySingleValue(ValueAddress, &ClassPath);
-      return true;
-    }
-  }
-
-  return false;
 }
 
 } // namespace Skald::PropertyAccess
