@@ -1435,6 +1435,14 @@ void ASkaldPlayerController::HandleLockedInEntrySelected(AFighterPawn *Fighter) 
     Grid->HighlightSelection(Fighter);
   }
   UpdateLockedInSelectionHighlight();
+
+  if (IsLocalController() && bIsBattleMap) {
+    if (Fighter->IsAlive()) {
+      if (ASkald_PlayerCharacter *CameraPawn = Cast<ASkald_PlayerCharacter>(GetPawn())) {
+        CameraPawn->FocusCameraOnActor(Fighter);
+      }
+    }
+  }
 }
 
 void ASkaldPlayerController::DetectBattleMap() {
