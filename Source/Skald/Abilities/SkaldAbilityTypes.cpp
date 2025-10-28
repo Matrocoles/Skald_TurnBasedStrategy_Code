@@ -2,6 +2,8 @@
 
 #include "Sound/SoundBase.h"
 #include "NiagaraSystem.h"
+#include "Animation/AnimMontage.h"
+#include "Engine/Texture2D.h"
 
 namespace
 {

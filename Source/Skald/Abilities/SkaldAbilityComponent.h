@@ -70,6 +70,9 @@ public:
     /** Attempt to trigger a slot. Returns true on success, populates OutFailureReason otherwise. */
     bool TryBeginAbility(ESkaldAbilitySlot Slot, FText& OutFailureReason);
 
+    /** Query whether a slot can currently be triggered without mutating state. */
+    bool CanActivateAbility(ESkaldAbilitySlot Slot, FText* OutFailureReason = nullptr) const;
+
     /** Passive shared with every fighter in the faction. */
     FSkaldAbilityDefinition GetPassiveAbility() const { return PassiveAbility; }
 
@@ -100,6 +103,7 @@ protected:
 
     bool CanPayCost(const FSkaldAbilityDefinition& Definition, FText& OutError) const;
     bool ConsumeCost(const FSkaldAbilityDefinition& Definition);
+    bool CanTriggerAbility(const FSkaldAbilityState& State, FText& OutError) const;
 
     void HandleAbilityTriggeredLocal(const FSkaldAbilityDefinition& Definition);
     void PlayAbilityFeedback(const FSkaldAbilityDefinition& Definition);

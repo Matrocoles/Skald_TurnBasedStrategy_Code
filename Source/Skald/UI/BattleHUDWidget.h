@@ -62,6 +62,9 @@ struct SKALD_API FBattleAbilitySlotDisplay {
 
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Battle|Abilities")
   bool bHasBeenUsed = false;
+
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Battle|Abilities")
+  bool bCanActivate = false;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnAbilityDisplayChanged,
@@ -69,6 +72,9 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnAbilityDisplayChanged,
                                             PassiveAbility,
                                             const TArray<FBattleAbilitySlotDisplay> &,
                                             ActiveSlots);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnAbilitySlotPressed,
+                                            ESkaldAbilitySlot, Slot);
 
 /**
  * HUD widget displayed during grid battles.
@@ -138,6 +144,9 @@ public:
   UPROPERTY(BlueprintAssignable, Category = "Skald|Battle|Abilities")
   FOnAbilityDisplayChanged OnAbilityDisplayChanged;
 
+  UPROPERTY(BlueprintAssignable, Category = "Skald|Battle|Abilities")
+  FOnAbilitySlotPressed OnAbilitySlotPressed;
+
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Battle|Abilities")
   FSkaldAbilityDefinition PassiveAbilityDefinition;
 
@@ -167,6 +176,42 @@ public:
   /** Initiative roll button bound from the blueprint. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UButton *RollInitiativeButton;
+
+  /** Optional UI button for the first ability slot. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UButton *AbilityButton1;
+
+  /** Optional UI button for the second ability slot. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UButton *AbilityButton2;
+
+  /** Optional UI button for the third ability slot. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UButton *AbilityButton3;
+
+  /** Optional image displayed for ability slot 1. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UImage *AbilityIcon1;
+
+  /** Optional image displayed for ability slot 2. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UImage *AbilityIcon2;
+
+  /** Optional image displayed for ability slot 3. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UImage *AbilityIcon3;
+
+  /** Optional label displayed under ability slot 1. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UTextBlock *AbilityLabel1;
+
+  /** Optional label displayed under ability slot 2. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UTextBlock *AbilityLabel2;
+
+  /** Optional label displayed under ability slot 3. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UTextBlock *AbilityLabel3;
 
   /** Text displaying current health. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
@@ -395,8 +440,24 @@ private:
   UFUNCTION()
   void HandleInitiativeRollPressed();
 
+  /** Callback when AbilityButton1 is pressed. */
+  UFUNCTION()
+  void HandleAbilityButtonPressedSlot1();
+
+  /** Callback when AbilityButton2 is pressed. */
+  UFUNCTION()
+  void HandleAbilityButtonPressedSlot2();
+
+  /** Callback when AbilityButton3 is pressed. */
+  UFUNCTION()
+  void HandleAbilityButtonPressedSlot3();
+
   /** Update all stat text panels from the bound fighter. */
   void UpdateStatPanel();
+  void UpdateAbilityButtons();
+  void UpdateAbilityButtonForSlot(ESkaldAbilitySlot Slot, UButton *Button,
+                                  UImage *IconWidget, UTextBlock *LabelWidget);
+  const FBattleAbilitySlotDisplay *FindAbilityDisplay(ESkaldAbilitySlot Slot) const;
 
   /** Update ability slot widgets to match the bound fighter. */
   void RefreshAbilityDisplay();

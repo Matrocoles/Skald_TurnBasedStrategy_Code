@@ -290,7 +290,13 @@ TArray<FFighterDefinition> UGridBattleManager::GetFightersForFaction(ESkaldFacti
         TEXT("GetFightersForFaction"),
         [&](const FName, const FFighterDefinition& Row)
         {
-            if (Row.Faction == Faction) Out.Add(Row);
+            if (Row.Faction == Faction)
+            {
+                FFighterDefinition Definition = Row;
+                Definition.PassiveAbility = GetFactionPassive(Faction);
+                Definition.ActiveAbility = GetFactionActiveAbility(Faction, Row.Stats.ArmyCost);
+                Out.Add(MoveTemp(Definition));
+            }
         });
     return Out;
 }

@@ -38,7 +38,10 @@ TArray<FFighterDefinition> UFighterDataLibrary::GetFightersForFaction(UObject* W
             {
                 if (Row->Faction == Faction)
                 {
-                    Out.Add(*Row);
+                    FFighterDefinition Definition = *Row;
+                    Definition.PassiveAbility = GetFactionPassive(Faction);
+                    Definition.ActiveAbility = GetFactionActiveAbility(Faction, Row->Stats.ArmyCost);
+                    Out.Add(MoveTemp(Definition));
                 }
             }
         }

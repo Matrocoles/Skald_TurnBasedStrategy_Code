@@ -1084,6 +1084,8 @@ void ASkaldPlayerController::InitializeBattleHUD() {
           this, &ASkaldPlayerController::HandleDiceResolutionComplete);
       BattleHudWidget->OnDiceOutcomeRevealed.AddDynamic(
           this, &ASkaldPlayerController::HandleDiceOutcomeRevealed);
+      BattleHudWidget->OnAbilitySlotPressed.AddDynamic(
+          this, &ASkaldPlayerController::HandleAbilityInput);
       OnSelectedFighterChanged.RemoveDynamic(
           BattleHudWidget, &UBattleHUDWidget::HandleSelectedFighterChanged);
       OnSelectedFighterChanged.AddDynamic(

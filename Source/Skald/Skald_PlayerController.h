@@ -133,6 +133,7 @@ public:
   void ServerTryUseAbilitySlot(ESkaldAbilitySlot Slot);
 
   /** Handle ability input routed from characters or widgets. */
+  UFUNCTION()
   void HandleAbilityInput(ESkaldAbilitySlot Slot);
 
   /** Retrieve the turn manager controlling this player. */
