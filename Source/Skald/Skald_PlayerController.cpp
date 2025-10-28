@@ -1037,8 +1037,6 @@ void ASkaldPlayerController::InitializeBattleHUD() {
           this, &ASkaldPlayerController::HandleDiceResolutionComplete);
       BattleHudWidget->OnDiceOutcomeRevealed.AddDynamic(
           this, &ASkaldPlayerController::HandleDiceOutcomeRevealed);
-      BattleHudWidget->OnLockedInFighterEntrySelected.AddDynamic(
-          this, &ASkaldPlayerController::HandleLockedInEntrySelected);
       OnSelectedFighterChanged.RemoveDynamic(
           BattleHudWidget, &UBattleHUDWidget::HandleSelectedFighterChanged);
       OnSelectedFighterChanged.AddDynamic(
@@ -1419,6 +1417,10 @@ void ASkaldPlayerController::UpdateLockedInActiveHighlight() {
   if (BattleHudWidget) {
     BattleHudWidget->SetActiveLockedInFighter(LockedActiveFighter.Get());
   }
+}
+
+void ASkaldPlayerController::RequestLockedInEntrySelection(AFighterPawn *Fighter) {
+  HandleLockedInEntrySelected(Fighter);
 }
 
 void ASkaldPlayerController::HandleLockedInEntrySelected(AFighterPawn *Fighter) {

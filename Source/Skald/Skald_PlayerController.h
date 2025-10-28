@@ -128,6 +128,9 @@ public:
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Turn")
   ATurnManager *GetTurnManager() const { return TurnManager; }
 
+  /** Handle a locked-in fighter entry being selected from the HUD. */
+  void RequestLockedInEntrySelection(AFighterPawn *Fighter);
+
   /** Send the local player's initial data to the server for replication. */
   UFUNCTION(Server, Reliable)
   void ServerInitPlayerState(const FString &Name, ESkaldFaction Faction,

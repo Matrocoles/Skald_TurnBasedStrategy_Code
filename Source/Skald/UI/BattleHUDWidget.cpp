@@ -325,6 +325,12 @@ void UBattleHUDWidget::HandleLockedInEntryClicked(AFighterPawn *Fighter) {
   }
 
   SetHighlightedLockedInFighter(Fighter);
+
+  if (ASkaldPlayerController *SkaldController =
+          Cast<ASkaldPlayerController>(GetOwningPlayer())) {
+    SkaldController->RequestLockedInEntrySelection(Fighter);
+  }
+
   OnLockedInFighterEntrySelected.Broadcast(Fighter);
 }
 
