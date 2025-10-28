@@ -12,12 +12,15 @@ void USkaldReplicationDriver::InitForNetDriver(UNetDriver* InNetDriver)
     CachedNetDriver = InNetDriver;
 }
 
-void USkaldReplicationDriver::ServerReplicateActors(float DeltaSeconds)
+auto USkaldReplicationDriver::ServerReplicateActors(float DeltaSeconds)
+    -> FServerReplicateActorsResult
 {
     if (CachedNetDriver)
     {
-        CachedNetDriver->ServerReplicateActors(DeltaSeconds);
+        return CachedNetDriver->ServerReplicateActors(DeltaSeconds);
     }
+
+    return Super::ServerReplicateActors(DeltaSeconds);
 }
 
 void USkaldReplicationDriver::TearDown()

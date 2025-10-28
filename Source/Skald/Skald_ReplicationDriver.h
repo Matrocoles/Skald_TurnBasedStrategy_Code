@@ -18,7 +18,8 @@ public:
     USkaldReplicationDriver();
 
     virtual void InitForNetDriver(UNetDriver* InNetDriver) override;
-    virtual void ServerReplicateActors(float DeltaSeconds) override;
+    using FServerReplicateActorsResult = decltype(static_cast<UReplicationDriver*>(nullptr)->ServerReplicateActors(0.f));
+    virtual FServerReplicateActorsResult ServerReplicateActors(float DeltaSeconds) override;
     virtual void TearDown() override;
 
 private:
