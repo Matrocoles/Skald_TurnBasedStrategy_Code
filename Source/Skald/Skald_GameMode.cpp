@@ -88,14 +88,14 @@ void ASkaldGameMode::InitGame(const FString &Map, const FString &Options,
                               FString &Error) {
   Super::InitGame(Map, Options, Error);
 
-#if WITH_SERVER_CODE && !UE_VERSION_OLDER_THAN(5, 5, 0)
+#if WITH_SERVER_CODE && !UE_VERSION_OLDER_THAN(5, 5, 0) && defined(UE_WITH_IRIS) && UE_WITH_IRIS
   if (UWorld *World = GetWorld()) {
     if (AWorldSettings *WorldSettings = World->GetWorldSettings()) {
       WorldSettings->SetReplicationDriverClass(
           USkaldReplicationDriver::StaticClass());
     }
   }
-#endif // WITH_SERVER_CODE && !UE_VERSION_OLDER_THAN(5, 5, 0)
+#endif // WITH_SERVER_CODE && !UE_VERSION_OLDER_THAN(5, 5, 0) && UE_WITH_IRIS
 
   // Reset transient state in case the same GameMode instance is reused after
   // travelling back from a battle. Any lingering timers or cached pointers can
