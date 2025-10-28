@@ -17,10 +17,10 @@ auto USkaldReplicationDriver::ServerReplicateActors(float DeltaSeconds)
 {
     if (CachedNetDriver)
     {
-        return CachedNetDriver->ServerReplicateActors_ProcessLoadedLevels(DeltaSeconds);
+        return CachedNetDriver->ServerReplicateActors(DeltaSeconds);
     }
 
-    return {};
+    return Super::ServerReplicateActors(DeltaSeconds);
 }
 
 void USkaldReplicationDriver::TearDown()
