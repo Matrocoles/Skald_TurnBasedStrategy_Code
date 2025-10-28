@@ -5,9 +5,10 @@
 #include "Skald_ReplicationDriver.generated.h"
 
 /**
- * Minimal replication driver that defers replication back to the owning net driver.
- * This gives the project an explicit ReplicationDriverClass so listen servers in PIE
- * no longer warn about missing configuration while still using the engine defaults.
+ * Minimal replication driver that allows the project to opt into an explicit
+ * ReplicationDriverClass while relying on the engine's default replication
+ * behaviour. We still cache the associated UNetDriver so future
+ * customisations can reference it if necessary.
  */
 UCLASS()
 class SKALD_API USkaldReplicationDriver : public UReplicationDriver
@@ -18,8 +19,6 @@ public:
     USkaldReplicationDriver();
 
     virtual void InitForNetDriver(UNetDriver* InNetDriver) override;
-    using FServerReplicateActorsResult = decltype(static_cast<UReplicationDriver*>(nullptr)->ServerReplicateActors(0.f));
-    virtual FServerReplicateActorsResult ServerReplicateActors(float DeltaSeconds) override;
     virtual void TearDown() override;
 
 private:

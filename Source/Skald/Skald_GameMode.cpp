@@ -17,7 +17,6 @@
 #include "Skald_GameInstance.h"
 #include "Skald_GameState.h"
 #include "Skald_PropertyAccess.h"
-#include "Skald_ReplicationDriver.h"
 #include "Skald_PlayerCharacter.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
@@ -63,7 +62,6 @@ ASkaldGameMode::ASkaldGameMode() {
   PlayerStateClass = ASkaldPlayerState::StaticClass();
   PlayerControllerClass = ASkaldPlayerController::StaticClass();
   DefaultPawnClass = ASkald_PlayerCharacter::StaticClass();
-  ReplicationDriverClass = USkaldReplicationDriver::StaticClass();
 
   TurnManager = nullptr;
   TurnManagerClass = ATurnManager::StaticClass();
