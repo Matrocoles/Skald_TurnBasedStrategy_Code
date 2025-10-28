@@ -222,20 +222,31 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
   ASkaldGameState *GS = GetGameState<ASkaldGameState>();
   ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>();
 
-  if (GS) {
-    // If a PlayerState already exists for this controller, reuse it instead of
-    // keeping a second one that may have been created by InitPlayerState.
-    for (APlayerState *ExistingPSBase : GS->PlayerArray) {
-      if (ExistingPSBase && ExistingPSBase->GetOwner() == PC &&
-          ExistingPSBase != PS) {
-        if (PS) {
-          GS->RemovePlayerState(PS);
-          PS->Destroy();
-        }
-        PS = Cast<ASkaldPlayerState>(ExistingPSBase);
-        PC->PlayerState = PS;
-        break;
+  if (!GS) {
+    // During seamless travel the GameState may not have finished
+    // initialising when RegisterPlayer is first invoked. Keep the controller
+    // pending and retry on the next tick so we always process it once the
+    // replicated state is available instead of silently dropping it.
+    PendingControllers.AddUnique(PC);
+
+    FTimerDelegate RetryDelegate = FTimerDelegate::CreateUObject(
+        this, &ASkaldGameMode::RegisterPlayer, PC);
+    GetWorldTimerManager().SetTimerForNextTick(RetryDelegate);
+    return;
+  }
+
+  // If a PlayerState already exists for this controller, reuse it instead of
+  // keeping a second one that may have been created by InitPlayerState.
+  for (APlayerState *ExistingPSBase : GS->PlayerArray) {
+    if (ExistingPSBase && ExistingPSBase->GetOwner() == PC &&
+        ExistingPSBase != PS) {
+      if (PS) {
+        GS->RemovePlayerState(PS);
+        PS->Destroy();
       }
+      PS = Cast<ASkaldPlayerState>(ExistingPSBase);
+      PC->PlayerState = PS;
+      break;
     }
   }
 
@@ -258,70 +269,68 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
 
   PS->bIsAI = PC->IsA<ASkaldAIController>();
 
-  if (GS) {
-    if (!GS->PlayerArray.Contains(PS)) {
-      GS->AddPlayerState(PS);
+  if (!GS->PlayerArray.Contains(PS)) {
+    GS->AddPlayerState(PS);
+  }
+
+  if (!TurnManager && !bIsMultiplayer) {
+    TurnManager = ResolveTurnManager();
+  }
+
+  if (TurnManager) {
+    if (!TurnManager->GetControllers().Contains(PC)) {
+      TurnManager->RegisterController(PC);
+      UE_LOG(LogSkald, Log, TEXT("RegisterPlayer: ControllerCount=%d"),
+             TurnManager->GetControllerCount());
     }
+  } else {
+    // Defer final registration until the turn manager is available. Ensure
+    // the controller remains in the pending list so we can retry once the
+    // manager finishes spawning in both single- and multiplayer sessions.
+    PendingControllers.AddUnique(PC);
 
-    if (!TurnManager && !bIsMultiplayer) {
-      TurnManager = ResolveTurnManager();
+    // Retry on the next tick so late-spawned managers still capture the
+    // controller without requiring manual refreshes.
+    FTimerDelegate RetryDelegate =
+        FTimerDelegate::CreateUObject(this, &ASkaldGameMode::RegisterPlayer,
+                                      PC);
+    GetWorldTimerManager().SetTimerForNextTick(RetryDelegate);
+    return;
+  }
+
+  if (PlayerDataArray.Num() < GS->PlayerArray.Num()) {
+    PlayerDataArray.SetNum(GS->PlayerArray.Num());
+  }
+
+  if (GI) {
+    if (PS->PlayerDisplayName.IsEmpty()) {
+      PS->PlayerDisplayName = GI->DisplayName;
+      PS->SetPlayerName(PS->PlayerDisplayName);
     }
-
-    if (TurnManager) {
-      if (!TurnManager->GetControllers().Contains(PC)) {
-        TurnManager->RegisterController(PC);
-        UE_LOG(LogSkald, Log, TEXT("RegisterPlayer: ControllerCount=%d"),
-               TurnManager->GetControllerCount());
-      }
-    } else {
-      // Defer final registration until the turn manager is available. Ensure
-      // the controller remains in the pending list so we can retry once the
-      // manager finishes spawning in both single- and multiplayer sessions.
-      PendingControllers.AddUnique(PC);
-
-      // Retry on the next tick so late-spawned managers still capture the
-      // controller without requiring manual refreshes.
-      FTimerDelegate RetryDelegate =
-          FTimerDelegate::CreateUObject(this, &ASkaldGameMode::RegisterPlayer,
-                                        PC);
-      GetWorldTimerManager().SetTimerForNextTick(RetryDelegate);
-      return;
+    if (PS->Faction == ESkaldFaction::None) {
+      PS->Faction = GI->Faction;
     }
+  }
 
-    if (PlayerDataArray.Num() < GS->PlayerArray.Num()) {
-      PlayerDataArray.SetNum(GS->PlayerArray.Num());
-    }
+  const int32 Index = GS->PlayerArray.IndexOfByKey(PS);
+  if (PlayerDataArray.IsValidIndex(Index)) {
+    PlayerDataArray[Index].PlayerID = PS->GetPlayerId();
+    PlayerDataArray[Index].PlayerName =
+        PS->GetResolvedPlayerName(TEXT("RegisterPlayer"));
+    PlayerDataArray[Index].IsAI = PS->bIsAI;
+    PlayerDataArray[Index].Faction = PS->Faction;
+    PlayerDataArray[Index].Resources = PS->Resources;
+  }
 
-    if (GI) {
-      if (PS->PlayerDisplayName.IsEmpty()) {
-        PS->PlayerDisplayName = GI->DisplayName;
-        PS->SetPlayerName(PS->PlayerDisplayName);
-      }
-      if (PS->Faction == ESkaldFaction::None) {
-        PS->Faction = GI->Faction;
-      }
-    }
+  // Notify listeners that player data has changed and refresh HUDs on the
+  // next tick once replication has a chance to update clients.
+  GS->OnPlayersUpdated.Broadcast();
+  FTimerDelegate RefreshDelegate =
+      FTimerDelegate::CreateUObject(this, &ASkaldGameMode::RefreshHUDs);
+  GetWorldTimerManager().SetTimerForNextTick(RefreshDelegate);
 
-    const int32 Index = GS->PlayerArray.IndexOfByKey(PS);
-    if (PlayerDataArray.IsValidIndex(Index)) {
-      PlayerDataArray[Index].PlayerID = PS->GetPlayerId();
-      PlayerDataArray[Index].PlayerName =
-          PS->GetResolvedPlayerName(TEXT("RegisterPlayer"));
-      PlayerDataArray[Index].IsAI = PS->bIsAI;
-      PlayerDataArray[Index].Faction = PS->Faction;
-      PlayerDataArray[Index].Resources = PS->Resources;
-    }
-
-    // Notify listeners that player data has changed and refresh HUDs on the
-    // next tick once replication has a chance to update clients.
-    GS->OnPlayersUpdated.Broadcast();
-    FTimerDelegate RefreshDelegate =
-        FTimerDelegate::CreateUObject(this, &ASkaldGameMode::RefreshHUDs);
-    GetWorldTimerManager().SetTimerForNextTick(RefreshDelegate);
-
-    if (!bWorldInitialized) {
-      TryInitializeWorldAndStart();
-    }
+  if (!bWorldInitialized) {
+    TryInitializeWorldAndStart();
   }
 }
 
