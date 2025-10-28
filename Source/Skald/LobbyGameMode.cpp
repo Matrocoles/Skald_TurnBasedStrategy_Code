@@ -426,7 +426,8 @@ void ALobbyGameMode::TryLaunchMatch(APlayerController* RequestingController)
     {
         const bool bIsStandalone = World->IsNetMode(NM_Standalone);
 #if WITH_EDITOR
-        const bool bIsPIE = (World->WorldType == EWorldType::PIE || World->WorldType == EWorldType::PIEPreview);
+        const bool bIsPIE = (World->WorldType == EWorldType::PIE || World->WorldType == EWorldType::EditorPreview ||
+                             World->WorldType == EWorldType::GamePreview);
 #else
         const bool bIsPIE = false;
 #endif

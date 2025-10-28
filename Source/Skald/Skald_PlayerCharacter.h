@@ -3,7 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "TimerManager.h"
-#include "Templates/WeakObjectPtr.h"
+#include "UObject/WeakObjectPtr.h"
 
 class AWorldMap;
 class ATerritory;
