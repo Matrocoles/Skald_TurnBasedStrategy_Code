@@ -653,10 +653,11 @@ void UBattleHUDWidget::RefreshAbilityDisplay() {
                                          ESkaldAbilitySlot::Ability2,
                                          ESkaldAbilitySlot::Ability3};
 
-  for (ESkaldAbilitySlot Slot : SlotOrder) {
-    if (const FSkaldAbilityState *State = AbilityComp->FindAbilityState(Slot)) {
+  for (ESkaldAbilitySlot AbilitySlot : SlotOrder) {
+    if (const FSkaldAbilityState *State =
+            AbilityComp->FindAbilityState(AbilitySlot)) {
       FBattleAbilitySlotDisplay Display;
-      Display.Slot = Slot;
+      Display.Slot = AbilitySlot;
       Display.Definition = State->Definition;
       Display.CooldownRemaining = State->CooldownRemaining;
       Display.bHasBeenUsed = State->bHasBeenUsed;
