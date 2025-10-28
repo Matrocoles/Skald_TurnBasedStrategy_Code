@@ -424,15 +424,28 @@ void ALobbyGameMode::TryLaunchMatch(APlayerController* RequestingController)
 
     if (UWorld* World = GetWorld())
     {
-        const FString TargetMap = TEXT("/Game/Blueprints/Maps/OverviewMap?listen");
-        if (World->IsNetMode(NM_Standalone))
+        const bool bIsStandalone = World->IsNetMode(NM_Standalone);
+#if WITH_EDITOR
+        const bool bIsPIE = (World->WorldType == EWorldType::PIE || World->WorldType == EWorldType::PIEPreview);
+#else
+        const bool bIsPIE = false;
+#endif
+
+        if (bIsStandalone)
         {
             UGameplayStatics::OpenLevel(this, FName(TEXT("/Game/Blueprints/Maps/OverviewMap")), true, TEXT("listen"));
+            return;
         }
-        else
+
+        if (bIsPIE)
         {
-            World->ServerTravel(TargetMap, /*bAbsolute=*/false);
+            bUseSeamlessTravel = true;
+            World->ServerTravel(TEXT("/Game/Blueprints/Maps/OverviewMap?listen"), /*bAbsolute=*/false, /*bShouldSkipGameNotify=*/false);
+            return;
         }
+
+        bUseSeamlessTravel = true;
+        World->ServerTravel(TEXT("/Game/Blueprints/Maps/OverviewMap?listen"), /*bAbsolute=*/false, /*bShouldSkipGameNotify=*/false);
     }
 }
 
