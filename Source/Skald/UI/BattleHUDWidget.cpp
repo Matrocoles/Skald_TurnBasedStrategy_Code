@@ -139,6 +139,14 @@ void UBattleHUDWidget::NativeDestruct() {
 
   ClearHealthTextHold();
 
+  if (BoundAbilityComponent.IsValid()) {
+    if (USkaldAbilityComponent *Existing = BoundAbilityComponent.Get()) {
+      Existing->OnAbilityStateChanged.RemoveDynamic(
+          this, &UBattleHUDWidget::HandleAbilityComponentUpdated);
+    }
+    BoundAbilityComponent = nullptr;
+  }
+
   Super::NativeDestruct();
 }
 
@@ -415,6 +423,14 @@ void UBattleHUDWidget::BindToFighter(AFighterPawn *Fighter) {
         this, &UBattleHUDWidget::HandleActionsChanged);
   }
 
+  if (BoundAbilityComponent.IsValid()) {
+    if (USkaldAbilityComponent *Existing = BoundAbilityComponent.Get()) {
+      Existing->OnAbilityStateChanged.RemoveDynamic(
+          this, &UBattleHUDWidget::HandleAbilityComponentUpdated);
+    }
+    BoundAbilityComponent = nullptr;
+  }
+
   if (BoundFighter && BoundFighter != Fighter) {
     ClearHealthTextHold();
   }
@@ -425,6 +441,14 @@ void UBattleHUDWidget::BindToFighter(AFighterPawn *Fighter) {
         this, &UBattleHUDWidget::HandleHealthChanged);
     BoundFighter->OnActionsChanged.AddDynamic(
         this, &UBattleHUDWidget::HandleActionsChanged);
+
+    if (USkaldAbilityComponent *AbilityComp =
+            BoundFighter->GetAbilityComponent()) {
+      BoundAbilityComponent = AbilityComp;
+      AbilityComp->OnAbilityStateChanged.AddDynamic(
+          this, &UBattleHUDWidget::HandleAbilityComponentUpdated);
+    }
+
     UpdateStatPanel();
     if (FighterNameText) {
       FighterNameText->SetText(FText::FromName(BoundFighter->GetFighterId()));
@@ -475,6 +499,7 @@ void UBattleHUDWidget::BindToFighter(AFighterPawn *Fighter) {
     }
   }
 
+  RefreshAbilityDisplay();
   UpdateActionButtonVisibility();
 }
 
@@ -558,6 +583,16 @@ void UBattleHUDWidget::HandleActionsChanged(int32 NewActions) {
   UpdateActionButtonVisibility();
 }
 
+void UBattleHUDWidget::HandleAbilityComponentUpdated(
+    USkaldAbilityComponent *AbilityComponent) {
+  if (!BoundAbilityComponent.IsValid() ||
+      BoundAbilityComponent.Get() != AbilityComponent) {
+    return;
+  }
+
+  RefreshAbilityDisplay();
+}
+
 void UBattleHUDWidget::UpdateStatPanel() {
   if (!BoundFighter) {
     return;
@@ -594,6 +629,38 @@ void UBattleHUDWidget::UpdateStatPanel() {
   }
 
   UpdateActionButtonVisibility();
+}
+
+void UBattleHUDWidget::RefreshAbilityDisplay() {
+  AbilitySlotDefinitions.Empty();
+
+  USkaldAbilityComponent *AbilityComp = BoundAbilityComponent.Get();
+  if (!AbilityComp) {
+    PassiveAbilityDefinition = FSkaldAbilityDefinition();
+    OnAbilityDisplayChanged.Broadcast(PassiveAbilityDefinition,
+                                      AbilitySlotDefinitions);
+    return;
+  }
+
+  PassiveAbilityDefinition = AbilityComp->GetPassiveAbility();
+  const ESkaldAbilitySlot SlotOrder[] = {ESkaldAbilitySlot::Ability1,
+                                         ESkaldAbilitySlot::Ability2,
+                                         ESkaldAbilitySlot::Ability3};
+
+  for (ESkaldAbilitySlot Slot : SlotOrder) {
+    if (const FSkaldAbilityState *State = AbilityComp->FindAbilityState(Slot)) {
+      FBattleAbilitySlotDisplay Display;
+      Display.Slot = Slot;
+      Display.Definition = State->Definition;
+      Display.CooldownRemaining = State->CooldownRemaining;
+      Display.bHasBeenUsed = State->bHasBeenUsed;
+      Display.bIsOnCooldown = State->bIsOnCooldown;
+      AbilitySlotDefinitions.Add(Display);
+    }
+  }
+
+  OnAbilityDisplayChanged.Broadcast(PassiveAbilityDefinition,
+                                    AbilitySlotDefinitions);
 }
 
 void UBattleHUDWidget::SetRoundInfo(const FText &RoundLabel,

@@ -1,4 +1,5 @@
 #include "FighterPawn.h"
+#include "Abilities/SkaldAbilityComponent.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/AudioComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -57,6 +58,8 @@ AFighterPawn::AFighterPawn() : MaxHealth(0) {
       CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DisplayMesh"));
   DisplayMesh->SetupAttachment(CollisionComponent);
   DisplayMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+  AbilityComponent = CreateDefaultSubobject<USkaldAbilityComponent>(TEXT("AbilityComponent"));
 
   HealthWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthWidget"));
   HealthWidget->SetupAttachment(DisplayMesh);
@@ -218,6 +221,8 @@ void AFighterPawn::OnConstruction(const FTransform &Transform) {
 void AFighterPawn::BeginPlay() {
   Super::BeginPlay();
 
+  RefreshAbilityLoadout();
+
   InitializeDisplayMeshMaterials();
   ApplyHitFlash(0.f);
   LastKnownHealth = Stats.Health;
@@ -377,6 +382,10 @@ void AFighterPawn::BeginActivation() {
   BroadcastActionsRemaining();
   UpdateActivationIndicator();
 
+  if (AbilityComponent) {
+    AbilityComponent->HandleActivationStarted();
+  }
+
   if (UGridOverlayComponent *Grid = GetGrid()) {
     Grid->HighlightSelection(this);
   }
@@ -389,6 +398,10 @@ void AFighterPawn::ResetActivationState() {
 
   BroadcastActionsRemaining();
   UpdateActivationIndicator();
+
+  if (AbilityComponent) {
+    AbilityComponent->HandleRoundStarted();
+  }
 }
 
 void AFighterPawn::FinishActivation() {
@@ -401,6 +414,16 @@ void AFighterPawn::FinishActivation() {
   if (UGridOverlayComponent *Grid = GetGrid()) {
     Grid->ClearSelectionHighlight();
   }
+}
+
+bool AFighterPawn::ConsumeAction() {
+  if (!bIsCurrentlyActive || ActionsRemaining <= 0) {
+    return false;
+  }
+
+  ActionsRemaining = FMath::Max(0, ActionsRemaining - 1);
+  BroadcastActionsRemaining();
+  return true;
 }
 
 UGridOverlayComponent *AFighterPawn::GetGrid() const {
@@ -865,9 +888,8 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
   } else {
     SetIsMoving(true);
   }
-  ActionsRemaining = FMath::Max(0, ActionsRemaining - 1);
 
-  BroadcastActionsRemaining();
+  ConsumeAction();
 
   if (Grid) {
     for (const FIntPoint &Cell : TargetCells) {
@@ -945,9 +967,7 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
 
   StartQueuedAttack(Target, MoveTemp(DiceResult));
 
-  ActionsRemaining = FMath::Max(0, ActionsRemaining - 1);
-
-  BroadcastActionsRemaining();
+  ConsumeAction();
 
   RefreshDisplayMeshYawOffset();
   FaceTowardsCells(CurrentCell, Target->CurrentCell);
@@ -1405,7 +1425,11 @@ void AFighterPawn::OnRep_Stats(const FFighterStats &OldStats) {
   } else if (!OnHealthChanged.IsBound()) {
     UpdateHealthDisplay(Stats.Health);
   }
+
+  RefreshAbilityLoadout();
 }
+
+void AFighterPawn::OnRep_Faction() { RefreshAbilityLoadout(); }
 
 void AFighterPawn::OnRep_MaxHealth() { UpdateHealthDisplay(Stats.Health); }
 
@@ -1427,6 +1451,12 @@ void AFighterPawn::OnRep_IsMoving() { RefreshMovementAudioComponent(); }
 void AFighterPawn::BroadcastActionsRemaining() {
   OnActionsChanged.Broadcast(ActionsRemaining);
   UpdateActivationIndicator();
+}
+
+void AFighterPawn::RefreshAbilityLoadout() {
+  if (AbilityComponent) {
+    AbilityComponent->RefreshAbilityLoadout(Stats, Faction);
+  }
 }
 
 void AFighterPawn::EnsureActivationWidget() {

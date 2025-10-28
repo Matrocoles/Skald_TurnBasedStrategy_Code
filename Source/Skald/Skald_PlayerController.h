@@ -5,6 +5,7 @@
 #include "GameFramework/PlayerController.h"
 #include "GridBattleManager.h"
 #include "SkaldTypes.h"
+#include "Abilities/SkaldAbilityTypes.h"
 #include "TimerManager.h"
 #include "Delegates/Delegate.h"
 #include "Camera/CameraShakeBase.h"
@@ -123,6 +124,16 @@ public:
 
   UFUNCTION(BlueprintCallable, Category = "UI")
   void HideInGameMenu();
+
+  /** Attempt to trigger the active fighter ability mapped to the given slot. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Battle")
+  bool TryUseAbilitySlot(ESkaldAbilitySlot Slot);
+
+  UFUNCTION(Server, Reliable)
+  void ServerTryUseAbilitySlot(ESkaldAbilitySlot Slot);
+
+  /** Handle ability input routed from characters or widgets. */
+  void HandleAbilityInput(ESkaldAbilitySlot Slot);
 
   /** Retrieve the turn manager controlling this player. */
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Turn")

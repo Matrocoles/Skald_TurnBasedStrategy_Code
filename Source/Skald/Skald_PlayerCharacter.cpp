@@ -1,4 +1,5 @@
 #include "Skald_PlayerCharacter.h"
+#include "Abilities/SkaldAbilityTypes.h"
 #include "Skald.h"
 #include "SkaldLogging.h"
 #include "WorldMap.h"
@@ -260,23 +261,26 @@ void ASkald_PlayerCharacter::HandleTerritorySelected(ATerritory* Territory)
 
 void ASkald_PlayerCharacter::AbilityOne()
 {
-        if (CurrentSelection)
+        if (ASkaldPlayerController* PlayerController = Cast<ASkaldPlayerController>(Controller))
         {
-                UE_LOG(LogSkald, Log, TEXT("%s used Ability One on %s"), *GetName(), *CurrentSelection->GetName());
+                PlayerController->HandleAbilityInput(ESkaldAbilitySlot::Ability1);
         }
 }
 
 void ASkald_PlayerCharacter::AbilityTwo()
 {
-        if (CurrentSelection)
+        if (ASkaldPlayerController* PlayerController = Cast<ASkaldPlayerController>(Controller))
         {
-                UE_LOG(LogSkald, Log, TEXT("%s used Ability Two"), *GetName());
+                PlayerController->HandleAbilityInput(ESkaldAbilitySlot::Ability2);
         }
 }
 
 void ASkald_PlayerCharacter::AbilityThree()
 {
-        UE_LOG(LogSkald, Log, TEXT("%s used Ability Three"), *GetName());
+        if (ASkaldPlayerController* PlayerController = Cast<ASkaldPlayerController>(Controller))
+        {
+                PlayerController->HandleAbilityInput(ESkaldAbilitySlot::Ability3);
+        }
 }
 
 void ASkald_PlayerCharacter::AdjustZoom(float Value)

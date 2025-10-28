@@ -19,6 +19,7 @@ class UCurveFloat;
 class UMaterialInstanceDynamic;
 class UDecalComponent;
 class UMaterialInterface;
+class USkaldAbilityComponent;
 
 UENUM(BlueprintType)
 enum class EFighterPawnFootprint : uint8 {
@@ -56,6 +57,10 @@ public:
   /** Mark this fighter's turn as complete. */
   UFUNCTION(BlueprintCallable, Category = "Fighter")
   void FinishActivation();
+
+  /** Spend a single action if available. Returns true on success. */
+  UFUNCTION(BlueprintCallable, Category = "Fighter|Actions")
+  bool ConsumeAction();
 
   /** Move to the specified grid cell if actions remain. */
   UFUNCTION(BlueprintCallable, Category = "Fighter")
@@ -143,7 +148,8 @@ public:
   FName FighterId;
 
   /** Faction owning this fighter instance. */
-  UPROPERTY(BlueprintReadWrite, EditAnywhere, Replicated, Category = "Fighter")
+  UPROPERTY(BlueprintReadWrite, EditAnywhere, ReplicatedUsing = OnRep_Faction,
+            Category = "Fighter")
   ESkaldFaction Faction = ESkaldFaction::None;
 
   /** Portrait associated with this fighter definition. */
@@ -175,6 +181,14 @@ public:
             Category = "Fighter")
   bool bIsCurrentlyActive;
 
+  /** Expose whether this fighter is actively taking a turn. */
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Fighter")
+  bool IsCurrentlyActive() const { return bIsCurrentlyActive; }
+
+  /** Remaining actions for the active turn. */
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Fighter")
+  int32 GetActionsRemaining() const { return ActionsRemaining; }
+
   /** True to override the incoming spawn rotation with SpawnFacingYaw. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Appearance")
   bool bOverrideSpawnFacingYaw = false;
@@ -198,6 +212,14 @@ public:
   UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter",
             meta = (AllowPrivateAccess = "true"))
   UCapsuleComponent *CollisionComponent;
+
+  /** Ability manager responsible for faction passives and unit actives. */
+  UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|Abilities",
+            meta = (AllowPrivateAccess = "true"))
+  USkaldAbilityComponent *AbilityComponent;
+
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Fighter|Abilities")
+  USkaldAbilityComponent *GetAbilityComponent() const { return AbilityComponent; }
 
   /** Widget displaying the current health. */
   UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|UI")
@@ -355,6 +377,9 @@ private:
   void OnRep_HasActivatedThisRound();
   UFUNCTION()
   void OnRep_IsCurrentlyActive();
+
+  UFUNCTION()
+  void OnRep_Faction();
   UFUNCTION()
   void OnRep_MaxHealth();
   UFUNCTION()
@@ -377,6 +402,9 @@ private:
 
   /** Helper to broadcast the current actions remaining value. */
   void BroadcastActionsRemaining();
+
+  /** Update the ability component with the latest stats/faction. */
+  void RefreshAbilityLoadout();
 
   /** Ensure the activation widget instance is ready for use. */
   void EnsureActivationWidget();

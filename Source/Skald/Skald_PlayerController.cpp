@@ -11,6 +11,8 @@
 #include "EngineUtils.h"
 #include "FighterDataLibrary.h"
 #include "FighterPawn.h"
+#include "Abilities/SkaldAbilityComponent.h"
+#include "Abilities/SkaldAbilityTypes.h"
 #include "GridBattleManager.h"
 #include "GridOverlayComponent.h"
 #include "InputCoreTypes.h"
@@ -185,6 +187,51 @@ void ASkaldPlayerController::CacheGameReferences() {
     CachedGameInstance->OnBattleMapStateChanged.AddDynamic(
         this, &ASkaldPlayerController::HandleBattleMapStateChanged);
   }
+}
+
+bool ASkaldPlayerController::TryUseAbilitySlot(ESkaldAbilitySlot Slot) {
+  if (!HasAuthority()) {
+    ServerTryUseAbilitySlot(Slot);
+    return false;
+  }
+
+  FText FailureReason;
+
+  if (!SelectedFighter) {
+    FailureReason = NSLOCTEXT("SkaldAbilities", "AbilityNoSelection",
+                               "Select a fighter before using abilities.");
+  } else if (!IsFriendlyFighter(SelectedFighter)) {
+    FailureReason = NSLOCTEXT("SkaldAbilities", "AbilityEnemyFighter",
+                               "Cannot trigger abilities on enemy fighters.");
+  } else if (USkaldAbilityComponent *AbilityComponent =
+                 SelectedFighter->GetAbilityComponent()) {
+    if (AbilityComponent->TryBeginAbility(Slot, FailureReason)) {
+      UpdateBattleHUDButtons();
+      return true;
+    }
+  } else {
+    FailureReason = NSLOCTEXT("SkaldAbilities", "AbilityComponentMissing",
+                               "This fighter has no abilities configured.");
+  }
+
+  if (!FailureReason.IsEmpty()) {
+    NotifyActionError(FailureReason.ToString());
+  }
+
+  return false;
+}
+
+void ASkaldPlayerController::HandleAbilityInput(ESkaldAbilitySlot Slot) {
+  if (!IsLocalController()) {
+    return;
+  }
+
+  TryUseAbilitySlot(Slot);
+}
+
+void ASkaldPlayerController::ServerTryUseAbilitySlot_Implementation(
+    ESkaldAbilitySlot Slot) {
+  TryUseAbilitySlot(Slot);
 }
 
 void ASkaldPlayerController::InitializeHUDWidget() {

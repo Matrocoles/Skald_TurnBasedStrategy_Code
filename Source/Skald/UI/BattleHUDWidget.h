@@ -4,6 +4,7 @@
 #include "GridBattleManager.h"
 #include "TimerManager.h"
 #include "UI/W_DiceResolutionPanel.h"
+#include "Abilities/SkaldAbilityComponent.h"
 #include "BattleHUDWidget.generated.h"
 
 class UButton;
@@ -42,6 +43,32 @@ struct FBattleActiveFloater {
   float Elapsed = 0.f;
   float Scale = 1.f;
 };
+
+USTRUCT(BlueprintType)
+struct SKALD_API FBattleAbilitySlotDisplay {
+  GENERATED_BODY()
+
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Battle|Abilities")
+  ESkaldAbilitySlot Slot = ESkaldAbilitySlot::Ability1;
+
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Battle|Abilities")
+  FSkaldAbilityDefinition Definition;
+
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Battle|Abilities")
+  int32 CooldownRemaining = 0;
+
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Battle|Abilities")
+  bool bIsOnCooldown = false;
+
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Battle|Abilities")
+  bool bHasBeenUsed = false;
+};
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnAbilityDisplayChanged,
+                                            const FSkaldAbilityDefinition &,
+                                            PassiveAbility,
+                                            const TArray<FBattleAbilitySlotDisplay> &,
+                                            ActiveSlots);
 
 /**
  * HUD widget displayed during grid battles.
@@ -107,6 +134,15 @@ public:
 
   UPROPERTY(BlueprintAssignable, Category = "Skald|Battle|Events")
   FOnLockedInFighterEntrySelected OnLockedInFighterEntrySelected;
+
+  UPROPERTY(BlueprintAssignable, Category = "Skald|Battle|Abilities")
+  FOnAbilityDisplayChanged OnAbilityDisplayChanged;
+
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Battle|Abilities")
+  FSkaldAbilityDefinition PassiveAbilityDefinition;
+
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Battle|Abilities")
+  TArray<FBattleAbilitySlotDisplay> AbilitySlotDefinitions;
 
   /** Returns true while dice resolutions or combat floaters are still animating. */
   UFUNCTION(BlueprintPure, Category = "Skald|Battle")
@@ -362,6 +398,9 @@ private:
   /** Update all stat text panels from the bound fighter. */
   void UpdateStatPanel();
 
+  /** Update ability slot widgets to match the bound fighter. */
+  void RefreshAbilityDisplay();
+
   /** Update the visibility state of action buttons. */
   void UpdateActionButtonVisibility();
 
@@ -372,6 +411,9 @@ private:
   /** Respond to action count changes from the fighter. */
   UFUNCTION()
   void HandleActionsChanged(int32 NewActions);
+
+  UFUNCTION()
+  void HandleAbilityComponentUpdated(USkaldAbilityComponent *AbilityComponent);
 
   /** Find the grid overlay component in the world. */
   UGridOverlayComponent *FindGridOverlay() const;
@@ -512,6 +554,9 @@ private:
   /** Fighter currently bound to the HUD. */
   UPROPERTY()
   AFighterPawn *BoundFighter;
+
+  /** Ability component currently providing passive/active data. */
+  TWeakObjectPtr<USkaldAbilityComponent> BoundAbilityComponent;
 
   /** Timer managing dice roll visibility. */
   FTimerHandle DiceRollerHideTimer;

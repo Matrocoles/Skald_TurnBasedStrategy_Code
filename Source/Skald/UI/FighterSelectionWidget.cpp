@@ -1,10 +1,12 @@
 #include "UI/FighterSelectionWidget.h"
 
+#include "Abilities/SkaldAbilityTypes.h"
 #include "Components/Button.h"
 #include "Components/Image.h"
 #include "Components/ScrollBox.h"
 #include "Components/TextBlock.h"
 #include "Engine/Texture2D.h"
+#include "Internationalization/Text.h"
 #include "SkaldLogging.h"
 #include "Skald_PlayerController.h"
 
@@ -73,6 +75,53 @@ void UFighterEntryWidget::Init(const FFighterDefinition &InFighter,
   }
   if (CostText) {
     CostText->SetText(FText::AsNumber(Fighter.Stats.ArmyCost));
+  }
+
+  PassiveAbilityDefinition = GetFactionPassive(Fighter.Faction);
+  ActiveAbilityDefinition =
+      GetFactionActiveAbility(Fighter.Faction, Fighter.Stats.ArmyCost);
+
+  if (PassiveAbilityText) {
+    if (PassiveAbilityDefinition.IsValid()) {
+      PassiveAbilityText->SetText(FText::Format(
+          NSLOCTEXT("SkaldAbilities", "PassiveEntryFormat", "{0}\n{1}"),
+          PassiveAbilityDefinition.AbilityName,
+          PassiveAbilityDefinition.AbilityDescription));
+    } else {
+      PassiveAbilityText->SetText(
+          NSLOCTEXT("SkaldAbilities", "PassiveEntryNone",
+                     "No faction passive available."));
+    }
+  }
+
+  if (ActiveAbilityText) {
+    if (ActiveAbilityDefinition.IsValid()) {
+      const FText CostLabel = ActiveAbilityDefinition.BuildCostLabel();
+      FText CooldownLabel;
+      if (ActiveAbilityDefinition.bOncePerBattle) {
+        CooldownLabel = NSLOCTEXT("SkaldAbilities", "AbilityOncePerBattleLabel",
+                                  "Use: once per battle");
+      } else if (ActiveAbilityDefinition.CooldownRounds > 0) {
+        CooldownLabel = FText::Format(
+            NSLOCTEXT("SkaldAbilities", "AbilityCooldownFormat",
+                      "Cooldown: {0} rounds"),
+            FText::AsNumber(ActiveAbilityDefinition.CooldownRounds));
+      } else {
+        CooldownLabel =
+            NSLOCTEXT("SkaldAbilities", "AbilityNoCooldownLabel",
+                       "Cooldown: none");
+      }
+
+      ActiveAbilityText->SetText(FText::Format(
+          NSLOCTEXT("SkaldAbilities", "ActiveEntryFormat",
+                     "{0} ({1})\n{2}\n{3}"),
+          ActiveAbilityDefinition.AbilityName, CostLabel,
+          ActiveAbilityDefinition.AbilityDescription, CooldownLabel));
+    } else {
+      ActiveAbilityText->SetText(
+          NSLOCTEXT("SkaldAbilities", "ActiveEntryNone",
+                     "No active ability assigned."));
+    }
   }
 
   if (PortraitImage)
