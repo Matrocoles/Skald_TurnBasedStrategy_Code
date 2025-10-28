@@ -34,6 +34,7 @@ class ASkald_BattleGameMode;
 class USoundBase;
 class UCameraShakeBase;
 class UNiagaraSystem;
+class ASkald_PlayerCharacter;
 
 /** Command issued by the player during a battle. */
 UENUM()
@@ -59,6 +60,8 @@ public:
   ASkaldPlayerController();
 
   virtual void OnRep_PlayerState() override;
+
+  virtual void OnPossess(APawn *InPawn) override;
 
   virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty> &OutLifetimeProps) const override;
 
@@ -470,6 +473,8 @@ public:
   /** React to the player finishing their pre-game selection. */
   UFUNCTION()
   void HandleFactionLockedIn();
+
+  void UpdateBattleCameraMode();
 
   void HandleFighterSelectionLockedIn();
 
