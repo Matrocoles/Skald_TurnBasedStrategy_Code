@@ -2,6 +2,7 @@
 
 #include "Blueprint/UserWidget.h"
 #include "GridBattleManager.h"
+#include "Abilities/SkaldAbilityTypes.h"
 #include "FighterSelectionWidget.generated.h"
 
 class UButton;
@@ -79,9 +80,25 @@ public:
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *CostText;
 
+  /** Passive ability summary text. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UTextBlock *PassiveAbilityText;
+
+  /** Active ability summary text. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UTextBlock *ActiveAbilityText;
+
   /** Fighter definition represented by this entry. */
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Fighter")
   FFighterDefinition Fighter;
+
+  /** Passive ability definition for this fighter's faction. */
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Fighter|Abilities")
+  FSkaldAbilityDefinition PassiveAbilityDefinition;
+
+  /** Active ability definition selected for this fighter's cost tier. */
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Fighter|Abilities")
+  FSkaldAbilityDefinition ActiveAbilityDefinition;
 
   /** Returns the portrait texture for this fighter, if loaded. */
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Skald|Fighter")
