@@ -144,6 +144,20 @@ void ASkald_PlayerCharacter::MoveForward(float Value)
 {
         if (bBattleCameraActive)
         {
+                if (bBattleCameraLocked)
+                {
+                        if (!FMath::IsNearlyZero(Value))
+                        {
+                                bHasManuallyRotatedWhileLocked = true;
+
+                                const float DeltaTime = GetWorld() ? GetWorld()->GetDeltaSeconds() : 0.f;
+                                const float PitchDelta = Value * BattleKeyboardPitchSpeed * DeltaTime;
+                                const float NewPitch = DesiredBattleRotation.Pitch + PitchDelta;
+                                DesiredBattleRotation.Pitch = FMath::Clamp(NewPitch, MinBattlePitch, MaxBattlePitch);
+                        }
+                        return;
+                }
+
                 BattleMoveInput.X = Value;
                 return;
         }
@@ -163,6 +177,19 @@ void ASkald_PlayerCharacter::MoveRight(float Value)
 {
         if (bBattleCameraActive)
         {
+                if (bBattleCameraLocked)
+                {
+                        if (!FMath::IsNearlyZero(Value))
+                        {
+                                bHasManuallyRotatedWhileLocked = true;
+
+                                const float DeltaTime = GetWorld() ? GetWorld()->GetDeltaSeconds() : 0.f;
+                                const float YawDelta = Value * BattleKeyboardYawSpeed * DeltaTime;
+                                DesiredBattleRotation.Yaw = FRotator::NormalizeAxis(DesiredBattleRotation.Yaw + YawDelta);
+                        }
+                        return;
+                }
+
                 BattleMoveInput.Y = Value;
                 return;
         }
@@ -222,6 +249,11 @@ void ASkald_PlayerCharacter::LookUp(float Value)
         {
                 if (!FMath::IsNearlyZero(Value))
                 {
+                        if (bBattleCameraLocked)
+                        {
+                                bHasManuallyRotatedWhileLocked = true;
+                        }
+
                         const float NewPitch = DesiredBattleRotation.Pitch + (Value * BattleMousePitchSpeed);
                         DesiredBattleRotation.Pitch = FMath::Clamp(NewPitch, MinBattlePitch, MaxBattlePitch);
                 }
@@ -493,10 +525,23 @@ FVector ASkald_PlayerCharacter::GetBattleLockWorldOffset(const AActor* FocusActo
                 return FVector::ZeroVector;
         }
 
-        const FVector Forward = FocusActor->GetActorForwardVector();
-        const FVector Right = FocusActor->GetActorRightVector();
         const FVector Up = FVector::UpVector;
 
-        return Forward * BattleLockRelativeOffset.X + Right * BattleLockRelativeOffset.Y + Up * BattleLockRelativeOffset.Z;
+        const FVector Forward = FocusActor->GetActorForwardVector();
+        const FVector Right = FocusActor->GetActorRightVector();
+
+        FVector Offset = Up * BattleLockRelativeOffset.Z;
+
+        if (!FMath::IsNearlyZero(BattleLockRelativeOffset.X))
+        {
+                Offset += Forward * BattleLockRelativeOffset.X;
+        }
+
+        if (!FMath::IsNearlyZero(BattleLockRelativeOffset.Y))
+        {
+                Offset += Right * BattleLockRelativeOffset.Y;
+        }
+
+        return Offset;
 }
 

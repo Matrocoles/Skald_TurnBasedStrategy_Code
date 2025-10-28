@@ -191,13 +191,21 @@ protected:
         UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Battle")
         float LockedBattlePitch = -20.f;
 
-        /** Relative offset from the focused fighter used while locked on (X=forward, Y=right, Z=up). */
+        /** Pivot offset from the focused fighter while locked on (X/Y shift the pawn, Z raises the pivot). */
         UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Battle")
-        FVector BattleLockRelativeOffset = FVector(-425.f, 0.f, 220.f);
+        FVector BattleLockRelativeOffset = FVector(0.f, 0.f, 220.f);
 
         /** Whether to automatically yaw the camera to face the lock target. */
         UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Battle")
         bool bAutoFaceLockTarget = true;
+
+        /** Keyboard yaw speed (degrees per second) applied while locked onto a fighter. */
+        UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Battle")
+        float BattleKeyboardYawSpeed = 120.f;
+
+        /** Keyboard pitch speed (degrees per second) applied while locked onto a fighter. */
+        UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Battle")
+        float BattleKeyboardPitchSpeed = 90.f;
 
 private:
         /** Perform per-frame updates while the battle camera is active. */
