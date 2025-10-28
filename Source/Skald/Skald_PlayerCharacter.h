@@ -179,6 +179,18 @@ protected:
         UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Battle")
         float BattleLockInterpSpeed = 6.f;
 
+        /** Absolute camera location used while the battle camera is active. */
+        FVector BattleCameraLocation = FVector::ZeroVector;
+
+        /** True when the spring arm has been detached for battle camera control. */
+        bool bBattleCameraDetached = false;
+
+        /** Cached relative location for restoring the spring arm after battle mode. */
+        FVector CachedBoomRelativeLocation = FVector::ZeroVector;
+
+        /** Cached state of absolute location usage on the spring arm. */
+        bool bCachedAbsoluteLocation = false;
+
         /** Camera lag speed applied while panning in battle mode. */
         UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Battle")
         float BattleCameraLagSpeed = 12.f;
