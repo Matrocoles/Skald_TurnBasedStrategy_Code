@@ -2,6 +2,7 @@
 
 #include "Blueprint/UserWidget.h"
 #include "CoreMinimal.h"
+#include "Input/Reply.h"
 
 #include "LockedInFighterEntryWidget.generated.h"
 
@@ -29,6 +30,10 @@ public:
 
   virtual void NativeConstruct() override;
   virtual void NativeDestruct() override;
+  virtual FReply NativeOnMouseButtonDown(const FGeometry &InGeometry,
+                                         const FPointerEvent &InMouseEvent) override;
+  virtual FReply NativeOnMouseButtonUp(const FGeometry &InGeometry,
+                                       const FPointerEvent &InMouseEvent) override;
 
   /** Assign the fighter represented by this entry. */
   UFUNCTION(BlueprintCallable, Category = "Skald|Battle")
@@ -137,10 +142,13 @@ protected:
 private:
   void BindToFighter(AFighterPawn *Fighter);
   void UnbindFromFighter();
+  void BroadcastEntryClicked();
 
   bool bIsSelected = false;
   bool bIsActive = false;
   bool bIsTurnSpent = false;
+  bool bHasPendingMouseClick = false;
+  bool bHandledByMouseInteraction = false;
 
   TWeakObjectPtr<AFighterPawn> BoundFighter;
 

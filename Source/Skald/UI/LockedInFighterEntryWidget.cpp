@@ -5,6 +5,7 @@
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
 #include "FighterPawn.h"
+#include "InputCoreTypes.h"
 #include "Internationalization/Text.h"
 
 ULockedInFighterEntryWidget::ULockedInFighterEntryWidget(
@@ -25,6 +26,32 @@ void ULockedInFighterEntryWidget::NativeConstruct() {
 void ULockedInFighterEntryWidget::NativeDestruct() {
   ResetEntry();
   Super::NativeDestruct();
+}
+
+FReply ULockedInFighterEntryWidget::NativeOnMouseButtonDown(
+    const FGeometry &InGeometry, const FPointerEvent &InMouseEvent) {
+  const bool bIsLeftButton = InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton;
+  if (bIsLeftButton) {
+    bHasPendingMouseClick = true;
+    bHandledByMouseInteraction = false;
+  }
+
+  return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+}
+
+FReply ULockedInFighterEntryWidget::NativeOnMouseButtonUp(
+    const FGeometry &InGeometry, const FPointerEvent &InMouseEvent) {
+  FReply Reply = Super::NativeOnMouseButtonUp(InGeometry, InMouseEvent);
+
+  const bool bIsLeftButton = InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton;
+  if (bIsLeftButton && bHasPendingMouseClick) {
+    bHasPendingMouseClick = false;
+    bHandledByMouseInteraction = true;
+    BroadcastEntryClicked();
+    return FReply::Handled();
+  }
+
+  return Reply;
 }
 
 void ULockedInFighterEntryWidget::SetFighter(AFighterPawn *InFighter) {
@@ -91,6 +118,8 @@ void ULockedInFighterEntryWidget::ResetEntry() {
   bIsSelected = false;
   bIsActive = false;
   bIsTurnSpent = false;
+  bHasPendingMouseClick = false;
+  bHandledByMouseInteraction = false;
   CachedMaxHealth = 1;
   if (PortraitImage) {
     PortraitImage->SetBrushFromTexture(nullptr);
@@ -103,9 +132,12 @@ void ULockedInFighterEntryWidget::ResetEntry() {
 }
 
 void ULockedInFighterEntryWidget::HandleEntryButtonClicked() {
-  if (AFighterPawn *Fighter = BoundFighter.Get()) {
-    OnEntryClicked.Broadcast(Fighter);
+  if (bHandledByMouseInteraction) {
+    bHandledByMouseInteraction = false;
+    return;
   }
+
+  BroadcastEntryClicked();
 }
 
 void ULockedInFighterEntryWidget::HandleFighterHealthChanged(int32 NewHealth) {
@@ -199,5 +231,11 @@ void ULockedInFighterEntryWidget::UnbindFromFighter() {
   }
 
   BoundFighter.Reset();
+}
+
+void ULockedInFighterEntryWidget::BroadcastEntryClicked() {
+  if (AFighterPawn *Fighter = BoundFighter.Get()) {
+    OnEntryClicked.Broadcast(Fighter);
+  }
 }
 
