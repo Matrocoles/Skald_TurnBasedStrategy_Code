@@ -1399,6 +1399,10 @@ void ASkaldPlayerController::HandleLockedInEntrySelected(AFighterPawn *Fighter) 
 
   SetSelectedFighter(Fighter, true);
   if (UGridOverlayComponent *Grid = FindGridOverlay()) {
+    const FIntPoint FighterCell = Fighter->GetCurrentCell();
+    if (Grid->IsCellInBounds(FighterCell)) {
+      HighlightClickedCell(Grid, FighterCell);
+    }
     Grid->HighlightSelection(Fighter);
   }
   UpdateLockedInSelectionHighlight();
