@@ -24,6 +24,7 @@
 #include "Territory.h"
 #include "TimerManager.h"
 #include "WorldMap.h"
+#include "Math/RotationMatrix.h"
 
 namespace {
 
@@ -36,7 +37,8 @@ struct FPendingControllerSlot {
 
 static TArray<FPendingControllerSlot> GPendingControllers;
 static bool GBattleSetupTriggered = false;
-constexpr float BattleSpawnHeightPadding = 300.f;
+constexpr float BattleSpawnHeightPadding = 100.f;
+constexpr int32 BattleSpawnEdgeColumns = 3;
 
 static bool IsAIController(const AController *C) {
   return C && C->IsA(ASkaldAIController::StaticClass());
@@ -815,7 +817,17 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
     }
 
     if (ControllersToRelocate.Num() > 0) {
-      RelocateControllersNearBattleGrid(ControllersToRelocate);
+      TMap<AController *, bool> ControllerSides;
+      if (AttackerC) {
+        ControllerSides.Add(AttackerC, true);
+      }
+      if (DefenderC) {
+        ControllerSides.Add(DefenderC, false);
+      }
+
+      RelocateControllersNearBattleGrid(
+          ControllersToRelocate,
+          ControllerSides.Num() > 0 ? &ControllerSides : nullptr);
     }
   }
 
@@ -994,7 +1006,8 @@ void ASkald_BattleGameMode::PollBattleBootstrap() {
 }
 
 bool ASkald_BattleGameMode::RelocateControllersNearBattleGrid(
-    const TArray<AController *> &Controllers) const {
+    const TArray<AController *> &Controllers,
+    const TMap<AController *, bool> *ControllerSides) const {
   if (Controllers.Num() == 0) {
     return false;
   }
@@ -1070,28 +1083,114 @@ bool ASkald_BattleGameMode::RelocateControllersNearBattleGrid(
   }
 
   BaseLocation.Z = HighestSurfaceZ + BattleSpawnHeightPadding;
+
+  FVector AttackerAnchor = BaseLocation;
+  FVector DefenderAnchor = BaseLocation;
+
+  if (Grid) {
+    const int32 Width = Grid->GetWidth();
+    const int32 Length = Grid->GetLength();
+
+    if (Width > 0 && Length > 0) {
+      const int32 MaxX = FMath::Max(Width - 1, 0);
+      const int32 MaxY = FMath::Max(Length - 1, 0);
+      const int32 EffectiveEdge = FMath::Clamp(BattleSpawnEdgeColumns, 1, Width);
+
+      const int32 AttackerMinX = 0;
+      const int32 AttackerMaxX = FMath::Clamp(EffectiveEdge - 1, 0, MaxX);
+      const int32 DefenderMinX = FMath::Clamp(Width - EffectiveEdge, 0, MaxX);
+      const int32 DefenderMaxX = MaxX;
+      const int32 CenterY = FMath::Clamp(Length / 2, 0, MaxY);
+
+      const FIntPoint AttackerCell((AttackerMinX + AttackerMaxX) / 2, CenterY);
+      const FIntPoint DefenderCell((DefenderMinX + DefenderMaxX) / 2, CenterY);
+
+      AttackerAnchor = Grid->GridToWorld(AttackerCell);
+      DefenderAnchor = Grid->GridToWorld(DefenderCell);
+
+      AttackerAnchor.Z = BaseLocation.Z;
+      DefenderAnchor.Z = BaseLocation.Z;
+    }
+  }
+
+  FVector AttackDirection = DefenderAnchor - AttackerAnchor;
+  AttackDirection.Z = 0.f;
+  if (AttackDirection.IsNearlyZero()) {
+    AttackDirection = FVector::ForwardVector;
+  }
+  AttackDirection.Normalize();
+
+  FVector DefenderDirection = -AttackDirection;
+  if (DefenderDirection.IsNearlyZero()) {
+    DefenderDirection = FVector::BackwardVector;
+  }
+
+  const FRotator AttackerRotation = AttackDirection.Rotation();
+  const FRotator DefenderRotation = DefenderDirection.Rotation();
   const float YSpacing = 150.f;
 
-  for (int32 Index = 0; Index < Controllers.Num(); ++Index) {
-    AController *Controller = Controllers[Index];
+  TArray<AController *> AttackerControllers;
+  TArray<AController *> DefenderControllers;
+  TArray<AController *> NeutralControllers;
+
+  for (AController *Controller : Controllers) {
     if (!Controller) {
       continue;
     }
 
-    APawn *Pawn = Controller->GetPawn();
-    if (!Pawn) {
-      continue;
+    if (ControllerSides) {
+      if (const bool *bIsAttacker = ControllerSides->Find(Controller)) {
+        (bIsAttacker && *bIsAttacker ? AttackerControllers : DefenderControllers)
+            .Add(Controller);
+        continue;
+      }
     }
 
-    FVector TargetLocation = BaseLocation;
-    if (Controllers.Num() > 1) {
-      const float OffsetIndex = static_cast<float>(Index) -
-                                0.5f * static_cast<float>(Controllers.Num() - 1);
-      TargetLocation.Y += OffsetIndex * YSpacing;
-    }
-
-    Pawn->SetActorLocation(TargetLocation, false);
+    NeutralControllers.Add(Controller);
   }
+
+  const auto PlaceControllers = [&](const TArray<AController *> &Group,
+                                    const FVector &Anchor,
+                                    const FRotator &Facing) {
+    if (Group.Num() == 0) {
+      return;
+    }
+
+    const FRotator FlatFacing(0.f, Facing.Yaw, 0.f);
+    FVector RightVector = FRotationMatrix(FlatFacing).GetScaledAxis(EAxis::Y);
+    if (RightVector.IsNearlyZero()) {
+      RightVector = FVector::YAxisVector;
+    }
+    RightVector.Normalize();
+
+    for (int32 Index = 0; Index < Group.Num(); ++Index) {
+      AController *Controller = Group[Index];
+      if (!Controller) {
+        continue;
+      }
+
+      APawn *Pawn = Controller->GetPawn();
+      if (!Pawn) {
+        continue;
+      }
+
+      FVector TargetLocation = Anchor;
+      if (Group.Num() > 1) {
+        const float OffsetIndex = static_cast<float>(Index) -
+                                  0.5f * static_cast<float>(Group.Num() - 1);
+        TargetLocation += RightVector * (OffsetIndex * YSpacing);
+      }
+
+      FRotator TargetRotation = FlatFacing;
+
+      Pawn->SetActorLocationAndRotation(TargetLocation, TargetRotation, false,
+                                        nullptr, ETeleportType::TeleportPhysics);
+    }
+  };
+
+  PlaceControllers(AttackerControllers, AttackerAnchor, AttackerRotation);
+  PlaceControllers(DefenderControllers, DefenderAnchor, DefenderRotation);
+  PlaceControllers(NeutralControllers, BaseLocation, AttackerRotation);
 
   return true;
 }
@@ -1158,7 +1257,7 @@ void ASkald_BattleGameMode::SpawnFighterSide(const TArray<FFighterDefinition> &R
   UGridOverlayComponent *Grid =
       Skald::GridOverlay::FindActiveGridOverlay(GetWorld());
 
-  const int32 Edge = 3;
+  const int32 Edge = BattleSpawnEdgeColumns;
   int32 GridWidth = Grid ? Grid->GetWidth() : UGridBattleManager::GridSize;
   int32 GridLength = Grid ? Grid->GetLength() : UGridBattleManager::GridSize;
 
@@ -1305,21 +1404,26 @@ void ASkald_BattleGameMode::TryLaunchBattle() {
   }
 
   TArray<AController *> ControllersToRelocate;
+  TMap<AController *, bool> ControllerSides;
   if (AttackerPS) {
     if (AController *OwnerController =
             Cast<AController>(AttackerPS->GetOwner())) {
       ControllersToRelocate.AddUnique(OwnerController);
+      ControllerSides.Add(OwnerController, true);
     }
   }
   if (DefenderPS) {
     if (AController *OwnerController =
             Cast<AController>(DefenderPS->GetOwner())) {
       ControllersToRelocate.AddUnique(OwnerController);
+      ControllerSides.Add(OwnerController, false);
     }
   }
 
   if (ControllersToRelocate.Num() > 0) {
-    RelocateControllersNearBattleGrid(ControllersToRelocate);
+    RelocateControllersNearBattleGrid(
+        ControllersToRelocate,
+        ControllerSides.Num() > 0 ? &ControllerSides : nullptr);
   }
 
   TArray<FFighterDefinition> AttackerDefs =
