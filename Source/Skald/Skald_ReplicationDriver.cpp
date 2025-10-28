@@ -17,7 +17,10 @@ auto USkaldReplicationDriver::ServerReplicateActors(float DeltaSeconds)
 {
     if (CachedNetDriver)
     {
-        return CachedNetDriver->ServerReplicateActors(DeltaSeconds);
+        // Call the underlying net driver's internal replication routine rather than
+        // re-entering UNetDriver::ServerReplicateActors, which would immediately
+        // delegate back to this replication driver and recurse indefinitely.
+        return CachedNetDriver->ServerReplicateActors_ProcessLoadedLevels(DeltaSeconds);
     }
 
     return Super::ServerReplicateActors(DeltaSeconds);
