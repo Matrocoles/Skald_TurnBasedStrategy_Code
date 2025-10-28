@@ -1,6 +1,7 @@
 #include "Abilities/SkaldAbilityComponent.h"
 
 #include "Abilities/SkaldAbilityTypes.h"
+#include "Containers/Set.h"
 #include "FighterPawn.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
@@ -29,7 +30,7 @@ void USkaldAbilityComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
     DOREPLIFETIME(USkaldAbilityComponent, PassiveAbility);
-    DOREPLIFETIME(USkaldAbilityComponent, AbilitySlots);
+    DOREPLIFETIME(USkaldAbilityComponent, ReplicatedAbilitySlots);
     DOREPLIFETIME(USkaldAbilityComponent, ReactionsRemaining);
     DOREPLIFETIME(USkaldAbilityComponent, bHasInitialisedLoadout);
 }
@@ -58,6 +59,8 @@ void USkaldAbilityComponent::RefreshAbilityLoadout(const FFighterStats& InStats,
     bHasInitialisedLoadout = true;
     ReactionsRemaining = ReactionsPerRound;
 
+    UpdateReplicatedAbilitySlots();
+
     BroadcastStateChanged();
 }
 
@@ -74,6 +77,7 @@ void USkaldAbilityComponent::HandleRoundStarted()
     }
 
     ReactionsRemaining = ReactionsPerRound;
+    UpdateReplicatedAbilitySlots();
     BroadcastStateChanged();
 }
 
@@ -128,6 +132,8 @@ bool USkaldAbilityComponent::TryBeginAbility(ESkaldAbilitySlot Slot, FText& OutF
         State->bIsOnCooldown = true;
     }
 
+    UpdateReplicatedAbilitySlots();
+
     if (GetOwnerRole() == ROLE_Authority)
     {
         MulticastAbilityTriggered(State->Definition);
@@ -160,6 +166,12 @@ const FSkaldAbilityState* USkaldAbilityComponent::FindAbilityState(ESkaldAbility
 
 void USkaldAbilityComponent::OnRep_AbilitySlots()
 {
+    AbilitySlots.Empty();
+    for (const FSkaldReplicatedAbilitySlotState& Entry : ReplicatedAbilitySlots)
+    {
+        AbilitySlots.Add(Entry.Slot, Entry.State);
+    }
+
     BroadcastStateChanged();
 }
 
@@ -274,6 +286,39 @@ void USkaldAbilityComponent::PlayAbilityFeedback(const FSkaldAbilityDefinition& 
             UGameplayStatics::SpawnSoundAttached(
                 Cue,
                 Fighter->GetRootComponent());
+        }
+    }
+}
+
+void USkaldAbilityComponent::UpdateReplicatedAbilitySlots()
+{
+    if (GetOwnerRole() != ROLE_Authority)
+    {
+        return;
+    }
+
+    ReplicatedAbilitySlots.Reset();
+    ReplicatedAbilitySlots.Reserve(AbilitySlots.Num());
+
+    TSet<ESkaldAbilitySlot> ProcessedSlots;
+    for (ESkaldAbilitySlot Slot : SlotOrder)
+    {
+        if (const FSkaldAbilityState* State = AbilitySlots.Find(Slot))
+        {
+            FSkaldReplicatedAbilitySlotState& Entry = ReplicatedAbilitySlots.AddDefaulted_GetRef();
+            Entry.Slot = Slot;
+            Entry.State = *State;
+            ProcessedSlots.Add(Slot);
+        }
+    }
+
+    for (const TPair<ESkaldAbilitySlot, FSkaldAbilityState>& Pair : AbilitySlots)
+    {
+        if (!ProcessedSlots.Contains(Pair.Key))
+        {
+            FSkaldReplicatedAbilitySlotState& Entry = ReplicatedAbilitySlots.AddDefaulted_GetRef();
+            Entry.Slot = Pair.Key;
+            Entry.State = Pair.Value;
         }
     }
 }
