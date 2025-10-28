@@ -28,6 +28,7 @@
 #include "SkaldLogging.h"
 #include "Skald_GameState.h"
 #include "Skald_PlayerState.h"
+#include "Skald_PlayerCharacter.h"
 #include "Skald_TurnManager.h"
 #include "Territory.h"
 #include "TimerManager.h"
@@ -647,6 +648,16 @@ void ASkaldPlayerController::OnRep_PlayerState() {
   }
 }
 
+void ASkaldPlayerController::OnPossess(APawn *InPawn) {
+  Super::OnPossess(InPawn);
+
+  if (!IsLocalController()) {
+    return;
+  }
+
+  UpdateBattleCameraMode();
+}
+
 void ASkaldPlayerController::ServerInitPlayerState_Implementation(
     const FString &Name, ESkaldFaction Faction, int32 NumAIPlayers) {
   UE_LOG(LogSkald, Log,
@@ -1205,6 +1216,16 @@ void ASkaldPlayerController::HandleActiveFighterChanged(
     }
   }
 
+  if (IsLocalController()) {
+    if (ASkald_PlayerCharacter *CameraPawn = Cast<ASkald_PlayerCharacter>(GetPawn())) {
+      if (bIsBattleMap && NewFighter && NewFighter->IsAlive()) {
+        CameraPawn->FocusCameraOnActor(NewFighter);
+      } else {
+        CameraPawn->ClearCameraFocus();
+      }
+    }
+  }
+
   if (!NewFighter && IsLocalController() && BattleTurnStartSound) {
     USkaldGameInstance *GI = CachedGameInstance;
     if (!GI) {
@@ -1468,6 +1489,10 @@ void ASkaldPlayerController::DetectBattleMap() {
   }
 
   bIsBattleMap = bDetectedBattleMap;
+
+  if (bIsBattleMap != bWasBattleMap) {
+    UpdateBattleCameraMode();
+  }
 
   if (bIsBattleMap && !bWasBattleMap) {
     LastStrategicInitiativeSoundRound = INDEX_NONE;
@@ -2686,6 +2711,30 @@ void ASkaldPlayerController::HandleFactionLockedIn() {
     FTimerDelegate RefreshDelegate = FTimerDelegate::CreateUObject(
         this, &ASkaldPlayerController::HandlePlayersUpdated);
     GetWorldTimerManager().SetTimerForNextTick(RefreshDelegate);
+  }
+}
+
+void ASkaldPlayerController::UpdateBattleCameraMode() {
+  if (!IsLocalController()) {
+    return;
+  }
+
+  ASkald_PlayerCharacter *CameraPawn = Cast<ASkald_PlayerCharacter>(GetPawn());
+  if (!CameraPawn) {
+    return;
+  }
+
+  CameraPawn->SetBattleCameraActive(bIsBattleMap);
+
+  if (!bIsBattleMap) {
+    CameraPawn->ClearCameraFocus();
+    return;
+  }
+
+  if (LockedActiveFighter.IsValid() && LockedActiveFighter->IsAlive()) {
+    CameraPawn->FocusCameraOnActor(LockedActiveFighter.Get());
+  } else {
+    CameraPawn->ClearCameraFocus();
   }
 }
 
