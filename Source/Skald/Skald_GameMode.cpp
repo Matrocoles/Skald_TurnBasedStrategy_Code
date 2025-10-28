@@ -17,6 +17,7 @@
 #include "Skald_GameInstance.h"
 #include "Skald_GameState.h"
 #include "Skald_PropertyAccess.h"
+#include "Skald_ReplicationDriver.h"
 #include "Skald_PlayerCharacter.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
@@ -62,6 +63,7 @@ ASkaldGameMode::ASkaldGameMode() {
   PlayerStateClass = ASkaldPlayerState::StaticClass();
   PlayerControllerClass = ASkaldPlayerController::StaticClass();
   DefaultPawnClass = ASkald_PlayerCharacter::StaticClass();
+  ReplicationDriverClass = USkaldReplicationDriver::StaticClass();
 
   TurnManager = nullptr;
   TurnManagerClass = ATurnManager::StaticClass();
@@ -303,13 +305,34 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
   }
 
   if (GI) {
-    if (PS->PlayerDisplayName.IsEmpty()) {
-      PS->PlayerDisplayName = GI->DisplayName;
-      PS->SetPlayerName(PS->PlayerDisplayName);
-    }
     if (PS->Faction == ESkaldFaction::None) {
       PS->Faction = GI->Faction;
     }
+
+    if (PS->PlayerDisplayName.IsEmpty()) {
+      PS->PlayerDisplayName = GI->DisplayName;
+    }
+  }
+
+  if (PS->PlayerDisplayName.IsEmpty()) {
+    FString ResolvedName = PS->GetPlayerName();
+    if (ResolvedName.IsEmpty()) {
+      ResolvedName = FString::Printf(TEXT("Player %d"), PS->GetPlayerId());
+    }
+    if (ResolvedName.IsEmpty()) {
+      ResolvedName = TEXT("Player");
+    }
+
+    PS->PlayerDisplayName = ResolvedName;
+  }
+
+  if (PS->GetPlayerName().IsEmpty() || PS->GetPlayerName() != PS->PlayerDisplayName) {
+    FString EffectiveName = PS->PlayerDisplayName;
+    if (EffectiveName.IsEmpty()) {
+      EffectiveName = TEXT("Player");
+    }
+
+    PS->SetPlayerName(EffectiveName);
   }
 
   const int32 Index = GS->PlayerArray.IndexOfByKey(PS);
