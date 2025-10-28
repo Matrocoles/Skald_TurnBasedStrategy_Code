@@ -51,7 +51,9 @@ public:
   void OnControllerReady(AController *Controller);
 
   /** Move controller pawns near the active battle grid, if available. */
-  bool RelocateControllersNearBattleGrid(const TArray<AController *> &Controllers) const;
+  bool RelocateControllersNearBattleGrid(
+      const TArray<AController *> &Controllers,
+      const TMap<AController *, bool> *ControllerSides = nullptr) const;
 
   /**
    * Called when the streamed battle level becomes active so existing
