@@ -925,6 +925,86 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
   }
 }
 
+bool AFighterPawn::TryTeleportToCell(FIntPoint TargetCell, int32 MaxDistance,
+                                     bool bRequireLineOfSight) {
+  UGridOverlayComponent *Grid = GetGrid();
+  if (!Grid) {
+    return false;
+  }
+
+  const FIntPoint StartCell = CurrentCell;
+  const int32 Distance = FMath::Max(FMath::Abs(TargetCell.X - StartCell.X),
+                                    FMath::Abs(TargetCell.Y - StartCell.Y));
+  if (MaxDistance > 0 && Distance > MaxDistance) {
+    return false;
+  }
+
+  const TArray<FIntPoint> PreviousCells = GetOccupiedCells(StartCell);
+  const TArray<FIntPoint> TargetCells = GetOccupiedCells(TargetCell);
+  if (TargetCells.Num() == 0) {
+    return false;
+  }
+
+  bool bHasLineOfSight = !bRequireLineOfSight;
+
+  for (const FIntPoint &Cell : TargetCells) {
+    if (!Grid->IsCellInBounds(Cell) || Grid->IsObscured(Cell)) {
+      return false;
+    }
+
+    const bool bPreviouslyOccupied = PreviousCells.Contains(Cell);
+    if (!bPreviouslyOccupied && Grid->IsOccupied(Cell)) {
+      return false;
+    }
+  }
+
+  if (bRequireLineOfSight) {
+    for (const FIntPoint &FromCell : PreviousCells) {
+      for (const FIntPoint &ToCell : TargetCells) {
+        if (Grid->HasLineOfSight(FromCell, ToCell)) {
+          bHasLineOfSight = true;
+          break;
+        }
+      }
+
+      if (bHasLineOfSight) {
+        break;
+      }
+    }
+
+    if (!bHasLineOfSight) {
+      return false;
+    }
+  }
+
+  for (const FIntPoint &Cell : PreviousCells) {
+    if (!TargetCells.Contains(Cell)) {
+      Grid->SetOccupied(Cell, false);
+    }
+  }
+
+  CurrentCell = TargetCell;
+  const FVector NewLocation = GetAlignedWorldLocation(TargetCell);
+  MovementTargetLocation = NewLocation;
+  SetActorLocation(NewLocation);
+  SetIsMoving(false);
+  RefreshDisplayMeshYawOffset();
+  FaceTowardsCells(StartCell, TargetCell);
+  FaceTowardsLocation(NewLocation);
+
+  for (const FIntPoint &Cell : TargetCells) {
+    Grid->SetOccupied(Cell, true);
+  }
+
+  const int32 NotifiedDistance = MaxDistance > 0 ? FMath::Min(Distance, MaxDistance)
+                                                 : Distance;
+  if (AbilityComponent) {
+    AbilityComponent->NotifyOwnerMoved(NotifiedDistance);
+  }
+
+  return true;
+}
+
 void AFighterPawn::PerformAttack(AFighterPawn *Target) {
   if (!bIsCurrentlyActive || ActionsRemaining <= 0 || !Target ||
       !Target->IsAlive()) {

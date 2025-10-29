@@ -596,6 +596,12 @@ void USkaldAbilityComponent::ApplyAbilityEffects(const FSkaldAbilityDefinition& 
         if (GetOwnerRole() == ROLE_Authority)
         {
             bVeilStepBonusActive = true;
+
+            FSkaldActiveAbilityModifier Modifier;
+            Modifier.SourceAbilityId = Definition.AbilityId;
+            Modifier.Delta.AttackRange = 1;
+            Modifier.bRemoveOnActivationEnd = true;
+            AddActiveModifier(MoveTemp(Modifier));
         }
     }
     else if (Definition.AbilityId == TEXT("Ability_Undead_Elite"))
@@ -811,6 +817,15 @@ void USkaldAbilityComponent::ApplyAbilityEffects(const FSkaldAbilityDefinition& 
             FSkaldActiveAbilityModifier Modifier;
             Modifier.SourceAbilityId = Definition.AbilityId;
             Modifier.Delta.AttackDice = 1;
+            if (AFighterPawn* OwnerFighter = CachedFighter.Get())
+            {
+                const int32 DesiredRange = 8;
+                const int32 RangeDelta = FMath::Max(0, DesiredRange - OwnerFighter->Stats.AttackRange);
+                if (RangeDelta > 0)
+                {
+                    Modifier.Delta.AttackRange = RangeDelta;
+                }
+            }
             Modifier.bRemoveOnActivationEnd = true;
             AddActiveModifier(MoveTemp(Modifier));
         }
@@ -1309,6 +1324,7 @@ void USkaldAbilityComponent::ApplyStatDeltaToOwner(const FSkaldAbilityStatDelta&
 
     ApplyIntDelta(Fighter->Stats.AttackDice, Delta.AttackDice);
     ApplyIntDelta(Fighter->Stats.AttackDamage, Delta.AttackDamage);
+    ApplyIntDelta(Fighter->Stats.AttackRange, Delta.AttackRange);
     ApplyIntDelta(Fighter->Stats.Movement, Delta.Movement);
     ApplyIntDelta(Fighter->Stats.Defence, Delta.Defence);
     ApplyIntDelta(Fighter->Stats.Strength, Delta.Strength);
@@ -1405,9 +1421,10 @@ void USkaldAbilityComponent::HandleBattleAttackResolved(AFighterPawn* Attacker, 
             BrutalChargeDistanceMoved = 0;
         }
 
-        if (bVeilStepBonusActive && Result.HitCount > 0)
+        if (bVeilStepBonusActive)
         {
             bVeilStepBonusActive = false;
+            RemoveModifiersByAbilityId(TEXT("Ability_Elf_Skirmish"));
         }
 
         if (bSmashThroughActive)

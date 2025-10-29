@@ -23,6 +23,9 @@ struct FSkaldAbilityStatDelta
     int32 AttackDamage = 0;
 
     UPROPERTY()
+    int32 AttackRange = 0;
+
+    UPROPERTY()
     int32 Movement = 0;
 
     UPROPERTY()
