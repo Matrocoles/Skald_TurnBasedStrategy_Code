@@ -130,6 +130,15 @@ void USkaldAbilityComponent::RefreshAbilityLoadout(const FFighterStats& InStats,
             SlotState.CooldownRemaining = 0;
             SlotState.bHasBeenUsed = false;
             SlotState.bIsOnCooldown = false;
+        }
+    }
+
+    bHasInitialisedLoadout = true;
+    ReactionsRemaining = ReactionsPerRound;
+
+    UpdateReplicatedAbilitySlots();
+
+    BroadcastStateChanged();
 }
 
 void ApplyDamageToFighter(AFighterPawn* Target, int32 Damage)
@@ -162,15 +171,6 @@ void HealFighter(AFighterPawn* Target, int32 Amount)
     {
         Target->OnHealthChanged.Broadcast(Target->Stats.Health);
     }
-}
-}
-
-    bHasInitialisedLoadout = true;
-    ReactionsRemaining = ReactionsPerRound;
-
-    UpdateReplicatedAbilitySlots();
-
-    BroadcastStateChanged();
 }
 
 void USkaldAbilityComponent::HandleRoundStarted()
