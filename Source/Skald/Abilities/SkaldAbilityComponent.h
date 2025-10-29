@@ -5,8 +5,11 @@
 #include "SkaldAbilityComponent.generated.h"
 
 class AFighterPawn;
+class UDataTable;
 class UNiagaraSystem;
 struct FFighterStats;
+struct FDiceRollResult;
+class UGridBattleManager;
 
 USTRUCT()
 struct FSkaldAbilityStatDelta
@@ -121,6 +124,7 @@ public:
     USkaldAbilityComponent();
 
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
     /** Assign passives/actives for the owning fighter. Safe to call multiple times. */
     void RefreshAbilityLoadout(const FFighterStats& InStats, ESkaldFaction InFaction);
@@ -160,6 +164,9 @@ public:
     UPROPERTY(BlueprintAssignable, Category = "Abilities|Events")
     FSkaldAbilityTriggered OnAbilityTriggered;
 
+    /** Apply a modifier originating from another fighter (e.g. enemy debuffs). */
+    void ReceiveExternalModifier(FSkaldActiveAbilityModifier&& Modifier);
+
 protected:
     virtual void BeginPlay() override;
 
@@ -182,9 +189,23 @@ protected:
     void RemoveActiveModifier(int32 Index);
     void RemoveExpiredModifiers(ESkaldAbilityModifierPhase Phase);
     void ApplyStatDeltaToOwner(const FSkaldAbilityStatDelta& Delta, bool bApply);
+    bool TryResolveFactionAbilitySet(ESkaldFaction InFaction, FSkaldFactionAbilitySet& OutSet);
+    FSkaldAbilityDefinition ResolveActiveAbilityForCost(const FSkaldFactionAbilitySet& AbilitySet, int32 ArmyCost) const;
+    UDataTable* GetFactionAbilityDataTable();
+    void TryRegisterBattleDelegates();
+    void RemoveBattleDelegates();
+    void HandleViralLashResolved(AFighterPawn* Defender, const FDiceRollResult& Result);
+    void HandleScrapperFeintResolved(const FDiceRollResult& Result);
+    void ApplyModifierToTarget(AFighterPawn* Target, FSkaldActiveAbilityModifier&& Modifier);
+
+    UFUNCTION()
+    void HandleBattleAttackResolved(AFighterPawn* Attacker, AFighterPawn* Defender, const FDiceRollResult& Result);
 
     /** Owning fighter cached for convenience. */
     TWeakObjectPtr<AFighterPawn> CachedFighter;
+
+    /** Cached pointer to the active battle manager for event hooks. */
+    TWeakObjectPtr<UGridBattleManager> CachedBattleManager;
 
     /** Passive shown on HUD and roster screens. */
     UPROPERTY(Replicated)
@@ -197,6 +218,20 @@ protected:
     /** Lightweight replicated view of slot -> state pairs. */
     UPROPERTY(ReplicatedUsing = OnRep_AbilitySlots)
     TArray<FSkaldReplicatedAbilitySlotState> ReplicatedAbilitySlots;
+
+    /** Optional data table providing faction ability definitions at runtime. */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ability", meta = (AllowedClasses = "DataTable"))
+    TSoftObjectPtr<UDataTable> FactionAbilityTable;
+
+    /** Cached pointer to the loaded data table asset, if any. */
+    UPROPERTY(Transient)
+    UDataTable* LoadedAbilityDataTable = nullptr;
+
+    /** True when Viral Lash should apply its contagion on the next attack resolution. */
+    bool bApplyViralLashOnNextAttack = false;
+
+    /** True when Scrapper Feint should grant its reposition bonus on the next miss. */
+    bool bApplyScrapperFeintOnNextMiss = false;
 
     /** Default reaction availability refreshed every round. */
     UPROPERTY(EditDefaultsOnly, Category = "Ability")
