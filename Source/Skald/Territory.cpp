@@ -27,19 +27,19 @@ FLinearColor GetFactionColor(ESkaldFaction Faction) {
   case ESkaldFaction::Orc:
     return FLinearColor::Red;
   case ESkaldFaction::Dwarf:
-    return FLinearColor(0.6f, 0.3f, 0.0f, 1.f); // Brown
+    return FLinearColor(0.55f, 0.35f, 0.15f, 1.f); // Brown
   case ESkaldFaction::Elf:
-    return FLinearColor::Green;
+    return FLinearColor(0.0f, 0.25f, 0.15f, 1.f); // Dark pine green
   case ESkaldFaction::LizardFolk:
     return FLinearColor(0.0f, 0.5f, 0.5f, 1.f); // Teal
   case ESkaldFaction::Undead:
     return FLinearColor::Black;
   case ESkaldFaction::Gnoll:
-    return FLinearColor(1.0f, 0.55f, 0.0f, 1.f); // Orange
+    return FLinearColor(1.0f, 0.45f, 0.05f, 1.f); // Orange
   case ESkaldFaction::Empire:
     return FLinearColor(0.5f, 0.0f, 0.5f, 1.f); // Purple
   case ESkaldFaction::Inflicted:
-    return FLinearColor(0.99f, 0.14f, 0.14f, 1.f); // Scarlet
+    return FLinearColor(1.0f, 0.85f, 0.1f, 1.f); // Yellow
   case ESkaldFaction::FrogFolk:
     return FLinearColor(1.f, 0.31f, 0.55f, 1.f); // Rose
   case ESkaldFaction::Ravpack:
