@@ -36,6 +36,8 @@ FLinearColor GetFactionColor(ESkaldFaction Faction) {
     return FLinearColor::Black;
   case ESkaldFaction::Gnoll:
     return FLinearColor(1.0f, 0.45f, 0.05f, 1.f); // Orange
+  case ESkaldFaction::Goblin:
+    return FLinearColor(0.196f, 0.804f, 0.196f, 1.f); // Lime green
   case ESkaldFaction::Empire:
     return FLinearColor(0.5f, 0.0f, 0.5f, 1.f); // Purple
   case ESkaldFaction::Inflicted:
