@@ -5,11 +5,33 @@
 #include "Animation/AnimMontage.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Containers/Set.h"
+#include "Engine/DataTable.h"
 #include "FighterPawn.h"
+#include "GridBattleManager.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
 #include "NiagaraFunctionLibrary.h"
+#include "SkaldLogging.h"
+#include "Skald_GameInstance.h"
 #include "Sound/SoundBase.h"
+
+namespace
+{
+FName BuildFactionRowName(ESkaldFaction Faction)
+{
+    if (Faction == ESkaldFaction::None)
+    {
+        return NAME_None;
+    }
+
+    if (const UEnum* FactionEnum = StaticEnum<ESkaldFaction>())
+    {
+        return FName(*FactionEnum->GetNameStringByValue(static_cast<int64>(Faction)));
+    }
+
+    return NAME_None;
+}
+} // namespace
 
 USkaldAbilityComponent::USkaldAbilityComponent()
 {
@@ -17,6 +39,9 @@ USkaldAbilityComponent::USkaldAbilityComponent()
     SetIsReplicatedByDefault(true);
     ReactionsRemaining = ReactionsPerRound;
     bHasInitialisedLoadout = false;
+    LoadedAbilityDataTable = nullptr;
+    bApplyViralLashOnNextAttack = false;
+    bApplyScrapperFeintOnNextMiss = false;
 
     SlotOrder = {ESkaldAbilitySlot::Ability1, ESkaldAbilitySlot::Ability2, ESkaldAbilitySlot::Ability3};
 }
@@ -26,6 +51,13 @@ void USkaldAbilityComponent::BeginPlay()
     Super::BeginPlay();
 
     CachedFighter = Cast<AFighterPawn>(GetOwner());
+    TryRegisterBattleDelegates();
+}
+
+void USkaldAbilityComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    RemoveBattleDelegates();
+    Super::EndPlay(EndPlayReason);
 }
 
 void USkaldAbilityComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -45,18 +77,26 @@ void USkaldAbilityComponent::RefreshAbilityLoadout(const FFighterStats& InStats,
         CachedFighter = Cast<AFighterPawn>(GetOwner());
     }
 
-    PassiveAbility = GetFactionPassive(InFaction);
-
     AbilitySlots.Empty();
+    bApplyViralLashOnNextAttack = false;
+    bApplyScrapperFeintOnNextMiss = false;
 
-    const FSkaldAbilityDefinition ActiveAbility = GetFactionActiveAbility(InFaction, InStats.ArmyCost);
-    if (ActiveAbility.IsValid())
+    FSkaldFactionAbilitySet AbilitySet;
+    const bool bFoundAbilitySet = TryResolveFactionAbilitySet(InFaction, AbilitySet);
+
+    PassiveAbility = bFoundAbilitySet ? AbilitySet.Passive : FSkaldAbilityDefinition();
+
+    if (bFoundAbilitySet)
     {
-        FSkaldAbilityState& SlotState = AbilitySlots.Add(ESkaldAbilitySlot::Ability1);
-        SlotState.Definition = ActiveAbility;
-        SlotState.CooldownRemaining = 0;
-        SlotState.bHasBeenUsed = false;
-        SlotState.bIsOnCooldown = false;
+        const FSkaldAbilityDefinition ActiveAbility = ResolveActiveAbilityForCost(AbilitySet, InStats.ArmyCost);
+        if (ActiveAbility.IsValid())
+        {
+            FSkaldAbilityState& SlotState = AbilitySlots.Add(ESkaldAbilitySlot::Ability1);
+            SlotState.Definition = ActiveAbility;
+            SlotState.CooldownRemaining = 0;
+            SlotState.bHasBeenUsed = false;
+            SlotState.bIsOnCooldown = false;
+        }
     }
 
     bHasInitialisedLoadout = true;
@@ -105,6 +145,8 @@ void USkaldAbilityComponent::HandleActivationFinished()
     {
         RemoveExpiredModifiers(ESkaldAbilityModifierPhase::ActivationEnd);
         bOwnerAttackedThisActivation = false;
+        bApplyViralLashOnNextAttack = false;
+        bApplyScrapperFeintOnNextMiss = false;
     }
     BroadcastStateChanged();
 }
@@ -115,6 +157,8 @@ bool USkaldAbilityComponent::TryBeginAbility(ESkaldAbilitySlot Slot, FText& OutF
     {
         return false;
     }
+
+    TryRegisterBattleDelegates();
 
     FSkaldAbilityState* State = AbilitySlots.Find(Slot);
     if (!State)
@@ -362,7 +406,14 @@ void USkaldAbilityComponent::ApplyAbilityEffects(const FSkaldAbilityDefinition& 
         return;
     }
 
-    if (Definition.AbilityId == TEXT("Ability_Inflicted_Line"))
+    if (Definition.AbilityId == TEXT("Ability_Inflicted_Skirmish"))
+    {
+        if (GetOwnerRole() == ROLE_Authority)
+        {
+            bApplyViralLashOnNextAttack = true;
+        }
+    }
+    else if (Definition.AbilityId == TEXT("Ability_Inflicted_Line"))
     {
         FSkaldActiveAbilityModifier Modifier;
         Modifier.SourceAbilityId = Definition.AbilityId;
@@ -370,6 +421,13 @@ void USkaldAbilityComponent::ApplyAbilityEffects(const FSkaldAbilityDefinition& 
         Modifier.Delta.Defence = -1;
         Modifier.bRemoveOnActivationStart = true;
         AddActiveModifier(MoveTemp(Modifier));
+    }
+    else if (Definition.AbilityId == TEXT("Ability_Ravpack_Skirmish"))
+    {
+        if (GetOwnerRole() == ROLE_Authority)
+        {
+            bApplyScrapperFeintOnNextMiss = true;
+        }
     }
     else if (Definition.AbilityId == TEXT("Ability_Ravpack_Elite"))
     {
@@ -487,6 +545,12 @@ void USkaldAbilityComponent::NotifyAttackCommitted()
     }
 }
 
+void USkaldAbilityComponent::ReceiveExternalModifier(FSkaldActiveAbilityModifier&& Modifier)
+{
+    AddActiveModifier(MoveTemp(Modifier));
+    BroadcastStateChanged();
+}
+
 void USkaldAbilityComponent::ApplyStatDeltaToOwner(const FSkaldAbilityStatDelta& Delta, bool bApply)
 {
     if (GetOwnerRole() != ROLE_Authority)
@@ -517,6 +581,240 @@ void USkaldAbilityComponent::ApplyStatDeltaToOwner(const FSkaldAbilityStatDelta&
     ApplyIntDelta(Fighter->Stats.Defence, Delta.Defence);
     ApplyIntDelta(Fighter->Stats.Strength, Delta.Strength);
     ApplyIntDelta(Fighter->Stats.CriticalBonusDamage, Delta.CriticalBonusDamage);
+}
+
+void USkaldAbilityComponent::TryRegisterBattleDelegates()
+{
+    if (GetOwnerRole() != ROLE_Authority)
+    {
+        return;
+    }
+
+    if (UGridBattleManager* ExistingManager = CachedBattleManager.Get())
+    {
+        ExistingManager->OnAttackResolved.RemoveDynamic(this, &USkaldAbilityComponent::HandleBattleAttackResolved);
+        ExistingManager->OnAttackResolved.AddDynamic(this, &USkaldAbilityComponent::HandleBattleAttackResolved);
+        return;
+    }
+
+    UWorld* World = GetWorld();
+    if (!World)
+    {
+        return;
+    }
+
+    if (USkaldGameInstance* GameInstance = World->GetGameInstance<USkaldGameInstance>())
+    {
+        if (UGridBattleManager* BattleManager = GameInstance->GridBattleManager)
+        {
+            CachedBattleManager = BattleManager;
+            BattleManager->OnAttackResolved.RemoveDynamic(this, &USkaldAbilityComponent::HandleBattleAttackResolved);
+            BattleManager->OnAttackResolved.AddDynamic(this, &USkaldAbilityComponent::HandleBattleAttackResolved);
+        }
+    }
+}
+
+void USkaldAbilityComponent::RemoveBattleDelegates()
+{
+    if (UGridBattleManager* BattleManager = CachedBattleManager.Get())
+    {
+        BattleManager->OnAttackResolved.RemoveDynamic(this, &USkaldAbilityComponent::HandleBattleAttackResolved);
+    }
+    CachedBattleManager.Reset();
+}
+
+void USkaldAbilityComponent::HandleBattleAttackResolved(AFighterPawn* Attacker, AFighterPawn* Defender, const FDiceRollResult& Result)
+{
+    if (GetOwnerRole() != ROLE_Authority)
+    {
+        return;
+    }
+
+    AFighterPawn* OwnerFighter = CachedFighter.Get();
+    if (!OwnerFighter)
+    {
+        return;
+    }
+
+    if (Attacker == OwnerFighter)
+    {
+        if (bApplyViralLashOnNextAttack)
+        {
+            HandleViralLashResolved(Defender, Result);
+            bApplyViralLashOnNextAttack = false;
+        }
+
+        if (bApplyScrapperFeintOnNextMiss)
+        {
+            HandleScrapperFeintResolved(Result);
+        }
+    }
+}
+
+void USkaldAbilityComponent::HandleViralLashResolved(AFighterPawn* Defender, const FDiceRollResult& Result)
+{
+    if (!Defender || Result.HitCount <= 0)
+    {
+        return;
+    }
+
+    FSkaldActiveAbilityModifier Modifier;
+    Modifier.SourceAbilityId = TEXT("Ability_Inflicted_Skirmish");
+    Modifier.Delta.Defence = -1;
+    Modifier.bRemoveOnRoundStart = true;
+
+    ApplyModifierToTarget(Defender, MoveTemp(Modifier));
+}
+
+void USkaldAbilityComponent::HandleScrapperFeintResolved(const FDiceRollResult& Result)
+{
+    if (Result.HitCount > 0)
+    {
+        bApplyScrapperFeintOnNextMiss = false;
+        return;
+    }
+
+    FSkaldActiveAbilityModifier Modifier;
+    Modifier.SourceAbilityId = TEXT("Ability_Ravpack_Skirmish");
+    Modifier.Delta.Movement = 2;
+    Modifier.bRemoveOnActivationEnd = true;
+
+    AddActiveModifier(MoveTemp(Modifier));
+    bApplyScrapperFeintOnNextMiss = false;
+    BroadcastStateChanged();
+}
+
+void USkaldAbilityComponent::ApplyModifierToTarget(AFighterPawn* Target, FSkaldActiveAbilityModifier&& Modifier)
+{
+    if (!Target)
+    {
+        return;
+    }
+
+    if (USkaldAbilityComponent* TargetAbility = Target->FindComponentByClass<USkaldAbilityComponent>())
+    {
+        TargetAbility->ReceiveExternalModifier(MoveTemp(Modifier));
+        return;
+    }
+
+    if (GetOwnerRole() != ROLE_Authority)
+    {
+        return;
+    }
+
+    auto ApplyIntDelta = [](int32& Stat, int32 Amount)
+    {
+        if (Amount == 0)
+        {
+            return;
+        }
+
+        Stat = FMath::Max(0, Stat + Amount);
+    };
+
+    ApplyIntDelta(Target->Stats.AttackDice, Modifier.Delta.AttackDice);
+    ApplyIntDelta(Target->Stats.AttackDamage, Modifier.Delta.AttackDamage);
+    ApplyIntDelta(Target->Stats.Movement, Modifier.Delta.Movement);
+    ApplyIntDelta(Target->Stats.Defence, Modifier.Delta.Defence);
+    ApplyIntDelta(Target->Stats.Strength, Modifier.Delta.Strength);
+    ApplyIntDelta(Target->Stats.CriticalBonusDamage, Modifier.Delta.CriticalBonusDamage);
+}
+
+bool USkaldAbilityComponent::TryResolveFactionAbilitySet(ESkaldFaction InFaction, FSkaldFactionAbilitySet& OutSet)
+{
+    const UEnum* FactionEnum = StaticEnum<ESkaldFaction>();
+    const FString FactionName = FactionEnum ? FactionEnum->GetNameStringByValue(static_cast<int64>(InFaction)) : FString(TEXT("Unknown"));
+
+    bool bConsultedDataTable = false;
+    if (UDataTable* Table = GetFactionAbilityDataTable())
+    {
+        bConsultedDataTable = true;
+        const FString Context = TEXT("USkaldAbilityComponent::TryResolveFactionAbilitySet");
+        const FName RowName = BuildFactionRowName(InFaction);
+        if (!RowName.IsNone())
+        {
+            if (const FSkaldFactionAbilityTableRow* TableRow = Table->FindRow<FSkaldFactionAbilityTableRow>(RowName, Context, false))
+            {
+                OutSet = TableRow->AbilitySet;
+                return true;
+            }
+        }
+
+        for (const TPair<FName, uint8*>& RowPair : Table->GetRowMap())
+        {
+            if (const FSkaldFactionAbilityTableRow* TableRow = reinterpret_cast<const FSkaldFactionAbilityTableRow*>(RowPair.Value))
+            {
+                if (TableRow->Faction == InFaction)
+                {
+                    OutSet = TableRow->AbilitySet;
+                    return true;
+                }
+            }
+        }
+    }
+
+    if (const FSkaldFactionAbilitySet* StaticSet = FindFactionAbilitySet(InFaction))
+    {
+        if (bConsultedDataTable)
+        {
+            UE_LOG(
+                LogSkald,
+                Warning,
+                TEXT("Faction ability table '%s' lacks an entry for faction '%s'; falling back to built-in defaults."),
+                *FactionAbilityTable.ToSoftObjectPath().ToString(),
+                *FactionName);
+        }
+        OutSet = *StaticSet;
+        return true;
+    }
+
+    if (bConsultedDataTable)
+    {
+        UE_LOG(
+            LogSkald,
+            Warning,
+            TEXT("Faction ability table '%s' missing entry for faction '%s' and no built-in default is available."),
+            *FactionAbilityTable.ToSoftObjectPath().ToString(),
+            *FactionName);
+    }
+
+    return false;
+}
+
+FSkaldAbilityDefinition USkaldAbilityComponent::ResolveActiveAbilityForCost(const FSkaldFactionAbilitySet& AbilitySet, int32 ArmyCost) const
+{
+    const ESkaldAbilityTier Tier = ResolveAbilityTierForCost(ArmyCost);
+    switch (Tier)
+    {
+    case ESkaldAbilityTier::Skirmish:
+        return AbilitySet.SkirmishAbility;
+    case ESkaldAbilityTier::Line:
+        return AbilitySet.LineAbility;
+    case ESkaldAbilityTier::Elite:
+        return AbilitySet.EliteAbility;
+    default:
+        break;
+    }
+
+    return FSkaldAbilityDefinition();
+}
+
+UDataTable* USkaldAbilityComponent::GetFactionAbilityDataTable()
+{
+    if (FactionAbilityTable.IsNull())
+    {
+        LoadedAbilityDataTable = nullptr;
+        return nullptr;
+    }
+
+    UDataTable* Table = FactionAbilityTable.Get();
+    if (!Table)
+    {
+        Table = FactionAbilityTable.LoadSynchronous();
+    }
+
+    LoadedAbilityDataTable = Table;
+    return LoadedAbilityDataTable;
 }
 
 void USkaldAbilityComponent::UpdateReplicatedAbilitySlots()

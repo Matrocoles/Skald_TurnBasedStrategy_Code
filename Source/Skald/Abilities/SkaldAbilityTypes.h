@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Engine/DataTable.h"
 #include "SkaldTypes.h"
 #include "SkaldAbilityTypes.generated.h"
 
@@ -144,6 +145,21 @@ struct FSkaldFactionAbilitySet
     /** Active for high-cost (elite) fighters. */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Ability")
     FSkaldAbilityDefinition EliteAbility;
+};
+
+/** Row wrapper used when authoring faction ability sets in a data table. */
+USTRUCT(BlueprintType)
+struct FSkaldFactionAbilityTableRow : public FTableRowBase
+{
+    GENERATED_BODY();
+
+    /** Faction that the ability set applies to. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Ability")
+    ESkaldFaction Faction = ESkaldFaction::None;
+
+    /** Ability bundle defining passives and actives for the faction. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Ability")
+    FSkaldFactionAbilitySet AbilitySet;
 };
 
 /** Return the ability tier associated with the supplied army cost. */
