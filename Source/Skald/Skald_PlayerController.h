@@ -10,11 +10,7 @@
 #include "Delegates/Delegate.h"
 #include "Camera/CameraShakeBase.h"
 #include "UObject/WeakObjectPtr.h"
-#if (ENGINE_MAJOR_VERSION > 5) || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5)
-#include "Templates/Optional.h"
-#else
-#include "Containers/Optional.h"
-#endif
+#include "Templates/SharedPointer.h"
 #include "Skald_PlayerController.generated.h"
 
 class ATurnManager;
