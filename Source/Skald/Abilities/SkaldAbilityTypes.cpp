@@ -9,11 +9,11 @@ namespace
 {
 ESkaldAbilityTier TierFromCost(int32 ArmyCost)
 {
-    if (ArmyCost >= 8)
+    if (ArmyCost >= 5)
     {
         return ESkaldAbilityTier::Elite;
     }
-    if (ArmyCost >= 4)
+    if (ArmyCost >= 2)
     {
         return ESkaldAbilityTier::Line;
     }
