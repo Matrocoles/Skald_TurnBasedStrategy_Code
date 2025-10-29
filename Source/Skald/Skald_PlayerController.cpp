@@ -369,14 +369,6 @@ void ASkaldPlayerController::AutoInitializeFromLobbySelection() {
     }
   }
 
-  if (DesiredName.IsEmpty() && CachedGameInstance) {
-    DesiredName = CachedGameInstance->DisplayName;
-  }
-
-  if (DesiredFaction == ESkaldFaction::None && CachedGameInstance) {
-    DesiredFaction = CachedGameInstance->Faction;
-  }
-
   const bool bMissingName = DesiredName.IsEmpty();
   const bool bMissingFaction = DesiredFaction == ESkaldFaction::None;
 
