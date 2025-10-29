@@ -1005,6 +1005,12 @@ bool AFighterPawn::TryTeleportToCell(FIntPoint TargetCell, int32 MaxDistance,
   ResolveTrapsAtDestination(TargetCells);
 
   if (!IsAlive()) {
+    for (const FIntPoint &Cell : PreviousCells) {
+      Grid->SetOccupied(Cell, false);
+    }
+    for (const FIntPoint &Cell : TargetCells) {
+      Grid->SetOccupied(Cell, false);
+    }
     return true;
   }
 
