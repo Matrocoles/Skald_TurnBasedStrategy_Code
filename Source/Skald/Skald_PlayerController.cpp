@@ -614,7 +614,8 @@ void ASkaldPlayerController::HighlightAbilityCommandOptions(
           EBattleCommandMode::AbilityTargetEnemy ||
       Command.Targeting.CommandMode ==
           EBattleCommandMode::AbilityTargetAlly) {
-    if (!CachedBattleManager.IsValid()) {
+    UGridBattleManager *BattleManager = GetBattleManager();
+    if (!BattleManager) {
       return;
     }
 
@@ -622,7 +623,7 @@ void ASkaldPlayerController::HighlightAbilityCommandOptions(
                               EBattleCommandMode::AbilityTargetEnemy;
 
     const TArray<AFighterPawn *> Fighters =
-        CachedBattleManager->GetInitiativeOrderSnapshot();
+        BattleManager->GetInitiativeOrderSnapshot();
     for (AFighterPawn *Candidate : Fighters) {
       if (!Candidate || Candidate == Source) {
         continue;
@@ -1889,6 +1890,7 @@ void ASkaldPlayerController::InitializeBattleHUD() {
   int32 PendingInitiativeRound = 0;
   // Bind to active-fighter changes
   if (GI && GI->GridBattleManager) {
+    CachedBattleManager = GI->GridBattleManager;
     GI->GridBattleManager->OnActiveFighterChanged.RemoveAll(this);
     GI->GridBattleManager->OnActiveFighterChanged.AddDynamic(
         this, &ASkaldPlayerController::HandleActiveFighterChanged);
@@ -1921,6 +1923,8 @@ void ASkaldPlayerController::InitializeBattleHUD() {
 
     bPendingInitiativePrompt = GI->GridBattleManager->IsAwaitingInitiativeRoll();
     PendingInitiativeRound = CurrentRound;
+  } else {
+    CachedBattleManager.Reset();
   }
 
   if (BattleHudWidget) {
@@ -2023,6 +2027,24 @@ AFighterPawn *ASkaldPlayerController::FindFighterAtCell(
       }
     }
   }
+  return nullptr;
+}
+
+UGridBattleManager *ASkaldPlayerController::GetBattleManager() const {
+  if (CachedBattleManager.IsValid()) {
+    return CachedBattleManager.Get();
+  }
+
+  USkaldGameInstance *GameInstance = CachedGameInstance;
+  if (!GameInstance) {
+    GameInstance = GetGameInstance<USkaldGameInstance>();
+  }
+
+  if (GameInstance && GameInstance->GridBattleManager) {
+    CachedBattleManager = GameInstance->GridBattleManager;
+    return CachedBattleManager.Get();
+  }
+
   return nullptr;
 }
 
@@ -5432,6 +5454,7 @@ void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,
   SelectedFighter = nullptr;
   LockedActiveFighter = nullptr;
   LastLocalInitiativeRoll = 0;
+  CachedBattleManager.Reset();
   bControlsAttackerSide = false;
   bControlsDefenderSide = false;
   LastStrategicInitiativeSoundRound = INDEX_NONE;

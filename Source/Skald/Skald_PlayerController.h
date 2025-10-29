@@ -401,6 +401,9 @@ protected:
             meta = (AllowPrivateAccess = "true"))
   USkaldGameInstance *CachedGameInstance;
 
+  /** Cached reference to the active grid battle manager. */
+  mutable TWeakObjectPtr<UGridBattleManager> CachedBattleManager;
+
   /** Current command selection when issuing grid battle orders. */
   EBattleCommandMode CurrentCommandMode;
 
@@ -439,6 +442,9 @@ protected:
 
   /** Find a fighter occupying the specified grid cell. */
   AFighterPawn *FindFighterAtCell(const FIntPoint &Cell) const;
+
+  /** Retrieve the active grid battle manager, caching the result. */
+  UGridBattleManager *GetBattleManager() const;
 
   UFUNCTION()
   void HandleActivatePressed();
