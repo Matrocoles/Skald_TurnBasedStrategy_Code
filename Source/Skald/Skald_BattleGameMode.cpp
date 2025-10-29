@@ -1351,6 +1351,8 @@ void ASkald_BattleGameMode::SpawnFighterSide(const TArray<FFighterDefinition> &R
       Pawn->FighterPortrait = Def.Portrait;
       Pawn->Faction = Def.Faction;
       Pawn->bIsAttacker = bAsAttacker;
+
+      Pawn->RefreshAbilityLoadout();
       BattleManager->RegisterFighter(Pawn, bAsAttacker);
     }
   }
