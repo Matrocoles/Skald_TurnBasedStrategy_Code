@@ -4,6 +4,7 @@
 #include "Abilities/SkaldAbilityTypes.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
+#include "Components/DecalComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Containers/Set.h"
 #include "Engine/DataTable.h"
