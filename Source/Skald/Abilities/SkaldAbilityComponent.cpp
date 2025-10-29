@@ -740,16 +740,32 @@ bool USkaldAbilityComponent::TryResolveFactionAbilitySet(ESkaldFaction InFaction
             }
         }
 
-        for (const TPair<FName, uint8*>& RowPair : Table->GetRowMap())
+        const UScriptStruct* const ExpectedRowStruct = FSkaldFactionAbilityTableRow::StaticStruct();
+        const UScriptStruct* const TableRowStruct = Table->GetRowStruct();
+        if (TableRowStruct == ExpectedRowStruct)
         {
-            if (const FSkaldFactionAbilityTableRow* TableRow = reinterpret_cast<const FSkaldFactionAbilityTableRow*>(RowPair.Value))
+            for (const TPair<FName, uint8*>& RowPair : Table->GetRowMap())
             {
-                if (TableRow->Faction == InFaction)
+                if (const FSkaldFactionAbilityTableRow* TableRow = reinterpret_cast<const FSkaldFactionAbilityTableRow*>(RowPair.Value))
                 {
-                    OutSet = TableRow->AbilitySet;
-                    return true;
+                    if (TableRow->Faction == InFaction)
+                    {
+                        OutSet = TableRow->AbilitySet;
+                        return true;
+                    }
                 }
             }
+        }
+        else
+        {
+            UE_LOG(
+                LogSkald,
+                Warning,
+                TEXT(
+                    "Faction ability table '%s' uses row struct '%s' but '%s' is required; skipping fallback iteration."),
+                *FactionAbilityTable.ToSoftObjectPath().ToString(),
+                TableRowStruct ? *TableRowStruct->GetName() : TEXT("<null>"),
+                *ExpectedRowStruct->GetName());
         }
     }
 
