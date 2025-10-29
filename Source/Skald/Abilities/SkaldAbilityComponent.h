@@ -147,6 +147,12 @@ public:
     /** Query whether a slot can currently be triggered without mutating state. */
     bool CanActivateAbility(ESkaldAbilitySlot Slot, FText* OutFailureReason = nullptr) const;
 
+    /** Restore one spent reaction if possible. */
+    bool TryRefreshReaction();
+
+    /** Force the owning fighter to lose all remaining reactions for the round. */
+    void ForceSpendAllReactions();
+
     /** Passive shared with every fighter in the faction. */
     FSkaldAbilityDefinition GetPassiveAbility() const { return PassiveAbility; }
 
@@ -166,6 +172,7 @@ public:
 
     /** Apply a modifier originating from another fighter (e.g. enemy debuffs). */
     void ReceiveExternalModifier(FSkaldActiveAbilityModifier&& Modifier);
+    void NotifyOwnerMoved(int32 DistanceMoved);
 
 protected:
     virtual void BeginPlay() override;
@@ -196,10 +203,18 @@ protected:
     void RemoveBattleDelegates();
     void HandleViralLashResolved(AFighterPawn* Defender, const FDiceRollResult& Result);
     void HandleScrapperFeintResolved(const FDiceRollResult& Result);
+    void HandleRallyingShotResolved(const FDiceRollResult& Result);
+    void HandleBrutalChargeResolved(AFighterPawn* Defender, const FDiceRollResult& Result);
+    void HandleRuneRiposteTriggered(AFighterPawn* Attacker, const FDiceRollResult& Result);
     void ApplyModifierToTarget(AFighterPawn* Target, FSkaldActiveAbilityModifier&& Modifier);
+    void RemoveModifiersByAbilityId(FName AbilityId);
+    void ConsumeOncePerBattleAbility(FName AbilityId);
 
     UFUNCTION()
     void HandleBattleAttackResolved(AFighterPawn* Attacker, AFighterPawn* Defender, const FDiceRollResult& Result);
+
+    UFUNCTION()
+    void HandleOwnerHealthChanged(int32 NewHealth);
 
     /** Owning fighter cached for convenience. */
     TWeakObjectPtr<AFighterPawn> CachedFighter;
@@ -232,6 +247,29 @@ protected:
 
     /** True when Scrapper Feint should grant its reposition bonus on the next miss. */
     bool bApplyScrapperFeintOnNextMiss = false;
+    bool bApplyRallyingShotOnNextAttack = false;
+    bool bBrutalChargeActive = false;
+    int32 BrutalChargeDistanceMoved = 0;
+    bool bRuneRiposteReady = false;
+    bool bVeilStepBonusActive = false;
+    bool bDeathlessAdvanceReady = false;
+    bool bShieldWallPivotActive = false;
+    TWeakObjectPtr<AFighterPawn> ShieldWallPivotProtectedAlly;
+    TSet<TWeakObjectPtr<AFighterPawn>> TacticalReservesRefreshedThisRound;
+    bool bSmashThroughActive = false;
+    bool bForgeguardBraceReady = false;
+    bool bDeepDelveMortarPending = false;
+    bool bMoonlanceFlurryActive = false;
+    int32 MoonlanceFlurryAttacksRemaining = 0;
+    bool bStarfallInvocationPending = false;
+    bool bGraveGraspPending = false;
+    bool bSoulHarvestActive = false;
+    bool bSoulHarvestKillSecured = false;
+    bool bHarrierDashActive = false;
+    bool bSuppressingFireActive = false;
+    bool bRendAndTearActive = false;
+    bool bArtilleryStrikePending = false;
+    bool bJuryRiggedExplosiveActive = false;
 
     /** Default reaction availability refreshed every round. */
     UPROPERTY(EditDefaultsOnly, Category = "Ability")

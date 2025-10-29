@@ -62,6 +62,12 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Fighter|Actions")
   bool ConsumeAction();
 
+  /** Attempt to restore a spent action if this fighter is currently active. */
+  bool TryRestoreAction();
+
+  /** Attempt to refresh a spent reaction if this fighter has an ability component. */
+  bool TryRestoreReaction();
+
   /** Move to the specified grid cell if actions remain. */
   UFUNCTION(BlueprintCallable, Category = "Fighter")
   void MoveToCell(FIntPoint TargetCell);

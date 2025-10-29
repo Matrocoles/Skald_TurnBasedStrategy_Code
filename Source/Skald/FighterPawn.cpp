@@ -430,6 +430,24 @@ bool AFighterPawn::ConsumeAction() {
   return true;
 }
 
+bool AFighterPawn::TryRestoreAction() {
+  if (!bIsCurrentlyActive || ActionsRemaining >= ActionsPerActivation) {
+    return false;
+  }
+
+  ActionsRemaining = FMath::Clamp(ActionsRemaining + 1, 0, ActionsPerActivation);
+  BroadcastActionsRemaining();
+  return true;
+}
+
+bool AFighterPawn::TryRestoreReaction() {
+  if (USkaldAbilityComponent *Ability = GetAbilityComponent()) {
+    return Ability->TryRefreshReaction();
+  }
+
+  return false;
+}
+
 UGridOverlayComponent *AFighterPawn::GetGrid() const {
   if (IsValid(CachedGrid) &&
       Skald::GridOverlay::IsComponentFromVisibleLevel(CachedGrid)) {
@@ -894,6 +912,10 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
   }
 
   ConsumeAction();
+
+  if (AbilityComponent) {
+    AbilityComponent->NotifyOwnerMoved(Distance);
+  }
 
   if (Grid) {
     for (const FIntPoint &Cell : TargetCells) {
