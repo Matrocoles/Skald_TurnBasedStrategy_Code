@@ -74,6 +74,9 @@ constexpr const TCHAR *PendingBattlePhaseError =
     TEXT("Cannot end the phase while a battle is awaiting confirmation.");
 
 constexpr float FighterDeathEffectHeightOffset = 120.f;
+constexpr int32 VeilStepRange = 3;
+const FColor VeilStepHighlightColor(128, 64, 255, 215);
+const FName VeilStepAbilityId(TEXT("Ability_Elf_Skirmish"));
 bool IsCursorOverInteractableSlateWidget() {
   if (!FSlateApplication::IsInitialized()) {
     return false;
@@ -226,12 +229,791 @@ void ASkaldPlayerController::HandleAbilityInput(ESkaldAbilitySlot Slot) {
     return;
   }
 
+  if (HandleAbilityTargetingInput(Slot)) {
+    return;
+  }
+
   TryUseAbilitySlot(Slot);
 }
 
 void ASkaldPlayerController::ServerTryUseAbilitySlot_Implementation(
     ESkaldAbilitySlot Slot) {
   TryUseAbilitySlot(Slot);
+}
+
+bool ASkaldPlayerController::IsVeilStepAbility(
+    const USkaldAbilityComponent *AbilityComp, ESkaldAbilitySlot Slot) const {
+  if (!AbilityComp) {
+    return false;
+  }
+
+  const FSkaldAbilityState *State = AbilityComp->FindAbilityState(Slot);
+  if (!State || !State->Definition.IsValid()) {
+    return false;
+  }
+
+  return State->Definition.AbilityId == VeilStepAbilityId;
+}
+
+bool ASkaldPlayerController::TryBeginVeilStepTargeting(ESkaldAbilitySlot Slot) {
+  if (!SelectedFighter) {
+    return false;
+  }
+
+  USkaldAbilityComponent *AbilityComponent =
+      SelectedFighter->GetAbilityComponent();
+  if (!AbilityComponent) {
+    const FText ErrorText = NSLOCTEXT(
+        "SkaldAbilities", "AbilityComponentMissing",
+        "This fighter has no abilities configured.");
+    NotifyActionError(ErrorText.ToString());
+    return true;
+  }
+
+  if (!IsVeilStepAbility(AbilityComponent, Slot)) {
+    return false;
+  }
+
+  if (!IsFriendlyFighter(SelectedFighter)) {
+    const FText ErrorText = NSLOCTEXT(
+        "SkaldAbilities", "AbilityEnemyFighter",
+        "Cannot trigger abilities on enemy fighters.");
+    NotifyActionError(ErrorText.ToString());
+    return true;
+  }
+
+  FText FailureReason;
+  if (!AbilityComponent->CanActivateAbility(Slot, &FailureReason)) {
+    if (!FailureReason.IsEmpty()) {
+      NotifyActionError(FailureReason.ToString());
+    }
+    return true;
+  }
+
+  BeginVeilStepTargeting(SelectedFighter, Slot);
+  return true;
+}
+
+void ASkaldPlayerController::BeginVeilStepTargeting(AFighterPawn *Fighter,
+                                                    ESkaldAbilitySlot Slot) {
+  if (!Fighter) {
+    return;
+  }
+
+  CancelCommandMode();
+  PendingVeilStepSlot = Slot;
+  PendingVeilStepFighter = Fighter;
+  CurrentCommandMode = EBattleCommandMode::VeilStep;
+
+  if (UGridOverlayComponent *Grid = FindGridOverlay()) {
+    HighlightVeilStepOptions(Fighter, Grid);
+  }
+}
+
+void ASkaldPlayerController::HighlightVeilStepOptions(
+    AFighterPawn *Fighter, UGridOverlayComponent *Grid) const {
+  if (!Fighter || !Grid) {
+    return;
+  }
+
+  Grid->ClearHighlights();
+
+  const FColor SelectionColor = Grid->SelectionHighlightColor.ToFColor(true);
+  const TArray<FIntPoint> CurrentCells = Fighter->GetOccupiedCells();
+  const FIntPoint CurrentAnchor = Fighter->GetCurrentCell();
+  for (const FIntPoint &Cell : CurrentCells) {
+    Grid->HighlightCell(Cell, SelectionColor, 0.f, false);
+  }
+
+  const int32 GridWidth = Grid->GetWidth();
+  const int32 GridHeight = Grid->GetLength();
+
+  for (int32 Y = 0; Y < GridHeight; ++Y) {
+    for (int32 X = 0; X < GridWidth; ++X) {
+      const FIntPoint Anchor(X, Y);
+      if (Anchor == CurrentAnchor) {
+        continue;
+      }
+
+      if (!IsVeilStepDestinationValid(Fighter, Grid, Anchor)) {
+        continue;
+      }
+
+      const TArray<FIntPoint> TargetCells = Fighter->GetOccupiedCells(Anchor);
+      for (const FIntPoint &Cell : TargetCells) {
+        Grid->HighlightCell(Cell, VeilStepHighlightColor, 0.f, false);
+      }
+    }
+  }
+}
+
+bool ASkaldPlayerController::FindBestVeilStepAnchor(
+    AFighterPawn *Fighter, UGridOverlayComponent *Grid,
+    const FIntPoint &ClickedCell, FIntPoint &OutAnchor) const {
+  if (!Fighter || !Grid) {
+    return false;
+  }
+
+  const int32 FootprintSize = Fighter->GetFootprintSideLength();
+  bool bFoundAnchor = false;
+  int32 BestDistance = MAX_int32;
+
+  for (int32 Dy = 0; Dy < FootprintSize; ++Dy) {
+    for (int32 Dx = 0; Dx < FootprintSize; ++Dx) {
+      const FIntPoint Candidate = ClickedCell - FIntPoint(Dx, Dy);
+      if (!IsVeilStepDestinationValid(Fighter, Grid, Candidate)) {
+        continue;
+      }
+
+      const int32 DistanceToClick = FMath::Max(
+          FMath::Abs(Candidate.X - ClickedCell.X),
+          FMath::Abs(Candidate.Y - ClickedCell.Y));
+
+      if (!bFoundAnchor || DistanceToClick < BestDistance) {
+        BestDistance = DistanceToClick;
+        OutAnchor = Candidate;
+        bFoundAnchor = true;
+      }
+    }
+  }
+
+  if (bFoundAnchor) {
+    return true;
+  }
+
+  if (IsVeilStepDestinationValid(Fighter, Grid, ClickedCell)) {
+    OutAnchor = ClickedCell;
+    return true;
+  }
+
+  return false;
+}
+
+bool ASkaldPlayerController::IsVeilStepDestinationValid(
+    AFighterPawn *Fighter, UGridOverlayComponent *Grid,
+    const FIntPoint &Anchor) const {
+  if (!Fighter || !Grid) {
+    return false;
+  }
+
+  const FIntPoint StartCell = Fighter->GetCurrentCell();
+  const int32 Distance = FMath::Max(FMath::Abs(Anchor.X - StartCell.X),
+                                    FMath::Abs(Anchor.Y - StartCell.Y));
+  if (Distance > VeilStepRange) {
+    return false;
+  }
+
+  const TArray<FIntPoint> CurrentCells = Fighter->GetOccupiedCells(StartCell);
+  const TArray<FIntPoint> TargetCells = Fighter->GetOccupiedCells(Anchor);
+  if (TargetCells.Num() == 0) {
+    return false;
+  }
+
+  for (const FIntPoint &Cell : TargetCells) {
+    if (!Grid->IsCellInBounds(Cell) || Grid->IsObscured(Cell)) {
+      return false;
+    }
+
+    const bool bPreviouslyOccupied = CurrentCells.Contains(Cell);
+    if (!bPreviouslyOccupied && Grid->IsOccupied(Cell)) {
+      return false;
+    }
+  }
+
+  bool bHasLineOfSight = false;
+  for (const FIntPoint &FromCell : CurrentCells) {
+    for (const FIntPoint &ToCell : TargetCells) {
+      if (Grid->HasLineOfSight(FromCell, ToCell)) {
+        bHasLineOfSight = true;
+        break;
+      }
+    }
+
+    if (bHasLineOfSight) {
+      break;
+    }
+  }
+
+  return bHasLineOfSight;
+}
+
+bool ASkaldPlayerController::ExecuteVeilStepInternal(
+    AFighterPawn *Fighter, ESkaldAbilitySlot Slot, const FIntPoint &TargetAnchor,
+    FText *OutError) {
+  if (!Fighter) {
+    if (OutError) {
+      *OutError = NSLOCTEXT("SkaldAbilities", "AbilityNoSelection",
+                             "Select a fighter before using abilities.");
+    }
+    return false;
+  }
+
+  USkaldAbilityComponent *AbilityComponent = Fighter->GetAbilityComponent();
+  if (!AbilityComponent || !IsVeilStepAbility(AbilityComponent, Slot)) {
+    if (OutError) {
+      *OutError = NSLOCTEXT("SkaldAbilities", "AbilityUnavailable",
+                             "No ability is assigned to that slot.");
+    }
+    return false;
+  }
+
+  UGridOverlayComponent *Grid = Fighter->GetGrid();
+  if (!IsVeilStepDestinationValid(Fighter, Grid, TargetAnchor)) {
+    if (OutError) {
+      *OutError = NSLOCTEXT("SkaldAbilities", "VeilStepInvalidDestination",
+                             "Select a visible empty tile within 3 squares.");
+    }
+    return false;
+  }
+
+  FText FailureReason;
+  if (!AbilityComponent->TryBeginAbility(Slot, FailureReason)) {
+    if (OutError) {
+      *OutError = FailureReason;
+    }
+    return false;
+  }
+
+  if (!Fighter->TryTeleportToCell(TargetAnchor, VeilStepRange, true)) {
+    UE_LOG(LogSkaldBattle, Warning,
+           TEXT("Veil Step teleport failed for %s despite validation."),
+           *Fighter->GetHumanReadableName());
+    if (OutError) {
+      *OutError = NSLOCTEXT("SkaldAbilities", "VeilStepTeleportFailed",
+                             "Unable to teleport to that cell.");
+    }
+    return false;
+  }
+
+  return true;
+}
+
+void ASkaldPlayerController::ServerExecuteVeilStep_Implementation(
+    AFighterPawn *Fighter, ESkaldAbilitySlot Slot, FIntPoint TargetAnchor) {
+  FText Error;
+  if (!ExecuteVeilStepInternal(Fighter, Slot, TargetAnchor, &Error)) {
+    if (!Error.IsEmpty()) {
+      NotifyActionError(Error.ToString());
+    }
+  }
+}
+
+bool ASkaldPlayerController::HandleAbilityTargetingInput(
+    ESkaldAbilitySlot Slot) {
+  if (TryBeginSpecialAbilityTargeting(Slot)) {
+    return true;
+  }
+
+  if (!SelectedFighter) {
+    return false;
+  }
+
+  if (!IsFriendlyFighter(SelectedFighter)) {
+    const FText ErrorText = NSLOCTEXT(
+        "SkaldAbilities", "AbilityEnemyFighter",
+        "Cannot trigger abilities on enemy fighters.");
+    NotifyActionError(ErrorText.ToString());
+    return true;
+  }
+
+  USkaldAbilityComponent *AbilityComponent =
+      SelectedFighter->GetAbilityComponent();
+  if (!AbilityComponent) {
+    const FText ErrorText =
+        NSLOCTEXT("SkaldAbilities", "AbilityComponentMissing",
+                  "This fighter has no abilities configured.");
+    NotifyActionError(ErrorText.ToString());
+    return true;
+  }
+
+  const FSkaldAbilityState *State =
+      AbilityComponent->FindAbilityState(Slot);
+  if (!State || !State->Definition.IsValid()) {
+    return false;
+  }
+
+  const FSkaldAbilityTargetingInfo TargetingInfo =
+      GetAbilityTargetingInfo(State->Definition.AbilityId);
+  if (TargetingInfo.CommandMode == EBattleCommandMode::None) {
+    return false;
+  }
+
+  FText FailureReason;
+  if (!AbilityComponent->CanActivateAbility(Slot, &FailureReason)) {
+    if (!FailureReason.IsEmpty()) {
+      NotifyActionError(FailureReason.ToString());
+    }
+    return true;
+  }
+
+  if (!TryBeginAbilityCommand(SelectedFighter, Slot, TargetingInfo,
+                              State->Definition.AbilityId)) {
+    return true;
+  }
+
+  return true;
+}
+
+bool ASkaldPlayerController::TryBeginSpecialAbilityTargeting(
+    ESkaldAbilitySlot Slot) {
+  if (TryBeginVeilStepTargeting(Slot)) {
+    return true;
+  }
+
+  return false;
+}
+
+bool ASkaldPlayerController::TryBeginAbilityCommand(
+    AFighterPawn *Fighter, ESkaldAbilitySlot Slot,
+    const FSkaldAbilityTargetingInfo &Targeting, const FName AbilityId) {
+  if (!Fighter || Targeting.CommandMode == EBattleCommandMode::None) {
+    return false;
+  }
+
+  CancelCommandMode();
+
+  FPendingAbilityCommand Command;
+  Command.SourceFighter = Fighter;
+  Command.Slot = Slot;
+  Command.AbilityId = AbilityId;
+  Command.Targeting = Targeting;
+
+  PendingAbilityCommand = Command;
+  CurrentCommandMode = Targeting.CommandMode;
+
+  if (UGridOverlayComponent *Grid = FindGridOverlay()) {
+    HighlightAbilityCommandOptions(Command, Grid);
+  }
+
+  return true;
+}
+
+namespace {
+const FColor AbilityTargetHighlightColor(255, 196, 0, 215);
+}
+
+void ASkaldPlayerController::HighlightAbilityCommandOptions(
+    const FPendingAbilityCommand &Command,
+    UGridOverlayComponent *Grid) const {
+  if (!Grid) {
+    return;
+  }
+
+  Grid->ClearHighlights();
+
+  AFighterPawn *Source = Command.SourceFighter.Get();
+  if (!Source) {
+    return;
+  }
+
+  const int32 Range = Command.Targeting.RangeOverride == INDEX_NONE
+                           ? Source->Stats.AttackRange
+                           : Command.Targeting.RangeOverride;
+
+  if (Command.Targeting.CommandMode ==
+          EBattleCommandMode::AbilityTargetEnemy ||
+      Command.Targeting.CommandMode ==
+          EBattleCommandMode::AbilityTargetAlly) {
+    if (!CachedBattleManager.IsValid()) {
+      return;
+    }
+
+    const bool bTargetEnemy = Command.Targeting.CommandMode ==
+                              EBattleCommandMode::AbilityTargetEnemy;
+
+    const TArray<AFighterPawn *> Fighters =
+        CachedBattleManager->GetInitiativeOrderSnapshot();
+    for (AFighterPawn *Candidate : Fighters) {
+      if (!Candidate || Candidate == Source) {
+        continue;
+      }
+
+      const bool bIsEnemy = Candidate->Faction != Source->Faction;
+      if (bTargetEnemy != bIsEnemy) {
+        continue;
+      }
+
+      const int32 Distance = Source->GetFootprintDistanceToFighter(Candidate);
+      if (Range >= 0 && Distance > Range) {
+        continue;
+      }
+
+      const TArray<FIntPoint> Cells = Candidate->GetOccupiedCells();
+      for (const FIntPoint &Cell : Cells) {
+        Grid->HighlightCell(Cell, AbilityTargetHighlightColor, 0.f, false);
+      }
+    }
+    return;
+  }
+
+  if (Command.Targeting.CommandMode ==
+      EBattleCommandMode::AbilityTargetCell) {
+    const int32 GridWidth = Grid->GetWidth();
+    const int32 GridHeight = Grid->GetLength();
+    const FIntPoint StartCell = Source->GetCurrentCell();
+
+    for (int32 Y = 0; Y < GridHeight; ++Y) {
+      for (int32 X = 0; X < GridWidth; ++X) {
+        const FIntPoint Cell(X, Y);
+        const int32 Distance = Source->GetFootprintDistanceToCell(Cell);
+        if (Range >= 0 && Distance > Range) {
+          continue;
+        }
+
+        Grid->HighlightCell(Cell, AbilityTargetHighlightColor, 0.f, false);
+      }
+    }
+  }
+}
+
+FSkaldAbilityTargetingInfo ASkaldPlayerController::GetAbilityTargetingInfo(
+    FName AbilityId) const {
+  FSkaldAbilityTargetingInfo Info;
+
+  if (AbilityId == TEXT("Ability_Human_Skirmish") ||
+      AbilityId == TEXT("Ability_Orc_Skirmish") ||
+      AbilityId == TEXT("Ability_Inflicted_Skirmish") ||
+      AbilityId == TEXT("Ability_Ravpack_Skirmish") ||
+      AbilityId == TEXT("Ability_Orc_Line") ||
+      AbilityId == TEXT("Ability_Dwarf_Elite") ||
+      AbilityId == TEXT("Ability_Elf_Line") ||
+      AbilityId == TEXT("Ability_Undead_Line") ||
+      AbilityId == TEXT("Ability_Gnoll_Skirmish") ||
+      AbilityId == TEXT("Ability_Gnoll_Elite") ||
+      AbilityId == TEXT("Ability_Empire_Skirmish") ||
+      AbilityId == TEXT("Ability_Empire_Elite") ||
+      AbilityId == TEXT("Ability_Ravpack_Line")) {
+    Info.CommandMode = EBattleCommandMode::AbilityTargetEnemy;
+    return Info;
+  }
+
+  if (AbilityId == TEXT("Ability_Elf_Elite")) {
+    Info.CommandMode = EBattleCommandMode::AbilityTargetEnemy;
+    Info.RangeOverride = 8;
+    return Info;
+  }
+
+  if (AbilityId == TEXT("Ability_Undead_Skirmish")) {
+    Info.CommandMode = EBattleCommandMode::AbilityTargetEnemy;
+    Info.RangeOverride = 3;
+    return Info;
+  }
+
+  return Info;
+}
+
+bool ASkaldPlayerController::ValidateAbilityTargetFighter(
+    const FPendingAbilityCommand &Command, AFighterPawn *Target,
+    FText &OutError) const {
+  OutError = FText::GetEmpty();
+
+  AFighterPawn *Source = Command.SourceFighter.Get();
+  if (!Source || !Target) {
+    OutError = NSLOCTEXT("SkaldAbilities", "AbilityNoSelection",
+                         "Select a fighter before using abilities.");
+    return false;
+  }
+
+  if (Target == Source && !Command.Targeting.bAllowSelfTarget) {
+    OutError = NSLOCTEXT("SkaldAbilities", "AbilitySelfInvalid",
+                         "Cannot target the source fighter with this ability.");
+    return false;
+  }
+
+  const bool bExpectEnemy = Command.Targeting.CommandMode ==
+                            EBattleCommandMode::AbilityTargetEnemy;
+  const bool bIsEnemy = Target->Faction != Source->Faction;
+  if (bExpectEnemy != bIsEnemy) {
+    OutError = bExpectEnemy
+                   ? NSLOCTEXT("SkaldAbilities", "AbilityEnemyRequired",
+                               "Select an enemy fighter.")
+                   : NSLOCTEXT("SkaldAbilities", "AbilityAllyRequired",
+                               "Select a friendly fighter.");
+    return false;
+  }
+
+  const int32 Range = Command.Targeting.RangeOverride == INDEX_NONE
+                          ? Source->Stats.AttackRange
+                          : Command.Targeting.RangeOverride;
+  const int32 Distance = Source->GetFootprintDistanceToFighter(Target);
+  if (Range >= 0 && Distance > Range) {
+    OutError = NSLOCTEXT("SkaldAbilities", "AbilityTargetOutOfRange",
+                         "Target is out of range.");
+    return false;
+  }
+
+  if (Command.Targeting.bRequireLineOfSight) {
+    UGridOverlayComponent *Grid = Source->GetGrid();
+    if (Grid && !Source->HasLineOfSightToFighter(Target, Range, Grid)) {
+      OutError = NSLOCTEXT("SkaldAbilities", "AbilityRequiresLineOfSight",
+                           "No line of sight to target.");
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool ASkaldPlayerController::ValidateAbilityTargetCell(
+    const FPendingAbilityCommand &Command, const FIntPoint &Cell,
+    FText &OutError) const {
+  OutError = FText::GetEmpty();
+
+  AFighterPawn *Source = Command.SourceFighter.Get();
+  if (!Source) {
+    OutError = NSLOCTEXT("SkaldAbilities", "AbilityNoSelection",
+                         "Select a fighter before using abilities.");
+    return false;
+  }
+
+  UGridOverlayComponent *Grid = Source->GetGrid();
+  if (!Grid || !Grid->IsCellInBounds(Cell)) {
+    OutError = NSLOCTEXT("SkaldAbilities", "AbilityCellInvalid",
+                         "Select a valid cell on the grid.");
+    return false;
+  }
+
+  const int32 Range = Command.Targeting.RangeOverride == INDEX_NONE
+                          ? Source->Stats.AttackRange
+                          : Command.Targeting.RangeOverride;
+  const int32 Distance = Source->GetFootprintDistanceToCell(Cell);
+  if (Range >= 0 && Distance > Range) {
+    OutError = NSLOCTEXT("SkaldAbilities", "AbilityTargetOutOfRange",
+                         "Target is out of range.");
+    return false;
+  }
+
+  if (Command.Targeting.bRequireLineOfSight) {
+    const TArray<FIntPoint> SourceCells = Source->GetOccupiedCells();
+    bool bHasLine = false;
+    for (const FIntPoint &SourceCell : SourceCells) {
+      if (Grid->HasLineOfSight(SourceCell, Cell)) {
+        bHasLine = true;
+        break;
+      }
+    }
+
+    if (!bHasLine) {
+      OutError = NSLOCTEXT("SkaldAbilities", "AbilityRequiresLineOfSight",
+                           "No line of sight to target.");
+      return false;
+    }
+  }
+
+  if (!Command.Targeting.bAllowEmptyCell && !Grid->IsOccupied(Cell)) {
+    OutError = NSLOCTEXT("SkaldAbilities", "AbilityRequiresTarget",
+                         "Select an occupied cell.");
+    return false;
+  }
+
+  return true;
+}
+
+bool ASkaldPlayerController::ExecuteAbilityCommandInternal(
+    const FPendingAbilityCommand &Command, AFighterPawn *TargetFighter,
+    const FIntPoint *TargetCell, FText *OutError) {
+  AFighterPawn *Source = Command.SourceFighter.Get();
+  if (!Source) {
+    if (OutError) {
+      *OutError = NSLOCTEXT("SkaldAbilities", "AbilityNoSelection",
+                             "Select a fighter before using abilities.");
+    }
+    return false;
+  }
+
+  USkaldAbilityComponent *AbilityComponent = Source->GetAbilityComponent();
+  if (!AbilityComponent) {
+    if (OutError) {
+      *OutError = NSLOCTEXT("SkaldAbilities", "AbilityComponentMissing",
+                             "This fighter has no abilities configured.");
+    }
+    return false;
+  }
+
+  const FSkaldAbilityState *State =
+      AbilityComponent->FindAbilityState(Command.Slot);
+  if (!State || !State->Definition.IsValid() ||
+      State->Definition.AbilityId != Command.AbilityId) {
+    if (OutError) {
+      *OutError = NSLOCTEXT("SkaldAbilities", "AbilityUnavailable",
+                             "No ability is assigned to that slot.");
+    }
+    return false;
+  }
+
+  FText FailureReason;
+  if (!AbilityComponent->CanActivateAbility(Command.Slot, &FailureReason)) {
+    if (OutError) {
+      *OutError = FailureReason;
+    }
+    return false;
+  }
+
+  if (Command.Targeting.CommandMode ==
+          EBattleCommandMode::AbilityTargetEnemy ||
+      Command.Targeting.CommandMode ==
+          EBattleCommandMode::AbilityTargetAlly) {
+    if (!TargetFighter) {
+      if (OutError) {
+        *OutError = NSLOCTEXT("SkaldAbilities", "AbilityRequiresTarget",
+                               "Select a valid target.");
+      }
+      return false;
+    }
+
+    if (!ValidateAbilityTargetFighter(Command, TargetFighter, FailureReason)) {
+      if (OutError) {
+        *OutError = FailureReason;
+      }
+      return false;
+    }
+
+    if (!TryExecuteAbilityOnFighter(Source, Command.Slot, TargetFighter,
+                                    FailureReason)) {
+      if (OutError) {
+        *OutError = FailureReason;
+      }
+      return false;
+    }
+
+    return true;
+  }
+
+  if (Command.Targeting.CommandMode ==
+      EBattleCommandMode::AbilityTargetCell) {
+    if (!TargetCell) {
+      if (OutError) {
+        *OutError = NSLOCTEXT("SkaldAbilities", "AbilityRequiresTarget",
+                               "Select a valid target.");
+      }
+      return false;
+    }
+
+    if (!ValidateAbilityTargetCell(Command, *TargetCell, FailureReason)) {
+      if (OutError) {
+        *OutError = FailureReason;
+      }
+      return false;
+    }
+
+    if (!TryExecuteAbilityAtCell(Source, Command.Slot, *TargetCell,
+                                 FailureReason)) {
+      if (OutError) {
+        *OutError = FailureReason;
+      }
+      return false;
+    }
+
+    return true;
+  }
+
+  if (OutError) {
+    *OutError = NSLOCTEXT("SkaldAbilities", "AbilityUnsupported",
+                           "Ability targeting not supported.");
+  }
+  return false;
+}
+
+void ASkaldPlayerController::ServerExecuteAbilityOnFighter_Implementation(
+    AFighterPawn *Source, ESkaldAbilitySlot Slot, AFighterPawn *Target) {
+  if (!Source) {
+    return;
+  }
+
+  FSkaldAbilityTargetingInfo Targeting =
+      GetAbilityTargetingInfo(FName());
+
+  if (USkaldAbilityComponent *AbilityComponent = Source->GetAbilityComponent()) {
+    if (const FSkaldAbilityState *State =
+            AbilityComponent->FindAbilityState(Slot)) {
+      Targeting = GetAbilityTargetingInfo(State->Definition.AbilityId);
+      FPendingAbilityCommand Command;
+      Command.SourceFighter = Source;
+      Command.Slot = Slot;
+      Command.AbilityId = State->Definition.AbilityId;
+      Command.Targeting = Targeting;
+
+      FText Error;
+      if (!ExecuteAbilityCommandInternal(Command, Target, nullptr, &Error)) {
+        if (!Error.IsEmpty()) {
+          NotifyActionError(Error.ToString());
+        }
+      }
+    }
+  }
+}
+
+void ASkaldPlayerController::ServerExecuteAbilityAtCell_Implementation(
+    AFighterPawn *Source, ESkaldAbilitySlot Slot, FIntPoint Target) {
+  if (!Source) {
+    return;
+  }
+
+  if (USkaldAbilityComponent *AbilityComponent = Source->GetAbilityComponent()) {
+    if (const FSkaldAbilityState *State =
+            AbilityComponent->FindAbilityState(Slot)) {
+      FPendingAbilityCommand Command;
+      Command.SourceFighter = Source;
+      Command.Slot = Slot;
+      Command.AbilityId = State->Definition.AbilityId;
+      Command.Targeting = GetAbilityTargetingInfo(State->Definition.AbilityId);
+
+      FText Error;
+      if (!ExecuteAbilityCommandInternal(Command, nullptr, &Target, &Error)) {
+        if (!Error.IsEmpty()) {
+          NotifyActionError(Error.ToString());
+        }
+      }
+    }
+  }
+}
+
+bool ASkaldPlayerController::TryExecuteAbilityOnFighter(
+    AFighterPawn *Source, ESkaldAbilitySlot Slot, AFighterPawn *Target,
+    FText &OutError) {
+  OutError = FText::GetEmpty();
+
+  if (!Source || !Target) {
+    OutError = NSLOCTEXT("SkaldAbilities", "AbilityRequiresTarget",
+                         "Select a valid target.");
+    return false;
+  }
+
+  USkaldAbilityComponent *AbilityComponent = Source->GetAbilityComponent();
+  if (!AbilityComponent) {
+    OutError = NSLOCTEXT("SkaldAbilities", "AbilityComponentMissing",
+                         "This fighter has no abilities configured.");
+    return false;
+  }
+
+  FText FailureReason;
+  if (!AbilityComponent->TryBeginAbility(Slot, FailureReason)) {
+    OutError = FailureReason;
+    return false;
+  }
+
+  const FSkaldAbilityState *State =
+      AbilityComponent->FindAbilityState(Slot);
+  if (State &&
+      State->Definition.CostType == ESkaldAbilityCostType::Action) {
+    Source->TryRestoreAction();
+  }
+
+  Source->PerformAttack(Target);
+
+  if (State && State->Definition.AbilityId == TEXT("Ability_Elf_Line")) {
+    Source->TryRestoreAction();
+  }
+  return true;
+}
+
+bool ASkaldPlayerController::TryExecuteAbilityAtCell(AFighterPawn *Source,
+                                                     ESkaldAbilitySlot Slot,
+                                                     const FIntPoint &Cell,
+                                                     FText &OutError) {
+  OutError = NSLOCTEXT("SkaldAbilities", "AbilityUnsupported",
+                       "Ability does not support ground targeting.");
+  return false;
 }
 
 void ASkaldPlayerController::InitializeHUDWidget() {
@@ -3048,6 +3830,42 @@ void ASkaldPlayerController::HandleGridClick() {
     UpdateBattleHUDButtons();
     break;
   }
+  case EBattleCommandMode::VeilStep: {
+    if (!PendingVeilStepFighter.IsValid() || !PendingVeilStepSlot.IsSet()) {
+      CancelCommandMode();
+      break;
+    }
+
+    AFighterPawn *VeilStepFighter = PendingVeilStepFighter.Get();
+    FIntPoint TargetAnchor = Cell;
+    bool bHasValidAnchor =
+        FindBestVeilStepAnchor(VeilStepFighter, Grid, Cell, TargetAnchor);
+
+    if (bHasValidAnchor) {
+      if (HasAuthority()) {
+        FText Error;
+        if (!ExecuteVeilStepInternal(VeilStepFighter,
+                                     PendingVeilStepSlot.GetValue(),
+                                     TargetAnchor, &Error)) {
+          if (!Error.IsEmpty()) {
+            NotifyActionError(Error.ToString());
+          }
+        }
+      } else {
+        ServerExecuteVeilStep(VeilStepFighter,
+                              PendingVeilStepSlot.GetValue(), TargetAnchor);
+      }
+    } else {
+      const FText ErrorText = NSLOCTEXT(
+          "SkaldAbilities", "VeilStepInvalidDestination",
+          "Select a visible empty tile within 3 squares.");
+      NotifyActionError(ErrorText.ToString());
+    }
+
+    CancelCommandMode();
+    UpdateBattleHUDButtons();
+    break;
+  }
   case EBattleCommandMode::Attack: {
     if (!LockedActiveFighter) {
       CancelCommandMode();
@@ -3118,6 +3936,72 @@ void ASkaldPlayerController::HandleGridClick() {
       LockedActiveFighter->PerformAttack(TargetPawn);
     }
     CancelCommandMode();
+    UpdateBattleHUDButtons();
+    break;
+  }
+  case EBattleCommandMode::AbilityTargetEnemy:
+  case EBattleCommandMode::AbilityTargetAlly:
+  case EBattleCommandMode::AbilityTargetCell: {
+    if (!PendingAbilityCommand.IsSet()) {
+      CancelCommandMode();
+      break;
+    }
+
+    const FPendingAbilityCommand &Command = PendingAbilityCommand.GetValue();
+    AFighterPawn *Source = Command.SourceFighter.Get();
+    if (!Source) {
+      CancelCommandMode();
+      break;
+    }
+
+    if (CurrentCommandMode == EBattleCommandMode::AbilityTargetCell) {
+      FText Error;
+      if (!ValidateAbilityTargetCell(Command, Cell, Error)) {
+        if (!Error.IsEmpty()) {
+          NotifyActionError(Error.ToString());
+        }
+        break;
+      }
+
+      if (HasAuthority()) {
+        FText ServerError;
+        if (!ExecuteAbilityCommandInternal(Command, nullptr, &Cell,
+                                           &ServerError)) {
+          if (!ServerError.IsEmpty()) {
+            NotifyActionError(ServerError.ToString());
+          }
+        }
+      } else {
+        ServerExecuteAbilityAtCell(Source, Command.Slot, Cell);
+      }
+
+      CancelAbilityCommand();
+      UpdateBattleHUDButtons();
+      break;
+    }
+
+    AFighterPawn *TargetFighter = CellFighter;
+    FText Error;
+    if (!ValidateAbilityTargetFighter(Command, TargetFighter, Error)) {
+      if (!Error.IsEmpty()) {
+        NotifyActionError(Error.ToString());
+      }
+      break;
+    }
+
+    if (HasAuthority()) {
+      FText ServerError;
+      if (!ExecuteAbilityCommandInternal(Command, TargetFighter, nullptr,
+                                         &ServerError)) {
+        if (!ServerError.IsEmpty()) {
+          NotifyActionError(ServerError.ToString());
+        }
+      }
+    } else {
+      ServerExecuteAbilityOnFighter(Source, Command.Slot, TargetFighter);
+    }
+
+    CancelAbilityCommand();
     UpdateBattleHUDButtons();
     break;
   }
@@ -3764,11 +4648,33 @@ void ASkaldPlayerController::ClientHidePrepareForBattle_Implementation() {
 
 void ASkaldPlayerController::CancelCommandMode() {
   CurrentCommandMode = EBattleCommandMode::None;
+  PendingVeilStepSlot.Reset();
+  PendingVeilStepFighter.Reset();
+  PendingAbilityCommand.Reset();
   if (UGridOverlayComponent *Grid = FindGridOverlay()) {
     Grid->ClearHighlights();
   }
   if (BattleHudWidget) {
     BattleHudWidget->ClearCommandPreviews();
+  }
+}
+
+void ASkaldPlayerController::CancelAbilityCommand() {
+  const bool bWasAbilityCommand =
+      CurrentCommandMode == EBattleCommandMode::AbilityTargetEnemy ||
+      CurrentCommandMode == EBattleCommandMode::AbilityTargetAlly ||
+      CurrentCommandMode == EBattleCommandMode::AbilityTargetCell;
+
+  PendingAbilityCommand.Reset();
+
+  if (!bWasAbilityCommand) {
+    return;
+  }
+
+  CurrentCommandMode = EBattleCommandMode::None;
+
+  if (UGridOverlayComponent *Grid = FindGridOverlay()) {
+    Grid->ClearHighlights();
   }
 }
 

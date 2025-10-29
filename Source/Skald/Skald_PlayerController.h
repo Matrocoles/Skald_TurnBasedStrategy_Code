@@ -10,6 +10,7 @@
 #include "Delegates/Delegate.h"
 #include "Camera/CameraShakeBase.h"
 #include "UObject/WeakObjectPtr.h"
+#include "Templates/Optional.h"
 #include "Skald_PlayerController.generated.h"
 
 class ATurnManager;
@@ -28,6 +29,7 @@ class USkaldGameInstance;
 class UFighterSelectionWidget;
 class AWorldMap;
 class AFighterPawn;
+class USkaldAbilityComponent;
 class AActor;
 class UGridOverlayComponent;
 class UWorld;
@@ -39,7 +41,30 @@ class ASkald_PlayerCharacter;
 
 /** Command issued by the player during a battle. */
 UENUM()
-enum class EBattleCommandMode : uint8 { None, Move, Attack };
+enum class EBattleCommandMode : uint8 {
+  None,
+  Move,
+  Attack,
+  VeilStep,
+  AbilityTargetEnemy,
+  AbilityTargetAlly,
+  AbilityTargetCell
+};
+
+struct FSkaldAbilityTargetingInfo {
+  EBattleCommandMode CommandMode = EBattleCommandMode::None;
+  int32 RangeOverride = INDEX_NONE;
+  bool bRequireLineOfSight = true;
+  bool bAllowSelfTarget = false;
+  bool bAllowEmptyCell = false;
+};
+
+struct FPendingAbilityCommand {
+  TWeakObjectPtr<AFighterPawn> SourceFighter;
+  ESkaldAbilitySlot Slot = ESkaldAbilitySlot::Ability1;
+  FName AbilityId = NAME_None;
+  FSkaldAbilityTargetingInfo Targeting;
+};
 
 /**
  * Player controller capable of participating in turn based gameplay.
@@ -768,6 +793,54 @@ private:
   void HandleLockedInEntrySelected(AFighterPawn *Fighter);
   UFUNCTION()
   void HandleTrackedFighterDestroyed(AActor *DestroyedActor);
+  bool TryBeginVeilStepTargeting(ESkaldAbilitySlot Slot);
+  bool IsVeilStepAbility(const USkaldAbilityComponent *AbilityComp,
+                         ESkaldAbilitySlot Slot) const;
+  void BeginVeilStepTargeting(AFighterPawn *Fighter, ESkaldAbilitySlot Slot);
+  void HighlightVeilStepOptions(AFighterPawn *Fighter,
+                                UGridOverlayComponent *Grid) const;
+  bool FindBestVeilStepAnchor(AFighterPawn *Fighter, UGridOverlayComponent *Grid,
+                              const FIntPoint &ClickedCell,
+                              FIntPoint &OutAnchor) const;
+  bool IsVeilStepDestinationValid(AFighterPawn *Fighter,
+                                  UGridOverlayComponent *Grid,
+                                  const FIntPoint &Anchor) const;
+  bool ExecuteVeilStepInternal(AFighterPawn *Fighter, ESkaldAbilitySlot Slot,
+                               const FIntPoint &TargetAnchor, FText *OutError);
+  UFUNCTION(Server, Reliable)
+  void ServerExecuteVeilStep(AFighterPawn *Fighter, ESkaldAbilitySlot Slot,
+                             FIntPoint TargetAnchor);
+  void CancelAbilityCommand();
+  bool TryBeginAbilityCommand(AFighterPawn *Fighter, ESkaldAbilitySlot Slot,
+                              const FSkaldAbilityTargetingInfo &Targeting,
+                              const FName AbilityId);
+  void HighlightAbilityCommandOptions(const FPendingAbilityCommand &Command,
+                                      UGridOverlayComponent *Grid) const;
+  bool ValidateAbilityTargetCell(const FPendingAbilityCommand &Command,
+                                 const FIntPoint &Cell,
+                                 FText &OutError) const;
+  bool ValidateAbilityTargetFighter(const FPendingAbilityCommand &Command,
+                                    AFighterPawn *Target,
+                                    FText &OutError) const;
+  FSkaldAbilityTargetingInfo GetAbilityTargetingInfo(FName AbilityId) const;
+  bool ExecuteAbilityCommandInternal(const FPendingAbilityCommand &Command,
+                                     AFighterPawn *TargetFighter,
+                                     const FIntPoint *TargetCell,
+                                     FText *OutError);
+  UFUNCTION(Server, Reliable)
+  void ServerExecuteAbilityOnFighter(AFighterPawn *Source,
+                                     ESkaldAbilitySlot Slot,
+                                     AFighterPawn *Target);
+  UFUNCTION(Server, Reliable)
+  void ServerExecuteAbilityAtCell(AFighterPawn *Source,
+                                  ESkaldAbilitySlot Slot, FIntPoint Target);
+  bool TryBeginSpecialAbilityTargeting(ESkaldAbilitySlot Slot);
+  bool HandleAbilityTargetingInput(ESkaldAbilitySlot Slot);
+  bool TryExecuteAbilityOnFighter(AFighterPawn *Source,
+                                  ESkaldAbilitySlot Slot,
+                                  AFighterPawn *Target, FText &OutError);
+  bool TryExecuteAbilityAtCell(AFighterPawn *Source, ESkaldAbilitySlot Slot,
+                               const FIntPoint &Cell, FText &OutError);
   bool IsFriendlyFighter(const AFighterPawn *Fighter) const;
   void DetermineControlledBattleSide();
   void TryDispatchPendingAttackPresentationNotifications();
@@ -778,6 +851,11 @@ private:
 
   UPROPERTY()
   TObjectPtr<AFighterPawn> LockedActiveFighter;
+
+  /** Cached state when targeting Veil Step destinations. */
+  TOptional<ESkaldAbilitySlot> PendingVeilStepSlot;
+  TWeakObjectPtr<AFighterPawn> PendingVeilStepFighter;
+  TOptional<FPendingAbilityCommand> PendingAbilityCommand;
 
   /** Friendly fighters tracked for HUD list synchronization. */
   TSet<TWeakObjectPtr<AFighterPawn>> ObservedFriendlyFighters;

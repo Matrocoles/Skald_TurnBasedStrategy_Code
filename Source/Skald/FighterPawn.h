@@ -72,6 +72,10 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Fighter")
   void MoveToCell(FIntPoint TargetCell);
 
+  /** Teleport to a target grid cell without consuming additional actions. */
+  bool TryTeleportToCell(FIntPoint TargetCell, int32 MaxDistance,
+                         bool bRequireLineOfSight);
+
   /** Units per second used when travelling between grid cells. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Movement",
             meta = (ClampMin = "0.0"))
