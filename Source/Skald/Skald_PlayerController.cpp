@@ -743,6 +743,11 @@ void ASkaldPlayerController::HighlightAbilityCommandOptions(
           continue;
         }
 
+        if (Command.AbilityId == TEXT("Ability_Ravpack_Line") &&
+            Grid->HasTrapMarker(Cell)) {
+          continue;
+        }
+
         Grid->HighlightCell(Cell, AbilityTargetHighlightColor, 0.f, false);
       }
     }
@@ -756,6 +761,8 @@ FSkaldAbilityTargetingInfo ASkaldPlayerController::GetAbilityTargetingInfo(
   struct FAbilityTargetingPreset {
     EBattleCommandMode CommandMode = EBattleCommandMode::None;
     int32 RangeOverride = INDEX_NONE;
+    bool bRequireLineOfSight = true;
+    bool bAllowEmptyCell = false;
   };
 
   // Maintain the per-ability targeting defaults in a single table so we can
@@ -764,26 +771,40 @@ FSkaldAbilityTargetingInfo ASkaldPlayerController::GetAbilityTargetingInfo(
   // (8 tiles) and Grave Grasp (3 tiles) are the only abilities whose selection
   // range exceeds their standard attack stat.
   static const TMap<FName, FAbilityTargetingPreset> TargetingPresets = {
-      {TEXT("Ability_Human_Skirmish"), {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
-      {TEXT("Ability_Orc_Skirmish"), {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
-      {TEXT("Ability_Inflicted_Skirmish"), {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
-      {TEXT("Ability_Ravpack_Skirmish"), {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
+      {TEXT("Ability_Human_Skirmish"),
+       {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
+      {TEXT("Ability_Orc_Skirmish"),
+       {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
+      {TEXT("Ability_Inflicted_Skirmish"),
+       {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
+      {TEXT("Ability_Ravpack_Skirmish"),
+       {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
       {TEXT("Ability_Orc_Line"), {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
-      {TEXT("Ability_Dwarf_Elite"), {EBattleCommandMode::AbilityTargetEnemy, 6}},
+      {TEXT("Ability_Dwarf_Elite"),
+       {EBattleCommandMode::AbilityTargetEnemy, 6}},
       {TEXT("Ability_Elf_Line"), {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
-      {TEXT("Ability_Undead_Line"), {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
-      {TEXT("Ability_Gnoll_Skirmish"), {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
-      {TEXT("Ability_Gnoll_Elite"), {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
-      {TEXT("Ability_Empire_Skirmish"), {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
-      {TEXT("Ability_Empire_Elite"), {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
-      {TEXT("Ability_Ravpack_Line"), {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
+      {TEXT("Ability_Undead_Line"),
+       {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
+      {TEXT("Ability_Gnoll_Skirmish"),
+       {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
+      {TEXT("Ability_Gnoll_Elite"),
+       {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
+      {TEXT("Ability_Empire_Skirmish"),
+       {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
+      {TEXT("Ability_Empire_Elite"),
+       {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
+      {TEXT("Ability_Ravpack_Line"),
+       {EBattleCommandMode::AbilityTargetCell, 1, true, true}},
       {TEXT("Ability_Elf_Elite"), {EBattleCommandMode::AbilityTargetEnemy, 8}},
-      {TEXT("Ability_Undead_Skirmish"), {EBattleCommandMode::AbilityTargetEnemy, 3}},
+      {TEXT("Ability_Undead_Skirmish"),
+       {EBattleCommandMode::AbilityTargetEnemy, 3}},
   };
 
   if (const FAbilityTargetingPreset *Preset = TargetingPresets.Find(AbilityId)) {
     Info.CommandMode = Preset->CommandMode;
     Info.RangeOverride = Preset->RangeOverride;
+    Info.bRequireLineOfSight = Preset->bRequireLineOfSight;
+    Info.bAllowEmptyCell = Preset->bAllowEmptyCell;
     return Info;
   }
 
@@ -892,6 +913,20 @@ bool ASkaldPlayerController::ValidateAbilityTargetCell(
     OutError = NSLOCTEXT("SkaldAbilities", "AbilityRequiresTarget",
                          "Select an occupied cell.");
     return false;
+  }
+
+  if (Command.AbilityId == TEXT("Ability_Ravpack_Line")) {
+    if (Grid->IsOccupied(Cell)) {
+      OutError = NSLOCTEXT("SkaldAbilities", "AbilityTrapCellOccupied",
+                           "That tile is already occupied.");
+      return false;
+    }
+
+    if (Grid->HasTrapMarker(Cell)) {
+      OutError = NSLOCTEXT("SkaldAbilities", "AbilityTrapCellBlocked",
+                           "A trap already covers that tile.");
+      return false;
+    }
   }
 
   return true;
@@ -1099,9 +1134,46 @@ bool ASkaldPlayerController::TryExecuteAbilityAtCell(AFighterPawn *Source,
                                                      ESkaldAbilitySlot Slot,
                                                      const FIntPoint &Cell,
                                                      FText &OutError) {
-  OutError = NSLOCTEXT("SkaldAbilities", "AbilityUnsupported",
-                       "Ability does not support ground targeting.");
-  return false;
+  OutError = FText::GetEmpty();
+
+  if (!Source) {
+    OutError = NSLOCTEXT("SkaldAbilities", "AbilityRequiresTarget",
+                         "Select a valid target.");
+    return false;
+  }
+
+  USkaldAbilityComponent *AbilityComponent = Source->GetAbilityComponent();
+  if (!AbilityComponent) {
+    OutError = NSLOCTEXT("SkaldAbilities", "AbilityComponentMissing",
+                         "This fighter has no abilities configured.");
+    return false;
+  }
+
+  const FSkaldAbilityState *State = AbilityComponent->FindAbilityState(Slot);
+  if (!State || !State->Definition.IsValid()) {
+    OutError = NSLOCTEXT("SkaldAbilities", "AbilityUnavailable",
+                         "No ability is assigned to that slot.");
+    return false;
+  }
+
+  const FName AbilityId = State->Definition.AbilityId;
+  const bool bHasPendingTrap = AbilityComponent->HasPendingTrapForAbility(AbilityId);
+
+  if (!bHasPendingTrap) {
+    FText FailureReason;
+    if (!AbilityComponent->TryBeginAbility(Slot, FailureReason)) {
+      OutError = FailureReason;
+      return false;
+    }
+  }
+
+  FText PlacementError;
+  if (!AbilityComponent->DeployTrapAtCell(Cell, AbilityId, PlacementError)) {
+    OutError = PlacementError;
+    return false;
+  }
+
+  return true;
 }
 
 void ASkaldPlayerController::InitializeHUDWidget() {

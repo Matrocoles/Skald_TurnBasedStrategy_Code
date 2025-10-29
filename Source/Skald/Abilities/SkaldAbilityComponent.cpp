@@ -9,6 +9,7 @@
 #include "Engine/DataTable.h"
 #include "FighterPawn.h"
 #include "GridBattleManager.h"
+#include "GridOverlayComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
 #include "NiagaraFunctionLibrary.h"
@@ -65,7 +66,6 @@ USkaldAbilityComponent::USkaldAbilityComponent()
     bSuppressingFireActive = false;
     bRendAndTearActive = false;
     bArtilleryStrikePending = false;
-    bJuryRiggedExplosiveActive = false;
 
     SlotOrder = {ESkaldAbilitySlot::Ability1, ESkaldAbilitySlot::Ability2, ESkaldAbilitySlot::Ability3};
 }
@@ -84,6 +84,7 @@ void USkaldAbilityComponent::BeginPlay()
 
 void USkaldAbilityComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+    ClearAllTraps();
     RemoveBattleDelegates();
     Super::EndPlay(EndPlayReason);
 }
@@ -105,6 +106,7 @@ void USkaldAbilityComponent::RefreshAbilityLoadout(const FFighterStats& InStats,
         CachedFighter = Cast<AFighterPawn>(GetOwner());
     }
 
+    ClearAllTraps();
     AbilitySlots.Empty();
     bApplyViralLashOnNextAttack = false;
     bApplyScrapperFeintOnNextMiss = false;
@@ -207,10 +209,28 @@ void USkaldAbilityComponent::HandleRoundStarted()
     bSuppressingFireActive = false;
     bRendAndTearActive = false;
     bArtilleryStrikePending = false;
-    bJuryRiggedExplosiveActive = false;
 
     if (GetOwnerRole() == ROLE_Authority)
     {
+        for (int32 TrapIndex = ActiveTraps.Num() - 1; TrapIndex >= 0; --TrapIndex)
+        {
+            FSkaldAbilityTrapState& Trap = ActiveTraps[TrapIndex];
+            if (Trap.bPendingPlacement)
+            {
+                continue;
+            }
+
+            if (Trap.RoundsRemaining > 0)
+            {
+                --Trap.RoundsRemaining;
+                if (Trap.RoundsRemaining <= 0)
+                {
+                    RemoveTrapAtIndex(TrapIndex);
+                    continue;
+                }
+            }
+        }
+
         RemoveExpiredModifiers(ESkaldAbilityModifierPhase::RoundStart);
     }
     UpdateReplicatedAbilitySlots();
@@ -237,7 +257,6 @@ void USkaldAbilityComponent::HandleActivationStarted()
     bSuppressingFireActive = false;
     bRendAndTearActive = false;
     bArtilleryStrikePending = false;
-    bJuryRiggedExplosiveActive = false;
     if (GetOwnerRole() == ROLE_Authority)
     {
         RemoveExpiredModifiers(ESkaldAbilityModifierPhase::ActivationStart);
@@ -272,7 +291,6 @@ void USkaldAbilityComponent::HandleActivationFinished()
         bSuppressingFireActive = false;
         bRendAndTearActive = false;
         bArtilleryStrikePending = false;
-        bJuryRiggedExplosiveActive = false;
     }
     BroadcastStateChanged();
 }
@@ -489,9 +507,15 @@ bool USkaldAbilityComponent::CanTriggerAbility(const FSkaldAbilityState& State, 
 void USkaldAbilityComponent::HandleAbilityTriggeredLocal(const FSkaldAbilityDefinition& Definition)
 {
     PlayAbilityFeedback(Definition);
-    if (GetOwnerRole() == ROLE_Authority)
+    const bool bShouldApplyEffects = (GetOwnerRole() == ROLE_Authority) && !bSuppressAbilityEffectOnNextTrigger;
+    if (bShouldApplyEffects)
     {
         ApplyAbilityEffects(Definition);
+    }
+
+    if (bSuppressAbilityEffectOnNextTrigger)
+    {
+        bSuppressAbilityEffectOnNextTrigger = false;
     }
     OnAbilityTriggered.Broadcast(this, Definition);
 }
@@ -499,6 +523,32 @@ void USkaldAbilityComponent::HandleAbilityTriggeredLocal(const FSkaldAbilityDefi
 void USkaldAbilityComponent::MulticastAbilityTriggered_Implementation(const FSkaldAbilityDefinition& Definition)
 {
     HandleAbilityTriggeredLocal(Definition);
+}
+
+void USkaldAbilityComponent::MulticastTrapPlaced_Implementation(const FIntPoint& Cell)
+{
+    if (GetOwnerRole() == ROLE_Authority)
+    {
+        return;
+    }
+
+    SpawnTrapVisualAtCell(Cell);
+}
+
+void USkaldAbilityComponent::MulticastTrapRemoved_Implementation(const FIntPoint& Cell)
+{
+    if (GetOwnerRole() == ROLE_Authority)
+    {
+        return;
+    }
+
+    if (AFighterPawn* OwnerFighter = CachedFighter.Get())
+    {
+        if (UGridOverlayComponent* Grid = OwnerFighter->GetGrid())
+        {
+            Grid->RemoveTrapMarker(Cell);
+        }
+    }
 }
 
 void USkaldAbilityComponent::PlayAbilityFeedback(const FSkaldAbilityDefinition& Definition)
@@ -1165,7 +1215,17 @@ void USkaldAbilityComponent::ApplyAbilityEffects(const FSkaldAbilityDefinition& 
     {
         if (GetOwnerRole() == ROLE_Authority)
         {
-            bJuryRiggedExplosiveActive = true;
+            AFighterPawn* OwnerFighter = CachedFighter.Get();
+            if (OwnerFighter)
+            {
+                FSkaldAbilityTrapState TrapState;
+                TrapState.SourceAbilityId = Definition.AbilityId;
+                TrapState.AbilityDefinition = Definition;
+                TrapState.RoundsRemaining = 2;
+                TrapState.Damage = OwnerFighter->Stats.AttackDamage + OwnerFighter->Stats.CriticalBonusDamage;
+                TrapState.bPendingPlacement = true;
+                ActiveTraps.Add(MoveTemp(TrapState));
+            }
         }
     }
 }
@@ -1201,6 +1261,92 @@ void USkaldAbilityComponent::RemoveActiveModifier(int32 Index)
 
     ApplyStatDeltaToOwner(ActiveModifiers[Index].Delta, false);
     ActiveModifiers.RemoveAtSwap(Index);
+}
+
+int32 USkaldAbilityComponent::FindPendingTrapIndex(FName AbilityId) const
+{
+    for (int32 Index = ActiveTraps.Num() - 1; Index >= 0; --Index)
+    {
+        const FSkaldAbilityTrapState& Trap = ActiveTraps[Index];
+        if (!Trap.bPendingPlacement)
+        {
+            continue;
+        }
+
+        if (!AbilityId.IsNone() && Trap.SourceAbilityId != AbilityId)
+        {
+            continue;
+        }
+
+        return Index;
+    }
+
+    return INDEX_NONE;
+}
+
+void USkaldAbilityComponent::RemoveTrapAtIndex(int32 Index)
+{
+    if (GetOwnerRole() != ROLE_Authority)
+    {
+        return;
+    }
+
+    if (!ActiveTraps.IsValidIndex(Index))
+    {
+        return;
+    }
+
+    const FSkaldAbilityTrapState TrapCopy = ActiveTraps[Index];
+
+    if (AFighterPawn* OwnerFighter = CachedFighter.Get())
+    {
+        if (UGridOverlayComponent* Grid = OwnerFighter->GetGrid())
+        {
+            if (TrapCopy.Cell != FIntPoint(INDEX_NONE, INDEX_NONE))
+            {
+                Grid->RemoveTrapMarker(TrapCopy.Cell);
+            }
+        }
+    }
+
+    ActiveTraps.RemoveAtSwap(Index);
+
+    if (TrapCopy.Cell != FIntPoint(INDEX_NONE, INDEX_NONE))
+    {
+        MulticastTrapRemoved(TrapCopy.Cell);
+    }
+}
+
+void USkaldAbilityComponent::ClearAllTraps()
+{
+    if (GetOwnerRole() != ROLE_Authority)
+    {
+        ActiveTraps.Empty();
+        return;
+    }
+
+    for (int32 Index = ActiveTraps.Num() - 1; Index >= 0; --Index)
+    {
+        RemoveTrapAtIndex(Index);
+    }
+
+    ActiveTraps.Empty();
+}
+
+UDecalComponent* USkaldAbilityComponent::SpawnTrapVisualAtCell(const FIntPoint& Cell)
+{
+    AFighterPawn* OwnerFighter = CachedFighter.Get();
+    if (!OwnerFighter)
+    {
+        return nullptr;
+    }
+
+    if (UGridOverlayComponent* Grid = OwnerFighter->GetGrid())
+    {
+        return Grid->AddTrapMarker(Cell);
+    }
+
+    return nullptr;
 }
 
 void USkaldAbilityComponent::RemoveExpiredModifiers(ESkaldAbilityModifierPhase Phase)
@@ -1290,6 +1436,98 @@ void USkaldAbilityComponent::NotifyOwnerMoved(int32 DistanceMoved)
     {
         BrutalChargeDistanceMoved += DistanceMoved;
     }
+}
+
+bool USkaldAbilityComponent::DeployTrapAtCell(const FIntPoint& Cell, FName AbilityId, FText& OutError)
+{
+    OutError = FText::GetEmpty();
+
+    if (GetOwnerRole() != ROLE_Authority)
+    {
+        return true;
+    }
+
+    AFighterPawn* OwnerFighter = CachedFighter.Get();
+    if (!OwnerFighter)
+    {
+        OutError = NSLOCTEXT("SkaldAbilities", "AbilityNoSelection", "Select a fighter before using abilities.");
+        return false;
+    }
+
+    UGridOverlayComponent* Grid = OwnerFighter->GetGrid();
+    if (!Grid || !Grid->IsCellInBounds(Cell))
+    {
+        OutError = NSLOCTEXT("SkaldAbilities", "AbilityCellInvalid", "Select a valid cell on the grid.");
+        return false;
+    }
+
+    if (Grid->IsOccupied(Cell))
+    {
+        OutError = NSLOCTEXT("SkaldAbilities", "AbilityTrapCellOccupied", "That tile is already occupied.");
+        return false;
+    }
+
+    if (Grid->HasTrapMarker(Cell))
+    {
+        OutError = NSLOCTEXT("SkaldAbilities", "AbilityTrapCellBlocked", "A trap already covers that tile.");
+        return false;
+    }
+
+    const int32 PendingIndex = FindPendingTrapIndex(AbilityId);
+
+    if (PendingIndex == INDEX_NONE)
+    {
+        OutError = NSLOCTEXT("SkaldAbilities", "AbilityTrapUnavailable", "No trap is ready to deploy.");
+        return false;
+    }
+
+    FSkaldAbilityTrapState& Trap = ActiveTraps[PendingIndex];
+    Trap.Cell = Cell;
+    Trap.bPendingPlacement = false;
+    Trap.VisualComponent = SpawnTrapVisualAtCell(Cell);
+
+    MulticastTrapPlaced(Cell);
+    return true;
+}
+
+bool USkaldAbilityComponent::TryResolveTrapAtCell(const FIntPoint& Cell, AFighterPawn* TriggeringFighter)
+{
+    if (GetOwnerRole() != ROLE_Authority)
+    {
+        return false;
+    }
+
+    AFighterPawn* OwnerFighter = CachedFighter.Get();
+    if (!OwnerFighter || !TriggeringFighter || TriggeringFighter->Faction == OwnerFighter->Faction)
+    {
+        return false;
+    }
+
+    for (int32 Index = 0; Index < ActiveTraps.Num(); ++Index)
+    {
+        FSkaldAbilityTrapState& Trap = ActiveTraps[Index];
+        if (Trap.bPendingPlacement || Trap.Cell != Cell)
+        {
+            continue;
+        }
+
+        ApplyDamageToFighter(TriggeringFighter, Trap.Damage);
+
+        const FSkaldAbilityTrapState TrapCopy = Trap;
+        RemoveTrapAtIndex(Index);
+
+        bSuppressAbilityEffectOnNextTrigger = true;
+        MulticastAbilityTriggered(TrapCopy.AbilityDefinition);
+
+        return true;
+    }
+
+    return false;
+}
+
+bool USkaldAbilityComponent::HasPendingTrapForAbility(FName AbilityId) const
+{
+    return FindPendingTrapIndex(AbilityId) != INDEX_NONE;
 }
 
 void USkaldAbilityComponent::ReceiveExternalModifier(FSkaldActiveAbilityModifier&& Modifier)
@@ -1613,16 +1851,6 @@ void USkaldAbilityComponent::HandleBattleAttackResolved(AFighterPawn* Attacker, 
             bArtilleryStrikePending = false;
         }
 
-        if (bJuryRiggedExplosiveActive)
-        {
-            if (Defender && Result.HitCount > 0)
-            {
-                const int32 AdditionalDamage = OwnerFighter->Stats.AttackDamage + OwnerFighter->Stats.CriticalBonusDamage;
-                ApplyDamageToFighter(Defender, AdditionalDamage);
-            }
-
-            bJuryRiggedExplosiveActive = false;
-        }
     }
     else if (Defender == OwnerFighter)
     {

@@ -569,6 +569,123 @@ void UGridOverlayComponent::SetOccupied(const FIntPoint &GridCoord,
   UpdateBaseGridVisual(GridCoord);
 }
 
+UDecalComponent *UGridOverlayComponent::AddTrapMarker(const FIntPoint &GridCoord) {
+  if (!IsValidGrid(GridCoord)) {
+    return nullptr;
+  }
+
+  AActor *Owner = GetOwner();
+  if (!Owner) {
+    return nullptr;
+  }
+
+  UMaterialInterface *BaseMaterial = TrapMarkerMaterial;
+  if (!BaseMaterial) {
+    BaseMaterial = GetHighlightDecalMaterial();
+  }
+
+  if (!BaseMaterial) {
+    return nullptr;
+  }
+
+  UDecalComponent *Decal = nullptr;
+  if (TWeakObjectPtr<UDecalComponent> *Existing = TrapMarkers.Find(GridCoord)) {
+    Decal = Existing->Get();
+    if (!Decal) {
+      TrapMarkers.Remove(GridCoord);
+      TrapMarkerMaterials.Remove(GridCoord);
+    }
+  }
+
+  if (!Decal) {
+    Decal = NewObject<UDecalComponent>(Owner);
+    if (!Decal) {
+      return nullptr;
+    }
+
+    Decal->CreationMethod = EComponentCreationMethod::Instance;
+    Decal->SetMobility(EComponentMobility::Movable);
+    Decal->FadeScreenSize = HighlightDecalFadeScreenSize;
+    Owner->AddOwnedComponent(Decal);
+    Owner->AddInstanceComponent(Decal);
+
+    if (USceneComponent *Root = Owner->GetRootComponent()) {
+      Decal->AttachToComponent(Root,
+                               FAttachmentTransformRules::KeepWorldTransform);
+    }
+
+    Decal->RegisterComponent();
+    TrapMarkers.Add(GridCoord, Decal);
+  }
+
+  UMaterialInstanceDynamic *DynamicMaterial = nullptr;
+  if (TWeakObjectPtr<UMaterialInstanceDynamic> *ExistingMaterial =
+          TrapMarkerMaterials.Find(GridCoord)) {
+    DynamicMaterial = ExistingMaterial->Get();
+    if (!DynamicMaterial) {
+      TrapMarkerMaterials.Remove(GridCoord);
+    }
+  }
+
+  if (!DynamicMaterial) {
+    DynamicMaterial = UMaterialInstanceDynamic::Create(BaseMaterial, this);
+    if (DynamicMaterial) {
+      TrapMarkerMaterials.Add(GridCoord, DynamicMaterial);
+    }
+  }
+
+  if (DynamicMaterial) {
+    Decal->SetDecalMaterial(DynamicMaterial);
+    DynamicMaterial->SetVectorParameterValue(TrapMarkerColorParameter,
+                                             TrapMarkerColor);
+  } else {
+    Decal->SetDecalMaterial(BaseMaterial);
+  }
+
+  const int32 ArrayIndex = Index(GridCoord);
+  const FQuat CellRotation = GetEffectiveCellRotation(ArrayIndex);
+  const FVector CellNormal =
+      CellRotation.RotateVector(FVector::UpVector).GetSafeNormal();
+  const FVector CellTangent =
+      CellRotation.RotateVector(FVector::ForwardVector).GetSafeNormal();
+  const FVector WorldCenter = GridToWorld(GridCoord);
+  FVector DecalLocation =
+      WorldCenter + CellNormal * (TrapMarkerHeightOffset +
+                                  TrapMarkerProjectionDepth * 0.5f);
+  const auto DecalBasis =
+      UE::Math::TRotationMatrix<double>::MakeFromXZ(-CellNormal, CellTangent);
+  const FQuat DecalQuat = DecalBasis.ToQuat();
+  const FRotator DecalRotation = DecalQuat.Rotator();
+
+  const float EffectiveCellSize = FMath::Max(CellSize, KINDA_SMALL_NUMBER);
+  const float HalfSize = 0.5f * EffectiveCellSize * TrapMarkerSizeMultiplier;
+  Decal->DecalSize = FVector(TrapMarkerProjectionDepth, HalfSize, HalfSize);
+  Decal->FadeScreenSize = HighlightDecalFadeScreenSize;
+  Decal->SetWorldLocationAndRotation(DecalLocation, DecalRotation);
+  Decal->SetFadeOut(0.f, 0.f, false);
+
+  return Decal;
+}
+
+void UGridOverlayComponent::RemoveTrapMarker(const FIntPoint &GridCoord) {
+  if (TWeakObjectPtr<UDecalComponent> *Existing = TrapMarkers.Find(GridCoord)) {
+    if (UDecalComponent *Decal = Existing->Get()) {
+      Decal->DestroyComponent();
+    }
+    TrapMarkers.Remove(GridCoord);
+  }
+
+  TrapMarkerMaterials.Remove(GridCoord);
+}
+
+bool UGridOverlayComponent::HasTrapMarker(const FIntPoint &GridCoord) const {
+  if (const TWeakObjectPtr<UDecalComponent> *Existing = TrapMarkers.Find(GridCoord)) {
+    return Existing->IsValid();
+  }
+
+  return false;
+}
+
 bool UGridOverlayComponent::EnsureHighlightComponentSetup() {
   if (!EnsureHighlightMeshComponentExists()) {
     return false;

@@ -456,6 +456,9 @@ private:
   /** Rotate the fighter to face from one grid cell towards another. */
   void FaceTowardsCells(const FIntPoint &FromCell, const FIntPoint &ToCell);
 
+  /** Trigger any traps occupying the provided destination cells. */
+  void ResolveTrapsAtDestination(const TArray<FIntPoint> &DestinationCells);
+
   /** Update movement audio playback to reflect current settings. */
   void RefreshMovementAudioComponent();
 

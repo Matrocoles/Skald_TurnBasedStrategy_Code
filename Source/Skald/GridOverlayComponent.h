@@ -130,6 +130,18 @@ public:
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Grid")
   bool IsCellInBounds(const FIntPoint &GridCoord) const;
 
+  /** Spawn a persistent trap marker at the supplied grid coordinate. */
+  UFUNCTION(BlueprintCallable, Category = "Grid|Trap")
+  UDecalComponent *AddTrapMarker(const FIntPoint &GridCoord);
+
+  /** Remove the persistent trap marker at the supplied grid coordinate. */
+  UFUNCTION(BlueprintCallable, Category = "Grid|Trap")
+  void RemoveTrapMarker(const FIntPoint &GridCoord);
+
+  /** Query whether a trap marker currently occupies the cell. */
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Grid|Trap")
+  bool HasTrapMarker(const FIntPoint &GridCoord) const;
+
   /** Check if there is line of sight between two grid cells. */
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Grid")
   bool HasLineOfSight(const FIntPoint &Start, const FIntPoint &End) const;
@@ -205,6 +217,32 @@ public:
   /** Material applied to the highlight mesh instances. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Grid|Highlight")
   UMaterialInterface *HighlightMaterial = nullptr;
+
+  /** Material applied to trap markers (must use the Deferred Decal domain). */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Grid|Trap")
+  UMaterialInterface *TrapMarkerMaterial = nullptr;
+
+  /** Name of the vector parameter driven by trap marker colours. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Grid|Trap")
+  FName TrapMarkerColorParameter = TEXT("TintColor");
+
+  /** Tint applied to trap markers when armed. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Trap")
+  FLinearColor TrapMarkerColor = FLinearColor(1.f, 0.2f, 0.f, 0.75f);
+
+  /** Depth of the trap marker projection along the surface normal. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Trap",
+            meta = (ClampMin = "0.0"))
+  float TrapMarkerProjectionDepth = 32.f;
+
+  /** Multiplier applied to the XY footprint of the trap marker relative to the cell size. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Trap",
+            meta = (ClampMin = "0.01"))
+  float TrapMarkerSizeMultiplier = 1.0f;
+
+  /** Vertical offset applied when spawning trap markers. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Trap")
+  float TrapMarkerHeightOffset = 2.f;
 
   /** If true, highlights will spawn decals instead of instanced meshes. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Highlight|Decal")
@@ -427,6 +465,14 @@ protected:
   /** Map grid coordinates to spawned highlight decals when decal mode is active. */
   UPROPERTY(Transient)
   TMap<FIntPoint, TWeakObjectPtr<UDecalComponent>> HighlightedDecals;
+
+  /** Trap markers currently active on the grid. */
+  UPROPERTY(Transient)
+  TMap<FIntPoint, TWeakObjectPtr<UDecalComponent>> TrapMarkers;
+
+  /** Dynamic materials applied to trap markers for per-instance colouring. */
+  UPROPERTY(Transient)
+  TMap<FIntPoint, TWeakObjectPtr<UMaterialInstanceDynamic>> TrapMarkerMaterials;
 
   /** Dynamic materials created for active decal highlights. */
   UPROPERTY(Transient)
