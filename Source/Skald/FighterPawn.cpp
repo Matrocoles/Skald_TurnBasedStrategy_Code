@@ -1751,9 +1751,9 @@ void AFighterPawn::ResolveTrapsAtDestination(
         continue;
       }
 
-      if (USkaldAbilityComponent *AbilityComponent =
+      if (USkaldAbilityComponent *OtherAbilityComponent =
               Fighter->GetAbilityComponent()) {
-        while (AbilityComponent->TryResolveTrapAtCell(Cell, this)) {
+        while (OtherAbilityComponent->TryResolveTrapAtCell(Cell, this)) {
           // Continue triggering traps anchored to this cell.
         }
       }
