@@ -753,32 +753,37 @@ FSkaldAbilityTargetingInfo ASkaldPlayerController::GetAbilityTargetingInfo(
     FName AbilityId) const {
   FSkaldAbilityTargetingInfo Info;
 
-  if (AbilityId == TEXT("Ability_Human_Skirmish") ||
-      AbilityId == TEXT("Ability_Orc_Skirmish") ||
-      AbilityId == TEXT("Ability_Inflicted_Skirmish") ||
-      AbilityId == TEXT("Ability_Ravpack_Skirmish") ||
-      AbilityId == TEXT("Ability_Orc_Line") ||
-      AbilityId == TEXT("Ability_Dwarf_Elite") ||
-      AbilityId == TEXT("Ability_Elf_Line") ||
-      AbilityId == TEXT("Ability_Undead_Line") ||
-      AbilityId == TEXT("Ability_Gnoll_Skirmish") ||
-      AbilityId == TEXT("Ability_Gnoll_Elite") ||
-      AbilityId == TEXT("Ability_Empire_Skirmish") ||
-      AbilityId == TEXT("Ability_Empire_Elite") ||
-      AbilityId == TEXT("Ability_Ravpack_Line")) {
-    Info.CommandMode = EBattleCommandMode::AbilityTargetEnemy;
-    return Info;
-  }
+  struct FAbilityTargetingPreset {
+    EBattleCommandMode CommandMode = EBattleCommandMode::None;
+    int32 RangeOverride = INDEX_NONE;
+  };
 
-  if (AbilityId == TEXT("Ability_Elf_Elite")) {
-    Info.CommandMode = EBattleCommandMode::AbilityTargetEnemy;
-    Info.RangeOverride = 8;
-    return Info;
-  }
+  // Maintain the per-ability targeting defaults in a single table so we can
+  // easily audit which actives provide extended range compared to a fighter's
+  // native attack profile. Deep Delve Mortar (6 tiles), Starfall Invocation
+  // (8 tiles) and Grave Grasp (3 tiles) are the only abilities whose selection
+  // range exceeds their standard attack stat.
+  static const TMap<FName, FAbilityTargetingPreset> TargetingPresets = {
+      {TEXT("Ability_Human_Skirmish"), {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
+      {TEXT("Ability_Orc_Skirmish"), {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
+      {TEXT("Ability_Inflicted_Skirmish"), {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
+      {TEXT("Ability_Ravpack_Skirmish"), {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
+      {TEXT("Ability_Orc_Line"), {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
+      {TEXT("Ability_Dwarf_Elite"), {EBattleCommandMode::AbilityTargetEnemy, 6}},
+      {TEXT("Ability_Elf_Line"), {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
+      {TEXT("Ability_Undead_Line"), {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
+      {TEXT("Ability_Gnoll_Skirmish"), {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
+      {TEXT("Ability_Gnoll_Elite"), {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
+      {TEXT("Ability_Empire_Skirmish"), {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
+      {TEXT("Ability_Empire_Elite"), {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
+      {TEXT("Ability_Ravpack_Line"), {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
+      {TEXT("Ability_Elf_Elite"), {EBattleCommandMode::AbilityTargetEnemy, 8}},
+      {TEXT("Ability_Undead_Skirmish"), {EBattleCommandMode::AbilityTargetEnemy, 3}},
+  };
 
-  if (AbilityId == TEXT("Ability_Undead_Skirmish")) {
-    Info.CommandMode = EBattleCommandMode::AbilityTargetEnemy;
-    Info.RangeOverride = 3;
+  if (const FAbilityTargetingPreset *Preset = TargetingPresets.Find(AbilityId)) {
+    Info.CommandMode = Preset->CommandMode;
+    Info.RangeOverride = Preset->RangeOverride;
     return Info;
   }
 
