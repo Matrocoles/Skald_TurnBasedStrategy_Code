@@ -302,7 +302,7 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
     PlayerDataArray.SetNum(GS->PlayerArray.Num());
   }
 
-  if (GI) {
+  if (GI && PC && PC->IsLocalController()) {
     if (PS->Faction == ESkaldFaction::None) {
       PS->Faction = GI->Faction;
     }
