@@ -8,6 +8,70 @@ class AFighterPawn;
 class UNiagaraSystem;
 struct FFighterStats;
 
+USTRUCT()
+struct FSkaldAbilityStatDelta
+{
+    GENERATED_BODY();
+
+    UPROPERTY()
+    int32 AttackDice = 0;
+
+    UPROPERTY()
+    int32 AttackDamage = 0;
+
+    UPROPERTY()
+    int32 Movement = 0;
+
+    UPROPERTY()
+    int32 Defence = 0;
+
+    UPROPERTY()
+    int32 Strength = 0;
+
+    UPROPERTY()
+    int32 CriticalBonusDamage = 0;
+};
+
+USTRUCT()
+struct FSkaldActiveAbilityModifier
+{
+    GENERATED_BODY();
+
+    UPROPERTY()
+    FName SourceAbilityId = NAME_None;
+
+    UPROPERTY()
+    FSkaldAbilityStatDelta Delta;
+
+    UPROPERTY()
+    int32 RemainingRounds = 0;
+
+    UPROPERTY()
+    bool bRemoveWhenRoundsExpire = false;
+
+    UPROPERTY()
+    bool bRemoveOnRoundStart = false;
+
+    UPROPERTY()
+    bool bRemoveOnActivationStart = false;
+
+    UPROPERTY()
+    bool bRemoveOnActivationEnd = false;
+
+    UPROPERTY()
+    bool bDealSelfDamageOnActivationEndIfAttack = false;
+
+    UPROPERTY()
+    int32 SelfDamageAmount = 0;
+};
+
+enum class ESkaldAbilityModifierPhase : uint8
+{
+    RoundStart,
+    ActivationStart,
+    ActivationEnd
+};
+
 USTRUCT(BlueprintType)
 struct FSkaldAbilityState
 {
@@ -67,6 +131,12 @@ public:
     /** Reset reaction usage and other activation state. Call when the fighter begins an activation. */
     void HandleActivationStarted();
 
+    /** Cleanup for modifiers that end when the activation finishes. */
+    void HandleActivationFinished();
+
+    /** Record that the owning fighter performed an attack during its activation. */
+    void NotifyAttackCommitted();
+
     /** Attempt to trigger a slot. Returns true on success, populates OutFailureReason otherwise. */
     bool TryBeginAbility(ESkaldAbilitySlot Slot, FText& OutFailureReason);
 
@@ -107,6 +177,11 @@ protected:
 
     void HandleAbilityTriggeredLocal(const FSkaldAbilityDefinition& Definition);
     void PlayAbilityFeedback(const FSkaldAbilityDefinition& Definition);
+    void ApplyAbilityEffects(const FSkaldAbilityDefinition& Definition);
+    void AddActiveModifier(FSkaldActiveAbilityModifier&& Modifier);
+    void RemoveActiveModifier(int32 Index);
+    void RemoveExpiredModifiers(ESkaldAbilityModifierPhase Phase);
+    void ApplyStatDeltaToOwner(const FSkaldAbilityStatDelta& Delta, bool bApply);
 
     /** Owning fighter cached for convenience. */
     TWeakObjectPtr<AFighterPawn> CachedFighter;
@@ -140,5 +215,13 @@ protected:
     TArray<ESkaldAbilitySlot> SlotOrder;
 
     void UpdateReplicatedAbilitySlots();
+
+    /** Transient list of active stat modifiers granted by abilities. */
+    UPROPERTY()
+    TArray<FSkaldActiveAbilityModifier> ActiveModifiers;
+
+    /** Tracks whether the owning fighter has made an attack during its current activation. */
+    UPROPERTY()
+    bool bOwnerAttackedThisActivation = false;
 };
 
