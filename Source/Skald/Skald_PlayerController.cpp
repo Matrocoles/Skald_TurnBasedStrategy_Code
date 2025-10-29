@@ -608,13 +608,59 @@ void ASkaldPlayerController::HighlightAbilityCommandOptions(
 
   const FColor SelectionColor = Grid->SelectionHighlightColor.ToFColor(true);
   const TArray<FIntPoint> SourceCells = Source->GetOccupiedCells();
+  TSet<FIntPoint> OccupiedCells;
   for (const FIntPoint &Cell : SourceCells) {
+    OccupiedCells.Add(Cell);
     Grid->HighlightCell(Cell, SelectionColor, 0.f, false);
   }
 
   const int32 Range = Command.Targeting.RangeOverride == INDEX_NONE
                            ? Source->Stats.AttackRange
                            : Command.Targeting.RangeOverride;
+
+  if (Range >= 0) {
+    const bool bTargetsCells = Command.Targeting.CommandMode ==
+                               EBattleCommandMode::AbilityTargetCell;
+    const FColor RangeColor =
+        bTargetsCells && Command.Targeting.bAllowEmptyCell
+            ? Grid->MovementHighlightColor.ToFColor(true)
+            : Grid->AttackHighlightColor.ToFColor(true);
+
+    const int32 GridWidth = Grid->GetWidth();
+    const int32 GridHeight = Grid->GetLength();
+    for (int32 Y = 0; Y < GridHeight; ++Y) {
+      for (int32 X = 0; X < GridWidth; ++X) {
+        const FIntPoint Cell(X, Y);
+        if (OccupiedCells.Contains(Cell)) {
+          continue;
+        }
+
+        bool bWithinRange = false;
+        for (const FIntPoint &SourceCell : SourceCells) {
+          const int32 Distance = FMath::Max(
+              FMath::Abs(SourceCell.X - Cell.X),
+              FMath::Abs(SourceCell.Y - Cell.Y));
+          if (Distance > Range) {
+            continue;
+          }
+
+          if (Command.Targeting.bRequireLineOfSight &&
+              !Grid->HasLineOfSight(SourceCell, Cell)) {
+            continue;
+          }
+
+          bWithinRange = true;
+          break;
+        }
+
+        if (!bWithinRange) {
+          continue;
+        }
+
+        Grid->HighlightCell(Cell, RangeColor, 0.f, false);
+      }
+    }
+  }
 
   if (Command.Targeting.CommandMode ==
           EBattleCommandMode::AbilityTargetEnemy ||
