@@ -606,6 +606,12 @@ void ASkaldPlayerController::HighlightAbilityCommandOptions(
     return;
   }
 
+  const FColor SelectionColor = Grid->SelectionHighlightColor.ToFColor(true);
+  const TArray<FIntPoint> SourceCells = Source->GetOccupiedCells();
+  for (const FIntPoint &Cell : SourceCells) {
+    Grid->HighlightCell(Cell, SelectionColor, 0.f, false);
+  }
+
   const int32 Range = Command.Targeting.RangeOverride == INDEX_NONE
                            ? Source->Stats.AttackRange
                            : Command.Targeting.RangeOverride;
@@ -625,7 +631,12 @@ void ASkaldPlayerController::HighlightAbilityCommandOptions(
     const TArray<AFighterPawn *> Fighters =
         BattleManager->GetInitiativeOrderSnapshot();
     for (AFighterPawn *Candidate : Fighters) {
-      if (!Candidate || Candidate == Source) {
+      if (!Candidate) {
+        continue;
+      }
+
+      const bool bIsSelf = Candidate == Source;
+      if (bIsSelf && !Command.Targeting.bAllowSelfTarget) {
         continue;
       }
 
@@ -639,6 +650,15 @@ void ASkaldPlayerController::HighlightAbilityCommandOptions(
         continue;
       }
 
+      if (Command.Targeting.bRequireLineOfSight) {
+        if (!Source->HasLineOfSightToFighter(Candidate, Range, Grid)) {
+          continue;
+        }
+      }
+
+      if (bIsSelf) {
+        continue;
+      }
       const TArray<FIntPoint> Cells = Candidate->GetOccupiedCells();
       for (const FIntPoint &Cell : Cells) {
         Grid->HighlightCell(Cell, AbilityTargetHighlightColor, 0.f, false);
@@ -651,13 +671,29 @@ void ASkaldPlayerController::HighlightAbilityCommandOptions(
       EBattleCommandMode::AbilityTargetCell) {
     const int32 GridWidth = Grid->GetWidth();
     const int32 GridHeight = Grid->GetLength();
-    const FIntPoint StartCell = Source->GetCurrentCell();
-
     for (int32 Y = 0; Y < GridHeight; ++Y) {
       for (int32 X = 0; X < GridWidth; ++X) {
         const FIntPoint Cell(X, Y);
         const int32 Distance = Source->GetFootprintDistanceToCell(Cell);
         if (Range >= 0 && Distance > Range) {
+          continue;
+        }
+
+        if (Command.Targeting.bRequireLineOfSight) {
+          bool bHasLineOfSight = false;
+          for (const FIntPoint &SourceCell : SourceCells) {
+            if (Grid->HasLineOfSight(SourceCell, Cell)) {
+              bHasLineOfSight = true;
+              break;
+            }
+          }
+
+          if (!bHasLineOfSight) {
+            continue;
+          }
+        }
+
+        if (!Command.Targeting.bAllowEmptyCell && !Grid->IsOccupied(Cell)) {
           continue;
         }
 
@@ -4715,6 +4751,13 @@ void ASkaldPlayerController::HighlightClickedCell(UGridOverlayComponent *Grid,
   } else if (CurrentCommandMode == EBattleCommandMode::Attack) {
     if (LockedActiveFighter && IsFriendlyFighter(LockedActiveFighter)) {
       Grid->HighlightAttack(LockedActiveFighter);
+      bRestoredCommandHighlights = true;
+    }
+  } else if (CurrentCommandMode == EBattleCommandMode::AbilityTargetEnemy ||
+             CurrentCommandMode == EBattleCommandMode::AbilityTargetAlly ||
+             CurrentCommandMode == EBattleCommandMode::AbilityTargetCell) {
+    if (PendingAbilityCommand.SourceFighter.IsValid()) {
+      HighlightAbilityCommandOptions(PendingAbilityCommand, Grid);
       bRestoredCommandHighlights = true;
     }
   }
