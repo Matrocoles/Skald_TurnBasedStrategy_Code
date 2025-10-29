@@ -416,7 +416,13 @@ private:
   void PruneInvalidLockedInEntries();
   ULockedInFighterEntryWidget *FindLockedInEntry(AFighterPawn *Fighter) const;
   ULockedInFighterEntryWidget *FindOrCreateLockedInEntry(AFighterPawn *Fighter);
+
+  /** Callback when a locked-in fighter entry is clicked in the list. */
+  UFUNCTION()
   void HandleLockedInEntryClicked(AFighterPawn *Fighter);
+
+  /** Callback when a locked-in fighter entry requests removal. */
+  UFUNCTION()
   void HandleLockedInEntryRemoved(AFighterPawn *Fighter);
   void RemoveLockedInEntry(AFighterPawn *Fighter);
 
