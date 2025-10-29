@@ -650,9 +650,6 @@ private:
   /** Create the faction selection widget for the local player. */
   void InitializeChoosePlayerWidget();
 
-  /** Determine whether lobby data already contains the local player's choices. */
-  bool ShouldAutoLockInFromLobby() const;
-
   /** Initialize the player state using lobby selections instead of the legacy widget. */
   void AutoInitializeFromLobbySelection();
 
@@ -669,6 +666,9 @@ private:
 
   /** Timer used to poll for the world map actor until it exists. */
   FTimerHandle WorldMapSearchHandle;
+
+  /** Timer used to retry lobby-driven initialization until selections replicate. */
+  FTimerHandle LobbyAutoInitHandle;
 
   /** Whether the battle HUD is currently visible. */
   bool bBattleHUDVisible;

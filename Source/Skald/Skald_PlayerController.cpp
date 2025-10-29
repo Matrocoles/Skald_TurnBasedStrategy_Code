@@ -348,22 +348,6 @@ void ASkaldPlayerController::InitializeChoosePlayerWidget() {
   SetIgnoreLookInput(true);
 }
 
-bool ASkaldPlayerController::ShouldAutoLockInFromLobby() const {
-  if (!CachedGameInstance || !CachedGameInstance->bIsMultiplayer) {
-    return false;
-  }
-
-  if (const ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
-    const bool bHasName = !PS->PlayerDisplayName.IsEmpty();
-    const bool bHasFaction = PS->Faction != ESkaldFaction::None;
-    if (bHasName && bHasFaction) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 void ASkaldPlayerController::AutoInitializeFromLobbySelection() {
   if (bHasInitialized) {
     return;
@@ -385,17 +369,36 @@ void ASkaldPlayerController::AutoInitializeFromLobbySelection() {
     }
   }
 
-  if (DesiredName.IsEmpty() && CachedGameInstance) {
-    DesiredName = CachedGameInstance->DisplayName;
-  }
+  const bool bMissingName = DesiredName.IsEmpty();
+  const bool bMissingFaction = DesiredFaction == ESkaldFaction::None;
 
-  if (DesiredFaction == ESkaldFaction::None && CachedGameInstance) {
-    DesiredFaction = CachedGameInstance->Faction;
-  }
+  if (bMissingName || bMissingFaction) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("AutoInitializeFromLobbySelection: awaiting lobby data. MissingName=%s MissingFaction=%s"),
+           bMissingName ? TEXT("true") : TEXT("false"),
+           bMissingFaction ? TEXT("true") : TEXT("false"));
 
-  if (DesiredName.IsEmpty() || DesiredFaction == ESkaldFaction::None) {
-    InitializeChoosePlayerWidget();
+    if (UWorld *World = GetWorld()) {
+      FTimerManager &TimerManager = World->GetTimerManager();
+      if (!TimerManager.IsTimerActive(LobbyAutoInitHandle)) {
+        TimerManager.SetTimer(LobbyAutoInitHandle, this,
+                              &ASkaldPlayerController::AutoInitializeFromLobbySelection,
+                              0.25f, false);
+      }
+    }
     return;
+  }
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(LobbyAutoInitHandle);
+  }
+
+  if (CachedGameInstance) {
+    CachedGameInstance->DisplayName = DesiredName;
+    CachedGameInstance->Faction = DesiredFaction;
+    if (DesiredFaction != ESkaldFaction::None) {
+      CachedGameInstance->TakenFactions.AddUnique(DesiredFaction);
+    }
   }
 
   if (!CachedGameMode || !CachedGameMode->IsWorldInitialized()) {
@@ -461,11 +464,7 @@ void ASkaldPlayerController::BeginPlay() {
       }
     }
     if (CachedGameInstance && CachedGameInstance->bIsMultiplayer) {
-      if (ShouldAutoLockInFromLobby()) {
-        AutoInitializeFromLobbySelection();
-      } else {
-        InitializeChoosePlayerWidget();
-      }
+      AutoInitializeFromLobbySelection();
     } else if (CachedGameInstance && !bHasInitialized) {
       if (!CachedGameMode || !CachedGameMode->IsWorldInitialized()) {
         ServerInitPlayerState(CachedGameInstance->DisplayName,
@@ -531,6 +530,7 @@ void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
       World->RemoveOnActorSpawnedHandler(FighterSpawnedHandle);
       FighterSpawnedHandle.Reset();
     }
+    World->GetTimerManager().ClearTimer(LobbyAutoInitHandle);
   }
 
   if (BattleResultWidget) {
@@ -679,7 +679,7 @@ void ASkaldPlayerController::OnRep_PlayerState() {
   Super::OnRep_PlayerState();
 
   if (!bHasInitialized && CachedGameInstance &&
-      CachedGameInstance->bIsMultiplayer && ShouldAutoLockInFromLobby()) {
+      CachedGameInstance->bIsMultiplayer) {
     AutoInitializeFromLobbySelection();
   }
 
@@ -2732,6 +2732,10 @@ void ASkaldPlayerController::HandleWorldStateChanged() {
 void ASkaldPlayerController::HandlePlayerLockedIn() { HandleFactionLockedIn(); }
 
 void ASkaldPlayerController::HandleFactionLockedIn() {
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(LobbyAutoInitHandle);
+  }
+
   if (bHasInitialized) {
     return;
   }

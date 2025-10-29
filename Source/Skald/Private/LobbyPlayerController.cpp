@@ -130,6 +130,10 @@ void ALobbyPlayerController::RequestFactionSelection(ESkaldFaction Faction)
 {
     if (IsLocalController())
     {
+        if (USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>())
+        {
+            GI->Faction = Faction;
+        }
         ServerSetFaction(Faction);
     }
 }
@@ -138,6 +142,10 @@ void ALobbyPlayerController::RequestDisplayNameUpdate(const FString& DisplayName
 {
     if (IsLocalController())
     {
+        if (USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>())
+        {
+            GI->DisplayName = DisplayName;
+        }
         ServerSetDisplayName(DisplayName);
     }
 }
