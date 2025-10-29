@@ -4756,9 +4756,12 @@ void ASkaldPlayerController::HighlightClickedCell(UGridOverlayComponent *Grid,
   } else if (CurrentCommandMode == EBattleCommandMode::AbilityTargetEnemy ||
              CurrentCommandMode == EBattleCommandMode::AbilityTargetAlly ||
              CurrentCommandMode == EBattleCommandMode::AbilityTargetCell) {
-    if (PendingAbilityCommand.SourceFighter.IsValid()) {
-      HighlightAbilityCommandOptions(PendingAbilityCommand, Grid);
-      bRestoredCommandHighlights = true;
+    if (PendingAbilityCommand.IsSet()) {
+      const FPendingAbilityCommand &Command = PendingAbilityCommand.GetValue();
+      if (Command.SourceFighter.IsValid()) {
+        HighlightAbilityCommandOptions(Command, Grid);
+        bRestoredCommandHighlights = true;
+      }
     }
   }
 
