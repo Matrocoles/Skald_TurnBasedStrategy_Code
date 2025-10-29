@@ -243,6 +243,33 @@ TMap<ESkaldFaction, FSkaldFactionAbilitySet> BuildFactionAbilityMap()
     {
         FSkaldFactionAbilitySet Set;
         Set.Passive = MakePassive(
+            TEXT("Ability_Goblin_Passive"),
+            NSLOCTEXT("SkaldAbilities", "GoblinPassiveName", "Mob Tactics"),
+            NSLOCTEXT("SkaldAbilities", "GoblinPassiveDesc", "At the start of its activation, if a Goblin fighter has an ally within 2 squares it gains +1 Attack Dice for that activation; otherwise it gains +1 Movement instead."));
+        Set.SkirmishAbility = MakeActive(
+            TEXT("Ability_Goblin_Skirmish"),
+            NSLOCTEXT("SkaldAbilities", "GoblinSkirmishName", "Flash Bomb"),
+            NSLOCTEXT("SkaldAbilities", "GoblinSkirmishDesc", "Make an attack with -1 Attack Damage; on hit, the target suffers -1 Defence and loses all reactions until its next activation."),
+            ESkaldAbilityCostType::Action,
+            0);
+        Set.LineAbility = MakeActive(
+            TEXT("Ability_Goblin_Line"),
+            NSLOCTEXT("SkaldAbilities", "GoblinLineName", "Tinkerer's Net"),
+            NSLOCTEXT("SkaldAbilities", "GoblinLineDesc", "Make an attack; on hit, the target suffers -2 Movement and -1 Attack Damage until the start of its next activation."),
+            ESkaldAbilityCostType::Action,
+            1);
+        Set.EliteAbility = MakeActive(
+            TEXT("Ability_Goblin_Elite"),
+            NSLOCTEXT("SkaldAbilities", "GoblinEliteName", "Smoke and Slash"),
+            NSLOCTEXT("SkaldAbilities", "GoblinEliteDesc", "Free. Gain +1 Attack Dice and +2 Movement for this activation. If you attack during this activation, suffer -1 Defence until the start of the next round."),
+            ESkaldAbilityCostType::Free,
+            2);
+        Result.Add(ESkaldFaction::Goblin, Set);
+    }
+
+    {
+        FSkaldFactionAbilitySet Set;
+        Set.Passive = MakePassive(
             TEXT("Ability_Empire_Passive"),
             NSLOCTEXT("SkaldAbilities", "EmpirePassiveName", "Iron Discipline"),
             NSLOCTEXT("SkaldAbilities", "EmpirePassiveDesc", "Empire units can reroll one initiative die per round and choose either result."));

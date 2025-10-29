@@ -49,6 +49,7 @@ enum class ESkaldFaction : uint8
     LizardFolk UMETA(DisplayName = "Lizard Folk Faction"),
     Undead     UMETA(DisplayName = "Undead Faction"),
     Gnoll      UMETA(DisplayName = "Gnoll Faction"),
+    Goblin     UMETA(DisplayName = "Goblin Faction"),
     Empire     UMETA(DisplayName = "Empire"),
     Inflicted  UMETA(DisplayName = "The Inflicted"),
     FrogFolk   UMETA(DisplayName = "FrogFolk"),

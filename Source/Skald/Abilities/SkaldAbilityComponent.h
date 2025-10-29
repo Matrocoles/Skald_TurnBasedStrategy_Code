@@ -319,6 +319,10 @@ protected:
     bool bSuppressingFireActive = false;
     bool bRendAndTearActive = false;
     bool bArtilleryStrikePending = false;
+    bool bGoblinFlashBombActive = false;
+    bool bGoblinNetActive = false;
+    bool bGoblinAmbushActive = false;
+    bool bGoblinAmbushPenaltyPending = false;
     bool bSuppressAbilityEffectOnNextTrigger = false;
 
     /** Active traps armed by this ability component. */

@@ -68,6 +68,10 @@ USkaldAbilityComponent::USkaldAbilityComponent()
     bSuppressingFireActive = false;
     bRendAndTearActive = false;
     bArtilleryStrikePending = false;
+    bGoblinFlashBombActive = false;
+    bGoblinNetActive = false;
+    bGoblinAmbushActive = false;
+    bGoblinAmbushPenaltyPending = false;
 
     SlotOrder = {ESkaldAbilitySlot::Ability1, ESkaldAbilitySlot::Ability2, ESkaldAbilitySlot::Ability3};
 }
@@ -118,6 +122,10 @@ void USkaldAbilityComponent::RefreshAbilityLoadout(const FFighterStats& InStats,
     bRuneRiposteReady = false;
     bVeilStepBonusActive = false;
     bDeathlessAdvanceReady = false;
+    bGoblinFlashBombActive = false;
+    bGoblinNetActive = false;
+    bGoblinAmbushActive = false;
+    bGoblinAmbushPenaltyPending = false;
 
     FSkaldFactionAbilitySet AbilitySet;
     const bool bFoundAbilitySet = TryResolveFactionAbilitySet(InFaction, AbilitySet);
@@ -211,6 +219,10 @@ void USkaldAbilityComponent::HandleRoundStarted()
     bSuppressingFireActive = false;
     bRendAndTearActive = false;
     bArtilleryStrikePending = false;
+    bGoblinFlashBombActive = false;
+    bGoblinNetActive = false;
+    bGoblinAmbushActive = false;
+    bGoblinAmbushPenaltyPending = false;
 
     if (GetOwnerRole() == ROLE_Authority)
     {
@@ -259,9 +271,58 @@ void USkaldAbilityComponent::HandleActivationStarted()
     bSuppressingFireActive = false;
     bRendAndTearActive = false;
     bArtilleryStrikePending = false;
+    bGoblinFlashBombActive = false;
+    bGoblinNetActive = false;
+    bGoblinAmbushActive = false;
+    bGoblinAmbushPenaltyPending = false;
     if (GetOwnerRole() == ROLE_Authority)
     {
         RemoveExpiredModifiers(ESkaldAbilityModifierPhase::ActivationStart);
+
+        if (PassiveAbility.AbilityId == TEXT("Ability_Goblin_Passive"))
+        {
+            if (!CachedBattleManager.IsValid())
+            {
+                TryRegisterBattleDelegates();
+            }
+
+            AFighterPawn* OwnerFighter = CachedFighter.Get();
+            if (OwnerFighter)
+            {
+                bool bHasNearbyAlly = false;
+                if (CachedBattleManager.IsValid())
+                {
+                    const TArray<AFighterPawn*> Fighters = CachedBattleManager->GetInitiativeOrderSnapshot();
+                    for (AFighterPawn* Fighter : Fighters)
+                    {
+                        if (!Fighter || Fighter == OwnerFighter || Fighter->Faction != OwnerFighter->Faction)
+                        {
+                            continue;
+                        }
+
+                        const int32 Distance = OwnerFighter->GetFootprintDistanceToFighter(Fighter);
+                        if (Distance <= 2)
+                        {
+                            bHasNearbyAlly = true;
+                            break;
+                        }
+                    }
+                }
+
+                FSkaldActiveAbilityModifier Modifier;
+                Modifier.SourceAbilityId = PassiveAbility.AbilityId;
+                if (bHasNearbyAlly)
+                {
+                    Modifier.Delta.AttackDice = 1;
+                }
+                else
+                {
+                    Modifier.Delta.Movement = 1;
+                }
+                Modifier.bRemoveOnActivationEnd = true;
+                AddActiveModifier(MoveTemp(Modifier));
+            }
+        }
     }
     BroadcastStateChanged();
 }
@@ -271,6 +332,21 @@ void USkaldAbilityComponent::HandleActivationFinished()
     if (GetOwnerRole() == ROLE_Authority)
     {
         RemoveExpiredModifiers(ESkaldAbilityModifierPhase::ActivationEnd);
+        const bool bAttackedThisActivation = bOwnerAttackedThisActivation;
+
+        if (bGoblinAmbushActive && bGoblinAmbushPenaltyPending && bAttackedThisActivation)
+        {
+            FSkaldActiveAbilityModifier Modifier;
+            Modifier.SourceAbilityId = TEXT("Ability_Goblin_Elite");
+            Modifier.Delta.Defence = -1;
+            Modifier.bRemoveOnRoundStart = true;
+            AddActiveModifier(MoveTemp(Modifier));
+        }
+
+        bGoblinAmbushActive = false;
+        bGoblinAmbushPenaltyPending = false;
+        bGoblinFlashBombActive = false;
+        bGoblinNetActive = false;
         bOwnerAttackedThisActivation = false;
         bApplyViralLashOnNextAttack = false;
         bApplyScrapperFeintOnNextMiss = false;
@@ -1008,6 +1084,44 @@ void USkaldAbilityComponent::ApplyAbilityEffects(const FSkaldAbilityDefinition& 
         if (GetOwnerRole() == ROLE_Authority)
         {
             bRendAndTearActive = true;
+        }
+    }
+    else if (Definition.AbilityId == TEXT("Ability_Goblin_Skirmish"))
+    {
+        if (GetOwnerRole() == ROLE_Authority)
+        {
+            bGoblinFlashBombActive = true;
+            RemoveModifiersByAbilityId(Definition.AbilityId);
+
+            FSkaldActiveAbilityModifier Modifier;
+            Modifier.SourceAbilityId = Definition.AbilityId;
+            Modifier.Delta.AttackDamage = -1;
+            Modifier.bRemoveOnActivationEnd = true;
+            AddActiveModifier(MoveTemp(Modifier));
+        }
+    }
+    else if (Definition.AbilityId == TEXT("Ability_Goblin_Line"))
+    {
+        if (GetOwnerRole() == ROLE_Authority)
+        {
+            bGoblinNetActive = true;
+        }
+    }
+    else if (Definition.AbilityId == TEXT("Ability_Goblin_Elite"))
+    {
+        if (GetOwnerRole() == ROLE_Authority)
+        {
+            RemoveModifiersByAbilityId(Definition.AbilityId);
+
+            FSkaldActiveAbilityModifier Modifier;
+            Modifier.SourceAbilityId = Definition.AbilityId;
+            Modifier.Delta.AttackDice = 1;
+            Modifier.Delta.Movement = 2;
+            Modifier.bRemoveOnActivationEnd = true;
+            AddActiveModifier(MoveTemp(Modifier));
+
+            bGoblinAmbushActive = true;
+            bGoblinAmbushPenaltyPending = true;
         }
     }
     else if (Definition.AbilityId == TEXT("Ability_Empire_Skirmish"))
@@ -1796,6 +1910,41 @@ void USkaldAbilityComponent::HandleBattleAttackResolved(AFighterPawn* Attacker, 
             }
 
             bHarrierDashActive = false;
+        }
+
+        if (bGoblinFlashBombActive)
+        {
+            if (Defender && Result.HitCount > 0)
+            {
+                FSkaldActiveAbilityModifier Modifier;
+                Modifier.SourceAbilityId = TEXT("Ability_Goblin_Skirmish");
+                Modifier.Delta.Defence = -1;
+                Modifier.bRemoveOnActivationStart = true;
+                ApplyModifierToTarget(Defender, MoveTemp(Modifier));
+
+                if (USkaldAbilityComponent* DefenderAbility = Defender->GetAbilityComponent())
+                {
+                    DefenderAbility->ForceSpendAllReactions();
+                }
+            }
+
+            bGoblinFlashBombActive = false;
+            RemoveModifiersByAbilityId(TEXT("Ability_Goblin_Skirmish"));
+        }
+
+        if (bGoblinNetActive)
+        {
+            if (Defender && Result.HitCount > 0)
+            {
+                FSkaldActiveAbilityModifier Modifier;
+                Modifier.SourceAbilityId = TEXT("Ability_Goblin_Line");
+                Modifier.Delta.Movement = -2;
+                Modifier.Delta.AttackDamage = -1;
+                Modifier.bRemoveOnActivationStart = true;
+                ApplyModifierToTarget(Defender, MoveTemp(Modifier));
+            }
+
+            bGoblinNetActive = false;
         }
 
         if (bSuppressingFireActive)
