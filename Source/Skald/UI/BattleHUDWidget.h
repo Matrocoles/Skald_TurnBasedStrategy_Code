@@ -455,9 +455,10 @@ private:
   /** Update all stat text panels from the bound fighter. */
   void UpdateStatPanel();
   void UpdateAbilityButtons();
-  void UpdateAbilityButtonForSlot(ESkaldAbilitySlot Slot, UButton *Button,
+  void UpdateAbilityButtonForSlot(ESkaldAbilitySlot AbilitySlot, UButton *Button,
                                   UImage *IconWidget, UTextBlock *LabelWidget);
-  const FBattleAbilitySlotDisplay *FindAbilityDisplay(ESkaldAbilitySlot Slot) const;
+  const FBattleAbilitySlotDisplay *
+  FindAbilityDisplay(ESkaldAbilitySlot AbilitySlot) const;
 
   /** Update ability slot widgets to match the bound fighter. */
   void RefreshAbilityDisplay();

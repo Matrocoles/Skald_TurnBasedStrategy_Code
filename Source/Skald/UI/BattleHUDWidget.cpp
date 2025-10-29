@@ -744,7 +744,7 @@ void UBattleHUDWidget::UpdateAbilityButtons() {
                              AbilityIcon3, AbilityLabel3);
 }
 
-void UBattleHUDWidget::UpdateAbilityButtonForSlot(ESkaldAbilitySlot Slot,
+void UBattleHUDWidget::UpdateAbilityButtonForSlot(ESkaldAbilitySlot AbilitySlot,
                                                   UButton *Button,
                                                   UImage *IconWidget,
                                                   UTextBlock *LabelWidget) {
@@ -758,7 +758,7 @@ void UBattleHUDWidget::UpdateAbilityButtonForSlot(ESkaldAbilitySlot Slot,
     return;
   }
 
-  const FBattleAbilitySlotDisplay *Display = FindAbilityDisplay(Slot);
+  const FBattleAbilitySlotDisplay *Display = FindAbilityDisplay(AbilitySlot);
   if (!Display) {
     Button->SetVisibility(ESlateVisibility::Collapsed);
     Button->SetIsEnabled(false);
@@ -860,9 +860,9 @@ void UBattleHUDWidget::UpdateAbilityButtonForSlot(ESkaldAbilitySlot Slot,
 }
 
 const FBattleAbilitySlotDisplay *
-UBattleHUDWidget::FindAbilityDisplay(ESkaldAbilitySlot Slot) const {
+UBattleHUDWidget::FindAbilityDisplay(ESkaldAbilitySlot AbilitySlot) const {
   for (const FBattleAbilitySlotDisplay &Display : AbilitySlotDefinitions) {
-    if (Display.Slot == Slot) {
+    if (Display.Slot == AbilitySlot) {
       return &Display;
     }
   }
