@@ -6,6 +6,7 @@
 
 class AFighterPawn;
 class UDataTable;
+class UDecalComponent;
 class UNiagaraSystem;
 struct FFighterStats;
 struct FDiceRollResult;
@@ -69,6 +70,33 @@ struct FSkaldActiveAbilityModifier
 
     UPROPERTY()
     int32 SelfDamageAmount = 0;
+};
+
+USTRUCT()
+struct FSkaldAbilityTrapState
+{
+    GENERATED_BODY();
+
+    UPROPERTY()
+    FIntPoint Cell = FIntPoint(INDEX_NONE, INDEX_NONE);
+
+    UPROPERTY()
+    int32 RoundsRemaining = 0;
+
+    UPROPERTY()
+    int32 Damage = 0;
+
+    UPROPERTY()
+    FName SourceAbilityId = NAME_None;
+
+    UPROPERTY()
+    FSkaldAbilityDefinition AbilityDefinition;
+
+    UPROPERTY(Transient)
+    TWeakObjectPtr<UDecalComponent> VisualComponent;
+
+    UPROPERTY()
+    bool bPendingPlacement = false;
 };
 
 enum class ESkaldAbilityModifierPhase : uint8
@@ -156,6 +184,15 @@ public:
     /** Force the owning fighter to lose all remaining reactions for the round. */
     void ForceSpendAllReactions();
 
+    /** Place a ground-targeted trap at the supplied grid cell. */
+    bool DeployTrapAtCell(const FIntPoint& Cell, FName AbilityId, FText& OutError);
+
+    /** Query whether this component is waiting for a trap placement for the given ability. */
+    bool HasPendingTrapForAbility(FName AbilityId) const;
+
+    /** Resolve any trap owned by this component at the supplied cell. */
+    bool TryResolveTrapAtCell(const FIntPoint& Cell, AFighterPawn* TriggeringFighter);
+
     /** Passive shared with every fighter in the faction. */
     FSkaldAbilityDefinition GetPassiveAbility() const { return PassiveAbility; }
 
@@ -197,6 +234,10 @@ protected:
     void ApplyAbilityEffects(const FSkaldAbilityDefinition& Definition);
     void AddActiveModifier(FSkaldActiveAbilityModifier&& Modifier);
     void RemoveActiveModifier(int32 Index);
+    int32 FindPendingTrapIndex(FName AbilityId) const;
+    void RemoveTrapAtIndex(int32 Index);
+    void ClearAllTraps();
+    UDecalComponent* SpawnTrapVisualAtCell(const FIntPoint& Cell);
     void RemoveExpiredModifiers(ESkaldAbilityModifierPhase Phase);
     void ApplyStatDeltaToOwner(const FSkaldAbilityStatDelta& Delta, bool bApply);
     bool TryResolveFactionAbilitySet(ESkaldFaction InFaction, FSkaldFactionAbilitySet& OutSet);
@@ -218,6 +259,12 @@ protected:
 
     UFUNCTION()
     void HandleOwnerHealthChanged(int32 NewHealth);
+
+    UFUNCTION(NetMulticast, Reliable)
+    void MulticastTrapPlaced(const FIntPoint& Cell);
+
+    UFUNCTION(NetMulticast, Reliable)
+    void MulticastTrapRemoved(const FIntPoint& Cell);
 
     /** Owning fighter cached for convenience. */
     TWeakObjectPtr<AFighterPawn> CachedFighter;
@@ -272,7 +319,11 @@ protected:
     bool bSuppressingFireActive = false;
     bool bRendAndTearActive = false;
     bool bArtilleryStrikePending = false;
-    bool bJuryRiggedExplosiveActive = false;
+    bool bSuppressAbilityEffectOnNextTrigger = false;
+
+    /** Active traps armed by this ability component. */
+    UPROPERTY()
+    TArray<FSkaldAbilityTrapState> ActiveTraps;
 
     /** Default reaction availability refreshed every round. */
     UPROPERTY(EditDefaultsOnly, Category = "Ability")

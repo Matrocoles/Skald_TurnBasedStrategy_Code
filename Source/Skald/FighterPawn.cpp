@@ -898,6 +898,8 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
   FaceTowardsCells(PreviousCell, TargetCell);
   FaceTowardsLocation(NewLocation);
 
+  ResolveTrapsAtDestination(TargetCells);
+
   const float EffectiveTolerance =
       FMath::Max(MovementStopTolerance, KINDA_SMALL_NUMBER);
   const bool bAlreadyAtTarget =
@@ -991,6 +993,8 @@ bool AFighterPawn::TryTeleportToCell(FIntPoint TargetCell, int32 MaxDistance,
   RefreshDisplayMeshYawOffset();
   FaceTowardsCells(StartCell, TargetCell);
   FaceTowardsLocation(NewLocation);
+
+  ResolveTrapsAtDestination(TargetCells);
 
   for (const FIntPoint &Cell : TargetCells) {
     Grid->SetOccupied(Cell, true);
@@ -1713,6 +1717,47 @@ void AFighterPawn::FaceTowardsCells(const FIntPoint &FromCell,
   if (!Direction.IsNearlyZero()) {
     const FRotator LookRotation = Direction.Rotation();
     ApplyFacingYaw(LookRotation.Yaw + SpawnFacingYawDelta);
+  }
+}
+
+void AFighterPawn::ResolveTrapsAtDestination(
+    const TArray<FIntPoint> &DestinationCells) {
+  if (GetLocalRole() != ROLE_Authority || DestinationCells.Num() == 0) {
+    return;
+  }
+
+  UWorld *World = GetWorld();
+  if (!World) {
+    return;
+  }
+
+  USkaldGameInstance *GameInstance =
+      Cast<USkaldGameInstance>(World->GetGameInstance());
+  if (!GameInstance) {
+    return;
+  }
+
+  UGridBattleManager *BattleManager = GameInstance->GridBattleManager;
+  if (!BattleManager) {
+    return;
+  }
+
+  const TArray<AFighterPawn *> Fighters =
+      BattleManager->GetInitiativeOrderSnapshot();
+
+  for (const FIntPoint &Cell : DestinationCells) {
+    for (AFighterPawn *Fighter : Fighters) {
+      if (!Fighter || Fighter == this || Fighter->Faction == Faction) {
+        continue;
+      }
+
+      if (USkaldAbilityComponent *AbilityComponent =
+              Fighter->GetAbilityComponent()) {
+        while (AbilityComponent->TryResolveTrapAtCell(Cell, this)) {
+          // Continue triggering traps anchored to this cell.
+        }
+      }
+    }
   }
 }
 
