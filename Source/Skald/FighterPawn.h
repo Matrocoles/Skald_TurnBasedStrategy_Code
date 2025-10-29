@@ -96,6 +96,9 @@ public:
   /** Trigger a hit flash scaled by the supplied damage amount. */
   void PlayImpactFlashForDamage(int32 DamageAmount);
 
+  /** Update the ability component with the latest stats/faction if possible. */
+  void UpdateAbilityLoadout();
+
   /** Show or hide the fighter's selection indicator. */
   UFUNCTION(BlueprintCallable, Category = "Fighter|Selection")
   void SetSelectionIndicatorVisible(bool bVisible);

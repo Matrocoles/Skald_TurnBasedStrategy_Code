@@ -1484,6 +1484,8 @@ void AFighterPawn::BroadcastActionsRemaining() {
   UpdateActivationIndicator();
 }
 
+void AFighterPawn::UpdateAbilityLoadout() { RefreshAbilityLoadout(); }
+
 void AFighterPawn::RefreshAbilityLoadout() {
   if (!AbilityComponent || !HasAuthority()) {
     return;
