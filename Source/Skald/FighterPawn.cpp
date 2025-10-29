@@ -900,6 +900,14 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
 
   ResolveTrapsAtDestination(TargetCells);
 
+  if (!IsAlive()) {
+    if (Grid) {
+      Grid->ClearHighlights();
+    }
+    SetIsMoving(false);
+    return;
+  }
+
   const float EffectiveTolerance =
       FMath::Max(MovementStopTolerance, KINDA_SMALL_NUMBER);
   const bool bAlreadyAtTarget =
@@ -995,6 +1003,10 @@ bool AFighterPawn::TryTeleportToCell(FIntPoint TargetCell, int32 MaxDistance,
   FaceTowardsLocation(NewLocation);
 
   ResolveTrapsAtDestination(TargetCells);
+
+  if (!IsAlive()) {
+    return true;
+  }
 
   for (const FIntPoint &Cell : TargetCells) {
     Grid->SetOccupied(Cell, true);
