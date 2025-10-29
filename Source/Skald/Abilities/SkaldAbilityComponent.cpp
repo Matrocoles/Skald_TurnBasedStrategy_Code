@@ -80,6 +80,10 @@ void USkaldAbilityComponent::HandleRoundStarted()
     }
 
     ReactionsRemaining = ReactionsPerRound;
+    if (GetOwnerRole() == ROLE_Authority)
+    {
+        RemoveExpiredModifiers(ESkaldAbilityModifierPhase::RoundStart);
+    }
     UpdateReplicatedAbilitySlots();
     BroadcastStateChanged();
 }
@@ -87,6 +91,21 @@ void USkaldAbilityComponent::HandleRoundStarted()
 void USkaldAbilityComponent::HandleActivationStarted()
 {
     ReactionsRemaining = ReactionsPerRound;
+    bOwnerAttackedThisActivation = false;
+    if (GetOwnerRole() == ROLE_Authority)
+    {
+        RemoveExpiredModifiers(ESkaldAbilityModifierPhase::ActivationStart);
+    }
+    BroadcastStateChanged();
+}
+
+void USkaldAbilityComponent::HandleActivationFinished()
+{
+    if (GetOwnerRole() == ROLE_Authority)
+    {
+        RemoveExpiredModifiers(ESkaldAbilityModifierPhase::ActivationEnd);
+        bOwnerAttackedThisActivation = false;
+    }
     BroadcastStateChanged();
 }
 
@@ -269,6 +288,10 @@ bool USkaldAbilityComponent::CanTriggerAbility(const FSkaldAbilityState& State, 
 void USkaldAbilityComponent::HandleAbilityTriggeredLocal(const FSkaldAbilityDefinition& Definition)
 {
     PlayAbilityFeedback(Definition);
+    if (GetOwnerRole() == ROLE_Authority)
+    {
+        ApplyAbilityEffects(Definition);
+    }
     OnAbilityTriggered.Broadcast(this, Definition);
 }
 
@@ -330,6 +353,170 @@ void USkaldAbilityComponent::PlayAbilityFeedback(const FSkaldAbilityDefinition& 
                 Fighter->GetRootComponent());
         }
     }
+}
+
+void USkaldAbilityComponent::ApplyAbilityEffects(const FSkaldAbilityDefinition& Definition)
+{
+    if (!Definition.IsValid())
+    {
+        return;
+    }
+
+    if (Definition.AbilityId == TEXT("Ability_Inflicted_Line"))
+    {
+        FSkaldActiveAbilityModifier Modifier;
+        Modifier.SourceAbilityId = Definition.AbilityId;
+        Modifier.Delta.AttackDice = 2;
+        Modifier.Delta.Defence = -1;
+        Modifier.bRemoveOnActivationStart = true;
+        AddActiveModifier(MoveTemp(Modifier));
+    }
+    else if (Definition.AbilityId == TEXT("Ability_Ravpack_Elite"))
+    {
+        FSkaldActiveAbilityModifier Modifier;
+        Modifier.SourceAbilityId = Definition.AbilityId;
+        Modifier.Delta.AttackDice = 1;
+        Modifier.Delta.Movement = 1;
+        Modifier.bRemoveOnActivationEnd = true;
+        Modifier.bDealSelfDamageOnActivationEndIfAttack = true;
+        Modifier.SelfDamageAmount = 1;
+        AddActiveModifier(MoveTemp(Modifier));
+    }
+}
+
+void USkaldAbilityComponent::AddActiveModifier(FSkaldActiveAbilityModifier&& Modifier)
+{
+    if (GetOwnerRole() != ROLE_Authority)
+    {
+        return;
+    }
+
+    if (!CachedFighter.IsValid())
+    {
+        return;
+    }
+
+    ApplyStatDeltaToOwner(Modifier.Delta, true);
+    ActiveModifiers.Add(MoveTemp(Modifier));
+}
+
+void USkaldAbilityComponent::RemoveActiveModifier(int32 Index)
+{
+    if (GetOwnerRole() != ROLE_Authority)
+    {
+        return;
+    }
+
+    if (!ActiveModifiers.IsValidIndex(Index))
+    {
+        return;
+    }
+
+    ApplyStatDeltaToOwner(ActiveModifiers[Index].Delta, false);
+    ActiveModifiers.RemoveAtSwap(Index);
+}
+
+void USkaldAbilityComponent::RemoveExpiredModifiers(ESkaldAbilityModifierPhase Phase)
+{
+    if (GetOwnerRole() != ROLE_Authority)
+    {
+        return;
+    }
+
+    for (int32 Index = ActiveModifiers.Num() - 1; Index >= 0; --Index)
+    {
+        FSkaldActiveAbilityModifier& Modifier = ActiveModifiers[Index];
+        bool bShouldRemove = false;
+
+        if (Phase == ESkaldAbilityModifierPhase::RoundStart)
+        {
+            if (Modifier.bRemoveWhenRoundsExpire && Modifier.RemainingRounds > 0)
+            {
+                --Modifier.RemainingRounds;
+                if (Modifier.RemainingRounds <= 0)
+                {
+                    bShouldRemove = true;
+                }
+            }
+
+            if (Modifier.bRemoveOnRoundStart)
+            {
+                bShouldRemove = true;
+            }
+        }
+        else if (Phase == ESkaldAbilityModifierPhase::ActivationStart)
+        {
+            if (Modifier.bRemoveOnActivationStart)
+            {
+                bShouldRemove = true;
+            }
+        }
+        else if (Phase == ESkaldAbilityModifierPhase::ActivationEnd)
+        {
+            if (Modifier.bRemoveOnActivationEnd)
+            {
+                if (Modifier.bDealSelfDamageOnActivationEndIfAttack && bOwnerAttackedThisActivation && Modifier.SelfDamageAmount > 0)
+                {
+                    if (AFighterPawn* Fighter = CachedFighter.Get())
+                    {
+                        const int32 PreviousHealth = Fighter->Stats.Health;
+                        Fighter->Stats.Health = FMath::Max(0, Fighter->Stats.Health - Modifier.SelfDamageAmount);
+                        if (Fighter->Stats.Health != PreviousHealth)
+                        {
+                            Fighter->OnHealthChanged.Broadcast(Fighter->Stats.Health);
+                        }
+                    }
+                }
+
+                bShouldRemove = true;
+            }
+        }
+
+        if (bShouldRemove)
+        {
+            RemoveActiveModifier(Index);
+        }
+    }
+}
+
+void USkaldAbilityComponent::NotifyAttackCommitted()
+{
+    if (GetOwnerRole() == ROLE_Authority)
+    {
+        bOwnerAttackedThisActivation = true;
+    }
+}
+
+void USkaldAbilityComponent::ApplyStatDeltaToOwner(const FSkaldAbilityStatDelta& Delta, bool bApply)
+{
+    if (GetOwnerRole() != ROLE_Authority)
+    {
+        return;
+    }
+
+    AFighterPawn* Fighter = CachedFighter.Get();
+    if (!Fighter)
+    {
+        return;
+    }
+
+    auto ApplyIntDelta = [bApply](int32& Stat, int32 Amount)
+    {
+        if (Amount == 0)
+        {
+            return;
+        }
+
+        const int32 DeltaValue = bApply ? Amount : -Amount;
+        Stat = FMath::Max(0, Stat + DeltaValue);
+    };
+
+    ApplyIntDelta(Fighter->Stats.AttackDice, Delta.AttackDice);
+    ApplyIntDelta(Fighter->Stats.AttackDamage, Delta.AttackDamage);
+    ApplyIntDelta(Fighter->Stats.Movement, Delta.Movement);
+    ApplyIntDelta(Fighter->Stats.Defence, Delta.Defence);
+    ApplyIntDelta(Fighter->Stats.Strength, Delta.Strength);
+    ApplyIntDelta(Fighter->Stats.CriticalBonusDamage, Delta.CriticalBonusDamage);
 }
 
 void USkaldAbilityComponent::UpdateReplicatedAbilitySlots()

@@ -411,6 +411,10 @@ void AFighterPawn::FinishActivation() {
   BroadcastActionsRemaining();
   UpdateActivationIndicator();
 
+  if (AbilityComponent) {
+    AbilityComponent->HandleActivationFinished();
+  }
+
   if (UGridOverlayComponent *Grid = GetGrid()) {
     Grid->ClearSelectionHighlight();
   }
@@ -964,6 +968,10 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
   FDiceRollResult DiceResult =
       UGridBattleManager::ResolveAttackDice(Stats, Target->Stats, *RandomStream);
   DiceResult.HighStakesFaction = Faction;
+
+  if (AbilityComponent) {
+    AbilityComponent->NotifyAttackCommitted();
+  }
 
   StartQueuedAttack(Target, MoveTemp(DiceResult));
 
