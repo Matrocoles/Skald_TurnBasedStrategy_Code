@@ -16,6 +16,7 @@
 #include "SkaldLogging.h"
 #include "Skald_GameInstance.h"
 #include "Sound/SoundBase.h"
+#include "UObject/WeakObjectPtrTemplates.h"
 
 namespace
 {
@@ -1484,7 +1485,7 @@ bool USkaldAbilityComponent::DeployTrapAtCell(const FIntPoint& Cell, FName Abili
     FSkaldAbilityTrapState& Trap = ActiveTraps[PendingIndex];
     Trap.Cell = Cell;
     Trap.bPendingPlacement = false;
-    Trap.VisualComponent = SpawnTrapVisualAtCell(Cell);
+    Trap.VisualComponent = MakeWeakObjectPtr(SpawnTrapVisualAtCell(Cell));
 
     MulticastTrapPlaced(Cell);
     return true;
