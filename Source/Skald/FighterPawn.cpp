@@ -14,9 +14,12 @@
 #include "Curves/CurveFloat.h"
 #include "GridBattleManager.h"
 #include "GridOverlayComponent.h"
+#include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
+#include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
 #include "Skald_GameInstance.h"
 #include "Sound/SoundBase.h"
 #include "TimerManager.h"
@@ -192,6 +195,8 @@ void AFighterPawn::GetLifetimeReplicatedProps(
   DOREPLIFETIME(AFighterPawn, CurrentCell);
   DOREPLIFETIME(AFighterPawn, SpawnFacingYawDelta);
   DOREPLIFETIME(AFighterPawn, MaxHealth);
+  DOREPLIFETIME(AFighterPawn, AttackType);
+  DOREPLIFETIME(AFighterPawn, AttackFX);
 }
 
 void AFighterPawn::OnConstruction(const FTransform &Transform) {
@@ -341,10 +346,22 @@ void AFighterPawn::InitializeMaxHealth(int32 InMaxHealth) {
   UpdateHealthDisplay(Stats.Health);
 }
 
+void AFighterPawn::SetAttackType(EFighterAttackType InAttackType) {
+  if (AttackType == InAttackType) {
+    return;
+  }
+
+  AttackType = InAttackType;
+  OnRep_AttackType();
+}
+
+void AFighterPawn::OnRep_AttackType() {}
+
 void AFighterPawn::Tick(float DeltaSeconds) {
   Super::Tick(DeltaSeconds);
 
   UpdateHitFlash(DeltaSeconds);
+  TickActiveProjectileFX(DeltaSeconds);
 
   const bool bShouldRunMovement =
       bIsMoving && (HasAuthority() || IsLocallyControlled());
@@ -368,6 +385,218 @@ void AFighterPawn::Tick(float DeltaSeconds) {
     SetIsMoving(false);
     MovementTargetLocation = GetActorLocation();
   }
+}
+
+void AFighterPawn::TickActiveProjectileFX(float DeltaSeconds) {
+  if (ActiveProjectileFX.Num() <= 0) {
+    return;
+  }
+
+  for (int32 Index = ActiveProjectileFX.Num() - 1; Index >= 0; --Index) {
+    FActiveProjectileFX &Projectile = ActiveProjectileFX[Index];
+    UNiagaraComponent *Component = Projectile.Component.Get();
+    if (!Component) {
+      ActiveProjectileFX.RemoveAtSwap(Index);
+      continue;
+    }
+
+    const float TravelTime = Projectile.TravelTime;
+    Projectile.ElapsedTime += DeltaSeconds;
+
+    const float EffectiveTime =
+        TravelTime > KINDA_SMALL_NUMBER ? TravelTime : KINDA_SMALL_NUMBER;
+    const float Alpha =
+        TravelTime > KINDA_SMALL_NUMBER
+            ? FMath::Clamp(Projectile.ElapsedTime / EffectiveTime, 0.f, 1.f)
+            : 1.f;
+    const FVector NewLocation = FMath::Lerp(Projectile.StartLocation,
+                                            Projectile.EndLocation, Alpha);
+    Component->SetWorldLocation(NewLocation);
+    Component->SetWorldRotation(
+        (Projectile.EndLocation - Projectile.StartLocation).Rotation());
+
+    if (Alpha >= 1.f) {
+      Component->Deactivate();
+      Component->SetAutoDestroy(true);
+      ActiveProjectileFX.RemoveAtSwap(Index);
+    }
+  }
+}
+
+FVector AFighterPawn::ResolveFXOrigin(const FName &SocketName,
+                                      const FVector &LocalOffset,
+                                      FRotator *OutSocketRotation) const {
+  const USceneComponent *SourceComponent =
+      DisplayMesh ? static_cast<const USceneComponent *>(DisplayMesh)
+                  : GetRootComponent();
+  if (!SourceComponent) {
+    if (OutSocketRotation) {
+      *OutSocketRotation = GetActorRotation();
+    }
+    const FTransform ActorTransform = GetActorTransform();
+    return ActorTransform.TransformPosition(LocalOffset);
+  }
+
+  FTransform SocketTransform = SourceComponent->GetComponentTransform();
+  if (!SocketName.IsNone() && SourceComponent->DoesSocketExist(SocketName)) {
+    SocketTransform = SourceComponent->GetSocketTransform(SocketName);
+  }
+
+  if (OutSocketRotation) {
+    *OutSocketRotation = SocketTransform.Rotator();
+  }
+
+  return SocketTransform.TransformPosition(LocalOffset);
+}
+
+void AFighterPawn::SpawnPreAttackSoundAtLocation(
+    const FVector &Location) const {
+  if (AttackFX.PreAttackSound.IsNull()) {
+    return;
+  }
+
+  if (UWorld *World = GetWorld()) {
+    if (USoundBase *SoundCue = AttackFX.PreAttackSound.LoadSynchronous()) {
+      UGameplayStatics::SpawnSoundAtLocation(World, SoundCue, Location);
+    }
+  }
+}
+
+void AFighterPawn::PlayPreAttackFX(AFighterPawn *Target) {
+  PlayMeleePreAttackFX(Target);
+
+  if (AttackType == EFighterAttackType::Ranged) {
+    PlayRangedPreAttackFX(Target);
+  }
+}
+
+void AFighterPawn::PlayMeleePreAttackFX(AFighterPawn *Target) {
+  if (AttackFX.PreAttackEffect.IsNull() && AttackFX.PreAttackSound.IsNull()) {
+    return;
+  }
+
+  const float TargetHalfHeight =
+      Target ? Target->GetSimpleCollisionHalfHeight() : GetSimpleCollisionHalfHeight();
+  const FVector TargetLocation = (Target ? Target->GetActorLocation()
+                                         : GetActorLocation()) +
+                                 FVector(0.f, 0.f, TargetHalfHeight);
+  FRotator SocketRotation;
+  const FVector SpawnLocation =
+      ResolveFXOrigin(AttackFX.PreAttackSocket, AttackFX.PreAttackOffset,
+                      &SocketRotation);
+
+  FVector Direction = (TargetLocation - SpawnLocation).GetSafeNormal();
+  if (Direction.IsNearlyZero()) {
+    Direction = SocketRotation.Vector();
+  }
+  const FRotator SpawnRotation = Direction.Rotation();
+
+  if (!AttackFX.PreAttackEffect.IsNull()) {
+    if (UWorld *World = GetWorld()) {
+      if (UNiagaraSystem *Effect =
+              AttackFX.PreAttackEffect.LoadSynchronous()) {
+        UNiagaraComponent *NiagaraComponent =
+            UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+                World, Effect, SpawnLocation, SpawnRotation);
+        if (NiagaraComponent) {
+          NiagaraComponent->SetAutoDestroy(true);
+        }
+      }
+    }
+  }
+
+  SpawnPreAttackSoundAtLocation(SpawnLocation);
+}
+
+void AFighterPawn::PlayRangedPreAttackFX(AFighterPawn *Target) {
+  if (AttackType != EFighterAttackType::Ranged) {
+    return;
+  }
+
+  if (!Target) {
+    return;
+  }
+
+  const float TargetHalfHeight = Target->GetSimpleCollisionHalfHeight();
+  const FVector TargetLocation =
+      Target->GetActorLocation() + FVector(0.f, 0.f, TargetHalfHeight);
+  FRotator SocketRotation;
+  const FVector SpawnLocation =
+      ResolveFXOrigin(AttackFX.ProjectileSocket, AttackFX.ProjectileOffset,
+                      &SocketRotation);
+
+  FVector Direction = (TargetLocation - SpawnLocation).GetSafeNormal();
+  if (Direction.IsNearlyZero()) {
+    Direction = SocketRotation.Vector();
+  }
+  const FRotator SpawnRotation = Direction.Rotation();
+
+  SpawnProjectileFX(SpawnLocation, TargetLocation, SpawnRotation);
+
+  if (!AttackFX.ProjectileSound.IsNull()) {
+    if (UWorld *World = GetWorld()) {
+      if (USoundBase *SoundCue = AttackFX.ProjectileSound.LoadSynchronous()) {
+        UGameplayStatics::SpawnSoundAtLocation(World, SoundCue, SpawnLocation);
+      }
+    }
+  }
+}
+
+void AFighterPawn::SpawnProjectileFX(const FVector &SpawnLocation,
+                                     const FVector &TargetLocation,
+                                     const FRotator &SpawnRotation) {
+  if (AttackFX.ProjectileEffect.IsNull()) {
+    return;
+  }
+
+  if (UWorld *World = GetWorld()) {
+    if (UNiagaraSystem *Effect =
+            AttackFX.ProjectileEffect.LoadSynchronous()) {
+      UNiagaraComponent *ProjectileComponent =
+          UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+              World, Effect, SpawnLocation, SpawnRotation);
+      if (!ProjectileComponent) {
+        return;
+      }
+
+      ProjectileComponent->SetAutoDestroy(false);
+
+      const float Distance = FVector::Dist(SpawnLocation, TargetLocation);
+      if (Distance > KINDA_SMALL_NUMBER &&
+          !AttackFX.ProjectileDistanceParameter.IsNone()) {
+        ProjectileComponent->SetVariableFloat(
+            AttackFX.ProjectileDistanceParameter, Distance);
+      }
+
+      if (!AttackFX.ProjectileColorParameter.IsNone()) {
+        ProjectileComponent->SetVariableLinearColor(
+            AttackFX.ProjectileColorParameter, AttackFX.ProjectileColor);
+      }
+
+      const float Speed = FMath::Max(KINDA_SMALL_NUMBER, AttackFX.ProjectileSpeed);
+      const float TravelTime =
+          Distance > KINDA_SMALL_NUMBER ? Distance / Speed : 0.f;
+
+      if (TravelTime <= 0.f) {
+        ProjectileComponent->SetWorldLocation(TargetLocation);
+        ProjectileComponent->Deactivate();
+        ProjectileComponent->SetAutoDestroy(true);
+        return;
+      }
+
+      FActiveProjectileFX Projectile;
+      Projectile.Component = ProjectileComponent;
+      Projectile.StartLocation = SpawnLocation;
+      Projectile.EndLocation = TargetLocation;
+      Projectile.TravelTime = TravelTime;
+      Projectile.ElapsedTime = 0.f;
+      ActiveProjectileFX.Add(MoveTemp(Projectile));
+    }
+  }
+}
+
+void AFighterPawn::MulticastPlayPreAttackFX_Implementation(AFighterPawn *Target) {
+  PlayPreAttackFX(Target);
 }
 
 void AFighterPawn::BeginActivation() {
@@ -1131,6 +1360,8 @@ void AFighterPawn::StartQueuedAttack(AFighterPawn *Target,
     TargetPawn->HandleIncomingAttackStarted();
   }
 
+  MulticastPlayPreAttackFX(Target);
+
   if (!PendingAttackDiceResult.DiceOutcomes.IsValidIndex(0)) {
     FinalizeQueuedAttack();
     return;
@@ -1522,6 +1753,14 @@ void AFighterPawn::HandleAutoHealthHoldExpired() {
 }
 
 void AFighterPawn::Destroyed() {
+  for (FActiveProjectileFX &Projectile : ActiveProjectileFX) {
+    if (UNiagaraComponent *Component = Projectile.Component.Get()) {
+      Component->Deactivate();
+      Component->SetAutoDestroy(true);
+    }
+  }
+  ActiveProjectileFX.Empty();
+
   CancelQueuedAttack();
   FinishActivation();
   if (UGridOverlayComponent *Grid = GetGrid()) {
