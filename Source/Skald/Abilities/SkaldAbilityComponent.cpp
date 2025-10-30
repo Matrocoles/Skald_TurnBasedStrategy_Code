@@ -49,12 +49,15 @@ void ApplyDefaultModifierDuration(FSkaldActiveAbilityModifier& Modifier)
         return;
     }
 
+    if (Modifier.RemainingRounds > 0)
+    {
+        Modifier.bRemoveWhenRoundsExpire = true;
+        return;
+    }
+
     Modifier.bRemoveOnRoundStart = true;
     Modifier.bRemoveWhenRoundsExpire = true;
-    if (Modifier.RemainingRounds <= 0)
-    {
-        Modifier.RemainingRounds = 1;
-    }
+    Modifier.RemainingRounds = 1;
 }
 } // namespace
 
