@@ -707,11 +707,6 @@ void UGridBattleManager::ReportAttackResolution(AFighterPawn* Attacker, AFighter
         }
     }
 
-    if (Attacker)
-    {
-        Attacker->TriggerAttackPresentationFX(Defender);
-    }
-
     const bool bHadListeners = OnAttackResolved.IsBound();
     OnAttackResolved.Broadcast(Attacker, Defender, Result);
 
