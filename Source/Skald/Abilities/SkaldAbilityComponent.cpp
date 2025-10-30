@@ -1678,6 +1678,25 @@ void USkaldAbilityComponent::ApplyStatDeltaToOwner(const FSkaldAbilityStatDelta&
 
     ApplyIntDelta(Fighter->Stats.AttackDice, Delta.AttackDice);
     ApplyIntDelta(Fighter->Stats.AttackDamage, Delta.AttackDamage);
+
+    auto ApplyTypedAttackDamage = [&](int32 Amount, EFighterAttackType RequiredType)
+    {
+        if (Amount == 0)
+        {
+            return;
+        }
+
+        if (Fighter->GetAttackType() != RequiredType)
+        {
+            return;
+        }
+
+        const int32 DeltaValue = bApply ? Amount : -Amount;
+        Fighter->Stats.AttackDamage = FMath::Max(0, Fighter->Stats.AttackDamage + DeltaValue);
+    };
+
+    ApplyTypedAttackDamage(Delta.MeleeAttackDamage, EFighterAttackType::Melee);
+    ApplyTypedAttackDamage(Delta.RangedAttackDamage, EFighterAttackType::Ranged);
     ApplyIntDelta(Fighter->Stats.AttackRange, Delta.AttackRange);
     ApplyIntDelta(Fighter->Stats.Movement, Delta.Movement);
     ApplyIntDelta(Fighter->Stats.Defence, Delta.Defence);
@@ -2132,6 +2151,11 @@ void USkaldAbilityComponent::HandleRuneRiposteTriggered(AFighterPawn* Attacker, 
         return;
     }
 
+    if (OwnerFighter->GetAttackType() != EFighterAttackType::Melee)
+    {
+        return;
+    }
+
     const int32 DamageToApply = FMath::Max(0, OwnerFighter->Stats.AttackDamage);
     if (DamageToApply <= 0)
     {
@@ -2218,6 +2242,24 @@ void USkaldAbilityComponent::ApplyModifierToTarget(AFighterPawn* Target, FSkaldA
 
     ApplyIntDelta(Target->Stats.AttackDice, Modifier.Delta.AttackDice);
     ApplyIntDelta(Target->Stats.AttackDamage, Modifier.Delta.AttackDamage);
+
+    auto ApplyTypedAttackDamage = [&](int32 Amount, EFighterAttackType RequiredType)
+    {
+        if (Amount == 0)
+        {
+            return;
+        }
+
+        if (Target->GetAttackType() != RequiredType)
+        {
+            return;
+        }
+
+        Target->Stats.AttackDamage = FMath::Max(0, Target->Stats.AttackDamage + Amount);
+    };
+
+    ApplyTypedAttackDamage(Modifier.Delta.MeleeAttackDamage, EFighterAttackType::Melee);
+    ApplyTypedAttackDamage(Modifier.Delta.RangedAttackDamage, EFighterAttackType::Ranged);
     ApplyIntDelta(Target->Stats.Movement, Modifier.Delta.Movement);
     ApplyIntDelta(Target->Stats.Defence, Modifier.Delta.Defence);
     ApplyIntDelta(Target->Stats.Strength, Modifier.Delta.Strength);

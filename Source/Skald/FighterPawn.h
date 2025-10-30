@@ -13,6 +13,7 @@ class UCapsuleComponent;
 class UTexture2D;
 class USoundBase;
 class UAudioComponent;
+class UNiagaraComponent;
 class UFighterActivationWidget;
 class UFighterHealthWidget;
 class UCurveFloat;
@@ -174,6 +175,16 @@ public:
             ReplicatedUsing = OnRep_GridFootprint, Category = "Fighter|Grid")
   EFighterPawnFootprint GridFootprint = EFighterPawnFootprint::SingleCell;
 
+  /** Primary attack classification used for combat interactions. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite,
+            ReplicatedUsing = OnRep_AttackType, Category = "Fighter|Combat")
+  EFighterAttackType AttackType = EFighterAttackType::Melee;
+
+  /** Customisable audiovisual payloads for pre-attack presentation. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated,
+            Category = "Fighter|Combat")
+  FFighterAttackFXDefinition AttackFX;
+
   /** True if this fighter belongs to the attacking side. */
   UPROPERTY(BlueprintReadWrite, EditAnywhere, Replicated,
             Category = "Fighter")
@@ -327,6 +338,12 @@ public:
   /** Retrieve the identifier associated with this fighter. */
   FName GetFighterId() const { return FighterId; }
 
+  /** Accessor for the fighter's attack classification. */
+  EFighterAttackType GetAttackType() const { return AttackType; }
+
+  /** Override the fighter's attack classification. */
+  void SetAttackType(EFighterAttackType InAttackType);
+
   /** Maximum health for this fighter. */
   int32 GetMaxHealth() const { return MaxHealth; }
 
@@ -397,6 +414,34 @@ private:
   void OnRep_MaxHealth();
   UFUNCTION()
   void OnRep_IsMoving();
+
+  UFUNCTION()
+  void OnRep_AttackType();
+
+  UFUNCTION(NetMulticast, Reliable)
+  void MulticastPlayPreAttackFX(AFighterPawn *Target);
+
+  void PlayPreAttackFX(AFighterPawn *Target);
+  void PlayMeleePreAttackFX(AFighterPawn *Target);
+  void PlayRangedPreAttackFX(AFighterPawn *Target);
+  FVector ResolveFXOrigin(const FName &SocketName, const FVector &LocalOffset,
+                          FRotator *OutSocketRotation = nullptr) const;
+  void SpawnPreAttackSoundAtLocation(const FVector &Location) const;
+
+  struct FActiveProjectileFX {
+    TWeakObjectPtr<UNiagaraComponent> Component;
+    FVector StartLocation = FVector::ZeroVector;
+    FVector EndLocation = FVector::ZeroVector;
+    float TravelTime = 0.f;
+    float ElapsedTime = 0.f;
+  };
+
+  void TickActiveProjectileFX(float DeltaSeconds);
+  void SpawnProjectileFX(const FVector &SpawnLocation,
+                         const FVector &TargetLocation,
+                         const FRotator &SpawnRotation);
+
+  TArray<FActiveProjectileFX> ActiveProjectileFX;
 
   /** Align the visible mesh with the collision capsule. */
   void UpdateMeshOffset();

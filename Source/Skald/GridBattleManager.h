@@ -115,6 +115,71 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FOnInitiativeRollCompleted, int32,
 
 /** Statistics for a fighter in grid battle mode. */
 USTRUCT(BlueprintType)
+class UNiagaraSystem;
+class USoundBase;
+
+UENUM(BlueprintType)
+enum class EFighterAttackType : uint8
+{
+    Melee UMETA(DisplayName = "Melee"),
+    Ranged UMETA(DisplayName = "Ranged"),
+};
+
+USTRUCT(BlueprintType)
+struct FFighterAttackFXDefinition
+{
+    GENERATED_BODY();
+
+    /** Niagara effect triggered before the attack dice are rolled. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Attack FX")
+    TSoftObjectPtr<UNiagaraSystem> PreAttackEffect;
+
+    /** Optional audio cue played alongside the pre-attack visual. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Attack FX")
+    TSoftObjectPtr<USoundBase> PreAttackSound;
+
+    /** Socket used when spawning pre-attack visuals. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Attack FX")
+    FName PreAttackSocket = NAME_None;
+
+    /** Offset (in local space) applied when spawning pre-attack visuals. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Attack FX")
+    FVector PreAttackOffset = FVector::ZeroVector;
+
+    /** Projectile Niagara effect spawned for ranged attacks. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Attack FX")
+    TSoftObjectPtr<UNiagaraSystem> ProjectileEffect;
+
+    /** Optional audio cue played when spawning a projectile. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Attack FX")
+    TSoftObjectPtr<USoundBase> ProjectileSound;
+
+    /** Socket used as the spawn origin for ranged projectiles. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Attack FX")
+    FName ProjectileSocket = NAME_None;
+
+    /** Offset (in local space) applied when spawning ranged projectiles. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Attack FX")
+    FVector ProjectileOffset = FVector::ZeroVector;
+
+    /** Speed (units per second) used when animating projectile travel. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Attack FX", meta=(ClampMin="0.0"))
+    float ProjectileSpeed = 1200.f;
+
+    /** Parameter set on the projectile Niagara system to represent distance. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Attack FX")
+    FName ProjectileDistanceParameter = TEXT("Distance");
+
+    /** Parameter used to tint the projectile Niagara system, if supported. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Attack FX")
+    FName ProjectileColorParameter = NAME_None;
+
+    /** Colour applied when setting the projectile tint parameter. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Attack FX")
+    FLinearColor ProjectileColor = FLinearColor::White;
+};
+
+USTRUCT(BlueprintType)
 struct FFighterStats
 {
     GENERATED_BODY();
@@ -165,6 +230,8 @@ struct FFighterDefinition : public FTableRowBase
         , Faction(ESkaldFaction::None)
         , Stats()
         , Portrait(nullptr)
+        , AttackType(EFighterAttackType::Melee)
+        , AttackFX()
     {
     }
 
@@ -182,6 +249,14 @@ struct FFighterDefinition : public FTableRowBase
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Fighter")
     TSoftObjectPtr<UTexture2D> Portrait;
+
+    /** Primary attack classification used for damage routing and FX. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Fighter|Combat")
+    EFighterAttackType AttackType = EFighterAttackType::Melee;
+
+    /** Customisable Niagara/SFX payloads played when this fighter attacks. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Fighter|Combat")
+    FFighterAttackFXDefinition AttackFX;
 
     /** Passive ability granted via the fighter's faction. */
     UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category="Fighter|Abilities")
@@ -202,6 +277,10 @@ struct FFighter
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Fighter")
     ESkaldFaction Faction = ESkaldFaction::None;
+
+    /** Primary attack type used when resolving damage and modifiers. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Fighter")
+    EFighterAttackType AttackType = EFighterAttackType::Melee;
 
     /** Current grid position of the fighter. */
     UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Fighter")

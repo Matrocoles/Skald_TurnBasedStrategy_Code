@@ -1350,6 +1350,8 @@ void ASkald_BattleGameMode::SpawnFighterSide(const TArray<FFighterDefinition> &R
       Pawn->FighterId = Def.Id;
       Pawn->FighterPortrait = Def.Portrait;
       Pawn->Faction = Def.Faction;
+      Pawn->SetAttackType(Def.AttackType);
+      Pawn->AttackFX = Def.AttackFX;
       Pawn->bIsAttacker = bAsAttacker;
 
       Pawn->UpdateAbilityLoadout();
@@ -1439,6 +1441,7 @@ void ASkald_BattleGameMode::TryLaunchBattle() {
     FFighter Fighter;
     Fighter.Stats = Def.Stats;
     Fighter.Faction = AttackerPS ? AttackerPS->Faction : Def.Faction;
+    Fighter.AttackType = Def.AttackType;
     Attackers.Add(Fighter);
   }
 
@@ -1448,6 +1451,7 @@ void ASkald_BattleGameMode::TryLaunchBattle() {
     FFighter Fighter;
     Fighter.Stats = Def.Stats;
     Fighter.Faction = DefenderPS ? DefenderPS->Faction : Def.Faction;
+    Fighter.AttackType = Def.AttackType;
     Defenders.Add(Fighter);
   }
 
