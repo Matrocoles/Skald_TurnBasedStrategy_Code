@@ -8,38 +8,25 @@
 #include "Abilities/SkaldAbilityComponent.h"
 #include "FighterPawn.h"
 #include "GridBattleManager.h"
-#include "GridOverlayComponent.h"
 #include "Tests/SkaldAutomationTestHelpers.h"
 #include "Engine/World.h"
-#include "Containers/Set.h"
 
-UCLASS()
-class UTestGridOverlayComponent final : public UGridOverlayComponent
+void UTestGridOverlayComponent::SetDifficultCell(const FIntPoint& Cell, bool bIsDifficult)
 {
-    GENERATED_BODY()
-
-public:
-    void SetDifficultCell(const FIntPoint& Cell, bool bIsDifficult)
+    if (bIsDifficult)
     {
-        if (bIsDifficult)
-        {
-            DifficultCells.Add(Cell);
-        }
-        else
-        {
-            DifficultCells.Remove(Cell);
-        }
+        DifficultCells.Add(Cell);
     }
-
-    virtual bool IsDifficultTerrain(const FIntPoint& GridCoord) const override
+    else
     {
-        return DifficultCells.Contains(GridCoord);
+        DifficultCells.Remove(Cell);
     }
+}
 
-private:
-    UPROPERTY()
-    TSet<FIntPoint> DifficultCells;
-};
+bool UTestGridOverlayComponent::IsDifficultTerrain(const FIntPoint& GridCoord) const
+{
+    return DifficultCells.Contains(GridCoord);
+}
 
 constexpr EAutomationTestFlags::Type DefaultTestFlags =
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter;
