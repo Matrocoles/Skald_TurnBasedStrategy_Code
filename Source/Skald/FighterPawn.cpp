@@ -490,6 +490,15 @@ void AFighterPawn::PlayPreAttackFX(AFighterPawn *Target) {
   }
 }
 
+void AFighterPawn::TriggerAttackPresentationFX(AFighterPawn *Target) {
+  if (HasAuthority()) {
+    MulticastPlayPreAttackFX(Target);
+    return;
+  }
+
+  PlayPreAttackFX(Target);
+}
+
 void AFighterPawn::PlayMeleePreAttackFX(AFighterPawn *Target) {
   if (AttackFX.PreAttackEffect.IsNull() && AttackFX.PreAttackSound.IsNull()) {
     return;
@@ -1520,8 +1529,6 @@ void AFighterPawn::ResolveNextAttackRoll() {
     FinalizeQueuedAttack();
     return;
   }
-
-  MulticastPlayPreAttackFX(Target);
 
   const FDiceRollOutcome &Outcome =
       PendingAttackDiceResult.DiceOutcomes[PendingAttackOutcomeIndex];
