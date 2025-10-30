@@ -28,9 +28,9 @@ bool UTestGridOverlayComponent::IsDifficultTerrain(const FIntPoint& GridCoord) c
     return DifficultCells.Contains(GridCoord);
 }
 
-constexpr EAutomationTestFlags::Type DefaultTestFlags =
-    static_cast<EAutomationTestFlags::Type>(
-        EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter);
+constexpr uint32 DefaultTestFlags =
+    static_cast<uint32>(EAutomationTestFlags::EditorContext) |
+    static_cast<uint32>(EAutomationTestFlags::EngineFilter);
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FPassiveUndeadNecroticResilienceTest,
