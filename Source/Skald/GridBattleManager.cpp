@@ -55,6 +55,24 @@ int32 CountFighters(const TArray<AFighterPawn*>& Fighters, bool bAttackerOnly)
     }
     return Count;
 }
+
+bool TeamHasLivingFaction(const TArray<FFighter>& Fighters, ESkaldFaction Faction)
+{
+    if (Faction == ESkaldFaction::None)
+    {
+        return false;
+    }
+
+    for (const FFighter& Fighter : Fighters)
+    {
+        if (Fighter.Faction == Faction && Fighter.Stats.Health > 0)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
 } // namespace
 
 UGridBattleManager::UGridBattleManager()
@@ -340,6 +358,8 @@ void UGridBattleManager::RollInitiative()
 
     const bool bAttackerRollProvided = PendingInitiativeRollAttacker.IsSet();
     const bool bDefenderRollProvided = PendingInitiativeRollDefender.IsSet();
+    const bool bAttackerHasEmpireDiscipline = TeamHasLivingFaction(AttackerTeam, ESkaldFaction::Empire);
+    const bool bDefenderHasEmpireDiscipline = TeamHasLivingFaction(DefenderTeam, ESkaldFaction::Empire);
 
     int32 Attempts = 0;
     const int32 MaxAttempts = 100;
@@ -376,6 +396,18 @@ void UGridBattleManager::RollInitiative()
         }
 
         ++Attempts;
+    }
+
+    if (bAttackerHasEmpireDiscipline && !bAttackerRollProvided)
+    {
+        const int32 Reroll = Rng.RandRange(1, InitiativeDiceSides);
+        AttackerRoll = FMath::Max(AttackerRoll, Reroll);
+    }
+
+    if (bDefenderHasEmpireDiscipline && !bDefenderRollProvided)
+    {
+        const int32 Reroll = Rng.RandRange(1, InitiativeDiceSides);
+        DefenderRoll = FMath::Max(DefenderRoll, Reroll);
     }
 
     if (AttackerRoll == DefenderRoll)

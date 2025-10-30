@@ -47,7 +47,7 @@ Individual armies can nudge thresholds up or down if data-table tuning warrants 
 
 ## Undead Faction
 
-* **Passive – Necrotic Resilience:** Undead fighters do not lose Strength from being reduced to 1 Health and ignore morale-based effects.
+* **Passive – Necrotic Resilience:** When reduced to 1 Health, Undead fighters gain `+1 Defence` and `+1 AttackDice` until they heal above 1 Health and ignore morale-based effects.
 * **Skirmish Ability – Grave Grasp (Action):** Attack a target within 3 squares. On a hit, root the enemy (Movement becomes 0) until end of its next activation.
 * **Line Ability – Soul Harvest (Action):** After defeating an enemy this activation, immediately gain `+1 AttackDice` and heal 1 Health (cannot exceed max). If no enemy dies, regain the action instead.
 * **Elite Ability – Deathless Advance (Free, once per battle):** When reduced to 0 Health, stand back up at 1 Health and gain `+2 AttackDice` for the rest of the round; afterwards, remove this ability.

@@ -1,5 +1,6 @@
 #include "GridOverlayComponent.h"
 #include "CollisionQueryParams.h"
+#include "Containers/Map.h"
 #include "Containers/Queue.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/EngineTypes.h"
@@ -542,6 +543,14 @@ float UGridOverlayComponent::GetCellHeight(const FIntPoint &GridCoord) const {
   }
   const int32 Idx = Index(GridCoord);
   return CellHeights.IsValidIndex(Idx) ? CellHeights[Idx] : Origin.Z;
+}
+
+bool UGridOverlayComponent::IsDifficultTerrain(const FIntPoint &GridCoord) const {
+  if (!IsValidGrid(GridCoord)) {
+    return false;
+  }
+  const int32 Idx = Index(GridCoord);
+  return ColumnTouchesTerrain.IsValidIndex(Idx) && ColumnTouchesTerrain[Idx];
 }
 
 void UGridOverlayComponent::SetOccupied(const FIntPoint &GridCoord,
@@ -1581,9 +1590,9 @@ void UGridOverlayComponent::HighlightMovement(AFighterPawn *Fighter) {
 
   HighlightFootprint(StartCell, SelectionColor);
 
-  TSet<FIntPoint> Visited;
+  TMap<FIntPoint, int32> BestCost;
   TQueue<TPair<FIntPoint, int32>> Frontier;
-  Visited.Add(StartCell);
+  BestCost.Add(StartCell, 0);
   Frontier.Enqueue(TPair<FIntPoint, int32>(StartCell, 0));
 
   TSet<FIntPoint> IgnoredCells;
@@ -1611,6 +1620,10 @@ void UGridOverlayComponent::HighlightMovement(AFighterPawn *Fighter) {
     const FIntPoint Cell = Node.Key;
     const int32 Distance = Node.Value;
 
+    if (Distance > Range) {
+      continue;
+    }
+
     if (Distance > 0) {
       HighlightFootprint(Cell, MovementColor);
     }
@@ -1625,9 +1638,6 @@ void UGridOverlayComponent::HighlightMovement(AFighterPawn *Fighter) {
 
     for (const FIntPoint &Dir : Directions) {
       const FIntPoint Next = Cell + Dir;
-      if (Visited.Contains(Next)) {
-        continue;
-      }
       if (!CanTraverseVertical(Cell, Next)) {
         continue;
       }
@@ -1665,8 +1675,19 @@ void UGridOverlayComponent::HighlightMovement(AFighterPawn *Fighter) {
           continue;
         }
       }
-      Visited.Add(Next);
-      Frontier.Enqueue(TPair<FIntPoint, int32>(Next, Distance + 1));
+      const int32 StepCost = FMath::Max(1, Fighter->GetMovementStepCost(Cell, Next, this));
+      const int32 NewCost = Distance + StepCost;
+      if (NewCost > Range) {
+        continue;
+      }
+
+      const int32 *ExistingCost = BestCost.Find(Next);
+      if (ExistingCost && *ExistingCost <= NewCost) {
+        continue;
+      }
+
+      BestCost.Add(Next, NewCost);
+      Frontier.Enqueue(TPair<FIntPoint, int32>(Next, NewCost));
     }
   }
 }

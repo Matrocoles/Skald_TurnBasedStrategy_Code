@@ -142,6 +142,8 @@ public:
   int32 GetFootprintDistanceToFighter(
       const AFighterPawn *Other, FIntPoint *OutSelfCell = nullptr,
       FIntPoint *OutOtherCell = nullptr) const;
+  int32 GetMovementStepCost(const FIntPoint &From, const FIntPoint &To,
+                            const UGridOverlayComponent *Grid) const;
 
   /** Determine if any occupied cells have line of sight within range. */
   bool HasLineOfSightToFighter(const AFighterPawn *Other, int32 Range,
@@ -209,6 +211,15 @@ public:
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Fighter")
   bool IsCurrentlyActive() const { return bIsCurrentlyActive; }
 
+  /** Notify the fighter that a passive buff became active. */
+  void NotifyPassiveBuffApplied(const FSkaldAbilityDefinition &Definition);
+
+  /** Notify the fighter that a passive buff ended. */
+  void NotifyPassiveBuffRemoved(FName AbilityId);
+
+  /** Clear any lingering passive buff visuals. */
+  void ClearAllPassiveBuffIndicators();
+
   /** Remaining actions for the active turn. */
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Fighter")
   int32 GetActionsRemaining() const { return ActionsRemaining; }
@@ -261,21 +272,41 @@ public:
   UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|Selection")
   UDecalComponent *SelectionDecal;
 
+  /** Decal shown while passive buffs affect the fighter. */
+  UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|Buffs")
+  UDecalComponent *PassiveBuffDecal = nullptr;
+
   /** Material used for the selection decal. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Selection")
   TObjectPtr<UMaterialInterface> SelectionDecalMaterial;
+
+  /** Material used for the passive buff decal. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Buffs")
+  TObjectPtr<UMaterialInterface> PassiveBuffDecalMaterial;
 
   /** Size used for the selection decal on single-cell fighters. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Selection")
   FVector SelectionDecalSizeSingleCell = FVector(32.f, 160.f, 160.f);
 
+  /** Size used for the passive buff decal on single-cell fighters. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Buffs")
+  FVector PassiveBuffDecalSizeSingleCell = FVector(32.f, 160.f, 160.f);
+
   /** Size used for the selection decal on four-cell fighters. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Selection")
   FVector SelectionDecalSizeFourCells = FVector(64.f, 320.f, 320.f);
 
+  /** Size used for the passive buff decal on four-cell fighters. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Buffs")
+  FVector PassiveBuffDecalSizeFourCells = FVector(64.f, 320.f, 320.f);
+
   /** Additional vertical offset applied to the selection decal. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Selection")
   float SelectionDecalFloorOffset = 0.f;
+
+  /** Additional vertical offset applied to the passive buff decal. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Buffs")
+  float PassiveBuffDecalFloorOffset = 0.f;
 
   /** Decal shown when the fighter is targeted for an incoming attack. */
   UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|Targeting")
@@ -382,6 +413,8 @@ private:
   /** Timer used to release automatic holds if no presentation consumes them. */
   FTimerHandle AutoHealthHoldTimerHandle;
 
+  bool TreatsDifficultTerrainAsNormal() const;
+
   bool ShouldOverrideSpawnFacingYaw() const;
   float GetCurrentWorldFacingYaw() const;
 
@@ -487,6 +520,18 @@ private:
 
   /** Apply the configured material to the targeted decal. */
   void RefreshTargetedIndicatorMaterial();
+
+  /** Toggle the passive buff decal visibility. */
+  void SetPassiveBuffVisible(bool bVisible);
+
+  /** Resize the passive buff decal based on the current footprint. */
+  void UpdatePassiveBuffDecalSize();
+
+  /** Align the passive buff decal with the ground plane. */
+  void UpdatePassiveBuffDecalTransform();
+
+  /** Apply the configured material to the passive buff decal. */
+  void RefreshPassiveBuffDecalMaterial();
 
   /** Resolve and cache an activation icon texture. */
   UTexture2D *ResolveActivationIcon(TSoftObjectPtr<UTexture2D> &IconSource,
@@ -607,6 +652,9 @@ private:
   /** Dynamic materials sourced from the display mesh for hit effects. */
   UPROPERTY()
   TArray<TObjectPtr<UMaterialInstanceDynamic>> CachedDisplayMeshMIDs;
+
+  /** Tracking for active passive buff sources to manage visuals. */
+  TMap<FName, int32> ActivePassiveBuffSources;
 
   float HitFlashElapsed = 0.f;
   float HitFlashStrength = 1.f;

@@ -6,6 +6,7 @@
 #include "Components/DecalComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/WidgetComponent.h"
+#include "Containers/Map.h"
 #include "Containers/Queue.h"
 #include "Containers/Set.h"
 #include "Engine/CollisionProfile.h"
@@ -140,6 +141,19 @@ AFighterPawn::AFighterPawn() : MaxHealth(0) {
   SelectionDecal->SetVisibility(false);
   SelectionDecal->SetCanEverAffectNavigation(false);
 
+  PassiveBuffDecal =
+      CreateDefaultSubobject<UDecalComponent>(TEXT("PassiveBuffDecal"));
+  PassiveBuffDecal->SetupAttachment(CollisionComponent);
+  PassiveBuffDecal->SetRelativeRotation(FRotator(-90.f, 0.f, 0.f));
+  PassiveBuffDecal->SetRelativeLocation(
+      FVector(0.f, 0.f,
+              -CollisionComponent->GetUnscaledCapsuleHalfHeight() +
+                  PassiveBuffDecalFloorOffset));
+  PassiveBuffDecal->DecalSize = PassiveBuffDecalSizeSingleCell;
+  PassiveBuffDecal->SetHiddenInGame(true);
+  PassiveBuffDecal->SetVisibility(false);
+  PassiveBuffDecal->SetCanEverAffectNavigation(false);
+
   TargetedDecal =
       CreateDefaultSubobject<UDecalComponent>(TEXT("TargetedDecal"));
   TargetedDecal->SetupAttachment(CollisionComponent);
@@ -176,6 +190,8 @@ AFighterPawn::AFighterPawn() : MaxHealth(0) {
   UpdateTargetedIndicatorTransform();
   RefreshSelectionIndicatorMaterial();
   RefreshTargetedIndicatorMaterial();
+  UpdatePassiveBuffDecalTransform();
+  RefreshPassiveBuffDecalMaterial();
 }
 
 void AFighterPawn::GetLifetimeReplicatedProps(
@@ -209,6 +225,10 @@ void AFighterPawn::OnConstruction(const FTransform &Transform) {
   UpdateTargetedIndicatorSize();
   UpdateTargetedIndicatorTransform();
   RefreshTargetedIndicatorMaterial();
+  UpdatePassiveBuffDecalSize();
+  UpdatePassiveBuffDecalTransform();
+  RefreshPassiveBuffDecalMaterial();
+  SetPassiveBuffVisible(false);
   SetTargetedIndicatorVisible(false);
   RefreshDisplayMeshYawOffset();
   const float IncomingSpawnYaw = Transform.GetRotation().Rotator().Yaw;
@@ -710,6 +730,43 @@ void AFighterPawn::SetTargetedIndicatorVisible(bool bVisible) {
   TargetedDecal->SetHiddenInGame(!bVisible);
 }
 
+void AFighterPawn::NotifyPassiveBuffApplied(
+    const FSkaldAbilityDefinition &Definition) {
+  if (!Definition.IsValid()) {
+    return;
+  }
+
+  int32 &Count = ActivePassiveBuffSources.FindOrAdd(Definition.AbilityId);
+  ++Count;
+
+  UpdatePassiveBuffDecalSize();
+  UpdatePassiveBuffDecalTransform();
+  RefreshPassiveBuffDecalMaterial();
+  SetPassiveBuffVisible(true);
+}
+
+void AFighterPawn::NotifyPassiveBuffRemoved(FName AbilityId) {
+  if (AbilityId.IsNone()) {
+    return;
+  }
+
+  if (int32 *Count = ActivePassiveBuffSources.Find(AbilityId)) {
+    *Count = FMath::Max(0, *Count - 1);
+    if (*Count == 0) {
+      ActivePassiveBuffSources.Remove(AbilityId);
+    }
+  }
+
+  if (ActivePassiveBuffSources.Num() == 0) {
+    SetPassiveBuffVisible(false);
+  }
+}
+
+void AFighterPawn::ClearAllPassiveBuffIndicators() {
+  ActivePassiveBuffSources.Empty();
+  SetPassiveBuffVisible(false);
+}
+
 FIntPoint AFighterPawn::GetCurrentCell() const { return CurrentCell; }
 
 int32 AFighterPawn::GetFootprintSideLength() const {
@@ -809,6 +866,31 @@ int32 AFighterPawn::GetFootprintDistanceToFighter(
   return BestDistance;
 }
 
+bool AFighterPawn::TreatsDifficultTerrainAsNormal() const {
+  if (!AbilityComponent) {
+    return false;
+  }
+
+  const FSkaldAbilityDefinition Passive = AbilityComponent->GetPassiveAbility();
+  return Passive.AbilityId == TEXT("Ability_Frog_Passive");
+}
+
+int32 AFighterPawn::GetMovementStepCost(const FIntPoint &From, const FIntPoint &To,
+                                        const UGridOverlayComponent *Grid) const {
+  if (From == To) {
+    return 0;
+  }
+
+  const bool bTreatsTerrainAsNormal = TreatsDifficultTerrainAsNormal();
+  const bool bDifficult = Grid && (Grid->IsDifficultTerrain(From) ||
+                                   Grid->IsDifficultTerrain(To));
+  if (!bDifficult || bTreatsTerrainAsNormal) {
+    return 1;
+  }
+
+  return 2;
+}
+
 bool AFighterPawn::HasLineOfSightToFighter(
     const AFighterPawn *Other, int32 Range, UGridOverlayComponent *Grid,
     FIntPoint *OutSelfCell, FIntPoint *OutOtherCell) const {
@@ -874,6 +956,7 @@ void AFighterPawn::ApplyFootprintScale() {
 
   UpdateSelectionIndicatorSize();
   UpdateTargetedIndicatorSize();
+  UpdatePassiveBuffDecalSize();
 }
 
 void AFighterPawn::UpdateSelectionIndicatorSize() {
@@ -934,6 +1017,46 @@ void AFighterPawn::RefreshTargetedIndicatorMaterial() {
   }
 
   TargetedDecal->SetDecalMaterial(TargetedDecalMaterial);
+}
+
+void AFighterPawn::SetPassiveBuffVisible(bool bVisible) {
+  if (!PassiveBuffDecal) {
+    return;
+  }
+
+  PassiveBuffDecal->SetVisibility(bVisible);
+  PassiveBuffDecal->SetHiddenInGame(!bVisible);
+}
+
+void AFighterPawn::UpdatePassiveBuffDecalSize() {
+  if (!PassiveBuffDecal) {
+    return;
+  }
+
+  const FVector DesiredSize =
+      GridFootprint == EFighterPawnFootprint::FourCells
+          ? PassiveBuffDecalSizeFourCells
+          : PassiveBuffDecalSizeSingleCell;
+  PassiveBuffDecal->DecalSize = DesiredSize;
+}
+
+void AFighterPawn::UpdatePassiveBuffDecalTransform() {
+  if (!PassiveBuffDecal || !CollisionComponent) {
+    return;
+  }
+
+  const float CapsuleHalfHeight = CollisionComponent->GetScaledCapsuleHalfHeight();
+  const float VerticalOffset =
+      -CapsuleHalfHeight + PassiveBuffDecalFloorOffset;
+  PassiveBuffDecal->SetRelativeLocation(FVector(0.f, 0.f, VerticalOffset));
+}
+
+void AFighterPawn::RefreshPassiveBuffDecalMaterial() {
+  if (!PassiveBuffDecal) {
+    return;
+  }
+
+  PassiveBuffDecal->SetDecalMaterial(PassiveBuffDecalMaterial);
 }
 
 void AFighterPawn::RefreshDisplayMeshYawOffset() {
@@ -1041,9 +1164,9 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
           FIntPoint(1, 0),  FIntPoint(-1, 0), FIntPoint(0, 1),  FIntPoint(0, -1),
           FIntPoint(1, 1),  FIntPoint(1, -1), FIntPoint(-1, 1), FIntPoint(-1, -1)};
 
-      TSet<FIntPoint> Visited;
+      TMap<FIntPoint, int32> BestCost;
       TQueue<TPair<FIntPoint, int32>> Frontier;
-      Visited.Add(CurrentCell);
+      BestCost.Add(CurrentCell, 0);
       Frontier.Enqueue(TPair<FIntPoint, int32>(CurrentCell, 0));
 
       while (!Frontier.IsEmpty()) {
@@ -1053,20 +1176,17 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
         const FIntPoint Cell = Node.Key;
         const int32 DistanceFromStart = Node.Value;
 
+        if (DistanceFromStart > Stats.Movement) {
+          continue;
+        }
+
         if (Cell == TargetCell) {
           bTargetReachable = true;
           break;
         }
 
-        if (DistanceFromStart >= Stats.Movement) {
-          continue;
-        }
-
         for (const FIntPoint &Dir : Directions) {
           const FIntPoint Next = Cell + Dir;
-          if (Visited.Contains(Next)) {
-            continue;
-          }
           if (!CanOccupyAnchor(Next)) {
             continue;
           }
@@ -1103,9 +1223,19 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
               continue;
             }
           }
+          const int32 StepCost = FMath::Max(1, GetMovementStepCost(Cell, Next, Grid));
+          const int32 NewCost = DistanceFromStart + StepCost;
+          if (NewCost > Stats.Movement) {
+            continue;
+          }
 
-          Visited.Add(Next);
-          Frontier.Enqueue(TPair<FIntPoint, int32>(Next, DistanceFromStart + 1));
+          const int32 *ExistingCost = BestCost.Find(Next);
+          if (ExistingCost && *ExistingCost <= NewCost) {
+            continue;
+          }
+
+          BestCost.Add(Next, NewCost);
+          Frontier.Enqueue(TPair<FIntPoint, int32>(Next, NewCost));
         }
       }
     }
@@ -1520,6 +1650,9 @@ void AFighterPawn::ClearQueuedAttackState(bool bBroadcastFinalized) {
 void AFighterPawn::HandleIncomingAttackStarted() {
   ++ActiveIncomingAttackCount;
   SetTargetedIndicatorVisible(true);
+  if (AbilityComponent) {
+    AbilityComponent->HandleIncomingAttackStarted();
+  }
 }
 
 void AFighterPawn::HandleIncomingAttackFinished() {
@@ -1530,6 +1663,9 @@ void AFighterPawn::HandleIncomingAttackFinished() {
   if (ActiveIncomingAttackCount <= 0) {
     ActiveIncomingAttackCount = 0;
     SetTargetedIndicatorVisible(false);
+  }
+  if (AbilityComponent) {
+    AbilityComponent->HandleIncomingAttackFinished();
   }
 }
 

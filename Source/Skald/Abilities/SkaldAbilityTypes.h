@@ -174,3 +174,9 @@ SKALD_API FSkaldAbilityDefinition GetFactionPassive(ESkaldFaction Faction);
 /** Fetch the active ability for a fighter based on faction and cost. */
 SKALD_API FSkaldAbilityDefinition GetFactionActiveAbility(ESkaldFaction Faction, int32 ArmyCost);
 
+/** Lookup an ability definition by its identifier if available. */
+SKALD_API FSkaldAbilityDefinition GetAbilityDefinitionById(FName AbilityId);
+
+/** True if the provided identifier maps to a registered passive ability. */
+SKALD_API bool IsPassiveAbilityId(FName AbilityId);
+
