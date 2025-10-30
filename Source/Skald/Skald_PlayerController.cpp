@@ -5126,9 +5126,6 @@ void ASkaldPlayerController::PlayAttackFeedback(
   FDiceRollOutcome SyntheticOutcome;
   SyntheticOutcome.bHit = Result.TotalDamage > 0;
   SyntheticOutcome.bCritical = Result.CriticalHitCount > 0;
-  if (Attacker) {
-    Attacker->TriggerAttackPresentationFX(Defender);
-  }
   PlayDiceOutcomeFeedback(Attacker, Defender, SyntheticOutcome);
 }
 
@@ -5487,9 +5484,6 @@ void ASkaldPlayerController::HandleDiceResolutionComplete(
 void ASkaldPlayerController::HandleDiceOutcomeRevealed(
     AFighterPawn *Attacker, AFighterPawn *Defender,
     const FDiceRollOutcome &Outcome, int32 RevealIndex) {
-  if (Attacker) {
-    Attacker->TriggerAttackPresentationFX(Defender);
-  }
   PlayDiceOutcomeFeedback(Attacker, Defender, Outcome);
 
   if (Defender && Outcome.bHit) {
