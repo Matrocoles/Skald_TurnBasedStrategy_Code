@@ -861,7 +861,9 @@ bool ASkaldAIController::TryMoveTowardsNearestEnemy(AFighterPawn *Fighter) {
         continue;
       }
 
-      const int32 StepCost = DistanceFromStart + 1;
+      const int32 MovementCost =
+          FMath::Max(1, Fighter->GetMovementStepCost(Cell, Next, Grid));
+      const int32 StepCost = DistanceFromStart + MovementCost;
       if (StepCost > MaxSteps) {
         continue;
       }
