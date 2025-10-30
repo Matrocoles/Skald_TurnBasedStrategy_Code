@@ -21,6 +21,7 @@
 #include "TimerManager.h"
 #include "UI/SkaldMainHUDWidget.h"
 #include "WorldMap.h"
+#include "Containers/Map.h"
 #include <limits>
 
 namespace {
@@ -838,30 +839,48 @@ bool ASkaldAIController::TryMoveTowardsNearestEnemy(AFighterPawn *Fighter) {
       FIntPoint(1, 0),  FIntPoint(-1, 0), FIntPoint(0, 1),  FIntPoint(0, -1),
       FIntPoint(1, 1),  FIntPoint(1, -1), FIntPoint(-1, 1), FIntPoint(-1, -1)};
 
-  TSet<FIntPoint> Visited;
-  TQueue<TPair<FIntPoint, int32>> Frontier;
-  Visited.Add(StartCell);
-  Frontier.Enqueue(TPair<FIntPoint, int32>(StartCell, 0));
+  struct FAIMovementFrontierNode {
+    FIntPoint Cell;
+    int32 PathCost;
+  };
+
+  auto FrontierComparator = [](const FAIMovementFrontierNode &A,
+                               const FAIMovementFrontierNode &B) {
+    return A.PathCost < B.PathCost;
+  };
+
+  TArray<FAIMovementFrontierNode> Frontier;
+  Frontier.Reserve(32);
+  Frontier.Add({StartCell, 0});
+
+  TMap<FIntPoint, int32> BestPathCosts;
+  BestPathCosts.Reserve(32);
+  BestPathCosts.Add(StartCell, 0);
 
   FIntPoint BestAnchor = StartCell;
   int32 BestDistance = CurrentDistance;
   int32 BestPathCost = TNumericLimits<int32>::Max();
 
-  while (!Frontier.IsEmpty()) {
-    TPair<FIntPoint, int32> Node;
-    Frontier.Dequeue(Node);
+  while (Frontier.Num() > 0) {
+    Frontier.Sort(FrontierComparator);
 
-    const FIntPoint Cell = Node.Key;
-    const int32 DistanceFromStart = Node.Value;
+    const FAIMovementFrontierNode Node = Frontier[0];
+    Frontier.RemoveAt(0, 1, /*bAllowShrinking*/ false);
+
+    const FIntPoint Cell = Node.Cell;
+    const int32 DistanceFromStart = Node.PathCost;
+
+    const int32 *RecordedCost = BestPathCosts.Find(Cell);
+    if (!RecordedCost || DistanceFromStart > *RecordedCost) {
+      continue;
+    }
 
     for (const FIntPoint &Dir : Directions) {
       const FIntPoint Next = Cell + Dir;
 
-      if (Visited.Contains(Next)) {
-        continue;
-      }
-
-      const int32 StepCost = DistanceFromStart + 1;
+      const int32 MovementCost =
+          FMath::Max(1, Fighter->GetMovementStepCost(Cell, Next, Grid));
+      const int32 StepCost = DistanceFromStart + MovementCost;
       if (StepCost > MaxSteps) {
         continue;
       }
@@ -874,8 +893,13 @@ bool ASkaldAIController::TryMoveTowardsNearestEnemy(AFighterPawn *Fighter) {
         continue;
       }
 
-      Visited.Add(Next);
-      Frontier.Enqueue(TPair<FIntPoint, int32>(Next, StepCost));
+      const int32 *ExistingCost = BestPathCosts.Find(Next);
+      if (ExistingCost && StepCost >= *ExistingCost) {
+        continue;
+      }
+
+      BestPathCosts.Add(Next, StepCost);
+      Frontier.Add({Next, StepCost});
 
       const int32 CandidateDistance = ComputeDistanceFromAnchor(Next);
       if (CandidateDistance > BestDistance) {
