@@ -45,6 +45,8 @@ private:
 };
 
 class AFighterPawn; // MUST be before the delegates
+class UNiagaraSystem;
+class USoundBase;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
     FOnBattleEnded, ESkaldFaction, WinningFaction, int32, AttackerCasualties, int32, DefenderCasualties);
@@ -112,11 +114,6 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnRoundStarted, int32, RoundNumber
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInitiativePhaseStarted, int32, RoundNumber);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FOnInitiativeRollCompleted, int32, RoundNumber,
     int32, AttackerRoll, int32, DefenderRoll, ESkaldFaction, WinningFaction);
-
-/** Statistics for a fighter in grid battle mode. */
-USTRUCT(BlueprintType)
-class UNiagaraSystem;
-class USoundBase;
 
 UENUM(BlueprintType)
 enum class EFighterAttackType : uint8
