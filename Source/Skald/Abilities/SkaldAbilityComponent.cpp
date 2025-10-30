@@ -49,12 +49,15 @@ void ApplyDefaultModifierDuration(FSkaldActiveAbilityModifier& Modifier)
         return;
     }
 
+    if (Modifier.RemainingRounds > 0)
+    {
+        Modifier.bRemoveWhenRoundsExpire = true;
+        return;
+    }
+
     Modifier.bRemoveOnRoundStart = true;
     Modifier.bRemoveWhenRoundsExpire = true;
-    if (Modifier.RemainingRounds <= 0)
-    {
-        Modifier.RemainingRounds = 1;
-    }
+    Modifier.RemainingRounds = 1;
 }
 } // namespace
 
@@ -1093,6 +1096,7 @@ void USkaldAbilityComponent::ApplyAbilityEffects(const FSkaldAbilityDefinition& 
                         FSkaldActiveAbilityModifier Modifier;
                         Modifier.SourceAbilityId = Definition.AbilityId;
                         Modifier.Delta.Movement = 1;
+                        Modifier.RemainingRounds = 1;
                         Modifier.bRemoveOnRoundStart = true;
                         ApplyModifierToTarget(Fighter, MoveTemp(Modifier));
                     }
@@ -1305,6 +1309,7 @@ void USkaldAbilityComponent::ApplyAbilityEffects(const FSkaldAbilityDefinition& 
                     FSkaldActiveAbilityModifier Modifier;
                     Modifier.SourceAbilityId = Definition.AbilityId;
                     Modifier.Delta.Defence = 1;
+                    Modifier.RemainingRounds = 1;
                     Modifier.bRemoveOnRoundStart = true;
                     ApplyModifierToTarget(BestAlly, MoveTemp(Modifier));
 
@@ -1341,6 +1346,7 @@ void USkaldAbilityComponent::ApplyAbilityEffects(const FSkaldAbilityDefinition& 
                         {
                             Modifier.Delta.AttackDice = -1;
                         }
+                        Modifier.RemainingRounds = 1;
                         Modifier.bRemoveOnRoundStart = true;
                         ApplyModifierToTarget(Fighter, MoveTemp(Modifier));
                     }
@@ -1926,6 +1932,7 @@ void USkaldAbilityComponent::HandleBattleAttackResolved(AFighterPawn* Attacker, 
                 FSkaldActiveAbilityModifier Modifier;
                 Modifier.SourceAbilityId = TEXT("Ability_Undead_Line");
                 Modifier.Delta.AttackDice = 1;
+                Modifier.RemainingRounds = 1;
                 Modifier.bRemoveOnRoundStart = true;
                 AddActiveModifier(MoveTemp(Modifier));
                 HealFighter(OwnerFighter, 1);
@@ -2135,6 +2142,7 @@ void USkaldAbilityComponent::HandleRallyingShotResolved(const FDiceRollResult& R
     FSkaldActiveAbilityModifier Modifier;
     Modifier.SourceAbilityId = TEXT("Ability_Human_Skirmish");
     Modifier.Delta.Movement = 1;
+    Modifier.RemainingRounds = 1;
     Modifier.bRemoveOnRoundStart = true;
     ApplyModifierToTarget(BestAlly, MoveTemp(Modifier));
 }
@@ -2218,6 +2226,7 @@ void USkaldAbilityComponent::HandleOwnerHealthChanged(int32 NewHealth)
     FSkaldActiveAbilityModifier Modifier;
     Modifier.SourceAbilityId = TEXT("Ability_Undead_Elite");
     Modifier.Delta.AttackDice = 2;
+    Modifier.RemainingRounds = 1;
     Modifier.bRemoveOnRoundStart = true;
     AddActiveModifier(MoveTemp(Modifier));
 
