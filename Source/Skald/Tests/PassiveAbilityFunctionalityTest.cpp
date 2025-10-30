@@ -4,43 +4,31 @@
 #if WITH_AUTOMATION_TESTS
 
 #include "Abilities/SkaldAbilityComponent.h"
+#include "Engine/World.h"
 #include "FighterPawn.h"
 #include "GridBattleManager.h"
-#include "GridOverlayComponent.h"
+#include "Tests/PassiveAbilityFunctionalityTest.h"
 #include "Tests/SkaldAutomationTestHelpers.h"
-#include "Engine/World.h"
-#include "Containers/Set.h"
-
-UCLASS()
-class UTestGridOverlayComponent final : public UGridOverlayComponent
-{
-    GENERATED_BODY()
-
-public:
-    void SetDifficultCell(const FIntPoint& Cell, bool bIsDifficult)
-    {
-        if (bIsDifficult)
-        {
-            DifficultCells.Add(Cell);
-        }
-        else
-        {
-            DifficultCells.Remove(Cell);
-        }
-    }
-
-    virtual bool IsDifficultTerrain(const FIntPoint& GridCoord) const override
-    {
-        return DifficultCells.Contains(GridCoord);
-    }
-
-private:
-    UPROPERTY()
-    TSet<FIntPoint> DifficultCells;
-};
 
 constexpr EAutomationTestFlags::Type DefaultTestFlags =
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter;
+
+void UTestGridOverlayComponent::SetDifficultCell(const FIntPoint& Cell, bool bIsDifficult)
+{
+    if (bIsDifficult)
+    {
+        DifficultCells.Add(Cell);
+    }
+    else
+    {
+        DifficultCells.Remove(Cell);
+    }
+}
+
+bool UTestGridOverlayComponent::IsDifficultTerrain(const FIntPoint& GridCoord) const
+{
+    return DifficultCells.Contains(GridCoord);
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FPassiveUndeadNecroticResilienceTest,
