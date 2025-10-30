@@ -1,6 +1,7 @@
+#include "Tests/PassiveAbilityFunctionalityTest.h"
+
 #include "CoreMinimal.h"
 #include "Misc/AutomationTest.h"
-#include "Tests/PassiveAbilityFunctionalityTest.h"
 
 #if WITH_AUTOMATION_TESTS
 
