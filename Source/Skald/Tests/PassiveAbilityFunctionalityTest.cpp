@@ -11,9 +11,6 @@
 #include "GridBattleManager.h"
 #include "Tests/SkaldAutomationTestHelpers.h"
 
-constexpr EAutomationTestFlags::Type DefaultTestFlags =
-    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter;
-
 void UTestGridOverlayComponent::SetDifficultCell(const FIntPoint& Cell, bool bIsDifficult)
 {
     if (bIsDifficult)
@@ -34,7 +31,7 @@ bool UTestGridOverlayComponent::IsDifficultTerrain(const FIntPoint& GridCoord) c
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FPassiveUndeadNecroticResilienceTest,
     "Skald.Ability.Passive.UndeadNecroticResilience",
-    DefaultTestFlags)
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FPassiveUndeadNecroticResilienceTest::RunTest(const FString& Parameters)
 {
@@ -110,7 +107,7 @@ bool FPassiveUndeadNecroticResilienceTest::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FFrogPassiveDifficultTerrainTest,
     "Skald.Ability.Passive.FrogTerrainCost",
-    DefaultTestFlags)
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FFrogPassiveDifficultTerrainTest::RunTest(const FString& Parameters)
 {
@@ -177,7 +174,7 @@ bool FFrogPassiveDifficultTerrainTest::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FEmpirePassiveInitiativeRerollTest,
     "Skald.Ability.Passive.EmpireInitiativeReroll",
-    DefaultTestFlags)
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FEmpirePassiveInitiativeRerollTest::RunTest(const FString& Parameters)
 {
