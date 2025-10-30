@@ -1360,8 +1360,6 @@ void AFighterPawn::StartQueuedAttack(AFighterPawn *Target,
     TargetPawn->HandleIncomingAttackStarted();
   }
 
-  MulticastPlayPreAttackFX(Target);
-
   if (!PendingAttackDiceResult.DiceOutcomes.IsValidIndex(0)) {
     FinalizeQueuedAttack();
     return;
@@ -1392,6 +1390,8 @@ void AFighterPawn::ResolveNextAttackRoll() {
     FinalizeQueuedAttack();
     return;
   }
+
+  MulticastPlayPreAttackFX(Target);
 
   const FDiceRollOutcome &Outcome =
       PendingAttackDiceResult.DiceOutcomes[PendingAttackOutcomeIndex];

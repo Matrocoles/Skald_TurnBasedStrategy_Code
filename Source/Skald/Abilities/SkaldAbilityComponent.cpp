@@ -35,6 +35,27 @@ FName BuildFactionRowName(ESkaldFaction Faction)
 
     return NAME_None;
 }
+
+bool ModifierHasExplicitDuration(const FSkaldActiveAbilityModifier& Modifier)
+{
+    return Modifier.bRemoveOnRoundStart || Modifier.bRemoveOnActivationStart
+        || Modifier.bRemoveOnActivationEnd || Modifier.bRemoveWhenRoundsExpire;
+}
+
+void ApplyDefaultModifierDuration(FSkaldActiveAbilityModifier& Modifier)
+{
+    if (ModifierHasExplicitDuration(Modifier))
+    {
+        return;
+    }
+
+    Modifier.bRemoveOnRoundStart = true;
+    Modifier.bRemoveWhenRoundsExpire = true;
+    if (Modifier.RemainingRounds <= 0)
+    {
+        Modifier.RemainingRounds = 1;
+    }
+}
 } // namespace
 
 USkaldAbilityComponent::USkaldAbilityComponent()
@@ -1359,6 +1380,7 @@ void USkaldAbilityComponent::AddActiveModifier(FSkaldActiveAbilityModifier&& Mod
         return;
     }
 
+    ApplyDefaultModifierDuration(Modifier);
     ApplyStatDeltaToOwner(Modifier.Delta, true);
     ActiveModifiers.Add(MoveTemp(Modifier));
 }
