@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Misc/AutomationTest.h"
 
+#if defined(WITH_AUTOMATION_TESTS)
 #if WITH_AUTOMATION_TESTS
 
 #include "Abilities/SkaldAbilityComponent.h"
@@ -28,11 +29,10 @@ bool UTestGridOverlayComponent::IsDifficultTerrain(const FIntPoint& GridCoord) c
     return DifficultCells.Contains(GridCoord);
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-    FPassiveUndeadNecroticResilienceTest,
-    "Skald.Ability.Passive.UndeadNecroticResilience",
-    EAutomationTestFlags::EditorContext |
-        EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPassiveUndeadNecroticResilienceTest,
+                                 "Skald.Ability.Passive.UndeadNecroticResilience",
+                                 EAutomationTestFlags::EditorContext |
+                                     EAutomationTestFlags::EngineFilter)
 
 bool FPassiveUndeadNecroticResilienceTest::RunTest(const FString& Parameters)
 {
@@ -105,11 +105,10 @@ bool FPassiveUndeadNecroticResilienceTest::RunTest(const FString& Parameters)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-    FFrogPassiveDifficultTerrainTest,
-    "Skald.Ability.Passive.FrogTerrainCost",
-    EAutomationTestFlags::EditorContext |
-        EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFrogPassiveDifficultTerrainTest,
+                                 "Skald.Ability.Passive.FrogTerrainCost",
+                                 EAutomationTestFlags::EditorContext |
+                                     EAutomationTestFlags::EngineFilter)
 
 bool FFrogPassiveDifficultTerrainTest::RunTest(const FString& Parameters)
 {
@@ -173,11 +172,10 @@ bool FFrogPassiveDifficultTerrainTest::RunTest(const FString& Parameters)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-    FEmpirePassiveInitiativeRerollTest,
-    "Skald.Ability.Passive.EmpireInitiativeReroll",
-    EAutomationTestFlags::EditorContext |
-        EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEmpirePassiveInitiativeRerollTest,
+                                 "Skald.Ability.Passive.EmpireInitiativeReroll",
+                                 EAutomationTestFlags::EditorContext |
+                                     EAutomationTestFlags::EngineFilter)
 
 bool FEmpirePassiveInitiativeRerollTest::RunTest(const FString& Parameters)
 {
@@ -274,3 +272,4 @@ bool FEmpirePassiveInitiativeRerollTest::RunTest(const FString& Parameters)
 }
 
 #endif // WITH_AUTOMATION_TESTS
+#endif // defined(WITH_AUTOMATION_TESTS)
