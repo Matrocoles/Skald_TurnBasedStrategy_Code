@@ -1182,6 +1182,7 @@ void UGridOverlayComponent::HighlightCell(const FIntPoint &GridCoord,
   }
 
   if (!EnsureHighlightComponentSetup()) {
+    HighlightCellWithDecal(GridCoord, Color);
     return;
   }
 

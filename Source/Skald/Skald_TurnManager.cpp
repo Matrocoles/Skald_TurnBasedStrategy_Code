@@ -1172,6 +1172,73 @@ void ATurnManager::BeginReadyPhase(const FS_BattlePayload &Battle,
       }
     }
 
+    const FString ParticipantDisplayName =
+        bIsAttacker ? NormalizedBattle.AttackerDisplayName
+                    : NormalizedBattle.DefenderDisplayName;
+    const ESkaldFaction ParticipantFaction =
+        bIsAttacker ? NormalizedBattle.AttackerFaction
+                    : NormalizedBattle.DefenderFaction;
+
+    if (!GameState) {
+      return nullptr;
+    }
+
+    if (!ParticipantDisplayName.IsEmpty()) {
+      for (APlayerState *PlayerState : GameState->PlayerArray) {
+        if (ASkaldPlayerState *SkaldPlayerState =
+                Cast<ASkaldPlayerState>(PlayerState)) {
+          FString CandidateName = SkaldPlayerState->PlayerDisplayName;
+          if (CandidateName.IsEmpty()) {
+            CandidateName = SkaldPlayerState->GetResolvedPlayerName(
+                TEXT("BeginReadyPhaseNameMatch"));
+          }
+
+          if (!CandidateName.IsEmpty() &&
+              CandidateName.Equals(ParticipantDisplayName,
+                                   ESearchCase::IgnoreCase)) {
+            return SkaldPlayerState;
+          }
+        }
+      }
+    }
+
+    if (ParticipantFaction != ESkaldFaction::None) {
+      ASkaldPlayerState *UniqueFactionMatch = nullptr;
+      ASkaldPlayerState *UniqueAIFactionMatch = nullptr;
+      int32 FactionMatchCount = 0;
+      int32 FactionAIMatchCount = 0;
+
+      for (APlayerState *PlayerState : GameState->PlayerArray) {
+        if (ASkaldPlayerState *SkaldPlayerState =
+                Cast<ASkaldPlayerState>(PlayerState)) {
+          if (SkaldPlayerState->Faction != ParticipantFaction) {
+            continue;
+          }
+
+          ++FactionMatchCount;
+          if (!UniqueFactionMatch) {
+            UniqueFactionMatch = SkaldPlayerState;
+          }
+
+          if (SkaldPlayerState->bIsAI) {
+            ++FactionAIMatchCount;
+            if (!UniqueAIFactionMatch) {
+              UniqueAIFactionMatch = SkaldPlayerState;
+            }
+          }
+        }
+      }
+
+      if (FactionMatchCount == 1 && UniqueFactionMatch) {
+        return UniqueFactionMatch;
+      }
+
+      if (FactionMatchCount > 1 && UniqueAIFactionMatch &&
+          FactionAIMatchCount == 1) {
+        return UniqueAIFactionMatch;
+      }
+    }
+
     return nullptr;
   };
 

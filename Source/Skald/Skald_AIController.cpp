@@ -486,42 +486,115 @@ void ASkaldAIController::DetermineControlledBattleSide() {
     return;
   }
 
-  const USkaldGameInstance *GameInstance = GetGameInstance<USkaldGameInstance>();
+  USkaldGameInstance *GameInstance = GetGameInstance<USkaldGameInstance>();
   if (!GameInstance) {
     return;
   }
 
-  const FS_BattlePayload &Battle = GameInstance->PendingBattle;
+  FS_BattlePayload &Battle = GameInstance->PendingBattle;
   const int32 PlayerId = PS->GetPlayerId();
-
-  if (PlayerId == Battle.AttackerPlayerID && PlayerId > 0) {
-    bAIControlsAttackerSide = true;
-  }
-  if (PlayerId == Battle.DefenderPlayerID && PlayerId > 0) {
-    bAIControlsDefenderSide = true;
+  FString PlayerName = PS->PlayerDisplayName;
+  if (PlayerName.IsEmpty()) {
+    PlayerName = PS->GetResolvedPlayerName(TEXT("SkaldAIController"));
   }
 
-  if (!bAIControlsAttackerSide || !bAIControlsDefenderSide) {
-    FString PlayerName = PS->GetPlayerName();
-    if (PlayerName.IsEmpty()) {
-      PlayerName = PS->PlayerDisplayName;
+  const bool bIsAIPlayer = PS->bIsAI;
+
+  auto MatchesFaction = [&](ESkaldFaction ParticipantFaction) {
+    return ParticipantFaction != ESkaldFaction::None &&
+           ParticipantFaction == PS->Faction;
+  };
+
+  bool bMatchedAttacker = false;
+  bool bMatchedDefender = false;
+
+  if (PlayerId > 0) {
+    if (Battle.AttackerPlayerID == PlayerId) {
+      bAIControlsAttackerSide = true;
+      bMatchedAttacker = true;
     }
 
-    auto MatchesParticipantName = [&PlayerName](const FString &Candidate) {
-      if (PlayerName.IsEmpty() || Candidate.IsEmpty()) {
-        return false;
+    if (Battle.DefenderPlayerID == PlayerId) {
+      bAIControlsDefenderSide = true;
+      bMatchedDefender = true;
+    }
+  }
+
+  if (!bMatchedAttacker || !bMatchedDefender) {
+    if (!PlayerName.IsEmpty()) {
+      if (!bMatchedAttacker && !Battle.AttackerDisplayName.IsEmpty() &&
+          PlayerName.Equals(Battle.AttackerDisplayName,
+                            ESearchCase::IgnoreCase)) {
+        bAIControlsAttackerSide = true;
+        bMatchedAttacker = true;
       }
-      return PlayerName.Equals(Candidate, ESearchCase::IgnoreCase);
+
+      if (!bMatchedDefender && !Battle.DefenderDisplayName.IsEmpty() &&
+          PlayerName.Equals(Battle.DefenderDisplayName,
+                            ESearchCase::IgnoreCase)) {
+        bAIControlsDefenderSide = true;
+        bMatchedDefender = true;
+      }
+    }
+  }
+
+  if (bIsAIPlayer) {
+    if (!bMatchedAttacker && MatchesFaction(Battle.AttackerFaction)) {
+      bAIControlsAttackerSide = true;
+      bMatchedAttacker = true;
+    }
+
+    if (!bMatchedDefender && MatchesFaction(Battle.DefenderFaction)) {
+      bAIControlsDefenderSide = true;
+      bMatchedDefender = true;
+    }
+
+    auto SideHasPlayerIdentity = [](const FS_BattlePayload &Payload,
+                                    bool bForAttackers) {
+      const int32 ParticipantId =
+          bForAttackers ? Payload.AttackerPlayerID : Payload.DefenderPlayerID;
+      const FString &ParticipantName = bForAttackers
+                                           ? Payload.AttackerDisplayName
+                                           : Payload.DefenderDisplayName;
+      return ParticipantId > 0 || !ParticipantName.IsEmpty();
     };
 
-    if (!bAIControlsAttackerSide &&
-        MatchesParticipantName(Battle.AttackerDisplayName)) {
-      bAIControlsAttackerSide = true;
+    if (!bMatchedAttacker && !bMatchedDefender) {
+      const bool bAttackerHasIdentity = SideHasPlayerIdentity(Battle, true);
+      const bool bDefenderHasIdentity = SideHasPlayerIdentity(Battle, false);
+
+      if (!bAttackerHasIdentity && bDefenderHasIdentity) {
+        bAIControlsAttackerSide = true;
+        bMatchedAttacker = true;
+      } else if (!bDefenderHasIdentity && bAttackerHasIdentity) {
+        bAIControlsDefenderSide = true;
+        bMatchedDefender = true;
+      }
     }
-    if (!bAIControlsDefenderSide &&
-        MatchesParticipantName(Battle.DefenderDisplayName)) {
-      bAIControlsDefenderSide = true;
+
+    if (!bMatchedAttacker && !bMatchedDefender) {
+      if (Battle.bAttackerIsAI && !Battle.bDefenderIsAI) {
+        bAIControlsAttackerSide = true;
+        bMatchedAttacker = true;
+      } else if (Battle.bDefenderIsAI && !Battle.bAttackerIsAI) {
+        bAIControlsDefenderSide = true;
+        bMatchedDefender = true;
+      }
     }
+  }
+
+  if (bAIControlsAttackerSide && bIsAIPlayer) {
+    Battle.bAttackerIsAI = true;
+  }
+
+  if (bAIControlsDefenderSide && bIsAIPlayer) {
+    Battle.bDefenderIsAI = true;
+  }
+
+  if (!bAIControlsAttackerSide && !bAIControlsDefenderSide && bIsAIPlayer) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("ASkaldAIController %s could not resolve a battle side."),
+           *GetName());
   }
 }
 
