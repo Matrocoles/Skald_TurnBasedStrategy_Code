@@ -272,7 +272,7 @@ TMap<ESkaldFaction, FSkaldFactionAbilitySet> BuildFactionAbilityMap()
         Set.Passive = MakePassive(
             TEXT("Ability_Empire_Passive"),
             NSLOCTEXT("SkaldAbilities", "EmpirePassiveName", "Iron Discipline"),
-            NSLOCTEXT("SkaldAbilities", "EmpirePassiveDesc", "Empire units can reroll one initiative die per round and choose either result."));
+            NSLOCTEXT("SkaldAbilities", "EmpirePassiveDesc", "IronLegion units can reroll one initiative die per round and choose either result."));
         Set.SkirmishAbility = MakeActive(
             TEXT("Ability_Empire_Skirmish"),
             NSLOCTEXT("SkaldAbilities", "EmpireSkirmishName", "Suppressing Fire"),
@@ -327,7 +327,7 @@ TMap<ESkaldFaction, FSkaldFactionAbilitySet> BuildFactionAbilityMap()
         Set.Passive = MakePassive(
             TEXT("Ability_Frog_Passive"),
             NSLOCTEXT("SkaldAbilities", "FrogPassiveName", "Mire Masters"),
-            NSLOCTEXT("SkaldAbilities", "FrogPassiveDesc", "FrogFolk treat water and swamp tiles as normal terrain and impose -1 Movement on enemies who start adjacent to them."));
+            NSLOCTEXT("SkaldAbilities", "FrogPassiveDesc", "ToadFolk treat water and swamp tiles as normal terrain and impose -1 Movement on enemies who start adjacent to them."));
         Set.SkirmishAbility = MakeActive(
             TEXT("Ability_Frog_Skirmish"),
             NSLOCTEXT("SkaldAbilities", "FrogSkirmishName", "Tongue Snare"),

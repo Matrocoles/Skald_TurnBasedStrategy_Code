@@ -59,9 +59,9 @@ Individual armies can nudge thresholds up or down if data-table tuning warrants 
 * **Line Ability – Howl of the Alpha (Action):** Emit a rallying howl. All allies within 4 squares gain `+1 Movement` and may ignore disengage penalties until end of round.
 * **Elite Ability – Rend and Tear (Action):** Make an attack; for each hit scored, inflict a stacking bleed that deals 1 damage at the start of the target’s activation (max 3 stacks).
 
-## Empire Faction
+## IronLegion Faction
 
-* **Passive – Iron Discipline:** Empire units can reroll one initiative die per round and choose either result.
+* **Passive – Iron Discipline:** IronLegion units can reroll one initiative die per round and choose either result.
 * **Skirmish Ability – Suppressing Fire (Action):** Attack at range with `-1 AttackDamage`; on hit, the target suffers `-2 Movement` and cannot take reactions until its next activation.
 * **Line Ability – Officer’s Command (Free, once per round):** After rolling attack dice, may transfer one unused hit to an adjacent ally’s pending attack before results are resolved.
 * **Elite Ability – Artillery Strike (Action, setup):** Spend an action to call artillery on a visible tile. At end of the round, roll an attack with `+2 AttackDamage` against all units within 2 squares (allies take half damage). Ability recharges after two rounds.
@@ -73,9 +73,9 @@ Individual armies can nudge thresholds up or down if data-table tuning warrants 
 * **Line Ability – Mutagenic Surge (Free, cooldown 2 rounds):** Before rolling attack dice, choose to gain `+2 AttackDice` and suffer `-1 Defence` until next activation.
 * **Elite Ability – Aberrant Bloom (Action, once per battle):** Transform adjacent empty squares into hazardous terrain until end of battle. Enemies entering or starting in the hazard take `AttackDamage` and suffer `-1 Movement` (stacking once).
 
-## FrogFolk Faction
+## ToadFolk Faction
 
-* **Passive – Mire Masters:** FrogFolk treat water and swamp tiles as normal terrain and impose `-1 Movement` on enemies who start adjacent to them.
+* **Passive – Mire Masters:** ToadFolk treat water and swamp tiles as normal terrain and impose `-1 Movement` on enemies who start adjacent to them.
 * **Skirmish Ability – Tongue Snare (Action):** Pull a target within 4 squares 1 square closer and reduce its `AttackDice` by 1 until end of round.
 * **Line Ability – Bubble Ward (Reaction):** When an ally within 3 squares is hit by a ranged attack, negate one hit and slide the ally 1 square.
 * **Elite Ability – Raincaller Deluge (Action, cooldown 2 rounds):** Create a rainstorm template (radius 2) for one round. Enemies inside suffer `-1 AttackDice`, allies gain `+1 Defence` and amphibious movement bonuses.
