@@ -16,6 +16,5 @@ public:
     virtual bool IsDifficultTerrain(const FIntPoint& GridCoord) const override;
 
 private:
-    UPROPERTY()
     TSet<FIntPoint> DifficultCells;
 };
