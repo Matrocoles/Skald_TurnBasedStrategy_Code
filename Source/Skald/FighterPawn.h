@@ -375,6 +375,9 @@ public:
   /** Override the fighter's attack classification. */
   void SetAttackType(EFighterAttackType InAttackType);
 
+  /** Play the configured pre-attack presentation effects against the target. */
+  void TriggerAttackPresentationFX(AFighterPawn *Target);
+
   /** Maximum health for this fighter. */
   int32 GetMaxHealth() const { return MaxHealth; }
 
