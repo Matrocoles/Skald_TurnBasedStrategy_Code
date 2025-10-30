@@ -8,6 +8,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Containers/Set.h"
 #include "Engine/DataTable.h"
+#include "Engine/World.h"
 #include "FighterPawn.h"
 #include "GridBattleManager.h"
 #include "GridOverlayComponent.h"
@@ -85,6 +86,7 @@ void USkaldAbilityComponent::BeginPlay()
     {
         Fighter->OnHealthChanged.AddDynamic(this, &USkaldAbilityComponent::HandleOwnerHealthChanged);
     }
+    ApplyPassiveEffectPresentation(false);
     TryRegisterBattleDelegates();
 }
 
@@ -103,6 +105,7 @@ void USkaldAbilityComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
     DOREPLIFETIME(USkaldAbilityComponent, ReplicatedAbilitySlots);
     DOREPLIFETIME(USkaldAbilityComponent, ReactionsRemaining);
     DOREPLIFETIME(USkaldAbilityComponent, bHasInitialisedLoadout);
+    DOREPLIFETIME(USkaldAbilityComponent, bPassiveEffectActive);
 }
 
 void USkaldAbilityComponent::RefreshAbilityLoadout(const FFighterStats& InStats, ESkaldFaction InFaction)
@@ -127,10 +130,19 @@ void USkaldAbilityComponent::RefreshAbilityLoadout(const FFighterStats& InStats,
     bGoblinAmbushActive = false;
     bGoblinAmbushPenaltyPending = false;
 
+    const FName PreviousPassiveId = PassiveAbility.AbilityId;
+    if (GetOwnerRole() == ROLE_Authority && !PreviousPassiveId.IsNone())
+    {
+        RemoveModifiersByAbilityId(PreviousPassiveId);
+    }
+
+    ResetPassiveEffectTracking();
+
     FSkaldFactionAbilitySet AbilitySet;
     const bool bFoundAbilitySet = TryResolveFactionAbilitySet(InFaction, AbilitySet);
 
     PassiveAbility = bFoundAbilitySet ? AbilitySet.Passive : FSkaldAbilityDefinition();
+    ApplyPassiveEffectPresentation(false);
 
     if (bFoundAbilitySet)
     {
@@ -1359,6 +1371,7 @@ void USkaldAbilityComponent::AddActiveModifier(FSkaldActiveAbilityModifier&& Mod
         return;
     }
 
+    HandlePassiveModifierAdded(Modifier);
     ApplyStatDeltaToOwner(Modifier.Delta, true);
     ActiveModifiers.Add(MoveTemp(Modifier));
 }
@@ -1375,8 +1388,10 @@ void USkaldAbilityComponent::RemoveActiveModifier(int32 Index)
         return;
     }
 
+    const FName SourceAbilityId = ActiveModifiers[Index].SourceAbilityId;
     ApplyStatDeltaToOwner(ActiveModifiers[Index].Delta, false);
     ActiveModifiers.RemoveAtSwap(Index);
+    HandlePassiveModifierRemoved(SourceAbilityId);
 }
 
 int32 USkaldAbilityComponent::FindPendingTrapIndex(FName AbilityId) const
@@ -1702,6 +1717,91 @@ void USkaldAbilityComponent::ApplyStatDeltaToOwner(const FSkaldAbilityStatDelta&
     ApplyIntDelta(Fighter->Stats.Defence, Delta.Defence);
     ApplyIntDelta(Fighter->Stats.Strength, Delta.Strength);
     ApplyIntDelta(Fighter->Stats.CriticalBonusDamage, Delta.CriticalBonusDamage);
+}
+
+void USkaldAbilityComponent::HandlePassiveModifierAdded(const FSkaldActiveAbilityModifier& Modifier)
+{
+    const FName PassiveId = PassiveAbility.AbilityId;
+    if (PassiveId.IsNone() || Modifier.SourceAbilityId != PassiveId)
+    {
+        return;
+    }
+
+    ++PassiveEffectStackCount;
+    RefreshPassiveEffectState(true);
+}
+
+void USkaldAbilityComponent::HandlePassiveModifierRemoved(FName SourceAbilityId)
+{
+    const FName PassiveId = PassiveAbility.AbilityId;
+    if (PassiveId.IsNone() || SourceAbilityId != PassiveId)
+    {
+        return;
+    }
+
+    PassiveEffectStackCount = FMath::Max(0, PassiveEffectStackCount - 1);
+    RefreshPassiveEffectState(false);
+}
+
+void USkaldAbilityComponent::RefreshPassiveEffectState(bool bPlayActivationEffects)
+{
+    const bool bShouldBeActive = PassiveEffectStackCount > 0;
+    if (bPassiveEffectActive != bShouldBeActive)
+    {
+        bPassiveEffectActive = bShouldBeActive;
+        ApplyPassiveEffectPresentation(bPlayActivationEffects);
+        BroadcastStateChanged();
+    }
+    else
+    {
+        ApplyPassiveEffectPresentation(false);
+    }
+}
+
+void USkaldAbilityComponent::ResetPassiveEffectTracking()
+{
+    PassiveEffectStackCount = 0;
+    RefreshPassiveEffectState(false);
+}
+
+void USkaldAbilityComponent::ApplyPassiveEffectPresentation(bool bPlayActivationEffects)
+{
+    AFighterPawn* Fighter = CachedFighter.Get();
+    if (!Fighter)
+    {
+        Fighter = Cast<AFighterPawn>(GetOwner());
+        CachedFighter = Fighter;
+    }
+
+    if (!Fighter)
+    {
+        return;
+    }
+
+    Fighter->SetPassiveBuffIndicatorVisible(bPassiveEffectActive);
+
+    bool bShouldPlayEffects = bPassiveEffectActive && bPlayActivationEffects;
+    if (bShouldPlayEffects)
+    {
+        if (UWorld* World = GetWorld())
+        {
+            if (World->GetNetMode() == NM_DedicatedServer)
+            {
+                bShouldPlayEffects = false;
+            }
+        }
+    }
+
+    if (bShouldPlayEffects)
+    {
+        PlayAbilityFeedback(PassiveAbility);
+    }
+}
+
+void USkaldAbilityComponent::OnRep_PassiveEffectActive()
+{
+    PassiveEffectStackCount = bPassiveEffectActive ? 1 : 0;
+    ApplyPassiveEffectPresentation(bPassiveEffectActive);
 }
 
 void USkaldAbilityComponent::TryRegisterBattleDelegates()

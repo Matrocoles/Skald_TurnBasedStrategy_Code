@@ -246,6 +246,11 @@ protected:
     UDecalComponent* SpawnTrapVisualAtCell(const FIntPoint& Cell);
     void RemoveExpiredModifiers(ESkaldAbilityModifierPhase Phase);
     void ApplyStatDeltaToOwner(const FSkaldAbilityStatDelta& Delta, bool bApply);
+    void HandlePassiveModifierAdded(const FSkaldActiveAbilityModifier& Modifier);
+    void HandlePassiveModifierRemoved(FName SourceAbilityId);
+    void RefreshPassiveEffectState(bool bPlayActivationEffects);
+    void ResetPassiveEffectTracking();
+    void ApplyPassiveEffectPresentation(bool bPlayActivationEffects);
     bool TryResolveFactionAbilitySet(ESkaldFaction InFaction, FSkaldFactionAbilitySet& OutSet);
     FSkaldAbilityDefinition ResolveActiveAbilityForCost(const FSkaldFactionAbilitySet& AbilitySet, int32 ArmyCost) const;
     UDataTable* GetFactionAbilityDataTable();
@@ -265,6 +270,9 @@ protected:
 
     UFUNCTION()
     void HandleOwnerHealthChanged(int32 NewHealth);
+
+    UFUNCTION()
+    void OnRep_PassiveEffectActive();
 
     UFUNCTION(NetMulticast, Reliable)
     void MulticastTrapPlaced(const FIntPoint& Cell);
@@ -356,6 +364,13 @@ protected:
     /** Transient list of active stat modifiers granted by abilities. */
     UPROPERTY()
     TArray<FSkaldActiveAbilityModifier> ActiveModifiers;
+
+    /** Number of active modifiers sourced from the owning passive ability. */
+    int32 PassiveEffectStackCount = 0;
+
+    /** True while the owning fighter benefits from their passive ability. */
+    UPROPERTY(ReplicatedUsing = OnRep_PassiveEffectActive)
+    bool bPassiveEffectActive = false;
 
     /** Tracks whether the owning fighter has made an attack during its current activation. */
     UPROPERTY()

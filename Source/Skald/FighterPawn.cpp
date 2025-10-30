@@ -153,6 +153,19 @@ AFighterPawn::AFighterPawn() : MaxHealth(0) {
   TargetedDecal->SetVisibility(false);
   TargetedDecal->SetCanEverAffectNavigation(false);
 
+  PassiveBuffDecal =
+      CreateDefaultSubobject<UDecalComponent>(TEXT("PassiveBuffDecal"));
+  PassiveBuffDecal->SetupAttachment(CollisionComponent);
+  PassiveBuffDecal->SetRelativeRotation(FRotator(-90.f, 0.f, 0.f));
+  PassiveBuffDecal->SetRelativeLocation(
+      FVector(0.f, 0.f,
+              -CollisionComponent->GetUnscaledCapsuleHalfHeight() +
+                  PassiveBuffDecalFloorOffset));
+  PassiveBuffDecal->DecalSize = PassiveBuffDecalSizeSingleCell;
+  PassiveBuffDecal->SetHiddenInGame(true);
+  PassiveBuffDecal->SetVisibility(false);
+  PassiveBuffDecal->SetCanEverAffectNavigation(false);
+
   MovementAudioComponent =
       CreateDefaultSubobject<UAudioComponent>(TEXT("MovementAudioComponent"));
   MovementAudioComponent->SetupAttachment(CollisionComponent);
@@ -174,8 +187,10 @@ AFighterPawn::AFighterPawn() : MaxHealth(0) {
   UpdateMeshOffset();
   UpdateSelectionIndicatorTransform();
   UpdateTargetedIndicatorTransform();
+  UpdatePassiveBuffIndicatorTransform();
   RefreshSelectionIndicatorMaterial();
   RefreshTargetedIndicatorMaterial();
+  RefreshPassiveBuffIndicatorMaterial();
 }
 
 void AFighterPawn::GetLifetimeReplicatedProps(
@@ -710,6 +725,15 @@ void AFighterPawn::SetTargetedIndicatorVisible(bool bVisible) {
   TargetedDecal->SetHiddenInGame(!bVisible);
 }
 
+void AFighterPawn::SetPassiveBuffIndicatorVisible(bool bVisible) {
+  if (!PassiveBuffDecal) {
+    return;
+  }
+
+  PassiveBuffDecal->SetVisibility(bVisible);
+  PassiveBuffDecal->SetHiddenInGame(!bVisible);
+}
+
 FIntPoint AFighterPawn::GetCurrentCell() const { return CurrentCell; }
 
 int32 AFighterPawn::GetFootprintSideLength() const {
@@ -874,6 +898,7 @@ void AFighterPawn::ApplyFootprintScale() {
 
   UpdateSelectionIndicatorSize();
   UpdateTargetedIndicatorSize();
+  UpdatePassiveBuffIndicatorSize();
 }
 
 void AFighterPawn::UpdateSelectionIndicatorSize() {
@@ -896,6 +921,8 @@ void AFighterPawn::UpdateSelectionIndicatorTransform() {
   const float CapsuleHalfHeight = CollisionComponent->GetScaledCapsuleHalfHeight();
   const float VerticalOffset = -CapsuleHalfHeight + SelectionDecalFloorOffset;
   SelectionDecal->SetRelativeLocation(FVector(0.f, 0.f, VerticalOffset));
+
+  UpdatePassiveBuffIndicatorTransform();
 }
 
 void AFighterPawn::RefreshSelectionIndicatorMaterial() {
@@ -934,6 +961,36 @@ void AFighterPawn::RefreshTargetedIndicatorMaterial() {
   }
 
   TargetedDecal->SetDecalMaterial(TargetedDecalMaterial);
+}
+
+void AFighterPawn::UpdatePassiveBuffIndicatorSize() {
+  if (!PassiveBuffDecal) {
+    return;
+  }
+
+  const FVector DesiredSize =
+      GridFootprint == EFighterPawnFootprint::FourCells
+          ? PassiveBuffDecalSizeFourCells
+          : PassiveBuffDecalSizeSingleCell;
+  PassiveBuffDecal->DecalSize = DesiredSize;
+}
+
+void AFighterPawn::UpdatePassiveBuffIndicatorTransform() {
+  if (!PassiveBuffDecal || !CollisionComponent) {
+    return;
+  }
+
+  const float CapsuleHalfHeight = CollisionComponent->GetScaledCapsuleHalfHeight();
+  const float VerticalOffset = -CapsuleHalfHeight + PassiveBuffDecalFloorOffset;
+  PassiveBuffDecal->SetRelativeLocation(FVector(0.f, 0.f, VerticalOffset));
+}
+
+void AFighterPawn::RefreshPassiveBuffIndicatorMaterial() {
+  if (!PassiveBuffDecal) {
+    return;
+  }
+
+  PassiveBuffDecal->SetDecalMaterial(PassiveBuffDecalMaterial);
 }
 
 void AFighterPawn::RefreshDisplayMeshYawOffset() {
@@ -1812,6 +1869,7 @@ void AFighterPawn::OnRep_GridFootprint() {
   UpdateMeshOffset();
   UpdateSelectionIndicatorTransform();
   UpdateTargetedIndicatorTransform();
+  UpdatePassiveBuffIndicatorTransform();
   AlignToCurrentCell();
 }
 

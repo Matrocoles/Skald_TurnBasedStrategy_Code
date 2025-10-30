@@ -112,6 +112,10 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Fighter|Targeting")
   void SetTargetedIndicatorVisible(bool bVisible);
 
+  /** Show or hide the passive buff indicator. */
+  UFUNCTION(BlueprintCallable, Category = "Fighter|Passives")
+  void SetPassiveBuffIndicatorVisible(bool bVisible);
+
   /** Event fired after any queued attack finishes resolving. */
   FOnQueuedAttackFinalized OnQueuedAttackFinalized;
 
@@ -296,6 +300,26 @@ public:
   /** Additional vertical offset applied to the targeted decal. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Targeting")
   float TargetedDecalFloorOffset = 0.f;
+
+  /** Decal shown while the fighter benefits from a passive buff. */
+  UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|Passives")
+  UDecalComponent *PassiveBuffDecal;
+
+  /** Material used for the passive buff decal. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Passives")
+  TObjectPtr<UMaterialInterface> PassiveBuffDecalMaterial;
+
+  /** Size used for the passive buff decal on single-cell fighters. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Passives")
+  FVector PassiveBuffDecalSizeSingleCell = FVector(32.f, 160.f, 160.f);
+
+  /** Size used for the passive buff decal on four-cell fighters. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Passives")
+  FVector PassiveBuffDecalSizeFourCells = FVector(64.f, 320.f, 320.f);
+
+  /** Additional vertical offset applied to the passive buff decal. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Passives")
+  float PassiveBuffDecalFloorOffset = 0.f;
 
   /** Widget indicating activation state (front facing). */
   UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|UI")
@@ -487,6 +511,15 @@ private:
 
   /** Apply the configured material to the targeted decal. */
   void RefreshTargetedIndicatorMaterial();
+
+  /** Update the passive buff decal size to match the current footprint. */
+  void UpdatePassiveBuffIndicatorSize();
+
+  /** Align the passive buff decal with the base of the fighter. */
+  void UpdatePassiveBuffIndicatorTransform();
+
+  /** Apply the configured material to the passive buff decal. */
+  void RefreshPassiveBuffIndicatorMaterial();
 
   /** Resolve and cache an activation icon texture. */
   UTexture2D *ResolveActivationIcon(TSoftObjectPtr<UTexture2D> &IconSource,
