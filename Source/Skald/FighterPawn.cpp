@@ -224,6 +224,7 @@ void AFighterPawn::OnConstruction(const FTransform &Transform) {
   UpdateTargetedIndicatorSize();
   UpdateTargetedIndicatorTransform();
   RefreshTargetedIndicatorMaterial();
+  UpdatePassiveBuffIndicatorSize();
   SetTargetedIndicatorVisible(false);
   RefreshDisplayMeshYawOffset();
   const float IncomingSpawnYaw = Transform.GetRotation().Rotator().Yaw;
@@ -1869,6 +1870,7 @@ void AFighterPawn::OnRep_GridFootprint() {
   UpdateMeshOffset();
   UpdateSelectionIndicatorTransform();
   UpdateTargetedIndicatorTransform();
+  UpdatePassiveBuffIndicatorSize();
   UpdatePassiveBuffIndicatorTransform();
   AlignToCurrentCell();
 }

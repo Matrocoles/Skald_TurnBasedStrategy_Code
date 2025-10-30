@@ -1802,6 +1802,7 @@ void USkaldAbilityComponent::OnRep_PassiveEffectActive()
 {
     PassiveEffectStackCount = bPassiveEffectActive ? 1 : 0;
     ApplyPassiveEffectPresentation(bPassiveEffectActive);
+    BroadcastStateChanged();
 }
 
 void USkaldAbilityComponent::TryRegisterBattleDelegates()
