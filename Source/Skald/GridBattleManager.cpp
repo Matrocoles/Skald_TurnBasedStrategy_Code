@@ -1188,12 +1188,16 @@ bool UGridBattleManager::IsSideAIControlled(bool bForAttackers) const
     const USkaldGameInstance* GameInstance = World->GetGameInstance<USkaldGameInstance>();
     int32 TargetPlayerId = INDEX_NONE;
     bool bPendingBattleAIFlag = true;
+    FString ParticipantDisplayName;
+    ESkaldFaction ParticipantFaction = ESkaldFaction::None;
 
     if (GameInstance)
     {
         const FS_BattlePayload& Battle = GameInstance->PendingBattle;
         TargetPlayerId = bForAttackers ? Battle.AttackerPlayerID : Battle.DefenderPlayerID;
         bPendingBattleAIFlag = bForAttackers ? Battle.bAttackerIsAI : Battle.bDefenderIsAI;
+        ParticipantDisplayName = bForAttackers ? Battle.AttackerDisplayName : Battle.DefenderDisplayName;
+        ParticipantFaction = bForAttackers ? Battle.AttackerFaction : Battle.DefenderFaction;
 
         if (bPendingBattleAIFlag)
         {
@@ -1202,6 +1206,15 @@ bool UGridBattleManager::IsSideAIControlled(bool bForAttackers) const
 
         if (TargetPlayerId <= 0)
         {
+            const int32 OpponentPlayerId = bForAttackers ? Battle.DefenderPlayerID : Battle.AttackerPlayerID;
+            const FString& OpponentDisplayName = bForAttackers ? Battle.DefenderDisplayName : Battle.AttackerDisplayName;
+            const bool bOpponentIdentified = OpponentPlayerId > 0 || !OpponentDisplayName.IsEmpty();
+
+            if (bOpponentIdentified)
+            {
+                return true;
+            }
+
             return false;
         }
     }
@@ -1214,6 +1227,73 @@ bool UGridBattleManager::IsSideAIControlled(bool bForAttackers) const
     bool bMatchedPlayerState = false;
     if (const AGameStateBase* GameState = World->GetGameState())
     {
+        auto MatchesDisplayName = [](const ASkaldPlayerState* PlayerState,
+                                     const FString& TargetName) {
+            if (!PlayerState || TargetName.IsEmpty())
+            {
+                return false;
+            }
+
+            FString CandidateName = PlayerState->PlayerDisplayName;
+            if (CandidateName.IsEmpty())
+            {
+                CandidateName = PlayerState->GetResolvedPlayerName(TEXT("GridBattleManagerAIResolve"));
+            }
+
+            return !CandidateName.IsEmpty() && CandidateName.Equals(TargetName, ESearchCase::IgnoreCase);
+        };
+
+        auto ResolveFactionMatch = [&](ESkaldFaction Faction) -> const ASkaldPlayerState*
+        {
+            if (Faction == ESkaldFaction::None)
+            {
+                return nullptr;
+            }
+
+            const ASkaldPlayerState* UniqueMatch = nullptr;
+            const ASkaldPlayerState* UniqueAIMatch = nullptr;
+            int32 MatchCount = 0;
+            int32 AIMatchCount = 0;
+
+            for (APlayerState* PlayerState : GameState->PlayerArray)
+            {
+                if (const ASkaldPlayerState* SkaldPlayerState = Cast<ASkaldPlayerState>(PlayerState))
+                {
+                    if (SkaldPlayerState->Faction != Faction)
+                    {
+                        continue;
+                    }
+
+                    ++MatchCount;
+                    if (!UniqueMatch)
+                    {
+                        UniqueMatch = SkaldPlayerState;
+                    }
+
+                    if (SkaldPlayerState->bIsAI)
+                    {
+                        ++AIMatchCount;
+                        if (!UniqueAIMatch)
+                        {
+                            UniqueAIMatch = SkaldPlayerState;
+                        }
+                    }
+                }
+            }
+
+            if (MatchCount == 1)
+            {
+                return UniqueMatch;
+            }
+
+            if (MatchCount > 1 && UniqueAIMatch && AIMatchCount == 1)
+            {
+                return UniqueAIMatch;
+            }
+
+            return nullptr;
+        };
+
         for (APlayerState* PlayerState : GameState->PlayerArray)
         {
             if (const ASkaldPlayerState* SkaldPlayerState = Cast<ASkaldPlayerState>(PlayerState))
@@ -1223,6 +1303,30 @@ bool UGridBattleManager::IsSideAIControlled(bool bForAttackers) const
                     bMatchedPlayerState = true;
                     return SkaldPlayerState->bIsAI;
                 }
+            }
+        }
+
+        if (!bMatchedPlayerState && !ParticipantDisplayName.IsEmpty())
+        {
+            for (APlayerState* PlayerState : GameState->PlayerArray)
+            {
+                if (const ASkaldPlayerState* SkaldPlayerState = Cast<ASkaldPlayerState>(PlayerState))
+                {
+                    if (MatchesDisplayName(SkaldPlayerState, ParticipantDisplayName))
+                    {
+                        bMatchedPlayerState = true;
+                        return SkaldPlayerState->bIsAI;
+                    }
+                }
+            }
+        }
+
+        if (!bMatchedPlayerState)
+        {
+            if (const ASkaldPlayerState* FactionMatch = ResolveFactionMatch(ParticipantFaction))
+            {
+                bMatchedPlayerState = true;
+                return FactionMatch->bIsAI;
             }
         }
     }
