@@ -1,3 +1,4 @@
+#include "CoreMinimal.h"
 #include "Misc/AutomationTest.h"
 
 #if WITH_AUTOMATION_TESTS
@@ -10,10 +11,8 @@
 #include "Engine/World.h"
 #include "Containers/Set.h"
 
-namespace
-{
 UCLASS()
-class UTestGridOverlayComponent : public UGridOverlayComponent
+class UTestGridOverlayComponent final : public UGridOverlayComponent
 {
     GENERATED_BODY()
 
@@ -39,7 +38,6 @@ private:
     UPROPERTY()
     TSet<FIntPoint> DifficultCells;
 };
-} // namespace
 
 constexpr EAutomationTestFlags::Type DefaultTestFlags =
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter;
@@ -83,8 +81,14 @@ bool FPassiveUndeadNecroticResilienceTest::RunTest(const FString& Parameters)
 
     World->Tick(LEVELTICK_All, 0.0f);
 
-    Human->RefreshAbilityLoadout();
-    Undead->RefreshAbilityLoadout();
+    if (USkaldAbilityComponent* HumanAbility = Human->GetAbilityComponent())
+    {
+        HumanAbility->RefreshAbilityLoadout(Human->Stats, Human->Faction);
+    }
+    if (USkaldAbilityComponent* UndeadAbility = Undead->GetAbilityComponent())
+    {
+        UndeadAbility->RefreshAbilityLoadout(Undead->Stats, Undead->Faction);
+    }
 
     const int32 HumanBaseStrength = Human->Stats.Strength;
     const int32 UndeadBaseStrength = Undead->Stats.Strength;
@@ -153,8 +157,14 @@ bool FFrogPassiveDifficultTerrainTest::RunTest(const FString& Parameters)
 
     World->Tick(LEVELTICK_All, 0.0f);
 
-    Human->RefreshAbilityLoadout();
-    Frog->RefreshAbilityLoadout();
+    if (USkaldAbilityComponent* HumanAbility = Human->GetAbilityComponent())
+    {
+        HumanAbility->RefreshAbilityLoadout(Human->Stats, Human->Faction);
+    }
+    if (USkaldAbilityComponent* FrogAbility = Frog->GetAbilityComponent())
+    {
+        FrogAbility->RefreshAbilityLoadout(Frog->Stats, Frog->Faction);
+    }
 
     UTestGridOverlayComponent* Grid = NewObject<UTestGridOverlayComponent>();
     TestNotNull(TEXT("Test grid"), Grid);
