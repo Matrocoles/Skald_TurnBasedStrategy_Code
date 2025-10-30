@@ -179,6 +179,7 @@ struct FFighterAttackFXDefinition
     FLinearColor ProjectileColor = FLinearColor::White;
 };
 
+USTRUCT(BlueprintType)
 struct FFighterStats
 {
     GENERATED_BODY();
