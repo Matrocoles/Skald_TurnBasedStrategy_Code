@@ -37,8 +37,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSkaldWorldStateChanged);
  * Handles turn sequencing for all registered player controllers.
  */
 UCLASS(Blueprintable, BlueprintType)
-class SKALD_API ATurnManager : public AActor
-{
+class SKALD_API ATurnManager : public AActor {
   GENERATED_BODY()
 
 public:
