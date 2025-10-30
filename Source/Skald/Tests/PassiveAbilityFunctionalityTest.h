@@ -5,6 +5,8 @@
 
 #include "PassiveAbilityFunctionalityTest.generated.h"
 
+#if WITH_AUTOMATION_TESTS
+
 UCLASS()
 class UTestGridOverlayComponent final : public UGridOverlayComponent
 {
@@ -19,3 +21,5 @@ private:
     UPROPERTY()
     TSet<FIntPoint> DifficultCells;
 };
+
+#endif // WITH_AUTOMATION_TESTS
