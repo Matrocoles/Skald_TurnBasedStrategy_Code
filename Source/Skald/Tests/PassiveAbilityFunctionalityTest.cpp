@@ -1,5 +1,6 @@
 #include "CoreMinimal.h"
 #include "Misc/AutomationTest.h"
+#include "Tests/PassiveAbilityFunctionalityTest.h"
 
 #if WITH_AUTOMATION_TESTS
 
@@ -7,7 +8,6 @@
 #include "Engine/World.h"
 #include "FighterPawn.h"
 #include "GridBattleManager.h"
-#include "Tests/PassiveAbilityFunctionalityTest.h"
 #include "Tests/SkaldAutomationTestHelpers.h"
 
 constexpr EAutomationTestFlags::Type DefaultTestFlags =
@@ -270,6 +270,17 @@ bool FEmpirePassiveInitiativeRerollTest::RunTest(const FString& Parameters)
     }
 
     return true;
+}
+
+#else  // WITH_AUTOMATION_TESTS
+
+void UTestGridOverlayComponent::SetDifficultCell(const FIntPoint& /*Cell*/, bool /*bIsDifficult*/)
+{
+}
+
+bool UTestGridOverlayComponent::IsDifficultTerrain(const FIntPoint& /*GridCoord*/) const
+{
+    return false;
 }
 
 #endif // WITH_AUTOMATION_TESTS
