@@ -150,6 +150,8 @@ public:
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Grid")
   float GetCellHeight(const FIntPoint &GridCoord) const;
 
+  virtual bool IsDifficultTerrain(const FIntPoint &GridCoord) const;
+
   /** Mark a grid cell as occupied or free. */
   UFUNCTION(BlueprintCallable, Category = "Grid")
   void SetOccupied(const FIntPoint &GridCoord, bool bOccupied);

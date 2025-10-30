@@ -59,6 +59,8 @@ void ApplyDefaultModifierDuration(FSkaldActiveAbilityModifier& Modifier)
     Modifier.bRemoveWhenRoundsExpire = true;
     Modifier.RemainingRounds = 1;
 }
+
+const FName LowHealthPenaltyId(TEXT("Ability_Global_LowHealthPenalty"));
 } // namespace
 
 USkaldAbilityComponent::USkaldAbilityComponent()
@@ -97,6 +99,16 @@ USkaldAbilityComponent::USkaldAbilityComponent()
     bGoblinAmbushActive = false;
     bGoblinAmbushPenaltyPending = false;
 
+    bElfEvasionActive = false;
+    bLizardPenaltyConsumedThisRound = false;
+    bRavpackMomentumPending = false;
+    bLowHealthStrengthPenaltyActive = false;
+    bUndeadResilienceActive = false;
+    DwarfPassiveAdjacentCount = 0;
+    LastKnownHealth = 0;
+    PassiveVisualStackCounts.Empty();
+    FactionsThatAttackedOwnerThisRound.Reset();
+
     SlotOrder = {ESkaldAbilitySlot::Ability1, ESkaldAbilitySlot::Ability2, ESkaldAbilitySlot::Ability3};
 }
 
@@ -108,6 +120,8 @@ void USkaldAbilityComponent::BeginPlay()
     if (AFighterPawn* Fighter = CachedFighter.Get())
     {
         Fighter->OnHealthChanged.AddDynamic(this, &USkaldAbilityComponent::HandleOwnerHealthChanged);
+        LastKnownHealth = Fighter->Stats.Health;
+        Fighter->ClearAllPassiveBuffIndicators();
     }
     TryRegisterBattleDelegates();
 }
@@ -116,6 +130,10 @@ void USkaldAbilityComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
     ClearAllTraps();
     RemoveBattleDelegates();
+    if (AFighterPawn* Fighter = CachedFighter.Get())
+    {
+        Fighter->ClearAllPassiveBuffIndicators();
+    }
     Super::EndPlay(EndPlayReason);
 }
 
@@ -150,6 +168,21 @@ void USkaldAbilityComponent::RefreshAbilityLoadout(const FFighterStats& InStats,
     bGoblinNetActive = false;
     bGoblinAmbushActive = false;
     bGoblinAmbushPenaltyPending = false;
+    bElfEvasionActive = false;
+    bLizardPenaltyConsumedThisRound = false;
+    bRavpackMomentumPending = false;
+    bLowHealthStrengthPenaltyActive = false;
+    bUndeadResilienceActive = false;
+    DwarfPassiveAdjacentCount = 0;
+    PassiveVisualStackCounts.Empty();
+    FactionsThatAttackedOwnerThisRound.Reset();
+    if (AFighterPawn* Fighter = CachedFighter.Get())
+    {
+        Fighter->ClearAllPassiveBuffIndicators();
+        LastKnownHealth = Fighter->Stats.Health;
+    }
+
+    RemoveModifiersByAbilityId(LowHealthPenaltyId);
 
     FSkaldFactionAbilitySet AbilitySet;
     const bool bFoundAbilitySet = TryResolveFactionAbilitySet(InFaction, AbilitySet);
@@ -173,6 +206,8 @@ void USkaldAbilityComponent::RefreshAbilityLoadout(const FFighterStats& InStats,
     ReactionsRemaining = ReactionsPerRound;
 
     UpdateReplicatedAbilitySlots();
+
+    RefreshPassiveState();
 
     BroadcastStateChanged();
 }
@@ -247,6 +282,8 @@ void USkaldAbilityComponent::HandleRoundStarted()
     bGoblinNetActive = false;
     bGoblinAmbushActive = false;
     bGoblinAmbushPenaltyPending = false;
+    bLizardPenaltyConsumedThisRound = false;
+    FactionsThatAttackedOwnerThisRound.Reset();
 
     if (GetOwnerRole() == ROLE_Authority)
     {
@@ -270,6 +307,7 @@ void USkaldAbilityComponent::HandleRoundStarted()
         }
 
         RemoveExpiredModifiers(ESkaldAbilityModifierPhase::RoundStart);
+        RefreshPassiveState();
     }
     UpdateReplicatedAbilitySlots();
     BroadcastStateChanged();
@@ -302,6 +340,19 @@ void USkaldAbilityComponent::HandleActivationStarted()
     if (GetOwnerRole() == ROLE_Authority)
     {
         RemoveExpiredModifiers(ESkaldAbilityModifierPhase::ActivationStart);
+
+        if (PassiveAbility.AbilityId == TEXT("Ability_Ravpack_Passive") && bRavpackMomentumPending)
+        {
+            FSkaldActiveAbilityModifier Modifier;
+            Modifier.SourceAbilityId = PassiveAbility.AbilityId;
+            Modifier.Delta.Movement = 2;
+            Modifier.bRemoveOnActivationEnd = true;
+            AddActiveModifier(MoveTemp(Modifier));
+            bRavpackMomentumPending = false;
+        }
+
+        ApplyActivationPassiveEffects();
+        RefreshPassiveState();
 
         if (PassiveAbility.AbilityId == TEXT("Ability_Goblin_Passive"))
         {
@@ -1386,9 +1437,38 @@ void USkaldAbilityComponent::AddActiveModifier(FSkaldActiveAbilityModifier&& Mod
         return;
     }
 
+    if (PassiveAbility.AbilityId == TEXT("Ability_Lizard_Passive") && !bLizardPenaltyConsumedThisRound)
+    {
+        bool bAdjusted = false;
+        if (Modifier.Delta.AttackDice < 0)
+        {
+            const int32 Adjustment = FMath::Min(1, -Modifier.Delta.AttackDice);
+            Modifier.Delta.AttackDice += Adjustment;
+            bAdjusted = Adjustment > 0;
+        }
+
+        if (!bAdjusted && Modifier.Delta.Strength < 0)
+        {
+            const int32 Adjustment = FMath::Min(1, -Modifier.Delta.Strength);
+            Modifier.Delta.Strength += Adjustment;
+            bAdjusted = Adjustment > 0;
+        }
+
+        if (bAdjusted)
+        {
+            bLizardPenaltyConsumedThisRound = true;
+        }
+    }
+
     ApplyDefaultModifierDuration(Modifier);
     ApplyStatDeltaToOwner(Modifier.Delta, true);
+    const FName SourceAbility = Modifier.SourceAbilityId;
     ActiveModifiers.Add(MoveTemp(Modifier));
+
+    if (IsPassiveAbilityId(SourceAbility))
+    {
+        HandlePassiveEffectApplied(GetAbilityDefinitionById(SourceAbility));
+    }
 }
 
 void USkaldAbilityComponent::RemoveActiveModifier(int32 Index)
@@ -1403,8 +1483,19 @@ void USkaldAbilityComponent::RemoveActiveModifier(int32 Index)
         return;
     }
 
-    ApplyStatDeltaToOwner(ActiveModifiers[Index].Delta, false);
+    const FSkaldActiveAbilityModifier RemovedModifier = ActiveModifiers[Index];
+    ApplyStatDeltaToOwner(RemovedModifier.Delta, false);
     ActiveModifiers.RemoveAtSwap(Index);
+
+    if (RemovedModifier.SourceAbilityId == LowHealthPenaltyId)
+    {
+        bLowHealthStrengthPenaltyActive = false;
+    }
+
+    if (IsPassiveAbilityId(RemovedModifier.SourceAbilityId))
+    {
+        HandlePassiveEffectRemoved(RemovedModifier.SourceAbilityId);
+    }
 }
 
 int32 USkaldAbilityComponent::FindPendingTrapIndex(FName AbilityId) const
@@ -1580,6 +1671,321 @@ void USkaldAbilityComponent::NotifyOwnerMoved(int32 DistanceMoved)
     {
         BrutalChargeDistanceMoved += DistanceMoved;
     }
+
+    if (PassiveAbility.AbilityId == TEXT("Ability_Elf_Passive") && DistanceMoved > 0)
+    {
+        if (!bElfEvasionActive)
+        {
+            bElfEvasionActive = true;
+            HandlePassiveEffectApplied(PassiveAbility);
+        }
+    }
+
+    RefreshPassiveState();
+    RefreshAllPassiveStates();
+}
+
+void USkaldAbilityComponent::ModifyOutgoingAttackStats(
+    AFighterPawn* Target, FFighterStats& InOutStats)
+{
+    if (GetOwnerRole() != ROLE_Authority || !CachedFighter.IsValid())
+    {
+        return;
+    }
+
+    if (PassiveAbility.AbilityId == TEXT("Ability_Gnoll_Passive") && Target)
+    {
+        if (USkaldAbilityComponent* TargetAbility = Target->FindComponentByClass<USkaldAbilityComponent>())
+        {
+            if (TargetAbility->HasFactionAttackedOwnerThisRound(CachedFighter->Faction))
+            {
+                InOutStats.AttackDice = FMath::Max(0, InOutStats.AttackDice + 1);
+            }
+        }
+    }
+}
+
+void USkaldAbilityComponent::ModifyIncomingAttackStats(
+    AFighterPawn* Attacker, FFighterStats& InOutAttackerStats)
+{
+    if (GetOwnerRole() != ROLE_Authority)
+    {
+        return;
+    }
+
+    (void)Attacker;
+
+    if (PassiveAbility.AbilityId == TEXT("Ability_Elf_Passive") && bElfEvasionActive)
+    {
+        InOutAttackerStats.AttackDice = FMath::Max(0, InOutAttackerStats.AttackDice - 1);
+    }
+}
+
+void USkaldAbilityComponent::HandleIncomingAttackStarted()
+{
+    if (GetOwnerRole() != ROLE_Authority)
+    {
+        return;
+    }
+
+    if (PassiveAbility.AbilityId == TEXT("Ability_Inflicted_Passive"))
+    {
+        int32 Roll = 0;
+        if (UWorld* World = GetWorld())
+        {
+            if (USkaldGameInstance* GameInstance = World->GetGameInstance<USkaldGameInstance>())
+            {
+                Roll = GameInstance->CombatRandomStream.RandRange(1, 6);
+            }
+        }
+
+        if (Roll <= 0)
+        {
+            Roll = FMath::RandRange(1, 6);
+        }
+
+        if (Roll >= 4)
+        {
+            FSkaldActiveAbilityModifier Modifier;
+            Modifier.SourceAbilityId = PassiveAbility.AbilityId;
+            Modifier.bRemoveOnRoundStart = true;
+            Modifier.Delta.Defence = 1;
+
+            AddActiveModifier(MoveTemp(Modifier));
+        }
+    }
+}
+
+void USkaldAbilityComponent::HandleIncomingAttackFinished()
+{
+}
+
+void USkaldAbilityComponent::RefreshPassiveState()
+{
+    if (GetOwnerRole() != ROLE_Authority || !PassiveAbility.IsValid())
+    {
+        return;
+    }
+
+    if (PassiveAbility.AbilityId == TEXT("Ability_Dwarf_Passive"))
+    {
+        RefreshDwarfPassive();
+    }
+}
+
+void USkaldAbilityComponent::RefreshAllPassiveStates()
+{
+    if (GetOwnerRole() != ROLE_Authority)
+    {
+        return;
+    }
+
+    if (!CachedBattleManager.IsValid())
+    {
+        TryRegisterBattleDelegates();
+    }
+
+    if (!CachedBattleManager.IsValid())
+    {
+        return;
+    }
+
+    const TArray<AFighterPawn*> Fighters = CachedBattleManager->GetInitiativeOrderSnapshot();
+    for (AFighterPawn* Fighter : Fighters)
+    {
+        if (!Fighter)
+        {
+            continue;
+        }
+
+        if (USkaldAbilityComponent* Ability = Fighter->FindComponentByClass<USkaldAbilityComponent>())
+        {
+            Ability->RefreshPassiveState();
+        }
+    }
+}
+
+void USkaldAbilityComponent::RefreshDwarfPassive()
+{
+    if (!CachedFighter.IsValid())
+    {
+        return;
+    }
+
+    if (!CachedBattleManager.IsValid())
+    {
+        TryRegisterBattleDelegates();
+    }
+
+    if (!CachedBattleManager.IsValid())
+    {
+        return;
+    }
+
+    const int32 AdjacentCount = CountAdjacentFactionAllies(CachedFighter.Get(), CachedFighter->Faction);
+    if (AdjacentCount == DwarfPassiveAdjacentCount)
+    {
+        return;
+    }
+
+    RemoveModifiersByAbilityId(PassiveAbility.AbilityId);
+    DwarfPassiveAdjacentCount = AdjacentCount;
+
+    if (AdjacentCount > 0)
+    {
+        FSkaldActiveAbilityModifier Modifier;
+        Modifier.SourceAbilityId = PassiveAbility.AbilityId;
+        Modifier.Delta.Defence = AdjacentCount;
+        AddActiveModifier(MoveTemp(Modifier));
+    }
+}
+
+void USkaldAbilityComponent::ApplyActivationPassiveEffects()
+{
+    if (!CachedFighter.IsValid())
+    {
+        return;
+    }
+
+    if (!CachedBattleManager.IsValid())
+    {
+        TryRegisterBattleDelegates();
+    }
+
+    if (!CachedBattleManager.IsValid())
+    {
+        return;
+    }
+
+    AFighterPawn* OwnerFighter = CachedFighter.Get();
+    const TArray<AFighterPawn*> Fighters = CachedBattleManager->GetInitiativeOrderSnapshot();
+
+    int32 AdjacentFrogCount = 0;
+    for (AFighterPawn* Fighter : Fighters)
+    {
+        if (!Fighter || Fighter == OwnerFighter)
+        {
+            continue;
+        }
+
+        if (Fighter->Faction == OwnerFighter->Faction)
+        {
+            continue;
+        }
+
+        if (Fighter->Stats.Health <= 0)
+        {
+            continue;
+        }
+
+        if (USkaldAbilityComponent* Ability = Fighter->FindComponentByClass<USkaldAbilityComponent>())
+        {
+            if (Ability->GetPassiveAbility().AbilityId == TEXT("Ability_Frog_Passive"))
+            {
+                if (OwnerFighter->GetFootprintDistanceToFighter(Fighter) <= 1)
+                {
+                    ++AdjacentFrogCount;
+                }
+            }
+        }
+    }
+
+    if (AdjacentFrogCount > 0)
+    {
+        FSkaldActiveAbilityModifier Modifier;
+        Modifier.SourceAbilityId = TEXT("Ability_Frog_Passive");
+        Modifier.Delta.Movement = -AdjacentFrogCount;
+        Modifier.bRemoveOnActivationEnd = true;
+        AddActiveModifier(MoveTemp(Modifier));
+    }
+}
+
+int32 USkaldAbilityComponent::CountAdjacentFactionAllies(
+    AFighterPawn* Fighter, ESkaldFaction Faction) const
+{
+    if (!Fighter || !CachedBattleManager.IsValid())
+    {
+        return 0;
+    }
+
+    int32 Count = 0;
+    const TArray<AFighterPawn*> Fighters = CachedBattleManager->GetInitiativeOrderSnapshot();
+    for (AFighterPawn* Other : Fighters)
+    {
+        if (!Other || Other == Fighter)
+        {
+            continue;
+        }
+
+        if (Other->Faction != Faction || Other->Stats.Health <= 0)
+        {
+            continue;
+        }
+
+        if (Fighter->GetFootprintDistanceToFighter(Other) <= 1)
+        {
+            ++Count;
+        }
+    }
+
+    return Count;
+}
+
+void USkaldAbilityComponent::HandlePassiveEffectApplied(const FSkaldAbilityDefinition& Definition)
+{
+    if (!Definition.IsValid())
+    {
+        return;
+    }
+
+    AFighterPawn* Fighter = CachedFighter.Get();
+    if (!Fighter)
+    {
+        return;
+    }
+
+    const FSkaldAbilityDefinition FactionPassive = GetFactionPassive(Fighter->Faction);
+    if (Definition.AbilityId != PassiveAbility.AbilityId && Definition.AbilityId != FactionPassive.AbilityId)
+    {
+        return;
+    }
+
+    int32& Count = PassiveVisualStackCounts.FindOrAdd(Definition.AbilityId);
+    ++Count;
+    if (Count == 1)
+    {
+        Fighter->NotifyPassiveBuffApplied(Definition);
+        PlayAbilityFeedback(Definition);
+    }
+}
+
+void USkaldAbilityComponent::HandlePassiveEffectRemoved(FName AbilityId)
+{
+    if (AbilityId.IsNone())
+    {
+        return;
+    }
+
+    AFighterPawn* Fighter = CachedFighter.Get();
+    if (!Fighter)
+    {
+        return;
+    }
+
+    if (int32* Count = PassiveVisualStackCounts.Find(AbilityId))
+    {
+        *Count = FMath::Max(0, *Count - 1);
+        if (*Count == 0)
+        {
+            PassiveVisualStackCounts.Remove(AbilityId);
+            Fighter->NotifyPassiveBuffRemoved(AbilityId);
+        }
+    }
+}
+
+bool USkaldAbilityComponent::HasFactionAttackedOwnerThisRound(ESkaldFaction Faction) const
+{
+    return FactionsThatAttackedOwnerThisRound.Contains(Faction);
 }
 
 bool USkaldAbilityComponent::DeployTrapAtCell(const FIntPoint& Cell, FName AbilityId, FText& OutError)
@@ -1785,6 +2191,8 @@ void USkaldAbilityComponent::HandleBattleAttackResolved(AFighterPawn* Attacker, 
         return;
     }
 
+    const bool bDefenderDied = Defender && Result.StartingHealth > 0 && Result.EndingHealth <= 0;
+
     if (bShieldWallPivotActive && ShieldWallPivotProtectedAlly.IsValid() && Defender == ShieldWallPivotProtectedAlly.Get())
     {
         if (Result.HitCount > 0)
@@ -1798,6 +2206,57 @@ void USkaldAbilityComponent::HandleBattleAttackResolved(AFighterPawn* Attacker, 
 
     if (Attacker == OwnerFighter)
     {
+        if (PassiveAbility.AbilityId == TEXT("Ability_Human_Passive"))
+        {
+            if (!CachedBattleManager.IsValid())
+            {
+                TryRegisterBattleDelegates();
+            }
+
+            if (CachedBattleManager.IsValid())
+            {
+                const TArray<AFighterPawn*> Fighters = CachedBattleManager->GetInitiativeOrderSnapshot();
+                for (AFighterPawn* Fighter : Fighters)
+                {
+                    if (!Fighter || Fighter == OwnerFighter || Fighter->Faction != OwnerFighter->Faction || Fighter->Stats.Health <= 0)
+                    {
+                        continue;
+                    }
+
+                    if (OwnerFighter->GetFootprintDistanceToFighter(Fighter) <= 1)
+                    {
+                        FSkaldActiveAbilityModifier Modifier;
+                        Modifier.SourceAbilityId = PassiveAbility.AbilityId;
+                        Modifier.Delta.AttackDice = 1;
+                        Modifier.bRemoveOnRoundStart = true;
+                        ApplyModifierToTarget(Fighter, MoveTemp(Modifier));
+                    }
+                }
+            }
+
+            RemoveModifiersByAbilityId(PassiveAbility.AbilityId);
+        }
+
+        if (PassiveAbility.AbilityId == TEXT("Ability_Orc_Passive"))
+        {
+            if (Result.CriticalHitCount > 0)
+            {
+                FSkaldActiveAbilityModifier Modifier;
+                Modifier.SourceAbilityId = PassiveAbility.AbilityId;
+                Modifier.Delta.Strength = 1;
+                AddActiveModifier(MoveTemp(Modifier));
+            }
+            else if (Result.HitCount <= 0)
+            {
+                RemoveModifiersByAbilityId(PassiveAbility.AbilityId);
+            }
+        }
+
+        if (PassiveAbility.AbilityId == TEXT("Ability_Ravpack_Passive") && bDefenderDied)
+        {
+            bRavpackMomentumPending = true;
+        }
+
         if (bApplyViralLashOnNextAttack)
         {
             HandleViralLashResolved(Defender, Result);
@@ -2053,6 +2512,17 @@ void USkaldAbilityComponent::HandleBattleAttackResolved(AFighterPawn* Attacker, 
     }
     else if (Defender == OwnerFighter)
     {
+        if (Attacker)
+        {
+            FactionsThatAttackedOwnerThisRound.Add(Attacker->Faction);
+        }
+
+        if (PassiveAbility.AbilityId == TEXT("Ability_Elf_Passive") && bElfEvasionActive && Result.HitCount > 0)
+        {
+            bElfEvasionActive = false;
+            HandlePassiveEffectRemoved(PassiveAbility.AbilityId);
+        }
+
         if (bRuneRiposteReady && Result.HitCount > 0)
         {
             HandleRuneRiposteTriggered(Attacker, Result);
@@ -2065,6 +2535,11 @@ void USkaldAbilityComponent::HandleBattleAttackResolved(AFighterPawn* Attacker, 
             bForgeguardBraceReady = false;
             RemoveModifiersByAbilityId(TEXT("Ability_Dwarf_Skirmish"));
         }
+    }
+
+    if (bDefenderDied && Attacker == OwnerFighter)
+    {
+        RefreshAllPassiveStates();
     }
 }
 
@@ -2207,6 +2682,77 @@ void USkaldAbilityComponent::HandleOwnerHealthChanged(int32 NewHealth)
         return;
     }
 
+    const int32 PreviousHealth = LastKnownHealth;
+
+    AFighterPawn* Fighter = CachedFighter.Get();
+
+    if (Fighter)
+    {
+        if (PassiveAbility.AbilityId == TEXT("Ability_Elf_Passive") && bElfEvasionActive && NewHealth < PreviousHealth)
+        {
+            bElfEvasionActive = false;
+            HandlePassiveEffectRemoved(PassiveAbility.AbilityId);
+        }
+
+        LastKnownHealth = NewHealth;
+    }
+
+    const bool bUndeadPassive = PassiveAbility.AbilityId == TEXT("Ability_Undead_Passive");
+    const bool bDroppedToCritical = NewHealth <= 1 && PreviousHealth > 1;
+    const bool bRecoveredFromCritical = NewHealth > 1 && PreviousHealth <= 1;
+
+    if (bUndeadPassive && PassiveAbility.IsValid())
+    {
+        if (bDroppedToCritical && !bUndeadResilienceActive)
+        {
+            bUndeadResilienceActive = true;
+
+            if (bLowHealthStrengthPenaltyActive)
+            {
+                RemoveModifiersByAbilityId(LowHealthPenaltyId);
+                bLowHealthStrengthPenaltyActive = false;
+            }
+
+            constexpr int32 UndeadCriticalDefenceBonus = 1;
+            constexpr int32 UndeadCriticalAttackDiceBonus = 1;
+
+            FSkaldActiveAbilityModifier ResilienceModifier;
+            ResilienceModifier.SourceAbilityId = PassiveAbility.AbilityId;
+            ResilienceModifier.Delta.Defence = UndeadCriticalDefenceBonus;
+            ResilienceModifier.Delta.AttackDice = UndeadCriticalAttackDiceBonus;
+            AddActiveModifier(MoveTemp(ResilienceModifier));
+        }
+        else if (bRecoveredFromCritical && bUndeadResilienceActive)
+        {
+            bUndeadResilienceActive = false;
+            RemoveModifiersByAbilityId(PassiveAbility.AbilityId);
+        }
+    }
+    else
+    {
+        if (bDroppedToCritical && !bLowHealthStrengthPenaltyActive && Fighter)
+        {
+            FSkaldActiveAbilityModifier Modifier;
+            Modifier.SourceAbilityId = LowHealthPenaltyId;
+            Modifier.Delta.Strength = -1;
+            Modifier.bRemoveWhenRoundsExpire = true;
+            Modifier.RemainingRounds = 0;
+            AddActiveModifier(MoveTemp(Modifier));
+            bLowHealthStrengthPenaltyActive = true;
+        }
+        else if (bRecoveredFromCritical && bLowHealthStrengthPenaltyActive)
+        {
+            RemoveModifiersByAbilityId(LowHealthPenaltyId);
+            bLowHealthStrengthPenaltyActive = false;
+        }
+    }
+
+    if (NewHealth <= 0 && bUndeadResilienceActive && PassiveAbility.IsValid())
+    {
+        bUndeadResilienceActive = false;
+        RemoveModifiersByAbilityId(PassiveAbility.AbilityId);
+    }
+
     if (!bDeathlessAdvanceReady || NewHealth > 0)
     {
         return;
@@ -2214,7 +2760,6 @@ void USkaldAbilityComponent::HandleOwnerHealthChanged(int32 NewHealth)
 
     bDeathlessAdvanceReady = false;
 
-    AFighterPawn* Fighter = CachedFighter.Get();
     if (!Fighter)
     {
         return;

@@ -329,6 +329,9 @@ public:
     UFUNCTION(BlueprintCallable, Category="Skald|Battle")
     void RollInitiative();
 
+    int32 GetLastInitiativeRollAttacker() const { return LastInitiativeRollAttacker; }
+    int32 GetLastInitiativeRollDefender() const { return LastInitiativeRollDefender; }
+
     /** Continue the round after the player confirms the initiative roll. */
     UFUNCTION(BlueprintCallable, Category="Skald|Battle", meta = (CPP_Default_AttackerRoll = "-1", CPP_Default_DefenderRoll = "-1"))
     void ConfirmInitiativeRoll(int32 AttackerRoll, int32 DefenderRoll);

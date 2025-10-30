@@ -7,6 +7,18 @@
 
 namespace
 {
+TMap<FName, FSkaldAbilityDefinition> AbilityDefinitionsById;
+
+void RegisterAbilityDefinition(const FSkaldAbilityDefinition& Definition)
+{
+    if (!Definition.IsValid())
+    {
+        return;
+    }
+
+    AbilityDefinitionsById.Add(Definition.AbilityId, Definition);
+}
+
 ESkaldAbilityTier TierFromCost(int32 ArmyCost)
 {
     if (ArmyCost >= 5)
@@ -48,6 +60,8 @@ TMap<ESkaldFaction, FSkaldFactionAbilitySet> BuildFactionAbilityMap()
 {
     TMap<ESkaldFaction, FSkaldFactionAbilitySet> Result;
 
+    AbilityDefinitionsById.Reset();
+
     {
         FSkaldFactionAbilitySet Set;
         Set.Passive = MakePassive(
@@ -73,6 +87,10 @@ TMap<ESkaldFaction, FSkaldFactionAbilitySet> BuildFactionAbilityMap()
             ESkaldAbilityCostType::Action,
             1);
         Result.Add(ESkaldFaction::Human, Set);
+        RegisterAbilityDefinition(Set.Passive);
+        RegisterAbilityDefinition(Set.SkirmishAbility);
+        RegisterAbilityDefinition(Set.LineAbility);
+        RegisterAbilityDefinition(Set.EliteAbility);
     }
 
     {
@@ -101,6 +119,10 @@ TMap<ESkaldFaction, FSkaldFactionAbilitySet> BuildFactionAbilityMap()
             0,
             true);
         Result.Add(ESkaldFaction::Orc, Set);
+        RegisterAbilityDefinition(Set.Passive);
+        RegisterAbilityDefinition(Set.SkirmishAbility);
+        RegisterAbilityDefinition(Set.LineAbility);
+        RegisterAbilityDefinition(Set.EliteAbility);
     }
 
     {
@@ -128,6 +150,10 @@ TMap<ESkaldFaction, FSkaldFactionAbilitySet> BuildFactionAbilityMap()
             ESkaldAbilityCostType::Action,
             2);
         Result.Add(ESkaldFaction::Dwarf, Set);
+        RegisterAbilityDefinition(Set.Passive);
+        RegisterAbilityDefinition(Set.SkirmishAbility);
+        RegisterAbilityDefinition(Set.LineAbility);
+        RegisterAbilityDefinition(Set.EliteAbility);
     }
 
     {
@@ -156,6 +182,10 @@ TMap<ESkaldFaction, FSkaldFactionAbilitySet> BuildFactionAbilityMap()
             0,
             true);
         Result.Add(ESkaldFaction::Elf, Set);
+        RegisterAbilityDefinition(Set.Passive);
+        RegisterAbilityDefinition(Set.SkirmishAbility);
+        RegisterAbilityDefinition(Set.LineAbility);
+        RegisterAbilityDefinition(Set.EliteAbility);
     }
 
     {
@@ -183,6 +213,10 @@ TMap<ESkaldFaction, FSkaldFactionAbilitySet> BuildFactionAbilityMap()
             ESkaldAbilityCostType::Free,
             3);
         Result.Add(ESkaldFaction::LizardFolk, Set);
+        RegisterAbilityDefinition(Set.Passive);
+        RegisterAbilityDefinition(Set.SkirmishAbility);
+        RegisterAbilityDefinition(Set.LineAbility);
+        RegisterAbilityDefinition(Set.EliteAbility);
     }
 
     {
@@ -190,7 +224,7 @@ TMap<ESkaldFaction, FSkaldFactionAbilitySet> BuildFactionAbilityMap()
         Set.Passive = MakePassive(
             TEXT("Ability_Undead_Passive"),
             NSLOCTEXT("SkaldAbilities", "UndeadPassiveName", "Necrotic Resilience"),
-            NSLOCTEXT("SkaldAbilities", "UndeadPassiveDesc", "Undead fighters do not lose Strength from being reduced to 1 Health and ignore morale-based effects."));
+            NSLOCTEXT("SkaldAbilities", "UndeadPassiveDesc", "When reduced to 1 Health, Undead fighters gain +1 Defence and +1 Attack Dice until they heal above 1 Health and ignore morale-based effects."));
         Set.SkirmishAbility = MakeActive(
             TEXT("Ability_Undead_Skirmish"),
             NSLOCTEXT("SkaldAbilities", "UndeadSkirmishName", "Grave Grasp"),
@@ -211,6 +245,10 @@ TMap<ESkaldFaction, FSkaldFactionAbilitySet> BuildFactionAbilityMap()
             0,
             true);
         Result.Add(ESkaldFaction::Undead, Set);
+        RegisterAbilityDefinition(Set.Passive);
+        RegisterAbilityDefinition(Set.SkirmishAbility);
+        RegisterAbilityDefinition(Set.LineAbility);
+        RegisterAbilityDefinition(Set.EliteAbility);
     }
 
     {
@@ -238,6 +276,10 @@ TMap<ESkaldFaction, FSkaldFactionAbilitySet> BuildFactionAbilityMap()
             ESkaldAbilityCostType::Action,
             1);
         Result.Add(ESkaldFaction::Gnoll, Set);
+        RegisterAbilityDefinition(Set.Passive);
+        RegisterAbilityDefinition(Set.SkirmishAbility);
+        RegisterAbilityDefinition(Set.LineAbility);
+        RegisterAbilityDefinition(Set.EliteAbility);
     }
 
     {
@@ -265,6 +307,10 @@ TMap<ESkaldFaction, FSkaldFactionAbilitySet> BuildFactionAbilityMap()
             ESkaldAbilityCostType::Free,
             2);
         Result.Add(ESkaldFaction::Goblin, Set);
+        RegisterAbilityDefinition(Set.Passive);
+        RegisterAbilityDefinition(Set.SkirmishAbility);
+        RegisterAbilityDefinition(Set.LineAbility);
+        RegisterAbilityDefinition(Set.EliteAbility);
     }
 
     {
@@ -292,6 +338,10 @@ TMap<ESkaldFaction, FSkaldFactionAbilitySet> BuildFactionAbilityMap()
             ESkaldAbilityCostType::Action,
             2);
         Result.Add(ESkaldFaction::Empire, Set);
+        RegisterAbilityDefinition(Set.Passive);
+        RegisterAbilityDefinition(Set.SkirmishAbility);
+        RegisterAbilityDefinition(Set.LineAbility);
+        RegisterAbilityDefinition(Set.EliteAbility);
     }
 
     {
@@ -320,6 +370,10 @@ TMap<ESkaldFaction, FSkaldFactionAbilitySet> BuildFactionAbilityMap()
             0,
             true);
         Result.Add(ESkaldFaction::Inflicted, Set);
+        RegisterAbilityDefinition(Set.Passive);
+        RegisterAbilityDefinition(Set.SkirmishAbility);
+        RegisterAbilityDefinition(Set.LineAbility);
+        RegisterAbilityDefinition(Set.EliteAbility);
     }
 
     {
@@ -347,6 +401,10 @@ TMap<ESkaldFaction, FSkaldFactionAbilitySet> BuildFactionAbilityMap()
             ESkaldAbilityCostType::Action,
             2);
         Result.Add(ESkaldFaction::FrogFolk, Set);
+        RegisterAbilityDefinition(Set.Passive);
+        RegisterAbilityDefinition(Set.SkirmishAbility);
+        RegisterAbilityDefinition(Set.LineAbility);
+        RegisterAbilityDefinition(Set.EliteAbility);
     }
 
     {
@@ -374,6 +432,10 @@ TMap<ESkaldFaction, FSkaldFactionAbilitySet> BuildFactionAbilityMap()
             ESkaldAbilityCostType::Free,
             2);
         Result.Add(ESkaldFaction::Ravpack, Set);
+        RegisterAbilityDefinition(Set.Passive);
+        RegisterAbilityDefinition(Set.SkirmishAbility);
+        RegisterAbilityDefinition(Set.LineAbility);
+        RegisterAbilityDefinition(Set.EliteAbility);
     }
 
     return Result;
@@ -435,5 +497,33 @@ FSkaldAbilityDefinition GetFactionActiveAbility(ESkaldFaction Faction, int32 Arm
         }
     }
     return FSkaldAbilityDefinition();
+}
+
+FSkaldAbilityDefinition GetAbilityDefinitionById(FName AbilityId)
+{
+    if (AbilityId.IsNone())
+    {
+        return FSkaldAbilityDefinition();
+    }
+
+    FindFactionAbilitySet(ESkaldFaction::None);
+
+    if (const FSkaldAbilityDefinition* Definition = AbilityDefinitionsById.Find(AbilityId))
+    {
+        return *Definition;
+    }
+
+    return FSkaldAbilityDefinition();
+}
+
+bool IsPassiveAbilityId(FName AbilityId)
+{
+    if (AbilityId.IsNone())
+    {
+        return false;
+    }
+
+    const FSkaldAbilityDefinition Definition = GetAbilityDefinitionById(AbilityId);
+    return Definition.IsValid() && Definition.bIsPassive;
 }
 

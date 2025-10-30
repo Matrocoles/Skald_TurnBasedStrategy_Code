@@ -219,6 +219,10 @@ public:
     /** Apply a modifier originating from another fighter (e.g. enemy debuffs). */
     void ReceiveExternalModifier(FSkaldActiveAbilityModifier&& Modifier);
     void NotifyOwnerMoved(int32 DistanceMoved);
+    void ModifyOutgoingAttackStats(AFighterPawn* Target, FFighterStats& InOutStats);
+    void ModifyIncomingAttackStats(AFighterPawn* Attacker, FFighterStats& InOutAttackerStats);
+    void HandleIncomingAttackStarted();
+    void HandleIncomingAttackFinished();
 
 protected:
     virtual void BeginPlay() override;
@@ -259,6 +263,14 @@ protected:
     void ApplyModifierToTarget(AFighterPawn* Target, FSkaldActiveAbilityModifier&& Modifier);
     void RemoveModifiersByAbilityId(FName AbilityId);
     void ConsumeOncePerBattleAbility(FName AbilityId);
+    void RefreshPassiveState();
+    void RefreshAllPassiveStates();
+    void RefreshDwarfPassive();
+    void ApplyActivationPassiveEffects();
+    int32 CountAdjacentFactionAllies(AFighterPawn* Fighter, ESkaldFaction Faction) const;
+    void HandlePassiveEffectApplied(const FSkaldAbilityDefinition& Definition);
+    void HandlePassiveEffectRemoved(FName AbilityId);
+    bool HasFactionAttackedOwnerThisRound(ESkaldFaction Faction) const;
 
     UFUNCTION()
     void HandleBattleAttackResolved(AFighterPawn* Attacker, AFighterPawn* Defender, const FDiceRollResult& Result);
@@ -330,6 +342,15 @@ protected:
     bool bGoblinAmbushActive = false;
     bool bGoblinAmbushPenaltyPending = false;
     bool bSuppressAbilityEffectOnNextTrigger = false;
+    bool bElfEvasionActive = false;
+    bool bLizardPenaltyConsumedThisRound = false;
+    bool bRavpackMomentumPending = false;
+    bool bLowHealthStrengthPenaltyActive = false;
+    bool bUndeadResilienceActive = false;
+    int32 DwarfPassiveAdjacentCount = 0;
+    int32 LastKnownHealth = 0;
+    TMap<FName, int32> PassiveVisualStackCounts;
+    TSet<ESkaldFaction> FactionsThatAttackedOwnerThisRound;
 
     /** Active traps armed by this ability component. */
     UPROPERTY()
