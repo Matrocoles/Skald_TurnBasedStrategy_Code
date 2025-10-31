@@ -44,6 +44,7 @@ constexpr float QueuedAttackFirstRollDelaySeconds = 0.48f;
 // Consistent pacing between any additional dice in the same queued attack to
 // mirror the UI reveal spacing.
 constexpr float QueuedAttackAdditionalRollDelaySeconds = 0.4f;
+constexpr float VisualAvoidanceFloorNormalThreshold = 0.65f;
 }
 
 AFighterPawn::AFighterPawn() : MaxHealth(0) {
@@ -453,7 +454,7 @@ void AFighterPawn::RebuildVisualMovementPath(const FVector &Destination) {
           BlockingHit, StartLocation, Destination, FQuat::Identity,
           VisualAvoidanceTraceChannel, ProbeShape, QueryParams);
 
-      if (bHit && BlockingHit.bBlockingHit) {
+      if (bHit && ShouldUseAvoidanceHit(BlockingHit)) {
         const FVector TravelDirection =
             (Destination - StartLocation).GetSafeNormal();
         const FVector SurfaceNormal =
@@ -530,6 +531,10 @@ void AFighterPawn::RebuildVisualMovementPath(const FVector &Destination) {
 
   VisualMovementPathPoints.Add(Destination);
 
+  for (FVector &Point : VisualMovementPathPoints) {
+    ConformPathPointToGround(Point);
+  }
+
   VisualMovementCumulativeDistances.Reserve(VisualMovementPathPoints.Num());
   VisualMovementCumulativeDistances.Add(0.f);
   float AccumulatedDistance = 0.f;
@@ -548,6 +553,28 @@ void AFighterPawn::RebuildVisualMovementPath(const FVector &Destination) {
       VisualMovementCumulativeDistances.Last() = VisualMovementPathLength;
     }
   }
+}
+
+bool AFighterPawn::ShouldUseAvoidanceHit(const FHitResult &Hit) const {
+  if (!Hit.bBlockingHit) {
+    return false;
+  }
+
+  if (Hit.Distance <= KINDA_SMALL_NUMBER) {
+    return false;
+  }
+
+  const FVector SurfaceNormal = Hit.Normal.GetSafeNormal();
+  if (SurfaceNormal.IsNearlyZero()) {
+    return false;
+  }
+
+  const float UpDot = FVector::DotProduct(SurfaceNormal, FVector::UpVector);
+  if (UpDot >= VisualAvoidanceFloorNormalThreshold - KINDA_SMALL_NUMBER) {
+    return false;
+  }
+
+  return true;
 }
 
 FVector AFighterPawn::SampleVisualMovementPath(float NormalisedDistance) const {
@@ -598,6 +625,36 @@ void AFighterPawn::ResetVisualMovementPath() {
   VisualMovementPathPoints.Reset();
   VisualMovementCumulativeDistances.Reset();
   VisualMovementPathLength = 0.f;
+}
+
+void AFighterPawn::ConformPathPointToGround(FVector &Location) const {
+  if (VisualGroundConformTraceHeight <= KINDA_SMALL_NUMBER) {
+    return;
+  }
+
+  UWorld *World = GetWorld();
+  if (!World) {
+    return;
+  }
+
+  const FVector TraceStart =
+      Location + FVector(0.f, 0.f, VisualGroundConformTraceHeight);
+  const FVector TraceEnd =
+      Location - FVector(0.f, 0.f, VisualGroundConformTraceHeight);
+
+  FHitResult Hit;
+  FCollisionQueryParams QueryParams(
+      SCENE_QUERY_STAT(FighterMovementGroundConform), false, this);
+  QueryParams.bTraceComplex = false;
+  QueryParams.AddIgnoredActor(this);
+
+  if (World->LineTraceSingleByChannel(Hit, TraceStart, TraceEnd,
+                                      VisualGroundConformTraceChannel,
+                                      QueryParams) &&
+      Hit.bBlockingHit) {
+    Location = Hit.Location;
+    Location.Z += GetSimpleCollisionHalfHeight();
+  }
 }
 
 void AFighterPawn::TickActiveProjectileFX(float DeltaSeconds) {

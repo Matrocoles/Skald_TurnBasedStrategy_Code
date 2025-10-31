@@ -125,6 +125,15 @@ public:
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Movement|Visual")
   TEnumAsByte<ECollisionChannel> VisualAvoidanceTraceChannel = ECC_WorldStatic;
 
+  /** Height of the trace used to project movement points onto the terrain. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Movement|Visual",
+            meta = (ClampMin = "0.0"))
+  float VisualGroundConformTraceHeight = 300.f;
+
+  /** Collision channel used when projecting movement points onto the terrain. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Movement|Visual")
+  TEnumAsByte<ECollisionChannel> VisualGroundConformTraceChannel = ECC_WorldStatic;
+
   /** Perform an attack against another fighter. */
   UFUNCTION(BlueprintCallable, Category = "Fighter")
   void PerformAttack(AFighterPawn *Target);
@@ -595,11 +604,17 @@ private:
   /** Generate a lightweight, obstacle-aware path for the current move. */
   void RebuildVisualMovementPath(const FVector &Destination);
 
+  /** Evaluate whether a visual avoidance hit should influence movement. */
+  bool ShouldUseAvoidanceHit(const FHitResult &Hit) const;
+
   /** Sample the cached visual movement path using a normalised distance. */
   FVector SampleVisualMovementPath(float NormalisedDistance) const;
 
   /** Clear any cached state related to visual movement interpolation. */
   void ResetVisualMovementPath();
+
+  /** Project a movement path point onto the underlying terrain surface. */
+  void ConformPathPointToGround(FVector &Location) const;
 
   /** Prepare and cache dynamic materials used for hit feedback. */
   void InitializeDisplayMeshMaterials();
