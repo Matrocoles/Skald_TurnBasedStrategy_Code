@@ -459,16 +459,21 @@ void AFighterPawn::RebuildVisualMovementPath(const FVector &Destination) {
         const FVector SurfaceNormal =
             BlockingHit.Normal.GetSafeNormal(KINDA_SMALL_NUMBER, FVector::UpVector);
 
+        const FVector UpBasis =
+            FMath::Abs(FVector::DotProduct(TravelDirection, FVector::UpVector)) >=
+                    (1.f - KINDA_SMALL_NUMBER)
+                ? FVector(0.f, 1.f, 0.f)
+                : FVector::UpVector;
+
         FVector AvoidanceDirection =
-            FVector::CrossProduct(SurfaceNormal, FVector::UpVector);
+            FVector::CrossProduct(SurfaceNormal, UpBasis);
 
         if (AvoidanceDirection.IsNearlyZero()) {
           AvoidanceDirection = FVector::CrossProduct(SurfaceNormal, TravelDirection);
         }
 
         if (AvoidanceDirection.IsNearlyZero()) {
-          AvoidanceDirection =
-              FVector::CrossProduct(TravelDirection, FVector::UpVector);
+          AvoidanceDirection = FVector::CrossProduct(TravelDirection, UpBasis);
         }
 
         const bool bHasAvoidanceDirection = !AvoidanceDirection.IsNearlyZero();
