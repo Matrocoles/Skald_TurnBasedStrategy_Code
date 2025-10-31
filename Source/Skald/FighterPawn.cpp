@@ -2370,6 +2370,14 @@ void AFighterPawn::RefreshMovementAudioComponent() {
 
 void AFighterPawn::SetIsMoving(bool bNewIsMoving) {
   if (bIsMoving == bNewIsMoving) {
+    if (bIsMoving && bNewIsMoving) {
+      MovementStartLocation = GetActorLocation();
+      MovementStraightLineDistance =
+          FVector::Dist(MovementStartLocation, MovementTargetLocation);
+      MovementProgress = 0.f;
+      RebuildVisualMovementPath(MovementTargetLocation);
+      RefreshMovementAudioComponent();
+    }
     return;
   }
 
