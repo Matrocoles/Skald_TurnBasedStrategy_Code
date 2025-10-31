@@ -1969,8 +1969,32 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
     }
 
     if (PS->IsEliminated) {
-      ++PlacementIndex;
-      continue;
+      bool bOwnsTerritory = false;
+      for (ATerritory *Territory : WorldMap->Territories) {
+        if (Territory && Territory->OwningPlayer == PS) {
+          bOwnsTerritory = true;
+          break;
+        }
+      }
+
+      if (!bOwnsTerritory) {
+        ++PlacementIndex;
+        continue;
+      }
+
+      UE_LOG(LogSkald, Warning,
+             TEXT("AdvanceArmyPlacement: Player %s flagged eliminated despite owning territories; clearing elimination flag."),
+             *PS->GetResolvedPlayerName(TEXT("AdvanceArmyPlacement_RecoverElimination")));
+
+      PS->IsEliminated = false;
+      if (FS_PlayerData *PlayerData = PlayerDataArray.FindByPredicate(
+              [PS](const FS_PlayerData &Data) {
+                return Data.PlayerID == PS->GetPlayerId();
+              })) {
+        PlayerData->IsEliminated = false;
+        PlayerData->IsAlive = true;
+      }
+      PS->ForceNetUpdate();
     }
 
     if (!ArmyPlacementLeader.IsValid()) {
@@ -1992,11 +2016,24 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
 
     // Mark whose placement turn it is so HUDs sync on all clients.
     if (ASkaldGameState *GSLocal = GetGameState<ASkaldGameState>()) {
-      const int32 NewIndex = GSLocal->PlayerArray.IndexOfByKey(PS);
+      int32 NewIndex = GSLocal->PlayerArray.IndexOfByKey(PS);
+      if (NewIndex == INDEX_NONE) {
+        NewIndex = GSLocal->PlayerArray.IndexOfByPredicate(
+            [PS](const APlayerState *PlayerState) {
+              const ASkaldPlayerState *SkaldPlayerState =
+                  Cast<ASkaldPlayerState>(PlayerState);
+              return SkaldPlayerState &&
+                     SkaldPlayerState->GetPlayerId() == PS->GetPlayerId();
+            });
+      }
       if (NewIndex != INDEX_NONE) {
         GSLocal->CurrentTurnIndex = NewIndex; // RepNotify → OnTurnIndexChanged
         GSLocal->OnTurnIndexChanged.Broadcast(
             NewIndex); // optional immediate local broadcast
+      } else {
+        UE_LOG(LogSkald, Warning,
+               TEXT("AdvanceArmyPlacement: Unable to resolve GameState index for %s; HUD turn sync skipped."),
+               *PS->GetResolvedPlayerName(TEXT("AdvanceArmyPlacement_MissingIndex")));
       }
     }
 
