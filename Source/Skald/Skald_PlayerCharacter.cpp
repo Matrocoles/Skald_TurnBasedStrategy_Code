@@ -534,7 +534,9 @@ FVector ASkald_PlayerCharacter::GetBattleLockWorldOffset(const AActor* FocusActo
 
         if (!FMath::IsNearlyZero(BattleLockRelativeOffset.X))
         {
-                Offset += Forward * BattleLockRelativeOffset.X;
+                // Positive X offsets should position the camera behind the focus actor
+                // so that the camera looks in the same direction as the fighter.
+                Offset -= Forward * BattleLockRelativeOffset.X;
         }
 
         if (!FMath::IsNearlyZero(BattleLockRelativeOffset.Y))
