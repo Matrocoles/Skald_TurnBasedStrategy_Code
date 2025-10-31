@@ -519,8 +519,14 @@ bool UGridOverlayComponent::HasLineOfSight(const FIntPoint &Start,
   int32 err = dx + dy;
 
   while (true) {
-    if (Current != Start && IsObscured(Current)) {
-      return false;
+    if (Current != Start) {
+      if (IsObscured(Current)) {
+        return false;
+      }
+
+      if (Current != End && IsOccupied(Current)) {
+        return false;
+      }
     }
     if (Current.X == x1 && Current.Y == y1) {
       break;
