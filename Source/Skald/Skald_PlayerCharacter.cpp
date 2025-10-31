@@ -433,7 +433,7 @@ void ASkald_PlayerCharacter::FocusCameraOnActor(AActor* FocusActor)
         if (bAutoFaceLockTarget)
         {
                 const FRotator TargetRotation = FocusActor->GetActorRotation();
-                DesiredBattleRotation.Yaw = TargetRotation.Yaw;
+                DesiredBattleRotation.Yaw = TargetRotation.Yaw + LockedBattleYawOffset;
         }
 
         const float ClampedPitch = FMath::Clamp(LockedBattlePitch, MinBattlePitch, MaxBattlePitch);
@@ -475,7 +475,7 @@ void ASkald_PlayerCharacter::UpdateBattleCamera(float DeltaTime)
 
                         if (bAutoFaceLockTarget && !bHasManuallyRotatedWhileLocked)
                         {
-                                DesiredBattleRotation.Yaw = FocusActor->GetActorRotation().Yaw;
+                                DesiredBattleRotation.Yaw = FocusActor->GetActorRotation().Yaw + LockedBattleYawOffset;
                         }
                 }
                 else
