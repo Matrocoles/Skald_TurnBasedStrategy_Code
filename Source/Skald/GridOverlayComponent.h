@@ -38,6 +38,13 @@ class UInstancedStaticMeshComponent;
 class UDecalComponent;
 class UMaterialInterface;
 class UStaticMesh;
+
+UENUM(BlueprintType)
+enum class EDifficultTerrainAuthoringMode : uint8 {
+  Automatic = 0 UMETA(DisplayName = "Automatic"),
+  Disabled UMETA(DisplayName = "Disabled"),
+  WholeGrid UMETA(DisplayName = "Whole Grid")
+};
 class UMaterialInstanceDynamic;
 struct FTimerHandle;
 class UWorld;
@@ -151,6 +158,10 @@ public:
   float GetCellHeight(const FIntPoint &GridCoord) const;
 
   virtual bool IsDifficultTerrain(const FIntPoint &GridCoord) const;
+
+  /** Override the difficult terrain state for a specific cell. */
+  UFUNCTION(BlueprintCallable, Category = "Grid|DifficultTerrain")
+  void SetCellDifficult(const FIntPoint &GridCoord, bool bIsDifficult);
 
   /** Mark a grid cell as occupied or free. */
   UFUNCTION(BlueprintCallable, Category = "Grid")
@@ -441,6 +452,11 @@ protected:
   UPROPERTY()
   TArray<bool> ColumnTouchesTerrain;
 
+  /** Determines how difficult terrain data is authored for this grid. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid")
+  EDifficultTerrainAuthoringMode DifficultTerrainAuthoringMode =
+      EDifficultTerrainAuthoringMode::Automatic;
+
   /** Guard to ensure placement randomisation is only applied once. */
   bool bHasRandomizedPlacement = false;
 
@@ -608,6 +624,15 @@ protected:
 
   /** Resolve the effective rotation for a grid cell, respecting editor settings. */
   FQuat GetEffectiveCellRotation(int32 ArrayIndex) const;
+
+  /** Ensure ColumnTouchesTerrain is initialised according to the authoring mode. */
+  void InitialiseColumnTouchesTerrain(int32 TotalCells);
+
+  /** True if automatic difficult terrain sampling should be applied. */
+  bool ShouldApplyAutomaticDifficultTerrain() const;
+
+  /** Grow the difficult terrain array to match the grid size when needed. */
+  void EnsureColumnTouchesTerrainCapacity();
 };
 
 namespace Skald
