@@ -1637,7 +1637,16 @@ bool UGridOverlayComponent::CanTraverseVertical(const FIntPoint &From,
   const bool bToTerrain = ColumnTouchesTerrain.IsValidIndex(ToIndex) &&
                           ColumnTouchesTerrain[ToIndex];
 
-  return bFromClimbable || bToClimbable || bFromTerrain || bToTerrain;
+  bool bHasTerrainSupport = bFromTerrain || bToTerrain;
+  if (!bHasTerrainSupport && !ShouldApplyAutomaticDifficultTerrain()) {
+    // When automatic difficult-terrain sampling is disabled, columns will no
+    // longer be marked as touching terrain by default. Treat them as
+    // supported so that vertical traversal (and therefore movement
+    // highlighting) still works unless explicit climbable data overrides it.
+    bHasTerrainSupport = true;
+  }
+
+  return bFromClimbable || bToClimbable || bHasTerrainSupport;
 }
 
 void UGridOverlayComponent::HighlightMovement(AFighterPawn *Fighter) {
