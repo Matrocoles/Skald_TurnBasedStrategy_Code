@@ -191,6 +191,10 @@ protected:
         UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Battle")
         float LockedBattlePitch = -20.f;
 
+        /** Additional yaw applied whenever the camera automatically faces a lock target. */
+        UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Battle")
+        float LockedBattleYawOffset = 0.f;
+
         /** Pivot offset from the focused fighter while locked on (X/Y shift the pawn, Z raises the pivot). */
         UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Battle")
         FVector BattleLockRelativeOffset = FVector(0.f, 0.f, 220.f);
