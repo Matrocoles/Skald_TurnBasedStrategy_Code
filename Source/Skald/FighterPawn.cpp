@@ -456,57 +456,73 @@ void AFighterPawn::RebuildVisualMovementPath(const FVector &Destination) {
       if (bHit && BlockingHit.bBlockingHit) {
         const FVector TravelDirection =
             (Destination - StartLocation).GetSafeNormal();
-        FVector UpVector = FVector::UpVector;
-        FVector LateralDirection =
-            FVector::CrossProduct(TravelDirection, UpVector);
+        const FVector SurfaceNormal =
+            BlockingHit.Normal.GetSafeNormal(KINDA_SMALL_NUMBER, FVector::UpVector);
 
-        if (LateralDirection.IsNearlyZero()) {
-          UpVector = FVector(0.f, 1.f, 0.f);
-          LateralDirection = FVector::CrossProduct(TravelDirection, UpVector);
+        const FVector UpBasis =
+            FMath::Abs(FVector::DotProduct(TravelDirection, FVector::UpVector)) >=
+                    (1.f - KINDA_SMALL_NUMBER)
+                ? FVector(0.f, 1.f, 0.f)
+                : FVector::UpVector;
+
+        FVector AvoidanceDirection =
+            FVector::CrossProduct(SurfaceNormal, UpBasis);
+
+        if (AvoidanceDirection.IsNearlyZero()) {
+          AvoidanceDirection = FVector::CrossProduct(SurfaceNormal, TravelDirection);
         }
 
-        if (!LateralDirection.IsNearlyZero()) {
-          LateralDirection = LateralDirection.GetSafeNormal();
-          if (FVector::DotProduct(LateralDirection, BlockingHit.Normal) < 0.f) {
-            LateralDirection *= -1.f;
+        if (AvoidanceDirection.IsNearlyZero()) {
+          AvoidanceDirection = FVector::CrossProduct(TravelDirection, UpBasis);
+        }
+
+        const bool bHasAvoidanceDirection = !AvoidanceDirection.IsNearlyZero();
+        if (bHasAvoidanceDirection) {
+          AvoidanceDirection = AvoidanceDirection.GetSafeNormal();
+          if (FVector::DotProduct(AvoidanceDirection, TravelDirection) < 0.f) {
+            AvoidanceDirection *= -1.f;
           }
+        } else {
+          AvoidanceDirection = FVector::ZeroVector;
+        }
 
-          const float PathLength = MovementStraightLineDistance;
-          const float FirstDistance =
-              FMath::Clamp(BlockingHit.Distance, 0.f, PathLength);
-          const float SecondDistance =
-              FMath::Clamp(BlockingHit.Distance + VisualAvoidanceRejoinDistance, 0.f,
-                           PathLength);
+        const float PathLength = MovementStraightLineDistance;
+        const float FirstDistance =
+            FMath::Clamp(BlockingHit.Distance, 0.f, PathLength);
+        const float SecondDistance =
+            FMath::Clamp(BlockingHit.Distance + VisualAvoidanceRejoinDistance, 0.f,
+                         PathLength);
 
-          const float FirstAlpha =
-              PathLength > KINDA_SMALL_NUMBER ? FirstDistance / PathLength : 0.f;
-          const float SecondAlpha = PathLength > KINDA_SMALL_NUMBER
-                                         ? SecondDistance / PathLength
-                                         : 1.f;
+        const float FirstAlpha =
+            PathLength > KINDA_SMALL_NUMBER ? FirstDistance / PathLength : 0.f;
+        const float SecondAlpha = PathLength > KINDA_SMALL_NUMBER
+                                       ? SecondDistance / PathLength
+                                       : 1.f;
 
-          const FVector SurfaceNormal = BlockingHit.Normal.GetSafeNormal(
-              KINDA_SMALL_NUMBER, FVector::UpVector);
+        FVector FirstWaypoint =
+            FMath::Lerp(StartLocation, Destination, FirstAlpha) +
+            SurfaceNormal * VisualAvoidanceSurfacePush;
+        if (bHasAvoidanceDirection) {
+          FirstWaypoint += AvoidanceDirection * VisualAvoidanceSideStep;
+        }
+        FirstWaypoint.Z =
+            FMath::Lerp(StartLocation.Z, Destination.Z, FirstAlpha);
 
-          FVector FirstWaypoint =
-              FMath::Lerp(StartLocation, Destination, FirstAlpha) +
-              SurfaceNormal * VisualAvoidanceSurfacePush +
-              LateralDirection * VisualAvoidanceSideStep;
-          FirstWaypoint.Z =
-              FMath::Lerp(StartLocation.Z, Destination.Z, FirstAlpha);
+        VisualMovementPathPoints.Add(FirstWaypoint);
 
-          VisualMovementPathPoints.Add(FirstWaypoint);
-
-          if (SecondAlpha < 1.f - KINDA_SMALL_NUMBER) {
-            FVector SecondWaypoint =
-                FMath::Lerp(StartLocation, Destination, SecondAlpha) +
-                SurfaceNormal * (VisualAvoidanceSurfacePush * 0.5f) +
-                LateralDirection *
-                    (VisualAvoidanceSideStep * VisualAvoidanceReturnRatio);
-            SecondWaypoint.Z =
-                FMath::Lerp(StartLocation.Z, Destination.Z, SecondAlpha);
-
-            VisualMovementPathPoints.Add(SecondWaypoint);
+        if (SecondAlpha < 1.f - KINDA_SMALL_NUMBER) {
+          FVector SecondWaypoint =
+              FMath::Lerp(StartLocation, Destination, SecondAlpha) +
+              SurfaceNormal * (VisualAvoidanceSurfacePush * 0.5f);
+          if (bHasAvoidanceDirection) {
+            SecondWaypoint +=
+                AvoidanceDirection *
+                (VisualAvoidanceSideStep * VisualAvoidanceReturnRatio);
           }
+          SecondWaypoint.Z =
+              FMath::Lerp(StartLocation.Z, Destination.Z, SecondAlpha);
+
+          VisualMovementPathPoints.Add(SecondWaypoint);
         }
       }
     }
