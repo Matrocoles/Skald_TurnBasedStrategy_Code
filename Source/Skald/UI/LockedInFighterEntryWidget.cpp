@@ -83,7 +83,7 @@ void ULockedInFighterEntryWidget::RefreshFromFighter() {
   }
 
   if (NameText) {
-    NameText->SetText(FText::FromString(Fighter->GetHumanReadableName()));
+    NameText->SetText(FText::FromName(Fighter->GetFighterId()));
   }
 
   CachedMaxHealth = FMath::Max(Fighter->GetMaxHealth(), 1);
