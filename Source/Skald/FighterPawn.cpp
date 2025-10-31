@@ -484,8 +484,8 @@ void AFighterPawn::RebuildVisualMovementPath(const FVector &Destination) {
                                          ? SecondDistance / PathLength
                                          : 1.f;
 
-          const FVector SurfaceNormal =
-              BlockingHit.Normal.GetSafeNormal(FVector::UpVector);
+          const FVector SurfaceNormal = BlockingHit.Normal.GetSafeNormal(
+              KINDA_SMALL_NUMBER, FVector::UpVector);
 
           FVector FirstWaypoint =
               FMath::Lerp(StartLocation, Destination, FirstAlpha) +
