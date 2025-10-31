@@ -32,6 +32,10 @@ public:
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid")
   bool bClimbable = false;
 
+  /** Whether this obstacle should mark its footprint as difficult terrain. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid")
+  bool bAddsDifficultTerrain = false;
+
   /** Enable manual control over which grid cells are considered blocked by this obstacle. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid", meta = (InlineEditConditionToggle))
   bool bOverrideBlockedCells = false;

@@ -306,7 +306,7 @@ void UGridOverlayComponent::BeginPlay() {
   CellRotations.Init(FQuat::Identity, TotalCells);
   ColumnMaxHeights.Init(Origin.Z, TotalCells);
   ColumnHasClimbable.Init(false, TotalCells);
-  ColumnTouchesTerrain.Init(false, TotalCells);
+  InitialiseColumnTouchesTerrain(TotalCells);
   if (bUseDecalBaseGrid) {
     BaseGridInstanceIndices.Empty();
     ClearBaseGridDecals();
@@ -368,7 +368,7 @@ void UGridOverlayComponent::RefreshGridDataFromOrigin() {
   DynamicOccupiedCells.Init(false, TotalCells);
   ColumnMaxHeights.Init(Origin.Z, TotalCells);
   ColumnHasClimbable.Init(false, TotalCells);
-  ColumnTouchesTerrain.Init(false, TotalCells);
+  InitialiseColumnTouchesTerrain(TotalCells);
 
   SampleEnvironmentAtOrigin();
 
@@ -422,7 +422,8 @@ void UGridOverlayComponent::SampleCellAt(const FIntPoint &GridCoord, float Trace
           FMath::Max(ColumnMaxHeights[Idx], CellHeights[Idx] + CellSize);
     }
 
-    if (ColumnTouchesTerrain.IsValidIndex(Idx)) {
+    if (ShouldApplyAutomaticDifficultTerrain() &&
+        ColumnTouchesTerrain.IsValidIndex(Idx)) {
       ColumnTouchesTerrain[Idx] = true;
     }
 
@@ -551,6 +552,23 @@ bool UGridOverlayComponent::IsDifficultTerrain(const FIntPoint &GridCoord) const
   }
   const int32 Idx = Index(GridCoord);
   return ColumnTouchesTerrain.IsValidIndex(Idx) && ColumnTouchesTerrain[Idx];
+}
+
+void UGridOverlayComponent::SetCellDifficult(const FIntPoint &GridCoord,
+                                             bool bIsDifficult) {
+  if (!IsValidGrid(GridCoord)) {
+    return;
+  }
+
+  EnsureColumnTouchesTerrainCapacity();
+
+  const int32 Idx = Index(GridCoord);
+  if (!ColumnTouchesTerrain.IsValidIndex(Idx)) {
+    return;
+  }
+
+  ColumnTouchesTerrain[Idx] = bIsDifficult;
+  UpdateBaseGridVisual(GridCoord);
 }
 
 void UGridOverlayComponent::SetOccupied(const FIntPoint &GridCoord,
@@ -991,6 +1009,52 @@ FQuat UGridOverlayComponent::GetEffectiveCellRotation(int32 ArrayIndex) const {
                                                 : FQuat::Identity;
 }
 
+void UGridOverlayComponent::InitialiseColumnTouchesTerrain(int32 TotalCells) {
+  if (TotalCells <= 0) {
+    ColumnTouchesTerrain.Empty();
+    return;
+  }
+
+  switch (DifficultTerrainAuthoringMode) {
+  case EDifficultTerrainAuthoringMode::Automatic:
+  case EDifficultTerrainAuthoringMode::Disabled:
+    ColumnTouchesTerrain.Init(false, TotalCells);
+    break;
+  case EDifficultTerrainAuthoringMode::WholeGrid:
+    ColumnTouchesTerrain.Init(true, TotalCells);
+    break;
+  default:
+    ColumnTouchesTerrain.Init(false, TotalCells);
+    break;
+  }
+}
+
+bool UGridOverlayComponent::ShouldApplyAutomaticDifficultTerrain() const {
+  return DifficultTerrainAuthoringMode != EDifficultTerrainAuthoringMode::Disabled;
+}
+
+void UGridOverlayComponent::EnsureColumnTouchesTerrainCapacity() {
+  const int32 TotalCells = Width * Length;
+  if (TotalCells <= 0) {
+    ColumnTouchesTerrain.Empty();
+    return;
+  }
+
+  const int32 PreviousNum = ColumnTouchesTerrain.Num();
+  if (PreviousNum == TotalCells) {
+    return;
+  }
+
+  ColumnTouchesTerrain.SetNum(TotalCells);
+
+  if (DifficultTerrainAuthoringMode == EDifficultTerrainAuthoringMode::WholeGrid &&
+      TotalCells > PreviousNum) {
+    for (int32 Index = PreviousNum; Index < TotalCells; ++Index) {
+      ColumnTouchesTerrain[Index] = true;
+    }
+  }
+}
+
 void UGridOverlayComponent::UpdateBaseGridVisual(const FIntPoint &GridCoord) {
   if (!IsValidGrid(GridCoord)) {
     return;
@@ -1392,6 +1456,8 @@ void UGridOverlayComponent::ApplyObstacleToGrid(UGridObstacleComponent *Obstacle
         Obstacle->GetTraceHalfHeightOrDefault(SamplingTraceHalfHeight);
     UWorld *World = bResampleCells ? GetWorld() : nullptr;
 
+    EnsureColumnTouchesTerrainCapacity();
+
     for (int32 Y = Min.Y; Y <= Max.Y; ++Y) {
       for (int32 X = Min.X; X <= Max.X; ++X) {
         const FIntPoint Cell(X, Y);
@@ -1426,6 +1492,9 @@ void UGridOverlayComponent::ApplyObstacleToGrid(UGridObstacleComponent *Obstacle
           if (Obstacle->bBlocksLineOfSight) {
             ObscuredCells[Idx] = true;
           }
+        }
+        if (ColumnTouchesTerrain.IsValidIndex(Idx)) {
+          ColumnTouchesTerrain[Idx] = Obstacle->bAddsDifficultTerrain;
         }
         UpdateBaseGridVisual(Cell);
       }
@@ -1478,7 +1547,8 @@ void UGridOverlayComponent::HandleLandscapeHit(const FHitResult &Hit,
     UpdateBaseGridVisual(Cell);
   }
 
-  if (ColumnTouchesTerrain.IsValidIndex(CellIndex)) {
+  if (ShouldApplyAutomaticDifficultTerrain() &&
+      ColumnTouchesTerrain.IsValidIndex(CellIndex)) {
     ColumnTouchesTerrain[CellIndex] = true;
   }
 }
