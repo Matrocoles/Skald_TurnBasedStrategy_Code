@@ -32,6 +32,8 @@ enum class EFighterPawnFootprint : uint8 {
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHealthChanged, int32, NewHealth);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnActionsChanged, int32,
                                             NewActionsRemaining);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnEngagementChanged, bool,
+                                            bNowEngaged);
 DECLARE_MULTICAST_DELEGATE(FOnQueuedAttackFinalized);
 
 /** Pawn representing a fighter in grid battles. */
@@ -72,7 +74,7 @@ public:
 
   /** Move to the specified grid cell if actions remain. */
   UFUNCTION(BlueprintCallable, Category = "Fighter")
-  void MoveToCell(FIntPoint TargetCell);
+  void MoveToCell(FIntPoint TargetCell, bool bConsumeAction = true);
 
   /** Teleport to a target grid cell without consuming additional actions. */
   bool TryTeleportToCell(FIntPoint TargetCell, int32 MaxDistance,
@@ -131,6 +133,20 @@ public:
 
   /** True while queued attack rolls are still being processed. */
   bool IsResolvingQueuedAttack() const;
+
+  /** Returns true if this fighter is currently engaged with an enemy. */
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Fighter|Combat")
+  bool IsEngaged() const { return bIsEngaged; }
+
+  /** Recalculate whether this fighter is engaged with nearby enemies. */
+  void UpdateEngagementStatus();
+
+  /** Recalculate engagement using a supplied snapshot of fighters. */
+  void UpdateEngagementStatus(const TArray<AFighterPawn *> &NearbyFighters);
+
+  /** Determine if moving to a location would result in engagement. */
+  bool WouldBeEngagedAtLocation(const FIntPoint &Anchor,
+                                const TArray<AFighterPawn *> &NearbyFighters) const;
 
   /** Trigger a hit flash scaled by the supplied damage amount. */
   void PlayImpactFlashForDamage(int32 DamageAmount);
@@ -215,6 +231,11 @@ public:
   UPROPERTY(EditAnywhere, BlueprintReadWrite,
             ReplicatedUsing = OnRep_AttackType, Category = "Fighter|Combat")
   EFighterAttackType AttackType = EFighterAttackType::Melee;
+
+  /** True while this fighter is engaged with at least one enemy. */
+  UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_IsEngaged,
+            Category = "Fighter|Combat")
+  bool bIsEngaged = false;
 
   /** Customisable audiovisual payloads for pre-attack presentation. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated,
@@ -400,6 +421,10 @@ public:
   UPROPERTY(BlueprintAssignable, Category = "Fighter|Events")
   FOnActionsChanged OnActionsChanged;
 
+  /** Event broadcast when engagement status changes. */
+  UPROPERTY(BlueprintAssignable, Category = "Fighter|Events")
+  FOnEngagementChanged OnEngagementChanged;
+
   /** Retrieve the identifier associated with this fighter. */
   FName GetFighterId() const { return FighterId; }
 
@@ -484,6 +509,8 @@ private:
   void OnRep_MaxHealth();
   UFUNCTION()
   void OnRep_IsMoving();
+  UFUNCTION()
+  void OnRep_IsEngaged();
 
   UFUNCTION()
   void OnRep_AttackType();
@@ -530,6 +557,11 @@ private:
 
   /** Helper to broadcast the current actions remaining value. */
   void BroadcastActionsRemaining();
+
+  void ApplyEngagementState(bool bNewEngaged);
+  bool ComputeEngagementState(const TArray<AFighterPawn *> &NearbyFighters,
+                              const FIntPoint *OverrideAnchor) const;
+  void RequestEngagementRefresh();
 
   /** Update the ability component with the latest stats/faction. */
   void RefreshAbilityLoadout();
