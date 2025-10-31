@@ -1493,8 +1493,9 @@ void UGridOverlayComponent::ApplyObstacleToGrid(UGridObstacleComponent *Obstacle
             ObscuredCells[Idx] = true;
           }
         }
-        if (ColumnTouchesTerrain.IsValidIndex(Idx)) {
-          ColumnTouchesTerrain[Idx] = Obstacle->bAddsDifficultTerrain;
+        if (ColumnTouchesTerrain.IsValidIndex(Idx) &&
+            Obstacle->bAddsDifficultTerrain) {
+          ColumnTouchesTerrain[Idx] = true;
         }
         UpdateBaseGridVisual(Cell);
       }
