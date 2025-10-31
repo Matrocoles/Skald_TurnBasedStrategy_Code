@@ -495,6 +495,16 @@ bool UGridOverlayComponent::IsOccupied(const FIntPoint &GridCoord) const {
   return bBlocked || bDynamic;
 }
 
+bool UGridOverlayComponent::IsDynamicallyOccupied(
+    const FIntPoint &GridCoord) const {
+  if (!IsValidGrid(GridCoord)) {
+    return false;
+  }
+  const int32 Idx = Index(GridCoord);
+  return DynamicOccupiedCells.IsValidIndex(Idx) ? DynamicOccupiedCells[Idx]
+                                               : false;
+}
+
 bool UGridOverlayComponent::IsObscured(const FIntPoint &GridCoord) const {
   if (!IsValidGrid(GridCoord)) {
     return false;
@@ -524,7 +534,7 @@ bool UGridOverlayComponent::HasLineOfSight(const FIntPoint &Start,
         return false;
       }
 
-      if (Current != End && IsOccupied(Current)) {
+      if (Current != End && IsDynamicallyOccupied(Current)) {
         return false;
       }
     }

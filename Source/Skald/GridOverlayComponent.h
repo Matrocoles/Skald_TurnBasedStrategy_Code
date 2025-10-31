@@ -129,6 +129,9 @@ public:
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Grid")
   bool IsOccupied(const FIntPoint &GridCoord) const;
 
+  /** Query whether a grid cell is dynamically occupied by an actor. */
+  bool IsDynamicallyOccupied(const FIntPoint &GridCoord) const;
+
   /** Query whether a grid cell is obscured. */
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Grid")
   bool IsObscured(const FIntPoint &GridCoord) const;
