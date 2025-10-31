@@ -3856,6 +3856,8 @@ void ASkaldPlayerController::SetupInputComponent() {
                             &ASkaldPlayerController::HandleRightClick);
     InputComponent->BindKey(EKeys::O, IE_Pressed, this,
                             &ASkaldPlayerController::ToggleInGameMenu);
+    InputComponent->BindKey(EKeys::Escape, IE_Pressed, this,
+                            &ASkaldPlayerController::ToggleInGameMenu);
   }
 }
 
