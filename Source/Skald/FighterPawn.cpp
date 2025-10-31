@@ -1,6 +1,8 @@
 #include "FighterPawn.h"
 #include "Abilities/SkaldAbilityComponent.h"
 #include "Blueprint/UserWidget.h"
+#include "CollisionQueryParams.h"
+#include "CollisionShape.h"
 #include "Components/AudioComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/DecalComponent.h"
@@ -11,6 +13,7 @@
 #include "Containers/Set.h"
 #include "Engine/CollisionProfile.h"
 #include "Engine/Texture2D.h"
+#include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Curves/CurveFloat.h"
 #include "GridBattleManager.h"
@@ -390,21 +393,195 @@ void AFighterPawn::Tick(float DeltaSeconds) {
     return;
   }
 
-  const FVector CurrentLocation = GetActorLocation();
-  const float EffectiveSpeed = FMath::Max(MovementSpeed, KINDA_SMALL_NUMBER);
-  const FVector NextLocation =
-      FMath::VInterpConstantTo(CurrentLocation, MovementTargetLocation, DeltaSeconds,
-                               EffectiveSpeed);
-  SetActorLocation(NextLocation);
-
   const float EffectiveTolerance =
       FMath::Max(MovementStopTolerance, KINDA_SMALL_NUMBER);
-  if (FVector::DistSquared(NextLocation, MovementTargetLocation) <=
-      FMath::Square(EffectiveTolerance)) {
+
+  if (MovementStraightLineDistance <= KINDA_SMALL_NUMBER ||
+      MovementSpeed <= KINDA_SMALL_NUMBER) {
     SetActorLocation(MovementTargetLocation);
+    MovementProgress = 1.f;
+    SetIsMoving(false);
+    MovementTargetLocation = GetActorLocation();
+    return;
+  }
+
+  const float DistanceStep = MovementSpeed * DeltaSeconds;
+  const float ProgressStep =
+      DistanceStep / FMath::Max(MovementStraightLineDistance, KINDA_SMALL_NUMBER);
+  MovementProgress =
+      FMath::Clamp(MovementProgress + ProgressStep, 0.f, 1.f);
+
+  const FVector NextLocation = SampleVisualMovementPath(MovementProgress);
+  SetActorLocation(NextLocation);
+
+  const bool bArrived =
+      MovementProgress >= 1.f - KINDA_SMALL_NUMBER ||
+      FVector::DistSquared(NextLocation, MovementTargetLocation) <=
+          FMath::Square(EffectiveTolerance);
+
+  if (bArrived) {
+    SetActorLocation(MovementTargetLocation);
+    MovementProgress = 1.f;
     SetIsMoving(false);
     MovementTargetLocation = GetActorLocation();
   }
+}
+
+void AFighterPawn::RebuildVisualMovementPath(const FVector &Destination) {
+  VisualMovementPathPoints.Reset();
+  VisualMovementCumulativeDistances.Reset();
+  VisualMovementPathLength = 0.f;
+
+  const FVector StartLocation = MovementStartLocation;
+  VisualMovementPathPoints.Add(StartLocation);
+
+  const bool bCanAttemptAvoidance = bUseVisualObstacleAvoidance &&
+                                    VisualAvoidanceProbeRadius > KINDA_SMALL_NUMBER &&
+                                    MovementStraightLineDistance > KINDA_SMALL_NUMBER;
+
+  if (bCanAttemptAvoidance) {
+    if (UWorld *World = GetWorld()) {
+      const FCollisionShape ProbeShape =
+          FCollisionShape::MakeSphere(VisualAvoidanceProbeRadius);
+      FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(FighterVisualAvoidance),
+                                        false, this);
+      QueryParams.bTraceComplex = false;
+      QueryParams.AddIgnoredActor(this);
+
+      FHitResult BlockingHit;
+      const bool bHit = World->SweepSingleByChannel(
+          BlockingHit, StartLocation, Destination, FQuat::Identity,
+          VisualAvoidanceTraceChannel, ProbeShape, QueryParams);
+
+      if (bHit && BlockingHit.bBlockingHit) {
+        const FVector TravelDirection =
+            (Destination - StartLocation).GetSafeNormal();
+        FVector UpVector = FVector::UpVector;
+        FVector LateralDirection =
+            FVector::CrossProduct(TravelDirection, UpVector);
+
+        if (LateralDirection.IsNearlyZero()) {
+          UpVector = FVector(0.f, 1.f, 0.f);
+          LateralDirection = FVector::CrossProduct(TravelDirection, UpVector);
+        }
+
+        if (!LateralDirection.IsNearlyZero()) {
+          LateralDirection = LateralDirection.GetSafeNormal();
+          if (FVector::DotProduct(LateralDirection, BlockingHit.Normal) < 0.f) {
+            LateralDirection *= -1.f;
+          }
+
+          const float PathLength = MovementStraightLineDistance;
+          const float FirstDistance =
+              FMath::Clamp(BlockingHit.Distance, 0.f, PathLength);
+          const float SecondDistance =
+              FMath::Clamp(BlockingHit.Distance + VisualAvoidanceRejoinDistance, 0.f,
+                           PathLength);
+
+          const float FirstAlpha =
+              PathLength > KINDA_SMALL_NUMBER ? FirstDistance / PathLength : 0.f;
+          const float SecondAlpha = PathLength > KINDA_SMALL_NUMBER
+                                         ? SecondDistance / PathLength
+                                         : 1.f;
+
+          const FVector SurfaceNormal =
+              BlockingHit.Normal.GetSafeNormal(FVector::UpVector);
+
+          FVector FirstWaypoint =
+              FMath::Lerp(StartLocation, Destination, FirstAlpha) +
+              SurfaceNormal * VisualAvoidanceSurfacePush +
+              LateralDirection * VisualAvoidanceSideStep;
+          FirstWaypoint.Z =
+              FMath::Lerp(StartLocation.Z, Destination.Z, FirstAlpha);
+
+          VisualMovementPathPoints.Add(FirstWaypoint);
+
+          if (SecondAlpha < 1.f - KINDA_SMALL_NUMBER) {
+            FVector SecondWaypoint =
+                FMath::Lerp(StartLocation, Destination, SecondAlpha) +
+                SurfaceNormal * (VisualAvoidanceSurfacePush * 0.5f) +
+                LateralDirection *
+                    (VisualAvoidanceSideStep * VisualAvoidanceReturnRatio);
+            SecondWaypoint.Z =
+                FMath::Lerp(StartLocation.Z, Destination.Z, SecondAlpha);
+
+            VisualMovementPathPoints.Add(SecondWaypoint);
+          }
+        }
+      }
+    }
+  }
+
+  VisualMovementPathPoints.Add(Destination);
+
+  VisualMovementCumulativeDistances.Reserve(VisualMovementPathPoints.Num());
+  VisualMovementCumulativeDistances.Add(0.f);
+  float AccumulatedDistance = 0.f;
+
+  for (int32 Index = 1; Index < VisualMovementPathPoints.Num(); ++Index) {
+    AccumulatedDistance += FVector::Dist(VisualMovementPathPoints[Index - 1],
+                                         VisualMovementPathPoints[Index]);
+    VisualMovementCumulativeDistances.Add(AccumulatedDistance);
+  }
+
+  VisualMovementPathLength = AccumulatedDistance;
+
+  if (VisualMovementPathLength <= KINDA_SMALL_NUMBER) {
+    VisualMovementPathLength = MovementStraightLineDistance;
+    if (VisualMovementCumulativeDistances.Num() > 0) {
+      VisualMovementCumulativeDistances.Last() = VisualMovementPathLength;
+    }
+  }
+}
+
+FVector AFighterPawn::SampleVisualMovementPath(float NormalisedDistance) const {
+  if (VisualMovementPathPoints.Num() <= 1) {
+    return MovementTargetLocation;
+  }
+
+  if (VisualMovementPathLength <= KINDA_SMALL_NUMBER) {
+    return VisualMovementPathPoints.Last();
+  }
+
+  const float ClampedAlpha = FMath::Clamp(NormalisedDistance, 0.f, 1.f);
+  const float TargetDistance = VisualMovementPathLength * ClampedAlpha;
+
+  for (int32 Index = 1; Index < VisualMovementPathPoints.Num(); ++Index) {
+    const float SegmentStart =
+        VisualMovementCumulativeDistances.IsValidIndex(Index - 1)
+            ? VisualMovementCumulativeDistances[Index - 1]
+            : 0.f;
+    const float SegmentEnd =
+        VisualMovementCumulativeDistances.IsValidIndex(Index)
+            ? VisualMovementCumulativeDistances[Index]
+            : SegmentStart;
+
+    const float SegmentLength = SegmentEnd - SegmentStart;
+    if (SegmentLength <= KINDA_SMALL_NUMBER) {
+      continue;
+    }
+
+    const bool bWithinSegment = TargetDistance <= SegmentEnd ||
+                                Index == VisualMovementPathPoints.Num() - 1;
+
+    if (bWithinSegment) {
+      const float LocalAlpha =
+          (TargetDistance - SegmentStart) / FMath::Max(SegmentLength, KINDA_SMALL_NUMBER);
+      return FMath::Lerp(VisualMovementPathPoints[Index - 1],
+                         VisualMovementPathPoints[Index],
+                         FMath::Clamp(LocalAlpha, 0.f, 1.f));
+    }
+  }
+
+  return VisualMovementPathPoints.Last();
+}
+
+void AFighterPawn::ResetVisualMovementPath() {
+  MovementProgress = 0.f;
+  MovementStraightLineDistance = 0.f;
+  VisualMovementPathPoints.Reset();
+  VisualMovementCumulativeDistances.Reset();
+  VisualMovementPathLength = 0.f;
 }
 
 void AFighterPawn::TickActiveProjectileFX(float DeltaSeconds) {
@@ -1961,7 +2138,20 @@ void AFighterPawn::OnRep_GridFootprint() {
 void AFighterPawn::OnRep_HasActivatedThisRound() { UpdateActivationIndicator(); }
 
 void AFighterPawn::OnRep_IsCurrentlyActive() { UpdateActivationIndicator(); }
-void AFighterPawn::OnRep_IsMoving() { RefreshMovementAudioComponent(); }
+void AFighterPawn::OnRep_IsMoving() {
+  if (bIsMoving) {
+    MovementTargetLocation = GetAlignedWorldLocation(CurrentCell);
+    MovementStartLocation = GetActorLocation();
+    MovementStraightLineDistance =
+        FVector::Dist(MovementStartLocation, MovementTargetLocation);
+    MovementProgress = 0.f;
+    RebuildVisualMovementPath(MovementTargetLocation);
+  } else {
+    ResetVisualMovementPath();
+  }
+
+  RefreshMovementAudioComponent();
+}
 
 void AFighterPawn::BroadcastActionsRemaining() {
   OnActionsChanged.Broadcast(ActionsRemaining);
@@ -2184,5 +2374,16 @@ void AFighterPawn::SetIsMoving(bool bNewIsMoving) {
   }
 
   bIsMoving = bNewIsMoving;
+
+  if (bIsMoving) {
+    MovementStartLocation = GetActorLocation();
+    MovementStraightLineDistance =
+        FVector::Dist(MovementStartLocation, MovementTargetLocation);
+    MovementProgress = 0.f;
+    RebuildVisualMovementPath(MovementTargetLocation);
+  } else {
+    ResetVisualMovementPath();
+  }
+
   RefreshMovementAudioComponent();
 }

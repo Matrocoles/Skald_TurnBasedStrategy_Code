@@ -3,6 +3,7 @@
 #include "Blueprint/UserWidget.h"
 #include "Components/WidgetComponent.h"
 #include "CoreMinimal.h"
+#include "Engine/EngineTypes.h"
 #include "GameFramework/Pawn.h"
 #include "GridBattleManager.h"
 #include "TimerManager.h"
@@ -90,6 +91,39 @@ public:
   /** Sound to play while this fighter travels between grid cells. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Audio")
   TObjectPtr<USoundBase> MovementSound = nullptr;
+
+  /** Enable simple visual obstacle avoidance while travelling between cells. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Movement|Visual")
+  bool bUseVisualObstacleAvoidance = true;
+
+  /** Radius of the probe used to detect blocking geometry along the travel path. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Movement|Visual",
+            meta = (ClampMin = "0.0"))
+  float VisualAvoidanceProbeRadius = 40.f;
+
+  /** Side step distance applied when steering around detected obstacles. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Movement|Visual",
+            meta = (ClampMin = "0.0"))
+  float VisualAvoidanceSideStep = 120.f;
+
+  /** Forward distance used when easing back towards the original travel line. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Movement|Visual",
+            meta = (ClampMin = "0.0"))
+  float VisualAvoidanceRejoinDistance = 180.f;
+
+  /** Strength of the outward push applied directly from the blocking surface. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Movement|Visual",
+            meta = (ClampMin = "0.0"))
+  float VisualAvoidanceSurfacePush = 25.f;
+
+  /** Fraction of the sidestep retained when blending back towards the target. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Movement|Visual",
+            meta = (ClampMin = "0.0", ClampMax = "1.0"))
+  float VisualAvoidanceReturnRatio = 0.35f;
+
+  /** Collision channel used for obstacle avoidance sweeps. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Movement|Visual")
+  TEnumAsByte<ECollisionChannel> VisualAvoidanceTraceChannel = ECC_WorldStatic;
 
   /** Perform an attack against another fighter. */
   UFUNCTION(BlueprintCallable, Category = "Fighter")
@@ -558,6 +592,15 @@ private:
   /** Helper to toggle movement state and trigger audio changes. */
   void SetIsMoving(bool bNewIsMoving);
 
+  /** Generate a lightweight, obstacle-aware path for the current move. */
+  void RebuildVisualMovementPath(const FVector &Destination);
+
+  /** Sample the cached visual movement path using a normalised distance. */
+  FVector SampleVisualMovementPath(float NormalisedDistance) const;
+
+  /** Clear any cached state related to visual movement interpolation. */
+  void ResetVisualMovementPath();
+
   /** Prepare and cache dynamic materials used for hit feedback. */
   void InitializeDisplayMeshMaterials();
 
@@ -622,6 +665,24 @@ private:
 
   /** World-space destination for the current interpolated move. */
   FVector MovementTargetLocation = FVector::ZeroVector;
+
+  /** World-space start location cached when a new move begins. */
+  FVector MovementStartLocation = FVector::ZeroVector;
+
+  /** Straight-line distance between the movement start and destination. */
+  float MovementStraightLineDistance = 0.f;
+
+  /** Normalised travel progress for the current move. */
+  float MovementProgress = 0.f;
+
+  /** Full set of points describing the visual travel path. */
+  TArray<FVector> VisualMovementPathPoints;
+
+  /** Accumulated distance along the visual travel path for each point. */
+  TArray<float> VisualMovementCumulativeDistances;
+
+  /** Total length of the current visual travel path. */
+  float VisualMovementPathLength = 0.f;
 
   /** Cached yaw offset derived from the display mesh's relative rotation. */
   float DisplayMeshYawOffset = 0.f;
