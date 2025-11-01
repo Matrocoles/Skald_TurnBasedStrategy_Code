@@ -573,16 +573,13 @@ void ASkaldGameMode::PopulateAIPlayers() {
       }
     }
 
-    OrderedRestorations.Sort([](const FS_PlayerData *A, const FS_PlayerData *B) {
-      auto DesiredIndex = [](const FS_PlayerData *Snapshot) {
-        if (!Snapshot) {
-          return TNumericLimits<int32>::Max();
+    OrderedRestorations.Sort([](const FS_PlayerData &A, const FS_PlayerData &B) {
+      auto DesiredIndex = [](const FS_PlayerData &Snapshot) {
+        if (Snapshot.DesiredControllerIndex >= 0) {
+          return Snapshot.DesiredControllerIndex;
         }
-        if (Snapshot->DesiredControllerIndex >= 0) {
-          return Snapshot->DesiredControllerIndex;
-        }
-        if (Snapshot->DesiredTurnIndex >= 0) {
-          return Snapshot->DesiredTurnIndex;
+        if (Snapshot.DesiredTurnIndex >= 0) {
+          return Snapshot.DesiredTurnIndex;
         }
         return TNumericLimits<int32>::Max();
       };
@@ -590,8 +587,8 @@ void ASkaldGameMode::PopulateAIPlayers() {
       const int32 AIndex = DesiredIndex(A);
       const int32 BIndex = DesiredIndex(B);
       if (AIndex == BIndex) {
-        const int32 AId = (A && A->PlayerID > 0) ? A->PlayerID : TNumericLimits<int32>::Max();
-        const int32 BId = (B && B->PlayerID > 0) ? B->PlayerID : TNumericLimits<int32>::Max();
+        const int32 AId = (A.PlayerID > 0) ? A.PlayerID : TNumericLimits<int32>::Max();
+        const int32 BId = (B.PlayerID > 0) ? B.PlayerID : TNumericLimits<int32>::Max();
         return AId < BId;
       }
       return AIndex < BIndex;
@@ -1084,16 +1081,16 @@ void ASkaldGameMode::NormalizePlayerStateIds() {
   };
 
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
-  const FSkaldTravelState *TravelState =
+  const FSkaldTravelState *TravelStatePtr =
       GI ? &GI->GetTravelState() : nullptr;
 
   TMap<FString, int32> DesiredIdByName;
   TArray<int32> DesiredHumanIds;
   TArray<int32> DesiredAIIds;
 
-  if (TravelState && TravelState->bValid &&
-      TravelState->PlayerSnapshots.Num() > 0) {
-    for (const FS_PlayerData &Snapshot : TravelState->PlayerSnapshots) {
+  if (TravelStatePtr && TravelStatePtr->bValid &&
+      TravelStatePtr->PlayerSnapshots.Num() > 0) {
+    for (const FS_PlayerData &Snapshot : TravelStatePtr->PlayerSnapshots) {
       if (Snapshot.PlayerID <= 0) {
         continue;
       }
@@ -1219,11 +1216,9 @@ void ASkaldGameMode::NormalizePlayerStateIds() {
     }
   }
 
-  if (TurnManager && GI) {
-    const FSkaldTravelState &TravelState = GI->GetTravelState();
-    if (TravelState.bValid) {
-      TurnManager->RestoreControllerOrderFromSnapshots(TravelState.PlayerSnapshots);
-    }
+  if (TurnManager && GI && TravelStatePtr && TravelStatePtr->bValid) {
+    TurnManager->RestoreControllerOrderFromSnapshots(
+        TravelStatePtr->PlayerSnapshots);
   }
 }
 
