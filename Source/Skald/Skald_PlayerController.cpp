@@ -2296,26 +2296,30 @@ UGridBattleManager *ASkaldPlayerController::GetBattleManager() const {
 
 void ASkaldPlayerController::HandleActiveFighterChanged(
     AFighterPawn *NewFighter) {
-  if (NewFighter && NewFighter->IsAlive()) {
-    LockedActiveFighter = NewFighter;
-    SetSelectedFighter(NewFighter, true);
+  CancelCommandMode();
+
+  AFighterPawn *ResolvedFighter =
+      (NewFighter && NewFighter->IsAlive()) ? NewFighter : nullptr;
+  LockedActiveFighter = ResolvedFighter;
+
+  if (LockedActiveFighter) {
+    SetSelectedFighter(LockedActiveFighter, true);
     if (bBattleHUDReadyToShow && !bBattleHUDVisible) {
       EnsureBattleHUDVisible();
     }
   } else {
-    LockedActiveFighter = nullptr;
+    SetSelectedFighter(nullptr, true);
   }
 
-  CancelCommandMode();
   UpdateBattleHUDButtons();
   UpdateBattlePlayersTurnDisplay();
-  if (!NewFighter) {
+  if (!LockedActiveFighter) {
     UpdateBattleHUDSelection();
   }
 
   if (UGridOverlayComponent *Grid = FindGridOverlay()) {
-    if (NewFighter && NewFighter->IsAlive()) {
-      Grid->HighlightSelection(NewFighter);
+    if (LockedActiveFighter) {
+      Grid->HighlightSelection(LockedActiveFighter);
     } else {
       Grid->ClearSelectionHighlight();
     }
@@ -2323,15 +2327,15 @@ void ASkaldPlayerController::HandleActiveFighterChanged(
 
   if (IsLocalController()) {
     if (ASkald_PlayerCharacter *CameraPawn = Cast<ASkald_PlayerCharacter>(GetPawn())) {
-      if (bIsBattleMap && NewFighter && NewFighter->IsAlive()) {
-        CameraPawn->FocusCameraOnActor(NewFighter);
+      if (bIsBattleMap && LockedActiveFighter) {
+        CameraPawn->FocusCameraOnActor(LockedActiveFighter);
       } else {
         CameraPawn->ClearCameraFocus();
       }
     }
   }
 
-  if (!NewFighter && IsLocalController() && BattleTurnStartSound) {
+  if (!LockedActiveFighter && IsLocalController() && BattleTurnStartSound) {
     USkaldGameInstance *GI = CachedGameInstance;
     if (!GI) {
       GI = GetGameInstance<USkaldGameInstance>();
