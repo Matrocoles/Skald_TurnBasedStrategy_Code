@@ -53,6 +53,8 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void RegisterController(ASkaldPlayerController *Controller);
 
+  void RestoreControllerOrderFromSnapshots(const TArray<FS_PlayerData> &Snapshots);
+
   /** Attempt to resume the saved turn state captured before travelling. */
   bool AttemptResumeSavedTurnState();
 

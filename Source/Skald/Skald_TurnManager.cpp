@@ -768,6 +768,95 @@ void ATurnManager::RegisterController(ASkaldPlayerController *Controller) {
   }
 }
 
+void ATurnManager::RestoreControllerOrderFromSnapshots(const TArray<FS_PlayerData> &Snapshots) {
+  if (Snapshots.Num() == 0 || Controllers.Num() == 0) {
+    return;
+  }
+
+  auto NormaliseName = [](const FString &InName) {
+    FString Result = InName;
+    Result.TrimStartAndEndInline();
+    Result.ToLowerInline();
+    return Result;
+  };
+
+  TMap<int32, int32> DesiredIndexById;
+  TMap<FString, int32> DesiredIndexByName;
+
+  for (const FS_PlayerData &Snapshot : Snapshots) {
+    const int32 DesiredIndex = (Snapshot.DesiredControllerIndex >= 0)
+                                   ? Snapshot.DesiredControllerIndex
+                                   : Snapshot.DesiredTurnIndex;
+    if (DesiredIndex < 0) {
+      continue;
+    }
+
+    if (Snapshot.PlayerID > 0 && !DesiredIndexById.Contains(Snapshot.PlayerID)) {
+      DesiredIndexById.Add(Snapshot.PlayerID, DesiredIndex);
+    }
+
+    const FString NormalisedName = NormaliseName(!Snapshot.DisplayName.IsEmpty()
+                                                     ? Snapshot.DisplayName
+                                                     : Snapshot.PlayerName);
+    if (!NormalisedName.IsEmpty() && !DesiredIndexByName.Contains(NormalisedName)) {
+      DesiredIndexByName.Add(NormalisedName, DesiredIndex);
+    }
+  }
+
+  TArray<TWeakObjectPtr<ASkaldPlayerController>> Reordered;
+  Reordered.SetNum(Controllers.Num());
+  TArray<TWeakObjectPtr<ASkaldPlayerController>> Unplaced;
+  Unplaced.Reserve(Controllers.Num());
+
+  for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr : Controllers) {
+    ASkaldPlayerController *Controller = ControllerPtr.Get();
+    if (!Controller) {
+      Unplaced.Add(ControllerPtr);
+      continue;
+    }
+
+    int32 DesiredIndex = INDEX_NONE;
+    if (ASkaldPlayerState *PS = Controller->GetPlayerState<ASkaldPlayerState>()) {
+      if (PS->GetPlayerId() > 0) {
+        if (int32 *FoundIndex = DesiredIndexById.Find(PS->GetPlayerId())) {
+          DesiredIndex = *FoundIndex;
+        }
+      }
+
+      if (DesiredIndex == INDEX_NONE) {
+        const FString Normalised = NormaliseName(PS->PlayerDisplayName.IsEmpty()
+                                                     ? PS->GetPlayerName()
+                                                     : PS->PlayerDisplayName);
+        if (!Normalised.IsEmpty()) {
+          if (int32 *FoundIndex = DesiredIndexByName.Find(Normalised)) {
+            DesiredIndex = *FoundIndex;
+          }
+        }
+      }
+    }
+
+    if (DesiredIndex != INDEX_NONE && Reordered.IsValidIndex(DesiredIndex) &&
+        !Reordered[DesiredIndex].IsValid()) {
+      Reordered[DesiredIndex] = ControllerPtr;
+    } else {
+      Unplaced.Add(ControllerPtr);
+    }
+  }
+
+  int32 UnplacedIndex = 0;
+  for (int32 Index = 0; Index < Reordered.Num(); ++Index) {
+    if (!Reordered[Index].IsValid() && Unplaced.IsValidIndex(UnplacedIndex)) {
+      Reordered[Index] = Unplaced[UnplacedIndex++];
+    }
+  }
+
+  for (; UnplacedIndex < Unplaced.Num(); ++UnplacedIndex) {
+    Reordered.Add(Unplaced[UnplacedIndex]);
+  }
+
+  Controllers = MoveTemp(Reordered);
+}
+
 bool ATurnManager::AttemptResumeSavedTurnState() {
   return TryResumeSavedTurnState();
 }
@@ -1658,6 +1747,19 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
       }
     }
 
+    auto ResolveControllerIndex = [&](ASkaldPlayerState *State) -> int32 {
+      if (!State) {
+        return INDEX_NONE;
+      }
+      if (ASkaldPlayerController *Owner = Cast<ASkaldPlayerController>(State->GetOwner())) {
+        return Controllers.IndexOfByPredicate(
+            [Owner](const TWeakObjectPtr<ASkaldPlayerController> &Ptr) {
+              return Ptr.Get() == Owner;
+            });
+      }
+      return INDEX_NONE;
+    };
+
     if (TravelState.PlayerSnapshots.Num() == 0 && GS) {
       TravelState.PlayerSnapshots.Reserve(GS->PlayerArray.Num());
       for (APlayerState *BasePS : GS->PlayerArray) {
@@ -1665,6 +1767,9 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
           FS_PlayerData Snapshot;
           Snapshot.PlayerID = SkaldPS->GetPlayerId();
           Snapshot.PlayerName = SkaldPS->GetResolvedPlayerName(TEXT("TravelState"));
+          Snapshot.DisplayName = SkaldPS->PlayerDisplayName;
+          Snapshot.DesiredControllerIndex = ResolveControllerIndex(SkaldPS);
+          Snapshot.DesiredTurnIndex = Snapshot.DesiredControllerIndex;
           Snapshot.IsAI = SkaldPS->bIsAI;
           Snapshot.IsHuman = !SkaldPS->bIsAI;
           Snapshot.IsEliminated = SkaldPS->IsEliminated;
@@ -1711,6 +1816,9 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
 
         SnapshotPtr->PlayerName =
             SkaldPS->GetResolvedPlayerName(TEXT("TravelState"));
+        SnapshotPtr->DisplayName = SkaldPS->PlayerDisplayName;
+        SnapshotPtr->DesiredControllerIndex = ResolveControllerIndex(SkaldPS);
+        SnapshotPtr->DesiredTurnIndex = SnapshotPtr->DesiredControllerIndex;
         SnapshotPtr->IsAI = SkaldPS->bIsAI;
         SnapshotPtr->IsHuman = !SkaldPS->bIsAI;
         SnapshotPtr->IsEliminated = SkaldPS->IsEliminated;

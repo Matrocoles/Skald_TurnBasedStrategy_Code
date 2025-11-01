@@ -1,5 +1,6 @@
 #include "Skald_GameMode.h"
 #include "Algo/RandomShuffle.h"
+#include "Algo/Sort.h"
 #include "Camera/CameraComponent.h"
 #include "Engine/DataTable.h"
 #include "Engine/Engine.h"
@@ -338,6 +339,7 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
     PlayerDataArray[Index].PlayerID = PS->GetPlayerId();
     PlayerDataArray[Index].PlayerName =
         PS->GetResolvedPlayerName(TEXT("RegisterPlayer"));
+    PlayerDataArray[Index].DisplayName = PS->PlayerDisplayName;
     PlayerDataArray[Index].IsAI = PS->bIsAI;
     PlayerDataArray[Index].Faction = PS->Faction;
     PlayerDataArray[Index].Resources = PS->Resources;
@@ -492,6 +494,200 @@ void ASkaldGameMode::PopulateAIPlayers() {
     }
   }
 
+  auto NormaliseName = [](const FString &InName) {
+    FString Result = InName;
+    Result.TrimStartAndEndInline();
+    Result.ToLowerInline();
+    return Result;
+  };
+
+  const FSkaldTravelState *TravelStatePtr = nullptr;
+  if (GI) {
+    const FSkaldTravelState &State = GI->GetTravelState();
+    if (State.bValid) {
+      TravelStatePtr = &State;
+    }
+  }
+
+  TMap<int32, const FS_PlayerData *> RestorableAIById;
+  TMap<FString, const FS_PlayerData *> RestorableAIByName;
+  TSet<const FS_PlayerData *> PendingRestorations;
+  if (TravelStatePtr) {
+    for (const FS_PlayerData &Snapshot : TravelStatePtr->PlayerSnapshots) {
+      if (!Snapshot.IsAI) {
+        continue;
+      }
+
+      const FS_PlayerData *SnapshotPtr = &Snapshot;
+      PendingRestorations.Add(SnapshotPtr);
+      if (Snapshot.PlayerID > 0 && !RestorableAIById.Contains(Snapshot.PlayerID)) {
+        RestorableAIById.Add(Snapshot.PlayerID, SnapshotPtr);
+      }
+
+      const FString NormalisedName =
+          NormaliseName(!Snapshot.DisplayName.IsEmpty() ? Snapshot.DisplayName
+                                                        : Snapshot.PlayerName);
+      if (!NormalisedName.IsEmpty() && !RestorableAIByName.Contains(NormalisedName)) {
+        RestorableAIByName.Add(NormalisedName, SnapshotPtr);
+      }
+    }
+  }
+
+  if (TravelStatePtr) {
+    for (ASkaldPlayerState *ExistingAIState : AIStates) {
+      if (!ExistingAIState) {
+        continue;
+      }
+
+      const FS_PlayerData *MatchingSnapshot = nullptr;
+      if (ExistingAIState->GetPlayerId() > 0) {
+        if (const FS_PlayerData *const *FoundById =
+                RestorableAIById.Find(ExistingAIState->GetPlayerId())) {
+          MatchingSnapshot = *FoundById;
+        }
+      }
+
+      if (!MatchingSnapshot) {
+        const FString NormalisedExisting =
+            NormaliseName(ExistingAIState->PlayerDisplayName);
+        if (!NormalisedExisting.IsEmpty()) {
+          if (const FS_PlayerData *const *FoundByName =
+                  RestorableAIByName.Find(NormalisedExisting)) {
+            MatchingSnapshot = *FoundByName;
+          }
+        }
+      }
+
+      if (MatchingSnapshot) {
+        PendingRestorations.Remove(MatchingSnapshot);
+      }
+    }
+  }
+
+  TArray<const FS_PlayerData *> OrderedRestorations;
+  if (TravelStatePtr && PendingRestorations.Num() > 0) {
+    for (const FS_PlayerData &Snapshot : TravelStatePtr->PlayerSnapshots) {
+      const FS_PlayerData *SnapshotPtr = &Snapshot;
+      if (PendingRestorations.Contains(SnapshotPtr)) {
+        OrderedRestorations.Add(SnapshotPtr);
+      }
+    }
+
+    OrderedRestorations.Sort([](const FS_PlayerData *A, const FS_PlayerData *B) {
+      auto DesiredIndex = [](const FS_PlayerData *Snapshot) {
+        if (!Snapshot) {
+          return TNumericLimits<int32>::Max();
+        }
+        if (Snapshot->DesiredControllerIndex >= 0) {
+          return Snapshot->DesiredControllerIndex;
+        }
+        if (Snapshot->DesiredTurnIndex >= 0) {
+          return Snapshot->DesiredTurnIndex;
+        }
+        return TNumericLimits<int32>::Max();
+      };
+
+      const int32 AIndex = DesiredIndex(A);
+      const int32 BIndex = DesiredIndex(B);
+      if (AIndex == BIndex) {
+        const int32 AId = (A && A->PlayerID > 0) ? A->PlayerID : TNumericLimits<int32>::Max();
+        const int32 BId = (B && B->PlayerID > 0) ? B->PlayerID : TNumericLimits<int32>::Max();
+        return AId < BId;
+      }
+      return AIndex < BIndex;
+    });
+  }
+
+  int32 RestoreCursor = 0;
+
+  TSet<FString> UsedDisplayNames;
+  for (APlayerState *ExistingPSBase : GS->PlayerArray) {
+    if (!ExistingPSBase) {
+      continue;
+    }
+
+    if (ASkaldPlayerState *ExistingSkaldState =
+            Cast<ASkaldPlayerState>(ExistingPSBase)) {
+      if (!ExistingSkaldState->PlayerDisplayName.IsEmpty()) {
+        UsedDisplayNames.Add(ExistingSkaldState->PlayerDisplayName);
+      }
+    } else {
+      const FString ExistingName = ExistingPSBase->GetPlayerName();
+      if (!ExistingName.IsEmpty()) {
+        UsedDisplayNames.Add(ExistingName);
+      }
+    }
+  }
+
+  TArray<FString> AvailableNames;
+  AvailableNames.Reserve(FantasyAINames.Num());
+  for (const FString &CandidateName : FantasyAINames) {
+    if (!UsedDisplayNames.Contains(CandidateName)) {
+      AvailableNames.Add(CandidateName);
+    }
+  }
+
+  auto AcquireRandomName = [&](int32 SeedCount) -> FString {
+    if (AvailableNames.Num() > 0) {
+      const int32 NameIndex =
+          GI ? GI->CombatRandomStream.RandRange(0, AvailableNames.Num() - 1)
+             : FMath::RandRange(0, AvailableNames.Num() - 1);
+      const FString Chosen = AvailableNames[NameIndex];
+      AvailableNames.RemoveAtSwap(NameIndex);
+      return Chosen;
+    }
+
+    int32 Suffix = SeedCount;
+    FString Generated;
+    do {
+      Generated = FString::Printf(TEXT("AI_%d"), Suffix++);
+    } while (UsedDisplayNames.Contains(Generated));
+    return Generated;
+  };
+
+  auto RemoveNameFromPool = [&](const FString &Name) {
+    if (Name.IsEmpty()) {
+      return;
+    }
+    AvailableNames.Remove(Name);
+  };
+
+  auto ResolveSnapshotName = [&](const FS_PlayerData *Snapshot) -> FString {
+    if (!Snapshot) {
+      return FString();
+    }
+    if (!Snapshot->DisplayName.IsEmpty()) {
+      return Snapshot->DisplayName;
+    }
+    return Snapshot->PlayerName;
+  };
+
+  auto ConsumeRestorationSnapshot = [&](const FS_PlayerData *Snapshot) {
+    if (!Snapshot) {
+      return;
+    }
+    PendingRestorations.Remove(Snapshot);
+  };
+
+  auto ApplySnapshotState = [&](ASkaldPlayerState *State,
+                                const FS_PlayerData *Snapshot) {
+    if (!State || !Snapshot) {
+      return;
+    }
+    if (Snapshot->PlayerID > 0 && State->GetPlayerId() != Snapshot->PlayerID) {
+      State->SetPlayerId(Snapshot->PlayerID);
+    }
+    State->Resources = Snapshot->Resources;
+    State->IsEliminated = Snapshot->IsEliminated;
+  };
+
+  auto ResolveSnapshotFaction = [&](const FS_PlayerData *Snapshot) {
+    if (!Snapshot) {
+      return ESkaldFaction::None;
+    }
+    return Snapshot->Faction;
+  };
+
   while (ExistingAI < TargetAI && SpawnAttempts++ < MaxSpawnAttempts) {
     FTransform SpawnTransform = FTransform::Identity;
     ASkaldPlayerController *AIController = Cast<ASkaldPlayerController>(
@@ -528,74 +724,46 @@ void ASkaldGameMode::PopulateAIPlayers() {
 
     AIState->bIsAI = true;
 
-    TSet<FString> UsedDisplayNames;
-    for (APlayerState *ExistingPSBase : GS->PlayerArray) {
-      if (!ExistingPSBase) {
-        continue;
-      }
 
-      if (ASkaldPlayerState *ExistingSkaldState =
-              Cast<ASkaldPlayerState>(ExistingPSBase)) {
-        if (!ExistingSkaldState->PlayerDisplayName.IsEmpty()) {
-          UsedDisplayNames.Add(ExistingSkaldState->PlayerDisplayName);
-        }
-      } else {
-        const FString ExistingName = ExistingPSBase->GetPlayerName();
-        if (!ExistingName.IsEmpty()) {
-          UsedDisplayNames.Add(ExistingName);
-        }
-      }
+
+    const FS_PlayerData *RestorationSnapshot = nullptr;
+    if (OrderedRestorations.IsValidIndex(RestoreCursor)) {
+      RestorationSnapshot = OrderedRestorations[RestoreCursor++];
+      ConsumeRestorationSnapshot(RestorationSnapshot);
     }
 
-    const bool bHasLobbyPreset = PendingLobbyAI.Num() > 0;
     FSkaldAIPlayerConfig LobbyPreset;
-    if (bHasLobbyPreset)
-    {
-        LobbyPreset = PendingLobbyAI[0];
-        PendingLobbyAI.RemoveAt(0);
-        if (!LobbyPreset.DisplayName.IsEmpty())
-        {
-            UsedDisplayNames.Add(LobbyPreset.DisplayName);
-        }
-        if (LobbyPreset.Faction != ESkaldFaction::None)
-        {
-            UsedFactions.Add(LobbyPreset.Faction);
-        }
+    bool bUsingLobbyPreset = false;
+    if (!RestorationSnapshot && PendingLobbyAI.Num() > 0) {
+      LobbyPreset = PendingLobbyAI[0];
+      PendingLobbyAI.RemoveAt(0);
+      bUsingLobbyPreset = true;
     }
 
-    TArray<FString> AvailableNames;
-    AvailableNames.Reserve(FantasyAINames.Num());
-    for (const FString &CandidateName : FantasyAINames) {
-      if (!UsedDisplayNames.Contains(CandidateName)) {
-        AvailableNames.Add(CandidateName);
-      }
-    }
-
-    FString SelectedName;
-    if (bHasLobbyPreset && !LobbyPreset.DisplayName.IsEmpty()) {
+    FString SelectedName = ResolveSnapshotName(RestorationSnapshot);
+    if (SelectedName.IsEmpty() && bUsingLobbyPreset && !LobbyPreset.DisplayName.IsEmpty()) {
       SelectedName = LobbyPreset.DisplayName;
-    } else if (AvailableNames.Num() > 0) {
-      const int32 NameIndex = GI
-                                  ? GI->CombatRandomStream.RandRange(
-                                        0, AvailableNames.Num() - 1)
-                                  : FMath::RandRange(0, AvailableNames.Num() - 1);
-      SelectedName = AvailableNames[NameIndex];
     }
-
     if (SelectedName.IsEmpty()) {
-      int32 Suffix = GS->PlayerArray.Num();
-      do {
-        SelectedName = FString::Printf(TEXT("AI_%d"), Suffix++);
-      } while (UsedDisplayNames.Contains(SelectedName));
+      SelectedName = AcquireRandomName(GS->PlayerArray.Num() + ExistingAI);
     }
 
+    RemoveNameFromPool(SelectedName);
     UsedDisplayNames.Add(SelectedName);
 
     AIState->PlayerDisplayName = SelectedName;
     AIState->SetPlayerName(AIState->PlayerDisplayName);
 
-    ESkaldFaction AssignedFaction = ESkaldFaction::None;
-    if (bHasLobbyPreset && LobbyPreset.Faction != ESkaldFaction::None) {
+    if (RestorationSnapshot) {
+      ApplySnapshotState(AIState, RestorationSnapshot);
+    }
+
+    ESkaldFaction AssignedFaction = ResolveSnapshotFaction(RestorationSnapshot);
+    if (AssignedFaction != ESkaldFaction::None) {
+      ReservedFactions.Remove(AssignedFaction);
+      RemainingReserved.Remove(AssignedFaction);
+      Available.Remove(AssignedFaction);
+    } else if (bUsingLobbyPreset && LobbyPreset.Faction != ESkaldFaction::None) {
       AssignedFaction = LobbyPreset.Faction;
       ReservedFactions.Remove(AssignedFaction);
       RemainingReserved.Remove(AssignedFaction);
@@ -1048,6 +1216,13 @@ void ASkaldGameMode::NormalizePlayerStateIds() {
           HUD->SyncPhaseButtons(HUD->CurrentPlayerID == HUD->LocalPlayerID);
         }
       }
+    }
+  }
+
+  if (TurnManager && GI) {
+    const FSkaldTravelState &TravelState = GI->GetTravelState();
+    if (TravelState.bValid) {
+      TurnManager->RestoreControllerOrderFromSnapshots(TravelState.PlayerSnapshots);
     }
   }
 }
