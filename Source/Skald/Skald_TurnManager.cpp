@@ -43,6 +43,7 @@
 
 namespace {
 constexpr float BattleResultReturnDelaySeconds = 5.0f;
+constexpr int32 MaxMovementActionsPerMovementPhase = 2;
 FString GetWorldPackageName(const UWorld *World);
 FString ResolveMapPackageFromRegistry(const FString &MapName);
 
@@ -1088,6 +1089,7 @@ void ATurnManager::AdvanceTurn() {
         CurrentController->GetPlayerState<ASkaldPlayerState>();
     const FString PlayerName =
         GetResolvedPlayerName(PS, TEXT("AdvanceTurn_Current"));
+    ResetMovementActionsForActivePlayer();
     ApplyReinforcementsAndResources(PS, TEXT("AdvanceTurn"));
 
     CurrentPhase = ETurnPhase::Reinforcement;
@@ -1128,6 +1130,70 @@ void ATurnManager::SortControllersByInitiative() {
     const int32 RollB = PSB ? PSB->InitiativeRoll : 0;
     return RollA > RollB;
   });
+}
+
+bool ATurnManager::CanPerformMovementAction(int32 PlayerID,
+                                            FString *OutError) const {
+  if (PlayerID <= 0) {
+    if (OutError) {
+      *OutError = TEXT("Unable to resolve player for movement.");
+    }
+    return false;
+  }
+
+  const int32 Used = MovementActionsTaken.FindRef(PlayerID);
+  if (Used >= MaxMovementActionsPerMovementPhase) {
+    if (OutError) {
+      *OutError =
+          TEXT("You can only move troops twice during the movement phase.");
+    }
+    return false;
+  }
+
+  return true;
+}
+
+void ATurnManager::RecordMovementAction(int32 PlayerID) {
+  if (PlayerID <= 0) {
+    return;
+  }
+
+  int32 &Used = MovementActionsTaken.FindOrAdd(PlayerID);
+  Used += 1;
+}
+
+int32 ATurnManager::GetMovementActionsRemaining(int32 PlayerID) const {
+  if (PlayerID <= 0) {
+    return 0;
+  }
+
+  const int32 Used = MovementActionsTaken.FindRef(PlayerID);
+  return FMath::Max(0, MaxMovementActionsPerMovementPhase - Used);
+}
+
+void ATurnManager::ResetMovementActionsForActivePlayer() {
+  const int32 ActivePlayerId = GetActivePlayerId();
+  if (ActivePlayerId != INDEX_NONE) {
+    MovementActionsTaken.Remove(ActivePlayerId);
+  }
+}
+
+int32 ATurnManager::GetActivePlayerId() const {
+  if (!Controllers.IsValidIndex(CurrentIndex)) {
+    return INDEX_NONE;
+  }
+
+  if (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr =
+          Controllers[CurrentIndex];
+      ControllerPtr.IsValid()) {
+    if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
+      if (ASkaldPlayerState *PS = Controller->GetPlayerState<ASkaldPlayerState>()) {
+        return PS->GetPlayerId();
+      }
+    }
+  }
+
+  return INDEX_NONE;
 }
 
 TArray<ASkaldPlayerController *> ATurnManager::GetControllers() const {
@@ -3085,6 +3151,7 @@ void ATurnManager::AdvancePhase() {
     break;
   case ETurnPhase::Treasure:
     CurrentPhase = ETurnPhase::Movement;
+    ResetMovementActionsForActivePlayer();
     break;
   case ETurnPhase::Movement:
     CurrentPhase = ETurnPhase::EndTurn;

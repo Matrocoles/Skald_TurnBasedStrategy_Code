@@ -90,6 +90,15 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void SortControllersByInitiative();
 
+  /** Returns true if the specified player can still perform a movement action this phase. */
+  bool CanPerformMovementAction(int32 PlayerID, FString *OutError = nullptr) const;
+
+  /** Record a completed movement action for the specified player. */
+  void RecordMovementAction(int32 PlayerID);
+
+  /** Query the number of remaining movement actions for the specified player. */
+  int32 GetMovementActionsRemaining(int32 PlayerID) const;
+
   /** Request that both players confirm readiness before travelling to battle. */
   UFUNCTION(BlueprintCallable, Category = "Battle")
   void RequestPrepareBattle(const FS_BattlePayload &Battle);
@@ -228,6 +237,15 @@ protected:
 
   /** Cached battle manager that currently has a battle end delegate bound. */
   TWeakObjectPtr<class UGridBattleManager> BoundBattleManager;
+
+  /** Number of movement actions completed during the current movement phase, keyed by player ID. */
+  TMap<int32, int32> MovementActionsTaken;
+
+  /** Clear the movement action counter for the active player. */
+  void ResetMovementActionsForActivePlayer();
+
+  /** Resolve the player ID for the active controller, or INDEX_NONE when unavailable. */
+  int32 GetActivePlayerId() const;
 
   /** Attempt to continue travelling to the battle map after capturing the world snapshot. */
   void RetryPendingBattleTravel();

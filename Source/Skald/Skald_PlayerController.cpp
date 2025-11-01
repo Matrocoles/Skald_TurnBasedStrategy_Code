@@ -3063,6 +3063,14 @@ void ASkaldPlayerController::ServerHandleMove_Implementation(int32 FromID,
     return;
   }
 
+  ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
+  const int32 PlayerID = PS ? PS->GetPlayerId() : -1;
+  if (PlayerID <= 0) {
+    Error = TEXT("Unable to resolve player for movement");
+    ClientHandleMoveOutcome(false, FromID, ToID, Error);
+    return;
+  }
+
   if (TurnManager->GetCurrentPhase() != ETurnPhase::Movement) {
     Error = TEXT("Troops can only move during the movement phase");
     ClientHandleMoveOutcome(false, FromID, ToID, Error);
@@ -3071,6 +3079,11 @@ void ASkaldPlayerController::ServerHandleMove_Implementation(int32 FromID,
 
   if (!IsMyTurn()) {
     Error = TEXT("You can only move troops during your turn");
+    ClientHandleMoveOutcome(false, FromID, ToID, Error);
+    return;
+  }
+
+  if (!TurnManager->CanPerformMovementAction(PlayerID, &Error)) {
     ClientHandleMoveOutcome(false, FromID, ToID, Error);
     return;
   }
@@ -3091,8 +3104,19 @@ void ASkaldPlayerController::ServerHandleMove_Implementation(int32 FromID,
     return;
   }
 
-  ClientHandleMoveOutcome(true, FromID, ToID,
-                          TEXT("Troops moved. Use End Phase to finish movement."));
+  TurnManager->RecordMovementAction(PlayerID);
+  const int32 RemainingMoves = TurnManager->GetMovementActionsRemaining(PlayerID);
+  FString SuccessMessage;
+  if (RemainingMoves > 0) {
+    SuccessMessage =
+        FString::Printf(TEXT("Troops moved. %d movement%s remaining this phase."),
+                        RemainingMoves,
+                        RemainingMoves == 1 ? TEXT("") : TEXT("s"));
+  } else {
+    SuccessMessage = TEXT("Troops moved. No movements remaining this phase.");
+  }
+
+  ClientHandleMoveOutcome(true, FromID, ToID, SuccessMessage);
 
   if (TurnManager) {
     for (ASkaldPlayerController *Controller : TurnManager->GetControllers()) {
