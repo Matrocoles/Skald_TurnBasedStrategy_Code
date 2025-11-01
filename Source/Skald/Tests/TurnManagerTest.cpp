@@ -7,6 +7,26 @@
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
 #include "Engine/World.h"
+#include "Territory.h"
+#include "WorldMap.h"
+#include "UObject/UnrealType.h"
+
+namespace {
+
+int32 GetCurrentTurnIndex(ATurnManager *TurnManager) {
+  if (!TurnManager) {
+    return INDEX_NONE;
+  }
+
+  if (FIntProperty *Prop = FindFProperty<FIntProperty>(
+          ATurnManager::StaticClass(), TEXT("CurrentIndex"))) {
+    return Prop->GetPropertyValue_InContainer(TurnManager);
+  }
+
+  return INDEX_NONE;
+}
+
+} // namespace
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldTurnManagerPhaseTest, "Skald.TurnManager.PhaseTransitions", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FSkaldTurnManagerPhaseTest::RunTest(const FString& Parameters) {
@@ -178,6 +198,151 @@ bool FSkaldTurnManagerAIWaitsForPlayerTest::RunTest(const FString &Parameters) {
   TestTrue(TEXT("Battle triggers once player confirms"), TM->bTriggerCalled);
   TestFalse(TEXT("Pending battle clears after trigger"),
             TM->HasPendingBattlePreparation());
+
+  return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FSkaldTurnManagerPromptMatchesWithoutPlayerIdTest,
+    "Skald.TurnManager.PreparePromptMatchesWithoutPlayerId",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSkaldTurnManagerPromptMatchesWithoutPlayerIdTest::RunTest(
+    const FString &Parameters) {
+  Skald::Tests::FScopedAutomationTestWorld TestWorld;
+  UWorld *World = TestWorld.Get();
+  TestNotNull(TEXT("World created"), World);
+  if (!World) {
+    return false;
+  }
+
+  ATestTurnManagerNoTravel *TM = World->SpawnActor<ATestTurnManagerNoTravel>();
+  ATestBattlePromptController *AttackerController =
+      World->SpawnActor<ATestBattlePromptController>();
+  ATestBattlePromptController *DefenderController =
+      World->SpawnActor<ATestBattlePromptController>();
+  ASkaldPlayerState *AttackerPS = World->SpawnActor<ASkaldPlayerState>();
+  ASkaldPlayerState *DefenderPS = World->SpawnActor<ASkaldPlayerState>();
+
+  TestNotNull(TEXT("TurnManager"), TM);
+  TestNotNull(TEXT("AttackerController"), AttackerController);
+  TestNotNull(TEXT("DefenderController"), DefenderController);
+  TestNotNull(TEXT("AttackerPlayerState"), AttackerPS);
+  TestNotNull(TEXT("DefenderPlayerState"), DefenderPS);
+  if (!TM || !AttackerController || !DefenderController || !AttackerPS ||
+      !DefenderPS) {
+    return false;
+  }
+
+  AttackerController->PlayerState = AttackerPS;
+  DefenderController->PlayerState = DefenderPS;
+  AttackerPS->PlayerDisplayName = TEXT("Alpha");
+  DefenderPS->PlayerDisplayName = TEXT("Bravo");
+
+  TM->RegisterController(AttackerController);
+  TM->RegisterController(DefenderController);
+
+  FS_BattlePayload Battle;
+  Battle.AttackerPlayerID = 42;
+  Battle.DefenderPlayerID = 77;
+  Battle.AttackerDisplayName = TEXT("Alpha");
+  Battle.DefenderDisplayName = TEXT("Bravo");
+
+  FSkaldBattleReadyState ReadyState;
+  ReadyState.AttackerPlayerID = Battle.AttackerPlayerID;
+  ReadyState.DefenderPlayerID = Battle.DefenderPlayerID;
+  ReadyState.bAttackerReady = false;
+  ReadyState.bDefenderReady = false;
+
+  TM->ForcePendingBattleState(Battle, ReadyState);
+
+  TestFalse(TEXT("Attacker prompt initially hidden"),
+            AttackerController->bPromptVisible);
+  TestFalse(TEXT("Defender prompt initially hidden"),
+            DefenderController->bPromptVisible);
+
+  TM->InvokeBroadcastPreparePrompt(Battle,
+                                   TEXT("PromptMatchesWithoutPlayerIdTest"));
+
+  TestTrue(TEXT("Attacker receives prompt despite missing PlayerId"),
+           AttackerController->bPromptVisible);
+  TestTrue(TEXT("Defender receives prompt despite missing PlayerId"),
+           DefenderController->bPromptVisible);
+
+  return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldTurnManagerSkipsEliminatedTest,
+                                 "Skald.TurnManager.SkipEliminatedPlayers",
+                                 EAutomationTestFlags::EditorContext |
+                                     EAutomationTestFlags::EngineFilter)
+bool FSkaldTurnManagerSkipsEliminatedTest::RunTest(const FString &Parameters) {
+  Skald::Tests::FScopedAutomationTestWorld TestWorld;
+  UWorld *World = TestWorld.Get();
+  TestNotNull(TEXT("World created"), World);
+  if (!World) {
+    return false;
+  }
+
+  ATurnManager *TM = World->SpawnActor<ATurnManager>();
+  ASkaldPlayerController *PC1 = World->SpawnActor<ASkaldPlayerController>();
+  ASkaldPlayerController *PC2 = World->SpawnActor<ASkaldPlayerController>();
+  ASkaldPlayerController *PC3 = World->SpawnActor<ASkaldPlayerController>();
+  ASkaldPlayerState *PS1 = World->SpawnActor<ASkaldPlayerState>();
+  ASkaldPlayerState *PS2 = World->SpawnActor<ASkaldPlayerState>();
+  ASkaldPlayerState *PS3 = World->SpawnActor<ASkaldPlayerState>();
+  AWorldMap *WorldMap = World->SpawnActor<AWorldMap>();
+
+  TestNotNull(TEXT("TurnManager"), TM);
+  TestNotNull(TEXT("PlayerController1"), PC1);
+  TestNotNull(TEXT("PlayerController2"), PC2);
+  TestNotNull(TEXT("PlayerController3"), PC3);
+  TestNotNull(TEXT("PlayerState1"), PS1);
+  TestNotNull(TEXT("PlayerState2"), PS2);
+  TestNotNull(TEXT("PlayerState3"), PS3);
+  TestNotNull(TEXT("WorldMap"), WorldMap);
+  if (!TM || !PC1 || !PC2 || !PC3 || !PS1 || !PS2 || !PS3 || !WorldMap) {
+    return false;
+  }
+
+  PC1->PlayerState = PS1;
+  PC2->PlayerState = PS2;
+  PC3->PlayerState = PS3;
+  PS1->InitiativeRoll = 3;
+  PS2->InitiativeRoll = 2;
+  PS3->InitiativeRoll = 1;
+
+  TM->RegisterController(PC1);
+  TM->RegisterController(PC2);
+  TM->RegisterController(PC3);
+
+  ATerritory *T1 = World->SpawnActor<ATerritory>();
+  ATerritory *T2 = World->SpawnActor<ATerritory>();
+  ATerritory *T3 = World->SpawnActor<ATerritory>();
+  TestNotNull(TEXT("Territory1"), T1);
+  TestNotNull(TEXT("Territory2"), T2);
+  TestNotNull(TEXT("Territory3"), T3);
+  if (!T1 || !T2 || !T3) {
+    return false;
+  }
+
+  WorldMap->Territories = {T1, T2, T3};
+
+  TM->StartTurns();
+  TestEqual(TEXT("Initial controller index"), GetCurrentTurnIndex(TM), 0);
+
+  TM->AdvanceTurn();
+  TestEqual(TEXT("Second controller active"), GetCurrentTurnIndex(TM), 1);
+
+  PS2->IsEliminated = true;
+  TM->AdvanceTurn();
+  TestEqual(TEXT("Skips eliminated controller"), GetCurrentTurnIndex(TM), 1);
+  TestEqual(TEXT("Remaining controller count"), TM->GetControllers().Num(), 2);
+
+  PS3->IsEliminated = true;
+  TM->AdvanceTurn();
+  TestEqual(TEXT("Wraps to first controller when others eliminated"),
+            GetCurrentTurnIndex(TM), 0);
+  TestEqual(TEXT("Single controller remains"), TM->GetControllers().Num(), 1);
 
   return true;
 }
