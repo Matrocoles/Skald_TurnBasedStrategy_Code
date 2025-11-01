@@ -9,6 +9,7 @@
 #include "Skald_AIController.generated.h"
 
 class AFighterPawn;
+class AWorldMap;
 class UGridBattleManager;
 class UGridOverlayComponent;
 
@@ -29,6 +30,13 @@ public:
   /** Execute the AI's decision making for the current turn. */
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void MakeAIDecision();
+
+  /**
+   * Execute the AI's strategic army placement for the current placement turn.
+   *
+   * @return Number of units deployed during this placement turn.
+   */
+  int32 PerformArmyPlacementTurn();
 
 protected:
   virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;

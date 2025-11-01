@@ -113,6 +113,58 @@ void ASkaldAIController::EndTurn() {
 
 void ASkaldAIController::MakeAIDecision() { ProcessCurrentPhase(); }
 
+int32 ASkaldAIController::PerformArmyPlacementTurn() {
+  if (!TurnManager) {
+    return 0;
+  }
+
+  ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
+  if (!PS || PS->DeployableUnits <= 0) {
+    return 0;
+  }
+
+  AWorldMap *WorldMap = Cast<AWorldMap>(
+      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
+  if (!WorldMap) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("PerformArmyPlacementTurn: missing world map; cannot deploy armies."));
+    return 0;
+  }
+
+  const int32 UnitsBefore = PS->DeployableUnits;
+
+  const FStrategicContext SavedContext = CachedStrategicContext;
+  const EAIStrategy SavedStrategy = CurrentStrategy;
+  const bool bSavedStrategyEvaluated = bStrategyEvaluatedThisTurn;
+
+  RefreshStrategicContext(WorldMap, PS);
+  if (CachedStrategicContext.OwnedTerritories.Num() > 0) {
+    CurrentStrategy = SelectStrategyFromContext(CachedStrategicContext);
+    bStrategyEvaluatedThisTurn = true;
+    ExecuteStrategicArmyPlacement(WorldMap, PS);
+  }
+
+  if (PS->DeployableUnits > 0) {
+    const int32 FallbackPlaced = WorldMap->AutoPlaceUnitsForAI(PS);
+    if (FallbackPlaced > 0) {
+      UE_LOG(LogSkald, Verbose,
+             TEXT("PerformArmyPlacementTurn: fallback auto-placement deployed %d units for %s."),
+             FallbackPlaced,
+             *PS->GetResolvedPlayerName(TEXT("PerformArmyPlacementTurn_Fallback")));
+    }
+  }
+
+  TurnManager->BroadcastDeployableUnits(PS);
+
+  const int32 UnitsPlaced = UnitsBefore - PS->DeployableUnits;
+
+  CachedStrategicContext = SavedContext;
+  CurrentStrategy = SavedStrategy;
+  bStrategyEvaluatedThisTurn = bSavedStrategyEvaluated;
+
+  return UnitsPlaced;
+}
+
 void ASkaldAIController::ProcessCurrentPhase() {
   if (!TurnManager) {
     UE_LOG(LogSkald, Warning,
