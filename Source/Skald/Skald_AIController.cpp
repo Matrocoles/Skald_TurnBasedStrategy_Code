@@ -953,6 +953,16 @@ void ASkaldAIController::ScheduleNextActivationAttempt() {
   }
 }
 
+void ASkaldAIController::ScheduleMovementCompletionPoll() {
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(FighterActionTimerHandle);
+    World->GetTimerManager().SetTimer(
+        FighterActionTimerHandle, this,
+        &ASkaldAIController::ProcessQueuedActivationIntent,
+        MovementCompletionPollInterval, false);
+  }
+}
+
 void ASkaldAIController::ProcessQueuedActivationIntent() {
   if (bAwaitingQueuedAttackResolution) {
     return;
@@ -965,6 +975,26 @@ void ASkaldAIController::ProcessQueuedActivationIntent() {
   }
 
   AFighterPawn *Fighter = PendingActivationFighter.Get();
+
+  if (bAwaitingMovementCompletion) {
+    if (!Fighter || !Fighter->IsMoving()) {
+      bAwaitingMovementCompletion = false;
+      ++ActivationIntentIterationCount;
+
+      if (!ShouldContinueActivation(Fighter)) {
+        CompleteFighterActivation();
+        return;
+      }
+
+      QueueActivationIntent(Fighter, EAIBattleActivationIntent::Attack);
+      ScheduleNextActivationAttempt();
+      return;
+    }
+
+    ScheduleMovementCompletionPoll();
+    return;
+  }
+
   if (!ShouldContinueActivation(Fighter)) {
     CompleteFighterActivation();
     return;
@@ -993,6 +1023,11 @@ void ASkaldAIController::ProcessQueuedActivationIntent() {
     break;
   case EAIBattleActivationIntent::Move:
     bActionTaken = TryMoveTowardsNearestEnemy(Fighter);
+    if (bActionTaken && Fighter && Fighter->IsMoving()) {
+      bAwaitingMovementCompletion = true;
+      ScheduleMovementCompletionPoll();
+      return;
+    }
     break;
   }
 
@@ -1046,6 +1081,7 @@ void ASkaldAIController::ClearActivationTimers() {
 
   PendingActivationIntents.Empty();
   bAwaitingQueuedAttackResolution = false;
+  bAwaitingMovementCompletion = false;
 }
 
 void ASkaldAIController::CompleteFighterActivation() {

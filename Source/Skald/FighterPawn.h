@@ -162,6 +162,9 @@ public:
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Fighter")
   bool IsAlive() const;
 
+  /** Determine whether the fighter is currently interpolating between cells. */
+  bool IsMoving() const;
+
   /** Get the grid overlay component, caching the result. */
   UGridOverlayComponent *GetGrid() const;
 

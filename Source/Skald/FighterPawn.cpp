@@ -2042,6 +2042,8 @@ void AFighterPawn::UpdateMeshOffset() {
 
 bool AFighterPawn::IsAlive() const { return Stats.Health > 0; }
 
+bool AFighterPawn::IsMoving() const { return bIsMoving; }
+
 void AFighterPawn::UpdateHealthDisplay(int32 NewHealth) {
   const int32 SafeMax = MaxHealth > 0 ? MaxHealth : FMath::Max(1, NewHealth);
 
