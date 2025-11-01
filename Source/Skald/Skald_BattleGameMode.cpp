@@ -125,6 +125,16 @@ static void AssignControllerSlot(AController *C) {
          TEXT("Assigned %s to slot %d (append)"), *GetNameSafe(C), NewIdx);
 }
 
+static void RefreshControllerSlotForState(ASkaldPlayerState *State) {
+  if (!State) {
+    return;
+  }
+
+  if (AController *Owner = State->GetOwner<AController>()) {
+    AssignControllerSlot(Owner);
+  }
+}
+
 void BuildTerritoryMap(const TArray<FS_Territory> &Source,
                        TMap<int32, FS_Territory> &Destination) {
   Destination.Reset();
@@ -177,10 +187,30 @@ ASkaldPlayerState *EnsureBattleParticipant(ASkaldGameState *GameState, UWorld *W
     return nullptr;
   }
 
+  auto ApplyDisplayName = [&](ASkaldPlayerState *Target) {
+    if (!Target || DisplayName.IsEmpty()) {
+      return;
+    }
+
+    const FString ExistingName = Target->PlayerDisplayName;
+    const FString CurrentPlayerName = Target->GetPlayerName();
+    if (!ExistingName.IsEmpty() &&
+        !ExistingName.Equals(DisplayName, ESearchCase::IgnoreCase)) {
+      UE_LOG(LogSkaldBattle, Warning,
+             TEXT("EnsureBattleParticipant: refusing to override display name for PlayerId %d (existing='%s' requested='%s')"),
+             Target->GetPlayerId(), *ExistingName, *DisplayName);
+      return;
+    }
+
+    Target->PlayerDisplayName = DisplayName;
+    if (!CurrentPlayerName.Equals(DisplayName, ESearchCase::CaseSensitive)) {
+      Target->SetPlayerName(DisplayName);
+    }
+  };
+
   if (ASkaldPlayerState *Existing = GameState->GetPlayerById(PlayerID)) {
     if (!DisplayName.IsEmpty()) {
-      Existing->PlayerDisplayName = DisplayName;
-      Existing->SetPlayerName(DisplayName);
+      ApplyDisplayName(Existing);
     } else if (Existing->GetPlayerName().IsEmpty()) {
       UE_LOG(LogSkald, Warning,
              TEXT("EnsureBattleParticipant: Missing name for PlayerId %d"),
@@ -190,6 +220,7 @@ ASkaldPlayerState *EnsureBattleParticipant(ASkaldGameState *GameState, UWorld *W
       Existing->Faction = Faction;
     }
     Existing->bIsAI = bIsAI;
+    RefreshControllerSlotForState(Existing);
     return Existing;
   }
 
@@ -200,8 +231,7 @@ ASkaldPlayerState *EnsureBattleParticipant(ASkaldGameState *GameState, UWorld *W
     }
 
     if (!DisplayName.IsEmpty()) {
-      Candidate->PlayerDisplayName = DisplayName;
-      Candidate->SetPlayerName(DisplayName);
+      ApplyDisplayName(Candidate);
     } else if (Candidate->GetPlayerName().IsEmpty()) {
       UE_LOG(LogSkald, Warning,
              TEXT("EnsureBattleParticipant: Missing name for PlayerId %d"),
@@ -240,6 +270,7 @@ ASkaldPlayerState *EnsureBattleParticipant(ASkaldGameState *GameState, UWorld *W
       GameState->ForceNetUpdate();
     }
 
+    RefreshControllerSlotForState(Candidate);
     return Candidate;
   }
 
@@ -255,8 +286,7 @@ ASkaldPlayerState *EnsureBattleParticipant(ASkaldGameState *GameState, UWorld *W
 
   NewState->SetPlayerId(PlayerID);
   if (!DisplayName.IsEmpty()) {
-    NewState->PlayerDisplayName = DisplayName;
-    NewState->SetPlayerName(DisplayName);
+    ApplyDisplayName(NewState);
   } else {
     UE_LOG(LogSkald, Warning,
            TEXT("EnsureBattleParticipant: Spawned PlayerState without name (Id=%d)"),
@@ -269,6 +299,7 @@ ASkaldPlayerState *EnsureBattleParticipant(ASkaldGameState *GameState, UWorld *W
 
   GameState->AddPlayerState(NewState);
   GameState->ForceNetUpdate();
+  RefreshControllerSlotForState(NewState);
   return NewState;
 }
 } // namespace
@@ -621,6 +652,7 @@ void ASkald_BattleGameMode::EnsureBattleControllers() {
       PS->Faction = Participant.Faction;
     }
     PS->bIsAI = Participant.bIsAI;
+    RefreshControllerSlotForState(PS);
     bUpdatedPlayers = true;
   }
 
