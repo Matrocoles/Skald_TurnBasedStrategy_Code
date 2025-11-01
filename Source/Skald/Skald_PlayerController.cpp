@@ -3981,18 +3981,16 @@ void ASkaldPlayerController::BeginDisengageMode() {
     return;
   }
 
-  if (!bHasPendingDisengageAction) {
-    if (!LockedActiveFighter->ConsumeAction()) {
-      const FText ErrorText = NSLOCTEXT(
-          "SkaldBattle", "DisengageNoActions",
-          "Not enough actions remain to disengage.");
-      NotifyActionError(ErrorText.ToString());
-      return;
-    }
-    bHasPendingDisengageAction = true;
+  if (LockedActiveFighter->GetActionsRemaining() <= 0) {
+    const FText ErrorText = NSLOCTEXT(
+        "SkaldBattle", "DisengageNoActions",
+        "Not enough actions remain to disengage.");
+    NotifyActionError(ErrorText.ToString());
+    return;
   }
 
   PendingDisengageStartCell = LockedActiveFighter->GetCurrentCell();
+  bHasPendingDisengage = true;
   CurrentCommandMode = EBattleCommandMode::Disengage;
   if (UGridOverlayComponent *Grid = FindGridOverlay()) {
     Grid->HighlightMovement(LockedActiveFighter);
@@ -4066,7 +4064,7 @@ void ASkaldPlayerController::HandleGridClick() {
       CancelCommandMode();
       break;
     }
-    if (!bHasPendingDisengageAction) {
+    if (!bHasPendingDisengage) {
       CancelCommandMode();
       break;
     }
@@ -4112,8 +4110,8 @@ void ASkaldPlayerController::HandleGridClick() {
       break;
     }
 
-    LockedActiveFighter->MoveToCell(TargetAnchor, false);
-    ResetPendingDisengage(false);
+    LockedActiveFighter->MoveToCell(TargetAnchor);
+    ResetPendingDisengage();
     CancelCommandMode();
     UpdateBattleHUDButtons();
     break;
@@ -4948,17 +4946,12 @@ void ASkaldPlayerController::CancelCommandMode() {
   }
 }
 
-void ASkaldPlayerController::ResetPendingDisengage(bool bRestoreAction) {
-  if (!bHasPendingDisengageAction) {
+void ASkaldPlayerController::ResetPendingDisengage() {
+  if (!bHasPendingDisengage) {
     return;
   }
 
-  if (bRestoreAction && LockedActiveFighter &&
-      LockedActiveFighter->IsCurrentlyActive()) {
-    LockedActiveFighter->TryRestoreAction();
-  }
-
-  bHasPendingDisengageAction = false;
+  bHasPendingDisengage = false;
   PendingDisengageStartCell = FIntPoint::ZeroValue;
 }
 

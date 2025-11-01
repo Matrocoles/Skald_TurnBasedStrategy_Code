@@ -755,7 +755,7 @@ private:
   void InitializeFighterSelectionIfNeeded();
 
   void CancelCommandMode();
-  void ResetPendingDisengage(bool bRestoreAction = true);
+  void ResetPendingDisengage();
   void HighlightClickedCell(UGridOverlayComponent *Grid, const FIntPoint &Cell);
   bool FindBestMovementAnchor(AFighterPawn *Fighter, UGridOverlayComponent *Grid,
                               const FIntPoint &DesiredCell,
@@ -872,7 +872,7 @@ private:
   TWeakObjectPtr<AFighterPawn> PendingVeilStepFighter;
   TOptional<FPendingAbilityCommand> PendingAbilityCommand;
 
-  bool bHasPendingDisengageAction = false;
+  bool bHasPendingDisengage = false;
   FIntPoint PendingDisengageStartCell = FIntPoint::ZeroValue;
 
   /** Friendly fighters tracked for HUD list synchronization. */
