@@ -1,7 +1,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Containers/Map.h"
 #include "Containers/Queue.h"
+#include "Containers/Set.h"
 #include "Skald_PlayerController.h"
 #include "TimerManager.h"
 #include "Skald_AIController.generated.h"
@@ -32,9 +34,46 @@ protected:
   virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
+  enum class EAIStrategy : uint8 { Offensive, Defensive, Hybrid };
+
+  struct FStrategicContext {
+    TArray<ATerritory *> OwnedTerritories;
+    TArray<ATerritory *> EnemyTerritories;
+    TArray<ATerritory *> EnemyCapitals;
+    TSet<ATerritory *> BorderTerritories;
+    TSet<ATerritory *> CapitalDefenseRing;
+    TSet<ATerritory *> EnemyCapitalApproach;
+    TMap<ATerritory *, int32> EnemyPressure;
+    ATerritory *Capital = nullptr;
+    int32 TotalFriendlyUnits = 0;
+    int32 TotalEnemyUnits = 0;
+    int32 TotalEnemyBorderUnits = 0;
+    int32 FriendlyBorderUnits = 0;
+    bool bCapitalThreatened = false;
+    bool bCanThreatenEnemyCapital = false;
+  };
+
   enum class EAIBattleActivationIntent : uint8 { Attack, Move };
 
   void ProcessCurrentPhase();
+  void RefreshStrategicContext(AWorldMap *WorldMap, ASkaldPlayerState *PlayerState);
+  bool EnsureStrategySelected(AWorldMap *WorldMap, ASkaldPlayerState *PlayerState);
+  EAIStrategy SelectStrategyFromContext(const FStrategicContext &Context) const;
+  FString DescribeStrategy(EAIStrategy Strategy) const;
+  float EvaluateOffensivePriority(const FStrategicContext &Context,
+                                  ATerritory *Territory) const;
+  float EvaluateDefensivePriority(const FStrategicContext &Context,
+                                  ATerritory *Territory) const;
+  void ExecuteStrategicArmyPlacement(AWorldMap *WorldMap,
+                                     ASkaldPlayerState *PlayerState);
+  void ExecuteStrategicReinforcements(AWorldMap *WorldMap,
+                                      ASkaldPlayerState *PlayerState);
+  bool ExecuteStrategicAttack(AWorldMap *WorldMap,
+                              ASkaldPlayerState *PlayerState);
+  bool ExecuteStrategicMovement(AWorldMap *WorldMap,
+                                ASkaldPlayerState *PlayerState);
+  int32 DetermineArmyToSend(EAIStrategy Strategy, int32 SourceUnits,
+                            int32 TargetUnits) const;
   void ScheduleNextDecisionStep(float DelaySeconds);
   void SchedulePhaseAdvance(float DelaySeconds);
   void ClearDecisionTimers();
@@ -100,6 +139,15 @@ private:
 
   /** Tracks whether a phase advance should occur on the next decision step. */
   bool bPendingPhaseAdvance = false;
+
+  /** Tracks whether the current turn's strategy has been evaluated. */
+  bool bStrategyEvaluatedThisTurn = false;
+
+  /** Cached strategic context reused throughout the turn. */
+  FStrategicContext CachedStrategicContext;
+
+  /** Current turn strategy guiding world-map decisions. */
+  EAIStrategy CurrentStrategy = EAIStrategy::Hybrid;
 
   /** Time between AI phase processing steps on the world map. */
   UPROPERTY(EditAnywhere, Category = "Turn|AI", meta = (ClampMin = "5.0"))
