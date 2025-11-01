@@ -5476,20 +5476,6 @@ void ASkaldPlayerController::HandleAttackResolved(AFighterPawn *Attacker,
                                                   const FDiceRollResult &Result) {
   PlayAttackFeedback(Attacker, Defender, Result);
 
-  if (Defender && Result.StartingHealth > 0 && Result.EndingHealth <= 0) {
-    TriggerFighterDeathFeedback(Defender);
-  }
-
-  if (Result.bHighStakesCritical) {
-    TriggerHighStakesCritFeedback(Attacker, Defender, Result);
-
-    if (UWorld *World = GetWorld()) {
-      if (ASkaldGameState *GameState = World->GetGameState<ASkaldGameState>()) {
-        GameState->RequestTransientSlowdown(0.2f, 0.25f);
-      }
-    }
-  }
-
   if (!BattleHudWidget) {
     if (MainHUD) {
       MainHUD->QueueDiceResolution(Attacker, Defender, Result);
@@ -5514,6 +5500,20 @@ void ASkaldPlayerController::HandleDiceResolutionComplete(
     const FDiceRollResult &Result) {
   if (Defender) {
     Defender->ReleaseHealthDisplayHold();
+  }
+
+  if (Defender && Result.StartingHealth > 0 && Result.EndingHealth <= 0) {
+    TriggerFighterDeathFeedback(Defender);
+  }
+
+  if (Result.bHighStakesCritical) {
+    TriggerHighStakesCritFeedback(Attacker, Defender, Result);
+
+    if (UWorld *World = GetWorld()) {
+      if (ASkaldGameState *GameState = World->GetGameState<ASkaldGameState>()) {
+        GameState->RequestTransientSlowdown(0.2f, 0.25f);
+      }
+    }
   }
 
   if (!BattleHudWidget) {
