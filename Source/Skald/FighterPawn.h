@@ -674,6 +674,10 @@ private:
   UPROPERTY(Replicated)
   FIntPoint CurrentCell;
 
+  /** Grid anchor used as the start for the current interpolated move. */
+  UPROPERTY(Replicated)
+  FIntPoint MovementSourceCell = FIntPoint::ZeroValue;
+
   /** Cached grid overlay component. */
   mutable UGridOverlayComponent *CachedGrid = nullptr;
 
