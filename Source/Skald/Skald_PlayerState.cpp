@@ -117,6 +117,7 @@ void ASkaldPlayerState::OnRep_PlayerId() {
       GS->OnPlayersUpdated.Broadcast();
     }
   }
+}
 
 void ASkaldPlayerState::ResetArmyPlacementDeployments() {
   ArmyPlacementDeployments.Reset();
