@@ -764,11 +764,14 @@ void AFighterPawn::PlayMeleePreAttackFX(AFighterPawn *Target) {
       ResolveFXOrigin(AttackFX.PreAttackSocket, AttackFX.PreAttackOffset,
                       &SocketRotation);
 
-  FVector Direction = (TargetLocation - SpawnLocation).GetSafeNormal();
-  if (Direction.IsNearlyZero()) {
-    Direction = SocketRotation.Vector();
+  FRotator SpawnRotation = SocketRotation;
+  if (AttackFX.PreAttackSocket.IsNone()) {
+    FVector Direction = (TargetLocation - SpawnLocation).GetSafeNormal();
+    if (Direction.IsNearlyZero()) {
+      Direction = SocketRotation.Vector();
+    }
+    SpawnRotation = Direction.Rotation();
   }
-  const FRotator SpawnRotation = Direction.Rotation();
 
   if (!AttackFX.PreAttackEffect.IsNull()) {
     if (UWorld *World = GetWorld()) {
