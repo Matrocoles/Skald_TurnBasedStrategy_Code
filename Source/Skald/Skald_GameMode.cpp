@@ -2222,9 +2222,46 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
     }
 
     if (PS->bIsAI) {
-      WorldMap->AutoPlaceUnitsForAI(PS);
-      TurnManager->BroadcastDeployableUnits(PS);
+      int32 UnitsPlaced = 0;
+      if (ASkaldAIController *AIController = Cast<ASkaldAIController>(PC)) {
+        UnitsPlaced = AIController->PerformArmyPlacementTurn();
+      } else {
+        UnitsPlaced = WorldMap->AutoPlaceUnitsForAI(PS);
+        if (UnitsPlaced > 0) {
+          TurnManager->BroadcastDeployableUnits(PS);
+        }
+      }
+
       bArmyPlacementFailsafeTriggered = false;
+
+      const bool bHasRemainingUnits = PS->DeployableUnits > 0;
+      bool bCanPlaceMore = false;
+      if (bHasRemainingUnits) {
+        for (ATerritory *Terr : WorldMap->Territories) {
+          if (!Terr || Terr->OwningPlayer != PS) {
+            continue;
+          }
+
+          const int32 TerritoryId = Terr->GetTerritoryId();
+          const int32 AlreadyPlaced =
+              PS->GetArmyPlacementDeploymentForTerritory(TerritoryId);
+          if (AlreadyPlaced < Skald::ArmyPlacement::DeployPerTerritoryLimit) {
+            bCanPlaceMore = true;
+            break;
+          }
+        }
+      }
+
+      if (bHasRemainingUnits && bCanPlaceMore) {
+        UE_LOG(LogSkald, Verbose,
+               TEXT("AdvanceArmyPlacement: %s retains %d units after placement; retrying."),
+               *PS->GetResolvedPlayerName(TEXT("AdvanceArmyPlacement_AIRetry")),
+               PS->DeployableUnits);
+        GetWorldTimerManager().SetTimer(ArmyPlacementAutoAdvanceHandle, this,
+                                        &ASkaldGameMode::AdvanceArmyPlacement,
+                                        RetryInitDelay, false);
+        return;
+      }
 
       bool bScheduledAutoAdvance = false;
       if (ArmyPlacementAutoAdvanceDelay > KINDA_SMALL_NUMBER) {
