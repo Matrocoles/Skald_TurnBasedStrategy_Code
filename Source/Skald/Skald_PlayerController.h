@@ -580,9 +580,9 @@ public:
 
   /** Local entry points so standalone/authority controllers can trigger the
    *  prepare-for-battle flow without relying on client RPC delivery. */
-  void ShowPrepareForBattlePromptLocal(
+  virtual void ShowPrepareForBattlePromptLocal(
       const FPrepareForBattlePromptData &PromptData);
-  void HidePrepareForBattlePromptLocal();
+  virtual void HidePrepareForBattlePromptLocal();
 
   /** Server-side processing of an attack request. */
   UFUNCTION(Server, Reliable)
