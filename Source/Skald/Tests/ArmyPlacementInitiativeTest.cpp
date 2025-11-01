@@ -12,6 +12,7 @@
 #include "Tests/SkaldAutomationTestHelpers.h"
 #include "UObject/UnrealType.h"
 #include "WorldMap.h"
+#include "Math/UnrealMathUtility.h"
 
 #include "Engine/World.h"
 
@@ -26,6 +27,32 @@ struct FSkaldGameModeAutomationAccessor {
     if (GameMode) {
       GameMode->HandleArmyPlacementFailsafe();
     }
+  }
+
+  static bool IsRetryInitTimerActive(ASkaldGameMode *GameMode) {
+    if (!GameMode) {
+      return false;
+    }
+
+    if (UWorld *World = GameMode->GetWorld()) {
+      return World->GetTimerManager().IsTimerActive(
+          GameMode->RetryInitTimerHandle);
+    }
+
+    return false;
+  }
+
+  static float GetRetryInitTimerRate(ASkaldGameMode *GameMode) {
+    if (!GameMode) {
+      return -1.f;
+    }
+
+    if (UWorld *World = GameMode->GetWorld()) {
+      return World->GetTimerManager().GetTimerRate(
+          GameMode->RetryInitTimerHandle);
+    }
+
+    return -1.f;
   }
 };
 
@@ -460,6 +487,63 @@ bool FInitializeWorldSingleInitiativeRollTest::RunTest(const FString &Parameters
     TestEqual(TEXT("Initiative roll preserved"), PS->InitiativeRoll,
               ExpectedRoll);
   }
+
+  return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldGameModeRetryInitTimerTest,
+                                 "Skald.GameMode.RetryInitTimerPersists",
+                                 EAutomationTestFlags::EditorContext |
+                                     EAutomationTestFlags::EngineFilter)
+
+bool FSkaldGameModeRetryInitTimerTest::RunTest(const FString &Parameters) {
+  Skald::Tests::FScopedAutomationTestWorld TestWorld;
+  UWorld *World = TestWorld.Get();
+  TestNotNull(TEXT("World created"), World);
+  if (!World) {
+    return false;
+  }
+
+  ASkaldGameMode *GameMode = World->SpawnActor<ASkaldGameMode>();
+  ATurnManager *TurnManager = World->SpawnActor<ATurnManager>();
+  ASkaldPlayerController *Controller =
+      World->SpawnActor<ASkaldPlayerController>();
+  ASkaldPlayerState *PlayerState = World->SpawnActor<ASkaldPlayerState>();
+
+  TestNotNull(TEXT("GameMode"), GameMode);
+  TestNotNull(TEXT("TurnManager"), TurnManager);
+  TestNotNull(TEXT("Controller"), Controller);
+  TestNotNull(TEXT("PlayerState"), PlayerState);
+  if (!GameMode || !TurnManager || !Controller || !PlayerState) {
+    return false;
+  }
+
+  AttachGameModeToWorld(World, GameMode);
+  GameMode->InitGameState();
+  ASkaldGameState *GameState = GameMode->GetGameState<ASkaldGameState>();
+  TestNotNull(TEXT("GameState initialised"), GameState);
+  if (!GameState) {
+    return false;
+  }
+
+  SetObjectProperty(GameMode, TEXT("TurnManager"), TurnManager);
+
+  Controller->PlayerState = PlayerState;
+  PlayerState->SetOwner(Controller);
+  PlayerState->bIsAI = true;
+  GameState->AddPlayerState(PlayerState);
+
+  GameMode->TryInitializeWorldAndStart();
+
+  const bool bTimerActive =
+      FSkaldGameModeAutomationAccessor::IsRetryInitTimerActive(GameMode);
+  const float TimerRate =
+      FSkaldGameModeAutomationAccessor::GetRetryInitTimerRate(GameMode);
+
+  TestTrue(TEXT("Retry init timer remains scheduled"), bTimerActive);
+  TestTrue(TEXT("Retry init timer uses positive delay"), TimerRate > 0.f);
+  TestTrue(TEXT("Retry init timer matches retry delay"),
+           FMath::IsNearlyEqual(TimerRate, 0.01f, KINDA_SMALL_NUMBER));
 
   return true;
 }

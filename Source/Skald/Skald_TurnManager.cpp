@@ -1028,6 +1028,8 @@ void ATurnManager::AdvanceTurn() {
     }
   }
 
+  const int32 PreviousIndex = CurrentIndex;
+
   Controllers.RemoveAll([](const TWeakObjectPtr<ASkaldPlayerController> &Ptr) {
     if (!Ptr.IsValid()) {
       return true;
@@ -1054,10 +1056,22 @@ void ATurnManager::AdvanceTurn() {
       [PreviousController](const TWeakObjectPtr<ASkaldPlayerController> &Ptr) {
         return Ptr.Get() == PreviousController;
       });
-  CurrentIndex =
-      (FoundIndex != INDEX_NONE) ? FoundIndex : Controllers.Num() - 1;
 
-  CurrentIndex = (CurrentIndex + 1) % Controllers.Num();
+  if (FoundIndex != INDEX_NONE) {
+    CurrentIndex = (FoundIndex + 1) % Controllers.Num();
+  } else {
+    const int32 SafeCount = Controllers.Num();
+    if (SafeCount <= 0) {
+      return;
+    }
+
+    int32 WrappedIndex = PreviousIndex % SafeCount;
+    if (WrappedIndex < 0) {
+      WrappedIndex += SafeCount;
+    }
+
+    CurrentIndex = WrappedIndex;
+  }
   if (ASkaldPlayerController *CurrentController =
           Controllers[CurrentIndex].Get()) {
     ASkaldPlayerState *PS =
@@ -2114,6 +2128,65 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
   bool bAttackerMatched = !bNeedsAttackerConfirmation;
   bool bDefenderMatched = !bNeedsDefenderConfirmation;
 
+  const FString ExpectedAttackerName = PromptData.AttackerDisplayName.ToString();
+  const FString ExpectedDefenderName = PromptData.DefenderDisplayName.ToString();
+
+  auto ResolveParticipantStateByContext = [&](bool bIsAttacker) {
+    const int32 PlayerId = bIsAttacker
+                               ? PendingBattleReadyState.AttackerPlayerID
+                               : PendingBattleReadyState.DefenderPlayerID;
+
+    if (PlayerId != INDEX_NONE && GameState) {
+      if (ASkaldPlayerState *Resolved = GameState->GetPlayerById(PlayerId)) {
+        return Resolved;
+      }
+    }
+
+    if (WorldMap) {
+      const int32 TerritoryId =
+          bIsAttacker ? Battle.FromTerritoryID : Battle.TargetTerritoryID;
+      if (ATerritory *Territory = WorldMap->GetTerritoryById(TerritoryId)) {
+        if (ASkaldPlayerState *Owner = Territory->OwningPlayer) {
+          return Owner;
+        }
+      }
+    }
+
+    return static_cast<ASkaldPlayerState *>(nullptr);
+  };
+
+  ASkaldPlayerState *ExpectedAttacker = ResolveParticipantStateByContext(true);
+  ASkaldPlayerState *ExpectedDefender = ResolveParticipantStateByContext(false);
+
+  auto MatchesParticipant = [&](ASkaldPlayerState *Candidate,
+                                ASkaldPlayerState *Expected, int32 ExpectedId,
+                                const FString &ExpectedName) {
+    if (!Candidate) {
+      return false;
+    }
+
+    if (Expected && Candidate == Expected) {
+      return true;
+    }
+
+    if (ExpectedId != INDEX_NONE && Candidate->GetPlayerId() == ExpectedId) {
+      return true;
+    }
+
+    if (ExpectedName.IsEmpty()) {
+      return false;
+    }
+
+    FString CandidateName = Candidate->PlayerDisplayName;
+    if (CandidateName.IsEmpty()) {
+      CandidateName = Candidate->GetResolvedPlayerName(
+          TEXT("BroadcastPrepareForBattlePrompt_Match"));
+    }
+
+    return !CandidateName.IsEmpty() &&
+           CandidateName.Equals(ExpectedName, ESearchCase::IgnoreCase);
+  };
+
   for (ASkaldPlayerController *Controller : ControllerSnapshot) {
     if (!Controller) {
       continue;
@@ -2126,11 +2199,12 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
              LogContext, *Controller->GetName());
     }
 
-    const int32 PlayerID = PS ? PS->GetPlayerId() : INDEX_NONE;
-    const bool bMatchesAttackerId =
-        PlayerID == PendingBattleReadyState.AttackerPlayerID;
-    const bool bMatchesDefenderId =
-        PlayerID == PendingBattleReadyState.DefenderPlayerID;
+    const bool bMatchesAttackerId = MatchesParticipant(
+        PS, ExpectedAttacker, PendingBattleReadyState.AttackerPlayerID,
+        ExpectedAttackerName);
+    const bool bMatchesDefenderId = MatchesParticipant(
+        PS, ExpectedDefender, PendingBattleReadyState.DefenderPlayerID,
+        ExpectedDefenderName);
 
     const bool bIsAttacker = bNeedsAttackerConfirmation && bMatchesAttackerId;
     const bool bIsDefender = bNeedsDefenderConfirmation && bMatchesDefenderId;
@@ -2142,7 +2216,8 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
       if (bParticipantIsAI) {
         UE_LOG(LogSkaldReady, Log,
                TEXT("%s: skipping prepare prompt for AI-controlled %s (Controller=%s PlayerID=%d)."),
-               LogContext, RoleLabel, *Controller->GetName(), PlayerID);
+               LogContext, RoleLabel, *Controller->GetName(),
+               PS ? PS->GetPlayerId() : INDEX_NONE);
       } else {
         UE_LOG(LogSkaldReady, Log,
                TEXT("WidgetSpawned PC=%s Role=%s Battle=%d->%d"),
@@ -2172,11 +2247,13 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
     if (bMatchesAttackerId && !bNeedsAttackerConfirmation) {
       UE_LOG(LogSkald, Log,
              TEXT("%s: cleared attacker prompt for controller %s (PlayerID %d) because confirmation is no longer required."),
-             LogContext, *Controller->GetName(), PlayerID);
+             LogContext, *Controller->GetName(),
+             PS ? PS->GetPlayerId() : INDEX_NONE);
     } else if (bMatchesDefenderId && !bNeedsDefenderConfirmation) {
       UE_LOG(LogSkald, Log,
              TEXT("%s: cleared defender prompt for controller %s (PlayerID %d) because confirmation is no longer required."),
-             LogContext, *Controller->GetName(), PlayerID);
+             LogContext, *Controller->GetName(),
+             PS ? PS->GetPlayerId() : INDEX_NONE);
     }
   }
 
