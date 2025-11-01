@@ -724,9 +724,10 @@ bool ASkaldAIController::ExecuteStrategicAttack(AWorldMap *WorldMap,
           continue;
         }
 
+        UnitsToSend = FMath::Min(UnitsToSend, MaxMovable);
         if (UnitsToSend < SkaldConstants::CapitalAttackArmyRequirement) {
-          UnitsToSend = FMath::Clamp(SkaldConstants::CapitalAttackArmyRequirement,
-                                     1, MaxMovable);
+          // The AI cannot commit the required force during the attack phase.
+          continue;
         }
 
         if (!SkaldHelpers::MeetsCapitalAttackRequirement(true, UnitsToSend)) {
