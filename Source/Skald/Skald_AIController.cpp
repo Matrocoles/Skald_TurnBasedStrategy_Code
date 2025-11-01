@@ -265,8 +265,8 @@ void ASkaldAIController::ProcessCurrentPhase() {
 }
 
 bool ASkaldAIController::EnsureStrategySelected(AWorldMap *WorldMap,
-                                                ASkaldPlayerState *PlayerState) {
-  RefreshStrategicContext(WorldMap, PlayerState);
+                                                ASkaldPlayerState *InPlayerState) {
+  RefreshStrategicContext(WorldMap, InPlayerState);
 
   if (bStrategyEvaluatedThisTurn) {
     return false;
@@ -289,9 +289,9 @@ bool ASkaldAIController::EnsureStrategySelected(AWorldMap *WorldMap,
 }
 
 void ASkaldAIController::RefreshStrategicContext(AWorldMap *WorldMap,
-                                                 ASkaldPlayerState *PlayerState) {
+                                                 ASkaldPlayerState *InPlayerState) {
   CachedStrategicContext = FStrategicContext();
-  if (!WorldMap || !PlayerState) {
+  if (!WorldMap || !InPlayerState) {
     return;
   }
 
@@ -304,7 +304,7 @@ void ASkaldAIController::RefreshStrategicContext(AWorldMap *WorldMap,
       continue;
     }
 
-    if (Territory->OwningPlayer == PlayerState) {
+    if (Territory->OwningPlayer == InPlayerState) {
       Context.OwnedTerritories.Add(Territory);
       Context.TotalFriendlyUnits += Territory->ArmyUnits;
       if (Territory->bIsCapital) {
@@ -333,7 +333,7 @@ void ASkaldAIController::RefreshStrategicContext(AWorldMap *WorldMap,
         continue;
       }
 
-      if (Neighbor->OwningPlayer == PlayerState) {
+      if (Neighbor->OwningPlayer == InPlayerState) {
         if (Context.Capital && Neighbor == Context.Capital) {
           bAdjacentFriendlyCapital = true;
         }
@@ -463,8 +463,8 @@ float ASkaldAIController::EvaluateDefensivePriority(
 }
 
 void ASkaldAIController::ExecuteStrategicArmyPlacement(
-    AWorldMap *WorldMap, ASkaldPlayerState *PlayerState) {
-  if (!WorldMap || !PlayerState || PlayerState->DeployableUnits <= 0) {
+    AWorldMap *WorldMap, ASkaldPlayerState *InPlayerState) {
+  if (!WorldMap || !InPlayerState || InPlayerState->DeployableUnits <= 0) {
     return;
   }
 
@@ -487,7 +487,7 @@ void ASkaldAIController::ExecuteStrategicArmyPlacement(
 
     const int32 TerritoryId = Territory->GetTerritoryId();
     const int32 AlreadyPlaced =
-        PlayerState->GetArmyPlacementDeploymentForTerritory(TerritoryId);
+        InPlayerState->GetArmyPlacementDeploymentForTerritory(TerritoryId);
     const int32 RemainingCapacity = MaxPerTerritory - AlreadyPlaced;
     if (RemainingCapacity <= 0) {
       continue;
@@ -532,7 +532,7 @@ void ASkaldAIController::ExecuteStrategicArmyPlacement(
   });
 
   int32 Index = 0;
-  while (PlayerState->DeployableUnits > 0 && Targets.Num() > 0) {
+  while (InPlayerState->DeployableUnits > 0 && Targets.Num() > 0) {
     FPlacementTarget &Target = Targets[Index];
     if (Target.RemainingCapacity <= 0) {
       Targets.RemoveAt(Index);
@@ -545,9 +545,9 @@ void ASkaldAIController::ExecuteStrategicArmyPlacement(
 
     ++Target.Territory->ArmyUnits;
     Target.Territory->RefreshAppearance();
-    --PlayerState->DeployableUnits;
-    PlayerState->AddArmyPlacementDeployment(Target.Territory->GetTerritoryId(),
-                                            1);
+    --InPlayerState->DeployableUnits;
+    InPlayerState->AddArmyPlacementDeployment(
+        Target.Territory->GetTerritoryId(), 1);
     --Target.RemainingCapacity;
 
     if (Targets.Num() > 0) {
@@ -557,9 +557,9 @@ void ASkaldAIController::ExecuteStrategicArmyPlacement(
 }
 
 void ASkaldAIController::ExecuteStrategicReinforcements(
-    AWorldMap *WorldMap, ASkaldPlayerState *PlayerState) {
-  if (!WorldMap || !PlayerState || PlayerState->DeployableUnits <= 0 ||
-      PlayerState->Resources <= 0) {
+    AWorldMap *WorldMap, ASkaldPlayerState *InPlayerState) {
+  if (!WorldMap || !InPlayerState || InPlayerState->DeployableUnits <= 0 ||
+      InPlayerState->Resources <= 0) {
     return;
   }
 
@@ -609,7 +609,7 @@ void ASkaldAIController::ExecuteStrategicReinforcements(
                   const FReinforcementTarget &B) { return A.Score > B.Score; });
 
   int32 Index = 0;
-  while (PlayerState->DeployableUnits > 0 && PlayerState->Resources > 0 &&
+  while (InPlayerState->DeployableUnits > 0 && InPlayerState->Resources > 0 &&
          Targets.Num() > 0) {
     FReinforcementTarget &Target = Targets[Index];
     if (!Target.Territory) {
@@ -623,8 +623,8 @@ void ASkaldAIController::ExecuteStrategicReinforcements(
 
     ++Target.Territory->ArmyUnits;
     Target.Territory->RefreshAppearance();
-    --PlayerState->DeployableUnits;
-    --PlayerState->Resources;
+    --InPlayerState->DeployableUnits;
+    --InPlayerState->Resources;
 
     if (Targets.Num() > 0) {
       Index = (Index + 1) % Targets.Num();
@@ -633,8 +633,8 @@ void ASkaldAIController::ExecuteStrategicReinforcements(
 }
 
 bool ASkaldAIController::ExecuteStrategicAttack(AWorldMap *WorldMap,
-                                                ASkaldPlayerState *PlayerState) {
-  if (!WorldMap || !PlayerState) {
+                                                ASkaldPlayerState *InPlayerState) {
+  if (!WorldMap || !InPlayerState) {
     return false;
   }
 
@@ -650,7 +650,7 @@ bool ASkaldAIController::ExecuteStrategicAttack(AWorldMap *WorldMap,
   bool bFoundOption = false;
 
   for (ATerritory *Source : CachedStrategicContext.OwnedTerritories) {
-    if (!Source || Source->OwningPlayer != PlayerState ||
+    if (!Source || Source->OwningPlayer != InPlayerState ||
         Source->ArmyUnits <= 1) {
       continue;
     }
@@ -665,7 +665,7 @@ bool ASkaldAIController::ExecuteStrategicAttack(AWorldMap *WorldMap,
         Source == CachedStrategicContext.Capital;
 
     for (ATerritory *Neighbor : Source->AdjacentTerritories) {
-      if (!Neighbor || Neighbor->OwningPlayer == PlayerState) {
+      if (!Neighbor || Neighbor->OwningPlayer == InPlayerState) {
         continue;
       }
 
@@ -738,12 +738,12 @@ bool ASkaldAIController::ExecuteStrategicAttack(AWorldMap *WorldMap,
 }
 
 bool ASkaldAIController::ExecuteStrategicMovement(AWorldMap *WorldMap,
-                                                  ASkaldPlayerState *PlayerState) {
-  if (!WorldMap || !PlayerState || !TurnManager) {
+                                                  ASkaldPlayerState *InPlayerState) {
+  if (!WorldMap || !InPlayerState || !TurnManager) {
     return false;
   }
 
-  const int32 PlayerID = PlayerState->GetPlayerId();
+  const int32 PlayerID = InPlayerState->GetPlayerId();
   if (PlayerID <= 0 ||
       TurnManager->GetMovementActionsRemaining(PlayerID) <= 0) {
     return false;
@@ -761,7 +761,7 @@ bool ASkaldAIController::ExecuteStrategicMovement(AWorldMap *WorldMap,
   bool bFoundOption = false;
 
   for (ATerritory *Source : CachedStrategicContext.OwnedTerritories) {
-    if (!Source || Source->OwningPlayer != PlayerState ||
+    if (!Source || Source->OwningPlayer != InPlayerState ||
         Source->ArmyUnits <= 1) {
       continue;
     }
@@ -772,7 +772,7 @@ bool ASkaldAIController::ExecuteStrategicMovement(AWorldMap *WorldMap,
         CachedStrategicContext.BorderTerritories.Contains(Source);
 
     for (ATerritory *Neighbor : Source->AdjacentTerritories) {
-      if (!Neighbor || Neighbor->OwningPlayer != PlayerState) {
+      if (!Neighbor || Neighbor->OwningPlayer != InPlayerState) {
         continue;
       }
 
@@ -1410,7 +1410,7 @@ bool ASkaldAIController::TryMoveTowardsNearestEnemy(AFighterPawn *Fighter) {
     Frontier.Sort(FrontierComparator);
 
     const FAIMovementFrontierNode Node = Frontier[0];
-    Frontier.RemoveAt(0, 1, /*bAllowShrinking*/ false);
+    Frontier.RemoveAt(0, 1, EAllowShrinking::No);
 
     const FIntPoint Cell = Node.Cell;
     const int32 DistanceFromStart = Node.PathCost;
