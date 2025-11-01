@@ -190,6 +190,9 @@ public:
   UFUNCTION(BlueprintCallable, Category = "WorldMap")
   int32 AutoPlaceUnitsForAI(ASkaldPlayerState *PlayerState);
 
+  /** Distribute any unplaced units once the placement phase ends. */
+  int32 DistributeUnplacedArmyPlacementUnits(ASkaldPlayerState *PlayerState);
+
 protected:
   /** Whether the overworld should currently be visible and interactive. */
   UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "WorldMap")

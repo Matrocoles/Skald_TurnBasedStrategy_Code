@@ -1,4 +1,5 @@
 #include "WorldMap.h"
+#include "Algo/RandomShuffle.h"
 #include "Algo/Reverse.h"
 #include "Components/ActorComponent.h"
 #include "Components/AudioComponent.h"
@@ -15,6 +16,8 @@
 #include "SkaldLogging.h"
 #include "Skald_GameMode.h"
 #include "Skald_PlayerState.h"
+#include "Math/NumericLimits.h"
+#include "Math/UnrealMathUtility.h"
 #include "Templates/Function.h"
 #include "Territory.h"
 #include "UObject/ConstructorHelpers.h"
@@ -677,21 +680,170 @@ int32 AWorldMap::AutoPlaceUnitsForAI(ASkaldPlayerState *PlayerState) {
   int32 UnitsPlaced = 0;
   int32 Remaining = PlayerState->DeployableUnits;
   int32 Index = 0;
+  int32 ConsecutiveSkips = 0;
+
+  const int32 MaxPerTerritory = Skald::ArmyPlacement::DeployPerTerritoryLimit;
 
   while (Remaining > 0 && OwnedTerritories.Num() > 0) {
     ATerritory *Target = OwnedTerritories[Index % OwnedTerritories.Num()];
     if (!Target) {
       ++Index;
+      ++ConsecutiveSkips;
+      if (ConsecutiveSkips >= OwnedTerritories.Num()) {
+        break;
+      }
       continue;
     }
+
+    const int32 TerritoryId = Target->GetTerritoryId();
+    const int32 AlreadyPlaced =
+        PlayerState->GetArmyPlacementDeploymentForTerritory(TerritoryId);
+    if (AlreadyPlaced >= MaxPerTerritory) {
+      ++Index;
+      ++ConsecutiveSkips;
+      if (ConsecutiveSkips >= OwnedTerritories.Num()) {
+        break;
+      }
+      continue;
+    }
+
+    ConsecutiveSkips = 0;
 
     ++Target->ArmyUnits;
     Target->RefreshAppearance();
     ++UnitsPlaced;
     --Remaining;
+    PlayerState->AddArmyPlacementDeployment(TerritoryId, 1);
     ++Index;
   }
 
   PlayerState->DeployableUnits = Remaining;
+  return UnitsPlaced;
+}
+
+int32 AWorldMap::DistributeUnplacedArmyPlacementUnits(
+    ASkaldPlayerState *PlayerState) {
+  if (!PlayerState || PlayerState->DeployableUnits <= 0) {
+    return 0;
+  }
+
+  TArray<ATerritory *> OwnedTerritories;
+  OwnedTerritories.Reserve(Territories.Num());
+  for (ATerritory *Territory : Territories) {
+    if (Territory && Territory->OwningPlayer == PlayerState) {
+      OwnedTerritories.Add(Territory);
+    }
+  }
+
+  if (OwnedTerritories.Num() == 0) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("DistributeUnplacedArmyPlacementUnits: Player %s has no owned territories"),
+           *PlayerState->GetResolvedPlayerName(TEXT("DistributeUnplacedArmyPlacementUnits")));
+    return 0;
+  }
+
+  TMap<ATerritory *, int32> PendingAssignments;
+  PendingAssignments.Reserve(OwnedTerritories.Num());
+  TMap<ATerritory *, int32> ProjectedArmyStrength;
+  ProjectedArmyStrength.Reserve(OwnedTerritories.Num());
+
+  for (ATerritory *Territory : OwnedTerritories) {
+    if (Territory) {
+      ProjectedArmyStrength.Add(Territory, Territory->ArmyUnits);
+    }
+  }
+
+  int32 Remaining = PlayerState->DeployableUnits;
+  int32 UnitsPlaced = 0;
+
+  const bool bHasManualDeployments = PlayerState->HasArmyPlacementDeployments();
+
+  if (!bHasManualDeployments) {
+    TArray<ATerritory *> Shuffled = OwnedTerritories;
+    if (Shuffled.Num() > 1) {
+      Algo::RandomShuffle(Shuffled);
+    }
+
+    const int32 TerritoryCount = Shuffled.Num();
+    const int32 BaseAllocation = TerritoryCount > 0 ? Remaining / TerritoryCount : 0;
+    int32 Remainder = TerritoryCount > 0 ? Remaining % TerritoryCount : 0;
+
+    for (int32 Index = 0; Index < Shuffled.Num() && Remaining > 0; ++Index) {
+      ATerritory *Territory = Shuffled[Index];
+      if (!Territory) {
+        continue;
+      }
+
+      int32 Allocation = BaseAllocation;
+      if (Remainder > 0) {
+        ++Allocation;
+        --Remainder;
+      }
+
+      if (Allocation <= 0) {
+        continue;
+      }
+
+      PendingAssignments.FindOrAdd(Territory) += Allocation;
+      if (int32 *Projected = ProjectedArmyStrength.Find(Territory)) {
+        *Projected += Allocation;
+      }
+      UnitsPlaced += Allocation;
+      Remaining -= Allocation;
+    }
+  } else {
+    while (Remaining > 0) {
+      int32 WeakestStrength = TNumericLimits<int32>::Max();
+      for (const TPair<ATerritory *, int32> &Entry : ProjectedArmyStrength) {
+        if (Entry.Key) {
+          WeakestStrength = FMath::Min(WeakestStrength, Entry.Value);
+        }
+      }
+
+      if (WeakestStrength == TNumericLimits<int32>::Max()) {
+        break;
+      }
+
+      TArray<ATerritory *> Candidates;
+      for (const TPair<ATerritory *, int32> &Entry : ProjectedArmyStrength) {
+        if (Entry.Key && Entry.Value == WeakestStrength) {
+          Candidates.Add(Entry.Key);
+        }
+      }
+
+      if (Candidates.Num() == 0) {
+        break;
+      }
+
+      ATerritory *ChosenTerritory =
+          Candidates[FMath::RandHelper(FMath::Max(Candidates.Num(), 1))];
+
+      PendingAssignments.FindOrAdd(ChosenTerritory) += 1;
+      if (int32 *Projected = ProjectedArmyStrength.Find(ChosenTerritory)) {
+        ++(*Projected);
+      }
+
+      ++UnitsPlaced;
+      --Remaining;
+    }
+  }
+
+  if (UnitsPlaced <= 0) {
+    return 0;
+  }
+
+  for (const TPair<ATerritory *, int32> &Assignment : PendingAssignments) {
+    ATerritory *Territory = Assignment.Key;
+    if (!Territory) {
+      continue;
+    }
+
+    Territory->ArmyUnits += Assignment.Value;
+    Territory->RefreshAppearance();
+  }
+
+  Remaining = FMath::Max(Remaining, 0);
+  PlayerState->DeployableUnits = Remaining;
+
   return UnitsPlaced;
 }
