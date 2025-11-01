@@ -728,6 +728,21 @@ protected:
                       FString *OutError);
 
 private:
+  struct FPendingDiceFeedbackState {
+    TWeakObjectPtr<AFighterPawn> Attacker;
+    TWeakObjectPtr<AFighterPawn> Defender;
+    FDiceRollResult Result;
+    int32 NextRevealIndex = 0;
+    int32 SimulatedDefenderHealth = 0;
+    bool bTriggeredDeathFeedback = false;
+    bool bTriggeredHighStakesFeedback = false;
+  };
+
+  FPendingDiceFeedbackState *FindPendingDiceFeedbackState(
+      AFighterPawn *Attacker, AFighterPawn *Defender);
+  void RemovePendingDiceFeedbackState(AFighterPawn *Attacker,
+                                      AFighterPawn *Defender);
+
   bool ValidateMoveRequest(AWorldMap *WorldMap, int32 FromID, int32 ToID,
                            int32 Troops, ATerritory *&OutSource,
                            ATerritory *&OutTarget, FString &OutError) const;
@@ -916,4 +931,7 @@ private:
 
   /** Cached battle manager awaiting presentation completion notification. */
   TWeakObjectPtr<UGridBattleManager> PendingPresentationBattleManager;
+
+  /** Pending dice feedback bookkeeping so FX can align with reveal timings. */
+  TArray<FPendingDiceFeedbackState> PendingDiceFeedbackStates;
 };

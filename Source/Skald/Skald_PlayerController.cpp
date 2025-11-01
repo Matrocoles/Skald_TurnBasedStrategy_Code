@@ -5415,6 +5415,64 @@ void ASkaldPlayerController::SpawnTimedNiagaraSystem(UNiagaraSystem *Effect,
                                     LifetimeSeconds, false);
 }
 
+ASkaldPlayerController::FPendingDiceFeedbackState *
+ASkaldPlayerController::FindPendingDiceFeedbackState(AFighterPawn *Attacker,
+                                                     AFighterPawn *Defender) {
+  for (int32 Index = 0; Index < PendingDiceFeedbackStates.Num();) {
+    FPendingDiceFeedbackState &State = PendingDiceFeedbackStates[Index];
+    AFighterPawn *StateAttacker = State.Attacker.Get();
+    AFighterPawn *StateDefender = State.Defender.Get();
+
+    if (!StateDefender) {
+      PendingDiceFeedbackStates.RemoveAt(Index);
+      continue;
+    }
+
+    const bool bAttackerMatches =
+        (!Attacker && !StateAttacker) || StateAttacker == Attacker ||
+        !StateAttacker;
+    const bool bDefenderMatches =
+        (!Defender && !StateDefender) || StateDefender == Defender;
+    if (bAttackerMatches && bDefenderMatches) {
+      return &State;
+    }
+
+    ++Index;
+  }
+
+  return nullptr;
+}
+
+void ASkaldPlayerController::RemovePendingDiceFeedbackState(
+    AFighterPawn *Attacker, AFighterPawn *Defender) {
+  for (int32 Index = 0; Index < PendingDiceFeedbackStates.Num(); ++Index) {
+    FPendingDiceFeedbackState &State = PendingDiceFeedbackStates[Index];
+    AFighterPawn *StateAttacker = State.Attacker.Get();
+    AFighterPawn *StateDefender = State.Defender.Get();
+    if (!StateDefender) {
+      PendingDiceFeedbackStates.RemoveAt(Index);
+      --Index;
+      continue;
+    }
+
+    const bool bAttackerMatches =
+        (!Attacker && !StateAttacker) || StateAttacker == Attacker ||
+        !StateAttacker;
+    const bool bDefenderMatches =
+        (!Defender && !StateDefender) || StateDefender == Defender;
+
+    if (bAttackerMatches && bDefenderMatches) {
+      PendingDiceFeedbackStates.RemoveAt(Index);
+      return;
+    }
+
+    if (!StateAttacker && !StateDefender) {
+      PendingDiceFeedbackStates.RemoveAt(Index);
+      --Index;
+    }
+  }
+}
+
 void ASkaldPlayerController::TriggerHighStakesCritFeedback(
     AFighterPawn *Attacker, AFighterPawn *Defender,
     const FDiceRollResult &Result) {
@@ -5476,6 +5534,18 @@ void ASkaldPlayerController::HandleAttackResolved(AFighterPawn *Attacker,
                                                   const FDiceRollResult &Result) {
   PlayAttackFeedback(Attacker, Defender, Result);
 
+  if (Defender) {
+    FPendingDiceFeedbackState &FeedbackState =
+        PendingDiceFeedbackStates.AddDefaulted_GetRef();
+    FeedbackState.Attacker = Attacker;
+    FeedbackState.Defender = Defender;
+    FeedbackState.Result = Result;
+    FeedbackState.SimulatedDefenderHealth = Result.StartingHealth;
+    FeedbackState.NextRevealIndex = 0;
+    FeedbackState.bTriggeredDeathFeedback = false;
+    FeedbackState.bTriggeredHighStakesFeedback = false;
+  }
+
   if (!BattleHudWidget) {
     if (MainHUD) {
       MainHUD->QueueDiceResolution(Attacker, Defender, Result);
@@ -5502,18 +5572,42 @@ void ASkaldPlayerController::HandleDiceResolutionComplete(
     Defender->ReleaseHealthDisplayHold();
   }
 
+  FPendingDiceFeedbackState *FeedbackState =
+      Defender ? FindPendingDiceFeedbackState(Attacker, Defender) : nullptr;
+  const bool bHasDiceOutcomes = Result.DiceOutcomes.Num() > 0;
+
   if (Defender && Result.StartingHealth > 0 && Result.EndingHealth <= 0) {
-    TriggerFighterDeathFeedback(Defender);
+    const bool bDeathTriggered =
+        FeedbackState && FeedbackState->bTriggeredDeathFeedback;
+    if (!bHasDiceOutcomes || !bDeathTriggered) {
+      TriggerFighterDeathFeedback(Defender);
+      if (FeedbackState) {
+        FeedbackState->bTriggeredDeathFeedback = true;
+      }
+    }
   }
 
   if (Result.bHighStakesCritical) {
-    TriggerHighStakesCritFeedback(Attacker, Defender, Result);
+    const bool bHighStakesTriggered =
+        FeedbackState && FeedbackState->bTriggeredHighStakesFeedback;
+    if (!bHasDiceOutcomes || !bHighStakesTriggered) {
+      TriggerHighStakesCritFeedback(Attacker, Defender, Result);
 
-    if (UWorld *World = GetWorld()) {
-      if (ASkaldGameState *GameState = World->GetGameState<ASkaldGameState>()) {
-        GameState->RequestTransientSlowdown(0.2f, 0.25f);
+      if (UWorld *World = GetWorld()) {
+        if (ASkaldGameState *GameState =
+                World->GetGameState<ASkaldGameState>()) {
+          GameState->RequestTransientSlowdown(0.2f, 0.25f);
+        }
+      }
+
+      if (FeedbackState) {
+        FeedbackState->bTriggeredHighStakesFeedback = true;
       }
     }
+  }
+
+  if (Defender) {
+    RemovePendingDiceFeedbackState(Attacker, Defender);
   }
 
   if (!BattleHudWidget) {
@@ -5548,6 +5642,46 @@ void ASkaldPlayerController::HandleDiceOutcomeRevealed(
 
   if (Defender && Outcome.bHit) {
     Defender->PlayImpactFlashForDamage(Outcome.Damage);
+  }
+
+  if (Defender) {
+    if (FPendingDiceFeedbackState *FeedbackState =
+            FindPendingDiceFeedbackState(Attacker, Defender)) {
+      const int32 HealthBefore = FeedbackState->SimulatedDefenderHealth;
+      const int32 DamageApplied = Outcome.bHit
+                                      ? FMath::Clamp(Outcome.Damage, 0,
+                                                     FMath::Max(0, HealthBefore))
+                                      : 0;
+      const int32 HealthAfter =
+          FMath::Max(0, HealthBefore - DamageApplied);
+      const bool bOutcomeKillsDefender =
+          HealthBefore > 0 && HealthAfter <= 0;
+
+      if (bOutcomeKillsDefender &&
+          !FeedbackState->bTriggeredDeathFeedback) {
+        TriggerFighterDeathFeedback(Defender);
+        FeedbackState->bTriggeredDeathFeedback = true;
+      }
+
+      if (bOutcomeKillsDefender && Outcome.bCritical &&
+          FeedbackState->Result.bHighStakesCritical &&
+          !FeedbackState->bTriggeredHighStakesFeedback) {
+        TriggerHighStakesCritFeedback(Attacker, Defender,
+                                      FeedbackState->Result);
+
+        if (UWorld *World = GetWorld()) {
+          if (ASkaldGameState *GameState =
+                  World->GetGameState<ASkaldGameState>()) {
+            GameState->RequestTransientSlowdown(0.2f, 0.25f);
+          }
+        }
+
+        FeedbackState->bTriggeredHighStakesFeedback = true;
+      }
+
+      FeedbackState->SimulatedDefenderHealth = HealthAfter;
+      FeedbackState->NextRevealIndex = RevealIndex + 1;
+    }
   }
 
   if (!PlayerCameraManager) {
@@ -5691,6 +5825,7 @@ void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,
   LastBattleTurnSoundRound = INDEX_NONE;
   bLastBattleTurnSoundWasAttacker = false;
   LastBattleTurnSoundAvailableCount = INDEX_NONE;
+  PendingDiceFeedbackStates.Reset();
 
   for (const TWeakObjectPtr<AFighterPawn> &TrackedFighter : ObservedFriendlyFighters) {
     if (AFighterPawn *Fighter = TrackedFighter.Get()) {
