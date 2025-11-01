@@ -2017,8 +2017,10 @@ void USkaldMainHUDWidget::HandleDeployClicked() {
   ActiveDeployWidget =
       CreateWidget<UDeployWidget>(GetWorld(), DeployWidgetClass);
   if (ActiveDeployWidget) {
-    ActiveDeployWidget->SetupDeployment(Territory, PS, this,
-                                        PS->DeployableUnits);
+    const int32 MaxDeployable = bIsArmyPlacement
+                                    ? FMath::Min(10, PS->DeployableUnits)
+                                    : PS->DeployableUnits;
+    ActiveDeployWidget->SetupDeployment(Territory, PS, this, MaxDeployable);
     ActiveDeployWidget->AddToViewport();
     if (APlayerController *FocusPC = GetOwningPlayer()) {
       FocusWidgetUIOnly(FocusPC, ActiveDeployWidget);
