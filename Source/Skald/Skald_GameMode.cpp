@@ -573,7 +573,8 @@ void ASkaldGameMode::PopulateAIPlayers() {
       }
     }
 
-    OrderedRestorations.Sort([](const FS_PlayerData &A, const FS_PlayerData &B) {
+    OrderedRestorations.Sort([](const FS_PlayerData *const &A,
+                                const FS_PlayerData *const &B) {
       auto DesiredIndex = [](const FS_PlayerData &Snapshot) {
         if (Snapshot.DesiredControllerIndex >= 0) {
           return Snapshot.DesiredControllerIndex;
@@ -584,11 +585,13 @@ void ASkaldGameMode::PopulateAIPlayers() {
         return TNumericLimits<int32>::Max();
       };
 
-      const int32 AIndex = DesiredIndex(A);
-      const int32 BIndex = DesiredIndex(B);
+      const int32 AIndex = DesiredIndex(*A);
+      const int32 BIndex = DesiredIndex(*B);
       if (AIndex == BIndex) {
-        const int32 AId = (A.PlayerID > 0) ? A.PlayerID : TNumericLimits<int32>::Max();
-        const int32 BId = (B.PlayerID > 0) ? B.PlayerID : TNumericLimits<int32>::Max();
+        const int32 AId = (A->PlayerID > 0) ? A->PlayerID
+                                            : TNumericLimits<int32>::Max();
+        const int32 BId = (B->PlayerID > 0) ? B->PlayerID
+                                            : TNumericLimits<int32>::Max();
         return AId < BId;
       }
       return AIndex < BIndex;
