@@ -711,9 +711,32 @@ bool ASkaldAIController::ExecuteStrategicAttack(AWorldMap *WorldMap,
         continue;
       }
 
-      const int32 UnitsToSend =
+      int32 UnitsToSend =
           DetermineArmyToSend(CurrentStrategy, SourceUnits, TargetUnits);
       if (UnitsToSend <= 0) {
+        continue;
+      }
+
+      if (bTargetIsCapital) {
+        const int32 MaxMovable = SourceUnits - 1;
+        if (MaxMovable < SkaldConstants::CapitalAttackArmyRequirement) {
+          // Not enough available forces to meet the capital attack requirement.
+          continue;
+        }
+
+        UnitsToSend = FMath::Min(UnitsToSend, MaxMovable);
+        if (UnitsToSend < SkaldConstants::CapitalAttackArmyRequirement) {
+          // The AI cannot commit the required force during the attack phase.
+          continue;
+        }
+
+        if (!SkaldHelpers::MeetsCapitalAttackRequirement(true, UnitsToSend)) {
+          continue;
+        }
+      }
+
+      if (!SkaldHelpers::MeetsCapitalAttackRequirement(bTargetIsCapital,
+                                                       UnitsToSend)) {
         continue;
       }
 
