@@ -531,8 +531,8 @@ void AFighterPawn::RebuildVisualMovementPath(const FVector &Destination) {
 
   VisualMovementPathPoints.Add(Destination);
 
-  for (FVector &Point : VisualMovementPathPoints) {
-    ConformPathPointToGround(Point);
+  for (int32 Index = 1; Index < VisualMovementPathPoints.Num(); ++Index) {
+    ConformPathPointToGround(VisualMovementPathPoints[Index]);
   }
 
   VisualMovementCumulativeDistances.Reserve(VisualMovementPathPoints.Num());
