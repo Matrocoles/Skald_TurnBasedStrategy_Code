@@ -1,5 +1,6 @@
 #include "FighterPawn.h"
 #include "Abilities/SkaldAbilityComponent.h"
+#include "Algo/Reverse.h"
 #include "Blueprint/UserWidget.h"
 #include "CollisionQueryParams.h"
 #include "CollisionShape.h"
@@ -213,6 +214,7 @@ void AFighterPawn::GetLifetimeReplicatedProps(
   DOREPLIFETIME(AFighterPawn, bIsMoving);
   DOREPLIFETIME(AFighterPawn, GridFootprint);
   DOREPLIFETIME(AFighterPawn, CurrentCell);
+  DOREPLIFETIME(AFighterPawn, MovementSourceCell);
   DOREPLIFETIME(AFighterPawn, SpawnFacingYawDelta);
   DOREPLIFETIME(AFighterPawn, MaxHealth);
   DOREPLIFETIME(AFighterPawn, AttackType);
@@ -327,6 +329,8 @@ void AFighterPawn::BeginPlay() {
     }
   }
 
+  MovementSourceCell = CurrentCell;
+
   MovementTargetLocation = GetActorLocation();
 
   // Ensure the configured spawn facing is applied on all clients while
@@ -436,7 +440,213 @@ void AFighterPawn::RebuildVisualMovementPath(const FVector &Destination) {
   const FVector StartLocation = MovementStartLocation;
   VisualMovementPathPoints.Add(StartLocation);
 
-  const bool bCanAttemptAvoidance = bUseVisualObstacleAvoidance &&
+  bool bConstructedFromGridPath = false;
+
+  if (UGridOverlayComponent *Grid = GetGrid()) {
+    FIntPoint StartAnchor = MovementSourceCell;
+    if (!Grid->IsCellInBounds(StartAnchor)) {
+      StartAnchor = Grid->WorldToGrid(StartLocation);
+    }
+
+    FIntPoint TargetAnchor = CurrentCell;
+    if (!Grid->IsCellInBounds(TargetAnchor)) {
+      TargetAnchor = Grid->WorldToGrid(Destination);
+    }
+
+    if (Grid->IsCellInBounds(StartAnchor) && Grid->IsCellInBounds(TargetAnchor) &&
+        StartAnchor != TargetAnchor) {
+      const TArray<FIntPoint> StartFootprint = GetOccupiedCells(StartAnchor);
+      TSet<FIntPoint> IgnoredCells;
+      IgnoredCells.Reserve(StartFootprint.Num());
+      for (const FIntPoint &Cell : StartFootprint) {
+        IgnoredCells.Add(Cell);
+      }
+
+      auto CanOccupyAnchor = [&](const FIntPoint &Anchor) {
+        const bool bIsDestination = Anchor == TargetAnchor;
+        const TArray<FIntPoint> CandidateCells = GetOccupiedCells(Anchor);
+        if (CandidateCells.Num() == 0) {
+          return false;
+        }
+
+        for (const FIntPoint &Cell : CandidateCells) {
+          if (!Grid->IsCellInBounds(Cell) || Grid->IsObscured(Cell)) {
+            return false;
+          }
+
+          const bool bIgnored = IgnoredCells.Contains(Cell);
+          if (!bIgnored && !bIsDestination && Grid->IsOccupied(Cell)) {
+            return false;
+          }
+        }
+
+        return true;
+      };
+
+      auto IsDiagonalStepClear = [&](const FIntPoint &From, const FIntPoint &To) {
+        if (From.X == To.X || From.Y == To.Y) {
+          return true;
+        }
+
+        const TArray<FIntPoint> FromCells = GetOccupiedCells(From);
+        const TArray<FIntPoint> NextCells = GetOccupiedCells(To);
+
+        TSet<FIntPoint> NextCellSet;
+        NextCellSet.Reserve(NextCells.Num());
+        for (const FIntPoint &NextCell : NextCells) {
+          NextCellSet.Add(NextCell);
+        }
+
+        auto IsBlocked = [&](const FIntPoint &CheckCell) {
+          if (!Grid->IsCellInBounds(CheckCell) || Grid->IsObscured(CheckCell)) {
+            return true;
+          }
+
+          if (NextCellSet.Contains(CheckCell) || IgnoredCells.Contains(CheckCell)) {
+            return false;
+          }
+
+          return Grid->IsOccupied(CheckCell);
+        };
+
+        const int32 StepX = FMath::Clamp(To.X - From.X, -1, 1);
+        const int32 StepY = FMath::Clamp(To.Y - From.Y, -1, 1);
+
+        for (const FIntPoint &FromCell : FromCells) {
+          if (IsBlocked(FromCell + FIntPoint(StepX, 0)) ||
+              IsBlocked(FromCell + FIntPoint(0, StepY))) {
+            return false;
+          }
+        }
+
+        return true;
+      };
+
+      struct FVisualPathNode {
+        FIntPoint Cell;
+        int32 Cost;
+      };
+
+      auto FrontierComparator = [](const FVisualPathNode &A,
+                                   const FVisualPathNode &B) {
+        return A.Cost < B.Cost;
+      };
+
+      const int32 EstimatedDistance =
+          FMath::Max(FMath::Abs(TargetAnchor.X - StartAnchor.X),
+                     FMath::Abs(TargetAnchor.Y - StartAnchor.Y));
+      const int32 SearchCostLimit =
+          FMath::Max3(Stats.Movement, EstimatedDistance * 4, 32);
+
+      TArray<FVisualPathNode> Frontier;
+      Frontier.Reserve(32);
+      Frontier.Add({StartAnchor, 0});
+
+      TMap<FIntPoint, int32> BestCost;
+      BestCost.Reserve(32);
+      BestCost.Add(StartAnchor, 0);
+
+      TMap<FIntPoint, FIntPoint> CameFrom;
+      CameFrom.Reserve(32);
+      CameFrom.Add(StartAnchor, StartAnchor);
+
+      static const FIntPoint Directions[] = {
+          FIntPoint(1, 0),  FIntPoint(-1, 0), FIntPoint(0, 1),  FIntPoint(0, -1),
+          FIntPoint(1, 1),  FIntPoint(1, -1), FIntPoint(-1, 1), FIntPoint(-1, -1)};
+
+      bool bFoundPath = false;
+
+      while (Frontier.Num() > 0) {
+        Frontier.Sort(FrontierComparator);
+
+        const FVisualPathNode Node = Frontier[0];
+        Frontier.RemoveAt(0, 1, /*bAllowShrinking*/ false);
+
+        const FIntPoint Cell = Node.Cell;
+        const int32 DistanceFromStart = Node.Cost;
+
+        const int32 *RecordedCost = BestCost.Find(Cell);
+        if (!RecordedCost || DistanceFromStart > *RecordedCost) {
+          continue;
+        }
+
+        if (Cell == TargetAnchor) {
+          bFoundPath = true;
+          break;
+        }
+
+        for (const FIntPoint &Dir : Directions) {
+          const FIntPoint Next = Cell + Dir;
+
+          if (!CanOccupyAnchor(Next)) {
+            continue;
+          }
+
+          if (!IsDiagonalStepClear(Cell, Next)) {
+            continue;
+          }
+
+          const int32 StepCost =
+              DistanceFromStart +
+              FMath::Max(1, GetMovementStepCost(Cell, Next, Grid));
+          if (StepCost > SearchCostLimit) {
+            continue;
+          }
+
+          const int32 *ExistingCost = BestCost.Find(Next);
+          if (ExistingCost && StepCost >= *ExistingCost) {
+            continue;
+          }
+
+          BestCost.Add(Next, StepCost);
+          CameFrom.Add(Next, Cell);
+          Frontier.Add({Next, StepCost});
+        }
+      }
+
+      if (bFoundPath) {
+        TArray<FIntPoint> PathAnchors;
+        PathAnchors.Reserve(16);
+
+        FIntPoint Step = TargetAnchor;
+        PathAnchors.Add(Step);
+
+        while (Step != StartAnchor) {
+          const FIntPoint *Previous = CameFrom.Find(Step);
+          if (!Previous || *Previous == Step) {
+            bFoundPath = false;
+            break;
+          }
+
+          Step = *Previous;
+          PathAnchors.Add(Step);
+        }
+
+        if (bFoundPath && PathAnchors.Num() > 1) {
+          Algo::Reverse(PathAnchors);
+
+          for (int32 Index = 1; Index < PathAnchors.Num(); ++Index) {
+            const bool bIsFinalAnchor = Index == PathAnchors.Num() - 1;
+            const FVector AnchorLocation =
+                GetAlignedWorldLocation(PathAnchors[Index]);
+
+            if (bIsFinalAnchor) {
+              if (!AnchorLocation.Equals(Destination, KINDA_SMALL_NUMBER)) {
+                VisualMovementPathPoints.Add(AnchorLocation);
+              }
+            } else {
+              VisualMovementPathPoints.Add(AnchorLocation);
+            }
+          }
+
+          bConstructedFromGridPath = true;
+        }
+      }
+    }
+  }
+
+  const bool bCanAttemptAvoidance = !bConstructedFromGridPath &&
+                                    bUseVisualObstacleAvoidance &&
                                     VisualAvoidanceProbeRadius > KINDA_SMALL_NUMBER &&
                                     MovementStraightLineDistance > KINDA_SMALL_NUMBER;
 
@@ -1508,6 +1718,7 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
     }
   }
 
+  MovementSourceCell = PreviousCell;
   CurrentCell = TargetCell;
   FVector NewLocation = Grid ? GetAlignedWorldLocation(TargetCell)
                              : GetActorLocation();
@@ -1612,6 +1823,7 @@ bool AFighterPawn::TryTeleportToCell(FIntPoint TargetCell, int32 MaxDistance,
   }
 
   CurrentCell = TargetCell;
+  MovementSourceCell = TargetCell;
   const FVector NewLocation = GetAlignedWorldLocation(TargetCell);
   MovementTargetLocation = NewLocation;
   SetActorLocation(NewLocation);
@@ -2173,6 +2385,7 @@ void AFighterPawn::Destroyed() {
     }
   }
   CurrentCell = FIntPoint::ZeroValue;
+  MovementSourceCell = FIntPoint::ZeroValue;
   Super::Destroyed();
 }
 
