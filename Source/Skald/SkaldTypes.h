@@ -339,6 +339,15 @@ struct SKALD_API FS_PlayerData
     FString PlayerName;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    FString DisplayName;
+
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    int32 DesiredControllerIndex = INDEX_NONE;
+
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    int32 DesiredTurnIndex = INDEX_NONE;
+
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
     bool IsAI = false;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
