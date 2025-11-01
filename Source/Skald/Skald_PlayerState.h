@@ -6,6 +6,14 @@
 #include "SkaldTypes.h"
 #include "Skald_PlayerState.generated.h"
 
+namespace Skald {
+namespace ArmyPlacement {
+/** Maximum number of deployable units allowed per territory during army
+ * placement. */
+static constexpr int32 DeployPerTerritoryLimit = 10;
+} // namespace ArmyPlacement
+} // namespace Skald
+
 /**
  * Player state containing basic information for turn management.
  */
@@ -88,4 +96,21 @@ public:
 
   virtual void GetLifetimeReplicatedProps(
       TArray<FLifetimeProperty> &OutLifetimeProps) const override;
+
+  /** Clears per-territory deployment tracking for the army placement phase. */
+  void ResetArmyPlacementDeployments();
+
+  /** Records an additional deployment to the specified territory. */
+  void AddArmyPlacementDeployment(int32 TerritoryId, int32 Amount);
+
+  /** Retrieves the number of units deployed to the territory this phase. */
+  int32 GetArmyPlacementDeploymentForTerritory(int32 TerritoryId) const;
+
+  /** Returns true if any deployments were recorded during the current phase. */
+  bool HasArmyPlacementDeployments() const;
+
+private:
+  /** Tracks deployments per territory during the army placement phase. */
+  UPROPERTY()
+  TMap<int32, int32> ArmyPlacementDeployments;
 };

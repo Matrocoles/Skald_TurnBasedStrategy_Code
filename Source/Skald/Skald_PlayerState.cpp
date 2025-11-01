@@ -117,4 +117,37 @@ void ASkaldPlayerState::OnRep_PlayerId() {
       GS->OnPlayersUpdated.Broadcast();
     }
   }
+
+void ASkaldPlayerState::ResetArmyPlacementDeployments() {
+  ArmyPlacementDeployments.Reset();
+}
+
+void ASkaldPlayerState::AddArmyPlacementDeployment(int32 TerritoryId,
+                                                   int32 Amount) {
+  if (Amount <= 0 || TerritoryId == INDEX_NONE) {
+    return;
+  }
+
+  int32 &Value = ArmyPlacementDeployments.FindOrAdd(TerritoryId);
+  Value += Amount;
+}
+
+int32 ASkaldPlayerState::GetArmyPlacementDeploymentForTerritory(
+    int32 TerritoryId) const {
+  if (TerritoryId == INDEX_NONE) {
+    return 0;
+  }
+
+  const int32 *Found = ArmyPlacementDeployments.Find(TerritoryId);
+  return Found ? *Found : 0;
+}
+
+bool ASkaldPlayerState::HasArmyPlacementDeployments() const {
+  for (const TPair<int32, int32> &Entry : ArmyPlacementDeployments) {
+    if (Entry.Value > 0) {
+      return true;
+    }
+  }
+
+  return false;
 }

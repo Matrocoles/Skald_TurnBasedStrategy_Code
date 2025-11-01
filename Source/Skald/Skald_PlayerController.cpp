@@ -2696,7 +2696,9 @@ void ASkaldPlayerController::HandleEndPhaseInternal() {
   ETurnPhase Phase = TurnManager->GetCurrentPhase();
   if (Phase == ETurnPhase::ArmyPlacement) {
     if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
-      PS->DeployableUnits = 0;
+      if (PS->DeployableUnits < 0) {
+        PS->DeployableUnits = 0;
+      }
       TurnManager->BroadcastDeployableUnits(PS);
     }
   }
@@ -3195,10 +3197,36 @@ void ASkaldPlayerController::ServerDeployUnits_Implementation(int32 TerritoryID,
     return;
   }
 
+  const int32 TerritoryId = Terr->GetTerritoryId();
+  if (bIsArmyPlacementPhase) {
+    const int32 AlreadyPlaced =
+        PS->GetArmyPlacementDeploymentForTerritory(TerritoryId);
+    const int32 MaxPerTerritory = Skald::ArmyPlacement::DeployPerTerritoryLimit;
+    if (AlreadyPlaced >= MaxPerTerritory) {
+      UE_LOG(LogSkald, Warning,
+             TEXT("ServerDeployUnits: Territory %d already reached placement limit"),
+             TerritoryID);
+      NotifyActionError(TEXT("This territory has already received the maximum deployments this phase"));
+      return;
+    }
+
+    if (AlreadyPlaced + Amount > MaxPerTerritory) {
+      UE_LOG(LogSkald, Warning,
+             TEXT("ServerDeployUnits: Placement exceeds limit. Territory=%d Current=%d Requested=%d"),
+             TerritoryID, AlreadyPlaced, Amount);
+      NotifyActionError(TEXT("You may only deploy up to 10 units to a territory during army placement"));
+      return;
+    }
+  }
+
   Terr->ArmyUnits += Amount;
   Terr->RefreshAppearance();
 
   PS->DeployableUnits -= Amount;
+
+  if (bIsArmyPlacementPhase) {
+    PS->AddArmyPlacementDeployment(TerritoryId, Amount);
+  }
 
   if (TurnManager) {
     TurnManager->BroadcastDeployableUnits(PS);

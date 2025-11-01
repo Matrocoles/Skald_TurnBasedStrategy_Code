@@ -783,6 +783,16 @@ void ATurnManager::StartArmyPlacementPhase() {
   CurrentPhase = ETurnPhase::ArmyPlacement;
   CurrentIndex = 0;
   bHasTurnsStarted = false;
+
+  for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr :
+       Controllers) {
+    if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
+      if (ASkaldPlayerState *PS = Controller->GetPlayerState<ASkaldPlayerState>()) {
+        PS->ResetArmyPlacementDeployments();
+      }
+    }
+  }
+
   BroadcastCurrentPhase();
 }
 
@@ -3110,15 +3120,35 @@ void ATurnManager::EndCurrentPhase() {
 
   if (bArmyPlacement) {
     bool bBlockAdvance = false;
+    ASkaldPlayerState *ActivePS = nullptr;
     if (ASkaldGameState *GS = GetWorld()->GetGameState<ASkaldGameState>()) {
       if (GS->PlayerArray.IsValidIndex(GS->CurrentTurnIndex)) {
-        if (ASkaldPlayerState *ActivePS =
-                Cast<ASkaldPlayerState>(GS->PlayerArray[GS->CurrentTurnIndex])) {
-          if (!ActivePS->bIsAI && ActivePS->DeployableUnits > 0) {
+        ActivePS = Cast<ASkaldPlayerState>(GS->PlayerArray[GS->CurrentTurnIndex]);
+        if (ActivePS && !ActivePS->bIsAI && ActivePS->DeployableUnits > 0) {
+          bool bCanPlaceMore = false;
+          if (AWorldMap *WorldMap = ResolveWorldMap()) {
+            for (ATerritory *Terr : WorldMap->Territories) {
+              if (Terr && Terr->OwningPlayer == ActivePS) {
+                const int32 TerritoryId = Terr->GetTerritoryId();
+                const int32 AlreadyPlaced =
+                    ActivePS->GetArmyPlacementDeploymentForTerritory(TerritoryId);
+                if (AlreadyPlaced < Skald::ArmyPlacement::DeployPerTerritoryLimit) {
+                  bCanPlaceMore = true;
+                  break;
+                }
+              }
+            }
+          }
+
+          if (bCanPlaceMore) {
             bBlockAdvance = true;
             UE_LOG(LogSkald, Verbose,
                    TEXT("EndCurrentPhase blocked: Human player %s still has %d units to place."),
                    *ActivePS->GetResolvedPlayerName(TEXT("EndCurrentPhase_ArmyPlacement")),
+                   ActivePS->DeployableUnits);
+          } else {
+            UE_LOG(LogSkald, Verbose,
+                   TEXT("EndCurrentPhase: Allowing advance despite %d unplaced units due to per-territory placement cap."),
                    ActivePS->DeployableUnits);
           }
         }
@@ -3127,6 +3157,16 @@ void ATurnManager::EndCurrentPhase() {
 
     if (bBlockAdvance) {
       return;
+    }
+
+    if (ActivePS && ActivePS->DeployableUnits > 0) {
+      if (AWorldMap *WorldMap = ResolveWorldMap()) {
+        const int32 Distributed =
+            WorldMap->DistributeUnplacedArmyPlacementUnits(ActivePS);
+        if (Distributed > 0) {
+          BroadcastDeployableUnits(ActivePS);
+        }
+      }
     }
 
     if (ASkaldGameMode *GM = GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {

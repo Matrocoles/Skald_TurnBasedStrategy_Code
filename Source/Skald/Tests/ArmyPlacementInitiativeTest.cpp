@@ -180,14 +180,29 @@ bool FArmyPlacementInitiativeOrderTest::RunTest(const FString &Parameters) {
   TestEqual(TEXT("Army placement begins with initiative winner"), GameState->CurrentTurnIndex,
             IndexA);
 
-  ControllerA->ServerDeployUnits(TerritoryA->TerritoryID, 40);
-  TestEqual(TEXT("PlayerA spent units"), StateA->DeployableUnits, 0);
+  ControllerA->ServerDeployUnits(TerritoryA->TerritoryID, 10);
+  TestEqual(TEXT("PlayerA limited deployment"), StateA->DeployableUnits, 30);
+  TestEqual(TEXT("PlayerA territory reinforced"), TerritoryA->ArmyUnits, 11);
+
+  ControllerA->ServerDeployUnits(TerritoryA->TerritoryID, 5);
+  TestEqual(TEXT("PlayerA cannot exceed placement cap"), StateA->DeployableUnits, 30);
+
   ControllerA->EndPhase();
+  TestEqual(TEXT("PlayerA leftover units automatically placed"),
+            StateA->DeployableUnits, 0);
+  TestEqual(TEXT("PlayerA territory received remaining units"), TerritoryA->ArmyUnits, 41);
   TestEqual(TEXT("Second player receives placement turn"), GameState->CurrentTurnIndex, IndexB);
 
-  ControllerB->ServerDeployUnits(TerritoryB->TerritoryID, 40);
-  TestEqual(TEXT("PlayerB spent units"), StateB->DeployableUnits, 0);
+  ControllerB->ServerDeployUnits(TerritoryB->TerritoryID, 10);
+  TestEqual(TEXT("PlayerB limited deployment"), StateB->DeployableUnits, 30);
+  TestEqual(TEXT("PlayerB territory reinforced"), TerritoryB->ArmyUnits, 11);
+
+  ControllerB->ServerDeployUnits(TerritoryB->TerritoryID, 5);
+  TestEqual(TEXT("PlayerB cannot exceed placement cap"), StateB->DeployableUnits, 30);
   ControllerB->EndPhase();
+  TestEqual(TEXT("PlayerB leftover units automatically placed"),
+            StateB->DeployableUnits, 0);
+  TestEqual(TEXT("PlayerB territory received remaining units"), TerritoryB->ArmyUnits, 41);
 
   TestEqual(TEXT("Turn advanced to reinforcement"), TurnManager->GetCurrentPhase(),
             ETurnPhase::Reinforcement);
@@ -198,6 +213,13 @@ bool FArmyPlacementInitiativeOrderTest::RunTest(const FString &Parameters) {
   TestEqual(TEXT("Initiative winner starts main turn"), CurrentIndex, ExpectedIndex);
   TestEqual(TEXT("GameState turn index reset to initiative winner"), GameState->CurrentTurnIndex,
             IndexA);
+
+  StateA->DeployableUnits = 5;
+  TurnManager->BroadcastDeployableUnits(StateA);
+  ControllerA->ServerDeployUnits(TerritoryA->TerritoryID, 5);
+  TestEqual(TEXT("Placement cap lifted after army phase"), StateA->DeployableUnits, 0);
+  TestEqual(TEXT("Territory can exceed ten units during reinforcement"),
+            TerritoryA->ArmyUnits, 46);
 
   return true;
 }
@@ -276,13 +298,20 @@ bool FAIArmyPlacementAutoAdvanceTest::RunTest(const FString &Parameters) {
 
   const int32 HumanIndex = GameState->PlayerArray.IndexOfByKey(HumanState);
   TestTrue(TEXT("Human player index valid"), HumanIndex != INDEX_NONE);
-  TestEqual(TEXT("AI spent deployable units"), AIState->DeployableUnits, 0);
-  TestEqual(TEXT("AI territory reinforced"), TerritoryAI->ArmyUnits, 41);
+  TestEqual(TEXT("AI leftover units automatically placed"), AIState->DeployableUnits, 0);
+  TestEqual(TEXT("AI territory received remaining units"), TerritoryAI->ArmyUnits, 41);
   TestEqual(TEXT("Human player's placement turn"), GameState->CurrentTurnIndex, HumanIndex);
 
-  HumanController->ServerDeployUnits(TerritoryHuman->TerritoryID, 40);
-  TestEqual(TEXT("Human spent deployable units"), HumanState->DeployableUnits, 0);
+  HumanController->ServerDeployUnits(TerritoryHuman->TerritoryID, 10);
+  TestEqual(TEXT("Human limited deployment"), HumanState->DeployableUnits, 30);
+  TestEqual(TEXT("Human territory reinforced"), TerritoryHuman->ArmyUnits, 11);
+
+  HumanController->ServerDeployUnits(TerritoryHuman->TerritoryID, 5);
+  TestEqual(TEXT("Human cannot exceed placement cap"), HumanState->DeployableUnits, 30);
   HumanController->EndPhase();
+
+  TestEqual(TEXT("Human leftover units automatically placed"), HumanState->DeployableUnits, 0);
+  TestEqual(TEXT("Human territory received remaining units"), TerritoryHuman->ArmyUnits, 41);
 
   TestEqual(TEXT("Main turn advanced to reinforcement"), TurnManager->GetCurrentPhase(),
             ETurnPhase::Reinforcement);
@@ -387,8 +416,20 @@ bool FAIArmyPlacementFailsafeRespectsHumanTest::RunTest(
   TestEqual(TEXT("Human still has units to place"), HumanState->DeployableUnits,
             40);
 
-  HumanController->ServerDeployUnits(TerritoryHuman->TerritoryID, 40);
+  HumanController->ServerDeployUnits(TerritoryHuman->TerritoryID, 10);
+  TestEqual(TEXT("Human limited deployment"), HumanState->DeployableUnits, 30);
+  TestEqual(TEXT("Human territory reinforced after failsafe"), TerritoryHuman->ArmyUnits, 11);
+
+  HumanController->ServerDeployUnits(TerritoryHuman->TerritoryID, 5);
+  TestEqual(TEXT("Human cannot exceed placement cap after failsafe"),
+            HumanState->DeployableUnits, 30);
+
   HumanController->EndPhase();
+
+  TestEqual(TEXT("Human leftover units automatically placed after failsafe"),
+            HumanState->DeployableUnits, 0);
+  TestEqual(TEXT("Human territory received remaining units after failsafe"),
+            TerritoryHuman->ArmyUnits, 41);
 
   TestEqual(TEXT("Turns advance after human finishes"),
             TurnManager->GetCurrentPhase(), ETurnPhase::Reinforcement);
