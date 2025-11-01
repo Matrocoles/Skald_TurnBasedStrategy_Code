@@ -60,6 +60,7 @@ private:
   void QueueActivationIntent(AFighterPawn *Fighter,
                              EAIBattleActivationIntent Intent);
   void ProcessQueuedActivationIntent();
+  void ScheduleMovementCompletionPoll();
   void HandleQueuedAttackFinalized();
   void ClearActivationTimers();
   void ScheduleNextActivationAttempt();
@@ -141,7 +142,13 @@ private:
   /** True while waiting for an async attack sequence to resolve. */
   bool bAwaitingQueuedAttackResolution = false;
 
+  /** True while waiting for a fighter's move animation to complete. */
+  bool bAwaitingMovementCompletion = false;
+
   /** Safety counter preventing infinite activation loops. */
   int32 ActivationIntentIterationCount = 0;
+
+  /** Polling interval used while waiting for movement completion visuals. */
+  static constexpr float MovementCompletionPollInterval = 0.1f;
 };
 
