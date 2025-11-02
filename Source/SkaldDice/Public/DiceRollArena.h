@@ -8,6 +8,7 @@ class UBoxComponent;
 class USceneComponent;
 class UPointLightComponent;
 class UDecalComponent;
+class UStaticMeshComponent;
 class UDiceRollConfig;
 
 UCLASS()
@@ -32,4 +33,7 @@ protected:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Dice")
     TObjectPtr<UDecalComponent> FloorVisual;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Dice")
+    TObjectPtr<UStaticMeshComponent> FloorMesh;
 };

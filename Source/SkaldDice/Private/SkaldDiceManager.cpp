@@ -255,19 +255,28 @@ void USkaldDiceManager::BroadcastInterim(FGuid RollId)
 
 bool USkaldDiceManager::SpawnPhysicalRoll(FActiveRoll& Roll, const TArray<int32>* PlayerResults, const TArray<int32>* EnemyResults)
 {
-    if (!Config || Config->bUseSpriteOnly)
+    if (!Config)
     {
+        UE_LOG(LogSkaldDice, Verbose, TEXT("SpawnPhysicalRoll aborted: no dice roll config available."));
+        return false;
+    }
+
+    if (Config->bUseSpriteOnly)
+    {
+        UE_LOG(LogSkaldDice, Verbose, TEXT("SpawnPhysicalRoll aborted: active config '%s' is set to sprite-only."), *GetNameSafe(Config));
         return false;
     }
 
     if (!Config->ArenaClass || (!Config->PlayerDiceClass && !Config->EnemyDiceClass))
     {
+        UE_LOG(LogSkaldDice, Warning, TEXT("SpawnPhysicalRoll aborted: config '%s' is missing an arena class or dice class."), *GetNameSafe(Config));
         return false;
     }
 
     UWorld* World = GetWorld();
     if (!World)
     {
+        UE_LOG(LogSkaldDice, Error, TEXT("SpawnPhysicalRoll aborted: subsystem has no valid world."));
         return false;
     }
 
@@ -282,6 +291,7 @@ bool USkaldDiceManager::SpawnPhysicalRoll(FActiveRoll& Roll, const TArray<int32>
     ADiceRollArena* Arena = World->SpawnActorDeferred<ADiceRollArena>(Config->ArenaClass, ArenaTransform);
     if (!Arena)
     {
+        UE_LOG(LogSkaldDice, Warning, TEXT("SpawnPhysicalRoll aborted: failed to spawn arena of class %s."), *GetNameSafe(*Config->ArenaClass));
         return false;
     }
 
@@ -293,6 +303,14 @@ bool USkaldDiceManager::SpawnPhysicalRoll(FActiveRoll& Roll, const TArray<int32>
     const FVector Extent = Config->ArenaBounds.GetExtent();
     const float SpawnSpread = FMath::Max(Config->SpawnSpread, 10.f);
     const float HeightOffset = FMath::Max(Config->SpawnHeightOffset, 30.f);
+    const float FloorZ = ArenaCenter.Z - Extent.Z;
+    const float CeilingZ = ArenaCenter.Z + Extent.Z;
+    const float MinSpawnZ = FloorZ + 10.f;
+    float MaxSpawnZ = CeilingZ - 10.f;
+    if (MaxSpawnZ <= MinSpawnZ)
+    {
+        MaxSpawnZ = MinSpawnZ + 1.f;
+    }
 
     Roll.Dice.Reset();
 
@@ -319,7 +337,12 @@ bool USkaldDiceManager::SpawnPhysicalRoll(FActiveRoll& Roll, const TArray<int32>
             FVector SpawnPosition = ArenaCenter;
             SpawnPosition.X += FMath::FRandRange(-SpawnSpread, SpawnSpread);
             SpawnPosition.Y += FMath::FRandRange(-SpawnSpread, SpawnSpread);
-            SpawnPosition.Z = ArenaCenter.Z + Extent.Z + HeightOffset;
+
+            const float DesiredHeight = FloorZ + HeightOffset;
+            const float RandomVariance = FMath::FRandRange(-HeightOffset * 0.25f, HeightOffset * 0.25f);
+            float SpawnZ = DesiredHeight + RandomVariance;
+            SpawnZ = FMath::Clamp(SpawnZ, MinSpawnZ, MaxSpawnZ);
+            SpawnPosition.Z = SpawnZ;
 
             const FRotator SpawnRotation(0.f, FMath::FRandRange(0.f, 360.f), 0.f);
 
@@ -330,6 +353,7 @@ bool USkaldDiceManager::SpawnPhysicalRoll(FActiveRoll& Roll, const TArray<int32>
             ASkaldDiceD6* Dice = World->SpawnActorDeferred<ASkaldDiceD6>(DiceClass, FTransform(SpawnRotation, SpawnPosition));
             if (!Dice)
             {
+                UE_LOG(LogSkaldDice, Warning, TEXT("SpawnPhysicalRoll: failed to spawn dice of class %s."), *GetNameSafe(*DiceClass));
                 continue;
             }
 
@@ -366,6 +390,7 @@ bool USkaldDiceManager::SpawnPhysicalRoll(FActiveRoll& Roll, const TArray<int32>
     const bool bSpawnedAll = Roll.Dice.Num() == Roll.TotalDice;
     if (!bSpawnedAll)
     {
+        UE_LOG(LogSkaldDice, Warning, TEXT("SpawnPhysicalRoll aborted: spawned %d of %d dice, cleaning up."), Roll.Dice.Num(), Roll.TotalDice);
         for (FActiveRoll::FDieState& DieState : Roll.Dice)
         {
             if (ASkaldDiceD6* Dice = DieState.Actor.Get())
