@@ -72,7 +72,8 @@ void ASkaldDiceD6::ApplyTint(const FLinearColor& Tint, FName TintParameterName)
     }
     else
     {
-        DiceMesh->SetVectorParameterValueOnMaterials(TEXT("TintColor"), Tint);
+        const FVector TintVector(Tint.R, Tint.G, Tint.B);
+        DiceMesh->SetVectorParameterValueOnMaterials(TEXT("TintColor"), TintVector);
     }
 }
 
