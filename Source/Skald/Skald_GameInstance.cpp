@@ -31,6 +31,8 @@
 #include "Widgets/Text/STextBlock.h"
 #include "Territory.h"
 #include "WorldMap.h"
+#include "SkaldDiceManager.h"
+#include "DiceRollConfig.h"
 
 using Skald::PropertyAccess::ReadBoolProperty;
 using Skald::PropertyAccess::ReadIntProperty;
@@ -74,6 +76,10 @@ void USkaldGameInstance::Init() {
   if (GEngine) {
     GEngine->OnNetworkFailure().AddUObject(
         this, &USkaldGameInstance::HandleNetworkFailure);
+  }
+
+  if (bAutoInitialiseDiceSubsystem) {
+    InitialiseDiceManager();
   }
 }
 
@@ -892,6 +898,40 @@ void USkaldGameInstance::SetBattleMapActive(bool bInBattleMap) {
 
 void USkaldGameInstance::SeedCombatRandomStream(int32 Seed) {
   CombatRandomStream.Initialize(Seed);
+}
+
+void USkaldGameInstance::ApplyDiceRollConfig() {
+  InitialiseDiceManager();
+}
+
+void USkaldGameInstance::InitialiseDiceManager() {
+  USkaldDiceManager *DiceManager = GetSubsystem<USkaldDiceManager>();
+  if (!DiceManager) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("Dice subsystem unavailable during game instance init."));
+    return;
+  }
+
+  if (DefaultDiceRollConfig.IsNull()) {
+    DiceManager->SetConfig(nullptr);
+    LoadedDiceRollConfig = nullptr;
+    return;
+  }
+
+  if (!DefaultDiceRollConfig.IsValid()) {
+    LoadedDiceRollConfig = DefaultDiceRollConfig.LoadSynchronous();
+  } else {
+    LoadedDiceRollConfig = DefaultDiceRollConfig.Get();
+  }
+
+  if (!LoadedDiceRollConfig) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("Failed to load dice roll config '%s'"),
+           *DefaultDiceRollConfig.ToString());
+    return;
+  }
+
+  DiceManager->SetConfig(LoadedDiceRollConfig);
 }
 
 void USkaldGameInstance::ShowDeployWidget() {

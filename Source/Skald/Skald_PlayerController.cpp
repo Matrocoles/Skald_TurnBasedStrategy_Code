@@ -34,6 +34,9 @@
 #include "Skald_TurnManager.h"
 #include "Territory.h"
 #include "TimerManager.h"
+#include "SkaldDiceManager.h"
+#include "SkaldDiceOverlayWidget.h"
+#include "SkaldDiceResultWidget.h"
 #include "UI/BattleHUDWidget.h"
 #include "UI/BattleResultWidget.h"
 #include "UI/FighterSelectionWidget.h"
@@ -1211,6 +1214,8 @@ void ASkaldPlayerController::InitializeHUDWidget() {
   MainHUD->SetIsFocusable(true);
   MainHUD->SetVisibility(ESlateVisibility::Hidden);
 
+  EnsureDiceWidgets();
+
   if (CachedGameState) {
     TArray<FS_PlayerData> Players;
     BuildPlayerDataArray(Players);
@@ -1457,6 +1462,20 @@ void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
   if (BattleHudWidget) {
     BattleHudWidget->RemoveFromParent();
     BattleHudWidget = nullptr;
+  }
+
+  if (DiceOverlayWidget) {
+    DiceOverlayWidget->RemoveFromParent();
+    DiceOverlayWidget = nullptr;
+  }
+
+  if (DiceResultWidget) {
+    DiceResultWidget->RemoveFromParent();
+    DiceResultWidget = nullptr;
+  }
+
+  if (UWorld *TimerWorld = GetWorld()) {
+    TimerWorld->GetTimerManager().ClearTimer(InitiativeResultHideTimer);
   }
 
   for (const TWeakObjectPtr<AFighterPawn> &TrackedFighter : ObservedFriendlyFighters) {
@@ -2037,6 +2056,8 @@ void ASkaldPlayerController::InitializeBattleHUD() {
       BattleHudWidget->SetEndTurnEnabled(false);
     }
   }
+
+  EnsureDiceWidgets();
 
   USkaldGameInstance *GI = CachedGameInstance;
   if (!GI) {
@@ -4450,6 +4471,22 @@ void ASkaldPlayerController::HandleInitiativeRollCompleted(
 
   BattleHudWidget->HideInitiativePrompt();
 
+  bool bShouldTriggerPresentation = true;
+  if (bInitiativeRollTriggeredLocally &&
+      LastLocalInitiativeAttacker == AttackerRoll &&
+      LastLocalInitiativeDefender == DefenderRoll) {
+    bShouldTriggerPresentation = false;
+  }
+
+  if (bShouldTriggerPresentation) {
+    ActiveLocalInitiativeRollId = TriggerInitiativeDicePresentation(AttackerRoll, DefenderRoll);
+  }
+
+  bInitiativeRollTriggeredLocally = false;
+  LastLocalInitiativeAttacker = INDEX_NONE;
+  LastLocalInitiativeDefender = INDEX_NONE;
+  ActiveLocalInitiativeRollId.Invalidate();
+
   DetermineControlledBattleSide();
 
   USkaldGameInstance *GI = CachedGameInstance;
@@ -4519,6 +4556,21 @@ void ASkaldPlayerController::HandleInitiativeRollRequested() {
 
   LastLocalInitiativeRoll = RollToDisplay > 0 ? RollToDisplay : 0;
 
+  if (AttackerRoll > 0 || DefenderRoll > 0) {
+    const FGuid LocalRollId = TriggerInitiativeDicePresentation(AttackerRoll, DefenderRoll);
+    if (LocalRollId.IsValid()) {
+      bInitiativeRollTriggeredLocally = true;
+      LastLocalInitiativeAttacker = AttackerRoll;
+      LastLocalInitiativeDefender = DefenderRoll;
+      ActiveLocalInitiativeRollId = LocalRollId;
+    } else {
+      bInitiativeRollTriggeredLocally = false;
+      LastLocalInitiativeAttacker = INDEX_NONE;
+      LastLocalInitiativeDefender = INDEX_NONE;
+      ActiveLocalInitiativeRollId.Invalidate();
+    }
+  }
+
   if (BattleHudWidget && RollToDisplay > 0) {
     BattleHudWidget->ShowDiceRoll(RollToDisplay, 2.f);
   }
@@ -4551,6 +4603,8 @@ void ASkaldPlayerController::ShowPendingStrategicInitiativeResult() {
   MainHUD->HideStrategicInitiativePrompt();
   MainHUD->ShowStrategicInitiativeRoll(PendingStrategicInitiativeRoll, 2.f);
   MainHUD->SetAwaitingStrategicInitiative(false);
+
+  TriggerInitiativeDicePresentation(PendingStrategicInitiativeRoll, INDEX_NONE);
 
   if (bPendingStrategicInitiativeWin && InitiativeWinSound && IsLocalController()) {
     UGameplayStatics::PlaySound2D(this, InitiativeWinSound);
@@ -5534,6 +5588,8 @@ void ASkaldPlayerController::HandleAttackResolved(AFighterPawn *Attacker,
                                                   const FDiceRollResult &Result) {
   PlayAttackFeedback(Attacker, Defender, Result);
 
+  TriggerAttackDicePresentation(Attacker, Result);
+
   if (Defender) {
     FPendingDiceFeedbackState &FeedbackState =
         PendingDiceFeedbackStates.AddDefaulted_GetRef();
@@ -5771,6 +5827,193 @@ void ASkaldPlayerController::TryDispatchPendingAttackPresentationNotifications()
 
 void ASkaldPlayerController::HandlePendingPresentationTimerTick() {
   TryDispatchPendingAttackPresentationNotifications();
+}
+
+void ASkaldPlayerController::EnsureDiceWidgets() {
+  if (!IsLocalController()) {
+    return;
+  }
+
+  const bool bShouldSpawnOverlay = bAutoPresentDiceRolls || bAutoPresentInitiativeRolls;
+  if (bShouldSpawnOverlay && !DiceOverlayWidget && DiceOverlayWidgetClass) {
+    DiceOverlayWidget = CreateWidget<USkaldDiceOverlayWidget>(this, DiceOverlayWidgetClass);
+    if (DiceOverlayWidget) {
+      DiceOverlayWidget->AddToViewport(32);
+      DiceOverlayWidget->SetVisibility(ESlateVisibility::Collapsed);
+    }
+  }
+
+  if (bAutoPresentInitiativeRolls && !DiceResultWidget && DiceResultWidgetClass) {
+    DiceResultWidget = CreateWidget<USkaldDiceResultWidget>(this, DiceResultWidgetClass);
+    if (DiceResultWidget) {
+      DiceResultWidget->AddToViewport(33);
+      DiceResultWidget->SetVisibility(ESlateVisibility::Collapsed);
+    }
+  }
+}
+
+USkaldDiceManager *ASkaldPlayerController::ResolveDiceManager() {
+  USkaldGameInstance *GI = CachedGameInstance;
+  if (!GI) {
+    GI = GetGameInstance<USkaldGameInstance>();
+    CachedGameInstance = GI;
+  }
+
+  return GI ? GI->GetSubsystem<USkaldDiceManager>() : nullptr;
+}
+
+void ASkaldPlayerController::TriggerAttackDicePresentation(
+    AFighterPawn *Attacker, const FDiceRollResult &Result) {
+  if (!IsLocalController() || !bAutoPresentDiceRolls) {
+    return;
+  }
+
+  if (Result.DiceOutcomes.Num() == 0) {
+    return;
+  }
+
+  EnsureDiceWidgets();
+
+  USkaldDiceManager *DiceManager = ResolveDiceManager();
+  if (!DiceManager) {
+    return;
+  }
+
+  const bool bFriendlyAttack = Attacker ? IsFriendlyFighter(Attacker) : true;
+
+  TArray<int32> PlayerResults;
+  TArray<int32> EnemyResults;
+  PlayerResults.Reserve(Result.DiceOutcomes.Num());
+  EnemyResults.Reserve(Result.DiceOutcomes.Num());
+
+  for (const FDiceRollOutcome &Outcome : Result.DiceOutcomes) {
+    const int32 RollValue = FMath::Clamp(Outcome.RollValue, 1, 6);
+    if (bFriendlyAttack) {
+      PlayerResults.Add(RollValue);
+    } else {
+      EnemyResults.Add(RollValue);
+    }
+  }
+
+  if (PlayerResults.Num() == 0 && EnemyResults.Num() == 0) {
+    return;
+  }
+
+  DiceManager->PlayScriptedRoll(PlayerResults, EnemyResults, false);
+
+  if (DiceOverlayWidget) {
+    DiceOverlayWidget->SetOverlayMode(ESkaldDiceOverlayMode::Attack);
+  }
+}
+
+FGuid ASkaldPlayerController::TriggerInitiativeDicePresentation(int32 AttackerRoll,
+                                                                int32 DefenderRoll) {
+  if (!IsLocalController() || !bAutoPresentInitiativeRolls) {
+    return FGuid();
+  }
+
+  if (AttackerRoll <= 0 && DefenderRoll <= 0) {
+    return FGuid();
+  }
+
+  EnsureDiceWidgets();
+
+  USkaldDiceManager *DiceManager = ResolveDiceManager();
+
+  DetermineControlledBattleSide();
+
+  const bool bPlayerIsAttacker = bControlsAttackerSide && !bControlsDefenderSide;
+  const bool bPlayerIsDefender = bControlsDefenderSide && !bControlsAttackerSide;
+
+  TArray<int32> PlayerResults;
+  TArray<int32> EnemyResults;
+  PlayerResults.Reserve(1);
+  EnemyResults.Reserve(1);
+
+  int32 PlayerResultValue = INDEX_NONE;
+  int32 EnemyResultValue = INDEX_NONE;
+
+  auto AppendValue = [&](int32 Value, bool bTreatAsPlayer) {
+    if (Value <= 0) {
+      return;
+    }
+
+    const int32 Clamped = FMath::Clamp(Value, 1, 6);
+    if (bTreatAsPlayer) {
+      PlayerResults.Add(Clamped);
+      if (PlayerResultValue == INDEX_NONE) {
+        PlayerResultValue = Clamped;
+      }
+    } else {
+      EnemyResults.Add(Clamped);
+      if (EnemyResultValue == INDEX_NONE) {
+        EnemyResultValue = Clamped;
+      }
+    }
+  };
+
+  if (bPlayerIsAttacker) {
+    AppendValue(AttackerRoll, true);
+    AppendValue(DefenderRoll, false);
+  } else if (bPlayerIsDefender) {
+    AppendValue(DefenderRoll, true);
+    AppendValue(AttackerRoll, false);
+  } else {
+    AppendValue(AttackerRoll, true);
+    AppendValue(DefenderRoll, false);
+  }
+
+  FGuid RollId;
+  if (DiceManager && (PlayerResults.Num() > 0 || EnemyResults.Num() > 0)) {
+    RollId = DiceManager->PlayScriptedRoll(PlayerResults, EnemyResults, true);
+  }
+
+  if (DiceOverlayWidget) {
+    DiceOverlayWidget->SetOverlayMode(ESkaldDiceOverlayMode::Initiative);
+  }
+
+  ShowInitiativeResults(PlayerResultValue, EnemyResultValue);
+
+  return RollId;
+}
+
+void ASkaldPlayerController::ShowInitiativeResults(int32 PlayerResult,
+                                                   int32 EnemyResult) {
+  if (!bAutoPresentInitiativeRolls) {
+    return;
+  }
+
+  EnsureDiceWidgets();
+
+  if (!DiceResultWidget) {
+    return;
+  }
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(InitiativeResultHideTimer);
+  }
+
+  DiceResultWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
+  DiceResultWidget->ShowResults(PlayerResult, EnemyResult);
+
+  if (InitiativeResultLingerSeconds > 0.f) {
+    if (UWorld *World = GetWorld()) {
+      World->GetTimerManager().SetTimer(
+          InitiativeResultHideTimer, this,
+          &ASkaldPlayerController::HideInitiativeResults,
+          InitiativeResultLingerSeconds, false);
+    }
+  }
+}
+
+void ASkaldPlayerController::HideInitiativeResults() {
+  if (DiceResultWidget) {
+    DiceResultWidget->SetVisibility(ESlateVisibility::Collapsed);
+  }
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(InitiativeResultHideTimer);
+  }
 }
 
 bool ASkaldPlayerController::IsFriendlyFighter(const AFighterPawn *Fighter) const {
