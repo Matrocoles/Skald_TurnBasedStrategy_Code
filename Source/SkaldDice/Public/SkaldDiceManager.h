@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "DiceRollConfig.h"
+#include "TimerManager.h"
 #include "SkaldDiceManager.generated.h"
 
 class ADiceRollArena;
