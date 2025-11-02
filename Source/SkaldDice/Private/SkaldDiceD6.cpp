@@ -2,9 +2,13 @@
 
 #include "Components/AudioComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Engine/CollisionProfile.h"
+#include "Engine/StaticMesh.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 #include "PhysicsEngine/BodyInstance.h"
 #include "PhysicsEngine/PhysicsSettings.h"
+#include "UObject/ConstructorHelpers.h"
 
 ASkaldDiceD6::ASkaldDiceD6()
 {
@@ -17,6 +21,20 @@ ASkaldDiceD6::ASkaldDiceD6()
     DiceMesh->SetNotifyRigidBodyCollision(true);
     DiceMesh->SetEnableGravity(true);
     DiceMesh->BodyInstance.bUseCCD = true;
+    DiceMesh->SetCollisionProfileName(UCollisionProfile::PhysicsActor_ProfileName);
+
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> DefaultMeshFinder(TEXT("/Engine/BasicShapes/Cube.Cube"));
+    if (DefaultMeshFinder.Succeeded())
+    {
+        DiceMesh->SetStaticMesh(DefaultMeshFinder.Object);
+        DiceMesh->SetRelativeScale3D(FVector(0.35f));
+    }
+
+    static ConstructorHelpers::FObjectFinder<UMaterialInterface> DefaultMaterialFinder(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+    if (DefaultMaterialFinder.Succeeded())
+    {
+        DiceMesh->SetMaterial(0, DefaultMaterialFinder.Object);
+    }
 
     ImpactAudio = CreateDefaultSubobject<UAudioComponent>(TEXT("ImpactAudio"));
     ImpactAudio->SetupAttachment(RootComponent);
