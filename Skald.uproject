@@ -1,82 +1,87 @@
 {
-	"FileVersion": 3,
-	"EngineAssociation": "{A7CF3C9E-4869-FBB9-D3F0-84AC39468585}",
-	"Category": "game",
-	"Description": "Game",
-	"Modules": [
-		{
-			"Name": "Skald",
-			"Type": "Runtime",
-			"LoadingPhase": "Default"
-		}
-	],
-	"Plugins": [
-		{
-			"Name": "ModelingToolsEditorMode",
-			"Enabled": false
-		},
-		{
-			"Name": "VisualStudioTools",
-			"Enabled": false,
-			"SupportedTargetPlatforms": [
-				"Win64"
-			],
-			"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/product/362651520df94e4fa65492dbcba44ae2"
-		},
-		{
-			"Name": "OnlineSubsystem",
-			"Enabled": true
-		},
-		{
-			"Name": "Landmass",
-			"Enabled": true
-		},
-		{
-			"Name": "VirtualHeightfieldMesh",
-			"Enabled": true
-		},
-		{
-			"Name": "Fab",
-			"Enabled": false,
-			"SupportedTargetPlatforms": [
-				"Win64",
-				"Mac",
-				"Linux"
-			]
-		},
-		{
-			"Name": "MeshPainting",
-			"Enabled": false
-		},
-		{
-			"Name": "Interchange",
-			"Enabled": false,
-			"SupportedTargetPlatforms": [
-				"Win64",
-				"Linux",
-				"Mac"
-			]
-		},
-		{
-			"Name": "InterchangeEditor",
-			"Enabled": false,
-			"SupportedTargetPlatforms": [
-				"Win64",
-				"Linux",
-				"Mac"
-			]
-		},
-		{
-			"Name": "InterchangeTests",
-			"Enabled": false
-		},
-		{
-			"Name": "GLTFExporter",
-			"Enabled": false
-		},
-		{
-			"Name": "CascadeToNiagaraConverter",
-			"Enabled": true
-		}
-	]
+        "FileVersion": 3,
+        "EngineAssociation": "{A7CF3C9E-4869-FBB9-D3F0-84AC39468585}",
+        "Category": "game",
+        "Description": "Game",
+        "Modules": [
+                {
+                        "Name": "Skald",
+                        "Type": "Runtime",
+                        "LoadingPhase": "Default"
+                },
+                {
+                        "Name": "SkaldDice",
+                        "Type": "Runtime",
+                        "LoadingPhase": "Default"
+                }
+        ],
+        "Plugins": [
+                {
+                        "Name": "ModelingToolsEditorMode",
+                        "Enabled": false
+                },
+                {
+                        "Name": "VisualStudioTools",
+                        "Enabled": false,
+                        "SupportedTargetPlatforms": [
+                                "Win64"
+                        ],
+                        "MarketplaceURL": "com.epicgames.launcher://ue/marketplace/product/362651520df94e4fa65492dbcba44ae2"
+                },
+                {
+                        "Name": "OnlineSubsystem",
+                        "Enabled": true
+                },
+                {
+                        "Name": "Landmass",
+                        "Enabled": true
+                },
+                {
+                        "Name": "VirtualHeightfieldMesh",
+                        "Enabled": true
+                },
+                {
+                        "Name": "Fab",
+                        "Enabled": false,
+                        "SupportedTargetPlatforms": [
+                                "Win64",
+                                "Mac",
+                                "Linux"
+                        ]
+                },
+                {
+                        "Name": "MeshPainting",
+                        "Enabled": false
+                },
+                {
+                        "Name": "Interchange",
+                        "Enabled": false,
+                        "SupportedTargetPlatforms": [
+                                "Win64",
+                                "Linux",
+                                "Mac"
+                        ]
+                },
+                {
+                        "Name": "InterchangeEditor",
+                        "Enabled": false,
+                        "SupportedTargetPlatforms": [
+                                "Win64",
+                                "Linux",
+                                "Mac"
+                        ]
+                },
+                {
+                        "Name": "InterchangeTests",
+                        "Enabled": false
+                },
+                {
+                        "Name": "GLTFExporter",
+                        "Enabled": false
+                },
+                {
+                        "Name": "CascadeToNiagaraConverter",
+                        "Enabled": true
+                }
+        ]
 }

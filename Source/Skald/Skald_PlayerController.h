@@ -38,6 +38,9 @@ class USoundBase;
 class UCameraShakeBase;
 class UNiagaraSystem;
 class ASkald_PlayerCharacter;
+class USkaldDiceOverlayWidget;
+class USkaldDiceResultWidget;
+class USkaldDiceManager;
 
 /** Command issued by the player during a battle. */
 UENUM()
@@ -197,6 +200,26 @@ protected:
   /** Widget class used for in-battle HUD. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "UI")
   TSubclassOf<UBattleHUDWidget> BattleHUDWidgetClass;
+
+  /** Overlay widget used to present dice rolls without additional blueprint wiring. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "UI|Dice")
+  TSubclassOf<USkaldDiceOverlayWidget> DiceOverlayWidgetClass;
+
+  /** Compact widget used to display initiative roll summaries. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "UI|Dice")
+  TSubclassOf<USkaldDiceResultWidget> DiceResultWidgetClass;
+
+  /** Automatically trigger dice overlay presentations for combat events. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "UI|Dice")
+  bool bAutoPresentDiceRolls = true;
+
+  /** Automatically trigger initiative presentations using the dice subsystem. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "UI|Dice")
+  bool bAutoPresentInitiativeRolls = true;
+
+  /** Duration to keep the initiative summary widget visible after an update. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "UI|Dice", meta = (ClampMin = "0.0"))
+  float InitiativeResultLingerSeconds = 2.f;
 
   /** Widget class providing the in-game menu overlay. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "UI")
@@ -368,6 +391,14 @@ protected:
   UPROPERTY(BlueprintReadOnly, Category = "UI",
             meta = (AllowPrivateAccess = "true"))
   TObjectPtr<UBattleHUDWidget> BattleHudWidget;
+
+  /** Dice overlay widget automatically spawned from class defaults. */
+  UPROPERTY(Transient)
+  TObjectPtr<USkaldDiceOverlayWidget> DiceOverlayWidget;
+
+  /** Initiative summary widget automatically spawned from class defaults. */
+  UPROPERTY(Transient)
+  TObjectPtr<USkaldDiceResultWidget> DiceResultWidget;
 
   UPROPERTY(BlueprintReadOnly, Category = "UI",
             meta = (AllowPrivateAccess = "true"))
@@ -866,6 +897,14 @@ private:
   void DetermineControlledBattleSide();
   void TryDispatchPendingAttackPresentationNotifications();
   void HandlePendingPresentationTimerTick();
+  void EnsureDiceWidgets();
+  void TriggerAttackDicePresentation(AFighterPawn *Attacker,
+                                     const FDiceRollResult &Result);
+  FGuid TriggerInitiativeDicePresentation(int32 AttackerRoll,
+                                          int32 DefenderRoll);
+  void ShowInitiativeResults(int32 PlayerResult, int32 EnemyResult);
+  void HideInitiativeResults();
+  USkaldDiceManager *ResolveDiceManager();
 
   UPROPERTY()
   TObjectPtr<AFighterPawn> SelectedFighter;
@@ -890,6 +929,10 @@ private:
   /** Cached copy of the last initiative value rolled locally so it can be
    *  re-presented once the server confirms the result. */
   int32 LastLocalInitiativeRoll = 0;
+  int32 LastLocalInitiativeAttacker = INDEX_NONE;
+  int32 LastLocalInitiativeDefender = INDEX_NONE;
+  bool bInitiativeRollTriggeredLocally = false;
+  FGuid ActiveLocalInitiativeRollId;
 
   /** Cached initiative value pending presentation on the strategic HUD. */
   int32 PendingStrategicInitiativeRoll = 0;
@@ -914,6 +957,9 @@ private:
 
   /** Last grid battle round index that triggered the initiative prompt audio. */
   int32 LastBattleInitiativeSoundRound = INDEX_NONE;
+
+  /** Timer handle used to hide the initiative result widget after a delay. */
+  FTimerHandle InitiativeResultHideTimer;
 
   /** State used to avoid replaying the grid turn cue when the prompt has not changed. */
   int32 LastBattleTurnSoundRound = INDEX_NONE;

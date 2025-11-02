@@ -24,6 +24,8 @@ class ATerritory;
 class ASkaldGameState;
 class ASkaldPlayerState;
 class UTexture2D;
+class UDiceRollConfig;
+class USkaldDiceManager;
 
 USTRUCT(BlueprintType)
 struct FSkaldTravelState
@@ -193,6 +195,18 @@ public:
   UPROPERTY(EditDefaultsOnly, Category = "UI")
   TSubclassOf<UUserWidget> DeployWidgetClass;
 
+  /** Dice roll configuration asset automatically supplied to the dice subsystem. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Dice")
+  TSoftObjectPtr<UDiceRollConfig> DefaultDiceRollConfig;
+
+  /** Automatically pushes DefaultDiceRollConfig into the dice subsystem at startup. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Dice")
+  bool bAutoInitialiseDiceSubsystem = true;
+
+  /** Runtime cached dice configuration that remains loaded for the subsystem. */
+  UPROPERTY(Transient)
+  TObjectPtr<UDiceRollConfig> LoadedDiceRollConfig = nullptr;
+
   /** Optional faction emblem textures keyed by faction enum. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
   TMap<ESkaldFaction, TSoftObjectPtr<UTexture2D>> FactionEmblemMap;
@@ -269,6 +283,10 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Battle")
   void SeedCombatRandomStream(int32 Seed);
 
+  /** Apply the configured dice roll data asset to the dice subsystem. */
+  UFUNCTION(BlueprintCallable, Category = "Dice")
+  void ApplyDiceRollConfig();
+
   /** Handle network failures and return to the lobby. */
   UFUNCTION()
   void HandleNetworkFailure(UWorld *World, UNetDriver *Driver,
@@ -301,6 +319,7 @@ private:
 
   void HandleWorldBeginPlay(UWorld *LoadedWorld);
   void HandleDeferredTravelResume(UWorld *LoadedWorld);
+  void InitialiseDiceManager();
   bool ShouldAttemptTravelResume() const;
   void ScheduleTravelResume(UWorld *World);
   void AttemptResumeAfterTravel();
