@@ -16,7 +16,7 @@ void USkaldDiceResultWidget::ShowResults(int32 PlayerResult, int32 EnemyResult)
     if (PlayerResultText)
     {
         const FText Value = PlayerResult > INDEX_NONE ? FText::AsNumber(PlayerResult) : EmptyValueText;
-        const FText& FormatText = !FText::IsEmpty(PrefixValueFormat) ? PrefixValueFormat : DefaultFormat;
+        const FText& FormatText = !PrefixValueFormat.IsEmpty() ? PrefixValueFormat : DefaultFormat;
         const FText DisplayText = bShowPrefix ? FText::Format(FormatText, PlayerPrefix, Value) : Value;
         PlayerResultText->SetText(DisplayText);
     }
@@ -24,7 +24,7 @@ void USkaldDiceResultWidget::ShowResults(int32 PlayerResult, int32 EnemyResult)
     if (EnemyResultText)
     {
         const FText Value = EnemyResult > INDEX_NONE ? FText::AsNumber(EnemyResult) : EmptyValueText;
-        const FText& FormatText = !FText::IsEmpty(PrefixValueFormat) ? PrefixValueFormat : DefaultFormat;
+        const FText& FormatText = !PrefixValueFormat.IsEmpty() ? PrefixValueFormat : DefaultFormat;
         const FText DisplayText = bShowPrefix ? FText::Format(FormatText, EnemyPrefix, Value) : Value;
         EnemyResultText->SetText(DisplayText);
     }

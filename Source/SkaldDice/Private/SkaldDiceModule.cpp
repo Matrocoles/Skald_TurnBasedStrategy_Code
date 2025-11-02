@@ -1,5 +1,6 @@
+#include "SkaldDiceModule.h"
+
 #include "Modules/ModuleManager.h"
-#include "Logging/LogMacros.h"
 
 DEFINE_LOG_CATEGORY(LogSkaldDice);
 
