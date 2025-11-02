@@ -263,6 +263,8 @@ void UGridBattleManager::RegisterFighter(AFighterPawn* Fighter, bool bAsAttacker
     {
         InitiativeOrder.Add(Fighter);
     }
+
+    RefreshEngagementStates();
 }
 
 void UGridBattleManager::UnregisterFighter(AFighterPawn* Fighter)
@@ -281,6 +283,33 @@ void UGridBattleManager::UnregisterFighter(AFighterPawn* Fighter)
     }
 
     EvaluateRoundProgress(bWasAttacker);
+
+    RefreshEngagementStates();
+}
+
+void UGridBattleManager::RefreshEngagementStates()
+{
+    if (UWorld* World = GetWorld())
+    {
+        if (World->IsNetMode(NM_Client))
+        {
+            return;
+        }
+    }
+
+    TArray<AFighterPawn*> Fighters = GetInitiativeOrderSnapshot();
+    if (Fighters.Num() == 0)
+    {
+        return;
+    }
+
+    for (AFighterPawn* Fighter : Fighters)
+    {
+        if (Fighter)
+        {
+            Fighter->UpdateEngagementStatus(Fighters);
+        }
+    }
 }
 
 TArray<AFighterPawn*> UGridBattleManager::GetInitiativeOrderSnapshot() const

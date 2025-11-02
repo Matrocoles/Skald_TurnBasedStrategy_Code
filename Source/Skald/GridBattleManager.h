@@ -450,6 +450,8 @@ public:
     UFUNCTION(BlueprintCallable, Category="Battle")
     void UnregisterFighter(AFighterPawn* Fighter);
 
+    void RefreshEngagementStates();
+
     UFUNCTION(BlueprintCallable, Category="Battle|Events")
     void ReportAttackResolution(AFighterPawn* Attacker, AFighterPawn* Defender, const FDiceRollResult& Result);
 

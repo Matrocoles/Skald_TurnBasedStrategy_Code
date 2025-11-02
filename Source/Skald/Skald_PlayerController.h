@@ -47,6 +47,7 @@ UENUM()
 enum class EBattleCommandMode : uint8 {
   None,
   Move,
+  Disengage,
   Attack,
   VeilStep,
   AbilityTargetEnemy,
@@ -463,6 +464,10 @@ protected:
   UFUNCTION()
   void BeginMoveMode();
 
+  /** Begin executing a disengage maneuver. */
+  UFUNCTION()
+  void BeginDisengageMode();
+
   /** Begin selecting an attack target. */
   UFUNCTION()
   void BeginAttackMode();
@@ -796,7 +801,11 @@ private:
   void InitializeFighterSelectionIfNeeded();
 
   void CancelCommandMode();
+  void ResetPendingDisengage();
   void HighlightClickedCell(UGridOverlayComponent *Grid, const FIntPoint &Cell);
+  bool FindBestMovementAnchor(AFighterPawn *Fighter, UGridOverlayComponent *Grid,
+                              const FIntPoint &DesiredCell,
+                              FIntPoint &OutAnchor) const;
   void SetSelectedFighter(AFighterPawn *Fighter, bool bForce = false);
   void ClearSelectedFighter();
   void UpdateBattleHUDSelection();
@@ -916,6 +925,9 @@ private:
   TOptional<ESkaldAbilitySlot> PendingVeilStepSlot;
   TWeakObjectPtr<AFighterPawn> PendingVeilStepFighter;
   TOptional<FPendingAbilityCommand> PendingAbilityCommand;
+
+  bool bHasPendingDisengage = false;
+  FIntPoint PendingDisengageStartCell = FIntPoint::ZeroValue;
 
   /** Friendly fighters tracked for HUD list synchronization. */
   TSet<TWeakObjectPtr<AFighterPawn>> ObservedFriendlyFighters;

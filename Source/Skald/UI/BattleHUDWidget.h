@@ -104,6 +104,11 @@ public:
   UPROPERTY(BlueprintAssignable, Category = "Skald|Battle|Events")
   FOnMovePressed OnMovePressed;
 
+  /** Delegate fired when the Disengage button is pressed. */
+  DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnDisengagePressed);
+  UPROPERTY(BlueprintAssignable, Category = "Skald|Battle|Events")
+  FOnDisengagePressed OnDisengagePressed;
+
   /** Delegate fired when the Attack button is pressed. */
   DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnAttackPressed);
   UPROPERTY(BlueprintAssignable, Category = "Skald|Battle|Events")
@@ -160,6 +165,10 @@ public:
   /** Move action button bound from the blueprint. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
   UButton *MoveButton;
+
+  /** Disengage action button bound from the blueprint. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UButton *DisengageButton;
 
   /** Attack action button bound from the blueprint. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
@@ -430,6 +439,10 @@ private:
   UFUNCTION()
   void HandleMovePressed();
 
+  /** Callback when DisengageButton is pressed. */
+  UFUNCTION()
+  void HandleDisengagePressed();
+
   /** Callback when AttackButton is pressed. */
   UFUNCTION()
   void HandleAttackPressed();
@@ -482,6 +495,9 @@ private:
 
   UFUNCTION()
   void HandleAbilityComponentUpdated(USkaldAbilityComponent *AbilityComponent);
+
+  UFUNCTION()
+  void HandleEngagementChanged(bool bEngaged);
 
   /** Find the grid overlay component in the world. */
   UGridOverlayComponent *FindGridOverlay() const;
@@ -605,6 +621,9 @@ private:
 
   /** Whether action buttons are allowed to be displayed. */
   bool bActionButtonsUnlocked = false;
+
+  /** Cached engagement state for the currently bound fighter. */
+  bool bBoundFighterEngaged = false;
 
   /** Map of tracked fighters to their entry widgets. */
   TMap<TWeakObjectPtr<AFighterPawn>, TObjectPtr<ULockedInFighterEntryWidget>>

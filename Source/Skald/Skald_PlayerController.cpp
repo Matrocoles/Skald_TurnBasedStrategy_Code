@@ -2033,6 +2033,8 @@ void ASkaldPlayerController::InitializeBattleHUD() {
       // Hook HUD buttons to controller modes
       BattleHudWidget->OnMovePressed.AddDynamic(
           this, &ASkaldPlayerController::BeginMoveMode);
+      BattleHudWidget->OnDisengagePressed.AddDynamic(
+          this, &ASkaldPlayerController::BeginDisengageMode);
       BattleHudWidget->OnAttackPressed.AddDynamic(
           this, &ASkaldPlayerController::BeginAttackMode);
       BattleHudWidget->OnActivatePressed.AddDynamic(
@@ -2210,6 +2212,91 @@ AFighterPawn *ASkaldPlayerController::FindFighterAtCell(
   return nullptr;
 }
 
+bool ASkaldPlayerController::FindBestMovementAnchor(
+    AFighterPawn *Fighter, UGridOverlayComponent *Grid,
+    const FIntPoint &DesiredCell, FIntPoint &OutAnchor) const {
+  OutAnchor = DesiredCell;
+  if (!Fighter || !Grid) {
+    return false;
+  }
+
+  const int32 FootprintSize = Fighter->GetFootprintSideLength();
+  const FIntPoint StartCell = Fighter->GetCurrentCell();
+  const int32 MovementRange = Fighter->Stats.Movement;
+  const TArray<FIntPoint> PreviousCells = Fighter->GetOccupiedCells();
+
+  int32 BestDistanceToStart = MAX_int32;
+  int32 BestDistanceToClicked = MAX_int32;
+  bool bFoundValidAnchor = false;
+  bool bBestAnchorMoves = false;
+
+  for (int32 Dy = 0; Dy < FootprintSize; ++Dy) {
+    for (int32 Dx = 0; Dx < FootprintSize; ++Dx) {
+      const FIntPoint CandidateAnchor = DesiredCell - FIntPoint(Dx, Dy);
+
+      if (!Grid->IsCellInBounds(CandidateAnchor)) {
+        continue;
+      }
+
+      const int32 DistanceToStart = FMath::Max(
+          FMath::Abs(CandidateAnchor.X - StartCell.X),
+          FMath::Abs(CandidateAnchor.Y - StartCell.Y));
+      if (DistanceToStart > MovementRange) {
+        continue;
+      }
+
+      const TArray<FIntPoint> CandidateCells =
+          Fighter->GetOccupiedCells(CandidateAnchor);
+
+      bool bCanOccupyCandidate = true;
+      for (const FIntPoint &CandidateCell : CandidateCells) {
+        if (!Grid->IsCellInBounds(CandidateCell) ||
+            Grid->IsObscured(CandidateCell)) {
+          bCanOccupyCandidate = false;
+          break;
+        }
+
+        const bool bCellPreviouslyOccupied = PreviousCells.Contains(CandidateCell);
+        if (!bCellPreviouslyOccupied && Grid->IsOccupied(CandidateCell)) {
+          bCanOccupyCandidate = false;
+          break;
+        }
+      }
+
+      if (!bCanOccupyCandidate) {
+        continue;
+      }
+
+      const bool bCandidateMoves = DistanceToStart > 0;
+      const int32 CandidateAnchorDistance = FMath::Max(
+          FMath::Abs(CandidateAnchor.X - DesiredCell.X),
+          FMath::Abs(CandidateAnchor.Y - DesiredCell.Y));
+
+      bool bUseCandidate = false;
+      if (!bFoundValidAnchor) {
+        bUseCandidate = true;
+      } else if (bCandidateMoves != bBestAnchorMoves) {
+        bUseCandidate = bCandidateMoves && !bBestAnchorMoves;
+      } else if (DistanceToStart < BestDistanceToStart) {
+        bUseCandidate = true;
+      } else if (DistanceToStart == BestDistanceToStart &&
+                 CandidateAnchorDistance < BestDistanceToClicked) {
+        bUseCandidate = true;
+      }
+
+      if (bUseCandidate) {
+        BestDistanceToStart = DistanceToStart;
+        BestDistanceToClicked = CandidateAnchorDistance;
+        OutAnchor = CandidateAnchor;
+        bBestAnchorMoves = bCandidateMoves;
+        bFoundValidAnchor = true;
+      }
+    }
+  }
+
+  return bFoundValidAnchor;
+}
+
 UGridBattleManager *ASkaldPlayerController::GetBattleManager() const {
   if (CachedBattleManager.IsValid()) {
     return CachedBattleManager.Get();
@@ -2230,26 +2317,30 @@ UGridBattleManager *ASkaldPlayerController::GetBattleManager() const {
 
 void ASkaldPlayerController::HandleActiveFighterChanged(
     AFighterPawn *NewFighter) {
-  if (NewFighter && NewFighter->IsAlive()) {
-    LockedActiveFighter = NewFighter;
-    SetSelectedFighter(NewFighter, true);
+  CancelCommandMode();
+
+  AFighterPawn *ResolvedFighter =
+      (NewFighter && NewFighter->IsAlive()) ? NewFighter : nullptr;
+  LockedActiveFighter = ResolvedFighter;
+
+  if (LockedActiveFighter) {
+    SetSelectedFighter(LockedActiveFighter, true);
     if (bBattleHUDReadyToShow && !bBattleHUDVisible) {
       EnsureBattleHUDVisible();
     }
   } else {
-    LockedActiveFighter = nullptr;
+    SetSelectedFighter(nullptr, true);
   }
 
-  CancelCommandMode();
   UpdateBattleHUDButtons();
   UpdateBattlePlayersTurnDisplay();
-  if (!NewFighter) {
+  if (!LockedActiveFighter) {
     UpdateBattleHUDSelection();
   }
 
   if (UGridOverlayComponent *Grid = FindGridOverlay()) {
-    if (NewFighter && NewFighter->IsAlive()) {
-      Grid->HighlightSelection(NewFighter);
+    if (LockedActiveFighter) {
+      Grid->HighlightSelection(LockedActiveFighter);
     } else {
       Grid->ClearSelectionHighlight();
     }
@@ -2257,15 +2348,15 @@ void ASkaldPlayerController::HandleActiveFighterChanged(
 
   if (IsLocalController()) {
     if (ASkald_PlayerCharacter *CameraPawn = Cast<ASkald_PlayerCharacter>(GetPawn())) {
-      if (bIsBattleMap && NewFighter && NewFighter->IsAlive()) {
-        CameraPawn->FocusCameraOnActor(NewFighter);
+      if (bIsBattleMap && LockedActiveFighter) {
+        CameraPawn->FocusCameraOnActor(LockedActiveFighter);
       } else {
         CameraPawn->ClearCameraFocus();
       }
     }
   }
 
-  if (!NewFighter && IsLocalController() && BattleTurnStartSound) {
+  if (!LockedActiveFighter && IsLocalController() && BattleTurnStartSound) {
     USkaldGameInstance *GI = CachedGameInstance;
     if (!GI) {
       GI = GetGameInstance<USkaldGameInstance>();
@@ -3935,6 +4026,7 @@ void ASkaldPlayerController::SetupInputComponent() {
 }
 
 void ASkaldPlayerController::BeginMoveMode() {
+  ResetPendingDisengage();
   if (!LockedActiveFighter || !IsFriendlyFighter(LockedActiveFighter))
     return;
   CurrentCommandMode = EBattleCommandMode::Move;
@@ -3944,12 +4036,39 @@ void ASkaldPlayerController::BeginMoveMode() {
 }
 
 void ASkaldPlayerController::BeginAttackMode() {
+  ResetPendingDisengage();
   if (!LockedActiveFighter || !IsFriendlyFighter(LockedActiveFighter))
     return;
   CurrentCommandMode = EBattleCommandMode::Attack;
   if (UGridOverlayComponent *Grid = FindGridOverlay()) {
     Grid->HighlightAttack(LockedActiveFighter);
   }
+}
+
+void ASkaldPlayerController::BeginDisengageMode() {
+  if (!LockedActiveFighter || !IsFriendlyFighter(LockedActiveFighter)) {
+    return;
+  }
+
+  if (!LockedActiveFighter->IsEngaged()) {
+    return;
+  }
+
+  if (LockedActiveFighter->GetActionsRemaining() <= 0) {
+    const FText ErrorText = NSLOCTEXT(
+        "SkaldBattle", "DisengageNoActions",
+        "Not enough actions remain to disengage.");
+    NotifyActionError(ErrorText.ToString());
+    return;
+  }
+
+  PendingDisengageStartCell = LockedActiveFighter->GetCurrentCell();
+  bHasPendingDisengage = true;
+  CurrentCommandMode = EBattleCommandMode::Disengage;
+  if (UGridOverlayComponent *Grid = FindGridOverlay()) {
+    Grid->HighlightMovement(LockedActiveFighter);
+  }
+  UpdateBattleHUDButtons();
 }
 
 void ASkaldPlayerController::HandleGridClick() {
@@ -4001,87 +4120,71 @@ void ASkaldPlayerController::HandleGridClick() {
     }
     FIntPoint TargetAnchor = Cell;
     if (Grid) {
-      const int32 FootprintSize = LockedActiveFighter->GetFootprintSideLength();
-      const FIntPoint StartCell = LockedActiveFighter->GetCurrentCell();
-      const int32 MovementRange = LockedActiveFighter->Stats.Movement;
-      const TArray<FIntPoint> PreviousCells = LockedActiveFighter->GetOccupiedCells();
-
-      int32 BestDistanceToStart = MAX_int32;
-      int32 BestDistanceToClicked = MAX_int32;
-      bool bFoundValidAnchor = false;
-      bool bBestAnchorMoves = false;
-
-      for (int32 Dy = 0; Dy < FootprintSize; ++Dy) {
-        for (int32 Dx = 0; Dx < FootprintSize; ++Dx) {
-          const FIntPoint CandidateAnchor = Cell - FIntPoint(Dx, Dy);
-
-          if (!Grid->IsCellInBounds(CandidateAnchor)) {
-            continue;
-          }
-
-          const int32 DistanceToStart = FMath::Max(
-              FMath::Abs(CandidateAnchor.X - StartCell.X),
-              FMath::Abs(CandidateAnchor.Y - StartCell.Y));
-          if (DistanceToStart > MovementRange) {
-            continue;
-          }
-
-          const TArray<FIntPoint> CandidateCells =
-              LockedActiveFighter->GetOccupiedCells(CandidateAnchor);
-
-          bool bCanOccupyCandidate = true;
-          for (const FIntPoint &CandidateCell : CandidateCells) {
-            if (!Grid->IsCellInBounds(CandidateCell) ||
-                Grid->IsObscured(CandidateCell)) {
-              bCanOccupyCandidate = false;
-              break;
-            }
-
-            const bool bCellPreviouslyOccupied =
-                PreviousCells.Contains(CandidateCell);
-            if (!bCellPreviouslyOccupied && Grid->IsOccupied(CandidateCell)) {
-              bCanOccupyCandidate = false;
-              break;
-            }
-          }
-
-          if (!bCanOccupyCandidate) {
-            continue;
-          }
-
-          const bool bCandidateMoves = DistanceToStart > 0;
-          const int32 CandidateAnchorDistance = FMath::Max(
-              FMath::Abs(CandidateAnchor.X - Cell.X),
-              FMath::Abs(CandidateAnchor.Y - Cell.Y));
-
-          bool bUseCandidate = false;
-          if (!bFoundValidAnchor) {
-            bUseCandidate = true;
-          } else if (bCandidateMoves != bBestAnchorMoves) {
-            bUseCandidate = bCandidateMoves && !bBestAnchorMoves;
-          } else if (DistanceToStart < BestDistanceToStart) {
-            bUseCandidate = true;
-          } else if (DistanceToStart == BestDistanceToStart &&
-                     CandidateAnchorDistance < BestDistanceToClicked) {
-            bUseCandidate = true;
-          }
-
-          if (bUseCandidate) {
-            BestDistanceToStart = DistanceToStart;
-            BestDistanceToClicked = CandidateAnchorDistance;
-            TargetAnchor = CandidateAnchor;
-            bBestAnchorMoves = bCandidateMoves;
-            bFoundValidAnchor = true;
-          }
-        }
-      }
-
-      if (!bFoundValidAnchor) {
-        TargetAnchor = Cell;
-      }
+      FindBestMovementAnchor(LockedActiveFighter, Grid, Cell, TargetAnchor);
     }
 
     LockedActiveFighter->MoveToCell(TargetAnchor);
+    CancelCommandMode();
+    UpdateBattleHUDButtons();
+    break;
+  }
+  case EBattleCommandMode::Disengage: {
+    if (!LockedActiveFighter) {
+      CancelCommandMode();
+      break;
+    }
+    if (!IsFriendlyFighter(LockedActiveFighter)) {
+      CancelCommandMode();
+      break;
+    }
+    if (!bHasPendingDisengage) {
+      CancelCommandMode();
+      break;
+    }
+
+    FIntPoint TargetAnchor = Cell;
+    if (Grid) {
+      FindBestMovementAnchor(LockedActiveFighter, Grid, Cell, TargetAnchor);
+    }
+
+    const int32 DistanceFromStart = FMath::Max(
+        FMath::Abs(TargetAnchor.X - PendingDisengageStartCell.X),
+        FMath::Abs(TargetAnchor.Y - PendingDisengageStartCell.Y));
+    if (DistanceFromStart <= 0) {
+      const FText ErrorText =
+          NSLOCTEXT("SkaldBattle", "DisengageMustMove",
+                    "You must move to disengage.");
+      NotifyActionError(ErrorText.ToString());
+      break;
+    }
+    if (DistanceFromStart > 3) {
+      const FText ErrorText = NSLOCTEXT(
+          "SkaldBattle", "DisengageTooFar",
+          "You can only disengage up to 3 tiles from your starting point.");
+      NotifyActionError(ErrorText.ToString());
+      break;
+    }
+
+    TArray<AFighterPawn *> NearbyFighters;
+    if (UGridBattleManager *BattleManager = GetBattleManager()) {
+      NearbyFighters = BattleManager->GetInitiativeOrderSnapshot();
+    } else if (UWorld *World = GetWorld()) {
+      for (TActorIterator<AFighterPawn> It(World); It; ++It) {
+        NearbyFighters.Add(*It);
+      }
+    }
+
+    if (LockedActiveFighter->WouldBeEngagedAtLocation(TargetAnchor,
+                                                      NearbyFighters)) {
+      const FText ErrorText = NSLOCTEXT(
+          "SkaldBattle", "DisengageStillEngaged",
+          "Choose a tile at least one cell away from enemies.");
+      NotifyActionError(ErrorText.ToString());
+      break;
+    }
+
+    LockedActiveFighter->MoveToCell(TargetAnchor);
+    ResetPendingDisengage();
     CancelCommandMode();
     UpdateBattleHUDButtons();
     break;
@@ -4936,6 +5039,7 @@ void ASkaldPlayerController::ClientHidePrepareForBattle_Implementation() {
 }
 
 void ASkaldPlayerController::CancelCommandMode() {
+  ResetPendingDisengage();
   CurrentCommandMode = EBattleCommandMode::None;
   PendingVeilStepSlot.Reset();
   PendingVeilStepFighter.Reset();
@@ -4946,6 +5050,15 @@ void ASkaldPlayerController::CancelCommandMode() {
   if (BattleHudWidget) {
     BattleHudWidget->ClearCommandPreviews();
   }
+}
+
+void ASkaldPlayerController::ResetPendingDisengage() {
+  if (!bHasPendingDisengage) {
+    return;
+  }
+
+  bHasPendingDisengage = false;
+  PendingDisengageStartCell = FIntPoint::ZeroValue;
 }
 
 void ASkaldPlayerController::CancelAbilityCommand() {
@@ -4975,6 +5088,11 @@ void ASkaldPlayerController::HighlightClickedCell(UGridOverlayComponent *Grid,
 
   bool bRestoredCommandHighlights = false;
   if (CurrentCommandMode == EBattleCommandMode::Move) {
+    if (LockedActiveFighter && IsFriendlyFighter(LockedActiveFighter)) {
+      Grid->HighlightMovement(LockedActiveFighter);
+      bRestoredCommandHighlights = true;
+    }
+  } else if (CurrentCommandMode == EBattleCommandMode::Disengage) {
     if (LockedActiveFighter && IsFriendlyFighter(LockedActiveFighter)) {
       Grid->HighlightMovement(LockedActiveFighter);
       bRestoredCommandHighlights = true;

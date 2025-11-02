@@ -218,6 +218,7 @@ void AFighterPawn::GetLifetimeReplicatedProps(
   DOREPLIFETIME(AFighterPawn, SpawnFacingYawDelta);
   DOREPLIFETIME(AFighterPawn, MaxHealth);
   DOREPLIFETIME(AFighterPawn, AttackType);
+  DOREPLIFETIME(AFighterPawn, bIsEngaged);
   DOREPLIFETIME(AFighterPawn, AttackFX);
 }
 
@@ -1574,8 +1575,16 @@ void AFighterPawn::AlignToCurrentCell() {
   }
 }
 
-void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
-  if (!bIsCurrentlyActive || ActionsRemaining <= 0) {
+void AFighterPawn::MoveToCell(FIntPoint TargetCell, bool bConsumeAction) {
+  if (!bIsCurrentlyActive) {
+    return;
+  }
+
+  if (bConsumeAction) {
+    if (ActionsRemaining <= 0) {
+      return;
+    }
+  } else if (ActionsRemaining < 0) {
     return;
   }
   const int32 Distance = FMath::Max(
@@ -1753,7 +1762,9 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
     SetIsMoving(true);
   }
 
-  ConsumeAction();
+  if (bConsumeAction) {
+    ConsumeAction();
+  }
 
   if (AbilityComponent) {
     AbilityComponent->NotifyOwnerMoved(Distance);
@@ -1765,6 +1776,8 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
     }
     Grid->ClearHighlights();
   }
+
+  RequestEngagementRefresh();
 }
 
 bool AFighterPawn::TryTeleportToCell(FIntPoint TargetCell, int32 MaxDistance,
@@ -1857,7 +1870,109 @@ bool AFighterPawn::TryTeleportToCell(FIntPoint TargetCell, int32 MaxDistance,
     AbilityComponent->NotifyOwnerMoved(NotifiedDistance);
   }
 
+  RequestEngagementRefresh();
+
   return true;
+}
+
+void AFighterPawn::UpdateEngagementStatus() {
+  if (!HasAuthority()) {
+    return;
+  }
+
+  if (UWorld *World = GetWorld()) {
+    TArray<AFighterPawn *> NearbyFighters;
+    NearbyFighters.Reserve(16);
+    for (TActorIterator<AFighterPawn> It(World); It; ++It) {
+      NearbyFighters.Add(*It);
+    }
+    UpdateEngagementStatus(NearbyFighters);
+  }
+}
+
+void AFighterPawn::UpdateEngagementStatus(
+    const TArray<AFighterPawn *> &NearbyFighters) {
+  if (!HasAuthority()) {
+    return;
+  }
+
+  const bool bNewEngaged = ComputeEngagementState(NearbyFighters, nullptr);
+  ApplyEngagementState(bNewEngaged);
+}
+
+bool AFighterPawn::WouldBeEngagedAtLocation(
+    const FIntPoint &Anchor,
+    const TArray<AFighterPawn *> &NearbyFighters) const {
+  return ComputeEngagementState(NearbyFighters, &Anchor);
+}
+
+bool AFighterPawn::ComputeEngagementState(
+    const TArray<AFighterPawn *> &NearbyFighters,
+    const FIntPoint *OverrideAnchor) const {
+  if (!IsAlive()) {
+    return false;
+  }
+
+  const FIntPoint Anchor = OverrideAnchor ? *OverrideAnchor : CurrentCell;
+  const TArray<FIntPoint> SelfCells = GetOccupiedCells(Anchor);
+  if (SelfCells.Num() == 0) {
+    return false;
+  }
+
+  static const FIntPoint AdjacentOffsets[] = {FIntPoint(1, 0),  FIntPoint(-1, 0),
+                                              FIntPoint(0, 1),  FIntPoint(0, -1)};
+
+  for (AFighterPawn *Other : NearbyFighters) {
+    if (!Other || Other == this) {
+      continue;
+    }
+    if (!Other->IsAlive()) {
+      continue;
+    }
+    if (Other->Faction == Faction) {
+      continue;
+    }
+
+    const TArray<FIntPoint> OtherCells = Other->GetOccupiedCells();
+    if (OtherCells.Num() == 0) {
+      continue;
+    }
+
+    for (const FIntPoint &SelfCell : SelfCells) {
+      for (const FIntPoint &Offset : AdjacentOffsets) {
+        const FIntPoint AdjacentCell = SelfCell + Offset;
+        if (OtherCells.Contains(AdjacentCell)) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+void AFighterPawn::ApplyEngagementState(bool bNewEngaged) {
+  if (bIsEngaged == bNewEngaged) {
+    return;
+  }
+
+  bIsEngaged = bNewEngaged;
+  OnEngagementChanged.Broadcast(bIsEngaged);
+}
+
+void AFighterPawn::RequestEngagementRefresh() {
+  if (UWorld *World = GetWorld()) {
+    if (World->IsNetMode(NM_Client)) {
+      return;
+    }
+
+    if (USkaldGameInstance *GameInstance =
+            Cast<USkaldGameInstance>(World->GetGameInstance())) {
+      if (UGridBattleManager *BattleManager = GameInstance->GridBattleManager) {
+        BattleManager->RefreshEngagementStates();
+      }
+    }
+  }
 }
 
 void AFighterPawn::PerformAttack(AFighterPawn *Target) {
@@ -2443,6 +2558,8 @@ void AFighterPawn::OnRep_IsMoving() {
 
   RefreshMovementAudioComponent();
 }
+
+void AFighterPawn::OnRep_IsEngaged() { OnEngagementChanged.Broadcast(bIsEngaged); }
 
 void AFighterPawn::BroadcastActionsRemaining() {
   OnActionsChanged.Broadcast(ActionsRemaining);

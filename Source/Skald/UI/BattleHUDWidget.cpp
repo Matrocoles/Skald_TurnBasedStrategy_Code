@@ -42,6 +42,11 @@ void UBattleHUDWidget::NativeConstruct() {
     MoveButton->OnClicked.AddDynamic(this,
                                      &UBattleHUDWidget::HandleMovePressed);
   }
+  if (DisengageButton) {
+    DisengageButton->OnClicked.AddDynamic(
+        this, &UBattleHUDWidget::HandleDisengagePressed);
+    DisengageButton->SetVisibility(ESlateVisibility::Collapsed);
+  }
   if (AttackButton) {
     AttackButton->OnClicked.AddDynamic(this,
                                        &UBattleHUDWidget::HandleAttackPressed);
@@ -143,6 +148,18 @@ void UBattleHUDWidget::NativeTick(const FGeometry &MyGeometry,
 }
 
 void UBattleHUDWidget::NativeDestruct() {
+  if (MoveButton) {
+    MoveButton->OnClicked.RemoveDynamic(this,
+                                        &UBattleHUDWidget::HandleMovePressed);
+  }
+  if (DisengageButton) {
+    DisengageButton->OnClicked.RemoveDynamic(
+        this, &UBattleHUDWidget::HandleDisengagePressed);
+  }
+  if (AttackButton) {
+    AttackButton->OnClicked.RemoveDynamic(this,
+                                          &UBattleHUDWidget::HandleAttackPressed);
+  }
   if (DiceResolutionPanel) {
     DiceResolutionPanel->OnResolutionComplete.RemoveDynamic(
         this, &UBattleHUDWidget::HandleDicePanelResolved);
@@ -187,6 +204,16 @@ void UBattleHUDWidget::NativeDestruct() {
   CachedFloaterPool.Reset();
 
   ClearHealthTextHold();
+
+  if (BoundFighter) {
+    BoundFighter->OnHealthChanged.RemoveDynamic(
+        this, &UBattleHUDWidget::HandleHealthChanged);
+    BoundFighter->OnActionsChanged.RemoveDynamic(
+        this, &UBattleHUDWidget::HandleActionsChanged);
+    BoundFighter->OnEngagementChanged.RemoveDynamic(
+        this, &UBattleHUDWidget::HandleEngagementChanged);
+    BoundFighter = nullptr;
+  }
 
   if (BoundAbilityComponent.IsValid()) {
     if (USkaldAbilityComponent *Existing = BoundAbilityComponent.Get()) {
@@ -476,6 +503,8 @@ void UBattleHUDWidget::BindToFighter(AFighterPawn *Fighter) {
         this, &UBattleHUDWidget::HandleHealthChanged);
     BoundFighter->OnActionsChanged.RemoveDynamic(
         this, &UBattleHUDWidget::HandleActionsChanged);
+    BoundFighter->OnEngagementChanged.RemoveDynamic(
+        this, &UBattleHUDWidget::HandleEngagementChanged);
   }
 
   if (BoundAbilityComponent.IsValid()) {
@@ -496,6 +525,10 @@ void UBattleHUDWidget::BindToFighter(AFighterPawn *Fighter) {
         this, &UBattleHUDWidget::HandleHealthChanged);
     BoundFighter->OnActionsChanged.AddDynamic(
         this, &UBattleHUDWidget::HandleActionsChanged);
+    BoundFighter->OnEngagementChanged.AddDynamic(
+        this, &UBattleHUDWidget::HandleEngagementChanged);
+
+    bBoundFighterEngaged = BoundFighter->IsEngaged();
 
     if (USkaldAbilityComponent *AbilityComp =
             BoundFighter->GetAbilityComponent()) {
@@ -518,6 +551,7 @@ void UBattleHUDWidget::BindToFighter(AFighterPawn *Fighter) {
       }
     }
   } else {
+    bBoundFighterEngaged = false;
     if (HealthText) {
       HealthText->SetText(FText::GetEmpty());
     }
@@ -572,6 +606,15 @@ void UBattleHUDWidget::HandleMovePressed() {
       Grid->HighlightMovement(BoundFighter);
       bMoveSelected = true;
     }
+  }
+}
+
+void UBattleHUDWidget::HandleDisengagePressed() {
+  OnDisengagePressed.Broadcast();
+  bMoveSelected = false;
+  bAttackSelected = false;
+  if (UGridOverlayComponent *Grid = FindGridOverlay()) {
+    Grid->ClearHighlights();
   }
 }
 
@@ -659,6 +702,14 @@ void UBattleHUDWidget::HandleAbilityComponentUpdated(
   }
 
   RefreshAbilityDisplay();
+}
+
+void UBattleHUDWidget::HandleEngagementChanged(bool bEngaged) {
+  if (!BoundFighter) {
+    return;
+  }
+  bBoundFighterEngaged = bEngaged;
+  UpdateActionButtonVisibility();
 }
 
 void UBattleHUDWidget::UpdateStatPanel() {
@@ -1071,16 +1122,27 @@ void UBattleHUDWidget::ClearCommandPreviews() {
 }
 
 void UBattleHUDWidget::UpdateActionButtonVisibility() {
-  const bool bShouldShow = bActionButtonsUnlocked && BoundFighter &&
-                           BoundFighter->ActionsRemaining > 0;
-  const ESlateVisibility DesiredVisibility =
-      bShouldShow ? ESlateVisibility::Visible : ESlateVisibility::Collapsed;
+  const bool bHasFighter = BoundFighter != nullptr;
+  const bool bHasActions = bHasFighter && BoundFighter->ActionsRemaining > 0;
+  const bool bShowButtons = bActionButtonsUnlocked && bHasFighter;
+
+  const bool bShowMoveButton = bShowButtons && bHasActions && !bBoundFighterEngaged;
+  const bool bShowDisengageButton =
+      bShowButtons && bHasActions && bBoundFighterEngaged;
+  const bool bShowAttackButton = bShowButtons && bHasActions;
 
   if (MoveButton) {
-    MoveButton->SetVisibility(DesiredVisibility);
+    MoveButton->SetVisibility(bShowMoveButton ? ESlateVisibility::Visible
+                                             : ESlateVisibility::Collapsed);
+  }
+  if (DisengageButton) {
+    DisengageButton->SetVisibility(
+        bShowDisengageButton ? ESlateVisibility::Visible
+                             : ESlateVisibility::Collapsed);
   }
   if (AttackButton) {
-    AttackButton->SetVisibility(DesiredVisibility);
+    AttackButton->SetVisibility(bShowAttackButton ? ESlateVisibility::Visible
+                                                 : ESlateVisibility::Collapsed);
   }
 }
 
