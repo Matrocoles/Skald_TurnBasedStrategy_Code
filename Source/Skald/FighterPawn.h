@@ -22,6 +22,7 @@ class UMaterialInstanceDynamic;
 class UDecalComponent;
 class UMaterialInterface;
 class USkaldAbilityComponent;
+class USkaldDiceManager;
 
 UENUM(BlueprintType)
 enum class EFighterPawnFootprint : uint8 {
@@ -45,6 +46,7 @@ public:
   virtual void Tick(float DeltaSeconds) override;
   virtual void OnConstruction(const FTransform &Transform) override;
   virtual void BeginPlay() override;
+  virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
   virtual void GetLifetimeReplicatedProps(
       TArray<FLifetimeProperty> &OutLifetimeProps) const override;
 
@@ -646,6 +648,14 @@ private:
   /** Reset queued attack bookkeeping and optionally notify listeners. */
   void ClearQueuedAttackState(bool bBroadcastFinalized);
 
+  bool AttemptPhysicalAttackRoll(AFighterPawn *Target);
+  void EnsureDiceManagerBinding();
+  void CleanupDiceManagerBinding();
+  USkaldDiceManager *GetDiceManager() const;
+
+  UFUNCTION()
+  void HandleDiceRollCompleted(const FGuid &RollId, const TArray<int32> &Results);
+
   void HandleIncomingAttackStarted();
   void HandleIncomingAttackFinished();
 
@@ -654,6 +664,9 @@ private:
 
   /** Target currently receiving delayed attack rolls. */
   TWeakObjectPtr<AFighterPawn> PendingAttackTarget;
+
+  /** Target awaiting a physical dice roll result. */
+  TWeakObjectPtr<AFighterPawn> PendingPhysicalAttackTarget;
 
   /** Whether the pending attack target has been reduced to zero health. */
   bool bPendingAttackTargetDied = false;
@@ -664,8 +677,21 @@ private:
   /** Tracks whether any pending attack roll has been processed. */
   bool bHasProcessedPendingRoll = false;
 
+  /** True while waiting for the dice subsystem to resolve a live roll. */
+  bool bAwaitingPhysicalAttackRoll = false;
+
   /** Cached dice roll data to broadcast once resolution completes. */
   FDiceRollResult PendingAttackDiceResult;
+
+  /** Active physical dice roll guid, if any. */
+  FGuid PendingAttackRollId;
+
+  /** Snapshot of stats used when requesting a physical dice roll. */
+  FFighterStats PendingAttackAttackerSnapshot;
+  FFighterStats PendingAttackDefenderSnapshot;
+
+  /** Cached pointer to the dice subsystem for attack rolls. */
+  TWeakObjectPtr<USkaldDiceManager> CachedDiceManager;
 
   /** Tracks whether cached dice data should be reported on finalisation. */
   bool bHasPendingDiceResult = false;

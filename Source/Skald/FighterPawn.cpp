@@ -26,6 +26,7 @@
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "Skald_GameInstance.h"
+#include "SkaldDiceManager.h"
 #include "Sound/SoundBase.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
@@ -355,6 +356,13 @@ void AFighterPawn::BeginPlay() {
       }
     }
   }
+
+  EnsureDiceManagerBinding();
+}
+
+void AFighterPawn::EndPlay(const EEndPlayReason::Type EndPlayReason) {
+  CleanupDiceManagerBinding();
+  Super::EndPlay(EndPlayReason);
 }
 
 UTexture2D *AFighterPawn::GetPortraitTexture() const {
@@ -1860,6 +1868,108 @@ bool AFighterPawn::TryTeleportToCell(FIntPoint TargetCell, int32 MaxDistance,
   return true;
 }
 
+USkaldDiceManager *AFighterPawn::GetDiceManager() const {
+  if (CachedDiceManager.IsValid()) {
+    return CachedDiceManager.Get();
+  }
+
+  if (UWorld *World = GetWorld()) {
+    if (USkaldGameInstance *GameInstance =
+            Cast<USkaldGameInstance>(World->GetGameInstance())) {
+      if (USkaldDiceManager *Manager =
+              GameInstance->GetSubsystem<USkaldDiceManager>()) {
+        return Manager;
+      }
+    }
+  }
+
+  return nullptr;
+}
+
+void AFighterPawn::EnsureDiceManagerBinding() {
+  if (USkaldDiceManager *Manager = GetDiceManager()) {
+    CachedDiceManager = Manager;
+    if (!Manager->OnDiceRollCompleted.IsAlreadyBound(
+            this, &AFighterPawn::HandleDiceRollCompleted)) {
+      Manager->OnDiceRollCompleted.AddDynamic(
+          this, &AFighterPawn::HandleDiceRollCompleted);
+    }
+  }
+}
+
+void AFighterPawn::CleanupDiceManagerBinding() {
+  if (USkaldDiceManager *Manager = CachedDiceManager.Get()) {
+    Manager->OnDiceRollCompleted.RemoveDynamic(
+        this, &AFighterPawn::HandleDiceRollCompleted);
+  }
+  CachedDiceManager.Reset();
+}
+
+bool AFighterPawn::AttemptPhysicalAttackRoll(AFighterPawn *Target) {
+  if (!Target || Stats.AttackDice <= 0) {
+    return false;
+  }
+
+  EnsureDiceManagerBinding();
+  USkaldDiceManager *DiceManager = CachedDiceManager.Get();
+  if (!DiceManager) {
+    return false;
+  }
+
+  const int32 DiceToRoll = FMath::Max(Stats.AttackDice, 0);
+  const FGuid RollId = DiceManager->RollDice_D6(DiceToRoll, 0, false);
+  if (!RollId.IsValid()) {
+    return false;
+  }
+
+  PendingAttackRollId = RollId;
+  bAwaitingPhysicalAttackRoll = true;
+  PendingAttackTarget = Target;
+  PendingPhysicalAttackTarget = Target;
+  PendingAttackAttackerSnapshot = Stats;
+  PendingAttackDefenderSnapshot = Target->Stats;
+
+  return true;
+}
+
+void AFighterPawn::HandleDiceRollCompleted(const FGuid &RollId,
+                                           const TArray<int32> &Results) {
+  if (!bAwaitingPhysicalAttackRoll || RollId != PendingAttackRollId) {
+    return;
+  }
+
+  bAwaitingPhysicalAttackRoll = false;
+  PendingAttackRollId.Invalidate();
+
+  AFighterPawn *Target = PendingPhysicalAttackTarget.Get();
+  PendingPhysicalAttackTarget.Reset();
+
+  if (!Target) {
+    PendingAttackTarget.Reset();
+    return;
+  }
+
+  USkaldGameInstance *GameInstance = nullptr;
+  if (UWorld *World = GetWorld()) {
+    GameInstance = Cast<USkaldGameInstance>(World->GetGameInstance());
+  }
+
+  FRandomStream *RandomStream = GameInstance ? &GameInstance->CombatRandomStream
+                                             : nullptr;
+  FRandomStream TempStream;
+  if (!RandomStream) {
+    TempStream.Initialize(FMath::Rand());
+    RandomStream = &TempStream;
+  }
+
+  FDiceRollResult DiceResult = UGridBattleManager::ResolveAttackDice(
+      PendingAttackAttackerSnapshot, PendingAttackDefenderSnapshot,
+      *RandomStream, &Results);
+  DiceResult.HighStakesFaction = Faction;
+
+  StartQueuedAttack(Target, MoveTemp(DiceResult));
+}
+
 void AFighterPawn::PerformAttack(AFighterPawn *Target) {
   if (!bIsCurrentlyActive || ActionsRemaining <= 0 || !Target ||
       !Target->IsAlive()) {
@@ -1922,15 +2032,9 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
     return;
   }
 
-  FDiceRollResult DiceResult =
-      UGridBattleManager::ResolveAttackDice(Stats, Target->Stats, *RandomStream);
-  DiceResult.HighStakesFaction = Faction;
-
   if (AbilityComponent) {
     AbilityComponent->NotifyAttackCommitted();
   }
-
-  StartQueuedAttack(Target, MoveTemp(DiceResult));
 
   ConsumeAction();
 
@@ -1941,10 +2045,21 @@ void AFighterPawn::PerformAttack(AFighterPawn *Target) {
   if (Grid) {
     Grid->ClearHighlights();
   }
+
+  if (AttemptPhysicalAttackRoll(Target)) {
+    return;
+  }
+
+  FDiceRollResult DiceResult =
+      UGridBattleManager::ResolveAttackDice(Stats, Target->Stats, *RandomStream);
+  DiceResult.HighStakesFaction = Faction;
+
+  StartQueuedAttack(Target, MoveTemp(DiceResult));
 }
 
 bool AFighterPawn::IsResolvingQueuedAttack() const {
-  return PendingAttackTarget.IsValid() || bHasPendingDiceResult;
+  return PendingAttackTarget.IsValid() || bHasPendingDiceResult ||
+         bAwaitingPhysicalAttackRoll;
 }
 
 void AFighterPawn::StartQueuedAttack(AFighterPawn *Target,
@@ -2111,8 +2226,13 @@ void AFighterPawn::ClearQueuedAttackState(bool bBroadcastFinalized) {
 
   PendingAttackOutcomeIndex = 0;
   PendingAttackTarget.Reset();
+  PendingPhysicalAttackTarget.Reset();
   bPendingAttackTargetDied = false;
   bHasProcessedPendingRoll = false;
+  bAwaitingPhysicalAttackRoll = false;
+  PendingAttackRollId.Invalidate();
+  PendingAttackAttackerSnapshot = FFighterStats();
+  PendingAttackDefenderSnapshot = FFighterStats();
 
   if (bBroadcastFinalized) {
     OnQueuedAttackFinalized.Broadcast();
