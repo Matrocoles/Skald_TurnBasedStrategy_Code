@@ -4,6 +4,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/CollisionProfile.h"
 #include "Engine/StaticMesh.h"
+#include "SkaldDiceModule.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "PhysicsEngine/BodyInstance.h"
@@ -63,6 +64,8 @@ void ASkaldDiceD6::InitialiseFromConfig(const UDiceRollConfig* InConfig)
     bSettled = false;
     bBroadcastSettlement = false;
     ResolvedValue = 1;
+
+    ValidateFaceMappings();
 }
 
 void ASkaldDiceD6::SetDesiredFaceValue(int32 InDesiredValue)
@@ -338,6 +341,68 @@ void ASkaldDiceD6::EnsureDynamicMaterialsCreated()
             {
                 DynamicMaterials.Add(DynamicMaterial);
             }
+        }
+    }
+}
+
+void ASkaldDiceD6::ValidateFaceMappings()
+{
+    if (bHasValidatedFaceMappings)
+    {
+        return;
+    }
+
+    bHasValidatedFaceMappings = true;
+
+    if (!DiceMesh || !CachedConfig)
+    {
+        return;
+    }
+
+    const UStaticMesh* StaticMesh = DiceMesh->GetStaticMesh();
+
+    TArray<FName> MeshSocketNames;
+    DiceMesh->GetAllSocketNames(MeshSocketNames);
+
+    FString AvailableSockets;
+    if (MeshSocketNames.Num() > 0)
+    {
+        TArray<FString> SocketStrings;
+        SocketStrings.Reserve(MeshSocketNames.Num());
+        for (const FName& SocketName : MeshSocketNames)
+        {
+            SocketStrings.Add(SocketName.ToString());
+        }
+
+        AvailableSockets = FString::Join(SocketStrings, TEXT(", "));
+    }
+    else
+    {
+        AvailableSockets = TEXT("<none>");
+    }
+
+    for (const FSkaldDiceFaceMapping& Mapping : CachedConfig->FaceLookup)
+    {
+        const bool bHasSocket = Mapping.SocketName != NAME_None;
+        const bool bSocketValid = bHasSocket && DiceMesh->DoesSocketExist(Mapping.SocketName);
+        const bool bHasLocalNormal = !Mapping.LocalNormal.IsNearlyZero();
+
+        if (bHasSocket && !bSocketValid)
+        {
+            UE_LOG(LogSkaldDice, Warning, TEXT("Dice '%s' (mesh '%s') references missing socket '%s' for face value %d. Available sockets: %s"),
+                *GetNameSafe(this),
+                *GetNameSafe(StaticMesh),
+                *Mapping.SocketName.ToString(),
+                Mapping.FaceValue,
+                *AvailableSockets);
+        }
+
+        if (!bSocketValid && !bHasLocalNormal)
+        {
+            UE_LOG(LogSkaldDice, Warning, TEXT("Dice '%s' (mesh '%s') face value %d has neither a valid socket nor a non-zero local normal; falling back to heuristics."),
+                *GetNameSafe(this),
+                *GetNameSafe(StaticMesh),
+                Mapping.FaceValue);
         }
     }
 }
