@@ -13,13 +13,18 @@ struct SKALDDICE_API FSkaldDiceFaceMapping
     GENERATED_BODY()
 
     FSkaldDiceFaceMapping()
-        : UpNormal(FVector::UpVector)
+        : LocalNormal(FVector::UpVector)
         , FaceValue(1)
     {
     }
 
+    /** Optional socket used to determine the world-space normal for this face. The socket's +Z axis should point out of the face. */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dice")
-    FVector UpNormal;
+    FName SocketName;
+
+    /** Local-space normal pointing out of the face. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dice")
+    FVector LocalNormal;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dice")
     int32 FaceValue;
