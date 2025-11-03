@@ -4,6 +4,7 @@
 #include "SkaldDiceD6.h"
 #include "SkaldDiceModule.h"
 #include "Engine/World.h"
+#include "GameFramework/PlayerController.h"
 #include "TimerManager.h"
 
 void USkaldDiceManager::Initialize(FSubsystemCollectionBase& Collection)
@@ -280,8 +281,26 @@ bool USkaldDiceManager::SpawnPhysicalRoll(FActiveRoll& Roll, const TArray<int32>
         return false;
     }
 
-    const FVector ArenaLocation = Config->ArenaBounds.GetCenter();
-    const FRotator ArenaRotation = FRotator::ZeroRotator;
+    FVector ArenaLocation = Config->ArenaBounds.GetCenter();
+    FRotator ArenaRotation = FRotator::ZeroRotator;
+    if (Config->bAnchorArenaToCamera)
+    {
+        if (APlayerController* PlayerController = World->GetFirstPlayerController())
+        {
+            FVector ViewLocation = FVector::ZeroVector;
+            FRotator ViewRotation = FRotator::ZeroRotator;
+            PlayerController->GetPlayerViewPoint(ViewLocation, ViewRotation);
+
+            const FVector Offset = ViewRotation.RotateVector(Config->ArenaCameraRelativeOffset);
+            ArenaLocation = ViewLocation + Offset;
+
+            if (Config->bMatchCameraYaw)
+            {
+                ArenaRotation = FRotator(0.f, ViewRotation.Yaw, 0.f);
+            }
+        }
+    }
+
     const FTransform ArenaTransform(ArenaRotation, ArenaLocation);
 
     FActorSpawnParameters ArenaParams;
@@ -297,6 +316,7 @@ bool USkaldDiceManager::SpawnPhysicalRoll(FActiveRoll& Roll, const TArray<int32>
 
     Arena->ConfigureArena(Config);
     Arena->FinishSpawning(ArenaTransform);
+    Arena->SetActorLocationAndRotation(ArenaLocation, ArenaRotation);
     Roll.Arena = Arena;
 
     const FVector ArenaCenter = Arena->GetActorLocation();
