@@ -1086,7 +1086,8 @@ void USkaldMainHUDWidget::ShowTurnEnded(const FString &PlayerName) {
 
 void USkaldMainHUDWidget::QueueDiceResolution(AFighterPawn *Attacker,
                                               AFighterPawn *Defender,
-                                              const FDiceRollResult &Result) {
+                                              const FDiceRollResult &Result,
+                                              bool /*bManualReveal*/) {
   FQueuedDiceResolution Entry;
   Entry.Attacker = MakeWeakObjectPtr(Attacker);
   Entry.Defender = MakeWeakObjectPtr(Defender);

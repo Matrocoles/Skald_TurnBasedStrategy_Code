@@ -614,6 +614,24 @@ void UGridBattleManager::HandleDiceRollCompleted(const FGuid& RollId, const TArr
 
     ApplyInitiativeAdjustments(AttackerRoll, DefenderRoll, bAttackerRollProvided, bDefenderRollProvided, bAttackerHasEmpireDiscipline, bDefenderHasEmpireDiscipline);
 
+    float CleanupDelay = 0.f;
+    if (USkaldDiceManager* Manager = ResolveDiceManager())
+    {
+        CleanupDelay = Manager->GetCleanupDelay();
+    }
+
+    if (UWorld* World = GetWorld())
+    {
+        FTimerManager& TimerManager = World->GetTimerManager();
+        TimerManager.ClearTimer(InitiativeWinnerAnnouncementTimer);
+
+        if (CleanupDelay > 0.f)
+        {
+            TimerManager.SetTimer(InitiativeWinnerAnnouncementTimer, FTimerDelegate::CreateUObject(this, &UGridBattleManager::CompleteInitiativeRoll, AttackerRoll, DefenderRoll), CleanupDelay, false);
+            return;
+        }
+    }
+
     CompleteInitiativeRoll(AttackerRoll, DefenderRoll);
 }
 
@@ -707,6 +725,7 @@ void UGridBattleManager::ResolveInitiativeRollInternal()
     if (UWorld* World = GetWorld())
     {
         World->GetTimerManager().ClearTimer(InitiativeAIRollTimer);
+        World->GetTimerManager().ClearTimer(InitiativeWinnerAnnouncementTimer);
     }
 
     if (!RollInitiative())

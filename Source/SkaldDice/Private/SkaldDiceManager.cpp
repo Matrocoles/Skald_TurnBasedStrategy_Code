@@ -139,6 +139,16 @@ FGuid USkaldDiceManager::PlayScriptedRoll(const TArray<int32>& PlayerResults, co
     return RollId;
 }
 
+float USkaldDiceManager::GetCleanupDelay() const
+{
+    if (!Config)
+    {
+        return 0.f;
+    }
+
+    return FMath::Max(Config->ArenaCleanupDelay, Config->DiceCleanupDelay);
+}
+
 USkaldDiceManager::FActiveRoll& USkaldDiceManager::AddRoll(int32 PlayerDice, int32 EnemyDice, float Duration, const FGuid& RollId, bool bForInitiative)
 {
     FActiveRoll& Entry = ActiveRolls.FindOrAdd(RollId);
@@ -380,7 +390,9 @@ bool USkaldDiceManager::SpawnPhysicalRoll(FActiveRoll& Roll, const TArray<int32>
             Dice->InitialiseFromConfig(Config);
             Dice->SetOwningRollId(Roll.RollId);
 
-            const int32 DesiredValue = (DesiredValues && DesiredValues->IsValidIndex(Index)) ? (*DesiredValues)[Index] : INDEX_NONE;
+            const int32 RequestedValue = (DesiredValues && DesiredValues->IsValidIndex(Index)) ? (*DesiredValues)[Index] : INDEX_NONE;
+            const bool bAllowDesiredValue = !Roll.bIsInitiative || Roll.bUseScriptedResults;
+            const int32 DesiredValue = bAllowDesiredValue ? RequestedValue : INDEX_NONE;
             Dice->SetDesiredFaceValue(DesiredValue);
             Dice->ApplyTint(bPlayerSide ? Config->PlayerTint : Config->EnemyTint, Config->DiceTintParameter);
             Dice->OnDiceSettled.AddDynamic(this, &USkaldDiceManager::HandleDieSettled);
@@ -398,7 +410,7 @@ bool USkaldDiceManager::SpawnPhysicalRoll(FActiveRoll& Roll, const TArray<int32>
 
             FActiveRoll::FDieState& DieState = Roll.Dice.AddDefaulted_GetRef();
             DieState.Actor = Dice;
-            DieState.DesiredValue = DesiredValue != INDEX_NONE ? FMath::Clamp(DesiredValue, 1, 6) : INDEX_NONE;
+            DieState.DesiredValue = (DesiredValue != INDEX_NONE) ? FMath::Clamp(DesiredValue, 1, 6) : INDEX_NONE;
             DieState.ResolvedValue = INDEX_NONE;
             DieState.bIsPlayerDie = bPlayerSide;
         }
@@ -479,7 +491,11 @@ void USkaldDiceManager::HandleDieSettled(ASkaldDiceD6* Dice, int32 FaceValue)
         if (DieState.Actor.Get() == Dice)
         {
             int32 FinalValue = FaceValue;
-            if (DieState.DesiredValue != INDEX_NONE && DieState.DesiredValue != FaceValue)
+            const bool bShouldForceDesired = DieState.DesiredValue != INDEX_NONE
+                && DieState.DesiredValue != FaceValue
+                && (!Roll->bIsInitiative || Roll->bUseScriptedResults);
+
+            if (bShouldForceDesired)
             {
                 Dice->ForceFaceValue(DieState.DesiredValue, false);
                 FinalValue = DieState.DesiredValue;

@@ -116,6 +116,8 @@ public:
 
   /** Delegate fired when the End Turn button is pressed. */
   DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnEndTurnPressed);
+  /** Delegate fired when a manual attack roll is requested. */
+  DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnAttackRollRequested);
   UPROPERTY(BlueprintAssignable, Category = "Skald|Battle|Events")
   FOnEndTurnPressed OnEndTurnPressed;
 
@@ -123,6 +125,9 @@ public:
   DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInitiativeRollRequested);
   UPROPERTY(BlueprintAssignable, Category = "Skald|Battle|Events")
   FOnInitiativeRollRequested OnInitiativeRollRequested;
+
+  UPROPERTY(BlueprintAssignable, Category = "Skald|Battle|Events")
+  FOnAttackRollRequested OnAttackRollRequested;
 
   DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
       FOnResolutionComplete, AFighterPawn *, Attacker, AFighterPawn *, Defender,
@@ -176,6 +181,10 @@ public:
   /** Initiative roll button bound from the blueprint. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UButton *RollInitiativeButton;
+
+  /** Manual roll button shown during player-driven attack dice reveals. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UButton *AttackRollButton;
 
   /** Optional UI button for the first ability slot. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
@@ -373,6 +382,9 @@ public:
   /** Toggle visibility for the Move and Attack buttons. */
   void SetActionButtonsVisibility(bool bVisible);
 
+  /** Toggle visibility for the manual attack roll button. */
+  void SetAttackRollButtonVisibility(bool bVisible);
+
   /** Clear any preview highlights tracked by the widget. */
   void ClearCommandPreviews();
 
@@ -392,7 +404,8 @@ public:
 
   /** Queue a dice resolution sequence for presentation on the panel. */
   void QueueDiceResolution(AFighterPawn *Attacker, AFighterPawn *Defender,
-                           const FDiceRollResult &Result);
+                           const FDiceRollResult &Result,
+                           bool bManualReveal = false);
 
   /** Override the default layout values at runtime. */
   UFUNCTION(BlueprintCallable, Category = "Skald|Battle|Dice")
@@ -586,6 +599,8 @@ private:
     TWeakObjectPtr<AFighterPawn> Attacker;
     TWeakObjectPtr<AFighterPawn> Defender;
     FDiceRollResult Result;
+    bool bManualReveal = false;
+    int32 PendingManualReveals = 0;
   };
 
   TArray<FBattleQueuedDiceResolution> PendingDiceResolutions;
@@ -605,6 +620,9 @@ private:
 
   /** Whether action buttons are allowed to be displayed. */
   bool bActionButtonsUnlocked = false;
+
+  /** Tracks whether the active resolution is using manual reveals. */
+  bool bManualDiceResolutionActive = false;
 
   /** Map of tracked fighters to their entry widgets. */
   TMap<TWeakObjectPtr<AFighterPawn>, TObjectPtr<ULockedInFighterEntryWidget>>

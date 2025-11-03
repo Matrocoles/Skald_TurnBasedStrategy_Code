@@ -51,6 +51,9 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Dice")
     FGuid PlayScriptedRoll(const TArray<int32>& PlayerResults, const TArray<int32>& EnemyResults, bool bForInitiative, float DurationOverride = -1.f);
 
+    /** Returns the duration before arena and dice are fully cleaned up. */
+    float GetCleanupDelay() const;
+
 protected:
     UPROPERTY(Transient)
     TObjectPtr<UDiceRollConfig> Config;

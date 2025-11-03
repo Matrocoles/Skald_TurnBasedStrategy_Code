@@ -400,6 +400,7 @@ void UW_DiceResolutionPanel::ResetPanel()
     RevealedMisses = 0;
     RevealedCrits = 0;
     bResolutionActive = false;
+    bAwaitingManualInput = false;
 
     if (ResolveProgressPlaceholder)
     {
@@ -408,6 +409,29 @@ void UW_DiceResolutionPanel::ResetPanel()
 
     UpdateSummaryLabels();
     UpdateTallies();
+}
+
+void UW_DiceResolutionPanel::SetManualRevealEnabled(bool bEnabled)
+{
+    bManualRevealEnabled = bEnabled;
+    bAwaitingManualInput = false;
+}
+
+bool UW_DiceResolutionPanel::AdvanceManualReveal()
+{
+    if (!bResolutionActive || !bManualRevealEnabled)
+    {
+        return false;
+    }
+
+    if (!bAwaitingManualInput)
+    {
+        return false;
+    }
+
+    bAwaitingManualInput = false;
+    RevealNextDie();
+    return true;
 }
 
 void UW_DiceResolutionPanel::SetDiceFaceTextures(const TArray<UTexture2D*>& InTextures)
@@ -653,6 +677,12 @@ void UW_DiceResolutionPanel::ScheduleNextReveal(float DelaySeconds)
         return;
     }
 
+    if (bManualRevealEnabled)
+    {
+        bAwaitingManualInput = true;
+        return;
+    }
+
     if (UWorld* World = GetWorld())
     {
         FTimerManager& TimerManager = World->GetTimerManager();
@@ -837,10 +867,17 @@ void UW_DiceResolutionPanel::RevealNextDie()
     }
     else
     {
-        const float NextDelay = (CurrentIndex == 0)
-            ? FirstRevealDelaySeconds
-            : SubsequentRevealDelaySeconds;
-        ScheduleNextReveal(NextDelay);
+        if (bManualRevealEnabled)
+        {
+            bAwaitingManualInput = true;
+        }
+        else
+        {
+            const float NextDelay = (CurrentIndex == 0)
+                ? FirstRevealDelaySeconds
+                : SubsequentRevealDelaySeconds;
+            ScheduleNextReveal(NextDelay);
+        }
     }
 }
 

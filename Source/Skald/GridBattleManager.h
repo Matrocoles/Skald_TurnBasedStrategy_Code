@@ -585,6 +585,9 @@ private:
     /** Timer used to delay the AI's initiative roll after the player rolls. */
     FTimerHandle InitiativeAIRollTimer;
 
+    /** Timer used to delay initiative winner announcements until dice clear. */
+    FTimerHandle InitiativeWinnerAnnouncementTimer;
+
     /** Timer used to defer the battle concluded broadcast so VFX/SFX can finish. */
     FTimerHandle BattleConclusionTimerHandle;
 

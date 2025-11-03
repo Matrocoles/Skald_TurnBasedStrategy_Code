@@ -90,6 +90,14 @@ public:
     UFUNCTION(BlueprintCallable, Category="Skald|Battle|Dice")
     void BeginResolution(const FDiceRollResult& Result);
 
+    /** Enable or disable manual player-driven reveal behaviour. */
+    UFUNCTION(BlueprintCallable, Category="Skald|Battle|Dice")
+    void SetManualRevealEnabled(bool bEnabled);
+
+    /** Trigger the next reveal step when manual reveal is enabled. */
+    UFUNCTION(BlueprintCallable, Category="Skald|Battle|Dice")
+    bool AdvanceManualReveal();
+
     /** Reset the panel to its default empty state. */
     UFUNCTION(BlueprintCallable, Category="Skald|Battle|Dice")
     void ResetPanel();
@@ -175,6 +183,12 @@ private:
 
     /** Whether the panel is currently revealing a result. */
     bool bResolutionActive = false;
+
+    /** Whether reveals are advanced manually instead of using timers. */
+    bool bManualRevealEnabled = false;
+
+    /** Tracks whether the panel is waiting for external input to continue. */
+    bool bAwaitingManualInput = false;
 
     /** Timer driving staggered die reveals. */
     FTimerHandle RevealTimerHandle;
