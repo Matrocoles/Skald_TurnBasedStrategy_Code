@@ -159,8 +159,14 @@ void ASkaldDiceD6::ForceFaceValue(int32 TargetValue, bool bBroadcastResult)
     FVector DesiredUp = FVector::UpVector;
     if (Mapping)
     {
-        DesiredUp = Mapping->UpNormal.GetSafeNormal();
+        const FVector MappingNormal = GetFaceWorldNormal(*Mapping);
+        if (!MappingNormal.IsNearlyZero())
+        {
+            DesiredUp = MappingNormal;
+        }
     }
+
+    DesiredUp = DesiredUp.GetSafeNormal();
 
     const FRotator TargetRot = FRotationMatrix::MakeFromZ(DesiredUp).Rotator() + FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f);
     const FVector Location = GetActorLocation();
@@ -248,31 +254,67 @@ int32 ASkaldDiceD6::ResolveFaceValue() const
         return 1;
     }
 
-    const FVector UpVector = DiceMesh->GetComponentTransform().GetUnitAxis(EAxis::Z);
+    const FVector ComponentUp = DiceMesh->GetComponentTransform().GetUnitAxis(EAxis::Z);
 
     int32 BestValue = 1;
-    float BestScore = -1.f;
+    float BestScore = -2.f;
+    bool bFoundFace = false;
 
     if (CachedConfig && CachedConfig->FaceLookup.Num() > 0)
     {
         for (const FSkaldDiceFaceMapping& Mapping : CachedConfig->FaceLookup)
         {
-            const float Score = FVector::DotProduct(UpVector, Mapping.UpNormal.GetSafeNormal());
-            if (Score > BestScore)
+            const FVector FaceNormal = GetFaceWorldNormal(Mapping);
+            if (FaceNormal.IsNearlyZero())
+            {
+                continue;
+            }
+
+            const float Score = FVector::DotProduct(FaceNormal, FVector::UpVector);
+            if (Score > 0.f && Score > BestScore)
             {
                 BestScore = Score;
                 BestValue = Mapping.FaceValue;
+                bFoundFace = true;
             }
         }
     }
     else
     {
         const FVector WorldUp = FVector::UpVector;
-        const float Alignment = FVector::DotProduct(UpVector, WorldUp);
+        const float Alignment = FVector::DotProduct(ComponentUp, WorldUp);
+        BestValue = Alignment > 0.f ? 1 : 6;
+    }
+
+    if (!bFoundFace)
+    {
+        const float Alignment = FVector::DotProduct(ComponentUp, FVector::UpVector);
         BestValue = Alignment > 0.f ? 1 : 6;
     }
 
     return FMath::Clamp(BestValue, 1, 6);
+}
+
+FVector ASkaldDiceD6::GetFaceWorldNormal(const FSkaldDiceFaceMapping& Mapping) const
+{
+    if (!DiceMesh)
+    {
+        return FVector::ZeroVector;
+    }
+
+    if (Mapping.SocketName != NAME_None && DiceMesh->DoesSocketExist(Mapping.SocketName))
+    {
+        const FTransform SocketTransform = DiceMesh->GetSocketTransform(Mapping.SocketName);
+        return SocketTransform.GetUnitAxis(EAxis::Z).GetSafeNormal();
+    }
+
+    const FVector LocalNormal = Mapping.LocalNormal;
+    if (!LocalNormal.IsNearlyZero())
+    {
+        return DiceMesh->GetComponentTransform().TransformVectorNoScale(LocalNormal).GetSafeNormal();
+    }
+
+    return FVector::ZeroVector;
 }
 
 void ASkaldDiceD6::EnsureDynamicMaterialsCreated()
