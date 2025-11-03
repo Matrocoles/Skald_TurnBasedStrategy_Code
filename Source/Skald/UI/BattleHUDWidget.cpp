@@ -64,6 +64,13 @@ void UBattleHUDWidget::NativeConstruct() {
     RollInitiativeButton->SetIsEnabled(true);
   }
 
+  if (AttackRollButton) {
+    AttackRollButton->OnClicked.AddDynamic(
+        this, &UBattleHUDWidget::HandleAttackRollPressed);
+    AttackRollButton->SetVisibility(ESlateVisibility::Collapsed);
+    AttackRollButton->SetIsEnabled(true);
+  }
+
   if (AbilityButton1) {
     AbilityButton1->OnClicked.AddDynamic(
         this, &UBattleHUDWidget::HandleAbilityButtonPressedSlot1);
@@ -158,6 +165,11 @@ void UBattleHUDWidget::NativeDestruct() {
     DiceRollerRenderTarget->OnCanvasRenderTargetUpdate.RemoveDynamic(
         this, &UBattleHUDWidget::HandleDiceRenderTargetUpdate);
     DiceRollerRenderTarget = nullptr;
+  }
+
+  if (AttackRollButton) {
+    AttackRollButton->OnClicked.RemoveDynamic(
+        this, &UBattleHUDWidget::HandleAttackRollPressed);
   }
 
   if (AbilityButton1) {
@@ -610,6 +622,26 @@ void UBattleHUDWidget::HandleInitiativeRollPressed() {
   OnInitiativeRollRequested.Broadcast();
 }
 
+void UBattleHUDWidget::HandleAttackRollPressed() {
+  if (!bManualDiceResolutionActive) {
+    return;
+  }
+
+  OnAttackRollRequested.Broadcast();
+
+  SetAttackRollButtonVisibility(false);
+
+  if (!DiceResolutionPanel) {
+    return;
+  }
+
+  const bool bAdvanced = DiceResolutionPanel->AdvanceManualReveal();
+
+  if (!bAdvanced && bManualDiceResolutionActive) {
+    SetAttackRollButtonVisibility(true);
+  }
+}
+
 void UBattleHUDWidget::HandleAbilityButtonPressedSlot1() {
   OnAbilitySlotPressed.Broadcast(ESkaldAbilitySlot::Ability1);
 }
@@ -961,6 +993,17 @@ void UBattleHUDWidget::SetEndTurnVisibility(bool bVisible) {
 void UBattleHUDWidget::SetActionButtonsVisibility(bool bVisible) {
   bActionButtonsUnlocked = bVisible;
   UpdateActionButtonVisibility();
+}
+
+void UBattleHUDWidget::SetAttackRollButtonVisibility(bool bVisible) {
+  if (!AttackRollButton) {
+    return;
+  }
+
+  const ESlateVisibility Desired =
+      bVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed;
+  AttackRollButton->SetVisibility(Desired);
+  AttackRollButton->SetIsEnabled(bVisible);
 }
 
 void UBattleHUDWidget::ShowDiceRoll(int32 RollValue, float DisplayDuration) {
@@ -1347,14 +1390,34 @@ void UBattleHUDWidget::ShowAttackResultFloater(AFighterPawn *Target,
          Result.MissCount, Result.StartingHealth, Result.EndingHealth);
 }
 
-void UBattleHUDWidget::QueueDiceResolution(AFighterPawn *Attacker,
-                                           AFighterPawn *Defender,
-                                           const FDiceRollResult &Result) {
-  FBattleQueuedDiceResolution Entry;
-  Entry.Attacker = Attacker;
-  Entry.Defender = Defender;
-  Entry.Result = Result;
-  PendingDiceResolutions.Add(MoveTemp(Entry));
+void UBattleHUDWidget::QueueDiceResolution(
+    AFighterPawn* Attacker,
+    AFighterPawn* Defender,
+    const FDiceRollResult& Result,
+    bool bManualReveal)
+{
+    FBattleQueuedDiceResolution Entry;
+    Entry.Attacker           = Attacker;
+    Entry.Defender           = Defender;
+    Entry.Result             = Result;
+    Entry.bManualReveal      = bManualReveal && Result.DiceOutcomes.Num() > 0;
+    Entry.PendingManualReveals = Entry.bManualReveal
+        ? Result.DiceOutcomes.Num()
+        : 0;
+
+    PendingDiceResolutions.Add(MoveTemp(Entry));
+
+    // IMPORTANT:
+    // - Manual reveals need the button visible so the player can advance the dice.
+    // - Only hide the button for non-manual resolutions.
+    if (!Entry.bManualReveal)
+    {
+        SetAttackRollButtonVisibility(false);
+    }
+
+    // If you have logic elsewhere that re-shows the button when a manual
+    // resolution becomes active, leave that as is.
+}
 
   BeginHealthTextHold(Defender, Result.StartingHealth, Result.EndingHealth);
 
@@ -1376,12 +1439,19 @@ void UBattleHUDWidget::ProcessNextDiceResolution() {
   ActiveDiceResolution = PendingDiceResolutions[0];
   PendingDiceResolutions.RemoveAt(0);
 
+  bManualDiceResolutionActive = ActiveDiceResolution.bManualReveal;
+  if (ActiveDiceResolution.bManualReveal) {
+    ActiveDiceResolution.PendingManualReveals =
+        ActiveDiceResolution.Result.DiceOutcomes.Num();
+  }
+
   if (!DiceResolutionPanel) {
     OnResolutionComplete.Broadcast(ActiveDiceResolution.Attacker.Get(),
                                    ActiveDiceResolution.Defender.Get(),
                                    ActiveDiceResolution.Result);
     ReleaseHealthTextHold(ActiveDiceResolution.Defender.Get());
     bDiceResolutionActive = false;
+    bManualDiceResolutionActive = false;
     ProcessNextDiceResolution();
     return;
   }
@@ -1391,7 +1461,16 @@ void UBattleHUDWidget::ProcessNextDiceResolution() {
       ActiveDiceResolution.Result);
   ApplyDiceResolutionPanelLayoutInternal(Layout);
 
+  DiceResolutionPanel->SetManualRevealEnabled(bManualDiceResolutionActive);
+
   DiceResolutionPanel->BeginResolution(ActiveDiceResolution.Result);
+
+  if (bManualDiceResolutionActive &&
+      ActiveDiceResolution.PendingManualReveals > 0) {
+    SetAttackRollButtonVisibility(true);
+  } else {
+    SetAttackRollButtonVisibility(false);
+  }
 }
 
 void UBattleHUDWidget::HandleDicePanelResolved(
@@ -1399,6 +1478,7 @@ void UBattleHUDWidget::HandleDicePanelResolved(
   HideDiceRoller();
 
   if (!bDiceResolutionActive) {
+    SetAttackRollButtonVisibility(false);
     ReleaseHealthTextHold(nullptr);
     OnResolutionComplete.Broadcast(nullptr, nullptr, Result);
     return;
@@ -1412,6 +1492,8 @@ void UBattleHUDWidget::HandleDicePanelResolved(
 
   bDiceResolutionActive = false;
   ActiveDiceResolution = FBattleQueuedDiceResolution();
+  bManualDiceResolutionActive = false;
+  SetAttackRollButtonVisibility(false);
 
   ProcessNextDiceResolution();
 }
@@ -1432,6 +1514,14 @@ void UBattleHUDWidget::HandleDiceOutcomeRevealed(
   OnDiceOutcomeRevealed.Broadcast(ActiveDiceResolution.Attacker.Get(),
                                   ActiveDiceResolution.Defender.Get(), Outcome,
                                   RevealIndex);
+
+  if (ActiveDiceResolution.bManualReveal &&
+      ActiveDiceResolution.PendingManualReveals > 0) {
+    --ActiveDiceResolution.PendingManualReveals;
+    if (ActiveDiceResolution.PendingManualReveals > 0) {
+      SetAttackRollButtonVisibility(true);
+    }
+  }
 }
 
 bool UBattleHUDWidget::IsCombatPresentationActive() const {

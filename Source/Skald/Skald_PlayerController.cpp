@@ -5599,7 +5599,9 @@ void ASkaldPlayerController::HandleAttackResolved(AFighterPawn *Attacker,
     Defender->HoldHealthDisplay(Result.StartingHealth);
   }
 
-  BattleHudWidget->QueueDiceResolution(Attacker, Defender, Result);
+  const bool bManualReveal = Attacker && IsFriendlyFighter(Attacker);
+  BattleHudWidget->QueueDiceResolution(Attacker, Defender, Result,
+                                       bManualReveal);
   if (MainHUD) {
     MainHUD->QueueDiceResolution(Attacker, Defender, Result);
   }

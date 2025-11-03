@@ -255,7 +255,8 @@ public:
 
   /** Queue a dice resolution sequence for the shared dice panel. */
   void QueueDiceResolution(AFighterPawn *Attacker, AFighterPawn *Defender,
-                           const FDiceRollResult &Result);
+                           const FDiceRollResult &Result,
+                           bool bManualReveal = false);
 
   /** Override the default layout values at runtime. */
   UFUNCTION(BlueprintCallable, Category = "Skald|Widgets|Dice")
