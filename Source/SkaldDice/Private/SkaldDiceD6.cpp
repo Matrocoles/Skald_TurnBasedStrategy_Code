@@ -4,6 +4,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/CollisionProfile.h"
 #include "Engine/StaticMesh.h"
+#include "SkaldDiceModule.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "PhysicsEngine/BodyInstance.h"
@@ -63,6 +64,8 @@ void ASkaldDiceD6::InitialiseFromConfig(const UDiceRollConfig* InConfig)
     bSettled = false;
     bBroadcastSettlement = false;
     ResolvedValue = 1;
+
+    ValidateFaceMappings();
 }
 
 void ASkaldDiceD6::SetDesiredFaceValue(int32 InDesiredValue)
@@ -159,8 +162,14 @@ void ASkaldDiceD6::ForceFaceValue(int32 TargetValue, bool bBroadcastResult)
     FVector DesiredUp = FVector::UpVector;
     if (Mapping)
     {
-        DesiredUp = Mapping->UpNormal.GetSafeNormal();
+        const FVector MappingNormal = GetFaceWorldNormal(*Mapping);
+        if (!MappingNormal.IsNearlyZero())
+        {
+            DesiredUp = MappingNormal;
+        }
     }
+
+    DesiredUp = DesiredUp.GetSafeNormal();
 
     const FRotator TargetRot = FRotationMatrix::MakeFromZ(DesiredUp).Rotator() + FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f);
     const FVector Location = GetActorLocation();
@@ -248,31 +257,67 @@ int32 ASkaldDiceD6::ResolveFaceValue() const
         return 1;
     }
 
-    const FVector UpVector = DiceMesh->GetComponentTransform().GetUnitAxis(EAxis::Z);
+    const FVector ComponentUp = DiceMesh->GetComponentTransform().GetUnitAxis(EAxis::Z);
 
     int32 BestValue = 1;
-    float BestScore = -1.f;
+    float BestScore = -2.f;
+    bool bFoundFace = false;
 
     if (CachedConfig && CachedConfig->FaceLookup.Num() > 0)
     {
         for (const FSkaldDiceFaceMapping& Mapping : CachedConfig->FaceLookup)
         {
-            const float Score = FVector::DotProduct(UpVector, Mapping.UpNormal.GetSafeNormal());
-            if (Score > BestScore)
+            const FVector FaceNormal = GetFaceWorldNormal(Mapping);
+            if (FaceNormal.IsNearlyZero())
+            {
+                continue;
+            }
+
+            const float Score = FVector::DotProduct(FaceNormal, FVector::UpVector);
+            if (Score > 0.f && Score > BestScore)
             {
                 BestScore = Score;
                 BestValue = Mapping.FaceValue;
+                bFoundFace = true;
             }
         }
     }
     else
     {
         const FVector WorldUp = FVector::UpVector;
-        const float Alignment = FVector::DotProduct(UpVector, WorldUp);
+        const float Alignment = FVector::DotProduct(ComponentUp, WorldUp);
+        BestValue = Alignment > 0.f ? 1 : 6;
+    }
+
+    if (!bFoundFace)
+    {
+        const float Alignment = FVector::DotProduct(ComponentUp, FVector::UpVector);
         BestValue = Alignment > 0.f ? 1 : 6;
     }
 
     return FMath::Clamp(BestValue, 1, 6);
+}
+
+FVector ASkaldDiceD6::GetFaceWorldNormal(const FSkaldDiceFaceMapping& Mapping) const
+{
+    if (!DiceMesh)
+    {
+        return FVector::ZeroVector;
+    }
+
+    if (Mapping.SocketName != NAME_None && DiceMesh->DoesSocketExist(Mapping.SocketName))
+    {
+        const FTransform SocketTransform = DiceMesh->GetSocketTransform(Mapping.SocketName);
+        return SocketTransform.GetUnitAxis(EAxis::Z).GetSafeNormal();
+    }
+
+    const FVector LocalNormal = Mapping.LocalNormal;
+    if (!LocalNormal.IsNearlyZero())
+    {
+        return DiceMesh->GetComponentTransform().TransformVectorNoScale(LocalNormal).GetSafeNormal();
+    }
+
+    return FVector::ZeroVector;
 }
 
 void ASkaldDiceD6::EnsureDynamicMaterialsCreated()
@@ -296,6 +341,68 @@ void ASkaldDiceD6::EnsureDynamicMaterialsCreated()
             {
                 DynamicMaterials.Add(DynamicMaterial);
             }
+        }
+    }
+}
+
+void ASkaldDiceD6::ValidateFaceMappings()
+{
+    if (bHasValidatedFaceMappings)
+    {
+        return;
+    }
+
+    bHasValidatedFaceMappings = true;
+
+    if (!DiceMesh || !CachedConfig)
+    {
+        return;
+    }
+
+    const UStaticMesh* StaticMesh = DiceMesh->GetStaticMesh();
+
+    TArray<FName> MeshSocketNames;
+    DiceMesh->GetAllSocketNames(MeshSocketNames);
+
+    FString AvailableSockets;
+    if (MeshSocketNames.Num() > 0)
+    {
+        TArray<FString> SocketStrings;
+        SocketStrings.Reserve(MeshSocketNames.Num());
+        for (const FName& SocketName : MeshSocketNames)
+        {
+            SocketStrings.Add(SocketName.ToString());
+        }
+
+        AvailableSockets = FString::Join(SocketStrings, TEXT(", "));
+    }
+    else
+    {
+        AvailableSockets = TEXT("<none>");
+    }
+
+    for (const FSkaldDiceFaceMapping& Mapping : CachedConfig->FaceLookup)
+    {
+        const bool bHasSocket = Mapping.SocketName != NAME_None;
+        const bool bSocketValid = bHasSocket && DiceMesh->DoesSocketExist(Mapping.SocketName);
+        const bool bHasLocalNormal = !Mapping.LocalNormal.IsNearlyZero();
+
+        if (bHasSocket && !bSocketValid)
+        {
+            UE_LOG(LogSkaldDice, Warning, TEXT("Dice '%s' (mesh '%s') references missing socket '%s' for face value %d. Available sockets: %s"),
+                *GetNameSafe(this),
+                *GetNameSafe(StaticMesh),
+                *Mapping.SocketName.ToString(),
+                Mapping.FaceValue,
+                *AvailableSockets);
+        }
+
+        if (!bSocketValid && !bHasLocalNormal)
+        {
+            UE_LOG(LogSkaldDice, Warning, TEXT("Dice '%s' (mesh '%s') face value %d has neither a valid socket nor a non-zero local normal; falling back to heuristics."),
+                *GetNameSafe(this),
+                *GetNameSafe(StaticMesh),
+                Mapping.FaceValue);
         }
     }
 }

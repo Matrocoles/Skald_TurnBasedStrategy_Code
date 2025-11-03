@@ -63,5 +63,9 @@ protected:
 private:
     void UpdateSettleState(float DeltaSeconds);
     int32 ResolveFaceValue() const;
+    FVector GetFaceWorldNormal(const FSkaldDiceFaceMapping& Mapping) const;
     void EnsureDynamicMaterialsCreated();
+    void ValidateFaceMappings();
+
+    bool bHasValidatedFaceMappings = false;
 };
