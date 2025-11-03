@@ -5908,8 +5908,10 @@ FGuid ASkaldPlayerController::TriggerInitiativeDicePresentation(int32 AttackerRo
 
   DetermineControlledBattleSide();
 
-  const bool bPlayerIsAttacker = bControlsAttackerSide && !bControlsDefenderSide;
-  const bool bPlayerIsDefender = bControlsDefenderSide && !bControlsAttackerSide;
+  bool bTreatAttackerAsPlayer = true;
+  if (UGridBattleManager *BattleManager = GetBattleManager()) {
+    bTreatAttackerAsPlayer = BattleManager->DoesInitiativePlayerSlotRepresentAttacker();
+  }
 
   TArray<int32> PlayerResults;
   TArray<int32> EnemyResults;
@@ -5938,16 +5940,8 @@ FGuid ASkaldPlayerController::TriggerInitiativeDicePresentation(int32 AttackerRo
     }
   };
 
-  if (bPlayerIsAttacker) {
-    AppendValue(AttackerRoll, true);
-    AppendValue(DefenderRoll, false);
-  } else if (bPlayerIsDefender) {
-    AppendValue(DefenderRoll, true);
-    AppendValue(AttackerRoll, false);
-  } else {
-    AppendValue(AttackerRoll, true);
-    AppendValue(DefenderRoll, false);
-  }
+  AppendValue(AttackerRoll, bTreatAttackerAsPlayer);
+  AppendValue(DefenderRoll, !bTreatAttackerAsPlayer);
 
   FGuid RollId;
   if (DiceManager && (PlayerResults.Num() > 0 || EnemyResults.Num() > 0)) {

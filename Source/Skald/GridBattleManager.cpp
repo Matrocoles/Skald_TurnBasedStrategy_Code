@@ -350,6 +350,13 @@ bool UGridBattleManager::RollInitiative()
     LastInitiativeRollAttacker = 0;
     LastInitiativeRollDefender = 0;
 
+    PendingInitiativePlayerDice = 0;
+    PendingInitiativeEnemyDice = 0;
+
+    const bool bTreatAttackerAsPlayerSlot = ShouldTreatAttackerDiceAsPlayerSlot();
+    bPendingInitiativePlayerSlotIsAttacker = bTreatAttackerAsPlayerSlot;
+    bPendingInitiativeEnemySlotIsAttacker = !bTreatAttackerAsPlayerSlot;
+
     const bool bAttackersPresent = HasLivingFighters(true);
     const bool bDefendersPresent = HasLivingFighters(false);
 
@@ -394,8 +401,29 @@ bool UGridBattleManager::RollInitiative()
 
         if (USkaldDiceManager* Manager = ResolveDiceManager())
         {
-            PendingInitiativePlayerDice = bNeedsAttackerRoll ? 1 : 0;
-            PendingInitiativeEnemyDice = bNeedsDefenderRoll ? 1 : 0;
+            if (bNeedsAttackerRoll)
+            {
+                if (bTreatAttackerAsPlayerSlot)
+                {
+                    ++PendingInitiativePlayerDice;
+                }
+                else
+                {
+                    ++PendingInitiativeEnemyDice;
+                }
+            }
+
+            if (bNeedsDefenderRoll)
+            {
+                if (!bTreatAttackerAsPlayerSlot)
+                {
+                    ++PendingInitiativePlayerDice;
+                }
+                else
+                {
+                    ++PendingInitiativeEnemyDice;
+                }
+            }
 
             if (PendingInitiativePlayerDice > 0 || PendingInitiativeEnemyDice > 0)
             {
@@ -514,6 +542,8 @@ void UGridBattleManager::ApplyInitiativeAdjustments(int32& AttackerRoll, int32& 
 
 void UGridBattleManager::CompleteInitiativeRoll(int32 AttackerRoll, int32 DefenderRoll)
 {
+    UpdateInitiativeSlotHistory();
+
     PendingInitiativeRollAttacker.Reset();
     PendingInitiativeRollDefender.Reset();
 
@@ -585,15 +615,59 @@ void UGridBattleManager::HandleDiceRollCompleted(const FGuid& RollId, const TArr
     int32 AttackerRoll = bAttackerRollProvided ? FMath::Clamp(PendingInitiativeRollAttacker.GetValue(), 1, InitiativeDiceSides) : 0;
     int32 DefenderRoll = bDefenderRollProvided ? FMath::Clamp(PendingInitiativeRollDefender.GetValue(), 1, InitiativeDiceSides) : 0;
 
-    int32 ResultIndex = 0;
-    if (!bAttackerRollProvided && PendingInitiativePlayerDice > 0 && Results.IsValidIndex(ResultIndex))
+    const int32 PlayerDiceCount = PendingInitiativePlayerDice;
+    const int32 EnemyDiceCount = PendingInitiativeEnemyDice;
+    int32 PlayerResultIndex = 0;
+    int32 EnemyResultIndex = 0;
+
+    auto ConsumePlayerResult = [&](int32& OutValue)
     {
-        AttackerRoll = FMath::Clamp(Results[ResultIndex++], 1, InitiativeDiceSides);
+        if (PlayerResultIndex < PlayerDiceCount && Results.IsValidIndex(PlayerResultIndex))
+        {
+            OutValue = FMath::Clamp(Results[PlayerResultIndex], 1, InitiativeDiceSides);
+            ++PlayerResultIndex;
+            return true;
+        }
+        return false;
+    };
+
+    auto ConsumeEnemyResult = [&](int32& OutValue)
+    {
+        if (EnemyResultIndex < EnemyDiceCount)
+        {
+            const int32 ResultPosition = PlayerDiceCount + EnemyResultIndex;
+            if (Results.IsValidIndex(ResultPosition))
+            {
+                OutValue = FMath::Clamp(Results[ResultPosition], 1, InitiativeDiceSides);
+                ++EnemyResultIndex;
+                return true;
+            }
+        }
+        return false;
+    };
+
+    if (!bAttackerRollProvided)
+    {
+        if (bPendingInitiativePlayerSlotIsAttacker)
+        {
+            ConsumePlayerResult(AttackerRoll);
+        }
+        else if (bPendingInitiativeEnemySlotIsAttacker)
+        {
+            ConsumeEnemyResult(AttackerRoll);
+        }
     }
 
-    if (!bDefenderRollProvided && PendingInitiativeEnemyDice > 0 && Results.IsValidIndex(ResultIndex))
+    if (!bDefenderRollProvided)
     {
-        DefenderRoll = FMath::Clamp(Results[ResultIndex++], 1, InitiativeDiceSides);
+        if (!bPendingInitiativePlayerSlotIsAttacker)
+        {
+            ConsumePlayerResult(DefenderRoll);
+        }
+        else if (!bPendingInitiativeEnemySlotIsAttacker)
+        {
+            ConsumeEnemyResult(DefenderRoll);
+        }
     }
 
     PendingInitiativePlayerDice = 0;
@@ -824,6 +898,25 @@ bool UGridBattleManager::ShouldPauseForInitiativePrompt() const
     const bool bAttackersHuman = !IsSideAIControlled(true);
     const bool bDefendersHuman = !IsSideAIControlled(false);
     return bAttackersHuman || bDefendersHuman;
+}
+
+bool UGridBattleManager::ShouldTreatAttackerDiceAsPlayerSlot() const
+{
+    const bool bAttackersAreAI = IsSideAIControlled(true);
+    const bool bDefendersAreAI = IsSideAIControlled(false);
+
+    if (bAttackersAreAI == bDefendersAreAI)
+    {
+        return true;
+    }
+
+    return !bAttackersAreAI;
+}
+
+void UGridBattleManager::UpdateInitiativeSlotHistory()
+{
+    bLastInitiativePlayerSlotWasAttacker = bPendingInitiativePlayerSlotIsAttacker;
+    bLastInitiativeEnemySlotWasAttacker = bPendingInitiativeEnemySlotIsAttacker;
 }
 
 void UGridBattleManager::AdvanceTurn()
