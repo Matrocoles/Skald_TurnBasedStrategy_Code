@@ -321,8 +321,13 @@ public:
     void SetRandomSeed(int32 Seed);
 
     /** Resolve an attack following strength/defence rules. Returns true if the defender survives. */
-    UFUNCTION(BlueprintCallable, Category="Battle")
-    static FDiceRollResult ResolveAttackDice(const FFighterStats& AttackerStats, const FFighterStats& DefenderStats, UPARAM(ref) FRandomStream& RandomStream, const TArray<int32>* OverrideRolls = nullptr);
+    UFUNCTION(BlueprintCallable, Category="Battle", meta = (AutoCreateRefTerm = "OverrideRolls"))
+    static FDiceRollResult ResolveAttackDice(const FFighterStats& AttackerStats, const FFighterStats& DefenderStats, UPARAM(ref) FRandomStream& RandomStream, const TArray<int32>& OverrideRolls);
+
+    static FDiceRollResult ResolveAttackDice(const FFighterStats& AttackerStats, const FFighterStats& DefenderStats, FRandomStream& RandomStream)
+    {
+        return ResolveAttackDice(AttackerStats, DefenderStats, RandomStream, TArray<int32>());
+    }
 
     UFUNCTION(BlueprintCallable, Category="Battle|Dice")
     static bool ResolveAttack(UPARAM(ref) FFighter& Attacker, UPARAM(ref) FFighter& Defender, UPARAM(ref) int32& OutDamage, UPARAM(ref) FRandomStream& RandomStream, UPARAM(ref) FDiceRollResult& OutResult);
