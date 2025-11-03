@@ -5,6 +5,7 @@
 #include "FighterPawn.h"
 #include "GridOverlayComponent.h"
 #include "SkaldLogging.h"
+#include "SkaldDiceManager.h"
 #include "Skald_GameInstance.h"
 #include "Skald_GameState.h"
 #include "Skald_PlayerState.h"
@@ -80,6 +81,16 @@ UGridBattleManager::UGridBattleManager()
     // FighterDefinitions is provided via editor (EditDefaultsOnly)
 }
 
+void UGridBattleManager::BeginDestroy()
+{
+    if (USkaldDiceManager* Manager = DiceManager.Get())
+    {
+        Manager->OnDiceRollCompleted.RemoveDynamic(this, &UGridBattleManager::HandleDiceRollCompleted);
+    }
+    DiceManager.Reset();
+    Super::BeginDestroy();
+}
+
 void UGridBattleManager::SetRandomSeed(int32 Seed)
 {
     Rng.Initialize(Seed);
@@ -130,7 +141,7 @@ void UGridBattleManager::InitBattle(const TArray<FFighter>& Attackers, const TAr
     bRoundStartDeferred = false;
 }
 
-FDiceRollResult UGridBattleManager::ResolveAttackDice(const FFighterStats& AttackerStats, const FFighterStats& DefenderStats, FRandomStream& RandomStream)
+FDiceRollResult UGridBattleManager::ResolveAttackDice(const FFighterStats& AttackerStats, const FFighterStats& DefenderStats, FRandomStream& RandomStream, const TArray<int32>* OverrideRolls)
 {
     FDiceRollResult Result;
     Result.StartingHealth = DefenderStats.Health;
@@ -151,7 +162,17 @@ FDiceRollResult UGridBattleManager::ResolveAttackDice(const FFighterStats& Attac
     for (int32 DieIndex = 0; DieIndex < DiceToRoll && SimulatedHealth > 0; ++DieIndex)
     {
         FDiceRollOutcome& Outcome = Result.DiceOutcomes.AddDefaulted_GetRef();
-        Outcome.RollValue = RandomStream.RandRange(1, 6);
+        int32 RollValue = 0;
+        if (OverrideRolls && OverrideRolls->IsValidIndex(DieIndex))
+        {
+            RollValue = FMath::Clamp((*OverrideRolls)[DieIndex], 1, 6);
+        }
+        else
+        {
+            RollValue = RandomStream.RandRange(1, 6);
+        }
+
+        Outcome.RollValue = RollValue;
 
         int32 Damage = 0;
         if (Outcome.RollValue == 6)
@@ -319,11 +340,11 @@ TArray<FFighterDefinition> UGridBattleManager::GetFightersForFaction(ESkaldFacti
     return Out;
 }
 
-void UGridBattleManager::RollInitiative()
+bool UGridBattleManager::RollInitiative()
 {
     if (bBattleConcluded)
     {
-        return;
+        return true;
     }
 
     LastInitiativeRollAttacker = 0;
@@ -336,36 +357,107 @@ void UGridBattleManager::RollInitiative()
     {
         InitiativeWinnerFaction = ESkaldFaction::None;
         bIsAttackerTurn = true;
-        return;
+        CompleteInitiativeRoll(0, 0);
+        return true;
     }
 
     if (!bAttackersPresent)
     {
         InitiativeWinnerFaction = DefenderTeam.Num() > 0 ? DefenderTeam[0].Faction : ESkaldFaction::None;
         bIsAttackerTurn = false;
-        return;
+        CompleteInitiativeRoll(0, 0);
+        return true;
     }
 
     if (!bDefendersPresent)
     {
         InitiativeWinnerFaction = AttackerTeam.Num() > 0 ? AttackerTeam[0].Faction : ESkaldFaction::None;
         bIsAttackerTurn = true;
-        return;
+        CompleteInitiativeRoll(0, 0);
+        return true;
     }
 
-    int32 AttackerRoll = PendingInitiativeRollAttacker.IsSet() ? PendingInitiativeRollAttacker.GetValue() : 0;
-    int32 DefenderRoll = PendingInitiativeRollDefender.IsSet() ? PendingInitiativeRollDefender.GetValue() : 0;
+    int32 AttackerRoll = PendingInitiativeRollAttacker.IsSet() ? FMath::Clamp(PendingInitiativeRollAttacker.GetValue(), 1, InitiativeDiceSides) : 0;
+    int32 DefenderRoll = PendingInitiativeRollDefender.IsSet() ? FMath::Clamp(PendingInitiativeRollDefender.GetValue(), 1, InitiativeDiceSides) : 0;
 
     const bool bAttackerRollProvided = PendingInitiativeRollAttacker.IsSet();
     const bool bDefenderRollProvided = PendingInitiativeRollDefender.IsSet();
-    const bool bAttackerHasEmpireDiscipline = TeamHasLivingFaction(AttackerTeam, ESkaldFaction::Empire);
-    const bool bDefenderHasEmpireDiscipline = TeamHasLivingFaction(DefenderTeam, ESkaldFaction::Empire);
+    const bool bNeedsAttackerRoll = !bAttackerRollProvided && AttackerRoll <= 0;
+    const bool bNeedsDefenderRoll = !bDefenderRollProvided && DefenderRoll <= 0;
 
-    int32 Attempts = 0;
-    const int32 MaxAttempts = 100;
-
-    while (Attempts < MaxAttempts)
+    if ((bNeedsAttackerRoll || bNeedsDefenderRoll))
     {
+        if (bInitiativeRollAwaitingResults)
+        {
+            return false;
+        }
+
+        if (USkaldDiceManager* Manager = ResolveDiceManager())
+        {
+            PendingInitiativePlayerDice = bNeedsAttackerRoll ? 1 : 0;
+            PendingInitiativeEnemyDice = bNeedsDefenderRoll ? 1 : 0;
+
+            if (PendingInitiativePlayerDice > 0 || PendingInitiativeEnemyDice > 0)
+            {
+                const FGuid RollId = Manager->RollDice_D6(PendingInitiativePlayerDice, PendingInitiativeEnemyDice, true);
+                if (RollId.IsValid())
+                {
+                    ActiveInitiativeRollId = RollId;
+                    bInitiativeRollAwaitingResults = true;
+                    return false;
+                }
+
+                PendingInitiativePlayerDice = 0;
+                PendingInitiativeEnemyDice = 0;
+            }
+        }
+
+        if (bNeedsAttackerRoll)
+        {
+            AttackerRoll = Rng.RandRange(1, InitiativeDiceSides);
+        }
+
+        if (bNeedsDefenderRoll)
+        {
+            DefenderRoll = Rng.RandRange(1, InitiativeDiceSides);
+        }
+    }
+
+    if (!bAttackerRollProvided || !bDefenderRollProvided)
+    {
+        int32 Attempts = 0;
+        const int32 MaxAttempts = 100;
+
+        while (Attempts < MaxAttempts && (!bAttackerRollProvided || !bDefenderRollProvided))
+        {
+            if (!bAttackerRollProvided && AttackerRoll <= 0)
+            {
+                AttackerRoll = Rng.RandRange(1, InitiativeDiceSides);
+            }
+
+            if (!bDefenderRollProvided && DefenderRoll <= 0)
+            {
+                DefenderRoll = Rng.RandRange(1, InitiativeDiceSides);
+            }
+
+            if (AttackerRoll != DefenderRoll)
+            {
+                break;
+            }
+
+            if (!bAttackerRollProvided)
+            {
+                AttackerRoll = 0;
+            }
+
+            if (!bDefenderRollProvided)
+            {
+                DefenderRoll = 0;
+            }
+
+            ++Attempts;
+        }
+
         if (!bAttackerRollProvided && AttackerRoll <= 0)
         {
             AttackerRoll = Rng.RandRange(1, InitiativeDiceSides);
@@ -375,29 +467,18 @@ void UGridBattleManager::RollInitiative()
         {
             DefenderRoll = Rng.RandRange(1, InitiativeDiceSides);
         }
-
-        if (AttackerRoll != DefenderRoll)
-        {
-            break;
-        }
-
-        if (bAttackerRollProvided && bDefenderRollProvided)
-        {
-            break;
-        }
-
-        if (!bAttackerRollProvided)
-        {
-            AttackerRoll = 0;
-        }
-        if (!bDefenderRollProvided)
-        {
-            DefenderRoll = 0;
-        }
-
-        ++Attempts;
     }
 
+    const bool bAttackerHasEmpireDiscipline = TeamHasLivingFaction(AttackerTeam, ESkaldFaction::Empire);
+    const bool bDefenderHasEmpireDiscipline = TeamHasLivingFaction(DefenderTeam, ESkaldFaction::Empire);
+    ApplyInitiativeAdjustments(AttackerRoll, DefenderRoll, bAttackerRollProvided, bDefenderRollProvided, bAttackerHasEmpireDiscipline, bDefenderHasEmpireDiscipline);
+
+    CompleteInitiativeRoll(AttackerRoll, DefenderRoll);
+    return true;
+}
+
+void UGridBattleManager::ApplyInitiativeAdjustments(int32& AttackerRoll, int32& DefenderRoll, bool bAttackerRollProvided, bool bDefenderRollProvided, bool bAttackerHasEmpireDiscipline, bool bDefenderHasEmpireDiscipline)
+{
     if (bAttackerHasEmpireDiscipline && !bAttackerRollProvided)
     {
         const int32 Reroll = Rng.RandRange(1, InitiativeDiceSides);
@@ -422,7 +503,6 @@ void UGridBattleManager::RollInitiative()
         }
         else
         {
-            // As a fallback, bias ties in favour of the attacker to avoid stalling the round start.
             AttackerRoll = InitiativeDiceSides;
             if (DefenderRoll == AttackerRoll)
             {
@@ -430,12 +510,15 @@ void UGridBattleManager::RollInitiative()
             }
         }
     }
+}
+
+void UGridBattleManager::CompleteInitiativeRoll(int32 AttackerRoll, int32 DefenderRoll)
+{
+    PendingInitiativeRollAttacker.Reset();
+    PendingInitiativeRollDefender.Reset();
 
     LastInitiativeRollAttacker = AttackerRoll;
     LastInitiativeRollDefender = DefenderRoll;
-
-    PendingInitiativeRollAttacker.Reset();
-    PendingInitiativeRollDefender.Reset();
 
     if (AttackerRoll >= DefenderRoll)
     {
@@ -447,6 +530,91 @@ void UGridBattleManager::RollInitiative()
         bIsAttackerTurn = false;
         InitiativeWinnerFaction = DefenderTeam.Num() > 0 ? DefenderTeam[0].Faction : ESkaldFaction::None;
     }
+
+    UE_LOG(LogSkaldBattle, Log, TEXT("[Battle] Round %d initiative winner: %s (Attacker=%d Defender=%d)"), CurrentRound,
+        *UEnum::GetValueAsString(InitiativeWinnerFaction), LastInitiativeRollAttacker, LastInitiativeRollDefender);
+
+    const bool bHasPresentationListeners = OnInitiativeRollCompleted.IsBound();
+    if (bHasPresentationListeners)
+    {
+        OnInitiativeRollCompleted.Broadcast(CurrentRound, LastInitiativeRollAttacker, LastInitiativeRollDefender, InitiativeWinnerFaction);
+    }
+
+    ScheduleRoundStart(bHasPresentationListeners);
+}
+
+USkaldDiceManager* UGridBattleManager::ResolveDiceManager()
+{
+    if (USkaldDiceManager* Manager = DiceManager.Get())
+    {
+        return Manager;
+    }
+
+    if (UWorld* World = GetWorld())
+    {
+        if (USkaldGameInstance* GameInstance = Cast<USkaldGameInstance>(World->GetGameInstance()))
+        {
+            if (USkaldDiceManager* Manager = GameInstance->GetSubsystem<USkaldDiceManager>())
+            {
+                if (!Manager->OnDiceRollCompleted.IsAlreadyBound(this, &UGridBattleManager::HandleDiceRollCompleted))
+                {
+                    Manager->OnDiceRollCompleted.AddDynamic(this, &UGridBattleManager::HandleDiceRollCompleted);
+                }
+                DiceManager = Manager;
+                return Manager;
+            }
+        }
+    }
+
+    return nullptr;
+}
+
+void UGridBattleManager::HandleDiceRollCompleted(const FGuid& RollId, const TArray<int32>& Results)
+{
+    if (!bInitiativeRollAwaitingResults || RollId != ActiveInitiativeRollId)
+    {
+        return;
+    }
+
+    ActiveInitiativeRollId.Invalidate();
+    bInitiativeRollAwaitingResults = false;
+
+    const bool bAttackerRollProvided = PendingInitiativeRollAttacker.IsSet();
+    const bool bDefenderRollProvided = PendingInitiativeRollDefender.IsSet();
+
+    int32 AttackerRoll = bAttackerRollProvided ? FMath::Clamp(PendingInitiativeRollAttacker.GetValue(), 1, InitiativeDiceSides) : 0;
+    int32 DefenderRoll = bDefenderRollProvided ? FMath::Clamp(PendingInitiativeRollDefender.GetValue(), 1, InitiativeDiceSides) : 0;
+
+    int32 ResultIndex = 0;
+    if (!bAttackerRollProvided && PendingInitiativePlayerDice > 0 && Results.IsValidIndex(ResultIndex))
+    {
+        AttackerRoll = FMath::Clamp(Results[ResultIndex++], 1, InitiativeDiceSides);
+    }
+
+    if (!bDefenderRollProvided && PendingInitiativeEnemyDice > 0 && Results.IsValidIndex(ResultIndex))
+    {
+        DefenderRoll = FMath::Clamp(Results[ResultIndex++], 1, InitiativeDiceSides);
+    }
+
+    PendingInitiativePlayerDice = 0;
+    PendingInitiativeEnemyDice = 0;
+
+    if (AttackerRoll <= 0)
+    {
+        AttackerRoll = Rng.RandRange(1, InitiativeDiceSides);
+    }
+
+    if (DefenderRoll <= 0)
+    {
+        DefenderRoll = Rng.RandRange(1, InitiativeDiceSides);
+    }
+
+    const bool bAttackerHasEmpireDiscipline = TeamHasLivingFaction(AttackerTeam, ESkaldFaction::Empire);
+    const bool bDefenderHasEmpireDiscipline = TeamHasLivingFaction(DefenderTeam, ESkaldFaction::Empire);
+
+    ApplyInitiativeAdjustments(AttackerRoll, DefenderRoll, bAttackerRollProvided, bDefenderRollProvided, bAttackerHasEmpireDiscipline, bDefenderHasEmpireDiscipline);
+
+    CompleteInitiativeRoll(AttackerRoll, DefenderRoll);
 }
 
 void UGridBattleManager::StartRound()
@@ -541,18 +709,11 @@ void UGridBattleManager::ResolveInitiativeRollInternal()
         World->GetTimerManager().ClearTimer(InitiativeAIRollTimer);
     }
 
-    RollInitiative();
-
-    UE_LOG(LogSkaldBattle, Log, TEXT("[Battle] Round %d initiative winner: %s (Attacker=%d Defender=%d)"), CurrentRound,
-        *UEnum::GetValueAsString(InitiativeWinnerFaction), LastInitiativeRollAttacker, LastInitiativeRollDefender);
-
-    const bool bHasPresentationListeners = OnInitiativeRollCompleted.IsBound();
-    if (bHasPresentationListeners)
+    if (!RollInitiative())
     {
-        OnInitiativeRollCompleted.Broadcast(CurrentRound, LastInitiativeRollAttacker, LastInitiativeRollDefender, InitiativeWinnerFaction);
+        // Awaiting physical dice results; finalization occurs in HandleDiceRollCompleted.
+        return;
     }
-
-    ScheduleRoundStart(bHasPresentationListeners);
 }
 
 void UGridBattleManager::ScheduleAIRollIfNeeded()

@@ -6,12 +6,14 @@
 #include "SkaldTypes.h"
 #include "TimerManager.h"
 #include "Containers/Set.h"
+#include "Containers/Map.h"
 #include "UObject/WeakObjectPtr.h"
 #include "Skald_GameMode.generated.h"
 class ATurnManager;
 class ASkaldGameState;
 class ASkaldPlayerController;
 class ASkaldPlayerState;
+class USkaldDiceManager;
 class AWorldMap;
 class APlayerController;
 class USkaldSaveGame;
@@ -269,6 +271,15 @@ private:
                                      int32 RoundNumber, int32 RollValue,
                                      bool bWonInitiative);
 
+  void EnsureStrategicInitiativeDiceBinding();
+  USkaldDiceManager *ResolveDiceManager();
+
+  UFUNCTION()
+  void HandleStrategicInitiativeDiceCompleted(const FGuid &RollId,
+                                              const TArray<int32> &Results);
+
+  int32 ResolveStrategicInitiativeResult(const TArray<int32> &Results);
+
   /** Perform any deferred work that must happen once the overworld is ready. */
   void HandleWorldInitializationComplete();
 
@@ -280,4 +291,10 @@ private:
 
   /** Whether the strategic initiative prompt has been shown this cycle. */
   bool bStrategicInitiativePromptIssued = false;
+
+  /** Cached dice subsystem used for strategic initiative rolls. */
+  TWeakObjectPtr<USkaldDiceManager> CachedDiceManager;
+
+  /** Active dice rolls awaiting completion for strategic initiative. */
+  TMap<FGuid, TWeakObjectPtr<ASkaldPlayerState>> PendingStrategicInitiativeRolls;
 };

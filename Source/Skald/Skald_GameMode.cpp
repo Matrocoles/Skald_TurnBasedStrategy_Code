@@ -16,6 +16,7 @@
 #include "Skald_AIController.h"
 #include "Skald_BattleGameMode.h"
 #include "Skald_GameInstance.h"
+#include "SkaldDiceManager.h"
 #include "Skald_GameState.h"
 #include "Skald_PropertyAccess.h"
 #include "Skald_PlayerCharacter.h"
@@ -1533,8 +1534,11 @@ void ASkaldGameMode::BeginStrategicInitiativePhase() {
   }
 
   PendingStrategicInitiativePlayers.Empty();
+  PendingStrategicInitiativeRolls.Empty();
   bAwaitingStrategicInitiativeInput = true;
   bStrategicInitiativePromptIssued = true;
+
+  EnsureStrategicInitiativeDiceBinding();
 
   for (APlayerState *PSBase : GS->PlayerArray) {
     if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
@@ -1607,6 +1611,44 @@ void ASkaldGameMode::ConfirmStrategicInitiativeRoll(
     return;
   }
 
+  if (PS->InitiativeRoll <= 0) {
+    bool bAlreadyRolling = false;
+    for (const auto &Entry : PendingStrategicInitiativeRolls) {
+      if (Entry.Value.Get() == PS) {
+        bAlreadyRolling = true;
+        break;
+      }
+    }
+
+    if (!bAlreadyRolling) {
+      bool bStartedRoll = false;
+      if (USkaldDiceManager *DiceManager = ResolveDiceManager()) {
+        EnsureStrategicInitiativeDiceBinding();
+        const FGuid RollId = DiceManager->RollDice_D6(1, 0, true);
+        if (RollId.IsValid()) {
+          PendingStrategicInitiativeRolls.Add(RollId, PS);
+          bStartedRoll = true;
+        } else {
+          UE_LOG(LogSkald, Warning,
+                 TEXT("Strategic initiative roll for %s failed to start; falling back "
+                      "to RNG."),
+                 PS ? *PS->GetPlayerName() : TEXT("Unknown"));
+        }
+      } else {
+        UE_LOG(LogSkald, Warning,
+               TEXT("Strategic initiative roll fallback: dice manager unavailable."));
+      }
+
+      if (bStartedRoll) {
+        return;
+      }
+
+      const TArray<int32> EmptyResults;
+      const int32 FallbackValue = ResolveStrategicInitiativeResult(EmptyResults);
+      PS->InitiativeRoll = FallbackValue;
+    }
+  }
+
   RemovePendingStrategicInitiativePlayer(PS);
 }
 
@@ -1623,6 +1665,7 @@ void ASkaldGameMode::ResolveStrategicInitiativePhase() {
 
   const bool bInitialized = InitializeWorld();
   PendingStrategicInitiativePlayers.Empty();
+  PendingStrategicInitiativeRolls.Empty();
   bStrategicInitiativePromptIssued = false;
 
   if (bInitialized) {
@@ -1650,6 +1693,71 @@ void ASkaldGameMode::NotifyStrategicInitiativeRoll(
     Controller->ClientPromptStrategicInitiative(RoundNumber, RollValue,
                                                bWonInitiative);
   }
+}
+
+void ASkaldGameMode::EnsureStrategicInitiativeDiceBinding() {
+  if (USkaldDiceManager *Manager = ResolveDiceManager()) {
+    if (!Manager->OnDiceRollCompleted.IsAlreadyBound(
+            this, &ASkaldGameMode::HandleStrategicInitiativeDiceCompleted)) {
+      Manager->OnDiceRollCompleted.AddDynamic(
+          this, &ASkaldGameMode::HandleStrategicInitiativeDiceCompleted);
+    }
+  }
+}
+
+USkaldDiceManager *ASkaldGameMode::ResolveDiceManager() {
+  if (CachedDiceManager.IsValid()) {
+    return CachedDiceManager.Get();
+  }
+
+  USkaldDiceManager *ResolvedManager = nullptr;
+  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+    ResolvedManager = GI->GetSubsystem<USkaldDiceManager>();
+  }
+
+  if (ResolvedManager) {
+    CachedDiceManager = ResolvedManager;
+  }
+
+  return ResolvedManager;
+}
+
+void ASkaldGameMode::HandleStrategicInitiativeDiceCompleted(
+    const FGuid &RollId, const TArray<int32> &Results) {
+  if (!bAwaitingStrategicInitiativeInput) {
+    PendingStrategicInitiativeRolls.Remove(RollId);
+    return;
+  }
+
+  TWeakObjectPtr<ASkaldPlayerState> *Entry =
+      PendingStrategicInitiativeRolls.Find(RollId);
+  if (!Entry) {
+    return;
+  }
+
+  ASkaldPlayerState *PlayerState = Entry->Get();
+  PendingStrategicInitiativeRolls.Remove(RollId);
+
+  const int32 RollValue = ResolveStrategicInitiativeResult(Results);
+  if (PlayerState) {
+    PlayerState->InitiativeRoll = RollValue;
+    RemovePendingStrategicInitiativePlayer(PlayerState);
+  } else {
+    HandlePendingStrategicInitiativeUpdate();
+  }
+}
+
+int32 ASkaldGameMode::ResolveStrategicInitiativeResult(
+    const TArray<int32> &Results) {
+  if (Results.Num() > 0) {
+    return FMath::Clamp(Results[0], 1, 6);
+  }
+
+  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+    return GI->CombatRandomStream.RandRange(1, 6);
+  }
+
+  return FMath::RandRange(1, 6);
 }
 
 void ASkaldGameMode::HandleWorldInitializationComplete() {
