@@ -1964,7 +1964,7 @@ void AFighterPawn::HandleDiceRollCompleted(const FGuid &RollId,
 
   FDiceRollResult DiceResult = UGridBattleManager::ResolveAttackDice(
       PendingAttackAttackerSnapshot, PendingAttackDefenderSnapshot,
-      *RandomStream, &Results);
+      *RandomStream, Results);
   DiceResult.HighStakesFaction = Faction;
 
   StartQueuedAttack(Target, MoveTemp(DiceResult));

@@ -141,7 +141,7 @@ void UGridBattleManager::InitBattle(const TArray<FFighter>& Attackers, const TAr
     bRoundStartDeferred = false;
 }
 
-FDiceRollResult UGridBattleManager::ResolveAttackDice(const FFighterStats& AttackerStats, const FFighterStats& DefenderStats, FRandomStream& RandomStream, const TArray<int32>* OverrideRolls)
+FDiceRollResult UGridBattleManager::ResolveAttackDice(const FFighterStats& AttackerStats, const FFighterStats& DefenderStats, FRandomStream& RandomStream, const TArray<int32>& OverrideRolls)
 {
     FDiceRollResult Result;
     Result.StartingHealth = DefenderStats.Health;
@@ -163,9 +163,9 @@ FDiceRollResult UGridBattleManager::ResolveAttackDice(const FFighterStats& Attac
     {
         FDiceRollOutcome& Outcome = Result.DiceOutcomes.AddDefaulted_GetRef();
         int32 RollValue = 0;
-        if (OverrideRolls && OverrideRolls->IsValidIndex(DieIndex))
+        if (OverrideRolls.IsValidIndex(DieIndex))
         {
-            RollValue = FMath::Clamp((*OverrideRolls)[DieIndex], 1, 6);
+            RollValue = FMath::Clamp(OverrideRolls[DieIndex], 1, 6);
         }
         else
         {
