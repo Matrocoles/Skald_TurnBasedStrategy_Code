@@ -159,19 +159,30 @@ void ASkaldDiceD6::ForceFaceValue(int32 TargetValue, bool bBroadcastResult)
         }
     }
 
-    FVector DesiredUp = FVector::UpVector;
+    FQuat TargetQuat = FQuat::Identity;
     if (Mapping)
     {
-        const FVector MappingNormal = GetFaceWorldNormal(*Mapping);
-        if (!MappingNormal.IsNearlyZero())
+        const FVector MappingLocalNormal = GetFaceLocalNormal(*Mapping);
+        if (!MappingLocalNormal.IsNearlyZero())
         {
-            DesiredUp = MappingNormal;
+            const FVector NormalisedLocalNormal = MappingLocalNormal.GetSafeNormal();
+            TargetQuat = FQuat::FindBetweenNormals(NormalisedLocalNormal, FVector::UpVector);
         }
     }
 
-    DesiredUp = DesiredUp.GetSafeNormal();
+    const float RandomYaw = FMath::FRandRange(0.f, 360.f);
+    if (!FMath::IsNearlyZero(RandomYaw))
+    {
+        const FQuat YawQuat(FVector::UpVector, FMath::DegreesToRadians(RandomYaw));
+        TargetQuat = YawQuat * TargetQuat;
+    }
 
-    const FRotator TargetRot = FRotationMatrix::MakeFromZ(DesiredUp).Rotator() + FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f);
+    if (TargetQuat.ContainsNaN())
+    {
+        TargetQuat = FQuat::Identity;
+    }
+
+    const FRotator TargetRot = TargetQuat.Rotator();
     const FVector Location = GetActorLocation();
 
     DiceMesh->SetSimulatePhysics(false);
@@ -298,7 +309,7 @@ int32 ASkaldDiceD6::ResolveFaceValue() const
     return FMath::Clamp(BestValue, 1, 6);
 }
 
-FVector ASkaldDiceD6::GetFaceWorldNormal(const FSkaldDiceFaceMapping& Mapping) const
+FVector ASkaldDiceD6::GetFaceLocalNormal(const FSkaldDiceFaceMapping& Mapping) const
 {
     if (!DiceMesh)
     {
@@ -307,11 +318,27 @@ FVector ASkaldDiceD6::GetFaceWorldNormal(const FSkaldDiceFaceMapping& Mapping) c
 
     if (Mapping.SocketName != NAME_None && DiceMesh->DoesSocketExist(Mapping.SocketName))
     {
-        const FTransform SocketTransform = DiceMesh->GetSocketTransform(Mapping.SocketName);
+        const FTransform SocketTransform = DiceMesh->GetSocketTransform(Mapping.SocketName, ERelativeTransformSpace::RTS_Component);
         return SocketTransform.GetUnitAxis(EAxis::Z).GetSafeNormal();
     }
 
     const FVector LocalNormal = Mapping.LocalNormal;
+    if (!LocalNormal.IsNearlyZero())
+    {
+        return LocalNormal.GetSafeNormal();
+    }
+
+    return FVector::ZeroVector;
+}
+
+FVector ASkaldDiceD6::GetFaceWorldNormal(const FSkaldDiceFaceMapping& Mapping) const
+{
+    if (!DiceMesh)
+    {
+        return FVector::ZeroVector;
+    }
+
+    const FVector LocalNormal = GetFaceLocalNormal(Mapping);
     if (!LocalNormal.IsNearlyZero())
     {
         return DiceMesh->GetComponentTransform().TransformVectorNoScale(LocalNormal).GetSafeNormal();
