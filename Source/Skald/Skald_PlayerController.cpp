@@ -4556,24 +4556,10 @@ void ASkaldPlayerController::HandleInitiativeRollRequested() {
 
   LastLocalInitiativeRoll = RollToDisplay > 0 ? RollToDisplay : 0;
 
-  if (AttackerRoll > 0 || DefenderRoll > 0) {
-    const FGuid LocalRollId = TriggerInitiativeDicePresentation(AttackerRoll, DefenderRoll);
-    if (LocalRollId.IsValid()) {
-      bInitiativeRollTriggeredLocally = true;
-      LastLocalInitiativeAttacker = AttackerRoll;
-      LastLocalInitiativeDefender = DefenderRoll;
-      ActiveLocalInitiativeRollId = LocalRollId;
-    } else {
-      bInitiativeRollTriggeredLocally = false;
-      LastLocalInitiativeAttacker = INDEX_NONE;
-      LastLocalInitiativeDefender = INDEX_NONE;
-      ActiveLocalInitiativeRollId.Invalidate();
-    }
-  }
-
-  if (BattleHudWidget && RollToDisplay > 0) {
-    BattleHudWidget->ShowDiceRoll(RollToDisplay, 2.f);
-  }
+  bInitiativeRollTriggeredLocally = false;
+  LastLocalInitiativeAttacker = INDEX_NONE;
+  LastLocalInitiativeDefender = INDEX_NONE;
+  ActiveLocalInitiativeRollId.Invalidate();
 
   if (GI && GI->GridBattleManager) {
     GI->GridBattleManager->ConfirmInitiativeRoll(AttackerRoll, DefenderRoll);
