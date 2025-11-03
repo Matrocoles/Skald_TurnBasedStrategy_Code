@@ -11,6 +11,8 @@
 #include "Delegates/Delegate.h"
 #include "GridBattleManager.generated.h"
 
+class USkaldDiceManager;
+
 /** Lightweight optional int32 replacement to avoid relying on engine optional templates. */
 struct FOptionalInt32
 {
@@ -320,14 +322,14 @@ public:
 
     /** Resolve an attack following strength/defence rules. Returns true if the defender survives. */
     UFUNCTION(BlueprintCallable, Category="Battle")
-    static FDiceRollResult ResolveAttackDice(const FFighterStats& AttackerStats, const FFighterStats& DefenderStats, UPARAM(ref) FRandomStream& RandomStream);
+    static FDiceRollResult ResolveAttackDice(const FFighterStats& AttackerStats, const FFighterStats& DefenderStats, UPARAM(ref) FRandomStream& RandomStream, const TArray<int32>* OverrideRolls = nullptr);
 
     UFUNCTION(BlueprintCallable, Category="Battle|Dice")
     static bool ResolveAttack(UPARAM(ref) FFighter& Attacker, UPARAM(ref) FFighter& Defender, UPARAM(ref) int32& OutDamage, UPARAM(ref) FRandomStream& RandomStream, UPARAM(ref) FDiceRollResult& OutResult);
 
     /** Roll initiative for the next round, determining which side acts first. */
     UFUNCTION(BlueprintCallable, Category="Skald|Battle")
-    void RollInitiative();
+    bool RollInitiative();
 
     int32 GetLastInitiativeRollAttacker() const { return LastInitiativeRollAttacker; }
     int32 GetLastInitiativeRollDefender() const { return LastInitiativeRollDefender; }
@@ -508,6 +510,8 @@ protected:
     bool bIsAttackerTurn = true;
 
 private:
+    virtual void BeginDestroy() override;
+
     void ResolveInitiativeRollInternal();
     void ScheduleAIRollIfNeeded();
     void PerformAIRoll();
@@ -528,6 +532,13 @@ private:
     void EnqueueDeferredPresentationFinish(AFighterPawn* Fighter, EGridActivationFinishReason Reason);
     void ProcessDeferredPresentationFinishes();
     void ProcessPendingFighterDeaths();
+
+    void ApplyInitiativeAdjustments(int32& AttackerRoll, int32& DefenderRoll, bool bAttackerRollProvided, bool bDefenderRollProvided, bool bAttackerHasEmpireDiscipline, bool bDefenderHasEmpireDiscipline);
+    void CompleteInitiativeRoll(int32 AttackerRoll, int32 DefenderRoll);
+    USkaldDiceManager* ResolveDiceManager();
+
+    UFUNCTION()
+    void HandleDiceRollCompleted(const FGuid& RollId, const TArray<int32>& Results);
 
     struct FDeferredActivationFinish
     {
@@ -607,5 +618,20 @@ private:
 
     /** Whether a round start attempt was deferred while waiting on presentation. */
     bool bRoundStartDeferred = false;
+
+    /** Dice subsystem used to drive initiative rolls. */
+    TWeakObjectPtr<USkaldDiceManager> DiceManager;
+
+    /** Active initiative roll awaiting completion. */
+    FGuid ActiveInitiativeRollId;
+
+    /** True when waiting for the dice subsystem to finish an initiative roll. */
+    bool bInitiativeRollAwaitingResults = false;
+
+    /** Number of attacker-side dice requested from the subsystem. */
+    int32 PendingInitiativePlayerDice = 0;
+
+    /** Number of defender-side dice requested from the subsystem. */
+    int32 PendingInitiativeEnemyDice = 0;
 };
 
