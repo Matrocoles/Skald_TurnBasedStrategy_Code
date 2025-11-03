@@ -67,6 +67,18 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dice|Arena")
     FBox ArenaBounds = FBox(FVector(-100.f, -100.f, 0.f), FVector(100.f, 100.f, 200.f));
 
+    /** When enabled the arena will be placed relative to the local player's camera instead of a fixed world position. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dice|Arena")
+    bool bAnchorArenaToCamera = true;
+
+    /** Offset from the camera when anchoring the arena. X is forward, Y is right, Z is up. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dice|Arena", meta = (EditCondition = "bAnchorArenaToCamera"))
+    FVector ArenaCameraRelativeOffset = FVector(350.f, 0.f, -120.f);
+
+    /** If true the arena's yaw rotation will match the camera so the floor faces the player. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dice|Arena", meta = (EditCondition = "bAnchorArenaToCamera"))
+    bool bMatchCameraYaw = true;
+
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dice|Settle")
     float SettleVelocityThreshold = 2.5f;
 
