@@ -388,8 +388,7 @@ void ASkaldDiceD6::ValidateFaceMappings()
 
     const UStaticMesh* StaticMesh = DiceMesh->GetStaticMesh();
 
-    TArray<FName> MeshSocketNames;
-    DiceMesh->GetAllSocketNames(MeshSocketNames);
+    const TArray<FName> MeshSocketNames = DiceMesh->GetAllSocketNames();
 
     FString AvailableSockets;
     if (MeshSocketNames.Num() > 0)
