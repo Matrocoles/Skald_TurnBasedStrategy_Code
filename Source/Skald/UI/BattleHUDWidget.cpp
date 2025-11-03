@@ -1390,25 +1390,34 @@ void UBattleHUDWidget::ShowAttackResultFloater(AFighterPawn *Target,
          Result.MissCount, Result.StartingHealth, Result.EndingHealth);
 }
 
-void UBattleHUDWidget::QueueDiceResolution(AFighterPawn *Attacker,
-                                           AFighterPawn *Defender,
-                                           const FDiceRollResult &Result,
-                                           bool bManualReveal) {
-  FBattleQueuedDiceResolution Entry;
-  Entry.Attacker = Attacker;
-  Entry.Defender = Defender;
-  Entry.Result = Result;
-  Entry.bManualReveal = bManualReveal && Result.DiceOutcomes.Num() > 0;
-  Entry.PendingManualReveals = Entry.bManualReveal
-                                    ? Result.DiceOutcomes.Num()
-                                    : 0;
-  PendingDiceResolutions.Add(MoveTemp(Entry));
+void UBattleHUDWidget::QueueDiceResolution(
+    AFighterPawn* Attacker,
+    AFighterPawn* Defender,
+    const FDiceRollResult& Result,
+    bool bManualReveal)
+{
+    FBattleQueuedDiceResolution Entry;
+    Entry.Attacker           = Attacker;
+    Entry.Defender           = Defender;
+    Entry.Result             = Result;
+    Entry.bManualReveal      = bManualReveal && Result.DiceOutcomes.Num() > 0;
+    Entry.PendingManualReveals = Entry.bManualReveal
+        ? Result.DiceOutcomes.Num()
+        : 0;
 
-  if (Entry.bManualReveal) {
-    SetAttackRollButtonVisibility(false);
-  } else {
-    SetAttackRollButtonVisibility(false);
-  }
+    PendingDiceResolutions.Add(MoveTemp(Entry));
+
+    // IMPORTANT:
+    // - Manual reveals need the button visible so the player can advance the dice.
+    // - Only hide the button for non-manual resolutions.
+    if (!Entry.bManualReveal)
+    {
+        SetAttackRollButtonVisibility(false);
+    }
+
+    // If you have logic elsewhere that re-shows the button when a manual
+    // resolution becomes active, leave that as is.
+}
 
   BeginHealthTextHold(Defender, Result.StartingHealth, Result.EndingHealth);
 
