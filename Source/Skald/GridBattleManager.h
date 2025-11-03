@@ -338,6 +338,8 @@ public:
 
     int32 GetLastInitiativeRollAttacker() const { return LastInitiativeRollAttacker; }
     int32 GetLastInitiativeRollDefender() const { return LastInitiativeRollDefender; }
+    bool DoesInitiativePlayerSlotRepresentAttacker() const { return bLastInitiativePlayerSlotWasAttacker; }
+    bool DoesInitiativeEnemySlotRepresentAttacker() const { return bLastInitiativeEnemySlotWasAttacker; }
 
     /** Continue the round after the player confirms the initiative roll. */
     UFUNCTION(BlueprintCallable, Category="Skald|Battle", meta = (CPP_Default_AttackerRoll = "-1", CPP_Default_DefenderRoll = "-1"))
@@ -523,6 +525,8 @@ private:
     void FinalizeRoundStart();
     void ScheduleRoundStart(bool bDelayForPresentation);
     bool ShouldPauseForInitiativePrompt() const;
+    bool ShouldTreatAttackerDiceAsPlayerSlot() const;
+    void UpdateInitiativeSlotHistory();
     void BroadcastBattleConcluded();
 
     bool HasLivingFighters(bool bForAttackers) const;
@@ -641,5 +645,17 @@ private:
 
     /** Number of defender-side dice requested from the subsystem. */
     int32 PendingInitiativeEnemyDice = 0;
+
+    /** Whether the pending player dice slot represents the attackers. */
+    bool bPendingInitiativePlayerSlotIsAttacker = true;
+
+    /** Whether the pending enemy dice slot represents the attackers. */
+    bool bPendingInitiativeEnemySlotIsAttacker = false;
+
+    /** Cached mapping used by UI to mirror the previous initiative presentation. */
+    bool bLastInitiativePlayerSlotWasAttacker = true;
+
+    /** Cached mapping used by UI to mirror the previous initiative presentation. */
+    bool bLastInitiativeEnemySlotWasAttacker = false;
 };
 
