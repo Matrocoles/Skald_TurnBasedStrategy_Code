@@ -11,7 +11,7 @@
 #include "Skald_PlayerState.h"
 #include "GameFramework/GameStateBase.h"
 #include "UObject/UnrealType.h"
-#include "Skald_playerController.h"
+#include "Skald_PlayerController.h"
 #include "UI/BattleHUDWidget.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -33,6 +33,49 @@ FString DescribeFighter(const AFighterPawn* Fighter)
         Fighter->bIsAttacker ? TEXT("true") : TEXT("false"),
         Fighter->HasActivatedThisRound() ? TEXT("true") : TEXT("false"),
         Fighter->IsAlive() ? TEXT("true") : TEXT("false"));
+}
+
+void GatherOwningPlayerControllers(UWorld* World, AFighterPawn* Fighter,
+                                   TArray<ASkaldPlayerController*>& OutControllers)
+{
+    if (!World)
+    {
+        return;
+    }
+
+    if (Fighter)
+    {
+        if (ASkaldPlayerController* DirectController = Cast<ASkaldPlayerController>(Fighter->GetController()))
+        {
+            const ASkaldPlayerState* PlayerState = DirectController->GetPlayerState<ASkaldPlayerState>();
+            if (!PlayerState || !PlayerState->bIsAI)
+            {
+                OutControllers.AddUnique(DirectController);
+            }
+        }
+    }
+
+    const bool bHasFaction = Fighter && Fighter->Faction != ESkaldFaction::None;
+
+    for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+    {
+        ASkaldPlayerController* Candidate = Cast<ASkaldPlayerController>(*It);
+        if (!Candidate || OutControllers.Contains(Candidate))
+        {
+            continue;
+        }
+
+        const ASkaldPlayerState* PlayerState = Candidate->GetPlayerState<ASkaldPlayerState>();
+        if (!PlayerState || PlayerState->bIsAI)
+        {
+            continue;
+        }
+
+        if (!bHasFaction || PlayerState->Faction == Fighter->Faction)
+        {
+            OutControllers.Add(Candidate);
+        }
+    }
 }
 
 int32 CountFighters(const TArray<AFighterPawn*>& Fighters, bool bAttackerOnly)
@@ -1649,22 +1692,48 @@ void UGridBattleManager::ShowAttackRollButtonForPlayer(AFighterPawn* Attacker)
         return;
     }
 
-    // Get the controller who owns this attacker pawn
-    ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(Attacker->GetController());
-    if (!PC)
+    if (World->GetNetMode() == NM_Client)
     {
-        UE_LOG(LogTemp, Warning, TEXT("GridBattleManager::ShowAttackRollButtonForPlayer: No valid PlayerController for %s"), *GetNameSafe(Attacker));
+        UE_LOG(LogTemp, Warning, TEXT("GridBattleManager::ShowAttackRollButtonForPlayer called on client; ignoring."));
         return;
     }
 
-    // Tell that client's controller to show the button on their HUD
-    UE_LOG(LogTemp, Warning, TEXT("[ManualDice] GridBattleManager calling ClientShowAttackRollButton for %s (Controller=%s)"),
-        *GetNameSafe(Attacker), *GetNameSafe(PC));
+    TArray<ASkaldPlayerController*> TargetControllers;
+    GatherOwningPlayerControllers(World, Attacker, TargetControllers);
 
-    PC->ClientShowAttackRollButton(Attacker);
+    if (TargetControllers.Num() == 0)
+    {
+        GatherOwningPlayerControllers(World, nullptr, TargetControllers);
+    }
+
+    if (TargetControllers.Num() == 0)
+    {
+        UE_LOG(LogTemp, Warning,
+            TEXT("GridBattleManager::ShowAttackRollButtonForPlayer: No owning player controller found for %s (Faction=%s)"),
+            *GetNameSafe(Attacker), *UEnum::GetValueAsString(Attacker->Faction));
+        return;
+    }
+
+    for (ASkaldPlayerController* PC : TargetControllers)
+    {
+        if (!PC)
+        {
+            continue;
+        }
+
+        UE_LOG(LogTemp, Warning, TEXT("[ManualDice] GridBattleManager calling ClientShowAttackRollButton for %s (Controller=%s)"),
+            *GetNameSafe(Attacker), *GetNameSafe(PC));
+
+        PC->ClientShowAttackRollButton(Attacker);
+    }
 }
 
 void UGridBattleManager::HideAttackRollButton()
+{
+    HideAttackRollButtonForFighter(nullptr);
+}
+
+void UGridBattleManager::HideAttackRollButtonForFighter(AFighterPawn* Attacker)
 {
     UWorld* World = GetWorld();
     if (!World)
@@ -1673,19 +1742,48 @@ void UGridBattleManager::HideAttackRollButton()
         return;
     }
 
-    // Get the local player's controller
-    APlayerController* PCBase = UGameplayStatics::GetPlayerController(World, 0);
-    ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(PCBase);
-    if (!PC)
+    if (World->GetNetMode() == NM_Client)
     {
-        UE_LOG(LogTemp, Warning, TEXT("GridBattleManager::HideAttackRollButton: No valid PlayerController"));
+        ASkaldPlayerController* LocalController = Cast<ASkaldPlayerController>(UGameplayStatics::GetPlayerController(World, 0));
+        if (!LocalController)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("GridBattleManager::HideAttackRollButton (client): No valid local controller"));
+            return;
+        }
+
+        if (UBattleHUDWidget* HUD = LocalController->GetBattleHUD())
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[ManualDice] GridBattleManager::HideAttackRollButton (client) - Hiding roll button"));
+            HUD->SetAttackRollButtonVisibility(false);
+        }
         return;
     }
 
-    // Use the controller's HUD reference to hide it locally
-    if (UBattleHUDWidget* HUD = PC->GetBattleHUD())
+    TArray<ASkaldPlayerController*> TargetControllers;
+    GatherOwningPlayerControllers(World, Attacker, TargetControllers);
+
+    if (TargetControllers.Num() == 0)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[ManualDice] GridBattleManager::HideAttackRollButton - Hiding roll button"));
-        HUD->SetAttackRollButtonVisibility(false);
+        GatherOwningPlayerControllers(World, nullptr, TargetControllers);
+    }
+
+    if (TargetControllers.Num() == 0)
+    {
+        UE_LOG(LogTemp, Warning,
+            TEXT("GridBattleManager::HideAttackRollButton: No owning player controller found for %s (Faction=%s)"),
+            *GetNameSafe(Attacker), Attacker ? *UEnum::GetValueAsString(Attacker->Faction) : TEXT("<None>"));
+        return;
+    }
+
+    for (ASkaldPlayerController* PC : TargetControllers)
+    {
+        if (!PC)
+        {
+            continue;
+        }
+
+        UE_LOG(LogTemp, Warning, TEXT("[ManualDice] GridBattleManager::HideAttackRollButton - Hiding roll button for %s"),
+            *GetNameSafe(PC));
+        PC->ClientHideAttackRollButton();
     }
 }

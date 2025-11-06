@@ -1986,18 +1986,18 @@ void AFighterPawn::TriggerManualAttackRoll()
     {
         if (UGridBattleManager* BattleManager = GI->GridBattleManager)
         {
-            BattleManager->HideAttackRollButton();
+            BattleManager->HideAttackRollButtonForFighter(this);
         }
     }
 } // nice clean closing brace
 
-// Server RPC Implementation — runs on the server
+// Server RPC Implementation  runs on the server
 void AFighterPawn::ServerShowAttackRollButtonForPlayer_Implementation()
 {
     ShowAttackRollButtonForPlayer();
 }
 
-// Core function — actually shows the roll button
+// Core function  actually shows the roll button
 void AFighterPawn::ShowAttackRollButtonForPlayer()
 {
     // Ensure this runs on the server only
