@@ -1703,14 +1703,11 @@ void UGridBattleManager::ShowAttackRollButtonForPlayer(AFighterPawn* Attacker)
 
     if (TargetControllers.Num() == 0)
     {
-        GatherOwningPlayerControllers(World, nullptr, TargetControllers);
-    }
-
-    if (TargetControllers.Num() == 0)
-    {
-        UE_LOG(LogTemp, Warning,
-            TEXT("GridBattleManager::ShowAttackRollButtonForPlayer: No owning player controller found for %s (Faction=%s)"),
+        UE_LOG(LogTemp, Log,
+            TEXT("GridBattleManager::ShowAttackRollButtonForPlayer: No eligible player controller for %s (Faction=%s). Auto-triggering roll."),
             *GetNameSafe(Attacker), *UEnum::GetValueAsString(Attacker->Faction));
+
+        Attacker->TriggerManualAttackRoll();
         return;
     }
 
@@ -1764,13 +1761,8 @@ void UGridBattleManager::HideAttackRollButtonForFighter(AFighterPawn* Attacker)
 
     if (TargetControllers.Num() == 0)
     {
-        GatherOwningPlayerControllers(World, nullptr, TargetControllers);
-    }
-
-    if (TargetControllers.Num() == 0)
-    {
-        UE_LOG(LogTemp, Warning,
-            TEXT("GridBattleManager::HideAttackRollButton: No owning player controller found for %s (Faction=%s)"),
+        UE_LOG(LogTemp, Verbose,
+            TEXT("GridBattleManager::HideAttackRollButton: No player controllers to notify for %s (Faction=%s)"),
             *GetNameSafe(Attacker), Attacker ? *UEnum::GetValueAsString(Attacker->Faction) : TEXT("<None>"));
         return;
     }
