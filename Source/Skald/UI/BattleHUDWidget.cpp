@@ -1447,10 +1447,14 @@ void UBattleHUDWidget::QueueDiceResolution(
     Entry.Attacker = Attacker;
     Entry.Defender = Defender;
     Entry.Result = Result;
-    Entry.bManualReveal = bManualReveal && Result.DiceOutcomes.Num() > 0;
-    Entry.PendingManualReveals = Entry.bManualReveal
-        ? Result.DiceOutcomes.Num()
-        : 0;
+
+    // Manual reveal has been retired so the full resolution plays automatically
+    // once the dice roll completes. Retain the parameter to avoid widespread
+    // signature churn but clamp behaviour to the fully-automatic flow.
+    const bool bEnableManualReveal = false;
+    const bool bShouldUseManualReveal = bEnableManualReveal && bManualReveal && Result.DiceOutcomes.Num() > 0;
+    Entry.bManualReveal = bShouldUseManualReveal;
+    Entry.PendingManualReveals = bShouldUseManualReveal ? Result.DiceOutcomes.Num() : 0;
 
     PendingDiceResolutions.Add(MoveTemp(Entry));
 
