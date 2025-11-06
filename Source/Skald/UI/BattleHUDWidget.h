@@ -383,6 +383,7 @@ public:
   void SetActionButtonsVisibility(bool bVisible);
 
   /** Toggle visibility for the manual attack roll button. */
+  UFUNCTION(BlueprintCallable, Category = "BattleHUD")
   void SetAttackRollButtonVisibility(bool bVisible);
 
   /** Clear any preview highlights tracked by the widget. */
@@ -458,6 +459,10 @@ private:
   /** Callback when RollInitiativeButton is pressed. */
   UFUNCTION()
   void HandleInitiativeRollPressed();
+
+  /** Callback when AttackRollButton is pressed. */
+  UFUNCTION()
+  void HandleAttackRollPressed();
 
   /** Callback when AbilityButton1 is pressed. */
   UFUNCTION()

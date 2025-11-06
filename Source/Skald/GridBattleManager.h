@@ -309,6 +309,13 @@ public:
     /** Number of sides on the initiative die. */
     static constexpr int32 InitiativeDiceSides = 6;
 
+    // --- Manual Dice Roll UI Support ---
+    UFUNCTION(BlueprintCallable, Category = "UI|Dice")
+    void ShowAttackRollButtonForPlayer(class AFighterPawn* Attacker);
+
+    UFUNCTION(BlueprintCallable, Category = "UI|Dice")
+    void HideAttackRollButton();
+
     /** Load fighter definitions and set default state. */
     UGridBattleManager();
 
@@ -463,6 +470,9 @@ public:
     UFUNCTION(BlueprintCallable, Category="Battle|Events")
     void ReportSimulatedAttackResolution(const FDiceRollResult& Result);
     void ReportAttackRejected(AFighterPawn* Attacker, AFighterPawn* Defender, const FText& Reason);
+
+    /** Called by the server when a player manually submits a dice roll result. */
+    void ApplyManualRollFromPlayer(class ASkaldPlayerController* Player, AFighterPawn* Attacker, int32 RollValue);
 
     /** Snapshot of the current initiative ordering. */
     UFUNCTION(BlueprintCallable, Category="Battle|Turn")

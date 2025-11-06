@@ -1397,33 +1397,24 @@ void UBattleHUDWidget::QueueDiceResolution(
     bool bManualReveal)
 {
     FBattleQueuedDiceResolution Entry;
-    Entry.Attacker           = Attacker;
-    Entry.Defender           = Defender;
-    Entry.Result             = Result;
-    Entry.bManualReveal      = bManualReveal && Result.DiceOutcomes.Num() > 0;
+    Entry.Attacker = Attacker;
+    Entry.Defender = Defender;
+    Entry.Result = Result;
+    Entry.bManualReveal = bManualReveal && Result.DiceOutcomes.Num() > 0;
     Entry.PendingManualReveals = Entry.bManualReveal
         ? Result.DiceOutcomes.Num()
         : 0;
 
     PendingDiceResolutions.Add(MoveTemp(Entry));
 
-    // IMPORTANT:
-    // - Manual reveals need the button visible so the player can advance the dice.
-    // - Only hide the button for non-manual resolutions.
-    if (!Entry.bManualReveal)
+    // Hold the health text while this resolution is animating.
+    BeginHealthTextHold(Defender, Result.StartingHealth, Result.EndingHealth);
+
+    // Start processing immediately if nothing is currently active.
+    if (!bDiceResolutionActive)
     {
-        SetAttackRollButtonVisibility(false);
+        ProcessNextDiceResolution();
     }
-
-    // If you have logic elsewhere that re-shows the button when a manual
-    // resolution becomes active, leave that as is.
-}
-
-  BeginHealthTextHold(Defender, Result.StartingHealth, Result.EndingHealth);
-
-  if (!bDiceResolutionActive) {
-    ProcessNextDiceResolution();
-  }
 }
 
 void UBattleHUDWidget::ProcessNextDiceResolution() {

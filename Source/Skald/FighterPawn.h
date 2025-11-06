@@ -23,6 +23,7 @@ class UDecalComponent;
 class UMaterialInterface;
 class USkaldAbilityComponent;
 class USkaldDiceManager;
+class ASkaldPlayerController;
 
 UENUM(BlueprintType)
 enum class EFighterPawnFootprint : uint8 {
@@ -53,6 +54,14 @@ public:
   /** Prepare the fighter for its activation. */
   UFUNCTION(BlueprintCallable, Category = "Fighter")
   void BeginActivation();
+
+  // --- Manual Dice Roll Support ---
+  UFUNCTION(BlueprintCallable, Category = "Combat|Dice")
+  void TriggerManualAttackRoll();
+
+  // Check UI Conditions
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Combat|Dice")
+  bool IsAwaitingPhysicalAttackRoll() const { return bAwaitingPhysicalAttackRoll; }
 
   /** Clear round-based activation flags. */
   UFUNCTION(BlueprintCallable, Category = "Fighter")
@@ -441,6 +450,11 @@ public:
   /** Resolve the portrait texture for this fighter if available. */
   UTexture2D *GetPortraitTexture() const;
 
+  UFUNCTION(Server, Reliable)
+  void ServerShowAttackRollButtonForPlayer();
+ 
+  void ShowAttackRollButtonForPlayer();
+
 protected:
   /** Clear grid occupancy when the fighter is destroyed. */
   virtual void Destroyed() override;
@@ -648,7 +662,7 @@ private:
   /** Reset queued attack bookkeeping and optionally notify listeners. */
   void ClearQueuedAttackState(bool bBroadcastFinalized);
 
-  bool AttemptPhysicalAttackRoll(AFighterPawn *Target);
+  bool AttemptPhysicalAttackRoll(class AFighterPawn* Target);
   void EnsureDiceManagerBinding();
   void CleanupDiceManagerBinding();
   USkaldDiceManager *GetDiceManager() const;

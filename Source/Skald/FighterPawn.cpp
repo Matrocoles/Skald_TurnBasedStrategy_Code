@@ -1,4 +1,5 @@
 #include "FighterPawn.h"
+#include "Skald_PlayerController.h"
 #include "Abilities/SkaldAbilityComponent.h"
 #include "Algo/Reverse.h"
 #include "Blueprint/UserWidget.h"
@@ -1905,31 +1906,131 @@ void AFighterPawn::CleanupDiceManagerBinding() {
   CachedDiceManager.Reset();
 }
 
-bool AFighterPawn::AttemptPhysicalAttackRoll(AFighterPawn *Target) {
-  if (!Target || Stats.AttackDice <= 0) {
-    return false;
-  }
+bool AFighterPawn::AttemptPhysicalAttackRoll(AFighterPawn* Target)
+{
+    if (!Target)
+    {
+        return false;
+    }
 
-  EnsureDiceManagerBinding();
-  USkaldDiceManager *DiceManager = CachedDiceManager.Get();
-  if (!DiceManager) {
-    return false;
-  }
+    // Only use the manual physical roll flow if we actually have dice.
+    if (Stats.AttackDice <= 0)
+    {
+        return false; // fall back to normal auto-resolution path
+    }
 
-  const int32 DiceToRoll = FMath::Max(Stats.AttackDice, 0);
-  const FGuid RollId = DiceManager->RollDice_D6(DiceToRoll, 0, false);
-  if (!RollId.IsValid()) {
-    return false;
-  }
+    // Store context so we know what to resolve when the player hits Roll.
+    PendingPhysicalAttackTarget = Target;
+    PendingAttackAttackerSnapshot = Stats;
+    PendingAttackDefenderSnapshot = Target->Stats;
+    bAwaitingPhysicalAttackRoll = true;
 
-  PendingAttackRollId = RollId;
-  bAwaitingPhysicalAttackRoll = true;
-  PendingAttackTarget = Target;
-  PendingPhysicalAttackTarget = Target;
-  PendingAttackAttackerSnapshot = Stats;
-  PendingAttackDefenderSnapshot = Target->Stats;
+    //  Debug: confirm we actually get here
+    UE_LOG(LogTemp, Warning, TEXT("AttemptPhysicalAttackRoll: attacker %s vs target %s, Dice=%d"),
+        *GetName(), *Target->GetName(), Stats.AttackDice);
 
-  return true;
+    // Ask the battle manager / HUD to show the Roll button for this pawn.
+    if (USkaldGameInstance* GI = Cast<USkaldGameInstance>(GetGameInstance()))
+    {
+        if (UGridBattleManager* BattleManager = GI->GridBattleManager)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("AttemptPhysicalAttackRoll: calling ShowAttackRollButtonForPlayer"));
+
+            if (HasAuthority())
+            {
+                ShowAttackRollButtonForPlayer();
+            }
+            else
+            {
+                ServerShowAttackRollButtonForPlayer();
+            }
+        }
+    }
+
+    return true;
+}
+
+void AFighterPawn::TriggerManualAttackRoll()
+{
+    // Safety: ensure a pending attack exists.
+    if (!bAwaitingPhysicalAttackRoll || !PendingPhysicalAttackTarget.IsValid())
+    {
+        return;
+    }
+
+    AFighterPawn* Target = PendingPhysicalAttackTarget.Get();
+    if (!Target || Stats.AttackDice <= 0)
+    {
+        return;
+    }
+
+    EnsureDiceManagerBinding();
+    USkaldDiceManager* DiceManager = CachedDiceManager.Get();
+    if (!DiceManager)
+    {
+        return;
+    }
+
+    const int32 DiceToRoll = FMath::Max(Stats.AttackDice, 0);
+    const FGuid RollId = DiceManager->RollDice_D6(DiceToRoll, 0, false);
+    if (!RollId.IsValid())
+    {
+        return;
+    }
+
+    PendingAttackRollId = RollId;
+    // keep bAwaitingPhysicalAttackRoll = true; cleared when result arrives
+
+    // Hide the button now that rolling has started
+    if (USkaldGameInstance* GI = Cast<USkaldGameInstance>(GetGameInstance()))
+    {
+        if (UGridBattleManager* BattleManager = GI->GridBattleManager)
+        {
+            BattleManager->HideAttackRollButton();
+        }
+    }
+} // nice clean closing brace
+
+// Server RPC Implementation — runs on the server
+void AFighterPawn::ServerShowAttackRollButtonForPlayer_Implementation()
+{
+    ShowAttackRollButtonForPlayer();
+}
+
+// Core function — actually shows the roll button
+void AFighterPawn::ShowAttackRollButtonForPlayer()
+{
+    // Ensure this runs on the server only
+    if (!HasAuthority())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("ShowAttackRollButtonForPlayer called on client, skipping (no authority)."));
+        return;
+    }
+
+    // Attempt to forward to the GridBattleManager via GameInstance
+    if (UWorld* World = GetWorld())
+    {
+        if (USkaldGameInstance* GI = Cast<USkaldGameInstance>(World->GetGameInstance()))
+        {
+            if (UGridBattleManager* Manager = GI->GridBattleManager)
+            {
+                UE_LOG(LogTemp, Warning, TEXT("AFighterPawn forwarding to GridBattleManager->ShowAttackRollButtonForPlayer (%s)"), *GetName());
+                Manager->ShowAttackRollButtonForPlayer(this);
+                return;
+            }
+        }
+    }
+
+    // Fallback path: try directly via PlayerController RPC
+    ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(GetController());
+    if (!PC)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("ShowAttackRollButtonForPlayer: No valid controller for %s"), *GetName());
+        return;
+    }
+
+    UE_LOG(LogTemp, Warning, TEXT("ShowAttackRollButtonForPlayer: Fallback path calling ClientShowAttackRollButton for %s"), *PC->GetName());
+    PC->ClientShowAttackRollButton(this);
 }
 
 void AFighterPawn::HandleDiceRollCompleted(const FGuid &RollId,

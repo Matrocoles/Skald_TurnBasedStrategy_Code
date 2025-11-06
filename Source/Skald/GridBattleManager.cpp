@@ -11,6 +11,9 @@
 #include "Skald_PlayerState.h"
 #include "GameFramework/GameStateBase.h"
 #include "UObject/UnrealType.h"
+#include "Skald_playerController.h"
+#include "UI/BattleHUDWidget.h"
+#include "Kismet/GameplayStatics.h"
 
 namespace
 {
@@ -890,10 +893,36 @@ void UGridBattleManager::ReportAttackResolution(AFighterPawn* Attacker, AFighter
     const bool bHadListeners = OnAttackResolved.IsBound();
     OnAttackResolved.Broadcast(Attacker, Defender, Result);
 
-    if (!bHadListeners)
+    // NOTE: do NOT define any other functions inside here.
+}
+
+// ============================================================
+// Manual Dice Roll: apply a player-submitted attack roll to the battle
+// ============================================================
+void UGridBattleManager::ApplyManualRollFromPlayer(ASkaldPlayerController* Player, AFighterPawn* Attacker, int32 RollValue)
+{
+    if (!Player || !Attacker)
     {
-        NotifyAttackPresentationComplete();
+        return;
     }
+
+    UWorld* World = GetWorld();
+    if (!World)
+    {
+        return;
+    }
+
+    const int32 ClampedValue = FMath::Clamp(RollValue, 1, 6);
+
+    UE_LOG(LogSkaldBattle, Log, TEXT("[ManualRoll] %s submitted roll %d for %s"),
+        *GetNameSafe(Player),
+        ClampedValue,
+        *GetNameSafe(Attacker));
+
+    // TODO: integrate this value into your actual dice pipeline.
+    // For now, this just logs. You can later:
+    //  - feed it into your dice manager, or
+    //  - store it on the battle manager and have your attack logic read it.
 }
 
 void UGridBattleManager::ReportSimulatedAttackResolution(const FDiceRollResult& Result)
@@ -1599,5 +1628,64 @@ void UGridBattleManager::BroadcastBattleConcluded()
     UE_LOG(LogSkaldBattle, Log, TEXT("[Battle] Battle ended. Winner=%s, AttackerCasualties=%d, DefenderCasualties=%d"),
         *UEnum::GetValueAsString(BattleConclusionWinner), BattleConclusionAttackerCasualties, BattleConclusionDefenderCasualties);
     OnBattleEnded.Broadcast(BattleConclusionWinner, BattleConclusionAttackerCasualties, BattleConclusionDefenderCasualties);
+} // ends BroadcastBattleConcluded()
+
+// ============================================================
+// Manual Dice Roll UI Integration (Player HUD control)
+// ============================================================
+
+void UGridBattleManager::ShowAttackRollButtonForPlayer(AFighterPawn* Attacker)
+{
+    if (!Attacker)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("GridBattleManager::ShowAttackRollButtonForPlayer called with null Attacker"));
+        return;
+    }
+
+    UWorld* World = GetWorld();
+    if (!World)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("GridBattleManager::ShowAttackRollButtonForPlayer: No valid world"));
+        return;
+    }
+
+    // Get the controller who owns this attacker pawn
+    ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(Attacker->GetController());
+    if (!PC)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("GridBattleManager::ShowAttackRollButtonForPlayer: No valid PlayerController for %s"), *GetNameSafe(Attacker));
+        return;
+    }
+
+    // Tell that client's controller to show the button on their HUD
+    UE_LOG(LogTemp, Warning, TEXT("[ManualDice] GridBattleManager calling ClientShowAttackRollButton for %s (Controller=%s)"),
+        *GetNameSafe(Attacker), *GetNameSafe(PC));
+
+    PC->ClientShowAttackRollButton(Attacker);
 }
 
+void UGridBattleManager::HideAttackRollButton()
+{
+    UWorld* World = GetWorld();
+    if (!World)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("GridBattleManager::HideAttackRollButton: No valid world"));
+        return;
+    }
+
+    // Get the local player's controller
+    APlayerController* PCBase = UGameplayStatics::GetPlayerController(World, 0);
+    ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(PCBase);
+    if (!PC)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("GridBattleManager::HideAttackRollButton: No valid PlayerController"));
+        return;
+    }
+
+    // Use the controller's HUD reference to hide it locally
+    if (UBattleHUDWidget* HUD = PC->GetBattleHUD())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[ManualDice] GridBattleManager::HideAttackRollButton - Hiding roll button"));
+        HUD->SetAttackRollButtonVisibility(false);
+    }
+}

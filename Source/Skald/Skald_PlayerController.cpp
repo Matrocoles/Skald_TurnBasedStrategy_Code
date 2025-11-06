@@ -2881,198 +2881,264 @@ void ASkaldPlayerController::HandleAttackRequested(int32 FromID, int32 ToID,
   ServerHandleAttack(FromID, ToID, ArmySent, bUseSiege);
 }
 
-void ASkaldPlayerController::HandlePrepareForBattleReady() {
-  ServerSetReadyForBattle(true);
+void ASkaldPlayerController::HandlePrepareForBattleReady()
+{
+    ServerSetReadyForBattle(true);
 }
 
 void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
-                                                               int32 ToID,
-                                                               int32 ArmySent,
-                                                               bool bUseSiege) {
-  if (TurnManager && TurnManager->HasPendingBattlePreparation()) {
-    NotifyActionError(PendingBattleAttackError);
-    return;
-  }
-
-  FString Error;
-  if (!ValidateAttack(FromID, ToID, ArmySent, bUseSiege, &Error)) {
-    NotifyActionError(Error);
-    return;
-  }
-
-  AWorldMap *WorldMap = Cast<AWorldMap>(
-      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
-  ATerritory *Source = WorldMap ? WorldMap->GetTerritoryById(FromID) : nullptr;
-  ATerritory *Target = WorldMap ? WorldMap->GetTerritoryById(ToID) : nullptr;
-  if (!Source || !Target) {
-    return;
-  }
-
-  ASkaldPlayerState *AttackerPS = Source->OwningPlayer;
-  ASkaldPlayerState *DefenderPS = Target->OwningPlayer;
-
-  if (TurnManager) {
-    FS_BattlePayload Battle;
-    Battle.AttackerPlayerID = AttackerPS ? AttackerPS->GetPlayerId() : -1;
-    Battle.DefenderPlayerID = DefenderPS ? DefenderPS->GetPlayerId() : -1;
-    Battle.FromTerritoryID = FromID;
-    Battle.TargetTerritoryID = ToID;
-    Battle.AttackerTerritoryName = Source->TerritoryName;
-    Battle.DefenderTerritoryName = Target->TerritoryName;
-    Battle.ArmyCountSent = ArmySent;
-    Battle.IsCapitalAttack = Target->bIsCapital;
-    if (AttackerPS) {
-      Battle.AttackerFaction = AttackerPS->Faction;
-      Battle.AttackerDisplayName =
-          ResolvePlayerName(AttackerPS, TEXT("ServerHandleAttack_Attacker"));
-      Battle.bAttackerIsAI = AttackerPS->bIsAI;
+    int32 ToID,
+    int32 ArmySent,
+    bool bUseSiege)
+{
+    if (TurnManager && TurnManager->HasPendingBattlePreparation())
+    {
+        NotifyActionError(PendingBattleAttackError);
+        return;
     }
-    if (DefenderPS) {
-      Battle.DefenderFaction = DefenderPS->Faction;
-      Battle.DefenderDisplayName =
-          ResolvePlayerName(DefenderPS, TEXT("ServerHandleAttack_Defender"));
-      Battle.bDefenderIsAI = DefenderPS->bIsAI;
-    }
-    if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
-      if (!Battle.AttackerFactionEmblem.ToSoftObjectPath().IsValid() &&
-          Battle.AttackerFaction != ESkaldFaction::None) {
-        Battle.AttackerFactionEmblem =
-            GI->GetFactionEmblem(Battle.AttackerFaction);
-      }
-      if (!Battle.DefenderFactionEmblem.ToSoftObjectPath().IsValid() &&
-          Battle.DefenderFaction != ESkaldFaction::None) {
-        Battle.DefenderFactionEmblem =
-            GI->GetFactionEmblem(Battle.DefenderFaction);
-      }
-    }
-    if (bUseSiege && CachedGameMode) {
-      const int32 SiegeID = CachedGameMode->ConsumeSiege(FromID);
-      if (SiegeID > 0) {
-        Battle.AssignedSiegeIDs.Add(SiegeID);
-      }
-    }
-    Battle.DefenderArmyCount = Target ? Target->ArmyUnits : 0;
-    if (!CachedGameMode) {
-      CachedGameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
-    }
-    if (CachedGameInstance) {
-      CachedGameInstance->CacheWorldMapSnapshot(GetWorld());
-    } else if (UWorld *World = GetWorld()) {
-      if (USkaldGameInstance *GI = World->GetGameInstance<USkaldGameInstance>()) {
-        GI->CacheWorldMapSnapshot(World);
-      }
-    }
-    TurnManager->HandleAttackConfirmed(Battle);
-    return;
-  }
 
-  int32 AttackingForces = ArmySent;
-  int32 DefendingForces = Target->ArmyUnits;
-  if (bUseSiege && CachedGameMode) {
-    CachedGameMode->ConsumeSiege(FromID);
-  }
-
-  Source->ArmyUnits -= ArmySent;
-
-  FRandomStream *CombatStream = nullptr;
-  if (CachedGameInstance) {
-    CachedGameInstance->SeedCombatRandomStream(FMath::Rand());
-    CombatStream = &CachedGameInstance->CombatRandomStream;
-  } else {
-    static FRandomStream FallbackStream;
-    FallbackStream.Initialize(FMath::Rand());
-    CombatStream = &FallbackStream;
-  }
-
-  while (AttackingForces > 0 && DefendingForces > 0) {
-    const int32 AttackRoll = CombatStream->RandRange(1, 6);
-    const int32 DefendRoll = CombatStream->RandRange(1, 6);
-    if (AttackRoll > DefendRoll) {
-      --DefendingForces;
-    } else {
-      --AttackingForces;
+    FString Error;
+    if (!ValidateAttack(FromID, ToID, ArmySent, bUseSiege, &Error))
+    {
+        NotifyActionError(Error);
+        return;
     }
-  }
 
-  if (DefendingForces <= 0) {
-    Target->OwningPlayer = AttackerPS;
-    Target->ArmyUnits = AttackingForces;
-  } else {
-    Target->ArmyUnits = DefendingForces;
-  }
-
-  Source->RefreshAppearance();
-  Target->RefreshAppearance();
-
-  if (TurnManager) {
-    for (ASkaldPlayerController *Controller : TurnManager->GetControllers()) {
-      if (USkaldMainHUDWidget *HUD =
-              Controller ? Controller->GetHUDWidget() : nullptr) {
-        const FString OwnerName =
-            ResolvePlayerName(Target->OwningPlayer, TEXT("ServerHandleAttack_Update"));
-        HUD->UpdateTerritoryInfo(Target->TerritoryName, OwnerName,
-                                 Target->ArmyUnits);
-      }
+    // ===== original attack logic (all inside the function) =====
+    AWorldMap* WorldMap = Cast<AWorldMap>(
+        UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
+    ATerritory* Source = WorldMap ? WorldMap->GetTerritoryById(FromID) : nullptr;
+    ATerritory* Target = WorldMap ? WorldMap->GetTerritoryById(ToID) : nullptr;
+    if (!Source || !Target)
+    {
+        return;
     }
-  }
+
+    ASkaldPlayerState* AttackerPS = Source->OwningPlayer;
+    ASkaldPlayerState* DefenderPS = Target->OwningPlayer;
+
+    // === TurnManager-driven battle (grid / advanced flow) ===
+    if (TurnManager)
+    {
+        FS_BattlePayload Battle;
+        Battle.AttackerPlayerID = AttackerPS ? AttackerPS->GetPlayerId() : -1;
+        Battle.DefenderPlayerID = DefenderPS ? DefenderPS->GetPlayerId() : -1;
+        Battle.FromTerritoryID = FromID;
+        Battle.TargetTerritoryID = ToID;
+        Battle.AttackerTerritoryName = Source->TerritoryName;
+        Battle.DefenderTerritoryName = Target->TerritoryName;
+        Battle.ArmyCountSent = ArmySent;
+        Battle.IsCapitalAttack = Target->bIsCapital;
+
+        if (AttackerPS)
+        {
+            Battle.AttackerFaction = AttackerPS->Faction;
+            Battle.AttackerDisplayName =
+                ResolvePlayerName(AttackerPS, TEXT("ServerHandleAttack_Attacker"));
+            Battle.bAttackerIsAI = AttackerPS->bIsAI;
+        }
+
+        if (DefenderPS)
+        {
+            Battle.DefenderFaction = DefenderPS->Faction;
+            Battle.DefenderDisplayName =
+                ResolvePlayerName(DefenderPS, TEXT("ServerHandleAttack_Defender"));
+            Battle.bDefenderIsAI = DefenderPS->bIsAI;
+        }
+
+        if (USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>())
+        {
+            if (!Battle.AttackerFactionEmblem.ToSoftObjectPath().IsValid() &&
+                Battle.AttackerFaction != ESkaldFaction::None)
+            {
+                Battle.AttackerFactionEmblem =
+                    GI->GetFactionEmblem(Battle.AttackerFaction);
+            }
+            if (!Battle.DefenderFactionEmblem.ToSoftObjectPath().IsValid() &&
+                Battle.DefenderFaction != ESkaldFaction::None)
+            {
+                Battle.DefenderFactionEmblem =
+                    GI->GetFactionEmblem(Battle.DefenderFaction);
+            }
+        }
+
+        if (bUseSiege && CachedGameMode)
+        {
+            const int32 SiegeID = CachedGameMode->ConsumeSiege(FromID);
+            if (SiegeID > 0)
+            {
+                Battle.AssignedSiegeIDs.Add(SiegeID);
+            }
+        }
+
+        Battle.DefenderArmyCount = Target ? Target->ArmyUnits : 0;
+
+        if (!CachedGameMode)
+        {
+            CachedGameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
+        }
+
+        if (CachedGameInstance)
+        {
+            CachedGameInstance->CacheWorldMapSnapshot(GetWorld());
+        }
+        else if (UWorld* World = GetWorld())
+        {
+            if (USkaldGameInstance* GI =
+                World->GetGameInstance<USkaldGameInstance>())
+            {
+                GI->CacheWorldMapSnapshot(World);
+            }
+        }
+
+        // Hand off to turn manager’s battle flow and exit.
+        TurnManager->HandleAttackConfirmed(Battle);
+        return;
+    }
+
+    // === Legacy / fallback auto-resolve battle logic ===
+    int32 AttackingForces = ArmySent;
+    int32 DefendingForces = Target->ArmyUnits;
+    if (bUseSiege && CachedGameMode)
+    {
+        CachedGameMode->ConsumeSiege(FromID);
+    }
+
+    // The attacking army leaves its origin territory
+    Source->ArmyUnits -= ArmySent;
+
+    FRandomStream* CombatStream = nullptr;
+    if (CachedGameInstance)
+    {
+        CachedGameInstance->SeedCombatRandomStream(FMath::Rand());
+        CombatStream = &CachedGameInstance->CombatRandomStream;
+    }
+    else
+    {
+        static FRandomStream FallbackStream;
+        FallbackStream.Initialize(FMath::Rand());
+        CombatStream = &FallbackStream;
+    }
+
+    while (AttackingForces > 0 && DefendingForces > 0)
+    {
+        const int32 AttackRoll = CombatStream->RandRange(1, 6);
+        const int32 DefendRoll = CombatStream->RandRange(1, 6);
+        if (AttackRoll > DefendRoll)
+        {
+            --DefendingForces;
+        }
+        else
+        {
+            --AttackingForces;
+        }
+    }
+
+    if (DefendingForces <= 0)
+    {
+        Target->OwningPlayer = AttackerPS;
+        Target->ArmyUnits = AttackingForces;
+    }
+    else
+    {
+        Target->ArmyUnits = DefendingForces;
+    }
+
+    Source->RefreshAppearance();
+    Target->RefreshAppearance();
+
+    if (TurnManager)
+    {
+        for (ASkaldPlayerController* Controller : TurnManager->GetControllers())
+        {
+            if (USkaldMainHUDWidget* HUD =
+                Controller ? Controller->GetHUDWidget() : nullptr)
+            {
+                const FString OwnerName =
+                    ResolvePlayerName(Target->OwningPlayer,
+                        TEXT("ServerHandleAttack_Update"));
+                HUD->UpdateTerritoryInfo(Target->TerritoryName,
+                    OwnerName,
+                    Target->ArmyUnits);
+            }
+        }
+    }
+}
+
+// ============================================================
+// Manual Dice Roll RPC
+// ============================================================
+void ASkaldPlayerController::ServerSubmitManualAttackRoll_Implementation(AFighterPawn* Attacker, int32 RollValue)
+{
+    if (!Attacker)
+    {
+        return;
+    }
+
+    if (UGridBattleManager* BM = GetBattleManager())
+    {
+        // Feed the player's manual roll to the battle manager.
+        BM->ApplyManualRollFromPlayer(this, Attacker, RollValue);
+    }
 }
 
 void ASkaldPlayerController::ServerSetReadyForBattle_Implementation(bool bReady) {
-  if (!EnsureTurnManager(TEXT("ServerSetReadyForBattle"))) {
-    return;
-  }
+    if (!EnsureTurnManager(TEXT("ServerSetReadyForBattle"))) {
+        return;
+    }
 
-  ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
-  const int32 PlayerID = PS ? PS->GetPlayerId() : -1;
-  if (PlayerID < 0) {
-    UE_LOG(LogSkald, Warning,
-           TEXT("ServerSetReadyForBattle called with invalid PlayerID"));
-    return;
-  }
+    ASkaldPlayerState* PS = GetPlayerState<ASkaldPlayerState>();
+    const int32 PlayerID = PS ? PS->GetPlayerId() : -1;
+    if (PlayerID < 0) {
+        UE_LOG(LogSkald, Warning,
+            TEXT("ServerSetReadyForBattle called with invalid PlayerID"));
+        return;
+    }
 
-  TurnManager->NotifyPlayerReadyForBattle(PlayerID, bReady);
+    TurnManager->NotifyPlayerReadyForBattle(PlayerID, bReady);
 }
 
 void ASkaldPlayerController::HandleMoveRequested(int32 FromID, int32 ToID,
-                                                 int32 Troops) {
-  UE_LOG(LogSkald, Log, TEXT("HUD move from %d to %d with %d"), FromID, ToID,
-         Troops);
+    int32 Troops) {
+    UE_LOG(LogSkald, Log, TEXT("HUD move from %d to %d with %d"), FromID, ToID,
+        Troops);
 
-  const auto ResetSelectionForRetry = [this]() {
-    if (MainHUD && MainHUD->CurrentPhase == ETurnPhase::Movement) {
-      MainHUD->ResetMoveSelectionAfterInvalidAttempt();
+    const auto ResetSelectionForRetry = [this]() {
+        if (MainHUD && MainHUD->CurrentPhase == ETurnPhase::Movement) {
+            MainHUD->ResetMoveSelectionAfterInvalidAttempt();
+        }
+        };
+
+    if (!IsMyTurn()) {
+        NotifyActionError(TEXT("You can only move troops during your turn"));
+        ResetSelectionForRetry();
+        return;
     }
-  };
 
-  if (!IsMyTurn()) {
-    NotifyActionError(TEXT("You can only move troops during your turn"));
-    ResetSelectionForRetry();
-    return;
-  }
+    const bool bInMovementPhase =
+        (TurnManager && TurnManager->GetCurrentPhase() == ETurnPhase::Movement) ||
+        (MainHUD && MainHUD->CurrentPhase == ETurnPhase::Movement);
+    if (!bInMovementPhase) {
+        NotifyActionError(TEXT("Troops can only move during the movement phase"));
+        ResetSelectionForRetry();
+        return;
+    }
 
-  const bool bInMovementPhase =
-      (TurnManager && TurnManager->GetCurrentPhase() == ETurnPhase::Movement) ||
-      (MainHUD && MainHUD->CurrentPhase == ETurnPhase::Movement);
-  if (!bInMovementPhase) {
-    NotifyActionError(TEXT("Troops can only move during the movement phase"));
-    ResetSelectionForRetry();
-    return;
-  }
+    AWorldMap* WorldMap = Cast<AWorldMap>(
+        UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
+    FString Error;
+    ATerritory* Source = nullptr;
+    ATerritory* Target = nullptr;
+    if (!ValidateMoveRequest(WorldMap, FromID, ToID, Troops, Source, Target,
+        Error)) {
+        NotifyActionError(Error);
+        ResetSelectionForRetry();
+        return;
+    }
 
-  AWorldMap *WorldMap = Cast<AWorldMap>(
-      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
-  FString Error;
-  ATerritory *Source = nullptr;
-  ATerritory *Target = nullptr;
-  if (!ValidateMoveRequest(WorldMap, FromID, ToID, Troops, Source, Target,
-                           Error)) {
-    NotifyActionError(Error);
-    ResetSelectionForRetry();
-    return;
-  }
-
-  ServerHandleMove(FromID, ToID, Troops);
+    ServerHandleMove(FromID, ToID, Troops);
 }
+
 
 void ASkaldPlayerController::ServerHandleMove_Implementation(int32 FromID,
                                                              int32 ToID,
@@ -4611,10 +4677,14 @@ void ASkaldPlayerController::ShowPendingStrategicInitiativeResult() {
 
 void ASkaldPlayerController::ClientPromptStrategicInitiative_Implementation(
     int32 RoundNumber, int32 RollValue, bool bWonInitiative) {
+        {
+            // Reset at the start of every new strategic initiative round
+            bInitiativeRollPresentationShown = false;
   PendingStrategicInitiativeRound = RoundNumber;
   PendingStrategicInitiativeRoll = RollValue;
   bPendingStrategicInitiativeWin = bWonInitiative;
   bAwaitingStrategicInitiativeRoll = true;
+        }
 
   ShowMainHUD();
 
@@ -5894,75 +5964,93 @@ void ASkaldPlayerController::TriggerAttackDicePresentation(
   }
 }
 
-FGuid ASkaldPlayerController::TriggerInitiativeDicePresentation(int32 AttackerRoll,
-                                                                int32 DefenderRoll) {
-  if (!IsLocalController() || !bAutoPresentInitiativeRolls) {
-    return FGuid();
-  }
+FGuid ASkaldPlayerController::TriggerInitiativeDicePresentation(int32 AttackerRoll, int32 DefenderRoll)
+{
+    if (!IsLocalController() || !bAutoPresentInitiativeRolls)
+        return FGuid();
 
-  if (AttackerRoll <= 0 && DefenderRoll <= 0) {
-    return FGuid();
-  }
+    // Prevent duplicate initiative visuals
+    if (bInitiativeRollPresentationShown)
+        return FGuid();
 
-  EnsureDiceWidgets();
+    bInitiativeRollPresentationShown = true;
 
-  USkaldDiceManager *DiceManager = ResolveDiceManager();
+    // --- your existing code continues below ---
+    EnsureDiceWidgets();
 
-  DetermineControlledBattleSide();
+    USkaldDiceManager* DiceManager = ResolveDiceManager();
 
-  const bool bPlayerIsAttacker = bControlsAttackerSide && !bControlsDefenderSide;
-  const bool bPlayerIsDefender = bControlsDefenderSide && !bControlsAttackerSide;
+    DetermineControlledBattleSide();
 
-  TArray<int32> PlayerResults;
-  TArray<int32> EnemyResults;
-  PlayerResults.Reserve(1);
-  EnemyResults.Reserve(1);
+    const bool bPlayerIsAttacker = bControlsAttackerSide && !bControlsDefenderSide;
+    const bool bPlayerIsDefender = bControlsDefenderSide && !bControlsAttackerSide;
 
-  int32 PlayerResultValue = INDEX_NONE;
-  int32 EnemyResultValue = INDEX_NONE;
+    TArray<int32> PlayerResults;
+    TArray<int32> EnemyResults;
+    PlayerResults.Reserve(1);
+    EnemyResults.Reserve(1);
 
-  auto AppendValue = [&](int32 Value, bool bTreatAsPlayer) {
-    if (Value <= 0) {
-      return;
+    int32 PlayerResultValue = INDEX_NONE;
+    int32 EnemyResultValue = INDEX_NONE;
+
+    auto AppendValue = [&](int32 Value, bool bTreatAsPlayer)
+        {
+            if (Value <= 0)
+                return;
+
+            const int32 Clamped = FMath::Clamp(Value, 1, 6);
+            if (bTreatAsPlayer)
+            {
+                PlayerResults.Add(Clamped);
+                if (PlayerResultValue == INDEX_NONE)
+                    PlayerResultValue = Clamped;
+            }
+            else
+            {
+                EnemyResults.Add(Clamped);
+                if (EnemyResultValue == INDEX_NONE)
+                    EnemyResultValue = Clamped;
+            }
+        };
+
+    if (bPlayerIsAttacker)
+    {
+        AppendValue(AttackerRoll, true);
+        AppendValue(DefenderRoll, false);
+    }
+    else if (bPlayerIsDefender)
+    {
+        AppendValue(DefenderRoll, true);
+        AppendValue(AttackerRoll, false);
+    }
+    else
+    {
+        AppendValue(AttackerRoll, true);
+        AppendValue(DefenderRoll, false);
     }
 
-    const int32 Clamped = FMath::Clamp(Value, 1, 6);
-    if (bTreatAsPlayer) {
-      PlayerResults.Add(Clamped);
-      if (PlayerResultValue == INDEX_NONE) {
-        PlayerResultValue = Clamped;
-      }
-    } else {
-      EnemyResults.Add(Clamped);
-      if (EnemyResultValue == INDEX_NONE) {
-        EnemyResultValue = Clamped;
-      }
+    FGuid RollId;
+
+    // Only clients show the dice physically.
+    // The server just updates HUDs with results — no duplicate rolls.
+    if (HasAuthority())
+    {
+        // Server: broadcast results (no visual roll)
+        ShowInitiativeResults(PlayerResultValue, EnemyResultValue);
     }
-  };
+    else if (DiceManager && (PlayerResults.Num() > 0 || EnemyResults.Num() > 0))
+    {
+        // Client: show physical dice roll and result
+        RollId = DiceManager->PlayScriptedRoll(PlayerResults, EnemyResults, true);
+    }
 
-  if (bPlayerIsAttacker) {
-    AppendValue(AttackerRoll, true);
-    AppendValue(DefenderRoll, false);
-  } else if (bPlayerIsDefender) {
-    AppendValue(DefenderRoll, true);
-    AppendValue(AttackerRoll, false);
-  } else {
-    AppendValue(AttackerRoll, true);
-    AppendValue(DefenderRoll, false);
-  }
+    // The overlay can be safely set client-side
+    if (DiceOverlayWidget)
+    {
+        DiceOverlayWidget->SetOverlayMode(ESkaldDiceOverlayMode::Initiative);
+    }
 
-  FGuid RollId;
-  if (DiceManager && (PlayerResults.Num() > 0 || EnemyResults.Num() > 0)) {
-    RollId = DiceManager->PlayScriptedRoll(PlayerResults, EnemyResults, true);
-  }
-
-  if (DiceOverlayWidget) {
-    DiceOverlayWidget->SetOverlayMode(ESkaldDiceOverlayMode::Initiative);
-  }
-
-  ShowInitiativeResults(PlayerResultValue, EnemyResultValue);
-
-  return RollId;
+    return RollId;
 }
 
 void ASkaldPlayerController::ShowInitiativeResults(int32 PlayerResult,
@@ -6107,12 +6195,55 @@ void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,
 
   HideMainHUD();
 
-  if (!CachedGameInstance) {
-    CachedGameInstance = GetGameInstance<USkaldGameInstance>();
+  if (!CachedGameInstance)
+  {
+      CachedGameInstance = GetGameInstance<USkaldGameInstance>();
   }
+
   const bool bReadyForOverworldHUD =
       !bIsBattleMap || (CachedGameInstance && !CachedGameInstance->bIsInBattleMap);
-  if (bReadyForOverworldHUD) {
-    ShowOverworldHUD();
+
+  if (bReadyForOverworldHUD)
+  {
+      ShowOverworldHUD();
   }
+} // closes the last function, NOT the class
+
+// === Manual Attack Roll UI Flow ===
+
+// CLIENT FUNCTIONS
+void ASkaldPlayerController::ClientShowAttackRollButton_Implementation(AFighterPawn* Attacker)
+{
+    if (UBattleHUDWidget* HUD = GetBattleHUD())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[ManualDice] ClientShowAttackRollButton received for %s"), *GetNameSafe(Attacker));
+        HUD->SetAttackRollButtonVisibility(true);
+    }
+}
+
+void ASkaldPlayerController::ClientHideAttackRollButton_Implementation()
+{
+    UE_LOG(LogTemp, Warning, TEXT("PC: ClientHideAttackRollButton called"));
+
+    if (BattleHUD)
+    {
+        BattleHUD->SetAttackRollButtonVisibility(false);
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("PC: BattleHUD is null!"));
+    }
+}
+
+// SERVER FUNCTION
+void ASkaldPlayerController::ServerTriggerManualAttackRoll_Implementation(AFighterPawn* Attacker)
+{
+    if (!Attacker)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("ServerTriggerManualAttackRoll called with null Attacker"));
+        return;
+    }
+
+    UE_LOG(LogTemp, Warning, TEXT("ServerTriggerManualAttackRoll called for %s"), *GetNameSafe(Attacker));
+    Attacker->TriggerManualAttackRoll();
 }

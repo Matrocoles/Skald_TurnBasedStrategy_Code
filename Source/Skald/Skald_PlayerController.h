@@ -110,6 +110,17 @@ public:
   UFUNCTION(Server, Reliable)
   void ServerEndPhase();
 
+  // === Manual Attack Roll UI Flow ===
+
+  UFUNCTION(Client, Reliable)
+  void ClientShowAttackRollButton(class AFighterPawn* Attacker);
+
+  UFUNCTION(Client, Reliable)
+  void ClientHideAttackRollButton();
+
+  UFUNCTION(Server, Reliable)
+  void ServerTriggerManualAttackRoll(class AFighterPawn* Attacker);
+
   /** Set the turn manager responsible for sequencing play. */
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void SetTurnManager(ATurnManager *Manager);
@@ -392,6 +403,10 @@ protected:
             meta = (AllowPrivateAccess = "true"))
   TObjectPtr<UBattleHUDWidget> BattleHudWidget;
 
+  /** Cached pointer to the active Battle HUD widget (runtime reference). */
+  UPROPERTY(BlueprintReadOnly, Category = "UI")
+  TObjectPtr<UBattleHUDWidget> BattleHUD;
+
   /** Dice overlay widget automatically spawned from class defaults. */
   UPROPERTY(Transient)
   TObjectPtr<USkaldDiceOverlayWidget> DiceOverlayWidget;
@@ -547,6 +562,10 @@ public:
   UFUNCTION()
   void HandleWorldStateChanged();
 
+  /** Getter for the active Battle HUD widget. */
+  UFUNCTION(BlueprintCallable, Category = "UI")
+  UBattleHUDWidget* GetBattleHUD() const { return BattleHUD; }
+
   /**
    * Legacy alias for HandleFactionLockedIn.
    * Enables player movement and look input after locking in their faction.
@@ -622,6 +641,12 @@ public:
 
   UFUNCTION(Server, Reliable)
   void ServerSetReadyForBattle(bool bReady);
+
+  // ============================================================
+  // Manual Dice Roll: Player sends manual attack roll result to server
+  // ============================================================
+  UFUNCTION(Server, Reliable)
+  void ServerSubmitManualAttackRoll(AFighterPawn* Attacker, int32 RollValue);
 
   /** Handle HUD siege build requests. */
   UFUNCTION(BlueprintCallable, Category = "UI")
@@ -980,4 +1005,7 @@ private:
 
   /** Pending dice feedback bookkeeping so FX can align with reveal timings. */
   TArray<FPendingDiceFeedbackState> PendingDiceFeedbackStates;
+
+  /** Prevents duplicate initiative dice visuals per round. */
+  bool bInitiativeRollPresentationShown = false;
 };
