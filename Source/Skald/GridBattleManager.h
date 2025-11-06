@@ -316,6 +316,8 @@ public:
     UFUNCTION(BlueprintCallable, Category = "UI|Dice")
     void HideAttackRollButton();
 
+    void HideAttackRollButtonForFighter(class AFighterPawn* Attacker);
+
     /** Load fighter definitions and set default state. */
     UGridBattleManager();
 
