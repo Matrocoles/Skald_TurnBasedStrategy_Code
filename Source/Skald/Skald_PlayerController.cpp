@@ -2041,6 +2041,8 @@ void ASkaldPlayerController::InitializeBattleHUD() {
           this, &ASkaldPlayerController::HandleEndTurnPressed);
       BattleHudWidget->OnInitiativeRollRequested.AddDynamic(
           this, &ASkaldPlayerController::HandleInitiativeRollRequested);
+      BattleHudWidget->OnAttackRollRequested.AddDynamic(
+          this, &ASkaldPlayerController::HandleAttackRollRequested);
       BattleHudWidget->OnResolutionComplete.AddDynamic(
           this, &ASkaldPlayerController::HandleDiceResolutionComplete);
       BattleHudWidget->OnDiceOutcomeRevealed.AddDynamic(
@@ -2054,6 +2056,7 @@ void ASkaldPlayerController::InitializeBattleHUD() {
       BattleHudWidget->SetEndTurnVisibility(false);
       BattleHudWidget->SetActivateEnabled(false);
       BattleHudWidget->SetEndTurnEnabled(false);
+      BattleHUD = BattleHudWidget;
     }
   }
 
@@ -2991,7 +2994,7 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
             }
         }
 
-        // Hand off to turn manager’s battle flow and exit.
+        // Hand off to turn managerÂ’s battle flow and exit.
         TurnManager->HandleAttackConfirmed(Battle);
         return;
     }
@@ -4632,6 +4635,28 @@ void ASkaldPlayerController::HandleInitiativeRollRequested() {
   }
 }
 
+void ASkaldPlayerController::HandleAttackRollRequested() {
+  if (!BattleHudWidget) {
+    return;
+  }
+
+  if (!BattleHudWidget->IsManualAttackRollPromptActive() ||
+      BattleHudWidget->IsManualDiceResolutionActive()) {
+    return;
+  }
+
+  AFighterPawn *Attacker = BattleHudWidget->GetManualAttackRollAttacker();
+  if (!Attacker) {
+    return;
+  }
+
+  if (HasAuthority()) {
+    Attacker->TriggerManualAttackRoll();
+  } else {
+    ServerTriggerManualAttackRoll(Attacker);
+  }
+}
+
 void ASkaldPlayerController::HandleStrategicInitiativeRollRequested() {
   bAwaitingStrategicInitiativeRoll = false;
 
@@ -5728,6 +5753,11 @@ void ASkaldPlayerController::HandleDiceResolutionComplete(
     return;
   }
 
+  if (Attacker &&
+      BattleHudWidget->GetManualAttackRollAttacker() == Attacker) {
+    BattleHudWidget->ExitManualAttackRollPrompt();
+  }
+
   {
     USkaldGameInstance *GI = CachedGameInstance;
     if (!GI) {
@@ -5823,6 +5853,11 @@ void ASkaldPlayerController::HandleAttackRejected(AFighterPawn *Attacker,
                                                   const FText &Reason) {
   if (!IsFriendlyFighter(Attacker)) {
     return;
+  }
+
+  if (BattleHudWidget && Attacker &&
+      BattleHudWidget->GetManualAttackRollAttacker() == Attacker) {
+    BattleHudWidget->ExitManualAttackRollPrompt();
   }
 
   const FString ReasonString = Reason.ToString();
@@ -6032,7 +6067,7 @@ FGuid ASkaldPlayerController::TriggerInitiativeDicePresentation(int32 AttackerRo
     FGuid RollId;
 
     // Only clients show the dice physically.
-    // The server just updates HUDs with results — no duplicate rolls.
+    // The server just updates HUDs with results Â— no duplicate rolls.
     if (HasAuthority())
     {
         // Server: broadcast results (no visual roll)
@@ -6214,10 +6249,16 @@ void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,
 // CLIENT FUNCTIONS
 void ASkaldPlayerController::ClientShowAttackRollButton_Implementation(AFighterPawn* Attacker)
 {
-    if (UBattleHUDWidget* HUD = GetBattleHUD())
+    UBattleHUDWidget* HUD = BattleHudWidget.Get();
+    if (!HUD)
+    {
+        HUD = GetBattleHUD();
+    }
+
+    if (HUD)
     {
         UE_LOG(LogTemp, Warning, TEXT("[ManualDice] ClientShowAttackRollButton received for %s"), *GetNameSafe(Attacker));
-        HUD->SetAttackRollButtonVisibility(true);
+        HUD->EnterManualAttackRollPrompt(Attacker);
     }
 }
 
@@ -6225,9 +6266,15 @@ void ASkaldPlayerController::ClientHideAttackRollButton_Implementation()
 {
     UE_LOG(LogTemp, Warning, TEXT("PC: ClientHideAttackRollButton called"));
 
-    if (BattleHUD)
+    UBattleHUDWidget* HUD = BattleHudWidget.Get();
+    if (!HUD)
     {
-        BattleHUD->SetAttackRollButtonVisibility(false);
+        HUD = GetBattleHUD();
+    }
+
+    if (HUD)
+    {
+        HUD->SetAttackRollButtonVisibility(false);
     }
     else
     {

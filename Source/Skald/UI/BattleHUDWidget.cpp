@@ -55,6 +55,7 @@ void UBattleHUDWidget::NativeConstruct() {
   if (EndTurnButton) {
     EndTurnButton->OnClicked.AddDynamic(
         this, &UBattleHUDWidget::HandleEndTurnPressed);
+    RefreshEndTurnButtonVisibility();
   }
 
   if (RollInitiativeButton) {
@@ -623,23 +624,29 @@ void UBattleHUDWidget::HandleInitiativeRollPressed() {
 }
 
 void UBattleHUDWidget::HandleAttackRollPressed() {
-  if (!bManualDiceResolutionActive) {
+  if (bManualDiceResolutionActive) {
+    SetAttackRollButtonVisibility(false);
+
+    if (!DiceResolutionPanel) {
+      return;
+    }
+
+    const bool bAdvanced = DiceResolutionPanel->AdvanceManualReveal();
+
+    if (!bAdvanced && bManualDiceResolutionActive) {
+      SetAttackRollButtonVisibility(true);
+    }
+
     return;
   }
 
-  OnAttackRollRequested.Broadcast();
+  if (!bManualAttackRollPromptActive) {
+    return;
+  }
 
   SetAttackRollButtonVisibility(false);
 
-  if (!DiceResolutionPanel) {
-    return;
-  }
-
-  const bool bAdvanced = DiceResolutionPanel->AdvanceManualReveal();
-
-  if (!bAdvanced && bManualDiceResolutionActive) {
-    SetAttackRollButtonVisibility(true);
-  }
+  OnAttackRollRequested.Broadcast();
 }
 
 void UBattleHUDWidget::HandleAbilityButtonPressedSlot1() {
@@ -984,10 +991,8 @@ void UBattleHUDWidget::SetEndTurnEnabled(bool bEnabled) {
 }
 
 void UBattleHUDWidget::SetEndTurnVisibility(bool bVisible) {
-  if (EndTurnButton) {
-    EndTurnButton->SetVisibility(
-        bVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
-  }
+  bEndTurnVisibilityRequested = bVisible;
+  RefreshEndTurnButtonVisibility();
 }
 
 void UBattleHUDWidget::SetActionButtonsVisibility(bool bVisible) {
@@ -1004,6 +1009,47 @@ void UBattleHUDWidget::SetAttackRollButtonVisibility(bool bVisible) {
       bVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed;
   AttackRollButton->SetVisibility(Desired);
   AttackRollButton->SetIsEnabled(bVisible);
+}
+
+void UBattleHUDWidget::EnterManualAttackRollPrompt(AFighterPawn *Attacker) {
+  if (!Attacker) {
+    ManualAttackRollAttacker.Reset();
+    bManualAttackRollPromptActive = false;
+    SetAttackRollButtonVisibility(false);
+    UpdateActionButtonVisibility();
+    RefreshEndTurnButtonVisibility();
+    return;
+  }
+
+  ManualAttackRollAttacker = Attacker;
+  bManualAttackRollPromptActive = true;
+  SetAttackRollButtonVisibility(true);
+  UpdateActionButtonVisibility();
+  RefreshEndTurnButtonVisibility();
+}
+
+void UBattleHUDWidget::ExitManualAttackRollPrompt() {
+  ManualAttackRollAttacker.Reset();
+  if (!bManualAttackRollPromptActive) {
+    RefreshEndTurnButtonVisibility();
+    return;
+  }
+
+  bManualAttackRollPromptActive = false;
+  SetAttackRollButtonVisibility(false);
+  UpdateActionButtonVisibility();
+  RefreshEndTurnButtonVisibility();
+}
+
+void UBattleHUDWidget::RefreshEndTurnButtonVisibility() {
+  if (!EndTurnButton) {
+    return;
+  }
+
+  const bool bShouldShow = bEndTurnVisibilityRequested && !bManualAttackRollPromptActive;
+  const ESlateVisibility DesiredVisibility =
+      bShouldShow ? ESlateVisibility::Visible : ESlateVisibility::Collapsed;
+  EndTurnButton->SetVisibility(DesiredVisibility);
 }
 
 void UBattleHUDWidget::ShowDiceRoll(int32 RollValue, float DisplayDuration) {
@@ -1115,7 +1161,8 @@ void UBattleHUDWidget::ClearCommandPreviews() {
 
 void UBattleHUDWidget::UpdateActionButtonVisibility() {
   const bool bShouldShow = bActionButtonsUnlocked && BoundFighter &&
-                           BoundFighter->ActionsRemaining > 0;
+                           BoundFighter->ActionsRemaining > 0 &&
+                           !bManualAttackRollPromptActive;
   const ESlateVisibility DesiredVisibility =
       bShouldShow ? ESlateVisibility::Visible : ESlateVisibility::Collapsed;
 

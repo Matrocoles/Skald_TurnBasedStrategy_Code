@@ -386,6 +386,22 @@ public:
   UFUNCTION(BlueprintCallable, Category = "BattleHUD")
   void SetAttackRollButtonVisibility(bool bVisible);
 
+  /** Enter manual attack roll mode for the supplied attacker. */
+  void EnterManualAttackRollPrompt(AFighterPawn *Attacker);
+
+  /** Clear any manual attack roll prompt state and restore normal controls. */
+  void ExitManualAttackRollPrompt();
+
+  AFighterPawn *GetManualAttackRollAttacker() const {
+    return ManualAttackRollAttacker.Get();
+  }
+  bool IsManualAttackRollPromptActive() const {
+    return bManualAttackRollPromptActive;
+  }
+  bool IsManualDiceResolutionActive() const {
+    return bManualDiceResolutionActive;
+  }
+
   /** Clear any preview highlights tracked by the widget. */
   void ClearCommandPreviews();
 
@@ -629,6 +645,15 @@ private:
   /** Tracks whether the active resolution is using manual reveals. */
   bool bManualDiceResolutionActive = false;
 
+  /** Tracks whether we are waiting on the player to trigger a manual attack roll. */
+  bool bManualAttackRollPromptActive = false;
+
+  /** Fighter currently awaiting a manual attack roll input. */
+  TWeakObjectPtr<AFighterPawn> ManualAttackRollAttacker;
+
+  /** Desired end turn visibility before manual overrides are applied. */
+  bool bEndTurnVisibilityRequested = false;
+
   /** Map of tracked fighters to their entry widgets. */
   TMap<TWeakObjectPtr<AFighterPawn>, TObjectPtr<ULockedInFighterEntryWidget>>
       LockedInFighterEntries;
@@ -659,5 +684,6 @@ private:
   FTimerHandle InitiativeRollButtonDelayTimer;
 
   void ApplyDiceResolutionPanelLayoutInternal(const FDiceResolutionPanelLayout &Layout);
+  void RefreshEndTurnButtonVisibility();
 };
 
