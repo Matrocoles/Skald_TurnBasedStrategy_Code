@@ -606,6 +606,9 @@ public:
   void HandleInitiativeRollRequested();
 
   UFUNCTION()
+  void HandleAttackRollRequested();
+
+  UFUNCTION()
   void HandleStrategicInitiativeRollRequested();
 
   UFUNCTION(Client, Reliable)
