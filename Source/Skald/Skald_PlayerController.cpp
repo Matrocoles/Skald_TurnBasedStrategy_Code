@@ -4066,6 +4066,17 @@ void ASkaldPlayerController::HandleGridClick() {
     }
     if (!bHasPendingDisengage) {
       CancelCommandMode();
+      UpdateBattleHUDButtons();
+      break;
+    }
+
+    if (LockedActiveFighter->GetActionsRemaining() <= 0) {
+      const FText ErrorText = NSLOCTEXT(
+          "SkaldBattle", "DisengageNoActions",
+          "Not enough actions remain to disengage.");
+      NotifyActionError(ErrorText.ToString());
+      CancelCommandMode();
+      UpdateBattleHUDButtons();
       break;
     }
 
@@ -4111,7 +4122,6 @@ void ASkaldPlayerController::HandleGridClick() {
     }
 
     LockedActiveFighter->MoveToCell(TargetAnchor);
-    ResetPendingDisengage();
     CancelCommandMode();
     UpdateBattleHUDButtons();
     break;
