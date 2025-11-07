@@ -1692,6 +1692,11 @@ void ATurnManager::ConfirmDefenderRetreatDestination(
   DefendingTerritory->OwningPlayer = AttackerState;
   DefendingTerritory->RefreshAppearance();
 
+  if (USkaldGameInstance *GameInstance = GetGameInstance<USkaldGameInstance>()) {
+    GameInstance->PendingBattle = FS_BattlePayload();
+  }
+  PendingBattle = FS_BattlePayload();
+
   auto DispatchToControllerConfirm =
       [](ASkaldPlayerController *Controller,
          TFunctionRef<void(ASkaldPlayerController *)> LocalAction,
