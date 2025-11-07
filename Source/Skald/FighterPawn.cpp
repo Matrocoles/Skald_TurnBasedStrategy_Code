@@ -2147,6 +2147,7 @@ bool AFighterPawn::AttemptPhysicalAttackRoll(AFighterPawn* Target)
     PendingPhysicalAttackTarget = Target;
     PendingAttackAttackerSnapshot = Stats;
     PendingAttackDefenderSnapshot = Target->Stats;
+    bHasPendingAttackSnapshot = true;
     bAwaitingPhysicalAttackRoll = true;
 
     //  Debug: confirm we actually get here
@@ -2397,6 +2398,12 @@ void AFighterPawn::StartQueuedAttack(AFighterPawn *Target,
     World->GetTimerManager().ClearTimer(AttackRollTimerHandle);
   }
 
+  if (Target) {
+    PendingAttackDefenderSnapshot = Target->Stats;
+  }
+  PendingAttackAttackerSnapshot = Stats;
+  bHasPendingAttackSnapshot = true;
+
   PendingAttackDiceResult = MoveTemp(DiceResult);
   PendingAttackOutcomeIndex = 0;
   PendingAttackTarget = Target;
@@ -2439,18 +2446,38 @@ void AFighterPawn::ResolveNextAttackRoll() {
     return;
   }
 
-  const FDiceRollOutcome &Outcome =
+  FDiceRollOutcome &Outcome =
       PendingAttackDiceResult.DiceOutcomes[PendingAttackOutcomeIndex];
   bHasProcessedPendingRoll = true;
 
   if (Outcome.bHit) {
+    const FFighterStats &DamageStats =
+        bHasPendingAttackSnapshot ? PendingAttackAttackerSnapshot : Stats;
+    const int32 BaseDamage = FMath::Max(0, DamageStats.AttackDamage);
+    const int32 CriticalBonus =
+        FMath::Max(0, DamageStats.CriticalBonusDamage);
+    const bool bCriticalRoll = Outcome.RollValue == 6;
+
+    int32 CalculatedDamage = Outcome.bHit ? BaseDamage : 0;
+    if (Outcome.bHit && bCriticalRoll) {
+      CalculatedDamage += CriticalBonus;
+    }
+
+    Outcome.bCritical =
+        Outcome.bHit && bCriticalRoll && CalculatedDamage > BaseDamage;
+    Outcome.Damage = CalculatedDamage;
+
+    const int32 HealthBefore = Target->Stats.Health;
     const int32 DamageToApply =
-        FMath::Min(Outcome.Damage, Target->Stats.Health);
+        FMath::Min(CalculatedDamage, HealthBefore);
     Target->Stats.Health =
-        FMath::Max(0, Target->Stats.Health - DamageToApply);
+        FMath::Max(0, HealthBefore - DamageToApply);
     if (Target->Stats.Health <= 0) {
       bPendingAttackTargetDied = true;
     }
+  } else {
+    Outcome.Damage = 0;
+    Outcome.bCritical = false;
   }
 
   Target->OnHealthChanged.Broadcast(Target->Stats.Health);
@@ -2476,6 +2503,59 @@ void AFighterPawn::ResolveNextAttackRoll() {
   }
 }
 
+void AFighterPawn::RefreshPendingAttackResultStats(AFighterPawn *Target) {
+  if (!bHasPendingDiceResult) {
+    return;
+  }
+
+  const int32 StartingHealth = PendingAttackDiceResult.StartingHealth;
+
+  int32 HitCount = 0;
+  int32 MissCount = 0;
+  int32 CriticalCount = 0;
+  int32 HighestCriticalDamage = 0;
+  int32 SimulatedHealth = StartingHealth;
+
+  for (const FDiceRollOutcome &Outcome : PendingAttackDiceResult.DiceOutcomes) {
+    if (Outcome.bHit) {
+      ++HitCount;
+
+      const int32 ClampedDamage = FMath::Max(0, Outcome.Damage);
+      if (SimulatedHealth > 0) {
+        const int32 AppliedDamage = FMath::Min(ClampedDamage, SimulatedHealth);
+        SimulatedHealth = FMath::Max(0, SimulatedHealth - AppliedDamage);
+      }
+
+      if (Outcome.bCritical) {
+        ++CriticalCount;
+        HighestCriticalDamage = FMath::Max(HighestCriticalDamage, ClampedDamage);
+      }
+    } else {
+      ++MissCount;
+    }
+  }
+
+  int32 ActualEndingHealth = SimulatedHealth;
+  if (Target) {
+    ActualEndingHealth = Target->Stats.Health;
+  } else if (bPendingAttackTargetDied) {
+    ActualEndingHealth = 0;
+  }
+
+  const int32 ClampedEndingHealth =
+      FMath::Clamp(ActualEndingHealth, 0, StartingHealth);
+
+  PendingAttackDiceResult.HitCount = HitCount;
+  PendingAttackDiceResult.MissCount = MissCount;
+  PendingAttackDiceResult.CriticalHitCount = CriticalCount;
+  PendingAttackDiceResult.HighestCriticalDamage = HighestCriticalDamage;
+  PendingAttackDiceResult.EndingHealth = ClampedEndingHealth;
+  PendingAttackDiceResult.TotalDamage =
+      FMath::Clamp(StartingHealth - ClampedEndingHealth, 0, StartingHealth);
+  PendingAttackDiceResult.bHighStakesCritical =
+      CriticalCount > 0 && ClampedEndingHealth <= 0 && StartingHealth > 0;
+}
+
 void AFighterPawn::FinalizeQueuedAttack() {
   if (UWorld *World = GetWorld()) {
     World->GetTimerManager().ClearTimer(AttackRollTimerHandle);
@@ -2486,16 +2566,16 @@ void AFighterPawn::FinalizeQueuedAttack() {
     if (!bPendingAttackTargetDied && !bHasProcessedPendingRoll) {
       Target->OnHealthChanged.Broadcast(Target->Stats.Health);
     }
+  }
 
-    if (bHasPendingDiceResult) {
-      PendingAttackDiceResult.EndingHealth = Target->Stats.Health;
+  if (bHasPendingDiceResult) {
+    RefreshPendingAttackResultStats(Target);
 
-      if (USkaldGameInstance *GI =
-              Cast<USkaldGameInstance>(GetGameInstance())) {
-        if (UGridBattleManager *BattleManager = GI->GridBattleManager) {
-          BattleManager->ReportAttackResolution(this, Target,
-                                               PendingAttackDiceResult);
-        }
+    if (USkaldGameInstance *GI =
+            Cast<USkaldGameInstance>(GetGameInstance())) {
+      if (UGridBattleManager *BattleManager = GI->GridBattleManager) {
+        BattleManager->ReportAttackResolution(this, Target,
+                                             PendingAttackDiceResult);
       }
     }
   }
@@ -2562,6 +2642,7 @@ void AFighterPawn::ClearQueuedAttackState(bool bBroadcastFinalized) {
   PendingAttackRollId.Invalidate();
   PendingAttackAttackerSnapshot = FFighterStats();
   PendingAttackDefenderSnapshot = FFighterStats();
+  bHasPendingAttackSnapshot = false;
 
   if (bBroadcastFinalized) {
     OnQueuedAttackFinalized.Broadcast();
