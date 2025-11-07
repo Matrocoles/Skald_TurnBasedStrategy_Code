@@ -1045,6 +1045,7 @@ private:
   {
     bool bActive = false;
     bool bHadBattleCamera = false;
+    bool bOverviewPrimed = false;
     FVector OriginalLocation = FVector::ZeroVector;
     FRotator OriginalRotation = FRotator::ZeroRotator;
     float OriginalZoom = 0.f;
@@ -1052,12 +1053,16 @@ private:
     FGuid ActiveRollId;
     int32 AttackerResult = 0;
     int32 DefenderResult = 0;
+    float OverviewStartTime = 0.f;
+    float OverviewDuration = 0.f;
     FTimerHandle OverviewTimerHandle;
     FTimerHandle CleanupDelayHandle;
     FTimerHandle ReturnTimerHandle;
   };
 
   FPendingInitiativeDiceSequence PendingInitiativeSequence;
+
+  void PrimeInitiativeDiceOverview();
 
   struct FPendingAttackDiceSequence
   {

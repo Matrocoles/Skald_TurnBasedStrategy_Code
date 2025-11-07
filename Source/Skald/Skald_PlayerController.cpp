@@ -4545,6 +4545,8 @@ void ASkaldPlayerController::HandleInitiativePhaseStarted(int32 RoundNumber) {
   const FText PromptText = NSLOCTEXT("Skald", "BattleInitiativePrompt",
                                      "Roll for initiative");
   BattleHudWidget->ShowInitiativePrompt(PromptText);
+
+  PrimeInitiativeDiceOverview();
 }
 
 void ASkaldPlayerController::HandleInitiativeRollCompleted(
@@ -4635,6 +4637,8 @@ void ASkaldPlayerController::HandleInitiativeRollRequested() {
   LastLocalInitiativeAttacker = INDEX_NONE;
   LastLocalInitiativeDefender = INDEX_NONE;
   ActiveLocalInitiativeRollId.Invalidate();
+
+  PrimeInitiativeDiceOverview();
 
   if (GI && GI->GridBattleManager) {
     GI->GridBattleManager->ConfirmInitiativeRoll(AttackerRequest, DefenderRequest);
@@ -6620,9 +6624,73 @@ FGuid ASkaldPlayerController::TriggerInitiativeDicePresentation(int32 AttackerRo
     return RollId;
 }
 
+void ASkaldPlayerController::PrimeInitiativeDiceOverview()
+{
+  if (!IsLocalController() || !bAutoPresentInitiativeRolls) {
+    return;
+  }
+
+  if (PendingInitiativeSequence.bActive &&
+      PendingInitiativeSequence.bOverviewPrimed &&
+      PendingInitiativeSequence.bHadBattleCamera) {
+    return;
+  }
+
+  ASkald_PlayerCharacter *CameraPawn = Cast<ASkald_PlayerCharacter>(GetPawn());
+  if (!CameraPawn || !bIsBattleMap || !CameraPawn->IsBattleCameraActive()) {
+    return;
+  }
+
+  ResetInitiativeDiceSequence();
+
+  PendingInitiativeSequence.bActive = true;
+  PendingInitiativeSequence.bHadBattleCamera = true;
+  PendingInitiativeSequence.OriginalLocation = CameraPawn->GetActorLocation();
+  PendingInitiativeSequence.OriginalRotation =
+      CameraPawn->GetCurrentBattleCameraRotation();
+  PendingInitiativeSequence.OriginalZoom =
+      CameraPawn->GetCurrentBattleCameraZoom();
+  PendingInitiativeSequence.OriginalLockTarget =
+      CameraPawn->GetCurrentBattleCameraLockTarget();
+  PendingInitiativeSequence.ActiveRollId.Invalidate();
+  PendingInitiativeSequence.AttackerResult = 0;
+  PendingInitiativeSequence.DefenderResult = 0;
+
+  CameraPawn->ClearCameraFocus();
+
+  FVector OverviewLocation = PendingInitiativeSequence.OriginalLocation;
+  FRotator OverviewRotation = PendingInitiativeSequence.OriginalRotation;
+  float OverviewZoom = 3000.f;
+  if (!ComputeBattlefieldOverviewTransform(
+          PendingInitiativeSequence.OriginalRotation.Yaw, OverviewLocation,
+          OverviewRotation, OverviewZoom)) {
+    ResetInitiativeDiceSequence();
+    return;
+  }
+
+  const float OverviewDuration = 0.65f;
+  CameraPawn->StartCameraTransition(OverviewLocation, OverviewRotation,
+                                    OverviewZoom, OverviewDuration);
+
+  PendingInitiativeSequence.bOverviewPrimed = true;
+  PendingInitiativeSequence.OverviewDuration = OverviewDuration;
+
+  if (UWorld *World = GetWorld()) {
+    PendingInitiativeSequence.OverviewStartTime = World->GetTimeSeconds();
+  } else {
+    PendingInitiativeSequence.OverviewStartTime = 0.f;
+  }
+}
+
 void ASkaldPlayerController::StartInitiativeDiceSequence(int32 AttackerRoll,
                                                          int32 DefenderRoll) {
-  ResetInitiativeDiceSequence();
+  const bool bAlreadyPrimed = PendingInitiativeSequence.bActive &&
+                              PendingInitiativeSequence.bHadBattleCamera &&
+                              PendingInitiativeSequence.bOverviewPrimed;
+
+  if (!bAlreadyPrimed) {
+    ResetInitiativeDiceSequence();
+  }
 
   if (!IsLocalController() || !bAutoPresentInitiativeRolls) {
     TriggerInitiativeDicePresentation(AttackerRoll, DefenderRoll);
@@ -6641,42 +6709,73 @@ void ASkaldPlayerController::StartInitiativeDiceSequence(int32 AttackerRoll,
     return;
   }
 
-  PendingInitiativeSequence.bActive = true;
-  PendingInitiativeSequence.bHadBattleCamera = true;
-  PendingInitiativeSequence.AttackerResult = AttackerRoll;
-  PendingInitiativeSequence.DefenderResult = DefenderRoll;
-  PendingInitiativeSequence.OriginalLocation = CameraPawn->GetActorLocation();
-  PendingInitiativeSequence.OriginalRotation =
-      CameraPawn->GetCurrentBattleCameraRotation();
-  PendingInitiativeSequence.OriginalZoom =
-      CameraPawn->GetCurrentBattleCameraZoom();
-  PendingInitiativeSequence.OriginalLockTarget =
-      CameraPawn->GetCurrentBattleCameraLockTarget();
-  PendingInitiativeSequence.ActiveRollId.Invalidate();
-
-  CameraPawn->ClearCameraFocus();
-
-  FVector OverviewLocation = PendingInitiativeSequence.OriginalLocation;
-  FRotator OverviewRotation = PendingInitiativeSequence.OriginalRotation;
-  float OverviewZoom = 3000.f;
-  if (!ComputeBattlefieldOverviewTransform(
-          PendingInitiativeSequence.OriginalRotation.Yaw, OverviewLocation,
-          OverviewRotation, OverviewZoom)) {
-    ResetInitiativeDiceSequence();
-    TriggerInitiativeDicePresentation(AttackerRoll, DefenderRoll);
-    return;
+  if (!PendingInitiativeSequence.bActive) {
+    PendingInitiativeSequence.bActive = true;
+    PendingInitiativeSequence.bHadBattleCamera = true;
+    PendingInitiativeSequence.OriginalLocation = CameraPawn->GetActorLocation();
+    PendingInitiativeSequence.OriginalRotation =
+        CameraPawn->GetCurrentBattleCameraRotation();
+    PendingInitiativeSequence.OriginalZoom =
+        CameraPawn->GetCurrentBattleCameraZoom();
+    PendingInitiativeSequence.OriginalLockTarget =
+        CameraPawn->GetCurrentBattleCameraLockTarget();
   }
 
-  const float OverviewDuration = 0.65f;
-  CameraPawn->StartCameraTransition(OverviewLocation, OverviewRotation,
-                                    OverviewZoom, OverviewDuration);
+  PendingInitiativeSequence.AttackerResult = AttackerRoll;
+  PendingInitiativeSequence.DefenderResult = DefenderRoll;
+  PendingInitiativeSequence.ActiveRollId.Invalidate();
+
+  float RemainingOverview = 0.f;
+
+  if (PendingInitiativeSequence.bOverviewPrimed) {
+    if (UWorld *World = GetWorld()) {
+      const float Now = World->GetTimeSeconds();
+      const float Elapsed = Now - PendingInitiativeSequence.OverviewStartTime;
+      RemainingOverview = FMath::Max(
+          0.f, PendingInitiativeSequence.OverviewDuration - Elapsed);
+    } else {
+      RemainingOverview = PendingInitiativeSequence.OverviewDuration;
+    }
+  } else {
+    CameraPawn->ClearCameraFocus();
+
+    FVector OverviewLocation = PendingInitiativeSequence.OriginalLocation;
+    FRotator OverviewRotation = PendingInitiativeSequence.OriginalRotation;
+    float OverviewZoom = 3000.f;
+    if (!ComputeBattlefieldOverviewTransform(
+            PendingInitiativeSequence.OriginalRotation.Yaw, OverviewLocation,
+            OverviewRotation, OverviewZoom)) {
+      ResetInitiativeDiceSequence();
+      TriggerInitiativeDicePresentation(AttackerRoll, DefenderRoll);
+      return;
+    }
+
+    const float OverviewDuration = 0.65f;
+    CameraPawn->StartCameraTransition(OverviewLocation, OverviewRotation,
+                                      OverviewZoom, OverviewDuration);
+
+    PendingInitiativeSequence.bOverviewPrimed = true;
+    PendingInitiativeSequence.OverviewDuration = OverviewDuration;
+    if (UWorld *World = GetWorld()) {
+      PendingInitiativeSequence.OverviewStartTime = World->GetTimeSeconds();
+    } else {
+      PendingInitiativeSequence.OverviewStartTime = 0.f;
+    }
+
+    RemainingOverview = OverviewDuration;
+  }
+
+  if (RemainingOverview <= KINDA_SMALL_NUMBER) {
+    HandleInitiativeDiceOverviewReached();
+    return;
+  }
 
   if (UWorld *World = GetWorld()) {
     FTimerDelegate OverviewDelegate = FTimerDelegate::CreateUObject(
         this, &ASkaldPlayerController::HandleInitiativeDiceOverviewReached);
     World->GetTimerManager().SetTimer(
         PendingInitiativeSequence.OverviewTimerHandle, OverviewDelegate,
-        OverviewDuration, /*bLoop*/ false);
+        RemainingOverview, /*bLoop*/ false);
   } else {
     HandleInitiativeDiceOverviewReached();
   }
