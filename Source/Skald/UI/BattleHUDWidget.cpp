@@ -787,8 +787,12 @@ void UBattleHUDWidget::BindToFighter(AFighterPawn *Fighter) {
     ClearHealthTextHold();
   }
 
+  const bool bShouldDisplayAsFriendly = IsFriendlyCandidate(Fighter);
+
   BoundFighter = Fighter;
-  if (BoundFighter) {
+  bBoundFighterIsFriendly = bShouldDisplayAsFriendly;
+
+  if (BoundFighter && bBoundFighterIsFriendly) {
     BoundFighter->OnHealthChanged.AddDynamic(
         this, &UBattleHUDWidget::HandleHealthChanged);
     BoundFighter->OnActionsChanged.AddDynamic(
@@ -805,8 +809,14 @@ void UBattleHUDWidget::BindToFighter(AFighterPawn *Fighter) {
 
     UpdateStatPanel();
   } else {
-    ClearPrimaryStatPanel();
-    ClearEnemyStatPanel();
+    BoundAbilityComponent = nullptr;
+
+    if (!BoundFighter) {
+      ClearPrimaryStatPanel();
+      ClearEnemyStatPanel();
+    } else {
+      UpdateStatPanel();
+    }
   }
 
   RefreshAbilityDisplay();
@@ -935,6 +945,10 @@ void UBattleHUDWidget::RevealInitiativeRollButton() {
 }
 
 void UBattleHUDWidget::HandleHealthChanged(int32 NewHealth) {
+  if (!bBoundFighterIsFriendly) {
+    return;
+  }
+
   if (bHealthTextHoldActive && HeldHealthTextFighter.IsValid() &&
       HeldHealthTextFighter.Get() == BoundFighter) {
     bHasPendingHealthTextValue = true;
@@ -948,6 +962,10 @@ void UBattleHUDWidget::HandleHealthChanged(int32 NewHealth) {
 }
 
 void UBattleHUDWidget::HandleActionsChanged(int32 NewActions) {
+  if (!bBoundFighterIsFriendly) {
+    return;
+  }
+
   if (ActionsText) {
     ActionsText->SetText(FText::AsNumber(NewActions));
   }
@@ -972,7 +990,12 @@ void UBattleHUDWidget::HandleAbilityComponentUpdated(
 }
 
 void UBattleHUDWidget::UpdateStatPanel() {
-  ApplyPrimaryFighterDisplay(BoundFighter);
+  if (BoundFighter && bBoundFighterIsFriendly) {
+    ApplyPrimaryFighterDisplay(BoundFighter);
+  } else {
+    ClearPrimaryStatPanel();
+  }
+
   UpdateActionButtonVisibility();
 }
 
@@ -1164,21 +1187,29 @@ AFighterPawn *UBattleHUDWidget::ResolveEnemyStatFighter(AFighterPawn *Attacker,
   return Attacker ? Attacker : Defender;
 }
 
-bool UBattleHUDWidget::IsKnownFriendlyFighter(const AFighterPawn *Fighter) const {
+bool UBattleHUDWidget::IsFriendlyCandidate(const AFighterPawn *Fighter) const {
   if (!Fighter) {
     return false;
   }
 
-  if (BoundFighter == Fighter) {
-    return true;
-  }
-
-  if (DisplayedFriendlyStatFighter.IsValid() &&
-      DisplayedFriendlyStatFighter.Get() == Fighter) {
-    return true;
-  }
-
   if (KnownFriendlyFighters.Contains(const_cast<AFighterPawn *>(Fighter))) {
+    return true;
+  }
+
+  if (const ASkaldPlayerController *SkaldController =
+          Cast<ASkaldPlayerController>(GetOwningPlayer())) {
+    if (SkaldController->IsFriendlyFighter(Fighter)) {
+      return true;
+    }
+  }
+
+  if (ActiveLockedInFighter.IsValid() &&
+      ActiveLockedInFighter.Get() == Fighter) {
+    return true;
+  }
+
+  if (HighlightedLockedInFighter.IsValid() &&
+      HighlightedLockedInFighter.Get() == Fighter) {
     return true;
   }
 
@@ -1188,7 +1219,24 @@ bool UBattleHUDWidget::IsKnownFriendlyFighter(const AFighterPawn *Fighter) const
     }
   }
 
+  if (DisplayedFriendlyStatFighter.IsValid() &&
+      DisplayedFriendlyStatFighter.Get() == Fighter) {
+    return true;
+  }
+
   return false;
+}
+
+bool UBattleHUDWidget::IsKnownFriendlyFighter(const AFighterPawn *Fighter) const {
+  if (!Fighter) {
+    return false;
+  }
+
+  if (BoundFighter == Fighter) {
+    return bBoundFighterIsFriendly;
+  }
+
+  return IsFriendlyCandidate(Fighter);
 }
 
 bool UBattleHUDWidget::IsKnownEnemyFighter(const AFighterPawn *Fighter) const {
@@ -1643,6 +1691,7 @@ void UBattleHUDWidget::ClearCommandPreviews() {
 
 void UBattleHUDWidget::UpdateActionButtonVisibility() {
   const bool bShouldShow = bActionButtonsUnlocked && BoundFighter &&
+                           bBoundFighterIsFriendly &&
                            BoundFighter->ActionsRemaining > 0 &&
                            !bManualAttackRollPromptActive;
   const bool bShowMoveButton =

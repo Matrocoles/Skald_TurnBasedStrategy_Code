@@ -529,6 +529,7 @@ private:
                                            AFighterPawn *Defender) const;
   AFighterPawn *ResolveEnemyStatFighter(AFighterPawn *Attacker,
                                         AFighterPawn *Defender) const;
+  bool IsFriendlyCandidate(const AFighterPawn *Fighter) const;
   bool IsKnownFriendlyFighter(const AFighterPawn *Fighter) const;
   bool IsKnownEnemyFighter(const AFighterPawn *Fighter) const;
 
@@ -805,6 +806,9 @@ private:
   /** Fighter currently bound to the HUD. */
   UPROPERTY()
   AFighterPawn *BoundFighter;
+
+  /** Whether the currently bound fighter should populate the primary stat panel. */
+  bool bBoundFighterIsFriendly = false;
 
   /** Ability component currently providing passive/active data. */
   TWeakObjectPtr<USkaldAbilityComponent> BoundAbilityComponent;
