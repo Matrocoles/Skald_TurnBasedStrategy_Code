@@ -737,12 +737,12 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void HandleRevoltPhase();
 
+protected:
   /** Reference to the game's turn manager.
    *  Exposed to Blueprints so BP_Skald_PlayerController can bind to
    *  turn events without keeping an external pointer that might be
    *  uninitialised.
    */
-protected:
   UPROPERTY(EditInstanceOnly, BlueprintReadOnly, ReplicatedUsing = OnRep_TurnManager,
             Category = "Turn", meta = (ExposeOnSpawn = true))
   TObjectPtr<ATurnManager> TurnManager;
@@ -759,17 +759,18 @@ protected:
   void ShowPrepareForBattlePromptLocal_Internal(
       const FPrepareForBattlePromptData &PromptData);
 
-  void BeginRetreatSelectionLocal(int32 DefendingTerritoryID,
-                                  const TArray<int32> &CandidateTerritoryIDs);
-  void CompleteRetreatSelectionLocal();
-  void NotifyRetreatFailed(const FText &Message);
-  void NotifyEnemyRetreated();
   virtual void OnBeginRetreatSelection(int32 DefendingTerritoryID,
                                        const TArray<int32> &CandidateTerritoryIDs);
 
   /** Set up the main HUD widget for the local player. */
   virtual void InitializeHUDWidget();
 
+public:
+  void BeginRetreatSelectionLocal(int32 DefendingTerritoryID,
+                                  const TArray<int32> &CandidateTerritoryIDs);
+  void CompleteRetreatSelectionLocal();
+  virtual void NotifyRetreatFailed(const FText &Message);
+  void NotifyEnemyRetreated();
 private:
   /** Display the stored strategic initiative roll if one is pending. */
   void ShowPendingStrategicInitiativeResult();
