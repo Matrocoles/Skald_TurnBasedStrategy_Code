@@ -717,6 +717,9 @@ private:
   /** Apply the next queued attack roll, showing the appropriate widget. */
   void ResolveNextAttackRoll();
 
+  /** Update cached dice result aggregates using the latest fighter stats. */
+  void RefreshPendingAttackResultStats(AFighterPawn *Target);
+
   /** Finalise any pending attack resolution and clean up timers/state. */
   void FinalizeQueuedAttack();
 
@@ -767,6 +770,9 @@ private:
   /** Snapshot of stats used when requesting a physical dice roll. */
   FFighterStats PendingAttackAttackerSnapshot;
   FFighterStats PendingAttackDefenderSnapshot;
+
+  /** True when the pending attack stat snapshots contain valid data. */
+  bool bHasPendingAttackSnapshot = false;
 
   /** Cached pointer to the dice subsystem for attack rolls. */
   TWeakObjectPtr<USkaldDiceManager> CachedDiceManager;
