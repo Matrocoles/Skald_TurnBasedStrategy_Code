@@ -1517,6 +1517,16 @@ void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
     World->GetTimerManager().ClearTimer(WorldMapSearchHandle);
   }
 
+  if (bDiceDelegatesBound) {
+    if (USkaldDiceManager *DiceManager = ResolveDiceManager()) {
+      DiceManager->OnDiceRollCompleted.RemoveDynamic(
+          this, &ASkaldPlayerController::HandlePhysicalDiceRollCompleted);
+    }
+    bDiceDelegatesBound = false;
+  }
+
+  ResetAttackDiceSequence();
+
   Super::EndPlay(EndPlayReason);
 }
 
@@ -1664,21 +1674,6 @@ void ASkaldPlayerController::OnPossess(APawn *InPawn) {
   }
 
   UpdateBattleCameraMode();
-}
-
-void ASkaldPlayerController::EndPlay(
-    const EEndPlayReason::Type EndPlayReason) {
-  if (bDiceDelegatesBound) {
-    if (USkaldDiceManager *DiceManager = ResolveDiceManager()) {
-      DiceManager->OnDiceRollCompleted.RemoveDynamic(
-          this, &ASkaldPlayerController::HandlePhysicalDiceRollCompleted);
-    }
-    bDiceDelegatesBound = false;
-  }
-
-  ResetAttackDiceSequence();
-
-  Super::EndPlay(EndPlayReason);
 }
 
 void ASkaldPlayerController::ServerInitPlayerState_Implementation(
