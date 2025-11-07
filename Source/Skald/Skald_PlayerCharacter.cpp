@@ -111,7 +111,14 @@ void ASkald_PlayerCharacter::Tick(float DeltaTime)
 
         if (bBattleCameraActive)
         {
-                UpdateBattleCamera(DeltaTime);
+                if (bCameraTransitionActive)
+                {
+                        UpdateCameraTransition(DeltaTime);
+                }
+                else
+                {
+                        UpdateBattleCamera(DeltaTime);
+                }
         }
 
         // Example tick behavior: keep track of selection validity
@@ -337,6 +344,7 @@ void ASkald_PlayerCharacter::SetBattleCameraActive(bool bActive)
         {
                 if (!bActive)
                 {
+                        bCameraTransitionActive = false;
                         ClearBattleCameraLock();
                 }
                 return;
@@ -344,6 +352,7 @@ void ASkald_PlayerCharacter::SetBattleCameraActive(bool bActive)
 
         if (!CameraBoom)
         {
+                bCameraTransitionActive = false;
                 bBattleCameraActive = bActive;
                 return;
         }
@@ -393,6 +402,7 @@ void ASkald_PlayerCharacter::SetBattleCameraActive(bool bActive)
         }
         else
         {
+                bCameraTransitionActive = false;
                 ClearBattleCameraLock();
 
                 CameraBoom->SetUsingAbsoluteRotation(false);
@@ -444,6 +454,79 @@ void ASkald_PlayerCharacter::FocusCameraOnActor(AActor* FocusActor)
 void ASkald_PlayerCharacter::ClearCameraFocus()
 {
         ClearBattleCameraLock();
+}
+
+float ASkald_PlayerCharacter::GetCurrentBattleCameraZoom() const
+{
+        if (CameraBoom)
+        {
+                return CameraBoom->TargetArmLength;
+        }
+
+        return DesiredBattleZoom;
+}
+
+void ASkald_PlayerCharacter::StartCameraTransition(const FVector& TargetLocation, const FRotator& TargetRotation, float TargetZoom, float Duration)
+{
+        const float SanitisedDuration = FMath::Max(Duration, KINDA_SMALL_NUMBER);
+        CameraTransitionStartLocation = GetActorLocation();
+        CameraTransitionTargetLocation = TargetLocation;
+        CameraTransitionStartRotation = CurrentBattleRotation;
+        CameraTransitionTargetRotation = TargetRotation;
+        CameraTransitionStartZoom = GetCurrentBattleCameraZoom();
+        CameraTransitionTargetZoom = FMath::Clamp(TargetZoom, MinBattleZoom, MaxBattleZoom);
+        CameraTransitionElapsed = 0.f;
+        CameraTransitionDuration = SanitisedDuration;
+        bCameraTransitionActive = true;
+
+        BattleCameraVelocity = FVector::ZeroVector;
+        BattleMoveInput = FVector2D::ZeroVector;
+}
+
+void ASkald_PlayerCharacter::UpdateCameraTransition(float DeltaTime)
+{
+        if (!bCameraTransitionActive)
+        {
+                return;
+        }
+
+        CameraTransitionElapsed += DeltaTime;
+        const float Duration = FMath::Max(CameraTransitionDuration, KINDA_SMALL_NUMBER);
+        const float Alpha = FMath::Clamp(CameraTransitionElapsed / Duration, 0.f, 1.f);
+
+        const FVector NewLocation = FMath::Lerp(CameraTransitionStartLocation, CameraTransitionTargetLocation, Alpha);
+        SetActorLocation(NewLocation);
+
+        const FQuat StartQuat = CameraTransitionStartRotation.Quaternion();
+        const FQuat TargetQuat = CameraTransitionTargetRotation.Quaternion();
+        const FQuat BlendedQuat = FQuat::Slerp(StartQuat, TargetQuat, Alpha).GetNormalized();
+        const FRotator NewRotation = BlendedQuat.Rotator();
+
+        DesiredBattleRotation = NewRotation;
+        CurrentBattleRotation = NewRotation;
+
+        const float NewZoom = FMath::Lerp(CameraTransitionStartZoom, CameraTransitionTargetZoom, Alpha);
+        DesiredBattleZoom = NewZoom;
+
+        if (CameraBoom)
+        {
+                CameraBoom->SetWorldRotation(NewRotation);
+                CameraBoom->TargetArmLength = NewZoom;
+        }
+
+        if (Alpha >= 1.f - KINDA_SMALL_NUMBER)
+        {
+                bCameraTransitionActive = false;
+                CameraTransitionElapsed = CameraTransitionDuration;
+                DesiredBattleRotation = CameraTransitionTargetRotation;
+                CurrentBattleRotation = CameraTransitionTargetRotation;
+
+                if (CameraBoom)
+                {
+                        CameraBoom->SetWorldRotation(CameraTransitionTargetRotation);
+                        CameraBoom->TargetArmLength = CameraTransitionTargetZoom;
+                }
+        }
 }
 
 void ASkald_PlayerCharacter::UpdateBattleCamera(float DeltaTime)

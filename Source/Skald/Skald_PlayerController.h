@@ -94,6 +94,8 @@ public:
 
   virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty> &OutLifetimeProps) const override;
 
+  virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
   UFUNCTION(BlueprintCallable, Category = "Turn")
   virtual void StartTurn();
 
@@ -926,13 +928,33 @@ private:
   void TryDispatchPendingAttackPresentationNotifications();
   void HandlePendingPresentationTimerTick();
   void EnsureDiceWidgets();
-  void TriggerAttackDicePresentation(AFighterPawn *Attacker,
-                                     const FDiceRollResult &Result);
+  FGuid TriggerAttackDicePresentation(AFighterPawn *Attacker,
+                                      const FDiceRollResult &Result);
   FGuid TriggerInitiativeDicePresentation(int32 AttackerRoll,
                                           int32 DefenderRoll);
   void ShowInitiativeResults(int32 PlayerResult, int32 EnemyResult);
   void HideInitiativeResults();
   USkaldDiceManager *ResolveDiceManager();
+
+  void StartAttackDiceSequence(AFighterPawn *Attacker, AFighterPawn *Defender,
+                               const FDiceRollResult &Result);
+  void ProcessAttackResolutionPresentation(AFighterPawn *Attacker,
+                                           AFighterPawn *Defender,
+                                           const FDiceRollResult &Result);
+  void ResetAttackDiceSequence();
+  void HandleAttackDiceOverviewReached();
+  void HandleAttackDiceCleanupFinished();
+  void HandleAttackDiceReturnComplete();
+  void CompletePendingAttackSequence();
+  bool ComputeBattlefieldOverviewTransform(float CurrentYaw,
+                                           FVector &OutLocation,
+                                           FRotator &OutRotation,
+                                           float &OutZoom) const;
+  void EnsureDiceManagerBindings();
+
+  UFUNCTION()
+  void HandlePhysicalDiceRollCompleted(const FGuid &RollId,
+                                       const TArray<int32> &Results);
 
   UPROPERTY()
   TObjectPtr<AFighterPawn> SelectedFighter;
@@ -1011,4 +1033,24 @@ private:
 
   /** Prevents duplicate initiative dice visuals per round. */
   bool bInitiativeRollPresentationShown = false;
+
+  struct FPendingAttackDiceSequence
+  {
+    TWeakObjectPtr<AFighterPawn> Attacker;
+    TWeakObjectPtr<AFighterPawn> Defender;
+    FDiceRollResult Result;
+    bool bActive = false;
+    bool bHadBattleCamera = false;
+    FVector OriginalLocation = FVector::ZeroVector;
+    FRotator OriginalRotation = FRotator::ZeroRotator;
+    float OriginalZoom = 0.f;
+    TWeakObjectPtr<AActor> OriginalLockTarget;
+    FGuid ActiveRollId;
+    FTimerHandle OverviewTimerHandle;
+    FTimerHandle CleanupDelayHandle;
+    FTimerHandle ReturnTimerHandle;
+  };
+
+  FPendingAttackDiceSequence PendingAttackSequence;
+  bool bDiceDelegatesBound = false;
 };
