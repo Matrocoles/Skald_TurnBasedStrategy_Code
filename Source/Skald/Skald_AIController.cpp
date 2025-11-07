@@ -1600,6 +1600,25 @@ bool ASkaldAIController::ShouldTriggerAbilityForAttack(
     return false;
   }
 
+  const int32 AttackRange = FMath::Max(1, Fighter->Stats.AttackRange);
+  bool bHasDirectAttack =
+      Fighter->GetFootprintDistanceToFighter(Target) <= AttackRange;
+  if (bHasDirectAttack) {
+    if (UGridOverlayComponent *Grid = Fighter->GetGrid()) {
+      if (!Fighter->HasLineOfSightToFighter(Target, AttackRange, Grid)) {
+        bHasDirectAttack = false;
+      }
+    }
+  }
+
+  if (bHasDirectAttack &&
+      Category != EAIFactionAbilityCategory::AoEAttack) {
+    const int32 TargetHealth = FMath::Max(1, Target->Stats.Health);
+    if (Fighter->Stats.AttackDamage >= TargetHealth) {
+      return false;
+    }
+  }
+
   const float Bonus =
       ComputeAbilityAttackScoreBonus(Fighter, Target, AbilityState);
   if (Bonus <= 0.f) {
@@ -1716,6 +1735,10 @@ bool ASkaldAIController::TryUseMovementAbility(AFighterPawn *Fighter,
   }
 
   if (Distance <= Fighter->Stats.Movement) {
+    return false;
+  }
+
+  if (Distance <= Fighter->Stats.Movement + AttackRange) {
     return false;
   }
 
