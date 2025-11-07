@@ -6,6 +6,7 @@
 #include "SkaldTypes.h"
 #include "TimerManager.h"
 #include "UI/W_DiceResolutionPanel.h"
+#include "Containers/Set.h"
 #include "SkaldMainHUDWidget.generated.h"
 
 class UButton;
@@ -158,8 +159,15 @@ public:
 
   /** Delegate fired when the local player marks themselves as ready. */
   DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSkaldPrepareForBattleReady);
+  DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSkaldRetreatRequested);
+  DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSkaldRetreatDestinationChosen,
+                                              int32, TerritoryID);
   UPROPERTY(BlueprintAssignable, Category = "Skald|Events")
   FSkaldPrepareForBattleReady OnPrepareForBattleReady;
+  UPROPERTY(BlueprintAssignable, Category = "Skald|Events")
+  FSkaldRetreatRequested OnRetreatRequested;
+  UPROPERTY(BlueprintAssignable, Category = "Skald|Events")
+  FSkaldRetreatDestinationChosen OnRetreatDestinationChosen;
 
   /** Delegate fired when the strategic initiative roll button is pressed. */
   DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnStrategicInitiativeRollRequested);
@@ -232,6 +240,19 @@ public:
   /** Hide the prepare for battle widget if active. */
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD|Battle")
   void HidePrepareForBattleDialog();
+
+  /** Begin selecting a territory to retreat into. */
+  void BeginRetreatSelection(int32 DefendingTerritoryID,
+                             const TArray<int32> &CandidateTerritoryIDs);
+
+  /** Clear retreat selection state and highlights. */
+  void CompleteRetreatSelection();
+
+  /** Display a retreat-specific error message. */
+  void ShowRetreatUnavailableMessage(const FText &Message);
+
+  /** Notify the player that the enemy retreated from battle. */
+  void ShowEnemyRetreatedMessage();
 
   /** Display the rolled initiative value using the configured dice visuals. */
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD|Initiative")
@@ -551,6 +572,9 @@ protected:
   UFUNCTION()
   void HandlePrepareForBattleClicked();
 
+  UFUNCTION()
+  void HandleRetreatClicked();
+
   void ClearDeployWidget();
 
   UPROPERTY()
@@ -560,6 +584,14 @@ protected:
   UPrepareForBattleWidget *ActivePrepareForBattleWidget = nullptr;
 
   bool bPrepareForBattleReadySent = false;
+  bool bRetreatRequestPending = false;
+  bool bSelectingRetreatDestination = false;
+  bool bAwaitingRetreatConfirmation = false;
+  int32 RetreatDefendingTerritoryID = -1;
+  TSet<int32> RetreatCandidateIds;
+  FPrepareForBattlePromptData ActivePreparePrompt;
+  bool bHasActivePreparePrompt = false;
+  bool bLocalPlayerIsDefender = false;
 
   /** Class used when requesting floaters from the subsystem. */
   UPROPERTY(EditAnywhere, Category = "Skald|HUD|Floaters")

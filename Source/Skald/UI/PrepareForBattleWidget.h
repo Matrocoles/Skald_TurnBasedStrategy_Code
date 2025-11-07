@@ -10,6 +10,7 @@ class UImage;
 class UTexture2D;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FPrepareForBattleClicked);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FPrepareForBattleRetreatClicked);
 
 /**
  * Confirmation widget shown after an attack is approved on the world map.
@@ -23,6 +24,7 @@ class SKALD_API UPrepareForBattleWidget : public UUserWidget {
 public:
   virtual void NativeOnInitialized() override;
   virtual void SynchronizeProperties() override;
+  virtual void NativeDestruct() override;
 
   /** Configure the text displayed for each participant/territory pair. */
   UFUNCTION(BlueprintCallable, Category = "Skald|Battle")
@@ -61,9 +63,21 @@ public:
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
   UButton *PrepareForBattleButton;
 
+  /** Button that allows the defender to retreat instead of fighting. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UButton *RetreatButton;
+
+  /** Text block used to display retreat-related status messages. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UTextBlock *RetreatStatusText;
+
   /** Fired when the local player clicks the prepare button. */
   UPROPERTY(BlueprintAssignable, Category = "Skald|Battle")
   FPrepareForBattleClicked OnPrepareButtonClicked;
+
+  /** Fired when the defender clicks the retreat button. */
+  UPROPERTY(BlueprintAssignable, Category = "Skald|Battle")
+  FPrepareForBattleRetreatClicked OnRetreatButtonClicked;
 
   /** Default text displayed for the attacking player's ID field. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Battle")
@@ -85,9 +99,20 @@ public:
   FText DefendingTerritoryNameText =
       FText::FromString(TEXT("Defending Territory"));
 
+  /** Update the retreat status label and optionally clear it after a delay. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Battle")
+  void ShowRetreatStatus(const FText &StatusMessage, float DisplayDuration = 0.f);
+
+  /** Show or hide the retreat button. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Battle")
+  void SetRetreatButtonVisibility(ESlateVisibility NewVisibility);
+
 protected:
   UFUNCTION()
   void HandlePrepareButtonClicked();
+
+  UFUNCTION()
+  void HandleRetreatButtonClicked();
 
   void RefreshTextWidgets();
 
@@ -97,5 +122,9 @@ protected:
   /** Cached texture references used when updating emblem widgets. */
   TWeakObjectPtr<UTexture2D> AttackingFactionTexture;
   TWeakObjectPtr<UTexture2D> DefendingFactionTexture;
+
+  FTimerHandle RetreatStatusTimerHandle;
+
+  void ClearRetreatStatus();
 };
 

@@ -236,6 +236,14 @@ struct SKALD_API FPrepareForBattlePromptData {
   /** Optional emblem for the defending player's faction. */
   UPROPERTY(BlueprintReadWrite, EditAnywhere)
   TSoftObjectPtr<UTexture2D> DefenderFactionEmblem;
+
+  /** Total number of units the attacker committed to the engagement. */
+  UPROPERTY(BlueprintReadWrite, EditAnywhere)
+  int32 AttackerCommittedArmy = 0;
+
+  /** Number of defending units stationed in the territory when the attack began. */
+  UPROPERTY(BlueprintReadWrite, EditAnywhere)
+  int32 DefenderArmyCount = 0;
 };
 
 /** Snapshot describing which participants have confirmed battle readiness. */
