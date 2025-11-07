@@ -1054,6 +1054,11 @@ void UBattleHUDWidget::UpdateEnemyStatPanel(AFighterPawn *Fighter) {
 }
 
 void UBattleHUDWidget::ClearEnemyStatPanel() {
+  if (bManualAttackRollPromptActive &&
+      (ManualAttackRollTarget.IsValid() || DisplayedEnemyStatFighter.IsValid())) {
+    return;
+  }
+
   DisplayedEnemyStatFighter.Reset();
 
   const auto ClearTextAndHide = [](UTextBlock *Widget) {
@@ -1165,6 +1170,10 @@ AFighterPawn *UBattleHUDWidget::ResolveFriendlyStatFighter(
 
 AFighterPawn *UBattleHUDWidget::ResolveEnemyStatFighter(AFighterPawn *Attacker,
                                                          AFighterPawn *Defender) const {
+  if (bManualAttackRollPromptActive && ManualAttackRollTarget.IsValid()) {
+    return ManualAttackRollTarget.Get();
+  }
+
   AFighterPawn *Friendly = ResolveFriendlyStatFighter(Attacker, Defender);
   if (Friendly) {
     AFighterPawn *Candidate = (Friendly == Attacker) ? Defender : Attacker;
@@ -1543,6 +1552,7 @@ void UBattleHUDWidget::SetAttackRollButtonVisibility(bool bVisible) {
 void UBattleHUDWidget::EnterManualAttackRollPrompt(AFighterPawn *Attacker) {
   if (!Attacker) {
     ManualAttackRollAttacker.Reset();
+    ManualAttackRollTarget.Reset();
     bManualAttackRollPromptActive = false;
     SetAttackRollButtonVisibility(false);
     UpdateActionButtonVisibility();
@@ -1551,7 +1561,11 @@ void UBattleHUDWidget::EnterManualAttackRollPrompt(AFighterPawn *Attacker) {
   }
 
   ManualAttackRollAttacker = Attacker;
+  ManualAttackRollTarget = Attacker->GetPendingPhysicalAttackTarget();
   bManualAttackRollPromptActive = true;
+  if (ManualAttackRollTarget.IsValid()) {
+    UpdateEnemyStatPanel(ManualAttackRollTarget.Get());
+  }
   SetAttackRollButtonVisibility(true);
   UpdateActionButtonVisibility();
   RefreshEndTurnButtonVisibility();
@@ -1559,6 +1573,7 @@ void UBattleHUDWidget::EnterManualAttackRollPrompt(AFighterPawn *Attacker) {
 
 void UBattleHUDWidget::ExitManualAttackRollPrompt() {
   ManualAttackRollAttacker.Reset();
+  ManualAttackRollTarget.Reset();
   if (!bManualAttackRollPromptActive) {
     RefreshEndTurnButtonVisibility();
     return;

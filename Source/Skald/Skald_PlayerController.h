@@ -124,6 +124,8 @@ public:
   UFUNCTION(Server, Reliable)
   void ServerTriggerManualAttackRoll(class AFighterPawn* Attacker);
 
+  bool IsFriendlyFighter(const AFighterPawn *Fighter) const;
+
   /** Set the turn manager responsible for sequencing play. */
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void SetTurnManager(ATurnManager *Manager);
@@ -926,7 +928,6 @@ private:
                                   AFighterPawn *Target, FText &OutError);
   bool TryExecuteAbilityAtCell(AFighterPawn *Source, ESkaldAbilitySlot Slot,
                                const FIntPoint &Cell, FText &OutError);
-  bool IsFriendlyFighter(const AFighterPawn *Fighter) const;
   void DetermineControlledBattleSide();
   void TryDispatchPendingAttackPresentationNotifications();
   void HandlePendingPresentationTimerTick();

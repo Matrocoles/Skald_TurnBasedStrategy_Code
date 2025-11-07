@@ -63,6 +63,9 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Combat|Dice")
   void TriggerManualAttackRoll();
 
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Combat|Dice")
+  AFighterPawn *GetPendingPhysicalAttackTarget() const;
+
   // Check UI Conditions
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Combat|Dice")
   bool IsAwaitingPhysicalAttackRoll() const { return bAwaitingPhysicalAttackRoll; }

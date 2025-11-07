@@ -2221,6 +2221,10 @@ void AFighterPawn::ServerShowAttackRollButtonForPlayer_Implementation()
     ShowAttackRollButtonForPlayer();
 }
 
+AFighterPawn *AFighterPawn::GetPendingPhysicalAttackTarget() const {
+  return PendingPhysicalAttackTarget.Get();
+}
+
 // Core function  actually shows the roll button
 void AFighterPawn::ShowAttackRollButtonForPlayer()
 {
