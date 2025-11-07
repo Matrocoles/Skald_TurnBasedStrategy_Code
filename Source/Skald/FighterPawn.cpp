@@ -10,6 +10,7 @@
 #include "Components/DecalComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/WidgetComponent.h"
+#include "Containers/Array.h"
 #include "Containers/Map.h"
 #include "Containers/Queue.h"
 #include "Containers/Set.h"
@@ -570,7 +571,7 @@ void AFighterPawn::RebuildVisualMovementPath(const FVector &Destination) {
         Frontier.Sort(FrontierComparator);
 
         const FVisualPathNode Node = Frontier[0];
-        Frontier.RemoveAt(0, 1, /*bAllowShrinking*/ false);
+        Frontier.RemoveAt(0, 1, EAllowShrinking::No);
 
         const FIntPoint Cell = Node.Cell;
         const int32 DistanceFromStart = Node.Cost;
@@ -1914,21 +1915,13 @@ bool AFighterPawn::AttemptPhysicalAttackRoll(AFighterPawn* Target)
         return false;
     }
 
-    // Only fighters controlled by human players should enter the manual roll
-    // flow. AI-controlled units should continue using the automatic resolution
-    // path to avoid triggering duplicate dice presentations when they attack.
+    // All fighters now leverage the manual dice presentation so the same
+    // cinematic attack camera and dice flow are used for both human players and
+    // AI-controlled units.
     ASkaldPlayerController* OwningController = Cast<ASkaldPlayerController>(GetController());
     if (!OwningController)
     {
         return false;
-    }
-
-    if (const ASkaldPlayerState* PlayerState = OwningController->GetPlayerState<ASkaldPlayerState>())
-    {
-        if (PlayerState->bIsAI)
-        {
-            return false;
-        }
     }
 
     // Only use the manual physical roll flow if we actually have dice.
