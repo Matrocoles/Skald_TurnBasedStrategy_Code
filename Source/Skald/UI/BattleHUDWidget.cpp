@@ -1498,16 +1498,26 @@ void UBattleHUDWidget::SetTerritoryName(const FText &TerritoryLabel) {
 }
 
 void UBattleHUDWidget::SetSelectedFighterName(const FText &Name) {
+  const bool bShouldDisplayFriendly = bBoundFighterIsFriendly && BoundFighter;
+
   if (FighterNameText) {
-    FighterNameText->SetText(Name);
+    if (bShouldDisplayFriendly) {
+      FighterNameText->SetText(Name);
+    } else if (!BoundFighter) {
+      FighterNameText->SetText(Name);
+    }
   }
+
   if (FighterImage) {
-    UTexture2D *PortraitTexture =
-        BoundFighter ? BoundFighter->GetPortraitTexture() : nullptr;
-    if (PortraitTexture) {
-      FighterImage->SetBrushFromTexture(PortraitTexture);
-      FighterImage->SetVisibility(ESlateVisibility::HitTestInvisible);
-    } else {
+    if (bShouldDisplayFriendly) {
+      if (UTexture2D *PortraitTexture = BoundFighter->GetPortraitTexture()) {
+        FighterImage->SetBrushFromTexture(PortraitTexture);
+        FighterImage->SetVisibility(ESlateVisibility::HitTestInvisible);
+      } else {
+        FighterImage->SetBrushFromTexture(nullptr);
+        FighterImage->SetVisibility(ESlateVisibility::Collapsed);
+      }
+    } else if (!BoundFighter) {
       FighterImage->SetBrushFromTexture(nullptr);
       FighterImage->SetVisibility(ESlateVisibility::Collapsed);
     }
