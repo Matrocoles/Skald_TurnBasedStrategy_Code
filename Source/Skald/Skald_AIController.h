@@ -61,7 +61,7 @@ private:
     bool bCanThreatenEnemyCapital = false;
   };
 
-  enum class EAIBattleActivationIntent : uint8 { Attack, Move };
+  enum class EAIBattleActivationIntent : uint8 { UseAbility, Attack, Move };
 
   void ProcessCurrentPhase();
   void RefreshStrategicContext(AWorldMap *WorldMap, ASkaldPlayerState *PlayerState);
@@ -100,8 +100,11 @@ private:
 
   AFighterPawn *FindNextFriendlyFighter(bool bExpectAttacker) const;
   AFighterPawn *FindNearestEnemy(AFighterPawn *Fighter) const;
-  bool TryAttackNearestEnemy(AFighterPawn *Fighter);
+  bool TryExecuteBestAbility(AFighterPawn *Fighter, bool &bOutTriggeredAttack);
+  bool TryExecuteBestAttack(AFighterPawn *Fighter);
   bool TryMoveTowardsNearestEnemy(AFighterPawn *Fighter);
+  bool ShouldStrafeBeforeAttacking(const AFighterPawn *Fighter) const;
+  float EvaluateBestAttackScore(const AFighterPawn *Fighter) const;
   void ExecuteActivationForFighter(AFighterPawn *Fighter);
   void TryActivateNextFighter();
   void QueueActivationIntent(AFighterPawn *Fighter,
@@ -119,6 +122,16 @@ private:
   int32 ComputeChebyshevDistance(UGridOverlayComponent *Grid,
                                  const AFighterPawn *A,
                                  const AFighterPawn *B) const;
+  float EvaluateBestAttackScoreFromAnchor(const AFighterPawn *Fighter,
+                                          const FIntPoint &Anchor,
+                                          AFighterPawn **OutTarget,
+                                          int32 RangeOverride = INDEX_NONE) const;
+  bool FindBestTrapPlacement(AFighterPawn *Fighter, const FName AbilityId,
+                             const FSkaldAbilityTargetingInfo &Targeting,
+                             int32 RangeOverride, FIntPoint &OutCell,
+                             float &OutScore) const;
+  float EvaluatePassiveAttackBonus(const AFighterPawn *Fighter,
+                                   const AFighterPawn *Target) const;
 
   virtual void HandleActiveFighterChanged(AFighterPawn *NewFighter) override;
 
@@ -192,11 +205,17 @@ private:
   /** Fighter currently being processed by the AI. */
   TWeakObjectPtr<AFighterPawn> PendingActivationFighter;
 
+  /** Tracks whether the pending fighter has moved during this activation. */
+  bool bPendingFighterMovedThisActivation = false;
+
   /** Ordered list of intents to process for the pending fighter. */
   TQueue<EAIBattleActivationIntent> PendingActivationIntents;
 
   /** True while waiting for an async attack sequence to resolve. */
   bool bAwaitingQueuedAttackResolution = false;
+
+  /** Ability identifiers already attempted during the current activation. */
+  TSet<FName> AbilitiesTriedThisActivation;
 
   /** True while waiting for a fighter's move animation to complete. */
   bool bAwaitingMovementCompletion = false;

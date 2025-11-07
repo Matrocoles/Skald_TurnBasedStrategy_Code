@@ -897,6 +897,7 @@ private:
   UFUNCTION(Server, Reliable)
   void ServerExecuteVeilStep(AFighterPawn *Fighter, ESkaldAbilitySlot Slot,
                              FIntPoint TargetAnchor);
+protected:
   void CancelAbilityCommand();
   bool TryBeginAbilityCommand(AFighterPawn *Fighter, ESkaldAbilitySlot Slot,
                               const FSkaldAbilityTargetingInfo &Targeting,
@@ -928,6 +929,8 @@ private:
                                   AFighterPawn *Target, FText &OutError);
   bool TryExecuteAbilityAtCell(AFighterPawn *Source, ESkaldAbilitySlot Slot,
                                const FIntPoint &Cell, FText &OutError);
+
+private:
   void DetermineControlledBattleSide();
   void TryDispatchPendingAttackPresentationNotifications();
   void HandlePendingPresentationTimerTick();
