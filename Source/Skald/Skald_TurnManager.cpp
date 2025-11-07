@@ -3506,3 +3506,15 @@ void ATurnManager::QueuePhaseBroadcastRetry(ETurnPhase Phase) {
                           RetryDelaySeconds, false);
   }
 }
+
+int32 ATurnManager::DistributeArmyPlacementUnits(ASkaldPlayerState *PlayerState) {
+  if (!PlayerState) {
+    return 0;
+  }
+
+  if (AWorldMap *WorldMap = ResolveWorldMap()) {
+    return WorldMap->DistributeUnplacedArmyPlacementUnits(PlayerState);
+  }
+
+  return 0;
+}
