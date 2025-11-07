@@ -48,53 +48,53 @@ constexpr float TrapPlacementAdjacencyScore = 6.0f;
 constexpr int32 MaxAbilityAttemptsPerActivation = 3;
 
 float EvaluateAbilityIntrinsicBonus(const FName &AbilityId) {
-  if (AbilityId == TEXT("Ability_Elf_Line")) {
-    return 8.0f;
-  }
-  if (AbilityId == TEXT("Ability_Elf_Elite")) {
-    return 6.0f;
-  }
-  if (AbilityId == TEXT("Ability_Dwarf_Elite")) {
-    return 5.0f;
-  }
-  if (AbilityId == TEXT("Ability_Undead_Skirmish")) {
-    return 3.5f;
-  }
-  if (AbilityId == TEXT("Ability_Human_Skirmish")) {
-    return 3.0f;
-  }
-  if (AbilityId == TEXT("Ability_Ravpack_Skirmish")) {
-    return 2.5f;
-  }
-  if (AbilityId == TEXT("Ability_Orc_Skirmish")) {
-    return 2.5f;
-  }
-  if (AbilityId == TEXT("Ability_Empire_Skirmish")) {
-    return 3.0f;
-  }
-  if (AbilityId == TEXT("Ability_Empire_Elite")) {
-    return 5.5f;
-  }
-  if (AbilityId == TEXT("Ability_Gnoll_Skirmish")) {
-    return 2.0f;
-  }
-  if (AbilityId == TEXT("Ability_Gnoll_Elite")) {
-    return 3.0f;
-  }
-  if (AbilityId == TEXT("Ability_Ravpack_Line")) {
-    return 4.5f;
-  }
-  if (AbilityId == TEXT("Ability_Orc_Line")) {
-    return 3.0f;
-  }
-  if (AbilityId == TEXT("Ability_Elf_Skirmish")) {
-    return 3.5f;
-  }
-  if (AbilityId == TEXT("Ability_Orc_Elite")) {
-    return 5.0f;
-  }
-  if (AbilityId == TEXT("Ability_Inflicted_Skirmish")) {
-    return 3.5f;
+  static const TMap<FName, float> AbilityBonuses = {
+      {TEXT("Ability_Elf_Line"), 8.0f},
+      {TEXT("Ability_Elf_Elite"), 6.0f},
+      {TEXT("Ability_Elf_Skirmish"), 3.5f},
+      {TEXT("Ability_Dwarf_Skirmish"), 2.5f},
+      {TEXT("Ability_Dwarf_Line"), 3.5f},
+      {TEXT("Ability_Dwarf_Elite"), 5.0f},
+      {TEXT("Ability_Undead_Skirmish"), 3.5f},
+      {TEXT("Ability_Undead_Line"), 4.0f},
+      {TEXT("Ability_Undead_Elite"), 6.0f},
+      {TEXT("Ability_Human_Skirmish"), 3.0f},
+      {TEXT("Ability_Human_Line"), 2.5f},
+      {TEXT("Ability_Human_Elite"), 6.0f},
+      {TEXT("Ability_Ravpack_Skirmish"), 2.5f},
+      {TEXT("Ability_Ravpack_Line"), 4.5f},
+      {TEXT("Ability_Ravpack_Elite"), 4.0f},
+      {TEXT("Ability_Orc_Skirmish"), 2.5f},
+      {TEXT("Ability_Orc_Line"), 3.0f},
+      {TEXT("Ability_Orc_Elite"), 5.5f},
+      {TEXT("Ability_Empire_Skirmish"), 3.0f},
+      {TEXT("Ability_Empire_Line"), 3.5f},
+      {TEXT("Ability_Empire_Elite"), 5.5f},
+      {TEXT("Ability_Gnoll_Skirmish"), 2.0f},
+      {TEXT("Ability_Gnoll_Line"), 3.0f},
+      {TEXT("Ability_Gnoll_Elite"), 3.0f},
+      {TEXT("Ability_Goblin_Skirmish"), 3.5f},
+      {TEXT("Ability_Goblin_Line"), 4.0f},
+      {TEXT("Ability_Goblin_Elite"), 4.5f},
+      {TEXT("Ability_Inflicted_Skirmish"), 3.5f},
+      {TEXT("Ability_Inflicted_Line"), 4.0f},
+      {TEXT("Ability_Inflicted_Elite"), 6.5f},
+      {TEXT("Ability_Lizard_Skirmish"), 3.5f},
+      {TEXT("Ability_Lizard_Line"), 3.0f},
+      {TEXT("Ability_Lizard_Elite"), 4.5f},
+      {TEXT("Ability_Lizardfolk_Skirmish"), 3.5f},
+      {TEXT("Ability_Lizardfolk_Line"), 3.0f},
+      {TEXT("Ability_Lizardfolk_Elite"), 4.5f},
+      {TEXT("Ability_Frog_Skirmish"), 3.5f},
+      {TEXT("Ability_Frog_Line"), 3.0f},
+      {TEXT("Ability_Frog_Elite"), 5.5f},
+      {TEXT("Ability_Frogfolk_Skirmish"), 3.5f},
+      {TEXT("Ability_Frogfolk_Line"), 3.0f},
+      {TEXT("Ability_Frogfolk_Elite"), 5.5f},
+  };
+
+  if (const float *Score = AbilityBonuses.Find(AbilityId)) {
+    return *Score;
   }
   return 0.0f;
 }
