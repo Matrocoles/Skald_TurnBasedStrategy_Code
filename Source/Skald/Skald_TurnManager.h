@@ -92,6 +92,12 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void SortControllersByInitiative();
 
+  /**
+   * Distribute any remaining deployable units for the specified player across
+   * their owned territories using the world map.
+   */
+  int32 DistributeArmyPlacementUnits(ASkaldPlayerState *PlayerState);
+
   /** Returns true if the specified player can still perform a movement action this phase. */
   bool CanPerformMovementAction(int32 PlayerID, FString *OutError = nullptr) const;
 

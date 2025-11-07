@@ -2736,12 +2736,9 @@ void ASkaldPlayerController::HandleEndPhaseInternal() {
   if (Phase == ETurnPhase::ArmyPlacement) {
     if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
       if (HasAuthority() && PS->DeployableUnits > 0) {
-        if (AWorldMap *WorldMap = TurnManager->ResolveWorldMap()) {
-          const int32 Distributed =
-              WorldMap->DistributeUnplacedArmyPlacementUnits(PS);
-          if (Distributed > 0) {
-            TurnManager->BroadcastDeployableUnits(PS);
-          }
+        const int32 Distributed = TurnManager->DistributeArmyPlacementUnits(PS);
+        if (Distributed > 0) {
+          TurnManager->BroadcastDeployableUnits(PS);
         }
       }
       if (PS->DeployableUnits < 0) {
