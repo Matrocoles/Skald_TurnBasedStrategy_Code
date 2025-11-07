@@ -8,6 +8,8 @@
 #include "Components/VerticalBoxSlot.h"
 #include "Engine/Texture2D.h"
 #include "Engine/World.h"
+#include "Internationalization/Text.h"
+#include "Math/UnrealMathUtility.h"
 #include "Types/SlateEnums.h"
 #include "Types/SlateStructs.h"
 #include "Blueprint/WidgetTree.h"
@@ -56,7 +58,8 @@ void UPrepareForBattleWidget::NativeDestruct() {
 void UPrepareForBattleWidget::SetupBattleDetails(
     const FText &InAttackingPlayerName, const FText &InAttackingTerritoryName,
     UTexture2D *InAttackingFactionIcon, const FText &InDefendingPlayerName,
-    const FText &InDefendingTerritoryName, UTexture2D *InDefendingFactionIcon) {
+    const FText &InDefendingTerritoryName, UTexture2D *InDefendingFactionIcon,
+    int32 InAttackingUnits, int32 InDefendingUnits) {
   if (WidgetTree && !WidgetTree->RootWidget) {
     BuildFallbackWidgetTree();
   }
@@ -67,6 +70,8 @@ void UPrepareForBattleWidget::SetupBattleDetails(
   DefendingTerritoryNameText = InDefendingTerritoryName;
   AttackingFactionTexture = InAttackingFactionIcon;
   DefendingFactionTexture = InDefendingFactionIcon;
+  AttackingUnits = FMath::Max(0, InAttackingUnits);
+  DefendingUnits = FMath::Max(0, InDefendingUnits);
   RefreshTextWidgets();
 }
 
@@ -90,6 +95,27 @@ void UPrepareForBattleWidget::RefreshTextWidgets() {
   }
   if (DefendingTerritoryName) {
     DefendingTerritoryName->SetText(DefendingTerritoryNameText);
+  }
+
+  auto BuildUnitsDisplayText = [](const FText &Label, int32 UnitCount) {
+    const FText SanitisedLabel = Label.IsEmptyOrWhitespace()
+                                     ? FText::FromString(TEXT("Units"))
+                                     : Label;
+    FFormatOrderedArguments OrderedArgs;
+    OrderedArgs.Add(SanitisedLabel);
+    OrderedArgs.Add(FText::AsNumber(UnitCount));
+    static const FText FormatText = FText::FromString(TEXT("{0}: {1}"));
+    return FText::Format(FormatText, OrderedArgs);
+  };
+
+  if (AttackingUnitsText) {
+    AttackingUnitsText->SetText(
+        BuildUnitsDisplayText(AttackingUnitsLabelText, AttackingUnits));
+  }
+
+  if (DefendingUnitsText) {
+    DefendingUnitsText->SetText(
+        BuildUnitsDisplayText(DefendingUnitsLabelText, DefendingUnits));
   }
 
   auto ApplyFactionEmblem = [](UImage *ImageWidget,
@@ -235,6 +261,37 @@ void UPrepareForBattleWidget::BuildFallbackWidgetTree() {
   AddFactionSection(TEXT("Defending"), DefendingPlayerNameText,
                     DefendingTerritoryNameText, DefendingPlayerName,
                     DefendingTerritoryName, DefendingFactionEmblem);
+
+  auto AddUnitsLabel = [&](const TCHAR *Name, UTextBlock *&OutTextBlock,
+                           const FText &Label, int32 UnitCount) {
+    UTextBlock *TextBlock = WidgetTree->ConstructWidget<UTextBlock>(
+        UTextBlock::StaticClass(), FName(Name));
+    if (!TextBlock) {
+      OutTextBlock = nullptr;
+      return;
+    }
+
+    TextBlock->SetJustification(ETextJustify::Center);
+    TextBlock->SetAutoWrapText(true);
+    const FText SanitisedLabel = Label.IsEmptyOrWhitespace()
+                                     ? FText::FromString(TEXT("Units"))
+                                     : Label;
+    TextBlock->SetText(FText::Format(FText::FromString(TEXT("{0}: {1}")),
+                                     SanitisedLabel, FText::AsNumber(UnitCount)));
+
+    if (UVerticalBoxSlot *TextSlot =
+            Root->AddChildToVerticalBox(TextBlock)) {
+      TextSlot->SetHorizontalAlignment(EHorizontalAlignment::HAlign_Fill);
+      TextSlot->SetPadding(FMargin(4.f, 2.f));
+    }
+
+    OutTextBlock = TextBlock;
+  };
+
+  AddUnitsLabel(TEXT("AttackingUnitsText"), AttackingUnitsText,
+                AttackingUnitsLabelText, AttackingUnits);
+  AddUnitsLabel(TEXT("DefendingUnitsText"), DefendingUnitsText,
+                DefendingUnitsLabelText, DefendingUnits);
 
   PrepareForBattleButton = WidgetTree->ConstructWidget<UButton>(
       UButton::StaticClass(), TEXT("PrepareForBattleButton"));
