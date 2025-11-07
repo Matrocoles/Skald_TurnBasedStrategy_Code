@@ -67,6 +67,7 @@ private:
     FVector GetFaceLocalNormal(const FSkaldDiceFaceMapping& Mapping) const;
     void EnsureDynamicMaterialsCreated();
     void ValidateFaceMappings();
+    void StabiliseAfterSettlement();
 
     bool bHasValidatedFaceMappings = false;
 };
