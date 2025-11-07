@@ -620,7 +620,7 @@ public:
 
   UFUNCTION(Client, Reliable)
   void ClientDisplayStrategicInitiativeResult(int32 RoundNumber, int32 RollValue,
-                                              bool bWonInitiative);
+                                              int32 EnemyRoll, bool bWonInitiative);
 
   UFUNCTION(Client, Reliable)
   void ClientClearStrategicInitiativeOverlay();
@@ -993,6 +993,9 @@ private:
 
   /** Cached initiative value pending presentation on the strategic HUD. */
   int32 PendingStrategicInitiativeRoll = 0;
+
+  /** Cached opponent initiative value for the strategic HUD overlay. */
+  int32 PendingStrategicInitiativeEnemyRoll = 0;
 
   /** Round index associated with the pending strategic initiative roll. */
   int32 PendingStrategicInitiativeRound = 0;
