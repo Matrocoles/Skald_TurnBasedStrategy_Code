@@ -1,6 +1,8 @@
 #include "Skald_AIController.h"
 #include "AIController.h"
 #include "Algo/Sort.h"
+#include "Abilities/SkaldAbilityComponent.h"
+#include "Abilities/SkaldAbilityTypes.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "FighterPawn.h"
@@ -34,6 +36,58 @@ constexpr TCHAR EnemyStrategyPlanningMessage[] =
     TEXT("Enemy is evaluating the battlefield...");
 constexpr float StrategyPlanningDelayFraction = 0.5f;
 constexpr float MinimumStrategyPlanningDelay = 0.75f;
+
+enum class EAIFactionAbilityCategory : uint8 {
+  None,
+  AttackDamageBuff,
+  AttackDebuffEnemy,
+  AoEAttack,
+  MovementBuff,
+  AllySupport
+};
+
+EAIFactionAbilityCategory ResolveFactionAbilityCategory(const FName &AbilityId) {
+  static const TMap<FName, EAIFactionAbilityCategory> AbilityCategoryMap = {
+      {TEXT("Ability_Inflicted_Line"), EAIFactionAbilityCategory::AttackDamageBuff},
+      {TEXT("Ability_Inflicted_Elite"), EAIFactionAbilityCategory::AoEAttack},
+      {TEXT("Ability_Empire_Elite"), EAIFactionAbilityCategory::AoEAttack},
+      {TEXT("Ability_Gnoll_Elite"), EAIFactionAbilityCategory::AttackDamageBuff},
+      {TEXT("Ability_Ravpack_Elite"), EAIFactionAbilityCategory::AttackDamageBuff},
+      {TEXT("Ability_Lizardfolk_Line"), EAIFactionAbilityCategory::AttackDamageBuff},
+      {TEXT("Ability_Lizardfolk_Elite"), EAIFactionAbilityCategory::AoEAttack},
+      {TEXT("Ability_Goblin_Elite"), EAIFactionAbilityCategory::AttackDamageBuff},
+      {TEXT("Ability_Elf_Elite"), EAIFactionAbilityCategory::AttackDamageBuff},
+      {TEXT("Ability_Elf_Line"), EAIFactionAbilityCategory::AttackDamageBuff},
+      {TEXT("Ability_Inflicted_Skirmish"), EAIFactionAbilityCategory::AttackDebuffEnemy},
+      {TEXT("Ability_Ravpack_Skirmish"), EAIFactionAbilityCategory::AttackDebuffEnemy},
+      {TEXT("Ability_Gnoll_Skirmish"), EAIFactionAbilityCategory::AttackDebuffEnemy},
+      {TEXT("Ability_Goblin_Skirmish"), EAIFactionAbilityCategory::AttackDebuffEnemy},
+      {TEXT("Ability_Goblin_Line"), EAIFactionAbilityCategory::AttackDebuffEnemy},
+      {TEXT("Ability_Empire_Skirmish"), EAIFactionAbilityCategory::AttackDebuffEnemy},
+      {TEXT("Ability_Undead_Line"), EAIFactionAbilityCategory::AttackDamageBuff},
+      {TEXT("Ability_Undead_Skirmish"), EAIFactionAbilityCategory::AttackDebuffEnemy},
+      {TEXT("Ability_Empire_Line"), EAIFactionAbilityCategory::AllySupport},
+      {TEXT("Ability_Gnoll_Line"), EAIFactionAbilityCategory::AllySupport},
+      {TEXT("Ability_Human_Skirmish"), EAIFactionAbilityCategory::AllySupport},
+      {TEXT("Ability_Human_Line"), EAIFactionAbilityCategory::AllySupport},
+      {TEXT("Ability_Human_Elite"), EAIFactionAbilityCategory::AllySupport},
+      {TEXT("Ability_Frogfolk_Line"), EAIFactionAbilityCategory::AllySupport},
+      {TEXT("Ability_Frogfolk_Elite"), EAIFactionAbilityCategory::AllySupport},
+      {TEXT("Ability_Orc_Skirmish"), EAIFactionAbilityCategory::MovementBuff},
+      {TEXT("Ability_Orc_Elite"), EAIFactionAbilityCategory::AllySupport},
+      {TEXT("Ability_Lizardfolk_Skirmish"), EAIFactionAbilityCategory::AttackDebuffEnemy},
+      {TEXT("Ability_Ravpack_Line"), EAIFactionAbilityCategory::AttackDebuffEnemy},
+      {TEXT("Ability_Dwarf_Line"), EAIFactionAbilityCategory::AttackDebuffEnemy},
+      {TEXT("Ability_Dwarf_Skirmish"), EAIFactionAbilityCategory::AttackDamageBuff},
+      {TEXT("Ability_Dwarf_Elite"), EAIFactionAbilityCategory::AoEAttack}
+  };
+
+  if (const EAIFactionAbilityCategory *Found = AbilityCategoryMap.Find(AbilityId)) {
+    return *Found;
+  }
+
+  return EAIFactionAbilityCategory::None;
+}
 }
 
 ASkald_BattleGameMode *ASkaldAIController::ResolveBattleGameMode() const {
@@ -1291,6 +1345,7 @@ AFighterPawn *ASkaldAIController::FindNearestEnemy(AFighterPawn *Fighter) const 
 
   AFighterPawn *BestEnemy = nullptr;
   int32 BestDistance = TNumericLimits<int32>::Max();
+  float BestThreatScore = TNumericLimits<float>::Lowest();
 
   const FIntPoint StartCell = Fighter->GetCurrentCell();
   if (!Grid->IsCellInBounds(StartCell)) {
@@ -1307,13 +1362,586 @@ AFighterPawn *ASkaldAIController::FindNearestEnemy(AFighterPawn *Fighter) const 
     }
 
     const int32 Distance = ComputeChebyshevDistance(Grid, Fighter, Candidate);
-    if (Distance < BestDistance) {
+    const float ThreatScore = static_cast<float>(Candidate->Stats.AttackDamage) +
+                              Candidate->Stats.Strength * 1.5f +
+                              Candidate->Stats.Health * 0.5f;
+    if (Distance < BestDistance ||
+        (Distance == BestDistance && ThreatScore > BestThreatScore)) {
       BestDistance = Distance;
+      BestThreatScore = ThreatScore;
       BestEnemy = Candidate;
     }
   }
 
   return BestEnemy;
+}
+
+bool ASkaldAIController::GatherEnemiesInRange(
+    AFighterPawn *Fighter, TArray<AFighterPawn *> &OutTargets) const {
+  OutTargets.Reset();
+  if (!Fighter) {
+    return false;
+  }
+
+  UGridOverlayComponent *Grid = Fighter->GetGrid();
+  if (!Grid) {
+    return false;
+  }
+
+  UWorld *World = GetWorld();
+  if (!World) {
+    return false;
+  }
+
+  const int32 AttackRange = FMath::Max(1, Fighter->Stats.AttackRange);
+  bool bFoundTarget = false;
+  for (TActorIterator<AFighterPawn> It(World); It; ++It) {
+    AFighterPawn *Candidate = *It;
+    if (!Candidate || Candidate == Fighter || !Candidate->IsAlive()) {
+      continue;
+    }
+
+    if (ControlsFighter(Candidate)) {
+      continue;
+    }
+
+    const int32 Distance = Fighter->GetFootprintDistanceToFighter(Candidate);
+    if (Distance > AttackRange) {
+      continue;
+    }
+
+    if (!Fighter->HasLineOfSightToFighter(Candidate, AttackRange, Grid)) {
+      continue;
+    }
+
+    OutTargets.Add(Candidate);
+    bFoundTarget = true;
+  }
+
+  return bFoundTarget;
+}
+
+float ASkaldAIController::EvaluateAttackTargetScore(
+    const AFighterPawn *Attacker, const AFighterPawn *Target) const {
+  return EvaluateAttackTargetScoreInternal(Attacker, Target, true);
+}
+
+float ASkaldAIController::EvaluateAttackTargetScoreInternal(
+    const AFighterPawn *Attacker, const AFighterPawn *Target,
+    bool bIncludeRandom) const {
+  if (!Attacker || !Target) {
+    return TNumericLimits<float>::Lowest();
+  }
+
+  AFighterPawn *MutableAttacker = const_cast<AFighterPawn *>(Attacker);
+  AFighterPawn *MutableTarget = const_cast<AFighterPawn *>(Target);
+
+  FFighterStats EffectiveAttackerStats = Attacker->Stats;
+  if (USkaldAbilityComponent *AttackerAbility =
+          MutableAttacker->FindComponentByClass<USkaldAbilityComponent>()) {
+    AttackerAbility->ModifyOutgoingAttackStats(MutableTarget,
+                                               EffectiveAttackerStats);
+  }
+
+  if (USkaldAbilityComponent *TargetAbility =
+          MutableTarget->FindComponentByClass<USkaldAbilityComponent>()) {
+    TargetAbility->ModifyIncomingAttackStats(MutableAttacker,
+                                             EffectiveAttackerStats);
+  }
+
+  const int32 TargetHealth = FMath::Max(1, Target->Stats.Health);
+  const int32 AttackDamage = EffectiveAttackerStats.AttackDamage;
+  const int32 CritDamage =
+      AttackDamage + EffectiveAttackerStats.CriticalBonusDamage;
+  const int32 Distance = Attacker->GetFootprintDistanceToFighter(Target);
+  const int32 AttackRange = FMath::Max(1, EffectiveAttackerStats.AttackRange);
+
+  float Score = 0.f;
+  if (AttackDamage >= TargetHealth) {
+    Score += 150.f;
+  } else {
+    const float DamageRatio = static_cast<float>(AttackDamage) /
+                              static_cast<float>(TargetHealth);
+    Score += DamageRatio * 100.f;
+  }
+
+  if (CritDamage >= TargetHealth) {
+    Score += 50.f;
+  }
+
+  const float ThreatValue = static_cast<float>(Target->Stats.AttackDamage) +
+                            Target->Stats.Strength * 1.5f +
+                            Target->Stats.Health * 0.25f;
+  Score += ThreatValue;
+
+  Score += FMath::Max(0, AttackRange - Distance) * 10.f;
+  Score += EffectiveAttackerStats.AttackDice * 5.f;
+  Score += EffectiveAttackerStats.Strength * 2.f;
+  Score += FMath::Min(Attacker->ActionsRemaining, 3) * 6.f;
+  Score += FMath::Min(Target->ActionsRemaining, 3) * 4.f;
+
+  if (bIncludeRandom) {
+    Score += FMath::FRandRange(0.f, 1.f);
+  }
+
+  return Score;
+}
+
+float ASkaldAIController::ComputeAbilityActivationBonus(
+    AFighterPawn *Fighter, const FSkaldAbilityState &AbilityState) const {
+  if (!Fighter || !AbilityState.Definition.IsValid()) {
+    return 0.f;
+  }
+
+  switch (ResolveFactionAbilityCategory(AbilityState.Definition.AbilityId)) {
+  case EAIFactionAbilityCategory::AttackDamageBuff:
+    return 60.f + Fighter->Stats.AttackDamage * 2.f +
+           Fighter->Stats.AttackDice * 2.f;
+  case EAIFactionAbilityCategory::AttackDebuffEnemy:
+    return 40.f + Fighter->Stats.AttackDamage * 1.5f;
+  case EAIFactionAbilityCategory::AoEAttack:
+    return 55.f + Fighter->Stats.AttackDamage * 1.5f;
+  case EAIFactionAbilityCategory::MovementBuff:
+    return 35.f + Fighter->Stats.Movement * 3.f;
+  default:
+    break;
+  }
+
+  return 0.f;
+}
+
+float ASkaldAIController::ComputeAbilityAttackScoreBonus(
+    AFighterPawn *Fighter, AFighterPawn *Target,
+    const FSkaldAbilityState &AbilityState) const {
+  if (!Fighter || !Target || !AbilityState.Definition.IsValid()) {
+    return 0.f;
+  }
+
+  const FName AbilityId = AbilityState.Definition.AbilityId;
+  const EAIFactionAbilityCategory Category =
+      ResolveFactionAbilityCategory(AbilityId);
+
+  float Bonus = 0.f;
+  switch (Category) {
+  case EAIFactionAbilityCategory::AttackDamageBuff: {
+    if (AbilityId == TEXT("Ability_Ravpack_Elite") && Fighter->Stats.Health <= 1) {
+      return 0.f;
+    }
+
+    Bonus = 40.f + Fighter->Stats.AttackDamage * 5.f +
+            Fighter->Stats.AttackDice * 4.f;
+
+    if (AbilityId == TEXT("Ability_Inflicted_Line")) {
+      Bonus += 20.f;
+    } else if (AbilityId == TEXT("Ability_Empire_Elite")) {
+      const int32 Nearby = CountEnemiesNearTarget(Target, 2);
+      if (Nearby > 0) {
+        Bonus += Nearby * 25.f;
+      }
+    } else if (AbilityId == TEXT("Ability_Lizardfolk_Line")) {
+      Bonus += 15.f;
+    }
+    break;
+  }
+  case EAIFactionAbilityCategory::AttackDebuffEnemy: {
+    const float ThreatScore = static_cast<float>(Target->Stats.AttackDamage) *
+                                  4.f +
+                              Target->Stats.Movement * 3.f +
+                              Target->Stats.Strength * 2.f;
+    Bonus = 20.f + ThreatScore;
+
+    if (AbilityId == TEXT("Ability_Goblin_Skirmish") &&
+        Target->Stats.Defence <= 1) {
+      Bonus *= 0.5f;
+    }
+    if (AbilityId == TEXT("Ability_Gnoll_Skirmish") &&
+        Target->Stats.Defence <= 0) {
+      Bonus *= 0.5f;
+    }
+    break;
+  }
+  case EAIFactionAbilityCategory::AoEAttack: {
+    const int32 Nearby = CountEnemiesNearTarget(Target, 2);
+    if (Nearby <= 0) {
+      return 0.f;
+    }
+    Bonus = 35.f * Nearby + Fighter->Stats.AttackDamage * 3.f;
+    break;
+  }
+  default:
+    break;
+  }
+
+  return Bonus;
+}
+
+bool ASkaldAIController::ShouldTriggerAbilityForAttack(
+    AFighterPawn *Fighter, AFighterPawn *Target,
+    const FSkaldAbilityState &AbilityState,
+    const FSkaldAbilityTargetingInfo &Targeting) const {
+  if (!Fighter || !Target || !AbilityState.Definition.IsValid()) {
+    return false;
+  }
+
+  if (Targeting.CommandMode != EBattleCommandMode::None &&
+      Targeting.CommandMode != EBattleCommandMode::AbilityTargetEnemy) {
+    return false;
+  }
+
+  const EAIFactionAbilityCategory Category =
+      ResolveFactionAbilityCategory(AbilityState.Definition.AbilityId);
+  if (Category != EAIFactionAbilityCategory::AttackDamageBuff &&
+      Category != EAIFactionAbilityCategory::AttackDebuffEnemy &&
+      Category != EAIFactionAbilityCategory::AoEAttack) {
+    return false;
+  }
+
+  if (AbilityState.Definition.CostType == ESkaldAbilityCostType::Reaction) {
+    return false;
+  }
+
+  const float Bonus =
+      ComputeAbilityAttackScoreBonus(Fighter, Target, AbilityState);
+  if (Bonus <= 0.f) {
+    return false;
+  }
+
+  const float BaseScore =
+      EvaluateAttackTargetScoreInternal(Fighter, Target, false);
+  if (BaseScore <= TNumericLimits<float>::Lowest() / 2) {
+    return false;
+  }
+
+  const float Threshold =
+      Category == EAIFactionAbilityCategory::AttackDebuffEnemy ? 25.f : 35.f;
+  return Bonus >= Threshold || (BaseScore + Bonus) >= BaseScore * 1.2f;
+}
+
+ASkaldAIController::EAIAttackAbilityResult
+ASkaldAIController::TryUseFactionAbilityBeforeAttack(AFighterPawn *Fighter,
+                                                     AFighterPawn *Target) {
+  if (!Fighter || !Target) {
+    return EAIAttackAbilityResult::None;
+  }
+
+  USkaldAbilityComponent *AbilityComponent = Fighter->GetAbilityComponent();
+  if (!AbilityComponent) {
+    return EAIAttackAbilityResult::None;
+  }
+
+  const FSkaldAbilityState *AbilityState =
+      AbilityComponent->FindAbilityState(ESkaldAbilitySlot::Ability1);
+  if (!AbilityState || !AbilityState->Definition.IsValid()) {
+    return EAIAttackAbilityResult::None;
+  }
+
+  const FName AbilityId = AbilityState->Definition.AbilityId;
+  const ESkaldAbilityCostType AbilityCost = AbilityState->Definition.CostType;
+  const FSkaldAbilityTargetingInfo Targeting =
+      ResolveAIAbilityTargeting(AbilityId);
+
+  FText FailureReason;
+  if (!AbilityComponent->CanActivateAbility(ESkaldAbilitySlot::Ability1,
+                                            &FailureReason)) {
+    return EAIAttackAbilityResult::None;
+  }
+
+  if (!ShouldTriggerAbilityForAttack(Fighter, Target, *AbilityState,
+                                     Targeting)) {
+    return EAIAttackAbilityResult::None;
+  }
+
+  if (!AbilityComponent->TryBeginAbility(ESkaldAbilitySlot::Ability1,
+                                         FailureReason)) {
+    UE_LOG(LogSkaldBattle, Verbose,
+           TEXT("[AI] Failed to trigger ability %s for %s: %s"),
+           *AbilityId.ToString(), *Fighter->GetHumanReadableName(),
+           *FailureReason.ToString());
+    return EAIAttackAbilityResult::None;
+  }
+
+  if (AbilityCost == ESkaldAbilityCostType::Action) {
+    Fighter->TryRestoreAction();
+  }
+
+  UE_LOG(LogSkaldBattle, Verbose,
+         TEXT("[AI] Triggered ability %s before attack for %s"),
+         *AbilityId.ToString(), *Fighter->GetHumanReadableName());
+
+  if (Targeting.CommandMode == EBattleCommandMode::AbilityTargetEnemy) {
+    Fighter->PerformAttack(Target);
+    if (AbilityId == TEXT("Ability_Elf_Line")) {
+      Fighter->TryRestoreAction();
+    }
+    return EAIAttackAbilityResult::AbilityTriggeredAttackExecuted;
+  }
+
+  return EAIAttackAbilityResult::AbilityTriggeredNoAttack;
+}
+
+bool ASkaldAIController::TryUseMovementAbility(AFighterPawn *Fighter,
+                                               AFighterPawn *Target) {
+  if (!Fighter || !Target) {
+    return false;
+  }
+
+  USkaldAbilityComponent *AbilityComponent = Fighter->GetAbilityComponent();
+  if (!AbilityComponent) {
+    return false;
+  }
+
+  const FSkaldAbilityState *AbilityState =
+      AbilityComponent->FindAbilityState(ESkaldAbilitySlot::Ability1);
+  if (!AbilityState || !AbilityState->Definition.IsValid()) {
+    return false;
+  }
+
+  const FName AbilityId = AbilityState->Definition.AbilityId;
+  const ESkaldAbilityCostType AbilityCost = AbilityState->Definition.CostType;
+  if (ResolveFactionAbilityCategory(AbilityId) !=
+      EAIFactionAbilityCategory::MovementBuff) {
+    return false;
+  }
+
+  const FSkaldAbilityTargetingInfo Targeting =
+      ResolveAIAbilityTargeting(AbilityId);
+  if (Targeting.CommandMode != EBattleCommandMode::None) {
+    return false;
+  }
+
+  const int32 Distance = Fighter->GetFootprintDistanceToFighter(Target);
+  const int32 AttackRange = FMath::Max(1, Fighter->Stats.AttackRange);
+  if (Distance <= AttackRange) {
+    return false;
+  }
+
+  if (Distance <= Fighter->Stats.Movement) {
+    return false;
+  }
+
+  int32 ExpectedBonus = 1;
+  if (AbilityId == TEXT("Ability_Orc_Skirmish") ||
+      AbilityId == TEXT("Ability_Goblin_Elite")) {
+    ExpectedBonus = 2;
+  }
+
+  if (Distance > Fighter->Stats.Movement + ExpectedBonus) {
+    return false;
+  }
+
+  FText FailureReason;
+  if (!AbilityComponent->CanActivateAbility(ESkaldAbilitySlot::Ability1,
+                                            &FailureReason)) {
+    return false;
+  }
+
+  if (!AbilityComponent->TryBeginAbility(ESkaldAbilitySlot::Ability1,
+                                         FailureReason)) {
+    UE_LOG(LogSkaldBattle, Verbose,
+           TEXT("[AI] Failed to trigger movement ability %s for %s: %s"),
+           *AbilityId.ToString(), *Fighter->GetHumanReadableName(),
+           *FailureReason.ToString());
+    return false;
+  }
+
+  if (AbilityCost == ESkaldAbilityCostType::Action) {
+    Fighter->TryRestoreAction();
+  }
+
+  UE_LOG(LogSkaldBattle, Verbose,
+         TEXT("[AI] Triggered movement ability %s for %s"),
+         *AbilityId.ToString(), *Fighter->GetHumanReadableName());
+
+  return true;
+}
+
+FSkaldAbilityTargetingInfo
+ASkaldAIController::ResolveAIAbilityTargeting(FName AbilityId) const {
+  FSkaldAbilityTargetingInfo Info;
+
+  static const TMap<FName, FSkaldAbilityTargetingInfo> TargetingPresets = {
+      {TEXT("Ability_Human_Skirmish"),
+       {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE, true, false, false}},
+      {TEXT("Ability_Orc_Skirmish"),
+       {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE, true, false, false}},
+      {TEXT("Ability_Inflicted_Skirmish"),
+       {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE, true, false, false}},
+      {TEXT("Ability_Ravpack_Skirmish"),
+       {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE, true, false, false}},
+      {TEXT("Ability_Orc_Line"),
+       {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE, true, false, false}},
+      {TEXT("Ability_Dwarf_Elite"),
+       {EBattleCommandMode::AbilityTargetEnemy, 6, true, false, false}},
+      {TEXT("Ability_Elf_Line"),
+       {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE, true, false, false}},
+      {TEXT("Ability_Undead_Line"),
+       {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE, true, false, false}},
+      {TEXT("Ability_Gnoll_Skirmish"),
+       {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE, true, false, false}},
+      {TEXT("Ability_Gnoll_Elite"),
+       {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE, true, false, false}},
+      {TEXT("Ability_Empire_Skirmish"),
+       {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE, true, false, false}},
+      {TEXT("Ability_Empire_Elite"),
+       {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE, true, false, false}},
+      {TEXT("Ability_Ravpack_Line"),
+       {EBattleCommandMode::AbilityTargetCell, 1, true, false, true}},
+      {TEXT("Ability_Elf_Elite"),
+       {EBattleCommandMode::AbilityTargetEnemy, 8, true, false, false}},
+      {TEXT("Ability_Undead_Skirmish"),
+       {EBattleCommandMode::AbilityTargetEnemy, 3, true, false, false}}};
+
+  if (const FSkaldAbilityTargetingInfo *Preset =
+          TargetingPresets.Find(AbilityId)) {
+    return *Preset;
+  }
+
+  return Info;
+}
+
+int32 ASkaldAIController::CountEnemiesNearTarget(const AFighterPawn *Center,
+                                                 int32 Range) const {
+  if (!Center) {
+    return 0;
+  }
+
+  UWorld *World = GetWorld();
+  if (!World) {
+    return 0;
+  }
+
+  int32 Count = 0;
+  for (TActorIterator<AFighterPawn> It(World); It; ++It) {
+    AFighterPawn *Candidate = *It;
+    if (!Candidate || Candidate == Center || !Candidate->IsAlive()) {
+      continue;
+    }
+
+    if (Candidate->Faction == Center->Faction) {
+      continue;
+    }
+
+    const int32 Distance =
+        Center->GetFootprintDistanceToFighter(Candidate);
+    if (Distance <= Range) {
+      ++Count;
+    }
+  }
+
+  return Count;
+}
+
+AFighterPawn *ASkaldAIController::FindBestAttackTarget(
+    AFighterPawn *Fighter) const {
+  if (!Fighter) {
+    return nullptr;
+  }
+
+  TArray<AFighterPawn *> Candidates;
+  if (!GatherEnemiesInRange(Fighter, Candidates)) {
+    return nullptr;
+  }
+
+  AFighterPawn *BestTarget = nullptr;
+  float BestScore = TNumericLimits<float>::Lowest();
+  for (AFighterPawn *Candidate : Candidates) {
+    const float Score = EvaluateAttackTargetScore(Fighter, Candidate);
+    if (Score > BestScore) {
+      BestScore = Score;
+      BestTarget = Candidate;
+    }
+  }
+
+  return BestTarget;
+}
+
+int32 ASkaldAIController::ComputeDistanceToNearestEnemy(
+    const AFighterPawn *Fighter) const {
+  if (!Fighter) {
+    return TNumericLimits<int32>::Max();
+  }
+
+  UGridOverlayComponent *Grid = Fighter->GetGrid();
+  if (!Grid) {
+    return TNumericLimits<int32>::Max();
+  }
+
+  UWorld *World = GetWorld();
+  if (!World) {
+    return TNumericLimits<int32>::Max();
+  }
+
+  int32 BestDistance = TNumericLimits<int32>::Max();
+  for (TActorIterator<AFighterPawn> It(World); It; ++It) {
+    AFighterPawn *Candidate = *It;
+    if (!Candidate || Candidate == Fighter || !Candidate->IsAlive()) {
+      continue;
+    }
+
+    if (ControlsFighter(Candidate)) {
+      continue;
+    }
+
+    const int32 Distance = ComputeChebyshevDistance(Grid, Fighter, Candidate);
+    if (Distance < BestDistance) {
+      BestDistance = Distance;
+    }
+  }
+
+  return BestDistance;
+}
+
+float ASkaldAIController::EvaluateFighterActivationPriority(
+    AFighterPawn *Fighter) const {
+  if (!Fighter) {
+    return TNumericLimits<float>::Lowest();
+  }
+
+  float Score = 0.f;
+
+  TArray<AFighterPawn *> Targets;
+  if (GatherEnemiesInRange(Fighter, Targets)) {
+    float BestTargetScore = TNumericLimits<float>::Lowest();
+    for (AFighterPawn *Target : Targets) {
+      BestTargetScore = FMath::Max(
+          BestTargetScore,
+          EvaluateAttackTargetScoreInternal(Fighter, Target, false));
+    }
+
+    Score += 500.f + BestTargetScore;
+  } else {
+    const int32 Distance = ComputeDistanceToNearestEnemy(Fighter);
+    if (Distance != TNumericLimits<int32>::Max()) {
+      Score += FMath::Clamp(200.f - Distance * 10.f, -100.f, 200.f);
+    }
+  }
+
+  if (Fighter->ActionsRemaining <= 0) {
+    Score -= 200.f;
+  } else {
+    Score += Fighter->ActionsRemaining * 25.f;
+  }
+
+  Score += Fighter->Stats.AttackDamage * 2.f;
+  Score += Fighter->Stats.Movement * 5.f;
+  Score += Fighter->Stats.Health;
+
+  if (USkaldAbilityComponent *AbilityComponent =
+          Fighter->GetAbilityComponent()) {
+    if (const FSkaldAbilityState *AbilityState =
+            AbilityComponent->FindAbilityState(ESkaldAbilitySlot::Ability1)) {
+      if (AbilityState->Definition.IsValid() &&
+          AbilityComponent->CanActivateAbility(ESkaldAbilitySlot::Ability1)) {
+        Score += ComputeAbilityActivationBonus(Fighter, *AbilityState);
+      }
+    }
+  }
+
+  if (Fighter->Stats.AttackRange > 1) {
+    Score += 10.f;
+  }
+
+  return Score;
 }
 
 AFighterPawn *ASkaldAIController::FindNextFriendlyFighter(bool bExpectAttacker) const {
@@ -1323,7 +1951,7 @@ AFighterPawn *ASkaldAIController::FindNextFriendlyFighter(bool bExpectAttacker) 
   }
 
   AFighterPawn *BestFighter = nullptr;
-  int32 BestDistance = TNumericLimits<int32>::Max();
+  float BestScore = TNumericLimits<float>::Lowest();
 
   for (TActorIterator<AFighterPawn> It(World); It; ++It) {
     AFighterPawn *Candidate = *It;
@@ -1337,11 +1965,9 @@ AFighterPawn *ASkaldAIController::FindNextFriendlyFighter(bool bExpectAttacker) 
       continue;
     }
 
-    UGridOverlayComponent *Grid = Candidate->GetGrid();
-    const int32 Distance = ComputeChebyshevDistance(
-        Grid, Candidate, FindNearestEnemy(Candidate));
-    if (Distance < BestDistance || !BestFighter) {
-      BestDistance = Distance;
+    const float Score = EvaluateFighterActivationPriority(Candidate);
+    if (Score > BestScore || !BestFighter) {
+      BestScore = Score;
       BestFighter = Candidate;
     }
   }
@@ -1359,22 +1985,22 @@ bool ASkaldAIController::TryAttackNearestEnemy(AFighterPawn *Fighter) {
     return false;
   }
 
-  AFighterPawn *Target = FindNearestEnemy(Fighter);
+  AFighterPawn *Target = FindBestAttackTarget(Fighter);
   if (!Target) {
     return false;
   }
 
-  const int32 Distance = Fighter->GetFootprintDistanceToFighter(Target);
-  if (Distance > Fighter->Stats.AttackRange) {
-    return false;
-  }
-
-  if (Grid &&
-      !Fighter->HasLineOfSightToFighter(Target, Fighter->Stats.AttackRange, Grid)) {
-    return false;
-  }
-
   const int32 ActionsBefore = Fighter->ActionsRemaining;
+  const EAIAttackAbilityResult AbilityResult =
+      TryUseFactionAbilityBeforeAttack(Fighter, Target);
+  if (AbilityResult == EAIAttackAbilityResult::AbilityTriggeredAttackExecuted) {
+    return true;
+  }
+
+  if (Fighter->ActionsRemaining <= 0) {
+    return false;
+  }
+
   Fighter->PerformAttack(Target);
   return Fighter->ActionsRemaining < ActionsBefore;
 }
@@ -1394,12 +2020,15 @@ bool ASkaldAIController::TryMoveTowardsNearestEnemy(AFighterPawn *Fighter) {
     return false;
   }
 
+  TryUseMovementAbility(Fighter, Enemy);
+
   const FIntPoint StartCell = Fighter->GetCurrentCell();
   const FIntPoint EnemyCell = Enemy->GetCurrentCell();
   if (!Grid->IsCellInBounds(StartCell) || !Grid->IsCellInBounds(EnemyCell)) {
     return false;
   }
 
+  const int32 AttackRange = FMath::Max(1, Fighter->Stats.AttackRange);
   const TArray<FIntPoint> EnemyFootprint = Enemy->GetOccupiedCells();
 
   auto ComputeDistanceFromAnchor = [&](const FIntPoint &Anchor) {
@@ -1422,6 +2051,24 @@ bool ASkaldAIController::TryMoveTowardsNearestEnemy(AFighterPawn *Fighter) {
       }
     }
     return BestDistance;
+  };
+
+  auto HasLineOfSightFromAnchor = [&](const FIntPoint &Anchor) {
+    const TArray<FIntPoint> CandidateCells = Fighter->GetOccupiedCells(Anchor);
+    for (const FIntPoint &SelfCell : CandidateCells) {
+      for (const FIntPoint &EnemyCellCoord : EnemyFootprint) {
+        const int32 Distance = FMath::Max(
+            FMath::Abs(SelfCell.X - EnemyCellCoord.X),
+            FMath::Abs(SelfCell.Y - EnemyCellCoord.Y));
+        if (Distance > AttackRange) {
+          continue;
+        }
+        if (Grid->HasLineOfSight(SelfCell, EnemyCellCoord)) {
+          return true;
+        }
+      }
+    }
+    return false;
   };
 
   const int32 CurrentDistance = ComputeDistanceFromAnchor(StartCell);
@@ -1508,6 +2155,10 @@ bool ASkaldAIController::TryMoveTowardsNearestEnemy(AFighterPawn *Fighter) {
   FIntPoint BestAnchor = StartCell;
   int32 BestDistance = CurrentDistance;
   int32 BestPathCost = TNumericLimits<int32>::Max();
+  FIntPoint BestAttackAnchor = StartCell;
+  int32 BestAttackDistance = CurrentDistance;
+  int32 BestAttackCost = TNumericLimits<int32>::Max();
+  bool bFoundAttackAnchor = false;
 
   while (Frontier.Num() > 0) {
     Frontier.Sort(FrontierComparator);
@@ -1550,6 +2201,18 @@ bool ASkaldAIController::TryMoveTowardsNearestEnemy(AFighterPawn *Fighter) {
       Frontier.Add({Next, StepCost});
 
       const int32 CandidateDistance = ComputeDistanceFromAnchor(Next);
+      const bool bWithinRange = CandidateDistance <= AttackRange;
+      const bool bHasLineOfSight = bWithinRange && HasLineOfSightFromAnchor(Next);
+
+      if (bHasLineOfSight &&
+          (!bFoundAttackAnchor || CandidateDistance < BestAttackDistance ||
+           (CandidateDistance == BestAttackDistance && StepCost < BestAttackCost))) {
+        BestAttackDistance = CandidateDistance;
+        BestAttackCost = StepCost;
+        BestAttackAnchor = Next;
+        bFoundAttackAnchor = true;
+      }
+
       if (CandidateDistance > BestDistance) {
         continue;
       }
@@ -1562,12 +2225,15 @@ bool ASkaldAIController::TryMoveTowardsNearestEnemy(AFighterPawn *Fighter) {
     }
   }
 
-  if (BestAnchor == StartCell) {
+  const FIntPoint Destination =
+      bFoundAttackAnchor ? BestAttackAnchor : BestAnchor;
+
+  if (Destination == StartCell) {
     return false;
   }
 
   const int32 ActionsBefore = Fighter->ActionsRemaining;
-  Fighter->MoveToCell(BestAnchor);
+  Fighter->MoveToCell(Destination);
   return Fighter->ActionsRemaining < ActionsBefore;
 }
 
