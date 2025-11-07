@@ -934,6 +934,13 @@ private:
   void HideInitiativeResults();
   USkaldDiceManager *ResolveDiceManager();
 
+  void StartInitiativeDiceSequence(int32 AttackerRoll, int32 DefenderRoll);
+  void HandleInitiativeDiceOverviewReached();
+  void HandleInitiativeDiceCleanupFinished();
+  void HandleInitiativeDiceReturnComplete();
+  void ResetInitiativeDiceSequence();
+  void CompletePendingInitiativeSequence();
+
   void StartAttackDiceSequence(AFighterPawn *Attacker, AFighterPawn *Defender,
                                const FDiceRollResult &Result);
   void ProcessAttackResolutionPresentation(AFighterPawn *Attacker,
@@ -1033,6 +1040,24 @@ private:
 
   /** Prevents duplicate initiative dice visuals per round. */
   bool bInitiativeRollPresentationShown = false;
+
+  struct FPendingInitiativeDiceSequence
+  {
+    bool bActive = false;
+    bool bHadBattleCamera = false;
+    FVector OriginalLocation = FVector::ZeroVector;
+    FRotator OriginalRotation = FRotator::ZeroRotator;
+    float OriginalZoom = 0.f;
+    TWeakObjectPtr<AActor> OriginalLockTarget;
+    FGuid ActiveRollId;
+    int32 AttackerResult = 0;
+    int32 DefenderResult = 0;
+    FTimerHandle OverviewTimerHandle;
+    FTimerHandle CleanupDelayHandle;
+    FTimerHandle ReturnTimerHandle;
+  };
+
+  FPendingInitiativeDiceSequence PendingInitiativeSequence;
 
   struct FPendingAttackDiceSequence
   {
