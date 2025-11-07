@@ -2408,16 +2408,20 @@ void ASkaldPlayerController::RefreshLockedInFighterList() {
   }
 
   TArray<AFighterPawn *> FriendlyFighters;
+  TArray<AFighterPawn *> EnemyFighters;
   FriendlyFighters.Reserve(OrderedFighters.Num());
+  EnemyFighters.Reserve(OrderedFighters.Num());
 
   auto ConsiderFighter = [&](AFighterPawn *Fighter) {
     if (!Fighter || !Fighter->IsAlive()) {
       return;
     }
-    if (!IsFriendlyFighter(Fighter)) {
-      return;
+
+    if (IsFriendlyFighter(Fighter)) {
+      FriendlyFighters.AddUnique(Fighter);
+    } else {
+      EnemyFighters.AddUnique(Fighter);
     }
-    FriendlyFighters.AddUnique(Fighter);
   };
 
   for (AFighterPawn *Fighter : OrderedFighters) {
@@ -2447,6 +2451,7 @@ void ASkaldPlayerController::RefreshLockedInFighterList() {
   }
 
   BattleHudWidget->SetLockedInFighters(FriendlyFighters);
+  BattleHudWidget->SetEnemyLockedInFighters(EnemyFighters);
   UpdateLockedInActiveHighlight();
   UpdateLockedInSelectionHighlight();
   BattleHudWidget->RefreshLockedInFighterTurnStates();
@@ -2459,14 +2464,32 @@ void ASkaldPlayerController::RefreshLockedInFighterTurnStates() {
 }
 
 void ASkaldPlayerController::UpdateLockedInSelectionHighlight() {
-  if (BattleHudWidget) {
-    BattleHudWidget->SetHighlightedLockedInFighter(SelectedFighter.Get());
+  if (!BattleHudWidget) {
+    return;
+  }
+
+  AFighterPawn *Selected = SelectedFighter.Get();
+  if (Selected && IsFriendlyFighter(Selected)) {
+    BattleHudWidget->SetHighlightedLockedInFighter(Selected);
+    BattleHudWidget->SetHighlightedEnemyLockedInFighter(nullptr);
+  } else {
+    BattleHudWidget->SetHighlightedLockedInFighter(nullptr);
+    BattleHudWidget->SetHighlightedEnemyLockedInFighter(Selected);
   }
 }
 
 void ASkaldPlayerController::UpdateLockedInActiveHighlight() {
-  if (BattleHudWidget) {
-    BattleHudWidget->SetActiveLockedInFighter(LockedActiveFighter.Get());
+  if (!BattleHudWidget) {
+    return;
+  }
+
+  AFighterPawn *Active = LockedActiveFighter.Get();
+  if (Active && IsFriendlyFighter(Active)) {
+    BattleHudWidget->SetActiveLockedInFighter(Active);
+    BattleHudWidget->SetActiveEnemyLockedInFighter(nullptr);
+  } else {
+    BattleHudWidget->SetActiveLockedInFighter(nullptr);
+    BattleHudWidget->SetActiveEnemyLockedInFighter(Active);
   }
 }
 
