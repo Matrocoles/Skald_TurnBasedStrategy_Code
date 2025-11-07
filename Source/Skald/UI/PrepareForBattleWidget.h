@@ -33,7 +33,9 @@ public:
                           UTexture2D *InAttackingFactionIcon,
                           const FText &InDefendingPlayerName,
                           const FText &InDefendingTerritoryName,
-                          UTexture2D *InDefendingFactionIcon);
+                          UTexture2D *InDefendingFactionIcon,
+                          int32 InAttackingUnits,
+                          int32 InDefendingUnits);
 
   /** Text block displaying the attacking player's name. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
@@ -71,6 +73,14 @@ public:
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *RetreatStatusText;
 
+  /** Text block displaying the total attacking units committed. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UTextBlock *AttackingUnitsText;
+
+  /** Text block displaying the total defending units stationed. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UTextBlock *DefendingUnitsText;
+
   /** Fired when the local player clicks the prepare button. */
   UPROPERTY(BlueprintAssignable, Category = "Skald|Battle")
   FPrepareForBattleClicked OnPrepareButtonClicked;
@@ -99,6 +109,16 @@ public:
   FText DefendingTerritoryNameText =
       FText::FromString(TEXT("Defending Territory"));
 
+  /** Customisable label prefix for the attacking units display. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Battle")
+  FText AttackingUnitsLabelText =
+      FText::FromString(TEXT("Attacking Units"));
+
+  /** Customisable label prefix for the defending units display. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Battle")
+  FText DefendingUnitsLabelText =
+      FText::FromString(TEXT("Defending Units"));
+
   /** Update the retreat status label and optionally clear it after a delay. */
   UFUNCTION(BlueprintCallable, Category = "Skald|Battle")
   void ShowRetreatStatus(const FText &StatusMessage, float DisplayDuration = 0.f);
@@ -122,6 +142,10 @@ protected:
   /** Cached texture references used when updating emblem widgets. */
   TWeakObjectPtr<UTexture2D> AttackingFactionTexture;
   TWeakObjectPtr<UTexture2D> DefendingFactionTexture;
+
+  /** Cached unit counts for each side of the battle. */
+  int32 AttackingUnits = 0;
+  int32 DefendingUnits = 0;
 
   FTimerHandle RetreatStatusTimerHandle;
 

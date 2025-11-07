@@ -828,21 +828,20 @@ void USkaldMainHUDWidget::ShowPrepareForBattleDialog(
       PromptData.DefenderFactionEmblem, PromptData.DefenderFaction,
       TEXT("Defender"));
 
-  ActivePrepareForBattleWidget->SetupBattleDetails(AttackerPlayerText,
-                                                   AttackerTerritoryText,
-                                                   AttackerEmblem,
-                                                   DefenderPlayerText,
-                                                   DefenderTerritoryText,
-                                                   DefenderEmblem);
+  ActivePrepareForBattleWidget->SetupBattleDetails(
+      AttackerPlayerText, AttackerTerritoryText, AttackerEmblem,
+      DefenderPlayerText, DefenderTerritoryText, DefenderEmblem,
+      PromptData.AttackerCommittedArmy, PromptData.DefenderArmyCount);
   ActivePrepareForBattleWidget->ShowRetreatStatus(FText::GetEmpty(), 0.f);
   if (ActivePrepareForBattleWidget->PrepareForBattleButton) {
+    const bool bLocalIsParticipant = bLocalIsAttacker || bLocalIsDefender;
     const ESlateVisibility PrepareVisibility =
-        bLocalIsAttacker ? ESlateVisibility::Visible
-                          : ESlateVisibility::Collapsed;
+        bLocalIsParticipant ? ESlateVisibility::Visible
+                             : ESlateVisibility::Collapsed;
     ActivePrepareForBattleWidget->PrepareForBattleButton->SetVisibility(
         PrepareVisibility);
     ActivePrepareForBattleWidget->PrepareForBattleButton->SetIsEnabled(
-        bLocalIsAttacker);
+        bLocalIsParticipant);
   }
   ActivePrepareForBattleWidget->SetRetreatButtonVisibility(
       bLocalIsDefender ? ESlateVisibility::Visible
