@@ -31,6 +31,10 @@ void USkaldDiceManager::Deinitialize()
         }
     }
     ActiveRolls.Empty();
+    FinalizeDeferredInitiativeCleanup();
+    DeferredInitiativeCleanups.Empty();
+    SharedInitiativeArena.Reset();
+    bHoldInitiativeDiceUntilRelease = false;
     Super::Deinitialize();
 }
 
@@ -85,6 +89,32 @@ void USkaldDiceManager::SetConfig(UDiceRollConfig* InConfig)
     {
         DeterministicStream.Initialize(Config->Seed);
     }
+}
+
+void USkaldDiceManager::SetHoldInitiativeDice(bool bHold)
+{
+    if (bHoldInitiativeDiceUntilRelease == bHold)
+    {
+        return;
+    }
+
+    bHoldInitiativeDiceUntilRelease = bHold;
+
+    if (bHold)
+    {
+        SharedInitiativeArena.Reset();
+    }
+    else
+    {
+        ReleaseHeldInitiativeDice();
+    }
+}
+
+void USkaldDiceManager::ReleaseHeldInitiativeDice()
+{
+    FinalizeDeferredInitiativeCleanup();
+    DeferredInitiativeCleanups.Empty();
+    SharedInitiativeArena.Reset();
 }
 
 TArray<int32> USkaldDiceManager::RollDiceBlocking_D6(int32 NumDice)
@@ -236,7 +266,14 @@ void USkaldDiceManager::CompleteRoll(FGuid RollId)
         World->GetTimerManager().ClearTimer(Roll->CompletionTimerHandle);
     }
 
-    CleanupRollActors(*Roll);
+    if (Roll->bIsInitiative && bHoldInitiativeDiceUntilRelease)
+    {
+        QueueDeferredInitiativeCleanup(*Roll);
+    }
+    else
+    {
+        CleanupRollActors(*Roll);
+    }
     ActiveRolls.Remove(RollId);
 }
 
@@ -293,7 +330,52 @@ bool USkaldDiceManager::SpawnPhysicalRoll(FActiveRoll& Roll, const TArray<int32>
 
     FVector ArenaLocation = Config->ArenaBounds.GetCenter();
     FRotator ArenaRotation = FRotator::ZeroRotator;
-    if (Config->bAnchorArenaToCamera)
+    ADiceRollArena* Arena = ResolveInitiativeArenaForRoll(Roll);
+
+    if (!Arena)
+    {
+        if (Config->bAnchorArenaToCamera)
+        {
+            if (APlayerController* PlayerController = World->GetFirstPlayerController())
+            {
+                FVector ViewLocation = FVector::ZeroVector;
+                FRotator ViewRotation = FRotator::ZeroRotator;
+                PlayerController->GetPlayerViewPoint(ViewLocation, ViewRotation);
+
+                const FVector Offset = ViewRotation.RotateVector(Config->ArenaCameraRelativeOffset);
+                ArenaLocation = ViewLocation + Offset;
+
+                if (Config->bMatchCameraYaw)
+                {
+                    ArenaRotation = FRotator(0.f, ViewRotation.Yaw, 0.f);
+                }
+            }
+        }
+
+        const FTransform ArenaTransform(ArenaRotation, ArenaLocation);
+
+        FActorSpawnParameters ArenaParams;
+        ArenaParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+        ArenaParams.ObjectFlags |= RF_Transient;
+
+        Arena = World->SpawnActorDeferred<ADiceRollArena>(Config->ArenaClass, ArenaTransform);
+        if (!Arena)
+        {
+            UE_LOG(LogSkaldDice, Warning, TEXT("SpawnPhysicalRoll aborted: failed to spawn arena of class %s."), *GetNameSafe(*Config->ArenaClass));
+            return false;
+        }
+
+        Arena->ConfigureArena(Config);
+        Arena->FinishSpawning(ArenaTransform);
+        Arena->SetActorLocationAndRotation(ArenaLocation, ArenaRotation);
+        Roll.Arena = Arena;
+
+        if (Roll.bIsInitiative && bHoldInitiativeDiceUntilRelease)
+        {
+            SharedInitiativeArena = Arena;
+        }
+    }
+    else if (Config->bAnchorArenaToCamera)
     {
         if (APlayerController* PlayerController = World->GetFirstPlayerController())
         {
@@ -308,26 +390,10 @@ bool USkaldDiceManager::SpawnPhysicalRoll(FActiveRoll& Roll, const TArray<int32>
             {
                 ArenaRotation = FRotator(0.f, ViewRotation.Yaw, 0.f);
             }
+
+            Arena->SetActorLocationAndRotation(ArenaLocation, ArenaRotation);
         }
     }
-
-    const FTransform ArenaTransform(ArenaRotation, ArenaLocation);
-
-    FActorSpawnParameters ArenaParams;
-    ArenaParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-    ArenaParams.ObjectFlags |= RF_Transient;
-
-    ADiceRollArena* Arena = World->SpawnActorDeferred<ADiceRollArena>(Config->ArenaClass, ArenaTransform);
-    if (!Arena)
-    {
-        UE_LOG(LogSkaldDice, Warning, TEXT("SpawnPhysicalRoll aborted: failed to spawn arena of class %s."), *GetNameSafe(*Config->ArenaClass));
-        return false;
-    }
-
-    Arena->ConfigureArena(Config);
-    Arena->FinishSpawning(ArenaTransform);
-    Arena->SetActorLocationAndRotation(ArenaLocation, ArenaRotation);
-    Roll.Arena = Arena;
 
     const FVector ArenaCenter = Arena->GetActorLocation();
     const FVector Extent = Config->ArenaBounds.GetExtent();
@@ -470,6 +536,79 @@ void USkaldDiceManager::CleanupRollActors(FActiveRoll& Roll)
 
     Roll.Dice.Reset();
     Roll.Arena.Reset();
+}
+
+void USkaldDiceManager::QueueDeferredInitiativeCleanup(FActiveRoll& Roll)
+{
+    FDeferredInitiativeCleanup& Cleanup = DeferredInitiativeCleanups.FindOrAdd(Roll.RollId);
+    Cleanup.Dice.Reset();
+    Cleanup.Arena.Reset();
+    Cleanup.DiceLifeSpan = Config ? FMath::Max(Config->DiceCleanupDelay, 0.f) : 0.5f;
+    Cleanup.ArenaLifeSpan = Config ? FMath::Max(Config->ArenaCleanupDelay, Cleanup.DiceLifeSpan) : Cleanup.DiceLifeSpan;
+
+    for (FActiveRoll::FDieState& DieState : Roll.Dice)
+    {
+        if (ASkaldDiceD6* Dice = DieState.Actor.Get())
+        {
+            Dice->OnDiceSettled.RemoveDynamic(this, &USkaldDiceManager::HandleDieSettled);
+            Cleanup.Dice.Add(Dice);
+        }
+    }
+
+    if (ADiceRollArena* Arena = Roll.Arena.Get())
+    {
+        Cleanup.Arena = Arena;
+    }
+
+    Roll.Dice.Reset();
+    Roll.Arena.Reset();
+}
+
+void USkaldDiceManager::FinalizeDeferredInitiativeCleanup()
+{
+    for (TPair<FGuid, FDeferredInitiativeCleanup>& Entry : DeferredInitiativeCleanups)
+    {
+        FDeferredInitiativeCleanup& Cleanup = Entry.Value;
+
+        for (TWeakObjectPtr<ASkaldDiceD6>& DiePtr : Cleanup.Dice)
+        {
+            if (ASkaldDiceD6* Dice = DiePtr.Get())
+            {
+                Dice->SetLifeSpan(Cleanup.DiceLifeSpan);
+            }
+        }
+
+        if (ADiceRollArena* Arena = Cleanup.Arena.Get())
+        {
+            Arena->SetLifeSpan(Cleanup.ArenaLifeSpan);
+        }
+    }
+}
+
+bool USkaldDiceManager::ShouldReuseInitiativeArena() const
+{
+    return bHoldInitiativeDiceUntilRelease && SharedInitiativeArena.IsValid();
+}
+
+ADiceRollArena* USkaldDiceManager::ResolveInitiativeArenaForRoll(FActiveRoll& Roll)
+{
+    if (!Roll.bIsInitiative || !bHoldInitiativeDiceUntilRelease)
+    {
+        return nullptr;
+    }
+
+    if (SharedInitiativeArena.IsValid())
+    {
+        if (ADiceRollArena* Arena = SharedInitiativeArena.Get())
+        {
+            Roll.Arena = Arena;
+            return Arena;
+        }
+
+        SharedInitiativeArena.Reset();
+    }
+
+    return nullptr;
 }
 
 void USkaldDiceManager::HandleDieSettled(ASkaldDiceD6* Dice, int32 FaceValue)

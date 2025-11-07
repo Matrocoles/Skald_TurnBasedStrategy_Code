@@ -41,6 +41,16 @@ public:
     TArray<int32> RollDiceBlocking_D6(int32 NumDice);
 
     /**
+     * Hold initiative dice on screen until an explicit release call arrives.
+     * While active, subsequent initiative rolls reuse the same arena so the
+     * presentation stays continuous across multiple participants.
+     */
+    void SetHoldInitiativeDice(bool bHold);
+
+    /** Release any initiative dice that are currently being held. */
+    void ReleaseHeldInitiativeDice();
+
+    /**
      * Schedule a dice roll presentation using precomputed results.
      *
      * @param PlayerResults Results that should be tinted for the local player.
@@ -93,11 +103,27 @@ private:
     void BroadcastInterim(FGuid RollId);
     bool SpawnPhysicalRoll(FActiveRoll& Roll, const TArray<int32>* PlayerResults = nullptr, const TArray<int32>* EnemyResults = nullptr);
     void CleanupRollActors(FActiveRoll& Roll);
+    void QueueDeferredInitiativeCleanup(FActiveRoll& Roll);
+    void FinalizeDeferredInitiativeCleanup();
+    bool ShouldReuseInitiativeArena() const;
+    ADiceRollArena* ResolveInitiativeArenaForRoll(FActiveRoll& Roll);
 
     UFUNCTION()
     void HandleDieSettled(ASkaldDiceD6* Dice, int32 FaceValue);
 
     TMap<FGuid, FActiveRoll> ActiveRolls;
+
+    struct FDeferredInitiativeCleanup
+    {
+        TArray<TWeakObjectPtr<ASkaldDiceD6>> Dice;
+        TWeakObjectPtr<ADiceRollArena> Arena;
+        float DiceLifeSpan = 0.f;
+        float ArenaLifeSpan = 0.f;
+    };
+
+    bool bHoldInitiativeDiceUntilRelease = false;
+    TWeakObjectPtr<ADiceRollArena> SharedInitiativeArena;
+    TMap<FGuid, FDeferredInitiativeCleanup> DeferredInitiativeCleanups;
 
     TArray<int32> GenerateResults(int32 TotalDice);
 };

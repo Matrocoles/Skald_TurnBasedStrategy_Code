@@ -260,6 +260,12 @@ private:
   /** Strip invalid weak pointers left behind after controller teardown. */
   void PrunePendingStrategicInitiativePlayers();
 
+  /** Remove players from the resolution tracking set once their roll finishes. */
+  void RemovePendingStrategicInitiativeResolutionPlayer(ASkaldPlayerState *PlayerState);
+
+  /** Strip invalid resolution pointers before evaluating completion. */
+  void PrunePendingStrategicInitiativeResolutionPlayers();
+
   /** Re-evaluate the initiative phase after the pending set mutates. */
   void HandlePendingStrategicInitiativeUpdate();
 
@@ -270,6 +276,21 @@ private:
   void NotifyStrategicInitiativeRoll(ASkaldPlayerController *Controller,
                                      int32 RoundNumber, int32 RollValue,
                                      bool bWonInitiative);
+
+  /** Begin a dice roll for the supplied player if possible. */
+  bool StartStrategicInitiativeRoll(ASkaldPlayerState *PlayerState,
+                                    bool bUsePlayerTint);
+
+  /** True when the provided player already has a roll awaiting completion. */
+  bool IsStrategicInitiativeRollPending(
+      const ASkaldPlayerState *PlayerState) const;
+
+  /** Queue the AI to roll initiative after a short delay. */
+  void ScheduleNextStrategicInitiativeAIRoll();
+
+  /** Perform the next queued AI initiative roll. */
+  void PerformStrategicInitiativeAIRoll(
+      TWeakObjectPtr<ASkaldPlayerState> PlayerState);
 
   void EnsureStrategicInitiativeDiceBinding();
   USkaldDiceManager *ResolveDiceManager();
@@ -286,11 +307,24 @@ private:
   /** Track players still needing to confirm the initiative roll. */
   TSet<TWeakObjectPtr<ASkaldPlayerState>> PendingStrategicInitiativePlayers;
 
+  /** Track all players whose initiative results have not been resolved. */
+  TSet<TWeakObjectPtr<ASkaldPlayerState>>
+      PendingStrategicInitiativeResolutionPlayers;
+
+  /** AI players that still need to roll initiative this phase. */
+  TArray<TWeakObjectPtr<ASkaldPlayerState>> PendingStrategicInitiativeAIPlayers;
+
   /** Whether the game is waiting for players to trigger the initiative roll. */
   bool bAwaitingStrategicInitiativeInput = false;
 
   /** Whether the strategic initiative prompt has been shown this cycle. */
   bool bStrategicInitiativePromptIssued = false;
+
+  /** Delay before the AI rolls its strategic initiative die. */
+  float StrategicInitiativeAIRollDelay = 1.f;
+
+  /** Timer used to stagger AI initiative rolls after the player. */
+  FTimerHandle StrategicInitiativeAIRollHandle;
 
   /** Cached dice subsystem used for strategic initiative rolls. */
   TWeakObjectPtr<USkaldDiceManager> CachedDiceManager;

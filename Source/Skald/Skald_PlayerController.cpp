@@ -4695,7 +4695,10 @@ void ASkaldPlayerController::ShowPendingStrategicInitiativeResult() {
   MainHUD->ShowStrategicInitiativeRoll(PendingStrategicInitiativeRoll, 2.f);
   MainHUD->SetAwaitingStrategicInitiative(false);
 
-  TriggerInitiativeDicePresentation(PendingStrategicInitiativeRoll, INDEX_NONE);
+  const int32 EnemyResult =
+      PendingStrategicInitiativeEnemyRoll > 0 ? PendingStrategicInitiativeEnemyRoll
+                                              : INDEX_NONE;
+  TriggerInitiativeDicePresentation(PendingStrategicInitiativeRoll, EnemyResult);
 
   if (bPendingStrategicInitiativeWin && InitiativeWinSound && IsLocalController()) {
     UGameplayStatics::PlaySound2D(this, InitiativeWinSound);
@@ -4710,20 +4713,21 @@ void ASkaldPlayerController::ShowPendingStrategicInitiativeResult() {
   MainHUD->UpdateInitiativeText(RoundMessage.ToString());
 
   PendingStrategicInitiativeRoll = 0;
+  PendingStrategicInitiativeEnemyRoll = 0;
   PendingStrategicInitiativeRound = 0;
   bPendingStrategicInitiativeWin = false;
 }
 
 void ASkaldPlayerController::ClientPromptStrategicInitiative_Implementation(
     int32 RoundNumber, int32 RollValue, bool bWonInitiative) {
-        {
-            // Reset at the start of every new strategic initiative round
-            bInitiativeRollPresentationShown = false;
+  // Reset at the start of every new strategic initiative round
+  bInitiativeRollPresentationShown = false;
+
   PendingStrategicInitiativeRound = RoundNumber;
   PendingStrategicInitiativeRoll = RollValue;
+  PendingStrategicInitiativeEnemyRoll = 0;
   bPendingStrategicInitiativeWin = bWonInitiative;
   bAwaitingStrategicInitiativeRoll = true;
-        }
 
   ShowMainHUD();
 
@@ -4751,9 +4755,11 @@ void ASkaldPlayerController::ServerConfirmStrategicInitiativeRollReady_Implement
 }
 
 void ASkaldPlayerController::ClientDisplayStrategicInitiativeResult_Implementation(
-    int32 RoundNumber, int32 RollValue, bool bWonInitiative) {
+    int32 RoundNumber, int32 RollValue, int32 EnemyRoll,
+    bool bWonInitiative) {
   PendingStrategicInitiativeRound = RoundNumber;
   PendingStrategicInitiativeRoll = RollValue;
+  PendingStrategicInitiativeEnemyRoll = EnemyRoll;
   bPendingStrategicInitiativeWin = bWonInitiative;
   bAwaitingStrategicInitiativeRoll = false;
 
