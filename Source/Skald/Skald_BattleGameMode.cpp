@@ -946,6 +946,32 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
       GS, World, Battle.DefenderPlayerID, Battle.DefenderDisplayName,
       Battle.DefenderFaction, Battle.bDefenderIsAI);
 
+  const auto ResolveParticipantAIFlag =
+      [this](ASkaldPlayerState *PlayerState, AController *Controller,
+             bool &bInOutPayloadFlag) {
+        if (!PlayerState && !Controller) {
+          return;
+        }
+
+        bool bResolvedIsAI = bInOutPayloadFlag;
+        if (Controller) {
+          const bool bControllerIsAI =
+              AIControllerClass && Controller->IsA(AIControllerClass);
+          bResolvedIsAI = bControllerIsAI;
+        } else if (PlayerState) {
+          bResolvedIsAI = PlayerState->bIsAI;
+        }
+
+        if (PlayerState) {
+          PlayerState->bIsAI = bResolvedIsAI;
+        }
+
+        bInOutPayloadFlag = bResolvedIsAI;
+      };
+
+  ResolveParticipantAIFlag(AttackerPS, AttackerC, Battle.bAttackerIsAI);
+  ResolveParticipantAIFlag(DefenderPS, DefenderC, Battle.bDefenderIsAI);
+
   if (!AttackerPS || !DefenderPS) {
     UE_LOG(LogSkaldBattle, Error,
            TEXT("BattleGM SetupPendingBattle: Failed to ensure participants (AttackerValid=%s DefenderValid=%s)"),
