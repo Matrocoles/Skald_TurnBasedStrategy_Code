@@ -64,6 +64,7 @@ void ASkaldDiceD6::InitialiseFromConfig(const UDiceRollConfig* InConfig)
     bSettled = false;
     bBroadcastSettlement = false;
     ResolvedValue = 1;
+    bSnapToDesiredValue = true;
 
     ValidateFaceMappings();
 }
@@ -71,6 +72,11 @@ void ASkaldDiceD6::InitialiseFromConfig(const UDiceRollConfig* InConfig)
 void ASkaldDiceD6::SetDesiredFaceValue(int32 InDesiredValue)
 {
     DesiredValue = InDesiredValue;
+}
+
+void ASkaldDiceD6::SetShouldSnapToDesired(bool bEnable)
+{
+    bSnapToDesiredValue = bEnable;
 }
 
 void ASkaldDiceD6::ApplyTint(const FLinearColor& Tint, FName TintParameterName)
@@ -251,8 +257,13 @@ void ASkaldDiceD6::UpdateSettleState(float DeltaSeconds)
         ResolvedValue = ResolveFaceValue();
         if (DesiredValue > 0 && ResolvedValue != DesiredValue)
         {
-            ForceFaceValue(DesiredValue, true);
-            return;
+            if (bSnapToDesiredValue)
+            {
+                ForceFaceValue(DesiredValue, true);
+                return;
+            }
+
+            ResolvedValue = FMath::Clamp(DesiredValue, 1, 6);
         }
 
         StabiliseAfterSettlement();

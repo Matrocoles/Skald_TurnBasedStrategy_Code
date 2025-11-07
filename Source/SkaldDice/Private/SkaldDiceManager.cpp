@@ -231,15 +231,21 @@ void USkaldDiceManager::CompleteRoll(FGuid RollId)
 
             if (DiceActor)
             {
-                if (DieState.DesiredValue != INDEX_NONE)
+                const bool bShouldSnap = DieState.bSnapToDesiredValue && DieState.DesiredValue != INDEX_NONE;
+                if (bShouldSnap && DieState.DesiredValue != Value)
                 {
                     DiceActor->ForceFaceValue(DieState.DesiredValue, false);
                     Value = DieState.DesiredValue;
                 }
-                else if (Value == INDEX_NONE)
+
+                if (Value == INDEX_NONE)
                 {
                     Value = DiceActor->SampleFaceValue();
                 }
+            }
+            else if (Value == INDEX_NONE && DieState.DesiredValue != INDEX_NONE)
+            {
+                Value = DieState.DesiredValue;
             }
 
             if (Value == INDEX_NONE)
@@ -460,6 +466,8 @@ bool USkaldDiceManager::SpawnPhysicalRoll(FActiveRoll& Roll, const TArray<int32>
             const bool bAllowDesiredValue = !Roll.bIsInitiative || Roll.bUseScriptedResults;
             const int32 DesiredValue = bAllowDesiredValue ? RequestedValue : INDEX_NONE;
             Dice->SetDesiredFaceValue(DesiredValue);
+            const bool bSnapToDesired = Roll.bIsInitiative;
+            Dice->SetShouldSnapToDesired(bSnapToDesired);
             Dice->ApplyTint(bPlayerSide ? Config->PlayerTint : Config->EnemyTint, Config->DiceTintParameter);
             Dice->OnDiceSettled.AddDynamic(this, &USkaldDiceManager::HandleDieSettled);
             Dice->FinishSpawning(FTransform(SpawnRotation, SpawnPosition));
@@ -484,6 +492,7 @@ bool USkaldDiceManager::SpawnPhysicalRoll(FActiveRoll& Roll, const TArray<int32>
             DieState.DesiredValue = (DesiredValue != INDEX_NONE) ? FMath::Clamp(DesiredValue, 1, 6) : INDEX_NONE;
             DieState.ResolvedValue = INDEX_NONE;
             DieState.bIsPlayerDie = bPlayerSide;
+            DieState.bSnapToDesiredValue = bSnapToDesired;
         }
     };
 
@@ -635,15 +644,13 @@ void USkaldDiceManager::HandleDieSettled(ASkaldDiceD6* Dice, int32 FaceValue)
         if (DieState.Actor.Get() == Dice)
         {
             int32 FinalValue = FaceValue;
-            const bool bShouldForceDesired = DieState.DesiredValue != INDEX_NONE
-                && DieState.DesiredValue != FaceValue
-                && (!Roll->bIsInitiative || Roll->bUseScriptedResults);
-
-            if (bShouldForceDesired)
+            const bool bShouldSnap = DieState.bSnapToDesiredValue && DieState.DesiredValue != INDEX_NONE;
+            if (bShouldSnap && DieState.DesiredValue != FaceValue)
             {
                 Dice->ForceFaceValue(DieState.DesiredValue, false);
                 FinalValue = DieState.DesiredValue;
             }
+
             DieState.ResolvedValue = FMath::Clamp(FinalValue, 1, 6);
             break;
         }
