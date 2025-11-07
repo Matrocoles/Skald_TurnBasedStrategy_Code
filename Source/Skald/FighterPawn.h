@@ -35,6 +35,8 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHealthChanged, int32, NewHealth);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnActionsChanged, int32,
                                             NewActionsRemaining);
 DECLARE_MULTICAST_DELEGATE(FOnQueuedAttackFinalized);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnEngagementChanged, bool,
+                                            bIsEngaged);
 
 /** Pawn representing a fighter in grid battles. */
 UCLASS()
@@ -85,9 +87,17 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Fighter")
   void MoveToCell(FIntPoint TargetCell);
 
+  /** Attempt to disengage from nearby enemies before moving. */
+  UFUNCTION(BlueprintCallable, Category = "Fighter")
+  bool TryDisengageToCell(FIntPoint TargetCell);
+
   /** Teleport to a target grid cell without consuming additional actions. */
   bool TryTeleportToCell(FIntPoint TargetCell, int32 MaxDistance,
                          bool bRequireLineOfSight);
+
+  /** Maximum Chebyshev distance allowed when disengaging. */
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Fighter|Movement")
+  int32 GetDisengageRange() const;
 
   /** Units per second used when travelling between grid cells. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Movement",
@@ -268,6 +278,10 @@ public:
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Fighter")
   bool IsCurrentlyActive() const { return bIsCurrentlyActive; }
 
+  /** Return true if this fighter is currently engaged with an enemy. */
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Fighter|Combat")
+  bool IsEngaged() const { return bIsEngaged; }
+
   /** Notify the fighter that a passive buff became active. */
   void NotifyPassiveBuffApplied(const FSkaldAbilityDefinition &Definition);
 
@@ -295,6 +309,11 @@ public:
       orientation when overriding incoming rotations. */
   UPROPERTY(Replicated)
   float SpawnFacingYawDelta = 0.f;
+
+  /** Whether this fighter is currently restricted by enemy engagement. */
+  UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_IsEngaged,
+            Category = "Fighter|Combat")
+  bool bIsEngaged = false;
 
   /** Mesh used to display the fighter. */
   UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
@@ -423,6 +442,10 @@ public:
   UPROPERTY(BlueprintAssignable, Category = "Fighter|Events")
   FOnActionsChanged OnActionsChanged;
 
+  /** Event broadcast when the fighter enters or leaves engagement. */
+  UPROPERTY(BlueprintAssignable, Category = "Fighter|Events")
+  FOnEngagementChanged OnEngagementChanged;
+
   /** Retrieve the identifier associated with this fighter. */
   FName GetFighterId() const { return FighterId; }
 
@@ -452,12 +475,48 @@ public:
 
   UFUNCTION(Server, Reliable)
   void ServerShowAttackRollButtonForPlayer();
- 
+
   void ShowAttackRollButtonForPlayer();
 
 protected:
   /** Clear grid occupancy when the fighter is destroyed. */
   virtual void Destroyed() override;
+
+  /** Re-evaluate engagement relationships across all fighters. */
+  void RecalculateBattleEngagement() const;
+
+  /** Refresh this fighter's engagement flag using a cached fighter snapshot. */
+  void RefreshEngagementStatusFromSnapshot(
+      const TArray<AFighterPawn *> &Fighters);
+
+  /** Determine whether occupying the supplied anchor would touch an enemy. */
+  bool HasAdjacentEnemyAtAnchor(
+      const FIntPoint &Anchor,
+      const TArray<AFighterPawn *> &FighterSnapshot) const;
+
+  /** Determine whether occupying the supplied anchor would touch an enemy. */
+  bool HasAdjacentEnemyAtAnchor(const FIntPoint &Anchor) const;
+
+  /** Validate that a movement destination can be reached within a range. */
+  bool ValidateMovementDestination(
+      const FIntPoint &TargetCell, int32 MaxDistance,
+      TArray<FIntPoint> &OutPreviousCells, TArray<FIntPoint> &OutTargetCells,
+      UGridOverlayComponent *&OutGrid) const;
+
+  /** Finalize movement updates and optionally consume an action. */
+  bool CommitMovementToCell(const FIntPoint &PreviousCell,
+                            const FIntPoint &TargetCell,
+                            UGridOverlayComponent *Grid,
+                            const TArray<FIntPoint> &PreviousCells,
+                            const TArray<FIntPoint> &TargetCells,
+                            int32 Distance, bool bSpendAction);
+
+  /** Apply a new engagement flag and notify listeners. */
+  void SetEngaged(bool bNewEngaged);
+
+  /** Replication notification when the engagement flag changes. */
+  UFUNCTION()
+  void OnRep_IsEngaged();
 
 private:
   /** Whether the health display should remain fixed during presentation. */

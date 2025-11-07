@@ -50,6 +50,7 @@ constexpr float QueuedAttackFirstRollDelaySeconds = 0.48f;
 // mirror the UI reveal spacing.
 constexpr float QueuedAttackAdditionalRollDelaySeconds = 0.4f;
 constexpr float VisualAvoidanceFloorNormalThreshold = 0.65f;
+constexpr int32 DisengageMaxDistance = 3;
 }
 
 AFighterPawn::AFighterPawn() : MaxHealth(0) {
@@ -216,6 +217,7 @@ void AFighterPawn::GetLifetimeReplicatedProps(
   DOREPLIFETIME(AFighterPawn, bHasActivatedThisRound);
   DOREPLIFETIME(AFighterPawn, bIsCurrentlyActive);
   DOREPLIFETIME(AFighterPawn, bIsMoving);
+  DOREPLIFETIME(AFighterPawn, bIsEngaged);
   DOREPLIFETIME(AFighterPawn, GridFootprint);
   DOREPLIFETIME(AFighterPawn, CurrentCell);
   DOREPLIFETIME(AFighterPawn, MovementSourceCell);
@@ -359,6 +361,8 @@ void AFighterPawn::BeginPlay() {
       }
     }
   }
+
+  RecalculateBattleEngagement();
 
   EnsureDiceManagerBinding();
 }
@@ -1585,148 +1589,173 @@ void AFighterPawn::AlignToCurrentCell() {
   }
 }
 
-void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
-  if (!bIsCurrentlyActive || ActionsRemaining <= 0) {
-    return;
+int32 AFighterPawn::GetDisengageRange() const {
+  return FMath::Max(0, FMath::Min(Stats.Movement, DisengageMaxDistance));
+}
+
+bool AFighterPawn::ValidateMovementDestination(
+    const FIntPoint &TargetCell, int32 MaxDistance,
+    TArray<FIntPoint> &OutPreviousCells, TArray<FIntPoint> &OutTargetCells,
+    UGridOverlayComponent *&OutGrid) const {
+  if (MaxDistance <= 0) {
+    return false;
   }
+
+  OutGrid = GetGrid();
+  if (!OutGrid) {
+    return false;
+  }
+
+  const FIntPoint StartCell = CurrentCell;
   const int32 Distance = FMath::Max(
-      FMath::Abs(TargetCell.X - CurrentCell.X),
-      FMath::Abs(TargetCell.Y - CurrentCell.Y));
-  if (Distance > Stats.Movement) {
-    return;
+      FMath::Abs(TargetCell.X - StartCell.X),
+      FMath::Abs(TargetCell.Y - StartCell.Y));
+  if (Distance > MaxDistance) {
+    return false;
   }
-  UGridOverlayComponent *Grid = GetGrid();
-  const FIntPoint PreviousCell = CurrentCell;
 
-  TArray<FIntPoint> PreviousCells;
-  TArray<FIntPoint> TargetCells;
+  OutPreviousCells = GetOccupiedCells();
+  OutTargetCells = GetOccupiedCells(TargetCell);
+  if (OutTargetCells.Num() == 0) {
+    return false;
+  }
 
-  if (Grid) {
-    PreviousCells = GetOccupiedCells();
-    TargetCells = GetOccupiedCells(TargetCell);
+  bool bCanOccupyTarget = true;
+  for (const FIntPoint &Cell : OutTargetCells) {
+    if (!OutGrid->IsCellInBounds(Cell) || OutGrid->IsObscured(Cell)) {
+      bCanOccupyTarget = false;
+      break;
+    }
+    const bool bCellPreviouslyOccupied = OutPreviousCells.Contains(Cell);
+    if (!bCellPreviouslyOccupied && OutGrid->IsOccupied(Cell)) {
+      bCanOccupyTarget = false;
+      break;
+    }
+  }
 
-    bool bCanOccupyTarget = true;
-    for (const FIntPoint &Cell : TargetCells) {
-      if (!Grid->IsCellInBounds(Cell) || Grid->IsObscured(Cell)) {
-        bCanOccupyTarget = false;
-        break;
+  if (!bCanOccupyTarget) {
+    return false;
+  }
+
+  bool bTargetReachable = (StartCell == TargetCell);
+  if (bTargetReachable) {
+    return true;
+  }
+
+  TSet<FIntPoint> IgnoredCells;
+  for (const FIntPoint &Cell : OutPreviousCells) {
+    IgnoredCells.Add(Cell);
+  }
+
+  auto CanOccupyAnchor = [&](const FIntPoint &Anchor) {
+    const TArray<FIntPoint> CandidateCells = GetOccupiedCells(Anchor);
+    for (const FIntPoint &Cell : CandidateCells) {
+      if (!OutGrid->IsCellInBounds(Cell) || OutGrid->IsObscured(Cell)) {
+        return false;
       }
-      const bool bCellPreviouslyOccupied = PreviousCells.Contains(Cell);
-      if (!bCellPreviouslyOccupied && Grid->IsOccupied(Cell)) {
-        bCanOccupyTarget = false;
-        break;
+      if (OutGrid->IsOccupied(Cell) && !IgnoredCells.Contains(Cell)) {
+        return false;
       }
     }
+    return true;
+  };
 
-    if (!bCanOccupyTarget) {
-      return;
+  static const FIntPoint Directions[8] = {
+      FIntPoint(1, 0),  FIntPoint(-1, 0), FIntPoint(0, 1),  FIntPoint(0, -1),
+      FIntPoint(1, 1),  FIntPoint(1, -1), FIntPoint(-1, 1), FIntPoint(-1, -1)};
+
+  TMap<FIntPoint, int32> BestCost;
+  TQueue<TPair<FIntPoint, int32>> Frontier;
+  BestCost.Add(StartCell, 0);
+  Frontier.Enqueue(TPair<FIntPoint, int32>(StartCell, 0));
+
+  while (!Frontier.IsEmpty()) {
+    TPair<FIntPoint, int32> Node;
+    Frontier.Dequeue(Node);
+
+    const FIntPoint Cell = Node.Key;
+    const int32 DistanceFromStart = Node.Value;
+
+    if (DistanceFromStart > MaxDistance) {
+      continue;
     }
 
-    bool bTargetReachable = CurrentCell == TargetCell;
+    if (Cell == TargetCell) {
+      bTargetReachable = true;
+      break;
+    }
 
-    if (!bTargetReachable) {
-      TSet<FIntPoint> IgnoredCells;
-      for (const FIntPoint &Cell : PreviousCells) {
-        IgnoredCells.Add(Cell);
+    for (const FIntPoint &Dir : Directions) {
+      const FIntPoint Next = Cell + Dir;
+      if (!OutGrid->CanTraverseVertical(Cell, Next)) {
+        continue;
       }
 
-      auto CanOccupyAnchor = [&](const FIntPoint &Anchor) {
-        const TArray<FIntPoint> CandidateCells = GetOccupiedCells(Anchor);
-        for (const FIntPoint &Cell : CandidateCells) {
-          if (!Grid->IsCellInBounds(Cell) || Grid->IsObscured(Cell)) {
-            return false;
+      if (!CanOccupyAnchor(Next)) {
+        continue;
+      }
+
+      if (Dir.X != 0 && Dir.Y != 0) {
+        const FIntPoint StepX(Dir.X, 0);
+        const FIntPoint StepY(0, Dir.Y);
+        const TArray<FIntPoint> FromCells = GetOccupiedCells(Cell);
+        const TArray<FIntPoint> NextCells = GetOccupiedCells(Next);
+        TSet<FIntPoint> NextCellSet;
+        NextCellSet.Reserve(NextCells.Num());
+        for (const FIntPoint &NextCell : NextCells) {
+          NextCellSet.Add(NextCell);
+        }
+
+        auto IsBlocked = [&](const FIntPoint &CheckCell) {
+          if (!OutGrid->IsCellInBounds(CheckCell) ||
+              OutGrid->IsObscured(CheckCell)) {
+            return true;
           }
-          if (Grid->IsOccupied(Cell) && !IgnoredCells.Contains(Cell)) {
-            return false;
+          if (OutGrid->IsOccupied(CheckCell) && !IgnoredCells.Contains(CheckCell) &&
+              !NextCellSet.Contains(CheckCell)) {
+            return true;
+          }
+          return false;
+        };
+
+        bool bDiagonalClear = true;
+        for (const FIntPoint &FromCell : FromCells) {
+          if (IsBlocked(FromCell + StepX) || IsBlocked(FromCell + StepY)) {
+            bDiagonalClear = false;
+            break;
           }
         }
-        return true;
-      };
 
-      static const FIntPoint Directions[8] = {
-          FIntPoint(1, 0),  FIntPoint(-1, 0), FIntPoint(0, 1),  FIntPoint(0, -1),
-          FIntPoint(1, 1),  FIntPoint(1, -1), FIntPoint(-1, 1), FIntPoint(-1, -1)};
-
-      TMap<FIntPoint, int32> BestCost;
-      TQueue<TPair<FIntPoint, int32>> Frontier;
-      BestCost.Add(CurrentCell, 0);
-      Frontier.Enqueue(TPair<FIntPoint, int32>(CurrentCell, 0));
-
-      while (!Frontier.IsEmpty()) {
-        TPair<FIntPoint, int32> Node;
-        Frontier.Dequeue(Node);
-
-        const FIntPoint Cell = Node.Key;
-        const int32 DistanceFromStart = Node.Value;
-
-        if (DistanceFromStart > Stats.Movement) {
+        if (!bDiagonalClear) {
           continue;
         }
-
-        if (Cell == TargetCell) {
-          bTargetReachable = true;
-          break;
-        }
-
-        for (const FIntPoint &Dir : Directions) {
-          const FIntPoint Next = Cell + Dir;
-          if (!CanOccupyAnchor(Next)) {
-            continue;
-          }
-          if (Dir.X != 0 && Dir.Y != 0) {
-            const TArray<FIntPoint> FromCells = GetOccupiedCells(Cell);
-            const TArray<FIntPoint> NextCells = GetOccupiedCells(Next);
-            TSet<FIntPoint> NextCellSet;
-            NextCellSet.Reserve(NextCells.Num());
-            for (const FIntPoint &NextCell : NextCells) {
-              NextCellSet.Add(NextCell);
-            }
-
-            auto IsBlocked = [&](const FIntPoint &CheckCell) {
-              if (!Grid->IsCellInBounds(CheckCell) || Grid->IsObscured(CheckCell)) {
-                return true;
-              }
-              if (Grid->IsOccupied(CheckCell) && !IgnoredCells.Contains(CheckCell) &&
-                  !NextCellSet.Contains(CheckCell)) {
-                return true;
-              }
-              return false;
-            };
-
-            bool bDiagonalClear = true;
-            for (const FIntPoint &FromCell : FromCells) {
-              if (IsBlocked(FromCell + FIntPoint(Dir.X, 0)) ||
-                  IsBlocked(FromCell + FIntPoint(0, Dir.Y))) {
-                bDiagonalClear = false;
-                break;
-              }
-            }
-
-            if (!bDiagonalClear) {
-              continue;
-            }
-          }
-          const int32 StepCost = FMath::Max(1, GetMovementStepCost(Cell, Next, Grid));
-          const int32 NewCost = DistanceFromStart + StepCost;
-          if (NewCost > Stats.Movement) {
-            continue;
-          }
-
-          const int32 *ExistingCost = BestCost.Find(Next);
-          if (ExistingCost && *ExistingCost <= NewCost) {
-            continue;
-          }
-
-          BestCost.Add(Next, NewCost);
-          Frontier.Enqueue(TPair<FIntPoint, int32>(Next, NewCost));
-        }
       }
-    }
 
-    if (!bTargetReachable) {
-      return;
-    }
+      const int32 StepCost =
+          FMath::Max(1, GetMovementStepCost(Cell, Next, OutGrid));
+      const int32 NewCost = DistanceFromStart + StepCost;
+      if (NewCost > MaxDistance) {
+        continue;
+      }
 
+      const int32 *ExistingCost = BestCost.Find(Next);
+      if (ExistingCost && *ExistingCost <= NewCost) {
+        continue;
+      }
+
+      BestCost.Add(Next, NewCost);
+      Frontier.Enqueue(TPair<FIntPoint, int32>(Next, NewCost));
+    }
+  }
+
+  return bTargetReachable;
+}
+
+bool AFighterPawn::CommitMovementToCell(
+    const FIntPoint &PreviousCell, const FIntPoint &TargetCell,
+    UGridOverlayComponent *Grid, const TArray<FIntPoint> &PreviousCells,
+    const TArray<FIntPoint> &TargetCells, int32 Distance, bool bSpendAction) {
+  if (Grid) {
     for (const FIntPoint &Cell : PreviousCells) {
       Grid->SetOccupied(Cell, false);
     }
@@ -1734,8 +1763,9 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
 
   MovementSourceCell = PreviousCell;
   CurrentCell = TargetCell;
-  FVector NewLocation = Grid ? GetAlignedWorldLocation(TargetCell)
-                             : GetActorLocation();
+
+  const FVector NewLocation =
+      Grid ? GetAlignedWorldLocation(TargetCell) : GetActorLocation();
   MovementTargetLocation = NewLocation;
   RefreshDisplayMeshYawOffset();
   FaceTowardsCells(PreviousCell, TargetCell);
@@ -1748,7 +1778,7 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
       Grid->ClearHighlights();
     }
     SetIsMoving(false);
-    return;
+    return false;
   }
 
   const float EffectiveTolerance =
@@ -1764,7 +1794,9 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
     SetIsMoving(true);
   }
 
-  ConsumeAction();
+  if (bSpendAction) {
+    ConsumeAction();
+  }
 
   if (AbilityComponent) {
     AbilityComponent->NotifyOwnerMoved(Distance);
@@ -1776,6 +1808,136 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
     }
     Grid->ClearHighlights();
   }
+
+  return true;
+}
+
+bool AFighterPawn::HasAdjacentEnemyAtAnchor(
+    const FIntPoint &Anchor,
+    const TArray<AFighterPawn *> &FighterSnapshot) const {
+  if (!IsAlive()) {
+    return false;
+  }
+
+  const TArray<FIntPoint> CandidateCells = GetOccupiedCells(Anchor);
+  if (CandidateCells.Num() == 0) {
+    return false;
+  }
+
+  for (AFighterPawn *Fighter : FighterSnapshot) {
+    if (!Fighter || Fighter == this) {
+      continue;
+    }
+    if (!Fighter->IsAlive() || Fighter->Faction == Faction ||
+        Fighter->IsActorBeingDestroyed()) {
+      continue;
+    }
+
+    const TArray<FIntPoint> OtherCells = Fighter->GetOccupiedCells();
+    for (const FIntPoint &SelfCell : CandidateCells) {
+      for (const FIntPoint &OtherCell : OtherCells) {
+        const int32 Distance = FMath::Max(
+            FMath::Abs(SelfCell.X - OtherCell.X),
+            FMath::Abs(SelfCell.Y - OtherCell.Y));
+        if (Distance <= 1) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+bool AFighterPawn::HasAdjacentEnemyAtAnchor(const FIntPoint &Anchor) const {
+  if (const USkaldGameInstance *GI =
+          Cast<USkaldGameInstance>(GetGameInstance())) {
+    if (UGridBattleManager *BattleManager = GI->GridBattleManager) {
+      const TArray<AFighterPawn *> Fighters =
+          BattleManager->GetInitiativeOrderSnapshot();
+      return HasAdjacentEnemyAtAnchor(Anchor, Fighters);
+    }
+  }
+  return false;
+}
+
+void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
+  if (!bIsCurrentlyActive || ActionsRemaining <= 0) {
+    return;
+  }
+  if (bIsEngaged) {
+    return;
+  }
+
+  const int32 MaxDistance = Stats.Movement;
+  if (MaxDistance <= 0) {
+    return;
+  }
+
+  UGridOverlayComponent *Grid = nullptr;
+  TArray<FIntPoint> PreviousCells;
+  TArray<FIntPoint> TargetCells;
+  if (!ValidateMovementDestination(TargetCell, MaxDistance, PreviousCells,
+                                   TargetCells, Grid)) {
+    return;
+  }
+
+  const FIntPoint PreviousCell = CurrentCell;
+  const int32 Distance = FMath::Max(
+      FMath::Abs(TargetCell.X - PreviousCell.X),
+      FMath::Abs(TargetCell.Y - PreviousCell.Y));
+
+  CommitMovementToCell(PreviousCell, TargetCell, Grid, PreviousCells,
+                       TargetCells, Distance, true);
+  RecalculateBattleEngagement();
+}
+
+bool AFighterPawn::TryDisengageToCell(FIntPoint TargetCell) {
+  if (!bIsCurrentlyActive || ActionsRemaining <= 0) {
+    return false;
+  }
+  if (!bIsEngaged) {
+    return false;
+  }
+
+  const int32 DisengageRange = GetDisengageRange();
+  if (DisengageRange <= 0) {
+    return false;
+  }
+
+  if (TargetCell == CurrentCell) {
+    return false;
+  }
+
+  UGridOverlayComponent *Grid = nullptr;
+  TArray<FIntPoint> PreviousCells;
+  TArray<FIntPoint> TargetCells;
+  if (!ValidateMovementDestination(TargetCell, DisengageRange, PreviousCells,
+                                   TargetCells, Grid)) {
+    return false;
+  }
+
+  TArray<AFighterPawn *> FighterSnapshot;
+  if (USkaldGameInstance *GI = Cast<USkaldGameInstance>(GetGameInstance())) {
+    if (UGridBattleManager *BattleManager = GI->GridBattleManager) {
+      FighterSnapshot = BattleManager->GetInitiativeOrderSnapshot();
+    }
+  }
+
+  if (HasAdjacentEnemyAtAnchor(TargetCell, FighterSnapshot)) {
+    return false;
+  }
+
+  const FIntPoint PreviousCell = CurrentCell;
+  const int32 Distance = FMath::Max(
+      FMath::Abs(TargetCell.X - PreviousCell.X),
+      FMath::Abs(TargetCell.Y - PreviousCell.Y));
+
+  const bool bCompletedMovement =
+      CommitMovementToCell(PreviousCell, TargetCell, Grid, PreviousCells,
+                           TargetCells, Distance, true);
+  RecalculateBattleEngagement();
+  return bCompletedMovement || !IsAlive();
 }
 
 bool AFighterPawn::TryTeleportToCell(FIntPoint TargetCell, int32 MaxDistance,
@@ -1868,7 +2030,58 @@ bool AFighterPawn::TryTeleportToCell(FIntPoint TargetCell, int32 MaxDistance,
     AbilityComponent->NotifyOwnerMoved(NotifiedDistance);
   }
 
+  RecalculateBattleEngagement();
+
   return true;
+}
+
+void AFighterPawn::RecalculateBattleEngagement() const {
+  if (!HasAuthority()) {
+    return;
+  }
+
+  const USkaldGameInstance *GI = Cast<USkaldGameInstance>(GetGameInstance());
+  if (!GI) {
+    return;
+  }
+
+  if (UGridBattleManager *BattleManager = GI->GridBattleManager) {
+    const TArray<AFighterPawn *> Fighters =
+        BattleManager->GetInitiativeOrderSnapshot();
+    for (AFighterPawn *Fighter : Fighters) {
+      if (Fighter && Fighter->HasAuthority()) {
+        Fighter->RefreshEngagementStatusFromSnapshot(Fighters);
+      }
+    }
+  }
+}
+
+void AFighterPawn::RefreshEngagementStatusFromSnapshot(
+    const TArray<AFighterPawn *> &Fighters) {
+  if (!HasAuthority()) {
+    return;
+  }
+
+  if (!IsAlive()) {
+    SetEngaged(false);
+    return;
+  }
+
+  const bool bShouldEngage = HasAdjacentEnemyAtAnchor(CurrentCell, Fighters);
+  SetEngaged(bShouldEngage);
+}
+
+void AFighterPawn::SetEngaged(bool bNewEngaged) {
+  if (bIsEngaged == bNewEngaged) {
+    return;
+  }
+
+  bIsEngaged = bNewEngaged;
+  OnEngagementChanged.Broadcast(bIsEngaged);
+}
+
+void AFighterPawn::OnRep_IsEngaged() {
+  OnEngagementChanged.Broadcast(bIsEngaged);
 }
 
 USkaldDiceManager *AFighterPawn::GetDiceManager() const {
@@ -2619,6 +2832,8 @@ void AFighterPawn::Destroyed() {
       }
     }
   }
+
+  RecalculateBattleEngagement();
   CurrentCell = FIntPoint::ZeroValue;
   MovementSourceCell = FIntPoint::ZeroValue;
   Super::Destroyed();
