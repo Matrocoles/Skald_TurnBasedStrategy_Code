@@ -47,6 +47,7 @@ UENUM()
 enum class EBattleCommandMode : uint8 {
   None,
   Move,
+  Disengage,
   Attack,
   VeilStep,
   AbilityTargetEnemy,
@@ -477,6 +478,10 @@ protected:
   /** Begin selecting a move destination. */
   UFUNCTION()
   void BeginMoveMode();
+
+  /** Begin selecting a disengage destination. */
+  UFUNCTION()
+  void BeginDisengageMode();
 
   /** Begin selecting an attack target. */
   UFUNCTION()

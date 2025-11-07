@@ -104,6 +104,11 @@ public:
   UPROPERTY(BlueprintAssignable, Category = "Skald|Battle|Events")
   FOnMovePressed OnMovePressed;
 
+  /** Delegate fired when the Disengage button is pressed. */
+  DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnDisengagePressed);
+  UPROPERTY(BlueprintAssignable, Category = "Skald|Battle|Events")
+  FOnDisengagePressed OnDisengagePressed;
+
   /** Delegate fired when the Attack button is pressed. */
   DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnAttackPressed);
   UPROPERTY(BlueprintAssignable, Category = "Skald|Battle|Events")
@@ -165,6 +170,10 @@ public:
   /** Move action button bound from the blueprint. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
   UButton *MoveButton;
+
+  /** Disengage action button bound from the blueprint. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UButton *DisengageButton;
 
   /** Attack action button bound from the blueprint. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
@@ -460,6 +469,10 @@ private:
   UFUNCTION()
   void HandleMovePressed();
 
+  /** Callback when DisengageButton is pressed. */
+  UFUNCTION()
+  void HandleDisengagePressed();
+
   /** Callback when AttackButton is pressed. */
   UFUNCTION()
   void HandleAttackPressed();
@@ -513,6 +526,10 @@ private:
   /** Respond to action count changes from the fighter. */
   UFUNCTION()
   void HandleActionsChanged(int32 NewActions);
+
+  /** Respond to engagement changes from the fighter. */
+  UFUNCTION()
+  void HandleFighterEngagementChanged(bool bEngaged);
 
   UFUNCTION()
   void HandleAbilityComponentUpdated(USkaldAbilityComponent *AbilityComponent);
@@ -635,6 +652,9 @@ private:
 
   /** Whether movement preview is currently shown. */
   bool bMoveSelected = false;
+
+  /** Whether disengage preview is currently shown. */
+  bool bDisengageSelected = false;
 
   /** Whether attack preview is currently shown. */
   bool bAttackSelected = false;

@@ -10,11 +10,13 @@
 #include "EngineUtils.h"
 #include "FighterPawn.h"
 #include "GridObstacleComponent.h"
+#include "GridBattleManager.h"
 #include "Components/DecalComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/SceneComponent.h"
 #include "GameFramework/Actor.h"
+#include "Skald_GameInstance.h"
 #include "Landscape.h"
 #include "LandscapeComponent.h"
 #include "Math/RotationMatrix.h"
@@ -1773,6 +1775,149 @@ void UGridOverlayComponent::HighlightMovement(AFighterPawn *Fighter) {
         }
       }
       const int32 StepCost = FMath::Max(1, Fighter->GetMovementStepCost(Cell, Next, this));
+      const int32 NewCost = Distance + StepCost;
+      if (NewCost > Range) {
+        continue;
+      }
+
+      const int32 *ExistingCost = BestCost.Find(Next);
+      if (ExistingCost && *ExistingCost <= NewCost) {
+        continue;
+      }
+
+      BestCost.Add(Next, NewCost);
+      Frontier.Enqueue(TPair<FIntPoint, int32>(Next, NewCost));
+    }
+  }
+}
+
+void UGridOverlayComponent::HighlightDisengage(AFighterPawn *Fighter,
+                                               int32 MaxDistance) {
+  if (!Fighter) {
+    return;
+  }
+
+  ClearHighlights();
+
+  const FIntPoint StartCell = Fighter->GetCurrentCell();
+  const int32 Range = FMath::Max(0, MaxDistance);
+
+  const FColor SelectionColor = SelectionHighlightColor.ToFColor(true);
+  const FColor MovementColor = MovementHighlightColor.ToFColor(true);
+
+  auto HighlightFootprint = [&](const FIntPoint &Anchor, const FColor &Color) {
+    const TArray<FIntPoint> Footprint = Fighter->GetOccupiedCells(Anchor);
+    for (const FIntPoint &Cell : Footprint) {
+      HighlightCell(Cell, Color, 0.f, false);
+    }
+  };
+
+  HighlightFootprint(StartCell, SelectionColor);
+
+  if (Range <= 0) {
+    return;
+  }
+
+  TArray<AFighterPawn *> FighterSnapshot;
+  if (UWorld *World = GetWorld()) {
+    if (USkaldGameInstance *GI = Cast<USkaldGameInstance>(World->GetGameInstance())) {
+      if (UGridBattleManager *BattleManager = GI->GridBattleManager) {
+        FighterSnapshot = BattleManager->GetInitiativeOrderSnapshot();
+      }
+    }
+  }
+
+  TMap<FIntPoint, int32> BestCost;
+  TQueue<TPair<FIntPoint, int32>> Frontier;
+  BestCost.Add(StartCell, 0);
+  Frontier.Enqueue(TPair<FIntPoint, int32>(StartCell, 0));
+
+  TSet<FIntPoint> IgnoredCells;
+  const TArray<FIntPoint> CurrentFootprint = Fighter->GetOccupiedCells();
+  for (const FIntPoint &Cell : CurrentFootprint) {
+    IgnoredCells.Add(Cell);
+  }
+
+  auto CanOccupyAnchor = [&](const FIntPoint &Anchor) {
+    const TArray<FIntPoint> CandidateCells = Fighter->GetOccupiedCells(Anchor);
+    for (const FIntPoint &Cell : CandidateCells) {
+      if (!IsCellInBounds(Cell) || IsObscured(Cell)) {
+        return false;
+      }
+      if (IsOccupied(Cell) && !IgnoredCells.Contains(Cell)) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  static const FIntPoint Directions[8] = {
+      FIntPoint(1, 0),  FIntPoint(-1, 0), FIntPoint(0, 1),  FIntPoint(0, -1),
+      FIntPoint(1, 1),  FIntPoint(1, -1), FIntPoint(-1, 1), FIntPoint(-1, -1)};
+
+  while (!Frontier.IsEmpty()) {
+    TPair<FIntPoint, int32> Node;
+    Frontier.Dequeue(Node);
+    const FIntPoint Cell = Node.Key;
+    const int32 Distance = Node.Value;
+
+    if (Distance > Range) {
+      continue;
+    }
+
+    if (Distance > 0 &&
+        !Fighter->HasAdjacentEnemyAtAnchor(Cell, FighterSnapshot)) {
+      HighlightFootprint(Cell, MovementColor);
+    }
+
+    if (Distance >= Range) {
+      continue;
+    }
+
+    for (const FIntPoint &Dir : Directions) {
+      const FIntPoint Next = Cell + Dir;
+      if (!CanTraverseVertical(Cell, Next)) {
+        continue;
+      }
+      if (!CanOccupyAnchor(Next)) {
+        continue;
+      }
+      if (Dir.X != 0 && Dir.Y != 0) {
+        const FIntPoint StepX(Dir.X, 0);
+        const FIntPoint StepY(0, Dir.Y);
+        const TArray<FIntPoint> FromCells = Fighter->GetOccupiedCells(Cell);
+        const TArray<FIntPoint> NextCells = Fighter->GetOccupiedCells(Next);
+        TSet<FIntPoint> NextCellSet;
+        NextCellSet.Reserve(NextCells.Num());
+        for (const FIntPoint &NextCell : NextCells) {
+          NextCellSet.Add(NextCell);
+        }
+        auto IsBlocked = [&](const FIntPoint &CheckCell) {
+          if (!IsCellInBounds(CheckCell) || IsObscured(CheckCell)) {
+            return true;
+          }
+          if (IsOccupied(CheckCell) && !IgnoredCells.Contains(CheckCell) &&
+              !NextCellSet.Contains(CheckCell)) {
+            return true;
+          }
+          return false;
+        };
+
+        bool bDiagonalClear = true;
+        for (const FIntPoint &FromCell : FromCells) {
+          if (IsBlocked(FromCell + StepX) || IsBlocked(FromCell + StepY)) {
+            bDiagonalClear = false;
+            break;
+          }
+        }
+
+        if (!bDiagonalClear) {
+          continue;
+        }
+      }
+
+      const int32 StepCost =
+          FMath::Max(1, Fighter->GetMovementStepCost(Cell, Next, this));
       const int32 NewCost = Distance + StepCost;
       if (NewCost > Range) {
         continue;

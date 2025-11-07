@@ -179,6 +179,10 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Grid")
   void HighlightMovement(AFighterPawn *Fighter);
 
+  /** Highlight valid disengage destinations for the fighter. */
+  UFUNCTION(BlueprintCallable, Category = "Grid")
+  void HighlightDisengage(AFighterPawn *Fighter, int32 MaxDistance);
+
   /** Highlight attack range for the fighter. */
   UFUNCTION(BlueprintCallable, Category = "Grid")
   void HighlightAttack(AFighterPawn *Fighter);
