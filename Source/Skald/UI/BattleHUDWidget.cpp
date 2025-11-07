@@ -204,6 +204,7 @@ void UBattleHUDWidget::NativeDestruct() {
   }
 
   ClearLockedInFighterList();
+  ClearEnemyLockedInFighterList();
 
   while (ActiveFloaters.Num() > 0) {
     ReleaseFloaterAtIndex(ActiveFloaters.Num() - 1);
@@ -285,6 +286,68 @@ void UBattleHUDWidget::SetLockedInFighters(
   }
 }
 
+void UBattleHUDWidget::SetEnemyLockedInFighters(
+    const TArray<AFighterPawn *> &Fighters) {
+  if (!ScrollBox_EnemyLockedInFightersList) {
+    UE_LOG(LogSkaldUI, Verbose,
+           TEXT("[BattleHUD] Enemy locked-in fighter list scroll box missing."));
+    return;
+  }
+
+  if (!LockedInFighterEntryClass) {
+    UE_LOG(LogSkaldUI, Warning,
+           TEXT("[BattleHUD] LockedInFighterEntryClass not set. Configure the HUD widget defaults."));
+    return;
+  }
+
+  PruneInvalidEnemyLockedInEntries();
+
+  EnemyLockedInFighterOrder.Reset();
+  ScrollBox_EnemyLockedInFightersList->ClearChildren();
+
+  TSet<AFighterPawn *> DesiredSet;
+  for (AFighterPawn *Fighter : Fighters) {
+    if (!Fighter) {
+      continue;
+    }
+
+    DesiredSet.Add(Fighter);
+    EnemyLockedInFighterOrder.Add(Fighter);
+
+    if (ULockedInFighterEntryWidget *Entry =
+            FindOrCreateEnemyLockedInEntry(Fighter)) {
+      Entry->SetFighter(Fighter);
+      Entry->SetIsActive(ActiveEnemyLockedInFighter.IsValid() &&
+                         ActiveEnemyLockedInFighter.Get() == Fighter);
+      Entry->SetIsSelected(HighlightedEnemyLockedInFighter.IsValid() &&
+                           HighlightedEnemyLockedInFighter.Get() == Fighter);
+      Entry->RefreshTurnState();
+      ScrollBox_EnemyLockedInFightersList->AddChild(Entry);
+    }
+  }
+
+  for (auto It = EnemyLockedInFighterEntries.CreateIterator(); It; ++It) {
+    AFighterPawn *Fighter = It->Key.Get();
+    if (!Fighter || !DesiredSet.Contains(Fighter)) {
+      if (It->Value) {
+        It->Value->RemoveFromParent();
+        It->Value->ResetEntry();
+      }
+      It.RemoveCurrent();
+    }
+  }
+
+  if (HighlightedEnemyLockedInFighter.IsValid() &&
+      !DesiredSet.Contains(HighlightedEnemyLockedInFighter.Get())) {
+    HighlightedEnemyLockedInFighter.Reset();
+  }
+
+  if (ActiveEnemyLockedInFighter.IsValid() &&
+      !DesiredSet.Contains(ActiveEnemyLockedInFighter.Get())) {
+    ActiveEnemyLockedInFighter.Reset();
+  }
+}
+
 void UBattleHUDWidget::ClearLockedInFighterList() {
   if (ScrollBox_LockedInFightersList) {
     ScrollBox_LockedInFightersList->ClearChildren();
@@ -301,11 +364,39 @@ void UBattleHUDWidget::ClearLockedInFighterList() {
   ActiveLockedInFighter.Reset();
 }
 
+void UBattleHUDWidget::ClearEnemyLockedInFighterList() {
+  if (ScrollBox_EnemyLockedInFightersList) {
+    ScrollBox_EnemyLockedInFightersList->ClearChildren();
+  }
+
+  for (auto &Pair : EnemyLockedInFighterEntries) {
+    if (Pair.Value) {
+      Pair.Value->ResetEntry();
+    }
+  }
+  EnemyLockedInFighterEntries.Reset();
+  EnemyLockedInFighterOrder.Reset();
+  HighlightedEnemyLockedInFighter.Reset();
+  ActiveEnemyLockedInFighter.Reset();
+}
+
 void UBattleHUDWidget::SetHighlightedLockedInFighter(AFighterPawn *Fighter) {
   HighlightedLockedInFighter = Fighter;
   PruneInvalidLockedInEntries();
 
   for (auto &Pair : LockedInFighterEntries) {
+    if (ULockedInFighterEntryWidget *Entry = Pair.Value) {
+      const bool bIsSelected = (Pair.Key.Get() == Fighter && Fighter != nullptr);
+      Entry->SetIsSelected(bIsSelected);
+    }
+  }
+}
+
+void UBattleHUDWidget::SetHighlightedEnemyLockedInFighter(AFighterPawn *Fighter) {
+  HighlightedEnemyLockedInFighter = Fighter;
+  PruneInvalidEnemyLockedInEntries();
+
+  for (auto &Pair : EnemyLockedInFighterEntries) {
     if (ULockedInFighterEntryWidget *Entry = Pair.Value) {
       const bool bIsSelected = (Pair.Key.Get() == Fighter && Fighter != nullptr);
       Entry->SetIsSelected(bIsSelected);
@@ -332,9 +423,34 @@ void UBattleHUDWidget::SetActiveLockedInFighter(AFighterPawn *Fighter) {
   }
 }
 
+void UBattleHUDWidget::SetActiveEnemyLockedInFighter(AFighterPawn *Fighter) {
+  ActiveEnemyLockedInFighter = Fighter;
+  PruneInvalidEnemyLockedInEntries();
+
+  for (auto &Pair : EnemyLockedInFighterEntries) {
+    if (ULockedInFighterEntryWidget *Entry = Pair.Value) {
+      const bool bIsActive = (Pair.Key.Get() == Fighter && Fighter != nullptr);
+      Entry->SetIsActive(bIsActive);
+      if (bIsActive) {
+        Entry->RefreshTurnState();
+      }
+    }
+  }
+}
+
 void UBattleHUDWidget::RefreshLockedInFighterTurnStates() {
   PruneInvalidLockedInEntries();
   for (auto &Pair : LockedInFighterEntries) {
+    if (ULockedInFighterEntryWidget *Entry = Pair.Value) {
+      Entry->RefreshTurnState();
+    }
+  }
+  RefreshEnemyLockedInFighterTurnStates();
+}
+
+void UBattleHUDWidget::RefreshEnemyLockedInFighterTurnStates() {
+  PruneInvalidEnemyLockedInEntries();
+  for (auto &Pair : EnemyLockedInFighterEntries) {
     if (ULockedInFighterEntryWidget *Entry = Pair.Value) {
       Entry->RefreshTurnState();
     }
@@ -358,6 +474,23 @@ void UBattleHUDWidget::PruneInvalidLockedInEntries() {
   });
 }
 
+void UBattleHUDWidget::PruneInvalidEnemyLockedInEntries() {
+  for (auto It = EnemyLockedInFighterEntries.CreateIterator(); It; ++It) {
+    const bool bEntryValid = It->Key.IsValid() && It->Value != nullptr;
+    if (!bEntryValid) {
+      if (It->Value) {
+        It->Value->RemoveFromParent();
+        It->Value->ResetEntry();
+      }
+      It.RemoveCurrent();
+    }
+  }
+
+  EnemyLockedInFighterOrder.RemoveAll([](const TWeakObjectPtr<AFighterPawn> &Ptr) {
+    return !Ptr.IsValid();
+  });
+}
+
 ULockedInFighterEntryWidget *
 UBattleHUDWidget::FindLockedInEntry(AFighterPawn *Fighter) const {
   if (!Fighter) {
@@ -365,6 +498,20 @@ UBattleHUDWidget::FindLockedInEntry(AFighterPawn *Fighter) const {
   }
 
   for (const auto &Pair : LockedInFighterEntries) {
+    if (Pair.Key.Get() == Fighter) {
+      return Pair.Value;
+    }
+  }
+  return nullptr;
+}
+
+ULockedInFighterEntryWidget *
+UBattleHUDWidget::FindEnemyLockedInEntry(AFighterPawn *Fighter) const {
+  if (!Fighter) {
+    return nullptr;
+  }
+
+  for (const auto &Pair : EnemyLockedInFighterEntries) {
     if (Pair.Key.Get() == Fighter) {
       return Pair.Value;
     }
@@ -394,6 +541,31 @@ UBattleHUDWidget::FindOrCreateLockedInEntry(AFighterPawn *Fighter) {
     NewEntry->OnEntryRemoved.AddDynamic(
         this, &UBattleHUDWidget::HandleLockedInEntryRemoved);
     LockedInFighterEntries.Add(Fighter, NewEntry);
+    return NewEntry;
+  }
+
+  return nullptr;
+}
+
+ULockedInFighterEntryWidget *
+UBattleHUDWidget::FindOrCreateEnemyLockedInEntry(AFighterPawn *Fighter) {
+  if (!Fighter) {
+    return nullptr;
+  }
+
+  if (ULockedInFighterEntryWidget *Existing = FindEnemyLockedInEntry(Fighter)) {
+    return Existing;
+  }
+
+  if (!LockedInFighterEntryClass) {
+    return nullptr;
+  }
+
+  if (ULockedInFighterEntryWidget *NewEntry =
+          CreateWidget<ULockedInFighterEntryWidget>(this, LockedInFighterEntryClass)) {
+    NewEntry->OnEntryRemoved.AddDynamic(
+        this, &UBattleHUDWidget::HandleEnemyLockedInEntryRemoved);
+    EnemyLockedInFighterEntries.Add(Fighter, NewEntry);
     return NewEntry;
   }
 
@@ -453,6 +625,51 @@ void UBattleHUDWidget::RemoveLockedInEntry(AFighterPawn *Fighter) {
         if (ULockedInFighterEntryWidget *Entry =
                 FindLockedInEntry(OrderedFighter)) {
           ScrollBox_LockedInFightersList->AddChild(Entry);
+        }
+      }
+    }
+  }
+}
+
+void UBattleHUDWidget::HandleEnemyLockedInEntryRemoved(AFighterPawn *Fighter) {
+  RemoveEnemyLockedInEntry(Fighter);
+}
+
+void UBattleHUDWidget::RemoveEnemyLockedInEntry(AFighterPawn *Fighter) {
+  if (!Fighter) {
+    return;
+  }
+
+  for (auto It = EnemyLockedInFighterEntries.CreateIterator(); It; ++It) {
+    if (It->Key.Get() == Fighter) {
+      if (It->Value) {
+        It->Value->RemoveFromParent();
+        It->Value->ResetEntry();
+      }
+      It.RemoveCurrent();
+      break;
+    }
+  }
+
+  EnemyLockedInFighterOrder.RemoveAll(
+      [Fighter](const TWeakObjectPtr<AFighterPawn> &Ptr) {
+        return Ptr.Get() == Fighter;
+      });
+
+  if (HighlightedEnemyLockedInFighter.Get() == Fighter) {
+    HighlightedEnemyLockedInFighter.Reset();
+  }
+  if (ActiveEnemyLockedInFighter.Get() == Fighter) {
+    ActiveEnemyLockedInFighter.Reset();
+  }
+
+  if (ScrollBox_EnemyLockedInFightersList) {
+    ScrollBox_EnemyLockedInFightersList->ClearChildren();
+    for (const TWeakObjectPtr<AFighterPawn> &Ptr : EnemyLockedInFighterOrder) {
+      if (AFighterPawn *OrderedFighter = Ptr.Get()) {
+        if (ULockedInFighterEntryWidget *Entry =
+                FindEnemyLockedInEntry(OrderedFighter)) {
+          ScrollBox_EnemyLockedInFightersList->AddChild(Entry);
         }
       }
     }

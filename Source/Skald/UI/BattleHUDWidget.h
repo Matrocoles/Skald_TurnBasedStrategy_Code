@@ -311,6 +311,10 @@ public:
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UScrollBox *ScrollBox_LockedInFightersList;
 
+  /** Scroll box containing enemy locked-in fighter entries. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UScrollBox *ScrollBox_EnemyLockedInFightersList;
+
   /** Widget class used for locked-in fighter list entries. */
   UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skald|Battle")
   TSubclassOf<ULockedInFighterEntryWidget> LockedInFighterEntryClass;
@@ -338,6 +342,26 @@ public:
   /** Refresh dimming state for all entries based on turn completion. */
   UFUNCTION(BlueprintCallable, Category = "Skald|Battle")
   void RefreshLockedInFighterTurnStates();
+
+  /** Populate the enemy locked-in fighter list with the provided fighters. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Battle")
+  void SetEnemyLockedInFighters(const TArray<AFighterPawn *> &Fighters);
+
+  /** Clear the enemy locked-in fighter list and associated bindings. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Battle")
+  void ClearEnemyLockedInFighterList();
+
+  /** Highlight the enemy entry representing the selected fighter. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Battle")
+  void SetHighlightedEnemyLockedInFighter(AFighterPawn *Fighter);
+
+  /** Highlight the enemy entry for the fighter whose activation is in progress. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Battle")
+  void SetActiveEnemyLockedInFighter(AFighterPawn *Fighter);
+
+  /** Refresh dimming state for all enemy entries based on turn completion. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Battle")
+  void RefreshEnemyLockedInFighterTurnStates();
 
   /** Panel that reveals per-die outcomes in sequence. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
@@ -456,6 +480,11 @@ private:
   ULockedInFighterEntryWidget *FindLockedInEntry(AFighterPawn *Fighter) const;
   ULockedInFighterEntryWidget *FindOrCreateLockedInEntry(AFighterPawn *Fighter);
 
+  void PruneInvalidEnemyLockedInEntries();
+  ULockedInFighterEntryWidget *FindEnemyLockedInEntry(AFighterPawn *Fighter) const;
+  ULockedInFighterEntryWidget *FindOrCreateEnemyLockedInEntry(
+      AFighterPawn *Fighter);
+
   /** Callback when a locked-in fighter entry is clicked in the list. */
   UFUNCTION()
   void HandleLockedInEntryClicked(AFighterPawn *Fighter);
@@ -464,6 +493,11 @@ private:
   UFUNCTION()
   void HandleLockedInEntryRemoved(AFighterPawn *Fighter);
   void RemoveLockedInEntry(AFighterPawn *Fighter);
+
+  /** Callback when an enemy locked-in fighter entry requests removal. */
+  UFUNCTION()
+  void HandleEnemyLockedInEntryRemoved(AFighterPawn *Fighter);
+  void RemoveEnemyLockedInEntry(AFighterPawn *Fighter);
 
   /** Callback when MoveButton is pressed. */
   UFUNCTION()
@@ -686,6 +720,19 @@ private:
 
   /** Fighter currently taking its activation. */
   TWeakObjectPtr<AFighterPawn> ActiveLockedInFighter;
+
+  /** Map of enemy fighters to their entry widgets. */
+  TMap<TWeakObjectPtr<AFighterPawn>, TObjectPtr<ULockedInFighterEntryWidget>>
+      EnemyLockedInFighterEntries;
+
+  /** Ordered array of enemy fighters displayed in the list. */
+  TArray<TWeakObjectPtr<AFighterPawn>> EnemyLockedInFighterOrder;
+
+  /** Currently highlighted enemy fighter entry (selection). */
+  TWeakObjectPtr<AFighterPawn> HighlightedEnemyLockedInFighter;
+
+  /** Enemy fighter currently taking its activation. */
+  TWeakObjectPtr<AFighterPawn> ActiveEnemyLockedInFighter;
 
   /** Fighter currently bound to the HUD. */
   UPROPERTY()
