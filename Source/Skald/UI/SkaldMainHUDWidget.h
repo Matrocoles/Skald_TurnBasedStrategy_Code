@@ -289,6 +289,14 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
   virtual void ShowErrorMessage(const FString &Message);
 
+  /** Display a temporary warning about the army placement limit. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
+  void ShowArmyPlacementLimitWarning(const FText &Message);
+
+  /** Cancel an in-progress deployment selection and hide related UI. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
+  void HandleDeploymentCancelled();
+
   /** Blueprint hook to draw the error message. */
   UFUNCTION(BlueprintImplementableEvent, Category = "Skald|HUD")
   void BP_ShowErrorMessage(const FString &Message);
@@ -493,8 +501,12 @@ protected:
   FTimerHandle TurnMessageTimerHandle;
   FTimerHandle StrategicInitiativeRollDelayHandle;
   FTimerHandle StrategicInitiativeDiceHideHandle;
+  FTimerHandle ArmyPlacementWarningTimerHandle;
   FText PendingSelectionPromptText;
   bool bPendingSelectionPromptVisible = false;
+  FText CachedSelectionPromptText;
+  bool bCachedSelectionPromptVisible = false;
+  bool bArmyPlacementWarningActive = false;
 
   // Internal handlers for widget actions
   UFUNCTION()
@@ -515,6 +527,7 @@ protected:
   bool IsStrategicInitiativeOverlayActive() const;
   void ApplyPendingSelectionPrompt();
   UTextBlock *GetSelectionPromptTextBlock() const;
+  void HandleArmyPlacementWarningExpired();
 
   UFUNCTION()
   void HandleStrategicDiceRenderTargetUpdate(class UCanvas *Canvas, int32 Width,

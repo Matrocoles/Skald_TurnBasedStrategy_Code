@@ -2735,6 +2735,15 @@ void ASkaldPlayerController::HandleEndPhaseInternal() {
   ETurnPhase Phase = TurnManager->GetCurrentPhase();
   if (Phase == ETurnPhase::ArmyPlacement) {
     if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+      if (HasAuthority() && PS->DeployableUnits > 0) {
+        if (AWorldMap *WorldMap = TurnManager->ResolveWorldMap()) {
+          const int32 Distributed =
+              WorldMap->DistributeUnplacedArmyPlacementUnits(PS);
+          if (Distributed > 0) {
+            TurnManager->BroadcastDeployableUnits(PS);
+          }
+        }
+      }
       if (PS->DeployableUnits < 0) {
         PS->DeployableUnits = 0;
       }
@@ -3633,11 +3642,19 @@ void ASkaldPlayerController::HandleTerritorySelected(ATerritory *Terr) {
 
 void ASkaldPlayerController::NotifyActionError_Implementation(
     const FString &Message) {
+  const bool bArmyPlacementLimitMessage =
+      Message.Contains(TEXT("maximum deployments")) ||
+      Message.Contains(TEXT("deploy up to 10"));
   UE_LOG(LogSkald, Warning, TEXT("%s"), *Message);
   if (MainHUD) {
-    MainHUD->ShowErrorMessage(Message);
+    if (bArmyPlacementLimitMessage) {
+      MainHUD->ShowArmyPlacementLimitWarning(FText::FromString(Message));
+    } else {
+      MainHUD->ShowErrorMessage(Message);
+    }
   } else if (GEngine) {
-    GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Red, Message);
+    const float DisplayTime = bArmyPlacementLimitMessage ? 2.f : 4.f;
+    GEngine->AddOnScreenDebugMessage(-1, DisplayTime, FColor::Red, Message);
   }
 }
 

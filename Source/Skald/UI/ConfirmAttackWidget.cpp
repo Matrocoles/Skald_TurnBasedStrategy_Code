@@ -1,6 +1,7 @@
 #include "UI/ConfirmAttackWidget.h"
 #include "Components/Button.h"
 #include "Components/SpinBox.h"
+#include "Kismet/GameplayStatics.h"
 
 void UConfirmAttackWidget::NativeConstruct() {
   Super::NativeConstruct();
@@ -11,6 +12,10 @@ void UConfirmAttackWidget::NativeConstruct() {
     ArmySelector->SetValue(1.f);
     ArmySelector->OnValueChanged.AddDynamic(
         this, &UConfirmAttackWidget::HandleValueChanged);
+  }
+
+  if (SendTroops) {
+    UGameplayStatics::PlaySound2D(this, SendTroops);
   }
 }
 
