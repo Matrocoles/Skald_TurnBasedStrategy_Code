@@ -234,7 +234,7 @@ FDiceRollResult UGridBattleManager::ResolveAttackDice(const FFighterStats& Attac
         Outcome.bHit = Damage > 0;
         Outcome.bCritical = Outcome.bHit && Outcome.RollValue == 6 && Damage > AttackerStats.AttackDamage;
 
-        if (Outcome.bHit)
+        if (Outcome.bHit && SimulatedHealth > 0)
         {
             const int32 AppliedDamage = FMath::Min(Damage, SimulatedHealth);
             SimulatedHealth -= AppliedDamage;
@@ -247,7 +247,7 @@ FDiceRollResult UGridBattleManager::ResolveAttackDice(const FFighterStats& Attac
                 Result.HighestCriticalDamage = FMath::Max(Result.HighestCriticalDamage, Damage);
             }
         }
-        else
+        else if (!Outcome.bHit)
         {
             ++Result.MissCount;
         }
