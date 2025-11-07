@@ -100,15 +100,24 @@ void ASkaldAIController::ShowPrepareForBattlePromptLocal(
     return;
   }
 
-  if (!ShouldAutoRetreat(PromptData)) {
-    return;
+  const EAIPrepareForBattleDecision Decision =
+      DeterminePrepareForBattleDecision(PromptData);
+  switch (Decision) {
+  case EAIPrepareForBattleDecision::AttemptRetreat:
+    UE_LOG(LogSkaldReady, Log,
+           TEXT("AI controller %s initiating retreat from prepare-for-battle prompt."),
+           *GetName());
+    bAutoRetreatPending = true;
+    ServerRequestRetreat();
+    break;
+  case EAIPrepareForBattleDecision::Ready:
+    UE_LOG(LogSkaldReady, Verbose,
+           TEXT("AI controller %s auto-readying for battle."), *GetName());
+    ServerSetReadyForBattle(true);
+    break;
+  default:
+    break;
   }
-
-  UE_LOG(LogSkaldReady, Log,
-         TEXT("AI controller %s initiating retreat from prepare-for-battle prompt."),
-         *GetName());
-  bAutoRetreatPending = true;
-  ServerRequestRetreat();
 }
 
 void ASkaldAIController::StartTurn() {
@@ -1922,28 +1931,41 @@ void ASkaldAIController::NotifyRetreatFailed(const FText &Message) {
   Super::NotifyRetreatFailed(Message);
 }
 
-bool ASkaldAIController::ShouldAutoRetreat(
+ASkaldAIController::EAIPrepareForBattleDecision
+ASkaldAIController::DeterminePrepareForBattleDecision(
     const FPrepareForBattlePromptData &PromptData) const {
   ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
-  if (!PS || PS->GetPlayerId() != PromptData.DefenderPlayerID) {
-    return false;
+  if (!PS) {
+    return EAIPrepareForBattleDecision::None;
+  }
+
+  const int32 PlayerId = PS->GetPlayerId();
+  const bool bIsDefender = PlayerId == PromptData.DefenderPlayerID;
+  const bool bIsAttacker = PlayerId == PromptData.AttackerPlayerID;
+
+  if (!bIsDefender && !bIsAttacker) {
+    return EAIPrepareForBattleDecision::None;
+  }
+
+  if (!bIsDefender) {
+    return EAIPrepareForBattleDecision::Ready;
   }
 
   const int32 AttackerArmy = PromptData.AttackerCommittedArmy;
   if (AttackerArmy <= 0) {
-    return false;
+    return EAIPrepareForBattleDecision::Ready;
   }
 
   AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
       GetWorld(), AWorldMap::StaticClass()));
   if (!WorldMap) {
-    return false;
+    return EAIPrepareForBattleDecision::Ready;
   }
 
   ATerritory *DefendingTerritory =
       WorldMap->GetTerritoryById(PromptData.DefendingTerritoryID);
   if (!DefendingTerritory || DefendingTerritory->OwningPlayer != PS) {
-    return false;
+    return EAIPrepareForBattleDecision::Ready;
   }
 
   int32 DefenderArmy = PromptData.DefenderArmyCount;
@@ -1952,33 +1974,52 @@ bool ASkaldAIController::ShouldAutoRetreat(
   }
 
   const int32 ArmyDifference = AttackerArmy - DefenderArmy;
-  if (ArmyDifference <= 1) {
-    return false;
+  if (ArmyDifference <= 0) {
+    return EAIPrepareForBattleDecision::Ready;
   }
 
   bool bHasCandidate = false;
-  int32 BestCombinedStrength = 0;
   for (ATerritory *Neighbor : DefendingTerritory->AdjacentTerritories) {
-    if (!Neighbor || Neighbor->OwningPlayer != PS) {
-      continue;
-    }
-
-    bHasCandidate = true;
-    const int32 CombinedStrength = Neighbor->ArmyUnits + DefenderArmy;
-    if (CombinedStrength > BestCombinedStrength) {
-      BestCombinedStrength = CombinedStrength;
+    if (Neighbor && Neighbor->OwningPlayer == PS) {
+      bHasCandidate = true;
+      break;
     }
   }
 
   if (!bHasCandidate) {
-    return false;
+    return EAIPrepareForBattleDecision::Ready;
   }
 
-  if (BestCombinedStrength < AttackerArmy) {
-    return false;
+  if (ArmyDifference >= 4) {
+    return EAIPrepareForBattleDecision::AttemptRetreat;
   }
 
-  return true;
+  float RetreatChance = 0.0f;
+  switch (ArmyDifference) {
+  case 1:
+    RetreatChance = 0.5f;
+    break;
+  case 2:
+    RetreatChance = 0.7f;
+    break;
+  case 3:
+    RetreatChance = 0.9f;
+    break;
+  default:
+    RetreatChance = 0.0f;
+    break;
+  }
+
+  if (RetreatChance <= 0.0f) {
+    return EAIPrepareForBattleDecision::Ready;
+  }
+
+  const float Roll = FMath::FRand();
+  if (Roll <= RetreatChance) {
+    return EAIPrepareForBattleDecision::AttemptRetreat;
+  }
+
+  return EAIPrepareForBattleDecision::Ready;
 }
 
 int32 ASkaldAIController::ChooseRetreatDestination(
