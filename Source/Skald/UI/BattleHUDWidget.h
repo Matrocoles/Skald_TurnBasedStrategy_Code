@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Blueprint/UserWidget.h"
+#include "Containers/Set.h"
 #include "GridBattleManager.h"
 #include "TimerManager.h"
 #include "UI/W_DiceResolutionPanel.h"
@@ -275,6 +276,50 @@ public:
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UImage *FighterImage;
 
+  /** Text displaying enemy health during attack resolution. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UTextBlock *EnemyHealthText;
+
+  /** Text displaying enemy attack damage during attack resolution. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UTextBlock *EnemyAttackText;
+
+  /** Text displaying enemy critical damage during attack resolution. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UTextBlock *EnemyCriticalDamageText;
+
+  /** Text displaying enemy movement during attack resolution. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UTextBlock *EnemyMoveText;
+
+  /** Text displaying enemy actions during attack resolution. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UTextBlock *EnemyActionsText;
+
+  /** Text displaying enemy strength during attack resolution. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UTextBlock *EnemyStrengthText;
+
+  /** Text displaying enemy defence during attack resolution. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UTextBlock *EnemyDefenceText;
+
+  /** Text displaying enemy attack range during attack resolution. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UTextBlock *EnemyAttackRangeText;
+
+  /** Text displaying enemy attack dice during attack resolution. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UTextBlock *EnemyAttackDiceText;
+
+  /** Text displaying the enemy fighter's identifier during attack resolution. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UTextBlock *EnemyFighterNameText;
+
+  /** Image displaying the enemy fighter's portrait during attack resolution. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UImage *EnemyFighterImage;
+
   /** Text displaying the current round. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *RoundText;
@@ -476,6 +521,17 @@ public:
       AFighterPawn *Attacker, AFighterPawn *Defender, const FDiceRollResult &Result) const;
 
 private:
+  void UpdateEnemyStatPanel(AFighterPawn *Fighter);
+  void ClearEnemyStatPanel();
+  void ApplyPrimaryFighterDisplay(AFighterPawn *Fighter);
+  void ClearPrimaryStatPanel();
+  AFighterPawn *ResolveFriendlyStatFighter(AFighterPawn *Attacker,
+                                           AFighterPawn *Defender) const;
+  AFighterPawn *ResolveEnemyStatFighter(AFighterPawn *Attacker,
+                                        AFighterPawn *Defender) const;
+  bool IsKnownFriendlyFighter(const AFighterPawn *Fighter) const;
+  bool IsKnownEnemyFighter(const AFighterPawn *Fighter) const;
+
   void PruneInvalidLockedInEntries();
   ULockedInFighterEntryWidget *FindLockedInEntry(AFighterPawn *Fighter) const;
   ULockedInFighterEntryWidget *FindOrCreateLockedInEntry(AFighterPawn *Fighter);
@@ -733,6 +789,18 @@ private:
 
   /** Enemy fighter currently taking its activation. */
   TWeakObjectPtr<AFighterPawn> ActiveEnemyLockedInFighter;
+
+  /** Enemy fighter currently displayed in the attack stat panel. */
+  TWeakObjectPtr<AFighterPawn> DisplayedEnemyStatFighter;
+
+  /** Fighter currently displayed in the primary stat panel. */
+  TWeakObjectPtr<AFighterPawn> DisplayedFriendlyStatFighter;
+
+  /** Cached set of friendly fighters for quick lookups. */
+  TSet<TWeakObjectPtr<AFighterPawn>> KnownFriendlyFighters;
+
+  /** Cached set of enemy fighters for quick lookups. */
+  TSet<TWeakObjectPtr<AFighterPawn>> KnownEnemyFighters;
 
   /** Fighter currently bound to the HUD. */
   UPROPERTY()
