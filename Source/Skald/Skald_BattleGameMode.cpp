@@ -15,6 +15,7 @@
 #include "GameFramework/Pawn.h"
 #include "GridBattleManager.h"
 #include "GridObstacleActor.h"
+#include "GridObstacleComponent.h"
 #include "GridOverlayComponent.h"
 #include "Skald.h"
 #include "Skald_GameInstance.h"
@@ -1135,7 +1136,7 @@ bool ASkald_BattleGameMode::RelocateControllersNearBattleGrid(
 
   if (World) {
     for (TActorIterator<AGridObstacleActor> It(World); It; ++It) {
-      const FBox Bounds = It->GetComponentsBoundingBox(true);
+      const FBox Bounds = Skald::GridObstacle::CalculateRelevantBounds(*It);
       HighestSurfaceZ = FMath::Max(HighestSurfaceZ, Bounds.Max.Z);
     }
   }

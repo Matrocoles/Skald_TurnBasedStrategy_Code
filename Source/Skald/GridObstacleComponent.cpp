@@ -2,6 +2,22 @@
 #include "GameFramework/Actor.h"
 #include "GridOverlayComponent.h"
 
+namespace Skald::GridObstacle {
+
+FBox CalculateRelevantBounds(const AActor *Actor) {
+  if (!Actor) {
+    return FBox(ForceInit);
+  }
+
+  FBox Bounds = Actor->GetComponentsBoundingBox(false);
+  if (!Bounds.IsValid) {
+    Bounds = Actor->GetComponentsBoundingBox(true);
+  }
+  return Bounds;
+}
+
+} // namespace Skald::GridObstacle
+
 UGridObstacleComponent::UGridObstacleComponent() {
   PrimaryComponentTick.bCanEverTick = false;
 }
@@ -43,7 +59,7 @@ bool UGridObstacleComponent::GetCustomGridFootprint(const UGridOverlayComponent 
     return false;
   }
 
-  const FBox Bounds = Owner->GetComponentsBoundingBox(true);
+  const FBox Bounds = Skald::GridObstacle::CalculateRelevantBounds(Owner);
   const FVector AnchorLocation = Bounds.IsValid
                                      ? Bounds.GetCenter()
                                      : Owner->GetActorLocation();

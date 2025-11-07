@@ -1406,7 +1406,7 @@ void UGridOverlayComponent::UnregisterObstacle(UGridObstacleComponent *Obstacle)
     bool bHasCustomFootprint = Obstacle->GetCustomGridFootprint(this, Min, Max);
 
     if (!bHasCustomFootprint) {
-      const FBox Bounds = Owner->GetComponentsBoundingBox(true);
+      const FBox Bounds = Skald::GridObstacle::CalculateRelevantBounds(Owner);
       if (Bounds.IsValid) {
         const FIntPoint RawMin = WorldToGrid(Bounds.Min);
         const FIntPoint RawMax = WorldToGrid(Bounds.Max);
@@ -1462,7 +1462,7 @@ void UGridOverlayComponent::ApplyObstacleToGrid(UGridObstacleComponent *Obstacle
   }
 
   if (AActor *Owner = Obstacle->GetOwner()) {
-    const FBox Bounds = Owner->GetComponentsBoundingBox(true);
+    const FBox Bounds = Skald::GridObstacle::CalculateRelevantBounds(Owner);
     FIntPoint Min;
     FIntPoint Max;
     if (!Obstacle->GetCustomGridFootprint(this, Min, Max)) {
