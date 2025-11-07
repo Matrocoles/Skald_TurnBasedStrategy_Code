@@ -205,7 +205,14 @@ private:
   /** True while waiting for an async attack sequence to resolve. */
   bool bAwaitingQueuedAttackResolution = false;
 
-  bool ShouldAutoRetreat(const FPrepareForBattlePromptData &PromptData) const;
+  enum class EAIPrepareForBattleDecision : uint8 {
+    None,
+    Ready,
+    AttemptRetreat
+  };
+
+  EAIPrepareForBattleDecision DeterminePrepareForBattleDecision(
+      const FPrepareForBattlePromptData &PromptData) const;
   int32 ChooseRetreatDestination(const TArray<int32> &CandidateTerritoryIDs,
                                  int32 DefendingTerritoryID) const;
   bool bAutoRetreatPending = false;
