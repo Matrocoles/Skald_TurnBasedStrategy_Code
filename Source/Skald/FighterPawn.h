@@ -743,6 +743,13 @@ private:
   void CleanupDiceManagerBinding();
   USkaldDiceManager *GetDiceManager() const;
 
+  void ProcessPhysicalDiceRollResults(const FGuid &RollId,
+                                      const TArray<int32> &Results);
+
+  UFUNCTION(Server, Reliable)
+  void ServerSubmitPhysicalDiceRoll(const FGuid &RollId,
+                                    const TArray<int32> &Results);
+
   UFUNCTION()
   void HandleDiceRollCompleted(const FGuid &RollId, const TArray<int32> &Results);
 

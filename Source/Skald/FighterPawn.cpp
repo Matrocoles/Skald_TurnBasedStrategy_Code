@@ -2264,6 +2264,16 @@ void AFighterPawn::ShowAttackRollButtonForPlayer()
 
 void AFighterPawn::HandleDiceRollCompleted(const FGuid &RollId,
                                            const TArray<int32> &Results) {
+  if (!HasAuthority()) {
+    ServerSubmitPhysicalDiceRoll(RollId, Results);
+    return;
+  }
+
+  ProcessPhysicalDiceRollResults(RollId, Results);
+}
+
+void AFighterPawn::ProcessPhysicalDiceRollResults(
+    const FGuid &RollId, const TArray<int32> &Results) {
   if (!bAwaitingPhysicalAttackRoll || RollId != PendingAttackRollId) {
     return;
   }
@@ -2324,6 +2334,11 @@ void AFighterPawn::HandleDiceRollCompleted(const FGuid &RollId,
   DiceResult.HighStakesFaction = Faction;
 
   StartQueuedAttack(Target, MoveTemp(DiceResult));
+}
+
+void AFighterPawn::ServerSubmitPhysicalDiceRoll_Implementation(
+    const FGuid &RollId, const TArray<int32> &Results) {
+  ProcessPhysicalDiceRollResults(RollId, Results);
 }
 
 void AFighterPawn::PerformAttack(AFighterPawn *Target) {
