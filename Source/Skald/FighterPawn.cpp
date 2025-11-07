@@ -2268,6 +2268,21 @@ void AFighterPawn::HandleDiceRollCompleted(const FGuid &RollId,
     return;
   }
 
+  FString ResultValuesString;
+  for (int32 Index = 0; Index < Results.Num(); ++Index) {
+    if (Index > 0) {
+      ResultValuesString.Append(TEXT(","));
+    }
+    ResultValuesString.AppendInt(Results[Index]);
+  }
+  if (ResultValuesString.IsEmpty()) {
+    ResultValuesString = TEXT("<empty>");
+  }
+
+  UE_LOG(LogTemp, Warning,
+         TEXT("HandleDiceRollCompleted: RollId=%s Values=[%s]"),
+         *RollId.ToString(), *ResultValuesString);
+
   bAwaitingPhysicalAttackRoll = false;
   PendingAttackRollId.Invalidate();
 
@@ -2518,6 +2533,21 @@ void AFighterPawn::ApplyPhysicalRollResults(
     FDiceRollResult &Result, const TArray<int32> &RollValues,
     const FFighterStats &AttackerStats,
     const FFighterStats &DefenderStats) {
+  FString RollValuesString;
+  for (int32 Index = 0; Index < RollValues.Num(); ++Index) {
+    if (Index > 0) {
+      RollValuesString.Append(TEXT(","));
+    }
+    RollValuesString.AppendInt(RollValues[Index]);
+  }
+  if (RollValuesString.IsEmpty()) {
+    RollValuesString = TEXT("<empty>");
+  }
+
+  UE_LOG(LogTemp, Warning,
+         TEXT("ApplyPhysicalRollResults: IncomingRolls=[%s] RollCount=%d OutcomeCount=%d"),
+         *RollValuesString, RollValues.Num(), Result.DiceOutcomes.Num());
+
   if (RollValues.Num() == 0 || Result.DiceOutcomes.Num() == 0) {
     return;
   }
