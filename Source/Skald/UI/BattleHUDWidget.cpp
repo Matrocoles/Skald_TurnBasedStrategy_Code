@@ -992,7 +992,7 @@ void UBattleHUDWidget::HandleAbilityComponentUpdated(
 void UBattleHUDWidget::UpdateStatPanel() {
   if (BoundFighter && bBoundFighterIsFriendly) {
     ApplyPrimaryFighterDisplay(BoundFighter);
-  } else {
+  } else if (!DisplayedFriendlyStatFighter.IsValid()) {
     ClearPrimaryStatPanel();
   }
 
@@ -1001,6 +1001,9 @@ void UBattleHUDWidget::UpdateStatPanel() {
 
 void UBattleHUDWidget::UpdateEnemyStatPanel(AFighterPawn *Fighter) {
   DisplayedEnemyStatFighter = Fighter;
+  if (Fighter) {
+    KnownEnemyFighters.Add(Fighter);
+  }
   if (!Fighter) {
     ClearEnemyStatPanel();
     return;
@@ -1205,15 +1208,13 @@ bool UBattleHUDWidget::IsFriendlyCandidate(const AFighterPawn *Fighter) const {
     return false;
   }
 
-  if (KnownFriendlyFighters.Contains(const_cast<AFighterPawn *>(Fighter))) {
-    return true;
-  }
-
   if (const ASkaldPlayerController *SkaldController =
           Cast<ASkaldPlayerController>(GetOwningPlayer())) {
-    if (SkaldController->IsFriendlyFighter(Fighter)) {
-      return true;
-    }
+    return SkaldController->IsFriendlyFighter(Fighter);
+  }
+
+  if (KnownFriendlyFighters.Contains(const_cast<AFighterPawn *>(Fighter))) {
+    return true;
   }
 
   if (ActiveLockedInFighter.IsValid() &&
