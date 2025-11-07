@@ -1438,6 +1438,10 @@ void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
 
   ResetPendingReadyPromptState();
 
+  if (AFighterPawn *BoundFighter = LockedFighterDelegateSource.Get()) {
+    UnbindLockedFighterDelegates(BoundFighter);
+  }
+
   if (MainHUD) {
     MainHUD->RemoveFromParent();
     MainHUD = nullptr;
@@ -2296,11 +2300,16 @@ UGridBattleManager *ASkaldPlayerController::GetBattleManager() const {
 
 void ASkaldPlayerController::HandleActiveFighterChanged(
     AFighterPawn *NewFighter) {
+  AFighterPawn *PreviousFighter = LockedActiveFighter;
   CancelCommandMode();
+  if (PreviousFighter) {
+    UnbindLockedFighterDelegates(PreviousFighter);
+  }
 
   AFighterPawn *ResolvedFighter =
       (NewFighter && NewFighter->IsAlive()) ? NewFighter : nullptr;
   LockedActiveFighter = ResolvedFighter;
+  BindLockedFighterDelegates(LockedActiveFighter);
 
   if (LockedActiveFighter) {
     SetSelectedFighter(LockedActiveFighter, true);
@@ -2438,6 +2447,17 @@ void ASkaldPlayerController::HandleTrackedFighterDestroyed(
     DestroyedFighter->OnDestroyed.RemoveDynamic(
         this, &ASkaldPlayerController::HandleTrackedFighterDestroyed);
     ObservedFriendlyFighters.Remove(DestroyedFighter);
+  }
+
+  if (DestroyedFighter == LockedActiveFighter) {
+    UnbindLockedFighterDelegates(DestroyedFighter);
+    LockedActiveFighter = nullptr;
+    CancelCommandMode();
+    UpdateBattleHUDButtons();
+  }
+
+  if (DestroyedFighter == SelectedFighter) {
+    ClearSelectedFighter();
   }
 
   RefreshLockedInFighterList();
@@ -4965,6 +4985,52 @@ void ASkaldPlayerController::ResetPendingDisengage() {
   PendingDisengageStartCell = FIntPoint::ZeroValue;
 }
 
+void ASkaldPlayerController::BindLockedFighterDelegates(AFighterPawn *Fighter) {
+  if (!IsValid(Fighter)) {
+    LockedFighterDelegateSource.Reset();
+    return;
+  }
+
+  Fighter->OnEngagementChanged.RemoveDynamic(
+      this, &ASkaldPlayerController::HandleLockedFighterEngagementChanged);
+  Fighter->OnEngagementChanged.AddDynamic(
+      this, &ASkaldPlayerController::HandleLockedFighterEngagementChanged);
+  LockedFighterDelegateSource = Fighter;
+}
+
+void ASkaldPlayerController::UnbindLockedFighterDelegates(AFighterPawn *Fighter) {
+  if (!IsValid(Fighter)) {
+    if (LockedFighterDelegateSource.Get() == Fighter) {
+      LockedFighterDelegateSource.Reset();
+    }
+    return;
+  }
+
+  Fighter->OnEngagementChanged.RemoveDynamic(
+      this, &ASkaldPlayerController::HandleLockedFighterEngagementChanged);
+  if (LockedFighterDelegateSource.Get() == Fighter) {
+    LockedFighterDelegateSource.Reset();
+  }
+}
+
+void ASkaldPlayerController::HandleLockedFighterEngagementChanged(bool bEngaged) {
+  if (!LockedActiveFighter) {
+    return;
+  }
+
+  const bool bCancelDisengage =
+      CurrentCommandMode == EBattleCommandMode::Disengage && !bEngaged;
+  const bool bCancelMove =
+      CurrentCommandMode == EBattleCommandMode::Move && bEngaged;
+
+  if (!bCancelDisengage && !bCancelMove) {
+    return;
+  }
+
+  CancelCommandMode();
+  UpdateBattleHUDButtons();
+}
+
 void ASkaldPlayerController::CancelAbilityCommand() {
   const bool bWasAbilityCommand =
       CurrentCommandMode == EBattleCommandMode::AbilityTargetEnemy ||
@@ -5053,7 +5119,7 @@ void ASkaldPlayerController::ClearSelectedFighter() {
   if (!SelectedFighter)
     return;
 
-  if (SelectedFighter) {
+  if (IsValid(SelectedFighter)) {
     SelectedFighter->SetSelectionIndicatorVisible(false);
   }
   SelectedFighter = nullptr;

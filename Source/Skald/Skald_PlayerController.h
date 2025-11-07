@@ -756,6 +756,10 @@ private:
 
   void CancelCommandMode();
   void ResetPendingDisengage();
+  void BindLockedFighterDelegates(AFighterPawn *Fighter);
+  void UnbindLockedFighterDelegates(AFighterPawn *Fighter);
+  UFUNCTION()
+  void HandleLockedFighterEngagementChanged(bool bEngaged);
   void HighlightClickedCell(UGridOverlayComponent *Grid, const FIntPoint &Cell);
   bool FindBestMovementAnchor(AFighterPawn *Fighter, UGridOverlayComponent *Grid,
                               const FIntPoint &DesiredCell,
@@ -874,6 +878,7 @@ private:
 
   bool bHasPendingDisengage = false;
   FIntPoint PendingDisengageStartCell = FIntPoint::ZeroValue;
+  TWeakObjectPtr<AFighterPawn> LockedFighterDelegateSource;
 
   /** Friendly fighters tracked for HUD list synchronization. */
   TSet<TWeakObjectPtr<AFighterPawn>> ObservedFriendlyFighters;
