@@ -32,6 +32,7 @@
 #include "Skald_PlayerState.h"
 #include "Skald_PlayerCharacter.h"
 #include "Skald_TurnManager.h"
+#include "SkaldFactionColorLibrary.h"
 #include "Territory.h"
 #include "TimerManager.h"
 #include "SkaldDiceManager.h"
@@ -2105,6 +2106,9 @@ void ASkaldPlayerController::InitializeBattleHUD() {
     GI->GridBattleManager->OnInitiativeRollCompleted.RemoveAll(this);
     GI->GridBattleManager->OnInitiativeRollCompleted.AddDynamic(
         this, &ASkaldPlayerController::HandleInitiativeRollCompleted);
+    GI->GridBattleManager->OnInitiativeRerollRequired.RemoveAll(this);
+    GI->GridBattleManager->OnInitiativeRerollRequired.AddDynamic(
+        this, &ASkaldPlayerController::HandleInitiativeRerollRequired);
     GI->GridBattleManager->OnBattleEnded.RemoveDynamic(
         this, &ASkaldPlayerController::HandleBattleEnded);
     GI->GridBattleManager->OnBattleEnded.AddDynamic(
@@ -6733,6 +6737,27 @@ void ASkaldPlayerController::HandleAttackRejected(AFighterPawn *Attacker,
   NotifyActionError(ReasonString);
 }
 
+void ASkaldPlayerController::HandleInitiativeRerollRequired(int32 RoundNumber,
+                                                            int32 AttackerRoll,
+                                                            int32 DefenderRoll) {
+  EnsureDiceWidgets();
+
+  if (DiceOverlayWidget) {
+    const FText RerollText = NSLOCTEXT("Skald", "BattleInitiativeReroll",
+                                       "REROLL!");
+    DiceOverlayWidget->ShowRerollMessage(RerollText);
+  }
+
+  if (BattleHudWidget) {
+    const FText PromptText = NSLOCTEXT("Skald", "BattleInitiativeRerollPrompt",
+                                       "Tie! Roll again");
+    BattleHudWidget->ShowInitiativePrompt(PromptText);
+  }
+
+  bInitiativeRollPresentationShown = false;
+  LastLocalInitiativeRoll = 0;
+}
+
 void ASkaldPlayerController::TryDispatchPendingAttackPresentationNotifications() {
   if (PendingAttackPresentationNotifications <= 0) {
     PendingAttackPresentationNotifications = 0;
@@ -6820,6 +6845,43 @@ USkaldDiceManager *ASkaldPlayerController::ResolveDiceManager() {
   return GI ? GI->GetSubsystem<USkaldDiceManager>() : nullptr;
 }
 
+FSkaldDiceTintOverride ASkaldPlayerController::BuildTintOverrideForFaction(ESkaldFaction Faction) const
+{
+  FSkaldDiceTintOverride Override;
+  FLinearColor Tint;
+  if (SkaldFactionColors::TryGetFactionColor(Faction, Tint)) {
+    Override.bOverrideTint = true;
+    Override.Tint = Tint;
+  }
+  return Override;
+}
+
+void ASkaldPlayerController::ResolveBattleDiceTints(
+    bool bTreatAttackersAsFriendly, FSkaldDiceTintOverride &OutPlayerTint,
+    FSkaldDiceTintOverride &OutEnemyTint) {
+  USkaldGameInstance *GI = CachedGameInstance;
+  if (!GI) {
+    GI = GetGameInstance<USkaldGameInstance>();
+    CachedGameInstance = GI;
+  }
+
+  ESkaldFaction AttackerFaction = ESkaldFaction::None;
+  ESkaldFaction DefenderFaction = ESkaldFaction::None;
+  if (GI) {
+    const FS_BattlePayload &Battle = GI->PendingBattle;
+    AttackerFaction = Battle.AttackerFaction;
+    DefenderFaction = Battle.DefenderFaction;
+  }
+
+  const ESkaldFaction FriendlyFaction =
+      bTreatAttackersAsFriendly ? AttackerFaction : DefenderFaction;
+  const ESkaldFaction EnemyFaction =
+      bTreatAttackersAsFriendly ? DefenderFaction : AttackerFaction;
+
+  OutPlayerTint = BuildTintOverrideForFaction(FriendlyFaction);
+  OutEnemyTint = BuildTintOverrideForFaction(EnemyFaction);
+}
+
 FGuid ASkaldPlayerController::TriggerAttackDicePresentation(
     AFighterPawn *Attacker, const FDiceRollResult &Result) {
   if (!IsLocalController() || !bAutoPresentDiceRolls) {
@@ -6857,7 +6919,12 @@ FGuid ASkaldPlayerController::TriggerAttackDicePresentation(
     return FGuid();
   }
 
-  FGuid RollId = DiceManager->PlayScriptedRoll(PlayerResults, EnemyResults, false);
+  FSkaldDiceTintOverride PlayerTintOverride;
+  FSkaldDiceTintOverride EnemyTintOverride;
+  ResolveBattleDiceTints(bFriendlyAttack, PlayerTintOverride, EnemyTintOverride);
+
+  FGuid RollId = DiceManager->PlayScriptedRoll(PlayerResults, EnemyResults, false, -1.f,
+                                               PlayerTintOverride, EnemyTintOverride);
 
   if (DiceOverlayWidget) {
     DiceOverlayWidget->SetOverlayMode(ESkaldDiceOverlayMode::Attack);
@@ -6933,6 +7000,11 @@ FGuid ASkaldPlayerController::TriggerInitiativeDicePresentation(int32 AttackerRo
 
     FGuid RollId;
 
+    const bool bTreatAttackersAsFriendly = bPlayerIsAttacker || (!bPlayerIsAttacker && !bPlayerIsDefender);
+    FSkaldDiceTintOverride PlayerTintOverride;
+    FSkaldDiceTintOverride EnemyTintOverride;
+    ResolveBattleDiceTints(bTreatAttackersAsFriendly, PlayerTintOverride, EnemyTintOverride);
+
     // Only clients show the dice physically.
     // The server just updates HUDs with results  no duplicate rolls.
     if (HasAuthority())
@@ -6943,7 +7015,7 @@ FGuid ASkaldPlayerController::TriggerInitiativeDicePresentation(int32 AttackerRo
     else if (DiceManager && (PlayerResults.Num() > 0 || EnemyResults.Num() > 0))
     {
         // Client: show physical dice roll and result
-        RollId = DiceManager->PlayScriptedRoll(PlayerResults, EnemyResults, true);
+        RollId = DiceManager->PlayScriptedRoll(PlayerResults, EnemyResults, true, -1.f, PlayerTintOverride, EnemyTintOverride);
     }
 
     // The overlay can be safely set client-side

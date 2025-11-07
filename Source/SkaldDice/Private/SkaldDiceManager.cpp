@@ -38,7 +38,7 @@ void USkaldDiceManager::Deinitialize()
     Super::Deinitialize();
 }
 
-FGuid USkaldDiceManager::RollDice_D6(int32 NumPlayerDice, int32 NumEnemyDice, bool bForInitiative)
+FGuid USkaldDiceManager::RollDice_D6(int32 NumPlayerDice, int32 NumEnemyDice, bool bForInitiative, FSkaldDiceTintOverride PlayerTintOverride, FSkaldDiceTintOverride EnemyTintOverride)
 {
     const int32 TotalDice = FMath::Max(NumPlayerDice, 0) + FMath::Max(NumEnemyDice, 0);
     if (TotalDice <= 0)
@@ -59,7 +59,7 @@ FGuid USkaldDiceManager::RollDice_D6(int32 NumPlayerDice, int32 NumEnemyDice, bo
     const float Duration = FMath::Clamp(FMath::FRandRange(MinDuration, MaxDuration), MinDuration, MaxDuration);
 
     const FGuid RollId = FGuid::NewGuid();
-    FActiveRoll& Roll = AddRoll(NumPlayerDice, NumEnemyDice, Duration, RollId, bForInitiative);
+    FActiveRoll& Roll = AddRoll(NumPlayerDice, NumEnemyDice, Duration, RollId, bForInitiative, PlayerTintOverride, EnemyTintOverride);
     Roll.RollId = RollId;
     Roll.StartTime = World->GetTimeSeconds();
     Roll.Duration = Duration;
@@ -122,7 +122,7 @@ TArray<int32> USkaldDiceManager::RollDiceBlocking_D6(int32 NumDice)
     return GenerateResults(FMath::Max(0, NumDice));
 }
 
-FGuid USkaldDiceManager::PlayScriptedRoll(const TArray<int32>& PlayerResults, const TArray<int32>& EnemyResults, bool bForInitiative, float DurationOverride)
+FGuid USkaldDiceManager::PlayScriptedRoll(const TArray<int32>& PlayerResults, const TArray<int32>& EnemyResults, bool bForInitiative, float DurationOverride, FSkaldDiceTintOverride PlayerTintOverride, FSkaldDiceTintOverride EnemyTintOverride)
 {
     const int32 PlayerDice = PlayerResults.Num();
     const int32 EnemyDice = EnemyResults.Num();
@@ -145,7 +145,7 @@ FGuid USkaldDiceManager::PlayScriptedRoll(const TArray<int32>& PlayerResults, co
     const float Duration = DurationOverride > 0.f ? DurationOverride : FMath::Clamp(FMath::FRandRange(MinDuration, MaxDuration), MinDuration, MaxDuration);
 
     const FGuid RollId = FGuid::NewGuid();
-    FActiveRoll& Roll = AddRoll(PlayerDice, EnemyDice, Duration, RollId, bForInitiative);
+    FActiveRoll& Roll = AddRoll(PlayerDice, EnemyDice, Duration, RollId, bForInitiative, PlayerTintOverride, EnemyTintOverride);
     Roll.RollId = RollId;
     Roll.StartTime = World->GetTimeSeconds();
     Roll.Duration = Duration;
@@ -179,7 +179,35 @@ float USkaldDiceManager::GetCleanupDelay() const
     return FMath::Max(Config->ArenaCleanupDelay, Config->DiceCleanupDelay);
 }
 
-USkaldDiceManager::FActiveRoll& USkaldDiceManager::AddRoll(int32 PlayerDice, int32 EnemyDice, float Duration, const FGuid& RollId, bool bForInitiative)
+bool USkaldDiceManager::GetEffectiveTintsForRoll(const FGuid& RollId, FLinearColor& OutPlayerTint, FLinearColor& OutEnemyTint) const
+{
+    const FActiveRoll* Roll = ActiveRolls.Find(RollId);
+    if (!Roll)
+    {
+        return false;
+    }
+
+    auto ResolveTint = [this](const FSkaldDiceTintOverride& Override, bool bPlayerSide) -> FLinearColor
+    {
+        if (Override.bOverrideTint)
+        {
+            return Override.Tint;
+        }
+
+        if (Config)
+        {
+            return bPlayerSide ? Config->PlayerTint : Config->EnemyTint;
+        }
+
+        return bPlayerSide ? FLinearColor(0.0f, 0.45f, 1.0f) : FLinearColor(1.0f, 0.1f, 0.1f);
+    };
+
+    OutPlayerTint = ResolveTint(Roll->PlayerTintOverride, true);
+    OutEnemyTint = ResolveTint(Roll->EnemyTintOverride, false);
+    return true;
+}
+
+USkaldDiceManager::FActiveRoll& USkaldDiceManager::AddRoll(int32 PlayerDice, int32 EnemyDice, float Duration, const FGuid& RollId, bool bForInitiative, const FSkaldDiceTintOverride& PlayerTintOverride, const FSkaldDiceTintOverride& EnemyTintOverride)
 {
     FActiveRoll& Entry = ActiveRolls.FindOrAdd(RollId);
     Entry.RollId = RollId;
@@ -192,6 +220,8 @@ USkaldDiceManager::FActiveRoll& USkaldDiceManager::AddRoll(int32 PlayerDice, int
     Entry.ScriptedResults.Reset();
     Entry.Dice.Reset();
     Entry.Arena.Reset();
+    Entry.PlayerTintOverride = PlayerTintOverride;
+    Entry.EnemyTintOverride = EnemyTintOverride;
     return Entry;
 }
 
@@ -416,6 +446,24 @@ bool USkaldDiceManager::SpawnPhysicalRoll(FActiveRoll& Roll, const TArray<int32>
 
     Roll.Dice.Reset();
 
+    auto ResolveEffectiveTint = [&](bool bPlayerSide) -> FLinearColor
+    {
+        const FSkaldDiceTintOverride& Override = bPlayerSide ? Roll.PlayerTintOverride : Roll.EnemyTintOverride;
+        if (Override.bOverrideTint)
+        {
+            return Override.Tint;
+        }
+
+        if (Config)
+        {
+            return bPlayerSide ? Config->PlayerTint : Config->EnemyTint;
+        }
+
+        return bPlayerSide ? FLinearColor(0.0f, 0.45f, 1.0f) : FLinearColor(1.0f, 0.1f, 0.1f);
+    };
+
+    const FName TintParameter = Config ? Config->DiceTintParameter : NAME_None;
+
     auto SpawnDiceForSide = [&](bool bPlayerSide, int32 Count, const TArray<int32>* DesiredValues)
     {
         if (Count <= 0)
@@ -468,7 +516,7 @@ bool USkaldDiceManager::SpawnPhysicalRoll(FActiveRoll& Roll, const TArray<int32>
             Dice->SetDesiredFaceValue(DesiredValue);
             const bool bSnapToDesired = Roll.bIsInitiative;
             Dice->SetShouldSnapToDesired(bSnapToDesired);
-            Dice->ApplyTint(bPlayerSide ? Config->PlayerTint : Config->EnemyTint, Config->DiceTintParameter);
+            Dice->ApplyTint(ResolveEffectiveTint(bPlayerSide), TintParameter);
             Dice->OnDiceSettled.AddDynamic(this, &USkaldDiceManager::HandleDieSettled);
             Dice->FinishSpawning(FTransform(SpawnRotation, SpawnPosition));
 

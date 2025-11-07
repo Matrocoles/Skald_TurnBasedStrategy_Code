@@ -13,6 +13,30 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDiceRollStarted, const FGuid&, Ro
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnDiceInterimUpdate, const FGuid&, RollId, float, Elapsed);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnDiceRollCompleted, const FGuid&, RollId, const TArray<int32>&, Results);
 
+USTRUCT(BlueprintType)
+struct SKALDDICE_API FSkaldDiceTintOverride
+{
+    GENERATED_BODY();
+
+    FSkaldDiceTintOverride()
+        : bOverrideTint(false)
+        , Tint(FLinearColor::White)
+    {
+    }
+
+    FSkaldDiceTintOverride(bool bInOverride, const FLinearColor& InTint)
+        : bOverrideTint(bInOverride)
+        , Tint(InTint)
+    {
+    }
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dice")
+    bool bOverrideTint;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dice", meta = (EditCondition = "bOverrideTint"))
+    FLinearColor Tint;
+};
+
 UCLASS()
 class SKALDDICE_API USkaldDiceManager : public UGameInstanceSubsystem
 {
@@ -32,7 +56,7 @@ public:
     FOnDiceRollCompleted OnDiceRollCompleted;
 
     UFUNCTION(BlueprintCallable, Category = "Dice")
-    FGuid RollDice_D6(int32 NumPlayerDice, int32 NumEnemyDice, bool bForInitiative);
+    FGuid RollDice_D6(int32 NumPlayerDice, int32 NumEnemyDice, bool bForInitiative, FSkaldDiceTintOverride PlayerTintOverride = FSkaldDiceTintOverride(), FSkaldDiceTintOverride EnemyTintOverride = FSkaldDiceTintOverride());
 
     UFUNCTION(BlueprintCallable, Category = "Dice")
     void SetConfig(UDiceRollConfig* InConfig);
@@ -59,7 +83,10 @@ public:
      * @param DurationOverride Optional fixed duration for the presentation. Negative values use config timing.
      */
     UFUNCTION(BlueprintCallable, Category = "Dice")
-    FGuid PlayScriptedRoll(const TArray<int32>& PlayerResults, const TArray<int32>& EnemyResults, bool bForInitiative, float DurationOverride = -1.f);
+    FGuid PlayScriptedRoll(const TArray<int32>& PlayerResults, const TArray<int32>& EnemyResults, bool bForInitiative, float DurationOverride = -1.f, FSkaldDiceTintOverride PlayerTintOverride = FSkaldDiceTintOverride(), FSkaldDiceTintOverride EnemyTintOverride = FSkaldDiceTintOverride());
+
+    UFUNCTION(BlueprintCallable, Category = "Dice")
+    bool GetEffectiveTintsForRoll(const FGuid& RollId, FLinearColor& OutPlayerTint, FLinearColor& OutEnemyTint) const;
 
     /** Returns the duration before arena and dice are fully cleaned up. */
     float GetCleanupDelay() const;
@@ -83,6 +110,8 @@ private:
         bool bIsInitiative = false;
         TArray<int32> ScriptedResults;
         TWeakObjectPtr<ADiceRollArena> Arena;
+        FSkaldDiceTintOverride PlayerTintOverride;
+        FSkaldDiceTintOverride EnemyTintOverride;
 
         struct FDieState
         {
@@ -99,7 +128,7 @@ private:
     FRandomStream DeterministicStream;
     bool bDeterministic = false;
 
-    FActiveRoll& AddRoll(int32 PlayerDice, int32 EnemyDice, float Duration, const FGuid& RollId, bool bForInitiative);
+    FActiveRoll& AddRoll(int32 PlayerDice, int32 EnemyDice, float Duration, const FGuid& RollId, bool bForInitiative, const FSkaldDiceTintOverride& PlayerTintOverride, const FSkaldDiceTintOverride& EnemyTintOverride);
     void CompleteRoll(FGuid RollId);
     void BroadcastInterim(FGuid RollId);
     bool SpawnPhysicalRoll(FActiveRoll& Roll, const TArray<int32>* PlayerResults = nullptr, const TArray<int32>* EnemyResults = nullptr);

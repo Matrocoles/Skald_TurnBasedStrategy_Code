@@ -12,6 +12,7 @@
 #include "GridBattleManager.generated.h"
 
 class USkaldDiceManager;
+struct FSkaldDiceTintOverride;
 
 /** Lightweight optional int32 replacement to avoid relying on engine optional templates. */
 struct FOptionalInt32
@@ -460,6 +461,10 @@ public:
     UPROPERTY(BlueprintAssignable, Category="Battle|Events")
     FOnInitiativeRollCompleted OnInitiativeRollCompleted;
 
+    /** Fired when an initiative roll ties and requires a reroll. */
+    UPROPERTY(BlueprintAssignable, Category="Battle|Events")
+    FOnInitiativeRerollRequired OnInitiativeRerollRequired;
+
     UFUNCTION(BlueprintCallable, Category="Battle")
     void RegisterFighter(AFighterPawn* Fighter, bool bAsAttacker);
 
@@ -489,6 +494,10 @@ public:
     /** Random stream used for all rolls. */
     UPROPERTY()
     FRandomStream Rng;
+
+    /** Delay (seconds) before prompting a reroll after a tied initiative. */
+    UPROPERTY(EditAnywhere, Category="Battle|Dice")
+    float InitiativeRerollDelay = 0.75f;
 
     /** Size of the square grid used in battle. */
     static const int32 GridSize = 48;
@@ -535,6 +544,10 @@ private:
     void FinalizeRoundStart();
     void ScheduleRoundStart(bool bDelayForPresentation);
     bool ShouldPauseForInitiativePrompt() const;
+    void HandleInitiativeTie(int32 AttackerRoll, int32 DefenderRoll);
+    void BeginInitiativeReroll();
+    ESkaldFaction ResolveFactionForSide(bool bForAttackers) const;
+    FSkaldDiceTintOverride BuildTintOverrideForSide(bool bForAttackers) const;
     void BroadcastBattleConcluded();
 
     bool HasLivingFighters(bool bForAttackers) const;
@@ -599,6 +612,9 @@ private:
 
     /** Timer used to delay initiative winner announcements until dice clear. */
     FTimerHandle InitiativeWinnerAnnouncementTimer;
+
+    /** Timer used to delay reroll prompts after a tie. */
+    FTimerHandle InitiativeRerollTimer;
 
     /** Timer used to defer the battle concluded broadcast so VFX/SFX can finish. */
     FTimerHandle BattleConclusionTimerHandle;
