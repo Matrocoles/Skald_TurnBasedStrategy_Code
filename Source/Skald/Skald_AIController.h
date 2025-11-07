@@ -12,6 +12,9 @@ class AFighterPawn;
 class AWorldMap;
 class UGridBattleManager;
 class UGridOverlayComponent;
+class USkaldAbilityComponent;
+struct FSkaldAbilityState;
+struct FSkaldAbilityTargetingInfo;
 
 /**
  * Controller handling AI turn logic.
@@ -107,8 +110,35 @@ private:
 
   AFighterPawn *FindNextFriendlyFighter(bool bExpectAttacker) const;
   AFighterPawn *FindNearestEnemy(AFighterPawn *Fighter) const;
+  AFighterPawn *FindBestAttackTarget(AFighterPawn *Fighter) const;
+  float EvaluateAttackTargetScore(const AFighterPawn *Attacker,
+                                  const AFighterPawn *Target) const;
+  float EvaluateAttackTargetScoreInternal(const AFighterPawn *Attacker,
+                                          const AFighterPawn *Target,
+                                          bool bIncludeRandom) const;
+  bool GatherEnemiesInRange(AFighterPawn *Fighter,
+                            TArray<AFighterPawn *> &OutTargets) const;
   bool TryAttackNearestEnemy(AFighterPawn *Fighter);
   bool TryMoveTowardsNearestEnemy(AFighterPawn *Fighter);
+  float ComputeAbilityActivationBonus(AFighterPawn *Fighter,
+                                      const FSkaldAbilityState &AbilityState) const;
+  float ComputeAbilityAttackScoreBonus(AFighterPawn *Fighter,
+                                       AFighterPawn *Target,
+                                       const FSkaldAbilityState &AbilityState) const;
+  bool ShouldTriggerAbilityForAttack(AFighterPawn *Fighter,
+                                     AFighterPawn *Target,
+                                     const FSkaldAbilityState &AbilityState,
+                                     const FSkaldAbilityTargetingInfo &Targeting) const;
+  enum class EAIAttackAbilityResult : uint8 {
+    None,
+    AbilityTriggeredNoAttack,
+    AbilityTriggeredAttackExecuted
+  };
+  EAIAttackAbilityResult TryUseFactionAbilityBeforeAttack(
+      AFighterPawn *Fighter, AFighterPawn *Target);
+  bool TryUseMovementAbility(AFighterPawn *Fighter, AFighterPawn *Target);
+  FSkaldAbilityTargetingInfo ResolveAIAbilityTargeting(FName AbilityId) const;
+  int32 CountEnemiesNearTarget(const AFighterPawn *Center, int32 Range) const;
   void ExecuteActivationForFighter(AFighterPawn *Fighter);
   void TryActivateNextFighter();
   void QueueActivationIntent(AFighterPawn *Fighter,
@@ -120,6 +150,8 @@ private:
   void ScheduleNextActivationAttempt();
   void ScheduleTryActivateNextFighter();
   bool ShouldContinueActivation(const AFighterPawn *Fighter) const;
+  int32 ComputeDistanceToNearestEnemy(const AFighterPawn *Fighter) const;
+  float EvaluateFighterActivationPriority(AFighterPawn *Fighter) const;
   void CompleteFighterActivation();
   virtual void HandleBattleMapStateChanged(bool bInBattleMap) override;
 
