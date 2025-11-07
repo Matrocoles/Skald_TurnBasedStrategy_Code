@@ -56,6 +56,10 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dice|Physics")
     FVector2D AngularImpulseRange = FVector2D(100.0f, 300.0f);
 
+    /** Additional upward impulse added to each die as it spawns. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dice|Physics", meta=(ClampMin="0"))
+    float SpawnPopImpulse = 120.f;
+
     /** Height offset applied when spawning dice above the arena bounds. */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dice|Physics")
     float SpawnHeightOffset = 60.f;

@@ -37,6 +37,24 @@ public:
         /** Release any active camera lock, returning manual control to the player. */
         void ClearCameraFocus();
 
+        /** True if the battle camera currently has an automatic lock target. */
+        bool IsBattleCameraLocked() const { return bBattleCameraLocked; }
+
+        /** Actor currently locked by the battle camera, if any. */
+        AActor* GetCurrentBattleCameraLockTarget() const { return LockedBattleActor.Get(); }
+
+        /** Current battle camera boom rotation. */
+        FRotator GetCurrentBattleCameraRotation() const { return CurrentBattleRotation; }
+
+        /** Current boom length used by the battle camera. */
+        float GetCurrentBattleCameraZoom() const;
+
+        /** Smoothly interpolate the battle camera toward the supplied transform. */
+        void StartCameraTransition(const FVector& TargetLocation, const FRotator& TargetRotation, float TargetZoom, float Duration);
+
+        /** True while an automated camera transition is running. */
+        bool IsCameraTransitionActive() const { return bCameraTransitionActive; }
+
 protected:
         /** Called when the game starts or when spawned */
         virtual void BeginPlay() override;
@@ -161,7 +179,7 @@ protected:
 
         /** Maximum allowed zoom distance when using the battle camera. */
         UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Battle")
-        float MaxBattleZoom = 2600.f;
+        float MaxBattleZoom = 3200.f;
 
         /** Amount applied to the desired zoom each time the mouse wheel turns. */
         UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Battle")
@@ -268,4 +286,18 @@ private:
 
         /** Cached collision test state for restoring after battle mode. */
         bool bCachedDoCollisionTest = true;
+
+        /** Tracks the current automated transition request, if any. */
+        bool bCameraTransitionActive = false;
+        float CameraTransitionDuration = 0.f;
+        float CameraTransitionElapsed = 0.f;
+        FVector CameraTransitionStartLocation = FVector::ZeroVector;
+        FVector CameraTransitionTargetLocation = FVector::ZeroVector;
+        FRotator CameraTransitionStartRotation = FRotator::ZeroRotator;
+        FRotator CameraTransitionTargetRotation = FRotator::ZeroRotator;
+        float CameraTransitionStartZoom = 0.f;
+        float CameraTransitionTargetZoom = 0.f;
+
+        /** Update the automated camera transition if one is active. */
+        void UpdateCameraTransition(float DeltaTime);
 };

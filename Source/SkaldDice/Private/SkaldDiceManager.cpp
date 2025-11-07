@@ -402,6 +402,11 @@ bool USkaldDiceManager::SpawnPhysicalRoll(FActiveRoll& Roll, const TArray<int32>
             FVector LinearDirection = FVector(FMath::FRandRange(-1.f, 1.f), FMath::FRandRange(-1.f, 1.f), FMath::FRandRange(0.35f, 1.f)).GetSafeNormal();
             FVector LinearImpulse = LinearDirection * LinearMagnitude;
 
+            if (Config && Config->SpawnPopImpulse > KINDA_SMALL_NUMBER)
+            {
+                LinearImpulse += FVector::UpVector * Config->SpawnPopImpulse;
+            }
+
             const float AngularMagnitude = FMath::RandRange(Config->AngularImpulseRange.X, Config->AngularImpulseRange.Y);
             FVector AngularDirection = FVector(FMath::FRandRange(-1.f, 1.f), FMath::FRandRange(-1.f, 1.f), FMath::FRandRange(-1.f, 1.f)).GetSafeNormal();
             FVector AngularImpulse = AngularDirection * AngularMagnitude;
