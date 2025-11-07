@@ -27,6 +27,7 @@
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "Skald_GameInstance.h"
+#include "Skald_PlayerState.h"
 #include "SkaldDiceManager.h"
 #include "Sound/SoundBase.h"
 #include "TimerManager.h"
@@ -1911,6 +1912,23 @@ bool AFighterPawn::AttemptPhysicalAttackRoll(AFighterPawn* Target)
     if (!Target)
     {
         return false;
+    }
+
+    // Only fighters controlled by human players should enter the manual roll
+    // flow. AI-controlled units should continue using the automatic resolution
+    // path to avoid triggering duplicate dice presentations when they attack.
+    ASkaldPlayerController* OwningController = Cast<ASkaldPlayerController>(GetController());
+    if (!OwningController)
+    {
+        return false;
+    }
+
+    if (const ASkaldPlayerState* PlayerState = OwningController->GetPlayerState<ASkaldPlayerState>())
+    {
+        if (PlayerState->bIsAI)
+        {
+            return false;
+        }
     }
 
     // Only use the manual physical roll flow if we actually have dice.
