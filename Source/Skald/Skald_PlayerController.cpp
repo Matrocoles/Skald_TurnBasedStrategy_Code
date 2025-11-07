@@ -25,6 +25,7 @@
 #include "Skald.h"
 #include "SkaldTypes.h"
 #include "Skald_GameInstance.h"
+#include "SkaldFactionColorConfig.h"
 #include "Skald_GameMode.h"
 #include "Skald_BattleGameMode.h"
 #include "SkaldLogging.h"
@@ -6892,6 +6893,24 @@ USkaldDiceManager *ASkaldPlayerController::ResolveDiceManager() {
   return GI ? GI->GetSubsystem<USkaldDiceManager>() : nullptr;
 }
 
+FLinearColor ASkaldPlayerController::ResolveFactionTint(
+    ESkaldFaction Faction) const {
+  if (const USkaldGameInstance *GameInstance =
+          GetGameInstance<USkaldGameInstance>()) {
+    return GameInstance->GetFactionColor(Faction);
+  }
+
+  return USkaldFactionColorConfig::GetFallbackColor(Faction);
+}
+
+FLinearColor ASkaldPlayerController::ResolveLocalPlayerFactionTint() const {
+  if (const ASkaldPlayerState *PlayerState = GetPlayerState<ASkaldPlayerState>()) {
+    return ResolveFactionTint(PlayerState->Faction);
+  }
+
+  return USkaldFactionColorConfig::GetFallbackColor(ESkaldFaction::None);
+}
+
 FGuid ASkaldPlayerController::TriggerAttackDicePresentation(
     AFighterPawn *Attacker, const FDiceRollResult &Result) {
   if (!IsLocalController() || !bAutoPresentDiceRolls) {
@@ -6927,6 +6946,61 @@ FGuid ASkaldPlayerController::TriggerAttackDicePresentation(
 
   if (PlayerResults.Num() == 0 && EnemyResults.Num() == 0) {
     return FGuid();
+  }
+
+  DiceManager->ClearNextRollTintOverrides();
+  if (!CachedGameInstance) {
+    CachedGameInstance = GetGameInstance<USkaldGameInstance>();
+  }
+
+  const FS_BattlePayload *BattlePayload =
+      CachedGameInstance ? &CachedGameInstance->PendingBattle : nullptr;
+
+  auto ResolveBattleFaction = [BattlePayload](bool bAttackerSide) {
+    if (BattlePayload) {
+      return bAttackerSide ? BattlePayload->AttackerFaction
+                           : BattlePayload->DefenderFaction;
+    }
+    return ESkaldFaction::None;
+  };
+
+  if (PlayerResults.Num() > 0) {
+    ESkaldFaction PlayerFaction = ESkaldFaction::None;
+
+    if (bFriendlyAttack) {
+      if (Attacker && Attacker->Faction != ESkaldFaction::None) {
+        PlayerFaction = Attacker->Faction;
+      } else if (const ASkaldPlayerState *LocalPlayerState =
+                     GetPlayerState<ASkaldPlayerState>()) {
+        PlayerFaction = LocalPlayerState->Faction;
+      } else {
+        PlayerFaction = ResolveBattleFaction(true);
+      }
+    } else {
+      PlayerFaction = ResolveBattleFaction(false);
+    }
+
+    if (PlayerFaction != ESkaldFaction::None) {
+      DiceManager->SetNextRollPlayerTintOverride(
+          ResolveFactionTint(PlayerFaction));
+    }
+  }
+
+  if (EnemyResults.Num() > 0) {
+    ESkaldFaction EnemyFaction = ESkaldFaction::None;
+
+    if (bFriendlyAttack) {
+      EnemyFaction = ResolveBattleFaction(false);
+    } else if (Attacker && Attacker->Faction != ESkaldFaction::None) {
+      EnemyFaction = Attacker->Faction;
+    } else {
+      EnemyFaction = ResolveBattleFaction(true);
+    }
+
+    if (EnemyFaction != ESkaldFaction::None) {
+      DiceManager->SetNextRollEnemyTintOverride(
+          ResolveFactionTint(EnemyFaction));
+    }
   }
 
   FGuid RollId = DiceManager->PlayScriptedRoll(PlayerResults, EnemyResults, false);
@@ -7014,6 +7088,57 @@ FGuid ASkaldPlayerController::TriggerInitiativeDicePresentation(int32 AttackerRo
     }
     else if (DiceManager && (PlayerResults.Num() > 0 || EnemyResults.Num() > 0))
     {
+        DiceManager->ClearNextRollTintOverrides();
+
+        if (!CachedGameInstance)
+        {
+            CachedGameInstance = GetGameInstance<USkaldGameInstance>();
+        }
+
+        const FS_BattlePayload* BattlePayload = CachedGameInstance ? &CachedGameInstance->PendingBattle : nullptr;
+        const ESkaldFaction AttackerFaction = BattlePayload ? BattlePayload->AttackerFaction : ESkaldFaction::None;
+        const ESkaldFaction DefenderFaction = BattlePayload ? BattlePayload->DefenderFaction : ESkaldFaction::None;
+
+        auto ApplyTintOverride = [&](bool bPlayerSide, ESkaldFaction Faction)
+        {
+            if (Faction == ESkaldFaction::None)
+            {
+                return;
+            }
+
+            const FLinearColor Tint = ResolveFactionTint(Faction);
+            if (bPlayerSide)
+            {
+                DiceManager->SetNextRollPlayerTintOverride(Tint);
+            }
+            else
+            {
+                DiceManager->SetNextRollEnemyTintOverride(Tint);
+            }
+        };
+
+        if (PlayerResults.Num() > 0)
+        {
+            ESkaldFaction PlayerFaction = AttackerFaction;
+            if (bPlayerIsDefender)
+            {
+                PlayerFaction = DefenderFaction;
+            }
+
+            ApplyTintOverride(true, PlayerFaction);
+        }
+
+        if (EnemyResults.Num() > 0)
+        {
+            ESkaldFaction EnemyFaction = DefenderFaction;
+            if (bPlayerIsDefender)
+            {
+                EnemyFaction = AttackerFaction;
+            }
+
+            ApplyTintOverride(false, EnemyFaction);
+        }
+
         // Client: show physical dice roll and result
         RollId = DiceManager->PlayScriptedRoll(PlayerResults, EnemyResults, true);
     }

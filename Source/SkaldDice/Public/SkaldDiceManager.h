@@ -64,6 +64,18 @@ public:
     /** Returns the duration before arena and dice are fully cleaned up. */
     float GetCleanupDelay() const;
 
+    /** Apply a player-side tint override for the next physical roll. */
+    void SetNextRollPlayerTintOverride(const FLinearColor& Tint);
+
+    /** Apply an enemy-side tint override for the next physical roll. */
+    void SetNextRollEnemyTintOverride(const FLinearColor& Tint);
+
+    /** Apply overrides for both sides simultaneously. */
+    void SetNextRollTintOverrides(const FLinearColor& PlayerTint, const FLinearColor& EnemyTint);
+
+    /** Clear any queued tint overrides. */
+    void ClearNextRollTintOverrides();
+
 protected:
     UPROPERTY(Transient)
     TObjectPtr<UDiceRollConfig> Config;
@@ -94,6 +106,8 @@ private:
         };
 
         TArray<FDieState> Dice;
+        FLinearColor PlayerTint = FLinearColor::White;
+        FLinearColor EnemyTint = FLinearColor::White;
     };
 
     FRandomStream DeterministicStream;
@@ -127,4 +141,9 @@ private:
     TMap<FGuid, FDeferredInitiativeCleanup> DeferredInitiativeCleanups;
 
     TArray<int32> GenerateResults(int32 TotalDice);
+
+    bool bHasPendingPlayerTintOverride = false;
+    bool bHasPendingEnemyTintOverride = false;
+    FLinearColor PendingPlayerTint = FLinearColor::White;
+    FLinearColor PendingEnemyTint = FLinearColor::White;
 };

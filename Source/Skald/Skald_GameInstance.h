@@ -26,6 +26,7 @@ class ASkaldPlayerState;
 class UTexture2D;
 class UDiceRollConfig;
 class USkaldDiceManager;
+class USkaldFactionColorConfig;
 
 USTRUCT(BlueprintType)
 struct FSkaldTravelState
@@ -203,9 +204,17 @@ public:
   UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Dice")
   bool bAutoInitialiseDiceSubsystem = true;
 
+  /** Optional data asset that exposes editor configurable faction colours. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Faction")
+  TSoftObjectPtr<USkaldFactionColorConfig> FactionColorConfig;
+
   /** Runtime cached dice configuration that remains loaded for the subsystem. */
   UPROPERTY(Transient)
   TObjectPtr<UDiceRollConfig> LoadedDiceRollConfig = nullptr;
+
+  /** Runtime cached faction colour configuration. */
+  UPROPERTY(Transient)
+  mutable TObjectPtr<USkaldFactionColorConfig> LoadedFactionColorConfig = nullptr;
 
   /** Optional faction emblem textures keyed by faction enum. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
@@ -218,6 +227,10 @@ public:
   /** Resolve the configured emblem for a given faction, if one exists. */
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "UI")
   TSoftObjectPtr<UTexture2D> GetFactionEmblem(ESkaldFaction InFaction) const;
+
+  /** Resolve the configured colour for a faction, with sensible defaults when missing. */
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Faction")
+  FLinearColor GetFactionColor(ESkaldFaction InFaction) const;
 
   /** Deploy widget instance owned by the game instance for Slate insertion. */
   UPROPERTY(Transient)
@@ -320,6 +333,7 @@ private:
   void HandleWorldBeginPlay(UWorld *LoadedWorld);
   void HandleDeferredTravelResume(UWorld *LoadedWorld);
   void InitialiseDiceManager();
+  void InitialiseFactionColorConfig();
   bool ShouldAttemptTravelResume() const;
   void ScheduleTravelResume(UWorld *World);
   void AttemptResumeAfterTravel();

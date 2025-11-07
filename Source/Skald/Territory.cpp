@@ -12,49 +12,23 @@
 #include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
 #include "Skald.h"
+#include "SkaldFactionColorConfig.h"
 #include "SkaldLogging.h"
 #include "SkaldTypes.h"
+#include "Skald_GameInstance.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
 #include "UObject/ConstructorHelpers.h"
 #include "WorldMap.h"
 
 namespace {
-FLinearColor GetFactionColor(ESkaldFaction Faction) {
-  switch (Faction) {
-  case ESkaldFaction::Human:
-    return FLinearColor::Blue;
-  case ESkaldFaction::Orc:
-    return FLinearColor::Red;
-  case ESkaldFaction::Dwarf:
-    return FLinearColor(0.55f, 0.35f, 0.15f, 1.f); // Brown
-  case ESkaldFaction::Elf:
-    return FLinearColor(0.05f, 0.18f, 0.08f, 1.f); // Dark vine green
-  case ESkaldFaction::LizardFolk:
-    return FLinearColor(0.0f, 0.5f, 0.5f, 1.f); // Teal
-  case ESkaldFaction::Undead:
-    return FLinearColor::Black;
-  case ESkaldFaction::Gnoll:
-    return FLinearColor(1.0f, 0.45f, 0.05f, 1.f); // Orange
-  case ESkaldFaction::Goblin:
-    return FLinearColor(0.196f, 0.804f, 0.196f, 1.f); // Lime green
-  case ESkaldFaction::Empire:
-    return FLinearColor(0.5f, 0.0f, 0.5f, 1.f); // Purple (IronLegion)
-  case ESkaldFaction::Inflicted:
-    return FLinearColor(1.0f, 0.85f, 0.1f, 1.f); // Yellow
-  case ESkaldFaction::FrogFolk:
-    return FLinearColor(1.f, 0.31f, 0.55f, 1.f); // Rose (ToadFolk)
-  case ESkaldFaction::Ravpack:
-    return FLinearColor(0.54f, 0.f, 0.54f, 1.f); // Violet
-  default:
-    return FLinearColor::White;
-  }
+const FName TerritoryColorParameterName(TEXT("Color"));
 }
-} // namespace
 
 ATerritory::ATerritory() {
   PrimaryActorTick.bCanEverTick = false;
   bReplicates = true;
+  DefaultColor = USkaldFactionColorConfig::GetFallbackColor(ESkaldFaction::None);
   MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
   MeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
   MeshComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
@@ -113,6 +87,8 @@ void ATerritory::OnConstruction(const FTransform &Transform) {
 
   UpdateSelectionDecalTransform();
   ApplySelectionDecalMaterial();
+  EnsureDynamicMaterial();
+  UpdateTerritoryColor();
 }
 
 void ATerritory::BeginPlay() {
@@ -142,10 +118,7 @@ void ATerritory::BeginPlay() {
     MeshComponent->OnClicked.AddDynamic(this, &ATerritory::HandleClicked);
 
     if (MeshComponent->GetNumMaterials() > 0) {
-      DynamicMaterial = MeshComponent->CreateAndSetMaterialInstanceDynamic(0);
-      if (DynamicMaterial) {
-        DynamicMaterial->GetVectorParameterValue(FName("Color"), DefaultColor);
-      }
+      EnsureDynamicMaterial();
     } else {
       UE_LOG(LogSkald, Warning, TEXT("Territory %s has no material at index 0"),
              *GetName());
@@ -196,7 +169,8 @@ void ATerritory::Select(int32 SelectingPlayerId) {
 
   if (!bIsSelected && bShouldShow && DynamicMaterial) {
     // Remember the existing color so it can be restored on deselect
-    DynamicMaterial->GetVectorParameterValue(FName("Color"), DefaultColor);
+    DynamicMaterial->GetVectorParameterValue(TerritoryColorParameterName,
+                                             DefaultColor);
   }
 
   bIsSelected = true;
@@ -320,17 +294,45 @@ void ATerritory::OnRep_IsCapital() { RefreshAppearance(); }
 
 void ATerritory::OnRep_ArmyUnits() { UpdateLabel(); }
 
+void ATerritory::EnsureDynamicMaterial() {
+  if (DynamicMaterial || !MeshComponent) {
+    return;
+  }
+
+  if (MeshComponent->GetNumMaterials() <= 0) {
+    return;
+  }
+
+  DynamicMaterial = MeshComponent->CreateAndSetMaterialInstanceDynamic(0);
+  if (DynamicMaterial) {
+    DynamicMaterial->GetVectorParameterValue(TerritoryColorParameterName,
+                                             DefaultColor);
+  }
+}
+
 void ATerritory::UpdateTerritoryColor() {
+  EnsureDynamicMaterial();
   if (!DynamicMaterial) {
     return;
   }
 
   FLinearColor NewColor = DefaultColor;
-  if (IsValid(OwningPlayer)) {
-    NewColor = GetFactionColor(OwningPlayer->Faction);
+  if (IsValid(OwningPlayer) && OwningPlayer->Faction != ESkaldFaction::None) {
+    if (UWorld *World = GetWorld()) {
+      if (USkaldGameInstance *GameInstance =
+              World->GetGameInstance<USkaldGameInstance>()) {
+        NewColor = GameInstance->GetFactionColor(OwningPlayer->Faction);
+      } else {
+        NewColor =
+            USkaldFactionColorConfig::GetFallbackColor(OwningPlayer->Faction);
+      }
+    }
+  } else {
+    NewColor = USkaldFactionColorConfig::GetFallbackColor(ESkaldFaction::None);
   }
 
-  DynamicMaterial->SetVectorParameterValue(FName("Color"), NewColor);
+  DynamicMaterial->SetVectorParameterValue(TerritoryColorParameterName,
+                                           NewColor);
   DefaultColor = NewColor;
 }
 
