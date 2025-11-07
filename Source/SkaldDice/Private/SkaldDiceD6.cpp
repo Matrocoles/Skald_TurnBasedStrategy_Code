@@ -254,7 +254,14 @@ void ASkaldDiceD6::UpdateSettleState(float DeltaSeconds)
     if (SettleTimer >= HoldTime)
     {
         bSettled = true;
-        ResolvedValue = ResolveFaceValue();
+        int32 PhysicalValue = ResolveFaceValue();
+        if (PhysicalValue <= 0 && DesiredValue > 0)
+        {
+            PhysicalValue = DesiredValue;
+        }
+
+        ResolvedValue = FMath::Clamp(PhysicalValue, 1, 6);
+
         if (DesiredValue > 0 && ResolvedValue != DesiredValue)
         {
             if (bSnapToDesiredValue)
@@ -262,8 +269,6 @@ void ASkaldDiceD6::UpdateSettleState(float DeltaSeconds)
                 ForceFaceValue(DesiredValue, true);
                 return;
             }
-
-            ResolvedValue = FMath::Clamp(DesiredValue, 1, 6);
         }
 
         StabiliseAfterSettlement();
