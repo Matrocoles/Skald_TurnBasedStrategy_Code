@@ -114,6 +114,8 @@ void UBattleHUDWidget::NativeConstruct() {
     AbilityLabel3->SetVisibility(ESlateVisibility::Collapsed);
   }
 
+  ClearEnemyStatPanel();
+
   if (DiceResolutionPanel) {
     DiceResolutionPanel->OnResolutionComplete.AddDynamic(
         this, &UBattleHUDWidget::HandleDicePanelResolved);
@@ -167,6 +169,7 @@ void UBattleHUDWidget::NativeDestruct() {
   PendingDiceResolutions.Reset();
   bDiceResolutionActive = false;
   ActiveDiceResolution = FBattleQueuedDiceResolution();
+  ClearEnemyStatPanel();
 
   if (DiceRollerRenderTarget) {
     DiceRollerRenderTarget->OnCanvasRenderTargetUpdate.RemoveDynamic(
@@ -241,6 +244,7 @@ void UBattleHUDWidget::SetLockedInFighters(
   PruneInvalidLockedInEntries();
 
   LockedInFighterOrder.Reset();
+  KnownFriendlyFighters.Reset();
   ScrollBox_LockedInFightersList->ClearChildren();
 
   TSet<AFighterPawn *> DesiredSet;
@@ -251,6 +255,7 @@ void UBattleHUDWidget::SetLockedInFighters(
 
     DesiredSet.Add(Fighter);
     LockedInFighterOrder.Add(Fighter);
+    KnownFriendlyFighters.Add(Fighter);
 
     if (ULockedInFighterEntryWidget *Entry =
             FindOrCreateLockedInEntry(Fighter)) {
@@ -271,6 +276,7 @@ void UBattleHUDWidget::SetLockedInFighters(
         It->Value->RemoveFromParent();
         It->Value->ResetEntry();
       }
+      KnownFriendlyFighters.Remove(It->Key);
       It.RemoveCurrent();
     }
   }
@@ -303,6 +309,7 @@ void UBattleHUDWidget::SetEnemyLockedInFighters(
   PruneInvalidEnemyLockedInEntries();
 
   EnemyLockedInFighterOrder.Reset();
+  KnownEnemyFighters.Reset();
   ScrollBox_EnemyLockedInFightersList->ClearChildren();
 
   TSet<AFighterPawn *> DesiredSet;
@@ -313,6 +320,7 @@ void UBattleHUDWidget::SetEnemyLockedInFighters(
 
     DesiredSet.Add(Fighter);
     EnemyLockedInFighterOrder.Add(Fighter);
+    KnownEnemyFighters.Add(Fighter);
 
     if (ULockedInFighterEntryWidget *Entry =
             FindOrCreateEnemyLockedInEntry(Fighter)) {
@@ -333,6 +341,7 @@ void UBattleHUDWidget::SetEnemyLockedInFighters(
         It->Value->RemoveFromParent();
         It->Value->ResetEntry();
       }
+      KnownEnemyFighters.Remove(It->Key);
       It.RemoveCurrent();
     }
   }
@@ -362,6 +371,7 @@ void UBattleHUDWidget::ClearLockedInFighterList() {
   LockedInFighterOrder.Reset();
   HighlightedLockedInFighter.Reset();
   ActiveLockedInFighter.Reset();
+  KnownFriendlyFighters.Reset();
 }
 
 void UBattleHUDWidget::ClearEnemyLockedInFighterList() {
@@ -378,6 +388,7 @@ void UBattleHUDWidget::ClearEnemyLockedInFighterList() {
   EnemyLockedInFighterOrder.Reset();
   HighlightedEnemyLockedInFighter.Reset();
   ActiveEnemyLockedInFighter.Reset();
+  KnownEnemyFighters.Reset();
 }
 
 void UBattleHUDWidget::SetHighlightedLockedInFighter(AFighterPawn *Fighter) {
@@ -436,6 +447,12 @@ void UBattleHUDWidget::SetActiveEnemyLockedInFighter(AFighterPawn *Fighter) {
       }
     }
   }
+
+  if (Fighter) {
+    UpdateEnemyStatPanel(Fighter);
+  } else if (!bDiceResolutionActive) {
+    ClearEnemyStatPanel();
+  }
 }
 
 void UBattleHUDWidget::RefreshLockedInFighterTurnStates() {
@@ -465,6 +482,7 @@ void UBattleHUDWidget::PruneInvalidLockedInEntries() {
         It->Value->RemoveFromParent();
         It->Value->ResetEntry();
       }
+      KnownFriendlyFighters.Remove(It->Key);
       It.RemoveCurrent();
     }
   }
@@ -472,6 +490,12 @@ void UBattleHUDWidget::PruneInvalidLockedInEntries() {
   LockedInFighterOrder.RemoveAll([](const TWeakObjectPtr<AFighterPawn> &Ptr) {
     return !Ptr.IsValid();
   });
+
+  for (auto It = KnownFriendlyFighters.CreateIterator(); It; ++It) {
+    if (!It->IsValid()) {
+      It.RemoveCurrent();
+    }
+  }
 }
 
 void UBattleHUDWidget::PruneInvalidEnemyLockedInEntries() {
@@ -482,6 +506,7 @@ void UBattleHUDWidget::PruneInvalidEnemyLockedInEntries() {
         It->Value->RemoveFromParent();
         It->Value->ResetEntry();
       }
+      KnownEnemyFighters.Remove(It->Key);
       It.RemoveCurrent();
     }
   }
@@ -489,6 +514,12 @@ void UBattleHUDWidget::PruneInvalidEnemyLockedInEntries() {
   EnemyLockedInFighterOrder.RemoveAll([](const TWeakObjectPtr<AFighterPawn> &Ptr) {
     return !Ptr.IsValid();
   });
+
+  for (auto It = KnownEnemyFighters.CreateIterator(); It; ++It) {
+    if (!It->IsValid()) {
+      It.RemoveCurrent();
+    }
+  }
 }
 
 ULockedInFighterEntryWidget *
@@ -607,6 +638,8 @@ void UBattleHUDWidget::RemoveLockedInEntry(AFighterPawn *Fighter) {
     }
   }
 
+  KnownFriendlyFighters.Remove(Fighter);
+
   LockedInFighterOrder.RemoveAll([Fighter](const TWeakObjectPtr<AFighterPawn> &Ptr) {
     return Ptr.Get() == Fighter;
   });
@@ -650,6 +683,8 @@ void UBattleHUDWidget::RemoveEnemyLockedInEntry(AFighterPawn *Fighter) {
       break;
     }
   }
+
+  KnownEnemyFighters.Remove(Fighter);
 
   EnemyLockedInFighterOrder.RemoveAll(
       [Fighter](const TWeakObjectPtr<AFighterPawn> &Ptr) {
@@ -750,53 +785,9 @@ void UBattleHUDWidget::BindToFighter(AFighterPawn *Fighter) {
     }
 
     UpdateStatPanel();
-    if (FighterNameText) {
-      FighterNameText->SetText(FText::FromName(BoundFighter->GetFighterId()));
-    }
-    if (FighterImage) {
-      if (UTexture2D *PortraitTexture = BoundFighter->GetPortraitTexture()) {
-        FighterImage->SetBrushFromTexture(PortraitTexture);
-        FighterImage->SetVisibility(ESlateVisibility::HitTestInvisible);
-      } else {
-        FighterImage->SetBrushFromTexture(nullptr);
-        FighterImage->SetVisibility(ESlateVisibility::Collapsed);
-      }
-    }
   } else {
-    if (HealthText) {
-      HealthText->SetText(FText::GetEmpty());
-    }
-    if (AttackText) {
-      AttackText->SetText(FText::GetEmpty());
-    }
-    if (CriticalDamageText) {
-      CriticalDamageText->SetText(FText::GetEmpty());
-    }
-    if (MoveText) {
-      MoveText->SetText(FText::GetEmpty());
-    }
-    if (ActionsText) {
-      ActionsText->SetText(FText::GetEmpty());
-    }
-    if (StrengthText) {
-      StrengthText->SetText(FText::GetEmpty());
-    }
-    if (DefenceText) {
-      DefenceText->SetText(FText::GetEmpty());
-    }
-    if (AttackRangeText) {
-      AttackRangeText->SetText(FText::GetEmpty());
-    }
-    if (AttackDiceText) {
-      AttackDiceText->SetText(FText::GetEmpty());
-    }
-    if (FighterNameText) {
-      FighterNameText->SetText(FText::GetEmpty());
-    }
-    if (FighterImage) {
-      FighterImage->SetBrushFromTexture(nullptr);
-      FighterImage->SetVisibility(ESlateVisibility::Collapsed);
-    }
+    ClearPrimaryStatPanel();
+    ClearEnemyStatPanel();
   }
 
   RefreshAbilityDisplay();
@@ -962,41 +953,251 @@ void UBattleHUDWidget::HandleAbilityComponentUpdated(
 }
 
 void UBattleHUDWidget::UpdateStatPanel() {
-  if (!BoundFighter) {
+  ApplyPrimaryFighterDisplay(BoundFighter);
+  UpdateActionButtonVisibility();
+}
+
+void UBattleHUDWidget::UpdateEnemyStatPanel(AFighterPawn *Fighter) {
+  DisplayedEnemyStatFighter = Fighter;
+  if (!Fighter) {
+    ClearEnemyStatPanel();
     return;
   }
-  if (HealthText) {
-    HealthText->SetText(FText::AsNumber(BoundFighter->Stats.Health));
-  }
-  if (AttackText) {
-    AttackText->SetText(FText::AsNumber(BoundFighter->Stats.AttackDamage));
-  }
-  if (CriticalDamageText) {
-    const int32 CriticalDamage =
-        BoundFighter->Stats.AttackDamage +
-        BoundFighter->Stats.CriticalBonusDamage;
-    CriticalDamageText->SetText(FText::AsNumber(CriticalDamage));
-  }
-  if (MoveText) {
-    MoveText->SetText(FText::AsNumber(BoundFighter->Stats.Movement));
-  }
-  if (ActionsText) {
-    ActionsText->SetText(FText::AsNumber(BoundFighter->ActionsRemaining));
-  }
-  if (StrengthText) {
-    StrengthText->SetText(FText::AsNumber(BoundFighter->Stats.Strength));
-  }
-  if (DefenceText) {
-    DefenceText->SetText(FText::AsNumber(BoundFighter->Stats.Defence));
-  }
-  if (AttackRangeText) {
-    AttackRangeText->SetText(FText::AsNumber(BoundFighter->Stats.AttackRange));
-  }
-  if (AttackDiceText) {
-    AttackDiceText->SetText(FText::AsNumber(BoundFighter->Stats.AttackDice));
+
+  const auto SetTextAndVisibility = [](UTextBlock *Widget, const FText &Value) {
+    if (Widget) {
+      Widget->SetText(Value);
+      Widget->SetVisibility(ESlateVisibility::HitTestInvisible);
+    }
+  };
+
+  SetTextAndVisibility(EnemyHealthText, FText::AsNumber(Fighter->Stats.Health));
+  SetTextAndVisibility(EnemyAttackText,
+                       FText::AsNumber(Fighter->Stats.AttackDamage));
+
+  if (EnemyCriticalDamageText) {
+    const int32 CriticalDamage = Fighter->Stats.AttackDamage +
+                                 Fighter->Stats.CriticalBonusDamage;
+    SetTextAndVisibility(EnemyCriticalDamageText,
+                         FText::AsNumber(CriticalDamage));
   }
 
-  UpdateActionButtonVisibility();
+  SetTextAndVisibility(EnemyMoveText,
+                       FText::AsNumber(Fighter->Stats.Movement));
+  SetTextAndVisibility(EnemyActionsText,
+                       FText::AsNumber(Fighter->ActionsRemaining));
+  SetTextAndVisibility(EnemyStrengthText,
+                       FText::AsNumber(Fighter->Stats.Strength));
+  SetTextAndVisibility(EnemyDefenceText,
+                       FText::AsNumber(Fighter->Stats.Defence));
+  SetTextAndVisibility(EnemyAttackRangeText,
+                       FText::AsNumber(Fighter->Stats.AttackRange));
+  SetTextAndVisibility(EnemyAttackDiceText,
+                       FText::AsNumber(Fighter->Stats.AttackDice));
+
+  if (EnemyFighterNameText) {
+    EnemyFighterNameText->SetText(FText::FromName(Fighter->GetFighterId()));
+    EnemyFighterNameText->SetVisibility(ESlateVisibility::HitTestInvisible);
+  }
+
+  if (EnemyFighterImage) {
+    if (UTexture2D *PortraitTexture = Fighter->GetPortraitTexture()) {
+      EnemyFighterImage->SetBrushFromTexture(PortraitTexture);
+      EnemyFighterImage->SetVisibility(ESlateVisibility::HitTestInvisible);
+    } else {
+      EnemyFighterImage->SetBrushFromTexture(nullptr);
+      EnemyFighterImage->SetVisibility(ESlateVisibility::Collapsed);
+    }
+  }
+}
+
+void UBattleHUDWidget::ClearEnemyStatPanel() {
+  DisplayedEnemyStatFighter.Reset();
+
+  const auto ClearTextAndHide = [](UTextBlock *Widget) {
+    if (Widget) {
+      Widget->SetText(FText::GetEmpty());
+      Widget->SetVisibility(ESlateVisibility::Collapsed);
+    }
+  };
+
+  ClearTextAndHide(EnemyHealthText);
+  ClearTextAndHide(EnemyAttackText);
+  ClearTextAndHide(EnemyCriticalDamageText);
+  ClearTextAndHide(EnemyMoveText);
+  ClearTextAndHide(EnemyActionsText);
+  ClearTextAndHide(EnemyStrengthText);
+  ClearTextAndHide(EnemyDefenceText);
+  ClearTextAndHide(EnemyAttackRangeText);
+  ClearTextAndHide(EnemyAttackDiceText);
+  ClearTextAndHide(EnemyFighterNameText);
+
+  if (EnemyFighterImage) {
+    EnemyFighterImage->SetBrushFromTexture(nullptr);
+    EnemyFighterImage->SetVisibility(ESlateVisibility::Collapsed);
+  }
+}
+
+void UBattleHUDWidget::ApplyPrimaryFighterDisplay(AFighterPawn *Fighter) {
+  DisplayedFriendlyStatFighter = Fighter;
+  if (!Fighter) {
+    ClearPrimaryStatPanel();
+    return;
+  }
+
+  const auto SetNumericText = [](UTextBlock *Widget, int32 Value) {
+    if (Widget) {
+      Widget->SetText(FText::AsNumber(Value));
+    }
+  };
+
+  SetNumericText(HealthText, Fighter->Stats.Health);
+  SetNumericText(AttackText, Fighter->Stats.AttackDamage);
+  SetNumericText(MoveText, Fighter->Stats.Movement);
+  SetNumericText(ActionsText, Fighter->ActionsRemaining);
+  SetNumericText(StrengthText, Fighter->Stats.Strength);
+  SetNumericText(DefenceText, Fighter->Stats.Defence);
+  SetNumericText(AttackRangeText, Fighter->Stats.AttackRange);
+  SetNumericText(AttackDiceText, Fighter->Stats.AttackDice);
+
+  if (CriticalDamageText) {
+    const int32 CriticalDamage =
+        Fighter->Stats.AttackDamage + Fighter->Stats.CriticalBonusDamage;
+    CriticalDamageText->SetText(FText::AsNumber(CriticalDamage));
+  }
+
+  if (FighterNameText) {
+    FighterNameText->SetText(FText::FromName(Fighter->GetFighterId()));
+  }
+
+  if (FighterImage) {
+    if (UTexture2D *PortraitTexture = Fighter->GetPortraitTexture()) {
+      FighterImage->SetBrushFromTexture(PortraitTexture);
+      FighterImage->SetVisibility(ESlateVisibility::HitTestInvisible);
+    } else {
+      FighterImage->SetBrushFromTexture(nullptr);
+      FighterImage->SetVisibility(ESlateVisibility::Collapsed);
+    }
+  }
+}
+
+void UBattleHUDWidget::ClearPrimaryStatPanel() {
+  DisplayedFriendlyStatFighter.Reset();
+
+  const auto ClearText = [](UTextBlock *Widget) {
+    if (Widget) {
+      Widget->SetText(FText::GetEmpty());
+    }
+  };
+
+  ClearText(HealthText);
+  ClearText(AttackText);
+  ClearText(CriticalDamageText);
+  ClearText(MoveText);
+  ClearText(ActionsText);
+  ClearText(StrengthText);
+  ClearText(DefenceText);
+  ClearText(AttackRangeText);
+  ClearText(AttackDiceText);
+
+  if (FighterNameText) {
+    FighterNameText->SetText(FText::GetEmpty());
+  }
+
+  if (FighterImage) {
+    FighterImage->SetBrushFromTexture(nullptr);
+    FighterImage->SetVisibility(ESlateVisibility::Collapsed);
+  }
+}
+
+AFighterPawn *UBattleHUDWidget::ResolveFriendlyStatFighter(
+    AFighterPawn *Attacker, AFighterPawn *Defender) const {
+  if (IsKnownFriendlyFighter(Attacker)) {
+    return Attacker;
+  }
+  if (IsKnownFriendlyFighter(Defender)) {
+    return Defender;
+  }
+  return nullptr;
+}
+
+AFighterPawn *UBattleHUDWidget::ResolveEnemyStatFighter(AFighterPawn *Attacker,
+                                                         AFighterPawn *Defender) const {
+  AFighterPawn *Friendly = ResolveFriendlyStatFighter(Attacker, Defender);
+  if (Friendly) {
+    AFighterPawn *Candidate = (Friendly == Attacker) ? Defender : Attacker;
+    if (Candidate) {
+      return Candidate;
+    }
+  }
+
+  if (IsKnownEnemyFighter(Attacker)) {
+    return Attacker;
+  }
+  if (IsKnownEnemyFighter(Defender)) {
+    return Defender;
+  }
+
+  if (Friendly) {
+    return (Friendly == Attacker) ? Defender : Attacker;
+  }
+
+  return Attacker ? Attacker : Defender;
+}
+
+bool UBattleHUDWidget::IsKnownFriendlyFighter(const AFighterPawn *Fighter) const {
+  if (!Fighter) {
+    return false;
+  }
+
+  if (BoundFighter == Fighter) {
+    return true;
+  }
+
+  if (DisplayedFriendlyStatFighter.IsValid() &&
+      DisplayedFriendlyStatFighter.Get() == Fighter) {
+    return true;
+  }
+
+  if (KnownFriendlyFighters.Contains(const_cast<AFighterPawn *>(Fighter))) {
+    return true;
+  }
+
+  for (const TWeakObjectPtr<AFighterPawn> &Ptr : LockedInFighterOrder) {
+    if (Ptr.Get() == Fighter) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+bool UBattleHUDWidget::IsKnownEnemyFighter(const AFighterPawn *Fighter) const {
+  if (!Fighter) {
+    return false;
+  }
+
+  if (DisplayedEnemyStatFighter.IsValid() &&
+      DisplayedEnemyStatFighter.Get() == Fighter) {
+    return true;
+  }
+
+  if (ActiveEnemyLockedInFighter.IsValid() &&
+      ActiveEnemyLockedInFighter.Get() == Fighter) {
+    return true;
+  }
+
+  if (KnownEnemyFighters.Contains(const_cast<AFighterPawn *>(Fighter))) {
+    return true;
+  }
+
+  for (const TWeakObjectPtr<AFighterPawn> &Ptr : EnemyLockedInFighterOrder) {
+    if (Ptr.Get() == Fighter) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 void UBattleHUDWidget::RefreshAbilityDisplay() {
@@ -1768,6 +1969,17 @@ void UBattleHUDWidget::ProcessNextDiceResolution() {
         ActiveDiceResolution.Result.DiceOutcomes.Num();
   }
 
+  if (AFighterPawn *FriendlyForDisplay =
+          ResolveFriendlyStatFighter(ActiveDiceResolution.Attacker.Get(),
+                                     ActiveDiceResolution.Defender.Get())) {
+    ApplyPrimaryFighterDisplay(FriendlyForDisplay);
+  }
+
+  AFighterPawn *EnemyForDisplay =
+      ResolveEnemyStatFighter(ActiveDiceResolution.Attacker.Get(),
+                              ActiveDiceResolution.Defender.Get());
+  UpdateEnemyStatPanel(EnemyForDisplay);
+
   if (!DiceResolutionPanel) {
     OnResolutionComplete.Broadcast(ActiveDiceResolution.Attacker.Get(),
                                    ActiveDiceResolution.Defender.Get(),
@@ -1775,6 +1987,8 @@ void UBattleHUDWidget::ProcessNextDiceResolution() {
     ReleaseHealthTextHold(ActiveDiceResolution.Defender.Get());
     bDiceResolutionActive = false;
     bManualDiceResolutionActive = false;
+    ClearEnemyStatPanel();
+    UpdateStatPanel();
     ProcessNextDiceResolution();
     return;
   }
@@ -1804,6 +2018,8 @@ void UBattleHUDWidget::HandleDicePanelResolved(
     SetAttackRollButtonVisibility(false);
     ReleaseHealthTextHold(nullptr);
     OnResolutionComplete.Broadcast(nullptr, nullptr, Result);
+    ClearEnemyStatPanel();
+    UpdateStatPanel();
     return;
   }
 
@@ -1817,6 +2033,8 @@ void UBattleHUDWidget::HandleDicePanelResolved(
   ActiveDiceResolution = FBattleQueuedDiceResolution();
   bManualDiceResolutionActive = false;
   SetAttackRollButtonVisibility(false);
+  ClearEnemyStatPanel();
+  UpdateStatPanel();
 
   ProcessNextDiceResolution();
 }
