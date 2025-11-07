@@ -403,7 +403,7 @@ void USkaldMainHUDWidget::UpdatePhaseBanner(ETurnPhase InPhase) {
       const FText Prompt = ResolveSelectionPromptText(
           SkaldSelectionPromptKeys::ArmyPlacementOwnedTerritoryPrompt,
           NSLOCTEXT("SkaldHUD", "ArmyPlacementOwnedTerritoryPrompt",
-                    "Select an owned territory."));
+                    "Select an owned territory. You may deploy up to 10 troops per territory."));
       ShowSelectionPromptMessage(Prompt);
     } else if (CurrentPhase == ETurnPhase::Movement) {
       const FText Prompt = ResolveSelectionPromptText(
@@ -1247,6 +1247,43 @@ void USkaldMainHUDWidget::ShowSelectionErrorMessage(const FText &Message) {
   ShowErrorMessage(Message.ToString());
 }
 
+void USkaldMainHUDWidget::ShowArmyPlacementLimitWarning(const FText &Message) {
+  const FString MessageString = Message.ToString();
+  ShowSelectionPromptMessage(Message);
+
+  if (GEngine) {
+    GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Red, MessageString);
+  }
+  BP_ShowErrorMessage(MessageString);
+
+  if (UWorld *World = GetWorld()) {
+    if (!bArmyPlacementWarningActive) {
+      CachedSelectionPromptText = PendingSelectionPromptText;
+      bCachedSelectionPromptVisible = bPendingSelectionPromptVisible;
+    }
+
+    bArmyPlacementWarningActive = true;
+
+    World->GetTimerManager().ClearTimer(ArmyPlacementWarningTimerHandle);
+    World->GetTimerManager().SetTimer(
+        ArmyPlacementWarningTimerHandle, this,
+        &USkaldMainHUDWidget::HandleArmyPlacementWarningExpired, 2.0f, false);
+  }
+}
+
+void USkaldMainHUDWidget::HandleArmyPlacementWarningExpired() {
+  bArmyPlacementWarningActive = false;
+
+  if (bCachedSelectionPromptVisible) {
+    ShowSelectionPromptMessage(CachedSelectionPromptText, true);
+  } else {
+    ShowSelectionPromptMessage(FText::GetEmpty(), false);
+  }
+
+  CachedSelectionPromptText = FText::GetEmpty();
+  bCachedSelectionPromptVisible = false;
+}
+
 void USkaldMainHUDWidget::ApplyPendingSelectionPrompt() {
   UTextBlock *PromptLabel = GetSelectionPromptTextBlock();
   if (!PromptLabel) {
@@ -2015,12 +2052,27 @@ void USkaldMainHUDWidget::HandleDeployClicked() {
     return;
   }
 
+  int32 MaxDeployable = PS->DeployableUnits;
+  if (bIsArmyPlacement) {
+    const int32 TerritoryId = Territory->TerritoryID;
+    const int32 AlreadyPlaced =
+        PS->GetArmyPlacementDeploymentForTerritory(TerritoryId);
+    const int32 RemainingCapacity =
+        FMath::Max(0, Skald::ArmyPlacement::DeployPerTerritoryLimit -
+                           AlreadyPlaced);
+    if (RemainingCapacity <= 0) {
+      const FText WarningText = NSLOCTEXT(
+          "SkaldHUD", "ArmyPlacementTerritoryMaxReached",
+          "Maximum troop deployment for this territory has been reached.");
+      ShowArmyPlacementLimitWarning(WarningText);
+      return;
+    }
+    MaxDeployable = FMath::Min(MaxDeployable, RemainingCapacity);
+  }
+
   ActiveDeployWidget =
       CreateWidget<UDeployWidget>(GetWorld(), DeployWidgetClass);
   if (ActiveDeployWidget) {
-    const int32 MaxDeployable = bIsArmyPlacement
-                                    ? FMath::Min(10, PS->DeployableUnits)
-                                    : PS->DeployableUnits;
     ActiveDeployWidget->SetupDeployment(Territory, PS, this, MaxDeployable);
     ActiveDeployWidget->AddToViewport();
     if (APlayerController *FocusPC = GetOwningPlayer()) {
@@ -2047,6 +2099,42 @@ void USkaldMainHUDWidget::ClearDeployWidget() {
   if (ASkaldPlayerController *PC =
           Cast<ASkaldPlayerController>(GetOwningPlayer())) {
     PC->ShowMainHUD();
+  }
+}
+
+void USkaldMainHUDWidget::HandleDeploymentCancelled() {
+  ClearDeployWidget();
+
+  if (DeployButton) {
+    DeployButton->SetVisibility(ESlateVisibility::Collapsed);
+    DeployButton->SetIsEnabled(false);
+  }
+
+  SelectedSourceID = -1;
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(ArmyPlacementWarningTimerHandle);
+  }
+  bArmyPlacementWarningActive = false;
+  CachedSelectionPromptText = FText::GetEmpty();
+  bCachedSelectionPromptVisible = false;
+
+  if (AWorldMap *WorldMap =
+          Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+              GetWorld(), AWorldMap::StaticClass()))) {
+    if (LocalPlayerID != -1) {
+      WorldMap->SelectTerritory(nullptr, false, LocalPlayerID);
+    } else {
+      WorldMap->SelectTerritory(nullptr, false, INDEX_NONE);
+    }
+  }
+
+  if (CurrentPhase == ETurnPhase::ArmyPlacement) {
+    const FText Prompt = ResolveSelectionPromptText(
+        SkaldSelectionPromptKeys::ArmyPlacementOwnedTerritoryPrompt,
+        NSLOCTEXT("SkaldHUD", "ArmyPlacementOwnedTerritoryPrompt",
+                  "Select an owned territory. You may deploy up to 10 troops per territory."));
+    ShowSelectionPromptMessage(Prompt);
   }
 }
 

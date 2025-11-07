@@ -5,6 +5,7 @@
 
 class UButton;
 class USpinBox;
+class USoundBase;
 class ATerritory;
 class ASkaldPlayerState;
 class USkaldMainHUDWidget;
@@ -38,6 +39,10 @@ public:
 
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
   UButton *DeclineButton;
+
+  /** Sound to play when the deploy widget is shown. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skald|Deploy")
+  TObjectPtr<USoundBase> HowManyTroops;
 
 private:
   UFUNCTION(BlueprintCallable, Category = "Skald|Deploy")

@@ -6,6 +6,7 @@
 
 class UButton;
 class USpinBox;
+class USoundBase;
 
 /**
  * Simple confirmation widget with Approve/Cancel buttons for attack
@@ -35,6 +36,10 @@ public:
   /** Number of units chosen by the player. */
   UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Skald|Attack")
   int32 ArmyCount = 1;
+
+  /** Sound to play when the confirm attack widget appears. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skald|Attack")
+  TObjectPtr<USoundBase> SendTroops;
 
 private:
   UFUNCTION(BlueprintCallable, Category = "Skald|Attack")

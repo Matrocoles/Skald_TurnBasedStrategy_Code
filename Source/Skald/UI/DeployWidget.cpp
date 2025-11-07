@@ -1,6 +1,7 @@
 #include "UI/DeployWidget.h"
 #include "Components/Button.h"
 #include "Components/SpinBox.h"
+#include "Kismet/GameplayStatics.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
 #include "SkaldTypes.h"
@@ -24,6 +25,10 @@ void UDeployWidget::NativeConstruct() {
     AmountSelector->SetMinValue(1.f);
     AmountSelector->SetDelta(1.f);
     AmountSelector->SetValue(1.f);
+  }
+
+  if (HowManyTroops) {
+    UGameplayStatics::PlaySound2D(this, HowManyTroops);
   }
 }
 
@@ -119,8 +124,10 @@ void UDeployWidget::HandleDecline() {
   if (OwningHUD.IsValid()) {
     if (Mode == EDeployWidgetMode::Transfer) {
       OwningHUD->CancelMoveSelection();
+      OwningHUD->ClearDeployWidget();
+    } else {
+      OwningHUD->HandleDeploymentCancelled();
     }
-    OwningHUD->ClearDeployWidget();
   } else if (IsInViewport()) {
     RemoveFromParent();
   }
