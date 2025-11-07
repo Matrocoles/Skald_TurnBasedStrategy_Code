@@ -89,6 +89,8 @@ UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class SKALD_API UGridOverlayComponent : public UActorComponent {
   GENERATED_BODY()
 
+  friend class AFighterPawn;
+
 public:
   UGridOverlayComponent();
 

@@ -43,6 +43,8 @@ UCLASS()
 class SKALD_API AFighterPawn : public APawn {
   GENERATED_BODY()
 
+  friend class UGridOverlayComponent;
+
 public:
   AFighterPawn();
 
