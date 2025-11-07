@@ -1201,6 +1201,10 @@ bool UBattleHUDWidget::IsFriendlyCandidate(const AFighterPawn *Fighter) const {
     return false;
   }
 
+  if (IsKnownEnemyFighter(Fighter)) {
+    return false;
+  }
+
   if (KnownFriendlyFighters.Contains(const_cast<AFighterPawn *>(Fighter))) {
     return true;
   }

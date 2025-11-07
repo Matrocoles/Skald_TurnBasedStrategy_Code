@@ -6130,6 +6130,13 @@ void ASkaldPlayerController::StartAttackDiceSequence(
   PendingAttackSequence.Attacker = Attacker;
   PendingAttackSequence.Defender = Defender;
   PendingAttackSequence.Result = Result;
+  PendingAttackSequence.PhysicalRollResults.Reset();
+  PendingAttackSequence.bHasPhysicalResults = false;
+  PendingAttackSequence.AttackerSnapshot =
+      Attacker ? Attacker->Stats : FFighterStats();
+  PendingAttackSequence.DefenderSnapshot =
+      Defender ? Defender->Stats : FFighterStats();
+  PendingAttackSequence.DefenderSnapshot.Health = Result.StartingHealth;
   PendingAttackSequence.bHadBattleCamera = true;
   PendingAttackSequence.OriginalLocation = CameraPawn->GetActorLocation();
   PendingAttackSequence.OriginalRotation =
@@ -6264,6 +6271,8 @@ void ASkaldPlayerController::HandlePhysicalDiceRollCompleted(
   }
 
   PendingAttackSequence.ActiveRollId.Invalidate();
+  PendingAttackSequence.PhysicalRollResults = Results;
+  PendingAttackSequence.bHasPhysicalResults = Results.Num() > 0;
 
   float CleanupDelay = 0.f;
   if (USkaldDiceManager *DiceManager = ResolveDiceManager()) {
@@ -6348,6 +6357,8 @@ void ASkaldPlayerController::CompletePendingAttackSequence() {
     return;
   }
 
+  ApplyPendingPhysicalAttackResults();
+
   ProcessAttackResolutionPresentation(PendingAttackSequence.Attacker.Get(),
                                       PendingAttackSequence.Defender.Get(),
                                       PendingAttackSequence.Result);
@@ -6365,6 +6376,58 @@ void ASkaldPlayerController::ResetAttackDiceSequence() {
   }
 
   PendingAttackSequence = FPendingAttackDiceSequence();
+}
+
+void ASkaldPlayerController::ApplyPendingPhysicalAttackResults() {
+  if (!PendingAttackSequence.bActive ||
+      !PendingAttackSequence.bHasPhysicalResults ||
+      PendingAttackSequence.PhysicalRollResults.Num() == 0) {
+    return;
+  }
+
+  const int32 ExpectedDice =
+      FMath::Max(0, PendingAttackSequence.AttackerSnapshot.AttackDice);
+  if (ExpectedDice <= 0) {
+    PendingAttackSequence.bHasPhysicalResults = false;
+    PendingAttackSequence.PhysicalRollResults.Reset();
+    return;
+  }
+
+  TArray<int32> RollValues = PendingAttackSequence.PhysicalRollResults;
+  if (RollValues.Num() > ExpectedDice) {
+    RollValues.SetNum(ExpectedDice);
+  }
+
+  USkaldGameInstance *GameInstance = CachedGameInstance;
+  if (!GameInstance) {
+    GameInstance = GetGameInstance<USkaldGameInstance>();
+    CachedGameInstance = GameInstance;
+  }
+
+  UGridBattleManager *BattleManager =
+      GameInstance ? GameInstance->GridBattleManager : nullptr;
+  if (!BattleManager) {
+    PendingAttackSequence.bHasPhysicalResults = false;
+    PendingAttackSequence.PhysicalRollResults.Reset();
+    return;
+  }
+
+  FFighterStats AttackerStats = PendingAttackSequence.AttackerSnapshot;
+  FFighterStats DefenderStats = PendingAttackSequence.DefenderSnapshot;
+  if (PendingAttackSequence.Result.StartingHealth > 0) {
+    DefenderStats.Health = PendingAttackSequence.Result.StartingHealth;
+  }
+
+  FRandomStream DummyStream;
+  DummyStream.Initialize(0x1234u);
+
+  FDiceRollResult Recalculated = BattleManager->ResolveAttackDice(
+      AttackerStats, DefenderStats, DummyStream, RollValues);
+  Recalculated.HighStakesFaction = PendingAttackSequence.Result.HighStakesFaction;
+
+  PendingAttackSequence.Result = Recalculated;
+  PendingAttackSequence.bHasPhysicalResults = false;
+  PendingAttackSequence.PhysicalRollResults.Reset();
 }
 
 bool ASkaldPlayerController::ComputeBattlefieldOverviewTransform(
