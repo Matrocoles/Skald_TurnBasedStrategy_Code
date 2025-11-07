@@ -1521,11 +1521,14 @@ void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
     if (USkaldDiceManager *DiceManager = ResolveDiceManager()) {
       DiceManager->OnDiceRollCompleted.RemoveDynamic(
           this, &ASkaldPlayerController::HandlePhysicalDiceRollCompleted);
+      DiceManager->OnDiceRollStarted.RemoveDynamic(
+          this, &ASkaldPlayerController::HandleDiceRollStarted);
     }
     bDiceDelegatesBound = false;
   }
 
   ResetAttackDiceSequence();
+  ResetManualDiceSequence();
 
   Super::EndPlay(EndPlayReason);
 }
@@ -4662,6 +4665,10 @@ void ASkaldPlayerController::HandleAttackRollRequested() {
     return;
   }
 
+  if (BeginManualDiceSequence(Attacker)) {
+    return;
+  }
+
   if (HasAuthority()) {
     Attacker->TriggerManualAttackRoll();
   } else {
@@ -5683,6 +5690,14 @@ void ASkaldPlayerController::HandleAttackResolved(AFighterPawn *Attacker,
 
   if (IsLocalController() && bAutoPresentDiceRolls &&
       Result.DiceOutcomes.Num() > 0) {
+    if (PendingManualSequence.bActive) {
+      PendingManualSequence.Defender = Defender;
+      PendingManualSequence.Result = Result;
+      PendingManualSequence.bHasResult = true;
+      TryCompleteManualDiceSequence();
+      return;
+    }
+
     StartAttackDiceSequence(Attacker, Defender, Result);
     return;
   }
@@ -5724,6 +5739,193 @@ void ASkaldPlayerController::ProcessAttackResolutionPresentation(
   }
 
   RefreshLockedInFighterList();
+}
+
+bool ASkaldPlayerController::BeginManualDiceSequence(AFighterPawn *Attacker) {
+  if (!IsLocalController() || !bAutoPresentDiceRolls || !Attacker) {
+    return false;
+  }
+
+  ASkald_PlayerCharacter *CameraPawn =
+      Cast<ASkald_PlayerCharacter>(GetPawn());
+  const bool bHasBattleCamera =
+      CameraPawn && bIsBattleMap && CameraPawn->IsBattleCameraActive();
+  if (!bHasBattleCamera) {
+    return false;
+  }
+
+  ResetManualDiceSequence();
+
+  PendingManualSequence.bActive = true;
+  PendingManualSequence.bHadBattleCamera = true;
+  PendingManualSequence.Attacker = Attacker;
+  PendingManualSequence.Defender.Reset();
+  PendingManualSequence.Result = FDiceRollResult();
+  PendingManualSequence.bTriggerServerRoll = !HasAuthority();
+  PendingManualSequence.bAwaitingRollId = false;
+  PendingManualSequence.bAwaitingRollCompletion = false;
+  PendingManualSequence.bHasResult = false;
+  PendingManualSequence.bPendingResolutionDispatch = false;
+  PendingManualSequence.ActiveRollId.Invalidate();
+
+  PendingManualSequence.OriginalLocation = CameraPawn->GetActorLocation();
+  PendingManualSequence.OriginalRotation =
+      CameraPawn->GetCurrentBattleCameraRotation();
+  PendingManualSequence.OriginalZoom =
+      CameraPawn->GetCurrentBattleCameraZoom();
+  PendingManualSequence.OriginalLockTarget =
+      CameraPawn->GetCurrentBattleCameraLockTarget();
+
+  CameraPawn->ClearCameraFocus();
+
+  FVector OverviewLocation = PendingManualSequence.OriginalLocation;
+  FRotator OverviewRotation = PendingManualSequence.OriginalRotation;
+  float OverviewZoom = 3000.f;
+  if (!ComputeBattlefieldOverviewTransform(
+          PendingManualSequence.OriginalRotation.Yaw, OverviewLocation,
+          OverviewRotation, OverviewZoom)) {
+    ResetManualDiceSequence();
+    return false;
+  }
+
+  const float OverviewDuration = 0.65f;
+  CameraPawn->StartCameraTransition(OverviewLocation, OverviewRotation,
+                                    OverviewZoom, OverviewDuration);
+
+  if (UWorld *World = GetWorld()) {
+    FTimerDelegate OverviewDelegate = FTimerDelegate::CreateUObject(
+        this, &ASkaldPlayerController::HandleManualDiceOverviewReached);
+    World->GetTimerManager().SetTimer(
+        PendingManualSequence.OverviewTimerHandle, OverviewDelegate,
+        OverviewDuration, /*bLoop*/ false);
+  } else {
+    HandleManualDiceOverviewReached();
+  }
+
+  return true;
+}
+
+void ASkaldPlayerController::HandleManualDiceOverviewReached() {
+  if (!PendingManualSequence.bActive) {
+    return;
+  }
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(
+        PendingManualSequence.OverviewTimerHandle);
+  }
+
+  AFighterPawn *Attacker = PendingManualSequence.Attacker.Get();
+  if (!Attacker) {
+    ResetManualDiceSequence();
+    return;
+  }
+
+  EnsureDiceManagerBindings();
+
+  PendingManualSequence.bAwaitingRollCompletion = true;
+  PendingManualSequence.bAwaitingRollId = true;
+  PendingManualSequence.ActiveRollId.Invalidate();
+
+  if (PendingManualSequence.bTriggerServerRoll) {
+    ServerTriggerManualAttackRoll(Attacker);
+  } else {
+    Attacker->TriggerManualAttackRoll();
+  }
+}
+
+void ASkaldPlayerController::HandleManualDiceCleanupFinished() {
+  if (!PendingManualSequence.bActive) {
+    return;
+  }
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(
+        PendingManualSequence.CleanupDelayHandle);
+  }
+
+  ASkald_PlayerCharacter *CameraPawn =
+      Cast<ASkald_PlayerCharacter>(GetPawn());
+  if (!CameraPawn || !PendingManualSequence.bHadBattleCamera) {
+    HandleManualDiceReturnComplete();
+    return;
+  }
+
+  const float ReturnDuration = 0.6f;
+  CameraPawn->StartCameraTransition(PendingManualSequence.OriginalLocation,
+                                    PendingManualSequence.OriginalRotation,
+                                    PendingManualSequence.OriginalZoom,
+                                    ReturnDuration);
+
+  if (UWorld *World = GetWorld()) {
+    FTimerDelegate ReturnDelegate = FTimerDelegate::CreateUObject(
+        this, &ASkaldPlayerController::HandleManualDiceReturnComplete);
+    World->GetTimerManager().SetTimer(
+        PendingManualSequence.ReturnTimerHandle, ReturnDelegate,
+        ReturnDuration, /*bLoop*/ false);
+  } else {
+    HandleManualDiceReturnComplete();
+  }
+}
+
+void ASkaldPlayerController::HandleManualDiceReturnComplete() {
+  if (!PendingManualSequence.bActive) {
+    return;
+  }
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(
+        PendingManualSequence.ReturnTimerHandle);
+  }
+
+  ASkald_PlayerCharacter *CameraPawn =
+      Cast<ASkald_PlayerCharacter>(GetPawn());
+  if (CameraPawn) {
+    if (PendingManualSequence.Attacker.IsValid()) {
+      CameraPawn->FocusCameraOnActor(PendingManualSequence.Attacker.Get());
+    } else if (PendingManualSequence.OriginalLockTarget.IsValid()) {
+      CameraPawn->FocusCameraOnActor(
+          PendingManualSequence.OriginalLockTarget.Get());
+    }
+  }
+
+  PendingManualSequence.bPendingResolutionDispatch = true;
+  TryCompleteManualDiceSequence();
+}
+
+void ASkaldPlayerController::HandleDiceRollStarted(const FGuid &RollId) {
+  if (!PendingManualSequence.bActive || !PendingManualSequence.bAwaitingRollId) {
+    return;
+  }
+
+  PendingManualSequence.ActiveRollId = RollId;
+  PendingManualSequence.bAwaitingRollId = false;
+}
+
+void ASkaldPlayerController::TryCompleteManualDiceSequence() {
+  if (!PendingManualSequence.bActive ||
+      !PendingManualSequence.bPendingResolutionDispatch ||
+      !PendingManualSequence.bHasResult) {
+    return;
+  }
+
+  ProcessAttackResolutionPresentation(PendingManualSequence.Attacker.Get(),
+                                      PendingManualSequence.Defender.Get(),
+                                      PendingManualSequence.Result);
+  ResetManualDiceSequence();
+}
+
+void ASkaldPlayerController::ResetManualDiceSequence() {
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(
+        PendingManualSequence.OverviewTimerHandle);
+    World->GetTimerManager().ClearTimer(
+        PendingManualSequence.CleanupDelayHandle);
+    World->GetTimerManager().ClearTimer(
+        PendingManualSequence.ReturnTimerHandle);
+  }
+
+  PendingManualSequence = FPendingManualDiceSequence();
 }
 
 void ASkaldPlayerController::StartAttackDiceSequence(
@@ -5816,6 +6018,39 @@ void ASkaldPlayerController::HandleAttackDiceOverviewReached() {
 
 void ASkaldPlayerController::HandlePhysicalDiceRollCompleted(
     const FGuid &RollId, const TArray<int32> &Results) {
+  if (PendingManualSequence.bActive &&
+      PendingManualSequence.bAwaitingRollCompletion) {
+    if (PendingManualSequence.ActiveRollId.IsValid() &&
+        PendingManualSequence.ActiveRollId != RollId) {
+      return;
+    }
+
+    PendingManualSequence.bAwaitingRollCompletion = false;
+    PendingManualSequence.ActiveRollId.Invalidate();
+
+    float CleanupDelay = 0.f;
+    if (USkaldDiceManager *DiceManager = ResolveDiceManager()) {
+      CleanupDelay = DiceManager->GetCleanupDelay();
+    }
+
+    if (UWorld *World = GetWorld()) {
+      World->GetTimerManager().ClearTimer(
+          PendingManualSequence.CleanupDelayHandle);
+
+      if (CleanupDelay > KINDA_SMALL_NUMBER) {
+        FTimerDelegate CleanupDelegate = FTimerDelegate::CreateUObject(
+            this, &ASkaldPlayerController::HandleManualDiceCleanupFinished);
+        World->GetTimerManager().SetTimer(
+            PendingManualSequence.CleanupDelayHandle, CleanupDelegate,
+            CleanupDelay, /*bLoop*/ false);
+        return;
+      }
+    }
+
+    HandleManualDiceCleanupFinished();
+    return;
+  }
+
   if (!PendingAttackSequence.bActive) {
     return;
   }
@@ -5963,8 +6198,16 @@ void ASkaldPlayerController::EnsureDiceManagerBindings() {
   }
 
   if (USkaldDiceManager *DiceManager = ResolveDiceManager()) {
-    DiceManager->OnDiceRollCompleted.AddDynamic(
-        this, &ASkaldPlayerController::HandlePhysicalDiceRollCompleted);
+    if (!DiceManager->OnDiceRollCompleted.IsAlreadyBound(
+            this, &ASkaldPlayerController::HandlePhysicalDiceRollCompleted)) {
+      DiceManager->OnDiceRollCompleted.AddDynamic(
+          this, &ASkaldPlayerController::HandlePhysicalDiceRollCompleted);
+    }
+    if (!DiceManager->OnDiceRollStarted.IsAlreadyBound(
+            this, &ASkaldPlayerController::HandleDiceRollStarted)) {
+      DiceManager->OnDiceRollStarted.AddDynamic(
+          this, &ASkaldPlayerController::HandleDiceRollStarted);
+    }
     bDiceDelegatesBound = true;
   }
 }

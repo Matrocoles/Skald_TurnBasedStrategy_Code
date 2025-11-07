@@ -953,6 +953,8 @@ private:
   UFUNCTION()
   void HandlePhysicalDiceRollCompleted(const FGuid &RollId,
                                        const TArray<int32> &Results);
+  UFUNCTION()
+  void HandleDiceRollStarted(const FGuid &RollId);
 
   UPROPERTY()
   TObjectPtr<AFighterPawn> SelectedFighter;
@@ -1050,5 +1052,35 @@ private:
   };
 
   FPendingAttackDiceSequence PendingAttackSequence;
+  struct FPendingManualDiceSequence
+  {
+    TWeakObjectPtr<AFighterPawn> Attacker;
+    TWeakObjectPtr<AFighterPawn> Defender;
+    FDiceRollResult Result;
+    bool bActive = false;
+    bool bHadBattleCamera = false;
+    bool bTriggerServerRoll = false;
+    bool bAwaitingRollId = false;
+    bool bAwaitingRollCompletion = false;
+    bool bHasResult = false;
+    bool bPendingResolutionDispatch = false;
+    FVector OriginalLocation = FVector::ZeroVector;
+    FRotator OriginalRotation = FRotator::ZeroRotator;
+    float OriginalZoom = 0.f;
+    TWeakObjectPtr<AActor> OriginalLockTarget;
+    FGuid ActiveRollId;
+    FTimerHandle OverviewTimerHandle;
+    FTimerHandle CleanupDelayHandle;
+    FTimerHandle ReturnTimerHandle;
+  };
+
+  void ResetManualDiceSequence();
+  bool BeginManualDiceSequence(class AFighterPawn* Attacker);
+  void HandleManualDiceOverviewReached();
+  void HandleManualDiceCleanupFinished();
+  void HandleManualDiceReturnComplete();
+  void TryCompleteManualDiceSequence();
+
+  FPendingManualDiceSequence PendingManualSequence;
   bool bDiceDelegatesBound = false;
 };
