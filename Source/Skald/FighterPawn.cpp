@@ -2292,9 +2292,20 @@ void AFighterPawn::HandleDiceRollCompleted(const FGuid &RollId,
     RandomStream = &TempStream;
   }
 
-  FDiceRollResult DiceResult = UGridBattleManager::ResolveAttackDice(
-      PendingAttackAttackerSnapshot, PendingAttackDefenderSnapshot,
-      *RandomStream, Results);
+  const FFighterStats &AttackerStats =
+      bHasPendingAttackSnapshot ? PendingAttackAttackerSnapshot : Stats;
+
+  FFighterStats DefenderStatsSnapshot =
+      bHasPendingAttackSnapshot
+          ? PendingAttackDefenderSnapshot
+          : (Target ? Target->Stats : FFighterStats());
+
+  FDiceRollResult DiceResult =
+      UGridBattleManager::ResolveAttackDice(AttackerStats, DefenderStatsSnapshot,
+                                            *RandomStream, Results);
+
+  ApplyPhysicalRollResults(DiceResult, Results, AttackerStats,
+                           DefenderStatsSnapshot);
   DiceResult.HighStakesFaction = Faction;
 
   StartQueuedAttack(Target, MoveTemp(DiceResult));
@@ -2501,6 +2512,109 @@ void AFighterPawn::ResolveNextAttackRoll() {
   } else {
     FinalizeQueuedAttack();
   }
+}
+
+void AFighterPawn::ApplyPhysicalRollResults(
+    FDiceRollResult &Result, const TArray<int32> &RollValues,
+    const FFighterStats &AttackerStats,
+    const FFighterStats &DefenderStats) {
+  if (RollValues.Num() == 0 || Result.DiceOutcomes.Num() == 0) {
+    return;
+  }
+
+  const int32 ExpectedDice = FMath::Max(0, Result.DiceOutcomes.Num());
+  if (ExpectedDice <= 0) {
+    return;
+  }
+
+  TArray<int32> SanitizedValues = RollValues;
+  if (SanitizedValues.Num() > ExpectedDice) {
+    SanitizedValues.SetNum(ExpectedDice);
+  }
+
+  const int32 StartingHealth = Result.StartingHealth > 0
+                                   ? Result.StartingHealth
+                                   : FMath::Max(0, DefenderStats.Health);
+
+  const int32 RequiredRoll = AttackerStats.Strength > DefenderStats.Defence
+                                 ? 3
+                                 : (AttackerStats.Strength < DefenderStats.Defence
+                                        ? 5
+                                        : 4);
+
+  const int32 DiceCount = Result.DiceOutcomes.Num();
+  const int32 ValuesToApply =
+      FMath::Min(DiceCount, SanitizedValues.Num());
+
+  const int32 BaseDamage = FMath::Max(0, AttackerStats.AttackDamage);
+  const int32 CriticalBonus =
+      FMath::Max(0, AttackerStats.CriticalBonusDamage);
+
+  for (int32 Index = 0; Index < ValuesToApply; ++Index) {
+    FDiceRollOutcome &Outcome = Result.DiceOutcomes[Index];
+    const int32 RollValue = FMath::Clamp(SanitizedValues[Index], 1, 6);
+
+    const bool bCriticalRoll = RollValue == 6;
+    const bool bHit = bCriticalRoll || RollValue >= RequiredRoll;
+
+    Outcome.RollValue = RollValue;
+
+    if (!bHit) {
+      Outcome.bHit = false;
+      Outcome.bCritical = false;
+      Outcome.Damage = 0;
+      continue;
+    }
+
+    Outcome.bHit = true;
+
+    int32 NewDamage = BaseDamage;
+    if (bCriticalRoll) {
+      NewDamage += CriticalBonus;
+    }
+
+    Outcome.Damage = FMath::Max(0, NewDamage);
+    Outcome.bCritical = bCriticalRoll && Outcome.Damage > BaseDamage;
+  }
+
+  int32 HitCount = 0;
+  int32 MissCount = 0;
+  int32 CriticalCount = 0;
+  int32 HighestCriticalDamage = 0;
+  int32 SimulatedHealth = StartingHealth;
+
+  for (FDiceRollOutcome &Outcome : Result.DiceOutcomes) {
+    if (Outcome.bHit) {
+      ++HitCount;
+
+      const int32 AppliedDamage =
+          FMath::Min(FMath::Max(0, Outcome.Damage), SimulatedHealth);
+      SimulatedHealth = FMath::Max(0, SimulatedHealth - AppliedDamage);
+
+      if (Outcome.bCritical) {
+        ++CriticalCount;
+        HighestCriticalDamage =
+            FMath::Max(HighestCriticalDamage, Outcome.Damage);
+      }
+    } else {
+      ++MissCount;
+      Outcome.Damage = 0;
+      Outcome.bCritical = false;
+    }
+  }
+
+  const int32 ClampedEndingHealth =
+      FMath::Clamp(SimulatedHealth, 0, StartingHealth);
+
+  Result.HitCount = HitCount;
+  Result.MissCount = MissCount;
+  Result.CriticalHitCount = CriticalCount;
+  Result.HighestCriticalDamage = HighestCriticalDamage;
+  Result.EndingHealth = ClampedEndingHealth;
+  Result.TotalDamage =
+      FMath::Clamp(StartingHealth - ClampedEndingHealth, 0, StartingHealth);
+  Result.bHighStakesCritical =
+      CriticalCount > 0 && ClampedEndingHealth <= 0 && StartingHealth > 0;
 }
 
 void AFighterPawn::RefreshPendingAttackResultStats(AFighterPawn *Target) {

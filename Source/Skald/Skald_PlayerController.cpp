@@ -6474,116 +6474,18 @@ void ASkaldPlayerController::ApplyPendingPhysicalAttackResults() {
     return;
   }
 
-  const int32 ExpectedDice =
-      FMath::Max(0, PendingAttackSequence.Result.DiceOutcomes.Num());
-  if (ExpectedDice <= 0) {
+  AFighterPawn *AttackerPawn = PendingAttackSequence.Attacker.Get();
+  if (!AttackerPawn) {
     PendingAttackSequence.bHasPhysicalResults = false;
     PendingAttackSequence.PhysicalRollResults.Reset();
     return;
   }
-
-  TArray<int32> RollValues = PendingAttackSequence.PhysicalRollResults;
-  if (RollValues.Num() > ExpectedDice) {
-    RollValues.SetNum(ExpectedDice);
-  }
-
-  USkaldGameInstance *GameInstance = CachedGameInstance;
-  if (!GameInstance) {
-    GameInstance = GetGameInstance<USkaldGameInstance>();
-    CachedGameInstance = GameInstance;
-  }
-
-  UGridBattleManager *BattleManager =
-      GameInstance ? GameInstance->GridBattleManager : nullptr;
-  if (!BattleManager) {
-    PendingAttackSequence.bHasPhysicalResults = false;
-    PendingAttackSequence.PhysicalRollResults.Reset();
-    return;
-  }
-
-  const FFighterStats &AttackerStats = PendingAttackSequence.AttackerSnapshot;
-  const FFighterStats &DefenderStats = PendingAttackSequence.DefenderSnapshot;
 
   FDiceRollResult UpdatedResult = PendingAttackSequence.Result;
-
-  const int32 StartingHealth =
-      UpdatedResult.StartingHealth > 0
-          ? UpdatedResult.StartingHealth
-          : FMath::Max(0, DefenderStats.Health);
-
-  const int32 RequiredRoll = AttackerStats.Strength > DefenderStats.Defence
-                                 ? 3
-                                 : (AttackerStats.Strength < DefenderStats.Defence
-                                        ? 5
-                                        : 4);
-
-  const int32 DiceCount = UpdatedResult.DiceOutcomes.Num();
-  const int32 ValuesToApply = FMath::Min(DiceCount, RollValues.Num());
-
-  const int32 BaseDamage = FMath::Max(0, AttackerStats.AttackDamage);
-  const int32 CriticalBonus =
-      FMath::Max(0, AttackerStats.CriticalBonusDamage);
-
-  for (int32 Index = 0; Index < ValuesToApply; ++Index) {
-    FDiceRollOutcome &Outcome = UpdatedResult.DiceOutcomes[Index];
-    const int32 RollValue = FMath::Clamp(RollValues[Index], 1, 6);
-
-    const bool bCriticalRoll = RollValue == 6;
-    const bool bHit = bCriticalRoll || RollValue >= RequiredRoll;
-
-    int32 Damage = 0;
-    if (bHit) {
-      Damage = BaseDamage;
-      if (bCriticalRoll) {
-        Damage += CriticalBonus;
-      }
-    }
-
-    Outcome.RollValue = RollValue;
-    Outcome.bHit = bHit;
-    Outcome.Damage = Damage;
-    Outcome.bCritical =
-        bHit && bCriticalRoll && Damage > BaseDamage;
-  }
-
-  int32 HitCount = 0;
-  int32 MissCount = 0;
-  int32 CriticalCount = 0;
-  int32 HighestCriticalDamage = 0;
-  int32 SimulatedHealth = StartingHealth;
-
-  for (FDiceRollOutcome &Outcome : UpdatedResult.DiceOutcomes) {
-    if (Outcome.bHit) {
-      ++HitCount;
-
-      const int32 AppliedDamage =
-          FMath::Min(FMath::Max(0, Outcome.Damage), SimulatedHealth);
-      SimulatedHealth = FMath::Max(0, SimulatedHealth - AppliedDamage);
-
-      if (Outcome.bCritical) {
-        ++CriticalCount;
-        HighestCriticalDamage =
-            FMath::Max(HighestCriticalDamage, Outcome.Damage);
-      }
-    } else {
-      ++MissCount;
-      Outcome.Damage = 0;
-      Outcome.bCritical = false;
-    }
-  }
-
-  const int32 ClampedEndingHealth =
-      FMath::Clamp(SimulatedHealth, 0, StartingHealth);
-
-  UpdatedResult.HitCount = HitCount;
-  UpdatedResult.MissCount = MissCount;
-  UpdatedResult.CriticalHitCount = CriticalCount;
-  UpdatedResult.HighestCriticalDamage = HighestCriticalDamage;
-  UpdatedResult.EndingHealth = ClampedEndingHealth;
-  UpdatedResult.TotalDamage =
-      FMath::Clamp(StartingHealth - ClampedEndingHealth, 0, StartingHealth);
-  UpdatedResult.bHighStakesCritical =
-      CriticalCount > 0 && ClampedEndingHealth <= 0 && StartingHealth > 0;
+  AFighterPawn::ApplyPhysicalRollResults(
+      UpdatedResult, PendingAttackSequence.PhysicalRollResults,
+      PendingAttackSequence.AttackerSnapshot,
+      PendingAttackSequence.DefenderSnapshot);
 
   UpdatedResult.HighStakesFaction =
       PendingAttackSequence.Result.HighStakesFaction;
