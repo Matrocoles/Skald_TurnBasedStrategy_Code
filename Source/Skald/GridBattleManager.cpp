@@ -205,7 +205,7 @@ FDiceRollResult UGridBattleManager::ResolveAttackDice(const FFighterStats& Attac
     Result.DiceOutcomes.Reserve(DiceToRoll);
 
     int32 SimulatedHealth = Result.StartingHealth;
-    for (int32 DieIndex = 0; DieIndex < DiceToRoll && SimulatedHealth > 0; ++DieIndex)
+    for (int32 DieIndex = 0; DieIndex < DiceToRoll; ++DieIndex)
     {
         FDiceRollOutcome& Outcome = Result.DiceOutcomes.AddDefaulted_GetRef();
         int32 RollValue = 0;

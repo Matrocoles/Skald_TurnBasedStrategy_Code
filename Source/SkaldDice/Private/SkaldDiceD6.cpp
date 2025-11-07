@@ -191,6 +191,8 @@ void ASkaldDiceD6::ForceFaceValue(int32 TargetValue, bool bBroadcastResult)
     SetActorLocationAndRotation(Location, TargetRot, false, nullptr, ETeleportType::TeleportPhysics);
     DiceMesh->SetWorldRotation(TargetRot, false, nullptr, ETeleportType::TeleportPhysics);
 
+    StabiliseAfterSettlement();
+
     bSettled = true;
     ResolvedValue = FMath::Clamp(Resolved, 1, 6);
     if (bBroadcastResult)
@@ -253,12 +255,27 @@ void ASkaldDiceD6::UpdateSettleState(float DeltaSeconds)
             return;
         }
 
+        StabiliseAfterSettlement();
+
         if (!bBroadcastSettlement)
         {
             bBroadcastSettlement = true;
             OnDiceSettled.Broadcast(this, ResolvedValue);
         }
     }
+}
+
+void ASkaldDiceD6::StabiliseAfterSettlement()
+{
+    if (!DiceMesh)
+    {
+        return;
+    }
+
+    DiceMesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
+    DiceMesh->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
+    DiceMesh->PutRigidBodyToSleep();
+    DiceMesh->SetSimulatePhysics(false);
 }
 
 int32 ASkaldDiceD6::ResolveFaceValue() const
