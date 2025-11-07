@@ -7,9 +7,11 @@
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Engine/Texture2D.h"
+#include "Engine/World.h"
 #include "Types/SlateEnums.h"
 #include "Types/SlateStructs.h"
 #include "Blueprint/WidgetTree.h"
+#include "TimerManager.h"
 
 void UPrepareForBattleWidget::NativeOnInitialized() {
   Super::NativeOnInitialized();
@@ -25,12 +27,30 @@ void UPrepareForBattleWidget::NativeOnInitialized() {
         this, &UPrepareForBattleWidget::HandlePrepareButtonClicked);
   }
 
+  if (RetreatButton &&
+      !RetreatButton->OnClicked.IsAlreadyBound(
+          this, &UPrepareForBattleWidget::HandleRetreatButtonClicked)) {
+    RetreatButton->OnClicked.AddDynamic(
+        this, &UPrepareForBattleWidget::HandleRetreatButtonClicked);
+  }
+
   RefreshTextWidgets();
 }
 
 void UPrepareForBattleWidget::SynchronizeProperties() {
   Super::SynchronizeProperties();
   RefreshTextWidgets();
+}
+
+void UPrepareForBattleWidget::NativeDestruct() {
+  ClearRetreatStatus();
+  if (RetreatButton) {
+    RetreatButton->OnClicked.RemoveAll(this);
+  }
+  if (PrepareForBattleButton) {
+    PrepareForBattleButton->OnClicked.RemoveAll(this);
+  }
+  Super::NativeDestruct();
 }
 
 void UPrepareForBattleWidget::SetupBattleDetails(
@@ -52,6 +72,10 @@ void UPrepareForBattleWidget::SetupBattleDetails(
 
 void UPrepareForBattleWidget::HandlePrepareButtonClicked() {
   OnPrepareButtonClicked.Broadcast();
+}
+
+void UPrepareForBattleWidget::HandleRetreatButtonClicked() {
+  OnRetreatButtonClicked.Broadcast();
 }
 
 void UPrepareForBattleWidget::RefreshTextWidgets() {
@@ -90,6 +114,46 @@ void UPrepareForBattleWidget::RefreshTextWidgets() {
 
   ApplyFactionEmblem(AttackingFactionEmblem, AttackingFactionTexture);
   ApplyFactionEmblem(DefendingFactionEmblem, DefendingFactionTexture);
+}
+
+void UPrepareForBattleWidget::ShowRetreatStatus(const FText &StatusMessage,
+                                                float DisplayDuration) {
+  if (RetreatStatusText) {
+    RetreatStatusText->SetText(StatusMessage);
+    const bool bHasMessage = !StatusMessage.IsEmptyOrWhitespace();
+    RetreatStatusText->SetVisibility(bHasMessage ? ESlateVisibility::Visible
+                                                 : ESlateVisibility::Collapsed);
+  }
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(RetreatStatusTimerHandle);
+    if (DisplayDuration > 0.f) {
+      World->GetTimerManager().SetTimer(
+          RetreatStatusTimerHandle, this,
+          &UPrepareForBattleWidget::ClearRetreatStatus, DisplayDuration, false);
+    }
+  }
+}
+
+void UPrepareForBattleWidget::SetRetreatButtonVisibility(
+    ESlateVisibility NewVisibility) {
+  if (RetreatButton) {
+    RetreatButton->SetVisibility(NewVisibility);
+    const bool bVisible = NewVisibility == ESlateVisibility::Visible ||
+                          NewVisibility == ESlateVisibility::HitTestInvisible ||
+                          NewVisibility == ESlateVisibility::SelfHitTestInvisible;
+    RetreatButton->SetIsEnabled(bVisible);
+  }
+}
+
+void UPrepareForBattleWidget::ClearRetreatStatus() {
+  if (RetreatStatusText) {
+    RetreatStatusText->SetText(FText::GetEmpty());
+    RetreatStatusText->SetVisibility(ESlateVisibility::Collapsed);
+  }
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(RetreatStatusTimerHandle);
+  }
 }
 
 void UPrepareForBattleWidget::BuildFallbackWidgetTree() {
@@ -197,6 +261,50 @@ void UPrepareForBattleWidget::BuildFallbackWidgetTree() {
         ButtonSlot->SetVerticalAlignment(EVerticalAlignment::VAlign_Center);
         ButtonSlot->SetPadding(FMargin(12.f, 6.f));
       }
+    }
+  }
+
+  RetreatButton = WidgetTree->ConstructWidget<UButton>(
+      UButton::StaticClass(), TEXT("RetreatButton"));
+  if (RetreatButton) {
+    RetreatButton->SetVisibility(ESlateVisibility::Collapsed);
+    if (UVerticalBoxSlot *RetreatSlot =
+            Root->AddChildToVerticalBox(RetreatButton)) {
+      RetreatSlot->SetHorizontalAlignment(EHorizontalAlignment::HAlign_Center);
+      RetreatSlot->SetPadding(FMargin(8.f, 8.f, 8.f, 0.f));
+    }
+
+    UTextBlock *RetreatLabel = WidgetTree->ConstructWidget<UTextBlock>(
+        UTextBlock::StaticClass(), TEXT("RetreatLabel"));
+    if (RetreatLabel) {
+      RetreatLabel->SetText(
+          NSLOCTEXT("SkaldHUD", "PrepareForBattleRetreat", "Retreat"));
+      RetreatLabel->SetJustification(ETextJustify::Center);
+      RetreatLabel->SetAutoWrapText(true);
+
+      if (UButtonSlot *RetreatButtonSlot =
+              Cast<UButtonSlot>(RetreatButton->AddChild(RetreatLabel))) {
+        RetreatButtonSlot->SetHorizontalAlignment(
+            EHorizontalAlignment::HAlign_Center);
+        RetreatButtonSlot->SetVerticalAlignment(
+            EVerticalAlignment::VAlign_Center);
+        RetreatButtonSlot->SetPadding(FMargin(12.f, 6.f));
+      }
+    }
+  }
+
+  RetreatStatusText = WidgetTree->ConstructWidget<UTextBlock>(
+      UTextBlock::StaticClass(), TEXT("RetreatStatusText"));
+  if (RetreatStatusText) {
+    RetreatStatusText->SetJustification(ETextJustify::Center);
+    RetreatStatusText->SetAutoWrapText(true);
+    RetreatStatusText->SetVisibility(ESlateVisibility::Collapsed);
+    RetreatStatusText->SetColorAndOpacity(FSlateColor(FLinearColor::Red));
+    if (UVerticalBoxSlot *StatusSlot =
+            Root->AddChildToVerticalBox(RetreatStatusText)) {
+      StatusSlot->SetHorizontalAlignment(
+          EHorizontalAlignment::HAlign_Center);
+      StatusSlot->SetPadding(FMargin(8.f, 6.f, 8.f, 0.f));
     }
   }
 }

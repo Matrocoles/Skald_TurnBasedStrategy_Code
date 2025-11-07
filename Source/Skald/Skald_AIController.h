@@ -26,6 +26,8 @@ public:
   virtual void EndTurn() override;
 
   virtual void InitializeHUDWidget() override;
+  virtual void ShowPrepareForBattlePromptLocal(
+      const FPrepareForBattlePromptData &PromptData) override;
 
   /** Execute the AI's decision making for the current turn. */
   UFUNCTION(BlueprintCallable, Category = "Turn")
@@ -40,6 +42,11 @@ public:
 
 protected:
   virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+  virtual void OnBeginRetreatSelection(
+      int32 DefendingTerritoryID,
+      const TArray<int32> &CandidateTerritoryIDs) override;
+  virtual void NotifyRetreatFailed(const FText &Message) override;
 
 private:
   enum class EAIStrategy : uint8 { Offensive, Defensive, Hybrid };
@@ -197,6 +204,11 @@ private:
 
   /** True while waiting for an async attack sequence to resolve. */
   bool bAwaitingQueuedAttackResolution = false;
+
+  bool ShouldAutoRetreat(const FPrepareForBattlePromptData &PromptData) const;
+  int32 ChooseRetreatDestination(const TArray<int32> &CandidateTerritoryIDs,
+                                 int32 DefendingTerritoryID) const;
+  bool bAutoRetreatPending = false;
 
   /** True while waiting for a fighter's move animation to complete. */
   bool bAwaitingMovementCompletion = false;

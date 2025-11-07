@@ -522,6 +522,14 @@ public:
   UFUNCTION(BlueprintCallable, Category = "UI")
   void HandlePrepareForBattleReady();
 
+  /** Handle HUD retreat requests. */
+  UFUNCTION(BlueprintCallable, Category = "UI")
+  void HandleRetreatRequested();
+
+  /** Handle HUD retreat destination confirmations. */
+  UFUNCTION(BlueprintCallable, Category = "UI")
+  void HandleRetreatDestinationSelected(int32 TerritoryID);
+
   /** Handle HUD move submissions.
    *  Bound to USkaldMainHUDWidget::OnMoveRequested in the HUD.
    *  Called when a move action is confirmed from a widget.
@@ -636,6 +644,19 @@ public:
   UFUNCTION(Client, Reliable)
   void ClientHidePrepareForBattle();
 
+  UFUNCTION(Client, Reliable)
+  void ClientBeginRetreatSelection(int32 DefendingTerritoryID,
+                                   const TArray<int32> &CandidateTerritoryIDs);
+
+  UFUNCTION(Client, Reliable)
+  void ClientCompleteRetreat();
+
+  UFUNCTION(Client, Reliable)
+  void ClientRetreatFailed(const FText &Message);
+
+  UFUNCTION(Client, Reliable)
+  void ClientEnemyRetreated();
+
   /** Local entry points so standalone/authority controllers can trigger the
    *  prepare-for-battle flow without relying on client RPC delivery. */
   virtual void ShowPrepareForBattlePromptLocal(
@@ -649,6 +670,12 @@ public:
 
   UFUNCTION(Server, Reliable)
   void ServerSetReadyForBattle(bool bReady);
+
+  UFUNCTION(Server, Reliable)
+  void ServerRequestRetreat();
+
+  UFUNCTION(Server, Reliable)
+  void ServerConfirmRetreatDestination(int32 TerritoryID);
 
   // ============================================================
   // Manual Dice Roll: Player sends manual attack roll result to server
@@ -729,6 +756,14 @@ protected:
   void ResetPendingReadyPromptState();
   void ShowPrepareForBattlePromptLocal_Internal(
       const FPrepareForBattlePromptData &PromptData);
+
+  void BeginRetreatSelectionLocal(int32 DefendingTerritoryID,
+                                  const TArray<int32> &CandidateTerritoryIDs);
+  void CompleteRetreatSelectionLocal();
+  void NotifyRetreatFailed(const FText &Message);
+  void NotifyEnemyRetreated();
+  virtual void OnBeginRetreatSelection(int32 DefendingTerritoryID,
+                                       const TArray<int32> &CandidateTerritoryIDs);
 
   /** Set up the main HUD widget for the local player. */
   virtual void InitializeHUDWidget();

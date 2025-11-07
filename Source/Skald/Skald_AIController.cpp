@@ -92,6 +92,25 @@ void ASkaldAIController::InitializeHUDWidget() {
          *GetName());
 }
 
+void ASkaldAIController::ShowPrepareForBattlePromptLocal(
+    const FPrepareForBattlePromptData &PromptData) {
+  Super::ShowPrepareForBattlePromptLocal(PromptData);
+
+  if (bAutoRetreatPending) {
+    return;
+  }
+
+  if (!ShouldAutoRetreat(PromptData)) {
+    return;
+  }
+
+  UE_LOG(LogSkaldReady, Log,
+         TEXT("AI controller %s initiating retreat from prepare-for-battle prompt."),
+         *GetName());
+  bAutoRetreatPending = true;
+  ServerRequestRetreat();
+}
+
 void ASkaldAIController::StartTurn() {
   DecisionIterationCount = 0;
   bAwaitingBattleTransition = false;
@@ -1868,5 +1887,144 @@ void ASkaldAIController::HandleBattleEnded(ESkaldFaction /*WinningFaction*/,
   bAwaitingQueuedAttackResolution = false;
   ActivationIntentIterationCount = 0;
   TeardownBattleAutomation();
+}
+
+void ASkaldAIController::OnBeginRetreatSelection(
+    int32 DefendingTerritoryID, const TArray<int32> &CandidateTerritoryIDs) {
+  Super::OnBeginRetreatSelection(DefendingTerritoryID, CandidateTerritoryIDs);
+
+  if (!HasAuthority()) {
+    return;
+  }
+
+  if (!bAutoRetreatPending) {
+    return;
+  }
+
+  const int32 ChosenTerritory =
+      ChooseRetreatDestination(CandidateTerritoryIDs, DefendingTerritoryID);
+  if (ChosenTerritory != INDEX_NONE) {
+    UE_LOG(LogSkaldReady, Log,
+           TEXT("AI controller %s confirming retreat to territory %d."),
+           *GetName(), ChosenTerritory);
+    ServerConfirmRetreatDestination(ChosenTerritory);
+  } else {
+    UE_LOG(LogSkaldReady, Warning,
+           TEXT("AI controller %s could not determine a retreat destination."),
+           *GetName());
+  }
+
+  bAutoRetreatPending = false;
+}
+
+void ASkaldAIController::NotifyRetreatFailed(const FText &Message) {
+  bAutoRetreatPending = false;
+  Super::NotifyRetreatFailed(Message);
+}
+
+bool ASkaldAIController::ShouldAutoRetreat(
+    const FPrepareForBattlePromptData &PromptData) const {
+  ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
+  if (!PS || PS->GetPlayerId() != PromptData.DefenderPlayerID) {
+    return false;
+  }
+
+  const int32 AttackerArmy = PromptData.AttackerCommittedArmy;
+  if (AttackerArmy <= 0) {
+    return false;
+  }
+
+  AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+      GetWorld(), AWorldMap::StaticClass()));
+  if (!WorldMap) {
+    return false;
+  }
+
+  ATerritory *DefendingTerritory =
+      WorldMap->GetTerritoryById(PromptData.DefendingTerritoryID);
+  if (!DefendingTerritory || DefendingTerritory->OwningPlayer != PS) {
+    return false;
+  }
+
+  int32 DefenderArmy = PromptData.DefenderArmyCount;
+  if (DefenderArmy <= 0) {
+    DefenderArmy = DefendingTerritory->ArmyUnits;
+  }
+
+  const int32 ArmyDifference = AttackerArmy - DefenderArmy;
+  if (ArmyDifference <= 1) {
+    return false;
+  }
+
+  bool bHasCandidate = false;
+  int32 BestCombinedStrength = 0;
+  for (ATerritory *Neighbor : DefendingTerritory->AdjacentTerritories) {
+    if (!Neighbor || Neighbor->OwningPlayer != PS) {
+      continue;
+    }
+
+    bHasCandidate = true;
+    const int32 CombinedStrength = Neighbor->ArmyUnits + DefenderArmy;
+    if (CombinedStrength > BestCombinedStrength) {
+      BestCombinedStrength = CombinedStrength;
+    }
+  }
+
+  if (!bHasCandidate) {
+    return false;
+  }
+
+  if (BestCombinedStrength < AttackerArmy) {
+    return false;
+  }
+
+  return true;
+}
+
+int32 ASkaldAIController::ChooseRetreatDestination(
+    const TArray<int32> &CandidateTerritoryIDs,
+    int32 DefendingTerritoryID) const {
+  if (CandidateTerritoryIDs.Num() == 0) {
+    return INDEX_NONE;
+  }
+
+  AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+      GetWorld(), AWorldMap::StaticClass()));
+  if (!WorldMap) {
+    return CandidateTerritoryIDs[0];
+  }
+
+  ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
+  if (!PS) {
+    return CandidateTerritoryIDs[0];
+  }
+
+  ATerritory *DefendingTerritory = WorldMap->GetTerritoryById(DefendingTerritoryID);
+  if (!DefendingTerritory) {
+    return CandidateTerritoryIDs[0];
+  }
+
+  int32 BestTerritoryId = INDEX_NONE;
+  int32 BestValue = TNumericLimits<int32>::Lowest();
+
+  for (int32 CandidateId : CandidateTerritoryIDs) {
+    ATerritory *Candidate = WorldMap->GetTerritoryById(CandidateId);
+    if (!Candidate || Candidate->OwningPlayer != PS) {
+      continue;
+    }
+
+    const int32 CombinedStrength =
+        Candidate->ArmyUnits + DefendingTerritory->ArmyUnits;
+    const int32 Value = CombinedStrength * 10 + Candidate->ArmyUnits;
+
+    if (Value > BestValue) {
+      BestValue = Value;
+      BestTerritoryId = CandidateId;
+    }
+  }
+
+  return BestTerritoryId == INDEX_NONE && CandidateTerritoryIDs.Num() > 0
+             ? CandidateTerritoryIDs[0]
+             : BestTerritoryId;
 }
 

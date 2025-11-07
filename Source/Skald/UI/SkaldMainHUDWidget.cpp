@@ -119,6 +119,14 @@ void USkaldMainHUDWidget::NativeConstruct() {
   SetIsFocusable(true);
   SetFocus();
 
+  bRetreatRequestPending = false;
+  bSelectingRetreatDestination = false;
+  bAwaitingRetreatConfirmation = false;
+  RetreatDefendingTerritoryID = -1;
+  RetreatCandidateIds.Empty();
+  bHasActivePreparePrompt = false;
+  bLocalPlayerIsDefender = false;
+
   // Ensure the full-screen HUD doesn't swallow world clicks.
   if (UWidget *Root = GetRootWidget()) {
     Root->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
@@ -229,6 +237,11 @@ void USkaldMainHUDWidget::NativeTick(const FGeometry &MyGeometry,
 }
 
 void USkaldMainHUDWidget::NativeDestruct() {
+  CompleteRetreatSelection();
+  bRetreatRequestPending = false;
+  bHasActivePreparePrompt = false;
+  bLocalPlayerIsDefender = false;
+
   if (DiceResolutionPanel) {
     DiceResolutionPanel->OnResolutionComplete.RemoveDynamic(
         this, &USkaldMainHUDWidget::HandleDicePanelResolved);
@@ -670,9 +683,18 @@ void USkaldMainHUDWidget::HideStrategicInitiativePrompt() {
 void USkaldMainHUDWidget::ShowPrepareForBattleDialog(
     const FPrepareForBattlePromptData &PromptData) {
   bPrepareForBattleReadySent = false;
+  bRetreatRequestPending = false;
+  bSelectingRetreatDestination = false;
+  bAwaitingRetreatConfirmation = false;
+  RetreatCandidateIds.Empty();
+  RetreatDefendingTerritoryID = -1;
+  ActivePreparePrompt = PromptData;
+  bHasActivePreparePrompt = true;
+  bLocalPlayerIsDefender = false;
 
   if (ActivePrepareForBattleWidget) {
     ActivePrepareForBattleWidget->OnPrepareButtonClicked.RemoveAll(this);
+    ActivePrepareForBattleWidget->OnRetreatButtonClicked.RemoveAll(this);
     ActivePrepareForBattleWidget->RemoveFromParent();
     ActivePrepareForBattleWidget = nullptr;
   }
@@ -690,6 +712,25 @@ void USkaldMainHUDWidget::ShowPrepareForBattleDialog(
            TEXT("ShowPrepareForBattleDialog: failed to create widget"));
     return;
   }
+
+  int32 EffectiveLocalId = LocalPlayerID;
+  bool bLocalIsAttacker = false;
+  bool bLocalIsDefender = false;
+  if (APlayerController *OwnerPC = GetOwningPlayer()) {
+    if (ASkaldPlayerState *LocalPS = OwnerPC->GetPlayerState<ASkaldPlayerState>()) {
+      const int32 PlayerId = LocalPS->GetPlayerId();
+      if (EffectiveLocalId <= 0 && PlayerId > 0) {
+        EffectiveLocalId = PlayerId;
+      }
+    }
+  }
+
+  if (EffectiveLocalId > 0) {
+    bLocalIsAttacker = EffectiveLocalId == PromptData.AttackerPlayerID;
+    bLocalIsDefender = EffectiveLocalId == PromptData.DefenderPlayerID;
+  }
+
+  bLocalPlayerIsDefender = bLocalIsDefender;
 
   auto BuildPlayerDisplayText = [&](const FText &Preferred, int32 PlayerId,
                                     const TCHAR *LogContext) -> FText {
@@ -793,24 +834,156 @@ void USkaldMainHUDWidget::ShowPrepareForBattleDialog(
                                                    DefenderPlayerText,
                                                    DefenderTerritoryText,
                                                    DefenderEmblem);
+  ActivePrepareForBattleWidget->ShowRetreatStatus(FText::GetEmpty(), 0.f);
+  if (ActivePrepareForBattleWidget->PrepareForBattleButton) {
+    const ESlateVisibility PrepareVisibility =
+        bLocalIsAttacker ? ESlateVisibility::Visible
+                          : ESlateVisibility::Collapsed;
+    ActivePrepareForBattleWidget->PrepareForBattleButton->SetVisibility(
+        PrepareVisibility);
+    ActivePrepareForBattleWidget->PrepareForBattleButton->SetIsEnabled(
+        bLocalIsAttacker);
+  }
+  ActivePrepareForBattleWidget->SetRetreatButtonVisibility(
+      bLocalIsDefender ? ESlateVisibility::Visible
+                        : ESlateVisibility::Collapsed);
+  if (bLocalIsDefender) {
+    ActivePrepareForBattleWidget->OnRetreatButtonClicked.AddDynamic(
+        this, &USkaldMainHUDWidget::HandleRetreatClicked);
+    if (ActivePrepareForBattleWidget->RetreatButton) {
+      ActivePrepareForBattleWidget->RetreatButton->SetIsEnabled(true);
+    }
+  }
+
   ActivePrepareForBattleWidget->SetVisibility(ESlateVisibility::Visible);
   ActivePrepareForBattleWidget->SetRenderOpacity(1.f);
   ActivePrepareForBattleWidget->SetIsEnabled(true);
   ActivePrepareForBattleWidget->OnPrepareButtonClicked.AddDynamic(
       this, &USkaldMainHUDWidget::HandlePrepareForBattleClicked);
-  if (ActivePrepareForBattleWidget->PrepareForBattleButton) {
-    ActivePrepareForBattleWidget->PrepareForBattleButton->SetIsEnabled(true);
-  }
   ActivePrepareForBattleWidget->AddToViewport(20);
 }
 
 void USkaldMainHUDWidget::HidePrepareForBattleDialog() {
   if (ActivePrepareForBattleWidget) {
     ActivePrepareForBattleWidget->OnPrepareButtonClicked.RemoveAll(this);
+    ActivePrepareForBattleWidget->OnRetreatButtonClicked.RemoveAll(this);
+    ActivePrepareForBattleWidget->ShowRetreatStatus(FText::GetEmpty(), 0.f);
     ActivePrepareForBattleWidget->RemoveFromParent();
     ActivePrepareForBattleWidget = nullptr;
   }
   bPrepareForBattleReadySent = false;
+  bRetreatRequestPending = false;
+  bHasActivePreparePrompt = false;
+  bLocalPlayerIsDefender = false;
+}
+
+void USkaldMainHUDWidget::BeginRetreatSelection(
+    int32 DefendingTerritoryID, const TArray<int32> &CandidateTerritoryIDs) {
+  HidePrepareForBattleDialog();
+
+  bSelectingRetreatDestination = true;
+  bAwaitingRetreatConfirmation = false;
+  bRetreatRequestPending = false;
+  RetreatDefendingTerritoryID = DefendingTerritoryID;
+  RetreatCandidateIds.Empty();
+  for (int32 CandidateID : CandidateTerritoryIDs) {
+    RetreatCandidateIds.Add(CandidateID);
+  }
+
+  bSelectingForAttack = false;
+  bSelectingForMove = false;
+  SelectedSourceID = -1;
+  SelectedTargetID = -1;
+
+  ClearTerritoryHighlights();
+
+  const FText PromptText = NSLOCTEXT(
+      "SkaldHUD", "RetreatSelectPrompt",
+      "Select a highlighted territory to retreat to.");
+  ShowSelectionPromptMessage(PromptText);
+
+  if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+          GetWorld(), AWorldMap::StaticClass()))) {
+    for (int32 CandidateID : RetreatCandidateIds) {
+      if (ATerritory *Candidate = WorldMap->GetTerritoryById(CandidateID)) {
+        Candidate->Select(LocalPlayerID);
+        HighlightedTerritories.Add(Candidate);
+      }
+    }
+  }
+}
+
+void USkaldMainHUDWidget::CompleteRetreatSelection() {
+  if (!bSelectingRetreatDestination && !bAwaitingRetreatConfirmation) {
+    RetreatCandidateIds.Empty();
+    RetreatDefendingTerritoryID = -1;
+    return;
+  }
+
+  bSelectingRetreatDestination = false;
+  bAwaitingRetreatConfirmation = false;
+  RetreatCandidateIds.Empty();
+  RetreatDefendingTerritoryID = -1;
+  ClearTerritoryHighlights();
+  ShowSelectionPromptMessage(FText::GetEmpty(), false);
+}
+
+void USkaldMainHUDWidget::ShowRetreatUnavailableMessage(const FText &Message) {
+  bRetreatRequestPending = false;
+  bAwaitingRetreatConfirmation = false;
+
+  if (ActivePrepareForBattleWidget) {
+    ActivePrepareForBattleWidget->ShowRetreatStatus(Message, 2.f);
+    if (ActivePrepareForBattleWidget->RetreatButton) {
+      ActivePrepareForBattleWidget->RetreatButton->SetIsEnabled(true);
+    }
+  } else {
+    ShowErrorMessage(Message.ToString());
+  }
+}
+
+void USkaldMainHUDWidget::ShowEnemyRetreatedMessage() {
+  if (!EndingTurnText) {
+    return;
+  }
+
+  ApplyBroadcastStyle(true);
+  EndingTurnText->SetText(
+      NSLOCTEXT("SkaldHUD", "EnemyRetreatedMessage", "Enemy Retreated"));
+  EndingTurnText->SetVisibility(ESlateVisibility::Visible);
+
+  if (UWorld *World = GetWorld()) {
+    FTimerManager &TimerManager = World->GetTimerManager();
+    TimerManager.ClearTimer(TurnMessageTimerHandle);
+
+    const TWeakObjectPtr<USkaldMainHUDWidget> WeakThis(this);
+    FTimerDelegate TimerDelegate;
+    TimerDelegate.BindLambda([WeakThis]() {
+      if (WeakThis.IsValid()) {
+        WeakThis->HideEndingTurn();
+      }
+    });
+
+    TimerManager.SetTimer(TurnMessageTimerHandle, TimerDelegate, 2.f, false);
+  }
+}
+
+void USkaldMainHUDWidget::HandleRetreatClicked() {
+  if (bRetreatRequestPending || !bLocalPlayerIsDefender || !bHasActivePreparePrompt) {
+    return;
+  }
+
+  bRetreatRequestPending = true;
+  bAwaitingRetreatConfirmation = false;
+
+  if (ActivePrepareForBattleWidget) {
+    ActivePrepareForBattleWidget->ShowRetreatStatus(FText::GetEmpty(), 0.f);
+    if (ActivePrepareForBattleWidget->RetreatButton) {
+      ActivePrepareForBattleWidget->RetreatButton->SetIsEnabled(false);
+    }
+  }
+
+  OnRetreatRequested.Broadcast();
 }
 
 void USkaldMainHUDWidget::ShowStrategicInitiativeRoll(int32 RollValue,
@@ -1454,6 +1627,25 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
   const bool bOwnedByLocal =
       LocalPS && IsValid(Territory->OwningPlayer) &&
       Territory->OwningPlayer->GetPlayerId() == LocalPS->GetPlayerId();
+
+  if (bSelectingRetreatDestination) {
+    if (bAwaitingRetreatConfirmation) {
+      return;
+    }
+
+    if (!RetreatCandidateIds.Contains(Territory->TerritoryID)) {
+      const FText Error = NSLOCTEXT(
+          "SkaldHUD", "RetreatInvalidTarget",
+          "Select a highlighted territory to retreat to.");
+      ShowSelectionErrorMessage(Error);
+      return;
+    }
+
+    bAwaitingRetreatConfirmation = true;
+    Territory->Select(LocalPlayerID);
+    OnRetreatDestinationChosen.Broadcast(Territory->TerritoryID);
+    return;
+  }
 
   if (bSelectingForAttack) {
     // If player is mid-selection and clicks a different friendly source,

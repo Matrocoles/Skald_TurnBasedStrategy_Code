@@ -1304,7 +1304,9 @@ bool ATurnManager::HasPendingBattlePreparation() const {
       PendingBattleReadyState.bAttackerReady ||
       PendingBattleReadyState.bDefenderReady;
 
-  return bHasPayload || bHasReadyAssignments;
+  const bool bRetreatInProgress = ActiveRetreatContext.IsActive();
+
+  return bHasPayload || bHasReadyAssignments || bRetreatInProgress;
 }
 
 void ATurnManager::HandleAttackConfirmed(const FS_BattlePayload &Battle) {
@@ -1316,6 +1318,443 @@ void ATurnManager::HandleAttackConfirmed(const FS_BattlePayload &Battle) {
   BeginReadyPhase(Battle, TEXT("HandleAttackConfirmed"));
 }
 
+void ATurnManager::RequestDefenderRetreat(
+    ASkaldPlayerController *RequestingController) {
+  if (!HasAuthority()) {
+    return;
+  }
+
+  if (!RequestingController) {
+    UE_LOG(LogSkaldReady, Warning,
+           TEXT("RequestDefenderRetreat ignored: requesting controller missing."));
+    return;
+  }
+
+  if (ActiveRetreatContext.IsActive()) {
+    UE_LOG(LogSkaldReady, Warning,
+           TEXT("RequestDefenderRetreat ignored: retreat already in progress."));
+    const FText AlreadyInProgressMessage =
+        NSLOCTEXT("SkaldHUD", "RetreatAlreadyPending", "Cannot Retreat!");
+    const bool bIsLocalController = RequestingController->IsLocalController();
+    const bool bHasClientConnection =
+        !bIsLocalController && RequestingController->GetNetConnection() != nullptr;
+    if (bIsLocalController || !bHasClientConnection) {
+      RequestingController->NotifyRetreatFailed(AlreadyInProgressMessage);
+    }
+    if (bHasClientConnection) {
+      RequestingController->ClientRetreatFailed(AlreadyInProgressMessage);
+    }
+    return;
+  }
+
+  const int32 DefendingPlayerId = PendingBattlePreparation.DefenderPlayerID;
+  const bool bHasPendingBattle =
+      PendingBattlePreparation.FromTerritoryID > 0 &&
+      PendingBattlePreparation.TargetTerritoryID > 0 &&
+      DefendingPlayerId != INDEX_NONE;
+
+  if (!bHasPendingBattle) {
+    UE_LOG(LogSkaldReady, Warning,
+           TEXT("RequestDefenderRetreat ignored: no pending battle preparation."));
+    const FText NoPendingBattleMessage =
+        NSLOCTEXT("SkaldHUD", "RetreatNoPendingBattle", "Cannot Retreat!");
+    const bool bIsLocalController = RequestingController->IsLocalController();
+    const bool bHasClientConnection =
+        !bIsLocalController && RequestingController->GetNetConnection() != nullptr;
+    if (bIsLocalController || !bHasClientConnection) {
+      RequestingController->NotifyRetreatFailed(NoPendingBattleMessage);
+    }
+    if (bHasClientConnection) {
+      RequestingController->ClientRetreatFailed(NoPendingBattleMessage);
+    }
+    return;
+  }
+
+  ASkaldPlayerState *RequestingState =
+      RequestingController->GetPlayerState<ASkaldPlayerState>();
+  if (!RequestingState || RequestingState->GetPlayerId() != DefendingPlayerId) {
+    UE_LOG(LogSkaldReady, Warning,
+           TEXT("RequestDefenderRetreat rejected: controller %s is not the defender."),
+           *GetNameSafe(RequestingController));
+    const FText NotDefenderMessage =
+        NSLOCTEXT("SkaldHUD", "RetreatNotDefender", "Cannot Retreat!");
+    const bool bIsLocalController = RequestingController->IsLocalController();
+    const bool bHasClientConnection =
+        !bIsLocalController && RequestingController->GetNetConnection() != nullptr;
+    if (bIsLocalController || !bHasClientConnection) {
+      RequestingController->NotifyRetreatFailed(NotDefenderMessage);
+    }
+    if (bHasClientConnection) {
+      RequestingController->ClientRetreatFailed(NotDefenderMessage);
+    }
+    return;
+  }
+
+  AWorldMap *WorldMap = ResolveWorldMap();
+  if (!WorldMap) {
+    UE_LOG(LogSkaldReady, Warning,
+           TEXT("RequestDefenderRetreat failed: world map unavailable."));
+    const FText FailureMessage =
+        NSLOCTEXT("SkaldHUD", "RetreatWorldMissing", "Cannot Retreat!");
+    const bool bIsLocalController = RequestingController->IsLocalController();
+    const bool bHasClientConnection =
+        !bIsLocalController && RequestingController->GetNetConnection() != nullptr;
+    if (bIsLocalController || !bHasClientConnection) {
+      RequestingController->NotifyRetreatFailed(FailureMessage);
+    }
+    if (bHasClientConnection) {
+      RequestingController->ClientRetreatFailed(FailureMessage);
+    }
+    return;
+  }
+
+  ATerritory *DefendingTerritory =
+      WorldMap->GetTerritoryById(PendingBattlePreparation.TargetTerritoryID);
+  if (!DefendingTerritory) {
+    UE_LOG(LogSkaldReady, Warning,
+           TEXT("RequestDefenderRetreat failed: defending territory %d not found."),
+           PendingBattlePreparation.TargetTerritoryID);
+    const FText FailureMessage =
+        NSLOCTEXT("SkaldHUD", "RetreatNoTerritory", "Cannot Retreat!");
+    const bool bIsLocalController = RequestingController->IsLocalController();
+    const bool bHasClientConnection =
+        !bIsLocalController && RequestingController->GetNetConnection() != nullptr;
+    if (bIsLocalController || !bHasClientConnection) {
+      RequestingController->NotifyRetreatFailed(FailureMessage);
+    }
+    if (bHasClientConnection) {
+      RequestingController->ClientRetreatFailed(FailureMessage);
+    }
+    return;
+  }
+
+  TSet<int32> CandidateIds;
+  for (ATerritory *Adjacent : DefendingTerritory->AdjacentTerritories) {
+    if (Adjacent && Adjacent->OwningPlayer == RequestingState) {
+      CandidateIds.Add(Adjacent->TerritoryID);
+    }
+  }
+
+  if (CandidateIds.Num() == 0) {
+    UE_LOG(LogSkaldReady, Log,
+           TEXT("RequestDefenderRetreat rejected: defender %s has no adjacent territory to retreat to."),
+           *GetNameSafe(RequestingController));
+    const FText NoAdjacentMessage =
+        NSLOCTEXT("SkaldHUD", "RetreatNoAdjacent", "Cannot Retreat!");
+    const bool bIsLocalController = RequestingController->IsLocalController();
+    const bool bHasClientConnection =
+        !bIsLocalController && RequestingController->GetNetConnection() != nullptr;
+    if (bIsLocalController || !bHasClientConnection) {
+      RequestingController->NotifyRetreatFailed(NoAdjacentMessage);
+    }
+    if (bHasClientConnection) {
+      RequestingController->ClientRetreatFailed(NoAdjacentMessage);
+    }
+    return;
+  }
+
+  ActiveRetreatContext.Reset();
+  ActiveRetreatContext.BattlePayload = PendingBattlePreparation;
+  ActiveRetreatContext.AttackerController =
+      FindControllerByPlayerId(PendingBattlePreparation.AttackerPlayerID);
+  ActiveRetreatContext.DefenderController = RequestingController;
+  ActiveRetreatContext.CandidateTerritoryIds = MoveTemp(CandidateIds);
+  ActiveRetreatContext.DefendingTerritoryId =
+      PendingBattlePreparation.TargetTerritoryID;
+  ActiveRetreatContext.AttackingTerritoryId =
+      PendingBattlePreparation.FromTerritoryID;
+  ActiveRetreatContext.bAwaitingDestination = true;
+
+  PendingBattlePreparation = FS_BattlePayload();
+  PendingBattleReadyState = FSkaldBattleReadyState();
+  CommitPendingBattleReadyState(TEXT("RequestDefenderRetreat_ClearReady"));
+
+  auto DispatchToController =
+      [](ASkaldPlayerController *Controller,
+         TFunctionRef<void(ASkaldPlayerController *)> LocalAction,
+         TFunctionRef<void(ASkaldPlayerController *)> ClientAction) {
+        if (!Controller) {
+          return;
+        }
+        const bool bIsLocal = Controller->IsLocalController();
+        const bool bHasClientConnection =
+            !bIsLocal && Controller->GetNetConnection() != nullptr;
+        const bool bShouldExecuteLocal = bIsLocal || !bHasClientConnection;
+        if (bShouldExecuteLocal) {
+          LocalAction(Controller);
+        }
+        if (bHasClientConnection) {
+          ClientAction(Controller);
+        }
+      };
+
+  auto HidePreparePrompt = [&](ASkaldPlayerController *Controller) {
+    DispatchToController(
+        Controller,
+        [](ASkaldPlayerController *LocalController) {
+          LocalController->HidePrepareForBattlePromptLocal();
+        },
+        [](ASkaldPlayerController *RemoteController) {
+          RemoteController->ClientHidePrepareForBattle();
+        });
+  };
+
+  auto NotifyEnemyRetreated = [&](ASkaldPlayerController *Controller) {
+    DispatchToController(
+        Controller,
+        [](ASkaldPlayerController *LocalController) {
+          LocalController->NotifyEnemyRetreated();
+        },
+        [](ASkaldPlayerController *RemoteController) {
+          RemoteController->ClientEnemyRetreated();
+        });
+  };
+
+  auto BeginSelectionForController = [&](ASkaldPlayerController *Controller) {
+    if (!Controller) {
+      return;
+    }
+    TArray<int32> CandidateArray =
+        ActiveRetreatContext.CandidateTerritoryIds.Array();
+    DispatchToController(
+        Controller,
+        [&](ASkaldPlayerController *LocalController) {
+          LocalController->BeginRetreatSelectionLocal(
+              ActiveRetreatContext.DefendingTerritoryId, CandidateArray);
+        },
+        [&](ASkaldPlayerController *RemoteController) {
+          RemoteController->ClientBeginRetreatSelection(
+              ActiveRetreatContext.DefendingTerritoryId, CandidateArray);
+        });
+  };
+
+  ASkaldPlayerController *AttackerController =
+      ActiveRetreatContext.AttackerController.Get();
+
+  HidePreparePrompt(RequestingController);
+  HidePreparePrompt(AttackerController);
+  NotifyEnemyRetreated(AttackerController);
+  BeginSelectionForController(RequestingController);
+
+  UE_LOG(LogSkaldReady, Log,
+         TEXT("Defender %s initiated retreat from territory %d."),
+         *GetNameSafe(RequestingController),
+         ActiveRetreatContext.DefendingTerritoryId);
+}
+
+void ATurnManager::ConfirmDefenderRetreatDestination(
+    ASkaldPlayerController *RequestingController, int32 TerritoryID) {
+  if (!HasAuthority()) {
+    return;
+  }
+
+  if (!ActiveRetreatContext.IsActive()) {
+    UE_LOG(LogSkaldReady, Warning,
+           TEXT("ConfirmDefenderRetreatDestination ignored: no active retreat."));
+    return;
+  }
+
+  if (!RequestingController) {
+    UE_LOG(LogSkaldReady, Warning,
+           TEXT("ConfirmDefenderRetreatDestination ignored: missing controller."));
+    return;
+  }
+
+  ASkaldPlayerState *RequestingState =
+      RequestingController->GetPlayerState<ASkaldPlayerState>();
+  const int32 DefenderPlayerId =
+      ActiveRetreatContext.BattlePayload.DefenderPlayerID;
+  if (!RequestingState || RequestingState->GetPlayerId() != DefenderPlayerId) {
+    UE_LOG(LogSkaldReady, Warning,
+           TEXT("ConfirmDefenderRetreatDestination rejected: controller %s is not the defender."),
+           *GetNameSafe(RequestingController));
+    return;
+  }
+
+  if (!ActiveRetreatContext.CandidateTerritoryIds.Contains(TerritoryID)) {
+    UE_LOG(LogSkaldReady, Warning,
+           TEXT("ConfirmDefenderRetreatDestination rejected: territory %d not a valid retreat candidate."),
+           TerritoryID);
+    const FText InvalidSelectionMessage = NSLOCTEXT(
+        "SkaldHUD", "RetreatInvalidSelection",
+        "Select a highlighted territory to retreat to.");
+    const bool bIsLocalController = RequestingController->IsLocalController();
+    const bool bHasClientConnection =
+        !bIsLocalController && RequestingController->GetNetConnection() != nullptr;
+    if (bIsLocalController || !bHasClientConnection) {
+      RequestingController->NotifyRetreatFailed(InvalidSelectionMessage);
+    }
+    if (bHasClientConnection) {
+      RequestingController->ClientRetreatFailed(InvalidSelectionMessage);
+    }
+    return;
+  }
+
+  AWorldMap *WorldMap = ResolveWorldMap();
+  if (!WorldMap) {
+    UE_LOG(LogSkaldReady, Warning,
+           TEXT("ConfirmDefenderRetreatDestination failed: world map unavailable."));
+    const FText FailureMessage =
+        NSLOCTEXT("SkaldHUD", "RetreatWorldMissingConfirm", "Cannot Retreat!");
+    const bool bIsLocalController = RequestingController->IsLocalController();
+    const bool bHasClientConnection =
+        !bIsLocalController && RequestingController->GetNetConnection() != nullptr;
+    if (bIsLocalController || !bHasClientConnection) {
+      RequestingController->NotifyRetreatFailed(FailureMessage);
+    }
+    if (bHasClientConnection) {
+      RequestingController->ClientRetreatFailed(FailureMessage);
+    }
+    return;
+  }
+
+  ATerritory *DefendingTerritory =
+      WorldMap->GetTerritoryById(ActiveRetreatContext.DefendingTerritoryId);
+  ATerritory *Destination = WorldMap->GetTerritoryById(TerritoryID);
+  ATerritory *AttackerSource =
+      WorldMap->GetTerritoryById(ActiveRetreatContext.AttackingTerritoryId);
+
+  if (!DefendingTerritory || !Destination) {
+    UE_LOG(LogSkaldReady, Warning,
+           TEXT("ConfirmDefenderRetreatDestination failed: missing defending (%s) or destination (%s) territory."),
+           *GetNameSafe(DefendingTerritory), *GetNameSafe(Destination));
+    const FText FailureMessage =
+        NSLOCTEXT("SkaldHUD", "RetreatInvalidTerritory", "Cannot Retreat!");
+    const bool bIsLocalController = RequestingController->IsLocalController();
+    const bool bHasClientConnection =
+        !bIsLocalController && RequestingController->GetNetConnection() != nullptr;
+    if (bIsLocalController || !bHasClientConnection) {
+      RequestingController->NotifyRetreatFailed(FailureMessage);
+    }
+    if (bHasClientConnection) {
+      RequestingController->ClientRetreatFailed(FailureMessage);
+    }
+    return;
+  }
+
+  if (Destination->OwningPlayer != RequestingState) {
+    UE_LOG(LogSkaldReady, Warning,
+           TEXT("ConfirmDefenderRetreatDestination rejected: destination territory %d is no longer owned by defender."),
+           TerritoryID);
+    const FText OwnershipMessage =
+        NSLOCTEXT("SkaldHUD", "RetreatLostTerritory", "Cannot Retreat!");
+    const bool bIsLocalController = RequestingController->IsLocalController();
+    const bool bHasClientConnection =
+        !bIsLocalController && RequestingController->GetNetConnection() != nullptr;
+    if (bIsLocalController || !bHasClientConnection) {
+      RequestingController->NotifyRetreatFailed(OwnershipMessage);
+    }
+    if (bHasClientConnection) {
+      RequestingController->ClientRetreatFailed(OwnershipMessage);
+    }
+    return;
+  }
+
+  const int32 AttackerPlayerId =
+      ActiveRetreatContext.BattlePayload.AttackerPlayerID;
+  ASkaldPlayerController *AttackerController =
+      ActiveRetreatContext.AttackerController.Get();
+  ASkaldPlayerState *AttackerState = nullptr;
+  if (AttackerController) {
+    AttackerState = AttackerController->GetPlayerState<ASkaldPlayerState>();
+  }
+
+  if (!AttackerState) {
+    if (ASkaldGameState *GameState =
+            GetWorld() ? GetWorld()->GetGameState<ASkaldGameState>() : nullptr) {
+      AttackerState = GameState->GetPlayerById(AttackerPlayerId);
+    }
+  }
+
+  const int32 DefenderArmy = FMath::Max(0, DefendingTerritory->ArmyUnits);
+  const int32 AttackerArmySent =
+      FMath::Max(0, ActiveRetreatContext.BattlePayload.ArmyCountSent);
+
+  Destination->ArmyUnits += DefenderArmy;
+  Destination->RefreshAppearance();
+  DefendingTerritory->ArmyUnits = 0;
+
+  if (AttackerSource) {
+    int32 ArmyToMove = AttackerArmySent;
+    if (ArmyToMove > AttackerSource->ArmyUnits) {
+      UE_LOG(LogSkaldReady, Warning,
+             TEXT("Retreat army adjustment: attacker source only has %d units but %d were committed."),
+             AttackerSource->ArmyUnits, ArmyToMove);
+      ArmyToMove = AttackerSource->ArmyUnits;
+    }
+    AttackerSource->ArmyUnits -= ArmyToMove;
+    AttackerSource->RefreshAppearance();
+    DefendingTerritory->ArmyUnits = ArmyToMove;
+  } else {
+    DefendingTerritory->ArmyUnits = AttackerArmySent;
+  }
+
+  DefendingTerritory->OwningPlayer = AttackerState;
+  DefendingTerritory->RefreshAppearance();
+
+  auto DispatchToControllerConfirm =
+      [](ASkaldPlayerController *Controller,
+         TFunctionRef<void(ASkaldPlayerController *)> LocalAction,
+         TFunctionRef<void(ASkaldPlayerController *)> ClientAction) {
+        if (!Controller) {
+          return;
+        }
+        const bool bIsLocal = Controller->IsLocalController();
+        const bool bHasClientConnection =
+            !bIsLocal && Controller->GetNetConnection() != nullptr;
+        const bool bShouldExecuteLocal = bIsLocal || !bHasClientConnection;
+        if (bShouldExecuteLocal) {
+          LocalAction(Controller);
+        }
+        if (bHasClientConnection) {
+          ClientAction(Controller);
+        }
+      };
+
+  DispatchToControllerConfirm(
+      RequestingController,
+      [](ASkaldPlayerController *LocalController) {
+        LocalController->CompleteRetreatSelectionLocal();
+      },
+      [](ASkaldPlayerController *RemoteController) {
+        RemoteController->ClientCompleteRetreat();
+      });
+
+  DispatchToControllerConfirm(
+      RequestingController,
+      [](ASkaldPlayerController *LocalController) {
+        LocalController->HandleWorldStateChanged();
+      },
+      [](ASkaldPlayerController *RemoteController) {
+        RemoteController->HandleWorldStateChanged();
+      });
+
+  if (AttackerController) {
+    DispatchToControllerConfirm(
+        AttackerController,
+        [](ASkaldPlayerController *LocalController) {
+          LocalController->HandleWorldStateChanged();
+        },
+        [](ASkaldPlayerController *RemoteController) {
+          RemoteController->HandleWorldStateChanged();
+        });
+  }
+
+  const int32 CapturedTerritoryId = ActiveRetreatContext.DefendingTerritoryId;
+  ClearActiveRetreatContext();
+
+  if (ASkaldGameMode *GameMode =
+          GetWorld() ? GetWorld()->GetAuthGameMode<ASkaldGameMode>() : nullptr) {
+    GameMode->CheckVictoryConditions();
+  }
+
+  OnWorldStateChanged.Broadcast();
+
+  UE_LOG(LogSkaldReady, Log,
+         TEXT("Defender retreated to territory %d. Attacker claimed territory %d."),
+         TerritoryID, CapturedTerritoryId);
+}
+
 void ATurnManager::RequestPrepareBattle(const FS_BattlePayload &Battle) {
   BeginReadyPhase(Battle, TEXT("RequestPrepareBattle"));
 }
@@ -1323,6 +1762,8 @@ void ATurnManager::RequestPrepareBattle(const FS_BattlePayload &Battle) {
 void ATurnManager::BeginReadyPhase(const FS_BattlePayload &Battle,
                                    const TCHAR *Context) {
   FS_BattlePayload NormalizedBattle = Battle;
+
+  ClearActiveRetreatContext();
 
   USkaldGameInstance *GameInstance = GetGameInstance<USkaldGameInstance>();
   ASkaldGameState *GameState = GetWorld() ?
@@ -3506,6 +3947,34 @@ void ATurnManager::QueuePhaseBroadcastRetry(ETurnPhase Phase) {
                           RetryDelaySeconds, false);
   }
 }
+
+ASkaldPlayerController *ATurnManager::FindControllerByPlayerId(int32 PlayerId) const {
+  if (PlayerId == INDEX_NONE) {
+    return nullptr;
+  }
+
+  for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr : Controllers) {
+    if (!ControllerPtr.IsValid()) {
+      continue;
+    }
+
+    ASkaldPlayerController *Controller = ControllerPtr.Get();
+    if (!Controller) {
+      continue;
+    }
+
+    if (ASkaldPlayerState *PlayerState =
+            Controller->GetPlayerState<ASkaldPlayerState>()) {
+      if (PlayerState->GetPlayerId() == PlayerId) {
+        return Controller;
+      }
+    }
+  }
+
+  return nullptr;
+}
+
+void ATurnManager::ClearActiveRetreatContext() { ActiveRetreatContext.Reset(); }
 
 int32 ATurnManager::DistributeArmyPlacementUnits(ASkaldPlayerState *PlayerState) {
   if (!PlayerState) {

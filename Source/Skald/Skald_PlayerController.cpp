@@ -1232,6 +1232,10 @@ void ASkaldPlayerController::InitializeHUDWidget() {
       this, &ASkaldPlayerController::HandleAttackRequested);
   MainHUD->OnPrepareForBattleReady.AddDynamic(
       this, &ASkaldPlayerController::HandlePrepareForBattleReady);
+  MainHUD->OnRetreatRequested.AddDynamic(
+      this, &ASkaldPlayerController::HandleRetreatRequested);
+  MainHUD->OnRetreatDestinationChosen.AddDynamic(
+      this, &ASkaldPlayerController::HandleRetreatDestinationSelected);
   MainHUD->OnMoveRequested.AddDynamic(
       this, &ASkaldPlayerController::HandleMoveRequested);
   MainHUD->OnEndAttackRequested.AddDynamic(
@@ -2933,6 +2937,14 @@ void ASkaldPlayerController::HandlePrepareForBattleReady()
     ServerSetReadyForBattle(true);
 }
 
+void ASkaldPlayerController::HandleRetreatRequested() {
+  ServerRequestRetreat();
+}
+
+void ASkaldPlayerController::HandleRetreatDestinationSelected(int32 TerritoryID) {
+  ServerConfirmRetreatDestination(TerritoryID);
+}
+
 void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
     int32 ToID,
     int32 ArmySent,
@@ -3143,6 +3155,23 @@ void ASkaldPlayerController::ServerSetReadyForBattle_Implementation(bool bReady)
     }
 
     TurnManager->NotifyPlayerReadyForBattle(PlayerID, bReady);
+}
+
+void ASkaldPlayerController::ServerRequestRetreat_Implementation() {
+  if (!EnsureTurnManager(TEXT("ServerRequestRetreat"))) {
+    return;
+  }
+
+  TurnManager->RequestDefenderRetreat(this);
+}
+
+void ASkaldPlayerController::ServerConfirmRetreatDestination_Implementation(
+    int32 TerritoryID) {
+  if (!EnsureTurnManager(TEXT("ServerConfirmRetreatDestination"))) {
+    return;
+  }
+
+  TurnManager->ConfirmDefenderRetreatDestination(this, TerritoryID);
 }
 
 void ASkaldPlayerController::HandleMoveRequested(int32 FromID, int32 ToID,
@@ -5004,6 +5033,48 @@ bool ASkaldPlayerController::TryShowPendingReadyPrompt() {
   return true;
 }
 
+void ASkaldPlayerController::BeginRetreatSelectionLocal(
+    int32 DefendingTerritoryID, const TArray<int32> &CandidateTerritoryIDs) {
+  if (!MainHUD) {
+    InitializeHUDWidget();
+  }
+
+  if (MainHUD) {
+    MainHUD->BeginRetreatSelection(DefendingTerritoryID, CandidateTerritoryIDs);
+  }
+
+  OnBeginRetreatSelection(DefendingTerritoryID, CandidateTerritoryIDs);
+}
+
+void ASkaldPlayerController::CompleteRetreatSelectionLocal() {
+  if (MainHUD) {
+    MainHUD->CompleteRetreatSelection();
+  }
+}
+
+void ASkaldPlayerController::NotifyRetreatFailed(const FText &Message) {
+  if (!MainHUD) {
+    InitializeHUDWidget();
+  }
+
+  if (MainHUD) {
+    MainHUD->ShowRetreatUnavailableMessage(Message);
+  }
+}
+
+void ASkaldPlayerController::NotifyEnemyRetreated() {
+  if (!MainHUD) {
+    InitializeHUDWidget();
+  }
+
+  if (MainHUD) {
+    MainHUD->ShowEnemyRetreatedMessage();
+  }
+}
+
+void ASkaldPlayerController::OnBeginRetreatSelection(
+    int32 /*DefendingTerritoryID*/, const TArray<int32> & /*CandidateTerritoryIDs*/) {}
+
 bool ASkaldPlayerController::ShouldDisplayPrepareForBattlePrompt(
     const FPrepareForBattlePromptData &PromptData) {
   ASkaldPlayerState *LocalPS = GetPlayerState<ASkaldPlayerState>();
@@ -5175,6 +5246,24 @@ void ASkaldPlayerController::ShowPrepareForBattlePromptLocal_Internal(
          TEXT("MainHUD not yet available for %s; caching prepare-for-battle prompt."),
          *GetName());
   RegisterPendingReadyPromptRetry();
+}
+
+void ASkaldPlayerController::ClientBeginRetreatSelection_Implementation(
+    int32 DefendingTerritoryID, const TArray<int32> &CandidateTerritoryIDs) {
+  BeginRetreatSelectionLocal(DefendingTerritoryID, CandidateTerritoryIDs);
+}
+
+void ASkaldPlayerController::ClientCompleteRetreat_Implementation() {
+  CompleteRetreatSelectionLocal();
+}
+
+void ASkaldPlayerController::ClientRetreatFailed_Implementation(
+    const FText &Message) {
+  NotifyRetreatFailed(Message);
+}
+
+void ASkaldPlayerController::ClientEnemyRetreated_Implementation() {
+  NotifyEnemyRetreated();
 }
 
 void ASkaldPlayerController::ClientShowPrepareForBattle_Implementation(

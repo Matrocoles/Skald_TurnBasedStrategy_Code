@@ -114,6 +114,13 @@ public:
   /** Process a confirmed attack and transition the turn system into the ready phase. */
   void HandleAttackConfirmed(const FS_BattlePayload &Battle);
 
+  /** Request that the current defender retreats instead of entering battle. */
+  void RequestDefenderRetreat(ASkaldPlayerController *RequestingController);
+
+  /** Confirm the destination territory for an active defender retreat. */
+  void ConfirmDefenderRetreatDestination(ASkaldPlayerController *RequestingController,
+                                         int32 TerritoryID);
+
   /** Transition into the grid based battle mode using the provided payload. */
   UFUNCTION(BlueprintCallable, Category = "Battle")
   virtual void TriggerGridBattle(const FS_BattlePayload &Battle);
@@ -216,6 +223,8 @@ protected:
 
   void CommitPendingBattleReadyState(const TCHAR *Context);
   bool TryAutoReadyAI(const TCHAR *Context);
+  ASkaldPlayerController *FindControllerByPlayerId(int32 PlayerId) const;
+  void ClearActiveRetreatContext();
   /** Payload for the next battle waiting on travel/resolution to finish. */
   FS_BattlePayload DeferredPendingBattle;
 
@@ -245,6 +254,31 @@ protected:
 
   /** Cached battle manager that currently has a battle end delegate bound. */
   TWeakObjectPtr<class UGridBattleManager> BoundBattleManager;
+
+  /** Context describing an in-progress retreat resolution. */
+  struct FSkaldRetreatContext {
+    FS_BattlePayload BattlePayload;
+    TWeakObjectPtr<ASkaldPlayerController> AttackerController;
+    TWeakObjectPtr<ASkaldPlayerController> DefenderController;
+    TSet<int32> CandidateTerritoryIds;
+    int32 DefendingTerritoryId = 0;
+    int32 AttackingTerritoryId = 0;
+    bool bAwaitingDestination = false;
+
+    void Reset() {
+      BattlePayload = FS_BattlePayload();
+      AttackerController.Reset();
+      DefenderController.Reset();
+      CandidateTerritoryIds.Reset();
+      DefendingTerritoryId = 0;
+      AttackingTerritoryId = 0;
+      bAwaitingDestination = false;
+    }
+
+    bool IsActive() const { return bAwaitingDestination; }
+  };
+
+  FSkaldRetreatContext ActiveRetreatContext;
 
   /** Number of movement actions completed during the current movement phase, keyed by player ID. */
   TMap<int32, int32> MovementActionsTaken;
