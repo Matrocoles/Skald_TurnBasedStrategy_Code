@@ -26,6 +26,7 @@ public:
     void SetOwningRollId(const FGuid& InRollId) { OwningRollId = InRollId; }
     FGuid GetOwningRollId() const { return OwningRollId; }
     void SetDesiredFaceValue(int32 InDesiredValue);
+    void SetShouldSnapToDesired(bool bEnable);
     void ApplyTint(const FLinearColor& Tint, FName TintParameterName);
     void LaunchDie(const FVector& Position, const FRotator& Rotation, const FVector& LinearImpulse, const FVector& AngularImpulse);
     void ForceFaceValue(int32 TargetValue, bool bBroadcastResult = true);
@@ -70,4 +71,5 @@ private:
     void StabiliseAfterSettlement();
 
     bool bHasValidatedFaceMappings = false;
+    bool bSnapToDesiredValue = true;
 };

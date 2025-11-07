@@ -90,6 +90,7 @@ private:
             int32 DesiredValue = INDEX_NONE;
             int32 ResolvedValue = INDEX_NONE;
             bool bIsPlayerDie = false;
+            bool bSnapToDesiredValue = true;
         };
 
         TArray<FDieState> Dice;
