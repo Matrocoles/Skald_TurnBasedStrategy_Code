@@ -6,6 +6,14 @@
 
 class UGridOverlayComponent;
 
+namespace Skald::GridObstacle {
+/**
+ * Calculate bounds for an obstacle actor, preferring colliding components.
+ * Falls back to all components if no colliding bounds are available.
+ */
+SKALD_API FBox CalculateRelevantBounds(const AActor *Actor);
+}
+
 /**
  * Component that marks an actor as a grid obstacle.
  * Can be added to static mesh actors to control movement and line-of-sight blocking behaviour.
