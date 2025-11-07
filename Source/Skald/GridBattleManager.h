@@ -615,6 +615,12 @@ private:
     /** Cached initiative roll for defenders to display in the HUD. */
     int32 LastInitiativeRollDefender = 0;
 
+    /** Whether the attacker has requested their initiative roll this round. */
+    bool bAttackerInitiativeRollRequested = false;
+
+    /** Whether the defender has requested their initiative roll this round. */
+    bool bDefenderInitiativeRollRequested = false;
+
     /** Duration that initiative dice should remain visible. */
     static constexpr float InitiativePresentationDelay = 2.f;
 

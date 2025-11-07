@@ -393,6 +393,17 @@ bool UGridBattleManager::RollInitiative()
         return true;
     }
 
+    if (!bAttackerInitiativeRollRequested || !bDefenderInitiativeRollRequested)
+    {
+        if (bAwaitingInitiativeRoll)
+        {
+            return false;
+        }
+
+        bAttackerInitiativeRollRequested = true;
+        bDefenderInitiativeRollRequested = true;
+    }
+
     LastInitiativeRollAttacker = 0;
     LastInitiativeRollDefender = 0;
 
@@ -562,6 +573,8 @@ void UGridBattleManager::CompleteInitiativeRoll(int32 AttackerRoll, int32 Defend
 {
     PendingInitiativeRollAttacker.Reset();
     PendingInitiativeRollDefender.Reset();
+    bAttackerInitiativeRollRequested = false;
+    bDefenderInitiativeRollRequested = false;
 
     LastInitiativeRollAttacker = AttackerRoll;
     LastInitiativeRollDefender = DefenderRoll;
@@ -722,6 +735,10 @@ void UGridBattleManager::StartRound()
         World->GetTimerManager().ClearTimer(InitiativeAIRollTimer);
     }
 
+    bAttackerInitiativeRollRequested = false;
+    bDefenderInitiativeRollRequested = false;
+    PendingInitiativeRollAttacker.Reset();
+    PendingInitiativeRollDefender.Reset();
     bAwaitingInitiativeRoll = false;
 
     if (ShouldPauseForInitiativePrompt())
@@ -732,6 +749,8 @@ void UGridBattleManager::StartRound()
         return;
     }
 
+    bAttackerInitiativeRollRequested = true;
+    bDefenderInitiativeRollRequested = true;
     ResolveInitiativeRollInternal();
 }
 
@@ -742,20 +761,25 @@ void UGridBattleManager::ConfirmInitiativeRoll(int32 AttackerRoll, int32 Defende
         return;
     }
 
-    if (AttackerRoll > 0)
+    if (AttackerRoll >= 0)
     {
-        PendingInitiativeRollAttacker = AttackerRoll;
+        bAttackerInitiativeRollRequested = true;
+        if (AttackerRoll > 0)
+        {
+            PendingInitiativeRollAttacker = AttackerRoll;
+        }
     }
 
-    if (DefenderRoll > 0)
+    if (DefenderRoll >= 0)
     {
-        PendingInitiativeRollDefender = DefenderRoll;
+        bDefenderInitiativeRollRequested = true;
+        if (DefenderRoll > 0)
+        {
+            PendingInitiativeRollDefender = DefenderRoll;
+        }
     }
 
-    const bool bHasAttackerRoll = PendingInitiativeRollAttacker.IsSet();
-    const bool bHasDefenderRoll = PendingInitiativeRollDefender.IsSet();
-
-    if (bHasAttackerRoll && bHasDefenderRoll)
+    if (bAttackerInitiativeRollRequested && bDefenderInitiativeRollRequested)
     {
         ResolveInitiativeRollInternal();
         return;
@@ -766,6 +790,11 @@ void UGridBattleManager::ConfirmInitiativeRoll(int32 AttackerRoll, int32 Defende
 
 void UGridBattleManager::ResolveInitiativeRollInternal()
 {
+    if (!bAttackerInitiativeRollRequested || !bDefenderInitiativeRollRequested)
+    {
+        return;
+    }
+
     bAwaitingInitiativeRoll = false;
 
     if (UWorld* World = GetWorld())
@@ -788,8 +817,8 @@ void UGridBattleManager::ScheduleAIRollIfNeeded()
         return;
     }
 
-    const bool bNeedsAttackerRoll = !PendingInitiativeRollAttacker.IsSet() && IsSideAIControlled(true);
-    const bool bNeedsDefenderRoll = !PendingInitiativeRollDefender.IsSet() && IsSideAIControlled(false);
+    const bool bNeedsAttackerRoll = !bAttackerInitiativeRollRequested && IsSideAIControlled(true);
+    const bool bNeedsDefenderRoll = !bDefenderInitiativeRollRequested && IsSideAIControlled(false);
 
     if (!bNeedsAttackerRoll && !bNeedsDefenderRoll)
     {
@@ -820,19 +849,19 @@ void UGridBattleManager::PerformAIRoll()
 
     bool bRolledValue = false;
 
-    if (!PendingInitiativeRollAttacker.IsSet() && IsSideAIControlled(true))
+    if (!bAttackerInitiativeRollRequested && IsSideAIControlled(true))
     {
-        PendingInitiativeRollAttacker = Rng.RandRange(1, InitiativeDiceSides);
+        bAttackerInitiativeRollRequested = true;
         bRolledValue = true;
     }
 
-    if (!PendingInitiativeRollDefender.IsSet() && IsSideAIControlled(false))
+    if (!bDefenderInitiativeRollRequested && IsSideAIControlled(false))
     {
-        PendingInitiativeRollDefender = Rng.RandRange(1, InitiativeDiceSides);
+        bDefenderInitiativeRollRequested = true;
         bRolledValue = true;
     }
 
-    if (PendingInitiativeRollAttacker.IsSet() && PendingInitiativeRollDefender.IsSet())
+    if (bAttackerInitiativeRollRequested && bDefenderInitiativeRollRequested)
     {
         ResolveInitiativeRollInternal();
         return;
