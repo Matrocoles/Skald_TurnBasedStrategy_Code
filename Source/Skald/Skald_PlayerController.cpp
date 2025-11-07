@@ -6386,7 +6386,7 @@ void ASkaldPlayerController::ApplyPendingPhysicalAttackResults() {
   }
 
   const int32 ExpectedDice =
-      FMath::Max(0, PendingAttackSequence.AttackerSnapshot.AttackDice);
+      FMath::Max(0, PendingAttackSequence.Result.DiceOutcomes.Num());
   if (ExpectedDice <= 0) {
     PendingAttackSequence.bHasPhysicalResults = false;
     PendingAttackSequence.PhysicalRollResults.Reset();
@@ -6417,6 +6417,8 @@ void ASkaldPlayerController::ApplyPendingPhysicalAttackResults() {
   if (PendingAttackSequence.Result.StartingHealth > 0) {
     DefenderStats.Health = PendingAttackSequence.Result.StartingHealth;
   }
+
+  AttackerStats.AttackDice = ExpectedDice;
 
   FRandomStream DummyStream;
   DummyStream.Initialize(0x1234u);
