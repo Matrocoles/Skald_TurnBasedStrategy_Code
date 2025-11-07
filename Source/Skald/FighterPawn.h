@@ -70,6 +70,15 @@ public:
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Combat|Dice")
   bool IsAwaitingPhysicalAttackRoll() const { return bAwaitingPhysicalAttackRoll; }
 
+  /**
+   * Rebuild the supplied dice result using concrete physical roll values so the
+   * queued attack resolves using the exact faces produced by the dice system.
+   */
+  static void ApplyPhysicalRollResults(
+      FDiceRollResult &Result, const TArray<int32> &RollValues,
+      const FFighterStats &AttackerStats,
+      const FFighterStats &DefenderStats);
+
   /** Clear round-based activation flags. */
   UFUNCTION(BlueprintCallable, Category = "Fighter")
   void ResetActivationState();
@@ -719,15 +728,6 @@ private:
 
   /** Update cached dice result aggregates using the latest fighter stats. */
   void RefreshPendingAttackResultStats(AFighterPawn *Target);
-
-  /**
-   * Rebuild the supplied dice result using concrete physical roll values so the
-   * queued attack resolves using the exact faces produced by the dice system.
-   */
-  static void ApplyPhysicalRollResults(
-      FDiceRollResult &Result, const TArray<int32> &RollValues,
-      const FFighterStats &AttackerStats,
-      const FFighterStats &DefenderStats);
 
   /** Finalise any pending attack resolution and clean up timers/state. */
   void FinalizeQueuedAttack();
