@@ -762,6 +762,9 @@ private:
   /** Fighter currently awaiting a manual attack roll input. */
   TWeakObjectPtr<AFighterPawn> ManualAttackRollAttacker;
 
+  /** Defender associated with the pending manual attack roll, if known. */
+  TWeakObjectPtr<AFighterPawn> ManualAttackRollTarget;
+
   /** Desired end turn visibility before manual overrides are applied. */
   bool bEndTurnVisibilityRequested = false;
 
