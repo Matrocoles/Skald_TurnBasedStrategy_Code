@@ -2743,6 +2743,11 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
   PromptData.DefendingTerritoryName = ResolveTerritoryName(
       Battle.TargetTerritoryID, Battle.DefenderTerritoryName,
       TEXT("DefendingTerritory"));
+  PromptData.AttackerCommittedArmy =
+      FMath::Max(0, Battle.ArmyCountSent);
+  PromptData.DefenderArmyCount =
+      Battle.DefenderArmyCount > 0 ? Battle.DefenderArmyCount
+                                   : FMath::Max(0, Battle.ArmyCountSent);
   PromptData.AttackerFactionEmblem =
       ResolveFactionEmblem(Battle.AttackerFactionEmblem, Battle.AttackerFaction,
                            TEXT("Attacker"));
