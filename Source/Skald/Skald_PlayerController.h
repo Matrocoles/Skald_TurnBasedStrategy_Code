@@ -966,6 +966,7 @@ private:
   UFUNCTION()
   void HandlePhysicalDiceRollCompleted(const FGuid &RollId,
                                        const TArray<int32> &Results);
+  void ApplyPendingPhysicalAttackResults();
   UFUNCTION()
   void HandleDiceRollStarted(const FGuid &RollId);
 
@@ -1078,13 +1079,17 @@ private:
     TWeakObjectPtr<AFighterPawn> Attacker;
     TWeakObjectPtr<AFighterPawn> Defender;
     FDiceRollResult Result;
+    TArray<int32> PhysicalRollResults;
     bool bActive = false;
     bool bHadBattleCamera = false;
+    bool bHasPhysicalResults = false;
     FVector OriginalLocation = FVector::ZeroVector;
     FRotator OriginalRotation = FRotator::ZeroRotator;
     float OriginalZoom = 0.f;
     TWeakObjectPtr<AActor> OriginalLockTarget;
     FGuid ActiveRollId;
+    FFighterStats AttackerSnapshot;
+    FFighterStats DefenderSnapshot;
     FTimerHandle OverviewTimerHandle;
     FTimerHandle CleanupDelayHandle;
     FTimerHandle ReturnTimerHandle;
