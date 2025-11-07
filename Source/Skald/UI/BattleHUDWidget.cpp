@@ -416,7 +416,26 @@ void UBattleHUDWidget::SetHighlightedEnemyLockedInFighter(AFighterPawn *Fighter)
 }
 
 void UBattleHUDWidget::HandleSelectedFighterChanged(AFighterPawn *Fighter) {
-  SetHighlightedLockedInFighter(Fighter);
+  const bool bIsFriendly = IsKnownFriendlyFighter(Fighter);
+  const bool bHasEnemyEntry = IsKnownEnemyFighter(Fighter);
+
+  if (bIsFriendly) {
+    SetHighlightedLockedInFighter(Fighter);
+    SetHighlightedEnemyLockedInFighter(nullptr);
+    return;
+  }
+
+  SetHighlightedLockedInFighter(nullptr);
+
+  if (Fighter) {
+    SetHighlightedEnemyLockedInFighter(bHasEnemyEntry ? Fighter : nullptr);
+    UpdateEnemyStatPanel(Fighter);
+  } else {
+    SetHighlightedEnemyLockedInFighter(nullptr);
+    if (!bDiceResolutionActive && !ActiveEnemyLockedInFighter.IsValid()) {
+      ClearEnemyStatPanel();
+    }
+  }
 }
 
 void UBattleHUDWidget::SetActiveLockedInFighter(AFighterPawn *Fighter) {
