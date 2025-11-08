@@ -1888,5 +1888,6 @@ void UGridBattleManager::HandleAutoManualAttackRoll(TWeakObjectPtr<AFighterPawn>
         return;
     }
 
+    Attacker->NotifyAIAttackPresentationReady();
     Attacker->TriggerManualAttackRoll();
 }

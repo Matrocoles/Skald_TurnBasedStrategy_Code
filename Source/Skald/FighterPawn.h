@@ -63,6 +63,9 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Combat|Dice")
   void TriggerManualAttackRoll();
 
+  UFUNCTION(BlueprintCallable, Category = "Combat|Dice")
+  void NotifyAIAttackPresentationReady();
+
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Combat|Dice")
   AFighterPawn *GetPendingPhysicalAttackTarget() const;
 
@@ -793,6 +796,10 @@ private:
   bool bAwaitingPhysicalAttackRoll = false;
   /** True while an AI controlled fighter is waiting to start its physical dice roll. */
   bool bPendingAIDiceRollDelay = false;
+  bool bAIManualRollPresentationReady = false;
+  bool bAIManualRollPendingTrigger = false;
+  bool bAIManualRollLoggedPanning = false;
+  bool bAIManualRollLoggedReady = false;
 
   /** Cached dice roll data to broadcast once resolution completes. */
   FDiceRollResult PendingAttackDiceResult;

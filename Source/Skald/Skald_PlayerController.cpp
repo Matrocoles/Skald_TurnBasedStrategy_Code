@@ -7386,5 +7386,6 @@ void ASkaldPlayerController::ServerTriggerManualAttackRoll_Implementation(AFight
     }
 
     UE_LOG(LogTemp, Warning, TEXT("ServerTriggerManualAttackRoll called for %s"), *GetNameSafe(Attacker));
+    Attacker->NotifyAIAttackPresentationReady();
     Attacker->TriggerManualAttackRoll();
 }

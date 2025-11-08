@@ -2145,6 +2145,18 @@ bool AFighterPawn::AttemptPhysicalAttackRoll(AFighterPawn *Target) {
   bPendingPhysicalRollValuesApplied = false;
   bAwaitingPhysicalAttackRoll = true;
 
+  CancelAIDiceRollDelay();
+  bAIManualRollPresentationReady = false;
+  bAIManualRollPendingTrigger = false;
+  bAIManualRollLoggedPanning = false;
+  bAIManualRollLoggedReady = false;
+
+  if (HasAuthority() && Controller &&
+      Controller->IsA(AEnemyAIController::StaticClass())) {
+    UE_LOG(LogTemp, Log, TEXT("AI Attack: Camera panning..."));
+    bAIManualRollLoggedPanning = true;
+  }
+
   UE_LOG(LogTemp, Log,
          TEXT("AttemptPhysicalAttackRoll: awaiting physical roll... (Attacker=%s, Target=%s, Dice=%d)"),
          *GetName(), *GetNameSafe(Target), FMath::Max(0, Stats.AttackDice));
@@ -2173,6 +2185,13 @@ void AFighterPawn::TriggerManualAttackRoll() {
   }
 
   if (Stats.AttackDice <= 0) {
+    return;
+  }
+
+  if (PendingAttackRollId.IsValid()) {
+    UE_LOG(LogTemp, Verbose,
+           TEXT("TriggerManualAttackRoll: roll already active for %s (RollId=%s)."),
+           *GetName(), *PendingAttackRollId.ToString());
     return;
   }
 
@@ -2220,27 +2239,77 @@ void AFighterPawn::ExecuteManualAttackRoll() {
 }
 
 bool AFighterPawn::ShouldDelayAIAttackRoll() {
-  if (!Controller || !Controller->IsA(AEnemyAIController::StaticClass())) {
+  const bool bIsAIControlled =
+      Controller && Controller->IsA(AEnemyAIController::StaticClass());
+  if (!bIsAIControlled) {
     CancelAIDiceRollDelay();
     return false;
   }
 
-  if (bPendingAIDiceRollDelay) {
+  if (PendingAttackRollId.IsValid()) {
     return true;
   }
 
-  UE_LOG(LogTemp, Log, TEXT("AI Attack: Waiting for camera overview..."));
-  bPendingAIDiceRollDelay = true;
+  if (!bAIManualRollPresentationReady) {
+    if (!bAIManualRollLoggedPanning) {
+      UE_LOG(LogTemp, Log, TEXT("AI Attack: Camera panning..."));
+      bAIManualRollLoggedPanning = true;
+    }
 
-  if (UWorld *World = GetWorld()) {
-    World->GetTimerManager().SetTimer(
-        AIDiceRollDelayHandle, this, &AFighterPawn::HandleAIDiceRollDelayComplete,
-        AIDiceRollOverviewDelaySeconds, false);
-  } else {
-    HandleAIDiceRollDelayComplete();
+    bAIManualRollPendingTrigger = true;
+
+    if (bPendingAIDiceRollDelay) {
+      return true;
+    }
+
+    bPendingAIDiceRollDelay = true;
+
+    if (UWorld *World = GetWorld()) {
+      World->GetTimerManager().SetTimer(
+          AIDiceRollDelayHandle, this,
+          &AFighterPawn::HandleAIDiceRollDelayComplete,
+          AIDiceRollOverviewDelaySeconds, false);
+    } else {
+      HandleAIDiceRollDelayComplete();
+    }
+
+    return true;
   }
 
-  return true;
+  bAIManualRollPendingTrigger = false;
+
+  if (!bAIManualRollLoggedReady) {
+    UE_LOG(LogTemp, Log, TEXT("AI Attack: Arena spawned, performing roll now."));
+    bAIManualRollLoggedReady = true;
+  }
+
+  return false;
+}
+
+void AFighterPawn::NotifyAIAttackPresentationReady() {
+  const bool bIsAIControlled =
+      Controller && Controller->IsA(AEnemyAIController::StaticClass());
+  if (!bIsAIControlled) {
+    CancelAIDiceRollDelay();
+    return;
+  }
+
+  CancelAIDiceRollDelay();
+
+  if (!bAwaitingPhysicalAttackRoll) {
+    return;
+  }
+
+  if (bAIManualRollPresentationReady) {
+    return;
+  }
+
+  bAIManualRollPresentationReady = true;
+
+  if (bAIManualRollPendingTrigger && !PendingAttackRollId.IsValid()) {
+    bAIManualRollPendingTrigger = false;
+    TriggerManualAttackRoll();
+  }
 }
 
 void AFighterPawn::HandleAIDiceRollDelayComplete() {
@@ -2250,9 +2319,7 @@ void AFighterPawn::HandleAIDiceRollDelayComplete() {
 
   CancelAIDiceRollDelay();
 
-  UE_LOG(LogTemp, Log, TEXT("AI Attack: Arena ready, rolling dice now."));
-
-  ExecuteManualAttackRoll();
+  NotifyAIAttackPresentationReady();
 }
 
 void AFighterPawn::CancelAIDiceRollDelay() {
@@ -2443,8 +2510,7 @@ void AFighterPawn::ProcessPhysicalDiceRollResults(
   DiceResult.HighStakesFaction = Faction;
 
   if (Controller && Controller->IsA(AEnemyAIController::StaticClass())) {
-    UE_LOG(LogTemp, Log,
-           TEXT("AI Attack: Physical roll complete — applying result."));
+    UE_LOG(LogTemp, Log, TEXT("AI Attack: Applying roll result."));
   }
 
   StartQueuedAttack(Target, MoveTemp(DiceResult));
