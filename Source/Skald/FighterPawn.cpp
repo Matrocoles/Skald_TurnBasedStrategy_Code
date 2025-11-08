@@ -2354,20 +2354,21 @@ void AFighterPawn::ProcessPhysicalDiceRollResults(
     const FFighterStats &AttackerStatsSnapshot =
         bHasPendingAttackSnapshot ? PendingAttackAttackerSnapshot : Stats;
 
-    FFighterStats DefenderStatsSnapshot = bHasPendingAttackSnapshot
-                                              ? PendingAttackDefenderSnapshot
-                                              : (Target ? Target->Stats
-                                                        : FFighterStats());
+    FFighterStats DefenderStatsSnapshotForResolution =
+        bHasPendingAttackSnapshot
+            ? PendingAttackDefenderSnapshot
+            : (Target ? Target->Stats : FFighterStats());
 
     PendingAttackDiceResult.HighStakesFaction = Faction;
 
     ApplyPhysicalRollResults(PendingAttackDiceResult, PendingPhysicalRollValues,
-                             AttackerStatsSnapshot, DefenderStatsSnapshot);
+                             AttackerStatsSnapshot,
+                             DefenderStatsSnapshotForResolution);
 
     const int32 StartingHealth =
         PendingAttackDiceResult.StartingHealth > 0
             ? PendingAttackDiceResult.StartingHealth
-            : FMath::Max(0, DefenderStatsSnapshot.Health);
+            : FMath::Max(0, DefenderStatsSnapshotForResolution.Health);
     const int32 ClampedEndingHealth =
         FMath::Clamp(PendingAttackDiceResult.EndingHealth, 0, StartingHealth);
 
