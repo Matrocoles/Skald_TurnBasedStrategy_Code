@@ -199,96 +199,47 @@ FDiceRollResult UGridBattleManager::ResolveAttackDice(const FFighterStats& Attac
     }
 
     const int32 DiceToRoll = FMath::Max(0, AttackerStats.AttackDice);
-    Result.DiceOutcomes.Reserve(DiceToRoll);
+    if (DiceToRoll <= 0)
+    {
+        return Result;
+    }
+
+    TArray<int32> RollValues;
+    RollValues.Reserve(DiceToRoll);
 
     if (OverrideRolls.Num() > 0)
     {
-        TArray<int32> SanitizedOverrides = OverrideRolls;
-        for (int32& Value : SanitizedOverrides)
+        RollValues = OverrideRolls;
+        for (int32& Value : RollValues)
         {
             Value = FMath::Clamp(Value, 1, 6);
         }
 
-        if (SanitizedOverrides.Num() > DiceToRoll)
+        if (RollValues.Num() > DiceToRoll)
         {
-            SanitizedOverrides.SetNum(DiceToRoll);
+            RollValues.SetNum(DiceToRoll);
         }
-        else if (SanitizedOverrides.Num() < DiceToRoll)
+        else if (RollValues.Num() < DiceToRoll)
         {
-            const int32 MissingCount = DiceToRoll - SanitizedOverrides.Num();
+            const int32 MissingCount = DiceToRoll - RollValues.Num();
             for (int32 Index = 0; Index < MissingCount; ++Index)
             {
-                SanitizedOverrides.Add(RandomStream.RandRange(1, 6));
+                RollValues.Add(RandomStream.RandRange(1, 6));
             }
         }
-
+    }
+    else
+    {
         for (int32 DieIndex = 0; DieIndex < DiceToRoll; ++DieIndex)
         {
-            FDiceRollOutcome& Outcome = Result.DiceOutcomes.AddDefaulted_GetRef();
-            const int32 RollValue = SanitizedOverrides.IsValidIndex(DieIndex)
-                                        ? SanitizedOverrides[DieIndex]
-                                        : RandomStream.RandRange(1, 6);
-            Outcome.RollValue = RollValue;
-        }
-
-        AFighterPawn::ApplyPhysicalRollResults(Result, SanitizedOverrides, AttackerStats, DefenderStats);
-        return Result;
-    }
-
-    const int32 RequiredRoll = AttackerStats.Strength > DefenderStats.Defence ? 3 :
-        (AttackerStats.Strength < DefenderStats.Defence ? 5 : 4);
-
-    int32 SimulatedHealth = Result.StartingHealth;
-    for (int32 DieIndex = 0; DieIndex < DiceToRoll; ++DieIndex)
-    {
-        FDiceRollOutcome& Outcome = Result.DiceOutcomes.AddDefaulted_GetRef();
-        int32 RollValue = 0;
-        if (OverrideRolls.IsValidIndex(DieIndex))
-        {
-            RollValue = FMath::Clamp(OverrideRolls[DieIndex], 1, 6);
-        }
-        else
-        {
-            RollValue = RandomStream.RandRange(1, 6);
-        }
-
-        Outcome.RollValue = RollValue;
-
-        int32 Damage = 0;
-        if (Outcome.RollValue == 6)
-        {
-            Damage = AttackerStats.AttackDamage + AttackerStats.CriticalBonusDamage;
-        }
-        else if (Outcome.RollValue >= RequiredRoll)
-        {
-            Damage = AttackerStats.AttackDamage;
-        }
-
-        Outcome.Damage = Damage;
-        Outcome.bHit = Damage > 0;
-        Outcome.bCritical = Outcome.bHit && Outcome.RollValue == 6 && Damage > AttackerStats.AttackDamage;
-
-        if (Outcome.bHit && SimulatedHealth > 0)
-        {
-            const int32 AppliedDamage = FMath::Min(Damage, SimulatedHealth);
-            SimulatedHealth -= AppliedDamage;
-            Result.TotalDamage += AppliedDamage;
-            ++Result.HitCount;
-
-            if (Outcome.bCritical)
-            {
-                ++Result.CriticalHitCount;
-                Result.HighestCriticalDamage = FMath::Max(Result.HighestCriticalDamage, Damage);
-            }
-        }
-        else if (!Outcome.bHit)
-        {
-            ++Result.MissCount;
+            RollValues.Add(RandomStream.RandRange(1, 6));
         }
     }
 
-    Result.EndingHealth = SimulatedHealth;
-    Result.bHighStakesCritical = Result.CriticalHitCount > 0 && Result.EndingHealth <= 0 && Result.StartingHealth > 0;
+    Result.DiceOutcomes.Reset();
+    Result.DiceOutcomes.SetNum(DiceToRoll);
+
+    AFighterPawn::ApplyPhysicalRollResults(Result, RollValues, AttackerStats, DefenderStats);
     return Result;
 }
 
