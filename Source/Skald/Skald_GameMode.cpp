@@ -16,6 +16,7 @@
 #include "Skald_AIController.h"
 #include "Skald_BattleGameMode.h"
 #include "Skald_GameInstance.h"
+#include "SkaldFactionColorLibrary.h"
 #include "SkaldDiceManager.h"
 #include "Skald_GameState.h"
 #include "Skald_PropertyAccess.h"
@@ -1702,7 +1703,21 @@ bool ASkaldGameMode::StartStrategicInitiativeRoll(
     EnsureStrategicInitiativeDiceBinding();
     const int32 PlayerDice = bUsePlayerTint ? 1 : 0;
     const int32 EnemyDice = bUsePlayerTint ? 0 : 1;
-    const FGuid RollId = DiceManager->RollDice_D6(PlayerDice, EnemyDice, true);
+    FSkaldDiceTintOverride PlayerTintOverride;
+    FSkaldDiceTintOverride EnemyTintOverride;
+    FLinearColor Tint;
+    if (PlayerState && SkaldFactionColors::TryGetFactionColor(PlayerState->Faction, Tint)) {
+      if (bUsePlayerTint) {
+        PlayerTintOverride.bOverrideTint = true;
+        PlayerTintOverride.Tint = Tint;
+      } else {
+        EnemyTintOverride.bOverrideTint = true;
+        EnemyTintOverride.Tint = Tint;
+      }
+    }
+
+    const FGuid RollId = DiceManager->RollDice_D6(PlayerDice, EnemyDice, true,
+                                                  PlayerTintOverride, EnemyTintOverride);
     if (RollId.IsValid()) {
       PendingStrategicInitiativeRolls.Add(RollId, PlayerState);
       return true;

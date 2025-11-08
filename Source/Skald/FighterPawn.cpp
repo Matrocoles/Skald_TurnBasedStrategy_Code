@@ -30,6 +30,7 @@
 #include "Skald_GameInstance.h"
 #include "Skald_PlayerState.h"
 #include "SkaldDiceManager.h"
+#include "SkaldFactionColorLibrary.h"
 #include "Sound/SoundBase.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
@@ -2185,7 +2186,14 @@ void AFighterPawn::TriggerManualAttackRoll()
     }
 
     const int32 DiceToRoll = FMath::Max(Stats.AttackDice, 0);
-    const FGuid RollId = DiceManager->RollDice_D6(DiceToRoll, 0, false);
+    FSkaldDiceTintOverride PlayerTintOverride;
+    FLinearColor Tint;
+    if (SkaldFactionColors::TryGetFactionColor(Faction, Tint))
+    {
+        PlayerTintOverride.bOverrideTint = true;
+        PlayerTintOverride.Tint = Tint;
+    }
+    const FGuid RollId = DiceManager->RollDice_D6(DiceToRoll, 0, false, PlayerTintOverride, FSkaldDiceTintOverride());
     if (!RollId.IsValid())
     {
         return;

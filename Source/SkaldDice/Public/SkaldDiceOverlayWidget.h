@@ -37,6 +37,9 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Dice|Overlay")
     void SetConfig(UDiceRollConfig* InConfig);
 
+    UFUNCTION(BlueprintCallable, Category = "Dice|Overlay")
+    void ShowRerollMessage(const FText& Message);
+
 protected:
     UFUNCTION()
     void HandleRollStarted(const FGuid& RollId);
@@ -48,6 +51,7 @@ protected:
     void HandleRollCompleted(const FGuid& RollId, const TArray<int32>& Results);
 
     void ApplyConfigTints();
+    void ApplyTints(const FLinearColor& PlayerTint, const FLinearColor& EnemyTint);
     void UpdatePanelVisibility() const;
     void ResolveConfigReference();
     void BindToManager();

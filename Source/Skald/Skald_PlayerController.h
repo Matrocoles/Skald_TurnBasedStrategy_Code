@@ -618,6 +618,10 @@ public:
                                      ESkaldFaction InitiativeWinner);
 
   UFUNCTION()
+  void HandleInitiativeRerollRequired(int32 RoundNumber, int32 AttackerRoll,
+                                      int32 DefenderRoll);
+
+  UFUNCTION()
   void HandleInitiativeRollRequested();
 
   UFUNCTION()
@@ -774,6 +778,11 @@ public:
 private:
   /** Display the stored strategic initiative roll if one is pending. */
   void ShowPendingStrategicInitiativeResult();
+
+  void ResolveBattleDiceTints(bool bTreatAttackersAsFriendly,
+                              FSkaldDiceTintOverride &OutPlayerTint,
+                              FSkaldDiceTintOverride &OutEnemyTint);
+  FSkaldDiceTintOverride BuildTintOverrideForFaction(ESkaldFaction Faction) const;
 
   ASkald_BattleGameMode *ResolveBattleGameMode();
 

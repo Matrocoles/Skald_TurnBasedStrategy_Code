@@ -6,6 +6,7 @@
 #include "GridOverlayComponent.h"
 #include "SkaldLogging.h"
 #include "SkaldDiceManager.h"
+#include "SkaldFactionColorLibrary.h"
 #include "Skald_GameInstance.h"
 #include "Skald_GameState.h"
 #include "Skald_PlayerState.h"
@@ -466,7 +467,8 @@ bool UGridBattleManager::RollInitiative()
 
             if (PendingInitiativePlayerDice > 0 || PendingInitiativeEnemyDice > 0)
             {
-                const FGuid RollId = Manager->RollDice_D6(PendingInitiativePlayerDice, PendingInitiativeEnemyDice, true);
+                const FGuid RollId = Manager->RollDice_D6(PendingInitiativePlayerDice, PendingInitiativeEnemyDice, true,
+                    BuildTintOverrideForSide(true), BuildTintOverrideForSide(false));
                 if (RollId.IsValid())
                 {
                     ActiveInitiativeRollId = RollId;
@@ -589,6 +591,14 @@ void UGridBattleManager::CompleteInitiativeRoll(int32 AttackerRoll, int32 Defend
     LastInitiativeRollAttacker = AttackerRoll;
     LastInitiativeRollDefender = DefenderRoll;
 
+    if (AttackerRoll > 0 && AttackerRoll == DefenderRoll)
+    {
+        UE_LOG(LogSkaldBattle, Log, TEXT("[Battle] Round %d initiative tied (Attacker=%d Defender=%d). Rerolling."),
+            CurrentRound, LastInitiativeRollAttacker, LastInitiativeRollDefender);
+        HandleInitiativeTie(AttackerRoll, DefenderRoll);
+        return;
+    }
+
     if (AttackerRoll >= DefenderRoll)
     {
         bIsAttackerTurn = true;
@@ -610,6 +620,70 @@ void UGridBattleManager::CompleteInitiativeRoll(int32 AttackerRoll, int32 Defend
     }
 
     ScheduleRoundStart(bHasPresentationListeners);
+}
+
+void UGridBattleManager::HandleInitiativeTie(int32 AttackerRoll, int32 DefenderRoll)
+{
+    InitiativeWinnerFaction = ESkaldFaction::None;
+    bInitiativeRollAwaitingResults = false;
+    PendingInitiativePlayerDice = 0;
+    PendingInitiativeEnemyDice = 0;
+
+    if (UWorld* World = GetWorld())
+    {
+        FTimerManager& TimerManager = World->GetTimerManager();
+        TimerManager.ClearTimer(InitiativeWinnerAnnouncementTimer);
+        TimerManager.ClearTimer(InitiativeRerollTimer);
+    }
+
+    bAwaitingInitiativeRoll = true;
+    bAttackerInitiativeRollRequested = false;
+    bDefenderInitiativeRollRequested = false;
+
+    if (OnInitiativeRerollRequired.IsBound())
+    {
+        OnInitiativeRerollRequired.Broadcast(CurrentRound, AttackerRoll, DefenderRoll);
+    }
+
+    const float Delay = FMath::Max(InitiativeRerollDelay, 0.f);
+    if (Delay > KINDA_SMALL_NUMBER)
+    {
+        if (UWorld* World = GetWorld())
+        {
+            World->GetTimerManager().SetTimer(InitiativeRerollTimer, this, &UGridBattleManager::BeginInitiativeReroll, Delay, false);
+            return;
+        }
+    }
+
+    BeginInitiativeReroll();
+}
+
+void UGridBattleManager::BeginInitiativeReroll()
+{
+    if (bBattleConcluded)
+    {
+        return;
+    }
+
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(InitiativeRerollTimer);
+    }
+
+    const bool bPauseForPrompt = ShouldPauseForInitiativePrompt();
+    bAwaitingInitiativeRoll = bPauseForPrompt;
+
+    if (bPauseForPrompt)
+    {
+        bAttackerInitiativeRollRequested = false;
+        bDefenderInitiativeRollRequested = false;
+        ScheduleAIRollIfNeeded();
+        return;
+    }
+
+    bAttackerInitiativeRollRequested = true;
+    bDefenderInitiativeRollRequested = true;
+    ResolveInitiativeRollInternal();
 }
 
 USkaldDiceManager* UGridBattleManager::ResolveDiceManager()
@@ -928,6 +1002,46 @@ bool UGridBattleManager::ShouldPauseForInitiativePrompt() const
     const bool bAttackersHuman = !IsSideAIControlled(true);
     const bool bDefendersHuman = !IsSideAIControlled(false);
     return bAttackersHuman || bDefendersHuman;
+}
+
+ESkaldFaction UGridBattleManager::ResolveFactionForSide(bool bForAttackers) const
+{
+    if (const UWorld* World = GetWorld())
+    {
+        if (const USkaldGameInstance* GameInstance = World->GetGameInstance<USkaldGameInstance>())
+        {
+            const FS_BattlePayload& Battle = GameInstance->PendingBattle;
+            const ESkaldFaction PendingFaction = bForAttackers ? Battle.AttackerFaction : Battle.DefenderFaction;
+            if (PendingFaction != ESkaldFaction::None)
+            {
+                return PendingFaction;
+            }
+        }
+    }
+
+    const TArray<FFighter>& Team = bForAttackers ? AttackerTeam : DefenderTeam;
+    for (const FFighter& Fighter : Team)
+    {
+        if (Fighter.Faction != ESkaldFaction::None)
+        {
+            return Fighter.Faction;
+        }
+    }
+
+    return ESkaldFaction::None;
+}
+
+FSkaldDiceTintOverride UGridBattleManager::BuildTintOverrideForSide(bool bForAttackers) const
+{
+    FSkaldDiceTintOverride Override;
+    const ESkaldFaction Faction = ResolveFactionForSide(bForAttackers);
+    FLinearColor Tint;
+    if (SkaldFactionColors::TryGetFactionColor(Faction, Tint))
+    {
+        Override.bOverrideTint = true;
+        Override.Tint = Tint;
+    }
+    return Override;
 }
 
 void UGridBattleManager::AdvanceTurn()

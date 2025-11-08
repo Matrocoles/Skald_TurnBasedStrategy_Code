@@ -93,6 +93,20 @@ void USkaldDiceOverlayWidget::HandleRollStarted(const FGuid& RollId)
     {
         TimerText->SetText(RollingStatusText);
     }
+
+    if (Manager)
+    {
+        FLinearColor PlayerTint;
+        FLinearColor EnemyTint;
+        if (Manager->GetEffectiveTintsForRoll(RollId, PlayerTint, EnemyTint))
+        {
+            ApplyTints(PlayerTint, EnemyTint);
+        }
+        else
+        {
+            ApplyConfigTints();
+        }
+    }
 }
 
 void USkaldDiceOverlayWidget::HandleRollUpdate(const FGuid& RollId, float Elapsed)
@@ -151,21 +165,36 @@ void USkaldDiceOverlayWidget::HandleRollCompleted(const FGuid& RollId, const TAr
 void USkaldDiceOverlayWidget::ApplyConfigTints()
 {
     const UDiceRollConfig* EffectiveConfig = Config ? Config.Get() : LoadedConfig.Get();
+    const FLinearColor PlayerTint = (bOverridePlayerTint || !EffectiveConfig)
+                                        ? PlayerTintOverride
+                                        : EffectiveConfig->PlayerTint;
+    const FLinearColor EnemyTint = (bOverrideEnemyTint || !EffectiveConfig)
+                                       ? EnemyTintOverride
+                                       : EffectiveConfig->EnemyTint;
+    ApplyTints(PlayerTint, EnemyTint);
+}
+
+void USkaldDiceOverlayWidget::ApplyTints(const FLinearColor& PlayerTint, const FLinearColor& EnemyTint)
+{
     if (PlayerTintImage)
     {
-        const FLinearColor Tint = (bOverridePlayerTint || !EffectiveConfig)
-                                      ? PlayerTintOverride
-                                      : EffectiveConfig->PlayerTint;
-        PlayerTintImage->SetColorAndOpacity(Tint);
+        PlayerTintImage->SetColorAndOpacity(PlayerTint);
     }
 
     if (EnemyTintImage)
     {
-        const FLinearColor Tint = (bOverrideEnemyTint || !EffectiveConfig)
-                                      ? EnemyTintOverride
-                                      : EffectiveConfig->EnemyTint;
-        EnemyTintImage->SetColorAndOpacity(Tint);
+        EnemyTintImage->SetColorAndOpacity(EnemyTint);
     }
+}
+
+void USkaldDiceOverlayWidget::ShowRerollMessage(const FText& Message)
+{
+    if (TimerText)
+    {
+        TimerText->SetText(Message);
+    }
+
+    SetVisibility(ESlateVisibility::HitTestInvisible);
 }
 
 void USkaldDiceOverlayWidget::UpdatePanelVisibility() const
