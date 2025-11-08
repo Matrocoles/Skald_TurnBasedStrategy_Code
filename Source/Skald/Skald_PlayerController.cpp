@@ -55,7 +55,6 @@
 #endif
 
 #include "Framework/Application/SlateApplication.h"
-#include "GameFramework/Controller.h"
 #include "Layout/WidgetPath.h"
 #include "Widgets/SWidget.h"
 #include "Widgets/SWindow.h"
@@ -70,23 +69,6 @@ FString ResolvePlayerName(const ASkaldPlayerState *PlayerState,
   }
 
   return PlayerState->GetResolvedPlayerName(Context);
-}
-
-bool IsFighterAIControlled(const AFighterPawn *Fighter) {
-  if (!Fighter) {
-    return false;
-  }
-
-  if (const ASkaldPlayerState *PlayerState =
-          Fighter->GetPlayerState<ASkaldPlayerState>()) {
-    return PlayerState->bIsAI;
-  }
-
-  if (const AController *Controller = Fighter->GetController()) {
-    return !Controller->IsPlayerController();
-  }
-
-  return false;
 }
 
 constexpr const TCHAR *PendingBattleAttackError =
@@ -6173,21 +6155,12 @@ void ASkaldPlayerController::HandleManualDiceReturnComplete() {
 }
 
 void ASkaldPlayerController::HandleDiceRollStarted(const FGuid &RollId) {
-  if (PendingManualSequence.bActive && PendingManualSequence.bAwaitingRollId) {
-    PendingManualSequence.ActiveRollId = RollId;
-    PendingManualSequence.bAwaitingRollId = false;
+  if (!PendingManualSequence.bActive || !PendingManualSequence.bAwaitingRollId) {
     return;
   }
 
-  if (PendingAttackSequence.bActive &&
-      !PendingAttackSequence.ActiveRollId.IsValid()) {
-    if (AFighterPawn *Attacker = PendingAttackSequence.Attacker.Get()) {
-      if (IsFighterAIControlled(Attacker) &&
-          Attacker->IsAwaitingPhysicalAttackRoll()) {
-        PendingAttackSequence.ActiveRollId = RollId;
-      }
-    }
-  }
+  PendingManualSequence.ActiveRollId = RollId;
+  PendingManualSequence.bAwaitingRollId = false;
 }
 
 void ASkaldPlayerController::TryCompleteManualDiceSequence() {
@@ -6301,21 +6274,6 @@ void ASkaldPlayerController::HandleAttackDiceOverviewReached() {
   if (UWorld *World = GetWorld()) {
     World->GetTimerManager().ClearTimer(
         PendingAttackSequence.OverviewTimerHandle);
-  }
-
-  AFighterPawn *Attacker = PendingAttackSequence.Attacker.Get();
-  const bool bAttackerIsAI = IsFighterAIControlled(Attacker);
-  const bool bExpectPhysicalRoll =
-      bAttackerIsAI && Attacker && Attacker->IsAwaitingPhysicalAttackRoll();
-
-  if (bExpectPhysicalRoll) {
-    const FGuid PendingRollId = Attacker->GetPendingAttackRollId();
-    if (PendingRollId.IsValid()) {
-      PendingAttackSequence.ActiveRollId = PendingRollId;
-    } else {
-      PendingAttackSequence.ActiveRollId.Invalidate();
-    }
-    return;
   }
 
   PendingAttackSequence.ActiveRollId = TriggerAttackDicePresentation(
