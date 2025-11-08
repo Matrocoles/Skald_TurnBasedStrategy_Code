@@ -2204,6 +2204,9 @@ void AFighterPawn::TriggerManualAttackRoll()
     }
 
     PendingAttackRollId = RollId;
+    UE_LOG(LogTemp, Log,
+           TEXT("TriggerManualAttackRoll: Awaiting dice arena completion (RollId=%s, Attacker=%s, Target=%s)"),
+           *RollId.ToString(), *GetName(), *GetNameSafe(Target));
     // keep bAwaitingPhysicalAttackRoll = true; cleared when result arrives
 
     // Hide the button now that rolling has started
@@ -2289,8 +2292,8 @@ void AFighterPawn::ProcessPhysicalDiceRollResults(
     ResultValuesString = TEXT("<empty>");
   }
 
-  UE_LOG(LogTemp, Warning,
-         TEXT("HandleDiceRollCompleted: RollId=%s Values=[%s]"),
+  UE_LOG(LogTemp, Log,
+         TEXT("ProcessPhysicalDiceRollResults: Dice arena completed (RollId=%s, Values=[%s]). Applying outcome."),
          *RollId.ToString(), *ResultValuesString);
 
   bAwaitingPhysicalAttackRoll = false;
@@ -2351,19 +2354,14 @@ void AFighterPawn::ProcessPhysicalDiceRollResults(
   if (bHasExistingQueuedAttack) {
     PendingPhysicalRollValues = SanitizedResults;
 
-    const FFighterStats &AttackerStatsSnapshot =
-        bHasPendingAttackSnapshot ? PendingAttackAttackerSnapshot : Stats;
-
     FFighterStats DefenderStatsSnapshotForResolution =
         bHasPendingAttackSnapshot
             ? PendingAttackDefenderSnapshot
             : (Target ? Target->Stats : FFighterStats());
 
     PendingAttackDiceResult.HighStakesFaction = Faction;
-
-    ApplyPhysicalRollResults(PendingAttackDiceResult, PendingPhysicalRollValues,
-                             AttackerStatsSnapshot,
-                             DefenderStatsSnapshotForResolution);
+    bPendingPhysicalRollValuesApplied = false;
+    ApplyPendingPhysicalRollValues();
 
     const int32 StartingHealth =
         PendingAttackDiceResult.StartingHealth > 0
@@ -2511,6 +2509,7 @@ void AFighterPawn::StartQueuedAttack(AFighterPawn *Target,
   bHasProcessedPendingRoll = false;
   bHasPendingDiceResult = true;
 
+  bPendingPhysicalRollValuesApplied = false;
   ApplyPendingPhysicalRollValues();
 
   if (AFighterPawn *TargetPawn = PendingAttackTarget.Get()) {
@@ -2606,7 +2605,8 @@ void AFighterPawn::ResolveNextAttackRoll() {
 }
 
 void AFighterPawn::ApplyPendingPhysicalRollValues() {
-  if (!bHasPendingDiceResult || PendingPhysicalRollValues.Num() == 0) {
+  if (!bHasPendingDiceResult || PendingPhysicalRollValues.Num() == 0 ||
+      bPendingPhysicalRollValuesApplied) {
     return;
   }
 
@@ -2621,6 +2621,7 @@ void AFighterPawn::ApplyPendingPhysicalRollValues() {
 
   ApplyPhysicalRollResults(PendingAttackDiceResult, PendingPhysicalRollValues,
                            AttackerStats, DefenderStatsSnapshot);
+  bPendingPhysicalRollValuesApplied = true;
 }
 
 void AFighterPawn::ApplyPhysicalRollResults(
@@ -2883,6 +2884,7 @@ void AFighterPawn::ClearQueuedAttackState(bool bBroadcastFinalized) {
   PendingAttackDefenderSnapshot = FFighterStats();
   bHasPendingAttackSnapshot = false;
   PendingPhysicalRollValues.Reset();
+  bPendingPhysicalRollValuesApplied = false;
 
   if (bBroadcastFinalized) {
     OnQueuedAttackFinalized.Broadcast();

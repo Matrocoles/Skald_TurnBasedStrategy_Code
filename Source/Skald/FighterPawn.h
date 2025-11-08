@@ -768,6 +768,9 @@ private:
   /** Cached physical dice values awaiting application to the pending result. */
   TArray<int32> PendingPhysicalRollValues;
 
+  /** Tracks whether pending physical dice values have already been applied. */
+  bool bPendingPhysicalRollValuesApplied = false;
+
   /** Target awaiting a physical dice roll result. */
   TWeakObjectPtr<AFighterPawn> PendingPhysicalAttackTarget;
 
