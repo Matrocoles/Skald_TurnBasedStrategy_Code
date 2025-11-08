@@ -2132,9 +2132,9 @@ bool AFighterPawn::AttemptPhysicalAttackRoll(AFighterPawn *Target) {
     return false; // AI-controlled fighters bypass the manual dice flow.
   }
 
-  if (const ASkaldPlayerState *PlayerState =
+  if (const ASkaldPlayerState *PlayerStatePtr =
           ControllingPlayer->GetPlayerState<ASkaldPlayerState>()) {
-    if (PlayerState->bIsAI) {
+    if (PlayerStatePtr->bIsAI) {
       return false;
     }
   }
