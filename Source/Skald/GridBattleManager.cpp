@@ -198,63 +198,48 @@ FDiceRollResult UGridBattleManager::ResolveAttackDice(const FFighterStats& Attac
         return Result;
     }
 
-    const int32 RequiredRoll = AttackerStats.Strength > DefenderStats.Defence ? 3 :
-        (AttackerStats.Strength < DefenderStats.Defence ? 5 : 4);
-
     const int32 DiceToRoll = FMath::Max(0, AttackerStats.AttackDice);
-    Result.DiceOutcomes.Reserve(DiceToRoll);
-
-    int32 SimulatedHealth = Result.StartingHealth;
-    for (int32 DieIndex = 0; DieIndex < DiceToRoll; ++DieIndex)
+    if (DiceToRoll <= 0)
     {
-        FDiceRollOutcome& Outcome = Result.DiceOutcomes.AddDefaulted_GetRef();
-        int32 RollValue = 0;
-        if (OverrideRolls.IsValidIndex(DieIndex))
-        {
-            RollValue = FMath::Clamp(OverrideRolls[DieIndex], 1, 6);
-        }
-        else
-        {
-            RollValue = RandomStream.RandRange(1, 6);
-        }
+        return Result;
+    }
 
-        Outcome.RollValue = RollValue;
+    TArray<int32> RollValues;
+    RollValues.Reserve(DiceToRoll);
 
-        int32 Damage = 0;
-        if (Outcome.RollValue == 6)
+    if (OverrideRolls.Num() > 0)
+    {
+        RollValues = OverrideRolls;
+        for (int32& Value : RollValues)
         {
-            Damage = AttackerStats.AttackDamage + AttackerStats.CriticalBonusDamage;
-        }
-        else if (Outcome.RollValue >= RequiredRoll)
-        {
-            Damage = AttackerStats.AttackDamage;
+            Value = FMath::Clamp(Value, 1, 6);
         }
 
-        Outcome.Damage = Damage;
-        Outcome.bHit = Damage > 0;
-        Outcome.bCritical = Outcome.bHit && Outcome.RollValue == 6 && Damage > AttackerStats.AttackDamage;
-
-        if (Outcome.bHit && SimulatedHealth > 0)
+        if (RollValues.Num() > DiceToRoll)
         {
-            const int32 AppliedDamage = FMath::Min(Damage, SimulatedHealth);
-            SimulatedHealth -= AppliedDamage;
-            Result.TotalDamage += AppliedDamage;
-            ++Result.HitCount;
-
-            if (Outcome.bCritical)
+            RollValues.SetNum(DiceToRoll);
+        }
+        else if (RollValues.Num() < DiceToRoll)
+        {
+            const int32 MissingCount = DiceToRoll - RollValues.Num();
+            for (int32 Index = 0; Index < MissingCount; ++Index)
             {
-                ++Result.CriticalHitCount;
-                Result.HighestCriticalDamage = FMath::Max(Result.HighestCriticalDamage, Damage);
+                RollValues.Add(RandomStream.RandRange(1, 6));
             }
         }
-        else if (!Outcome.bHit)
+    }
+    else
+    {
+        for (int32 DieIndex = 0; DieIndex < DiceToRoll; ++DieIndex)
         {
-            ++Result.MissCount;
+            RollValues.Add(RandomStream.RandRange(1, 6));
         }
     }
 
-    Result.EndingHealth = SimulatedHealth;
-    Result.bHighStakesCritical = Result.CriticalHitCount > 0 && Result.EndingHealth <= 0 && Result.StartingHealth > 0;
+    Result.DiceOutcomes.Reset();
+    Result.DiceOutcomes.SetNum(DiceToRoll);
+
+    AFighterPawn::ApplyPhysicalRollResults(Result, RollValues, AttackerStats, DefenderStats);
     return Result;
 }
 

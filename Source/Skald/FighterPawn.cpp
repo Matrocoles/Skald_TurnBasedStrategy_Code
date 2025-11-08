@@ -2336,9 +2336,14 @@ void AFighterPawn::ProcessPhysicalDiceRollResults(
   for (int32 &Value : SanitizedResults) {
     Value = FMath::Clamp(Value, 1, 6);
   }
+  if (SanitizedResults.Num() < DiceResult.DiceOutcomes.Num()) {
+    const int32 ExistingCount = SanitizedResults.Num();
+    SanitizedResults.Reserve(DiceResult.DiceOutcomes.Num());
+    for (int32 Index = ExistingCount; Index < DiceResult.DiceOutcomes.Num(); ++Index) {
+      SanitizedResults.Add(DiceResult.DiceOutcomes[Index].RollValue);
+    }
+  }
 
-  ApplyPhysicalRollResults(DiceResult, SanitizedResults, AttackerStats,
-                           DefenderStatsSnapshot);
   PendingPhysicalRollValues = MoveTemp(SanitizedResults);
   DiceResult.HighStakesFaction = Faction;
 
