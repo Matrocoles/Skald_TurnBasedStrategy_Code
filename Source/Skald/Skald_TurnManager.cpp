@@ -2750,9 +2750,15 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
       TEXT("DefendingTerritory"));
   PromptData.AttackerCommittedArmy =
       FMath::Max(0, Battle.ArmyCountSent);
-  PromptData.DefenderArmyCount =
-      Battle.DefenderArmyCount > 0 ? Battle.DefenderArmyCount
-                                   : FMath::Max(0, Battle.ArmyCountSent);
+
+  int32 ResolvedDefenderArmyCount = Battle.DefenderArmyCount;
+  if (ResolvedDefenderArmyCount <= 0 && WorldMap) {
+    if (ATerritory *DefendingTerritory =
+            WorldMap->GetTerritoryById(Battle.TargetTerritoryID)) {
+      ResolvedDefenderArmyCount = DefendingTerritory->ArmyUnits;
+    }
+  }
+  PromptData.DefenderArmyCount = FMath::Max(0, ResolvedDefenderArmyCount);
   PromptData.AttackerFactionEmblem =
       ResolveFactionEmblem(Battle.AttackerFactionEmblem, Battle.AttackerFaction,
                            TEXT("Attacker"));
