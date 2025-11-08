@@ -556,6 +556,9 @@ private:
 
     UFUNCTION()
     void HandleDiceRollCompleted(const FGuid& RollId, const TArray<int32>& Results);
+    void ScheduleAutoManualAttackRoll(class AFighterPawn* Attacker);
+    void HandleAutoManualAttackRoll(TWeakObjectPtr<class AFighterPawn> AttackerPtr);
+    void ClearAutoManualAttackRoll(class AFighterPawn* Attacker);
 
     struct FDeferredActivationFinish
     {
@@ -659,5 +662,8 @@ private:
 
     /** Number of defender-side dice requested from the subsystem. */
     int32 PendingInitiativeEnemyDice = 0;
+
+    /** Timers used to auto-trigger manual attack rolls for AI controlled fighters. */
+    TMap<TWeakObjectPtr<AFighterPawn>, FTimerHandle> PendingAutoManualAttackRolls;
 };
 

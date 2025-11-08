@@ -18,6 +18,9 @@
 namespace
 {
 constexpr float BattleConclusionBroadcastDelaySeconds = 1.5f;
+// Delay used when automatically triggering a manual attack roll for AI controlled
+// fighters so their flow aligns with the player camera presentation cadence.
+constexpr float AutoManualAttackRollDelaySeconds = 0.65f;
 
 FString DescribeFighter(const AFighterPawn* Fighter)
 {
@@ -134,6 +137,16 @@ void UGridBattleManager::BeginDestroy()
         Manager->OnDiceRollCompleted.RemoveDynamic(this, &UGridBattleManager::HandleDiceRollCompleted);
     }
     DiceManager.Reset();
+
+    if (UWorld* World = GetWorld())
+    {
+        for (TPair<TWeakObjectPtr<AFighterPawn>, FTimerHandle>& Pair : PendingAutoManualAttackRolls)
+        {
+            World->GetTimerManager().ClearTimer(Pair.Value);
+        }
+    }
+    PendingAutoManualAttackRolls.Empty();
+
     Super::BeginDestroy();
 }
 
@@ -1730,12 +1743,14 @@ void UGridBattleManager::ShowAttackRollButtonForPlayer(AFighterPawn* Attacker)
     if (TargetControllers.Num() == 0)
     {
         UE_LOG(LogTemp, Log,
-            TEXT("GridBattleManager::ShowAttackRollButtonForPlayer: No eligible player controller for %s (Faction=%s). Auto-triggering roll."),
+            TEXT("GridBattleManager::ShowAttackRollButtonForPlayer: No eligible player controller for %s (Faction=%s). Scheduling auto roll."),
             *GetNameSafe(Attacker), *UEnum::GetValueAsString(Attacker->Faction));
 
-        Attacker->TriggerManualAttackRoll();
+        ScheduleAutoManualAttackRoll(Attacker);
         return;
     }
+
+    ClearAutoManualAttackRoll(Attacker);
 
     for (ASkaldPlayerController* PC : TargetControllers)
     {
@@ -1804,4 +1819,74 @@ void UGridBattleManager::HideAttackRollButtonForFighter(AFighterPawn* Attacker)
             *GetNameSafe(PC));
         PC->ClientHideAttackRollButton();
     }
+}
+
+void UGridBattleManager::ScheduleAutoManualAttackRoll(AFighterPawn* Attacker)
+{
+    if (!Attacker)
+    {
+        return;
+    }
+
+    UWorld* World = GetWorld();
+    if (!World)
+    {
+        return;
+    }
+
+    if (!Attacker->IsAwaitingPhysicalAttackRoll())
+    {
+        return;
+    }
+
+    const TWeakObjectPtr<AFighterPawn> AttackerPtr(Attacker);
+    FTimerHandle& TimerHandle = PendingAutoManualAttackRolls.FindOrAdd(AttackerPtr);
+    World->GetTimerManager().ClearTimer(TimerHandle);
+
+    FTimerDelegate Delegate = FTimerDelegate::CreateUObject(
+        this, &UGridBattleManager::HandleAutoManualAttackRoll, AttackerPtr);
+    World->GetTimerManager().SetTimer(
+        TimerHandle, Delegate, AutoManualAttackRollDelaySeconds, /*bLoop*/ false);
+}
+
+void UGridBattleManager::ClearAutoManualAttackRoll(AFighterPawn* Attacker)
+{
+    if (!Attacker)
+    {
+        return;
+    }
+
+    UWorld* World = GetWorld();
+    if (!World)
+    {
+        return;
+    }
+
+    const TWeakObjectPtr<AFighterPawn> AttackerPtr(Attacker);
+    if (FTimerHandle* TimerHandle = PendingAutoManualAttackRolls.Find(AttackerPtr))
+    {
+        World->GetTimerManager().ClearTimer(*TimerHandle);
+        PendingAutoManualAttackRolls.Remove(AttackerPtr);
+    }
+}
+
+void UGridBattleManager::HandleAutoManualAttackRoll(TWeakObjectPtr<AFighterPawn> AttackerPtr)
+{
+    UWorld* World = GetWorld();
+    if (World)
+    {
+        if (FTimerHandle* TimerHandle = PendingAutoManualAttackRolls.Find(AttackerPtr))
+        {
+            World->GetTimerManager().ClearTimer(*TimerHandle);
+            PendingAutoManualAttackRolls.Remove(AttackerPtr);
+        }
+    }
+
+    AFighterPawn* Attacker = AttackerPtr.Get();
+    if (!Attacker || !Attacker->IsAwaitingPhysicalAttackRoll())
+    {
+        return;
+    }
+
+    Attacker->TriggerManualAttackRoll();
 }
