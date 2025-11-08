@@ -729,6 +729,9 @@ private:
   /** Update cached dice result aggregates using the latest fighter stats. */
   void RefreshPendingAttackResultStats(AFighterPawn *Target);
 
+  /** Ensure any stored physical dice results are applied to the pending attack. */
+  void ApplyPendingPhysicalRollValues();
+
   /** Finalise any pending attack resolution and clean up timers/state. */
   void FinalizeQueuedAttack();
 
@@ -761,6 +764,9 @@ private:
 
   /** Target currently receiving delayed attack rolls. */
   TWeakObjectPtr<AFighterPawn> PendingAttackTarget;
+
+  /** Cached physical dice values awaiting application to the pending result. */
+  TArray<int32> PendingPhysicalRollValues;
 
   /** Target awaiting a physical dice roll result. */
   TWeakObjectPtr<AFighterPawn> PendingPhysicalAttackTarget;
