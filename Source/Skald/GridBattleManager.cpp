@@ -198,11 +198,45 @@ FDiceRollResult UGridBattleManager::ResolveAttackDice(const FFighterStats& Attac
         return Result;
     }
 
-    const int32 RequiredRoll = AttackerStats.Strength > DefenderStats.Defence ? 3 :
-        (AttackerStats.Strength < DefenderStats.Defence ? 5 : 4);
-
     const int32 DiceToRoll = FMath::Max(0, AttackerStats.AttackDice);
     Result.DiceOutcomes.Reserve(DiceToRoll);
+
+    if (OverrideRolls.Num() > 0)
+    {
+        TArray<int32> SanitizedOverrides = OverrideRolls;
+        for (int32& Value : SanitizedOverrides)
+        {
+            Value = FMath::Clamp(Value, 1, 6);
+        }
+
+        if (SanitizedOverrides.Num() > DiceToRoll)
+        {
+            SanitizedOverrides.SetNum(DiceToRoll);
+        }
+        else if (SanitizedOverrides.Num() < DiceToRoll)
+        {
+            const int32 MissingCount = DiceToRoll - SanitizedOverrides.Num();
+            for (int32 Index = 0; Index < MissingCount; ++Index)
+            {
+                SanitizedOverrides.Add(RandomStream.RandRange(1, 6));
+            }
+        }
+
+        for (int32 DieIndex = 0; DieIndex < DiceToRoll; ++DieIndex)
+        {
+            FDiceRollOutcome& Outcome = Result.DiceOutcomes.AddDefaulted_GetRef();
+            const int32 RollValue = SanitizedOverrides.IsValidIndex(DieIndex)
+                                        ? SanitizedOverrides[DieIndex]
+                                        : RandomStream.RandRange(1, 6);
+            Outcome.RollValue = RollValue;
+        }
+
+        AFighterPawn::ApplyPhysicalRollResults(Result, SanitizedOverrides, AttackerStats, DefenderStats);
+        return Result;
+    }
+
+    const int32 RequiredRoll = AttackerStats.Strength > DefenderStats.Defence ? 3 :
+        (AttackerStats.Strength < DefenderStats.Defence ? 5 : 4);
 
     int32 SimulatedHealth = Result.StartingHealth;
     for (int32 DieIndex = 0; DieIndex < DiceToRoll; ++DieIndex)
