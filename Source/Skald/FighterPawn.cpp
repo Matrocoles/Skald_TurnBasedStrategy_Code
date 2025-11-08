@@ -2344,6 +2344,50 @@ void AFighterPawn::ProcessPhysicalDiceRollResults(
     }
   }
 
+  const bool bHasExistingQueuedAttack =
+      bHasPendingDiceResult && PendingAttackTarget.IsValid() &&
+      PendingAttackTarget.Get() == Target;
+
+  if (bHasExistingQueuedAttack) {
+    PendingPhysicalRollValues = SanitizedResults;
+
+    const FFighterStats &AttackerStatsSnapshot =
+        bHasPendingAttackSnapshot ? PendingAttackAttackerSnapshot : Stats;
+
+    FFighterStats DefenderStatsSnapshot = bHasPendingAttackSnapshot
+                                              ? PendingAttackDefenderSnapshot
+                                              : (Target ? Target->Stats
+                                                        : FFighterStats());
+
+    PendingAttackDiceResult.HighStakesFaction = Faction;
+
+    ApplyPhysicalRollResults(PendingAttackDiceResult, PendingPhysicalRollValues,
+                             AttackerStatsSnapshot, DefenderStatsSnapshot);
+
+    const int32 StartingHealth =
+        PendingAttackDiceResult.StartingHealth > 0
+            ? PendingAttackDiceResult.StartingHealth
+            : FMath::Max(0, DefenderStatsSnapshot.Health);
+    const int32 ClampedEndingHealth =
+        FMath::Clamp(PendingAttackDiceResult.EndingHealth, 0, StartingHealth);
+
+    PendingAttackDiceResult.EndingHealth = ClampedEndingHealth;
+    PendingAttackDiceResult.TotalDamage =
+        FMath::Clamp(StartingHealth - ClampedEndingHealth, 0, StartingHealth);
+
+    if (Target) {
+      const bool bHealthChanged = Target->Stats.Health != ClampedEndingHealth;
+      Target->Stats.Health = ClampedEndingHealth;
+      if (bHealthChanged) {
+        Target->OnHealthChanged.Broadcast(Target->Stats.Health);
+      }
+      bPendingAttackTargetDied = Target->Stats.Health <= 0;
+    }
+
+    RefreshPendingAttackResultStats(Target);
+    return;
+  }
+
   PendingPhysicalRollValues = MoveTemp(SanitizedResults);
   DiceResult.HighStakesFaction = Faction;
 
