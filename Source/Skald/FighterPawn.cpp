@@ -29,12 +29,15 @@
 #include "NiagaraFunctionLibrary.h"
 #include "Skald_GameInstance.h"
 #include "Skald_PlayerState.h"
+#include "Skald_AIController.h"
 #include "SkaldDiceManager.h"
 #include "Sound/SoundBase.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
 #include "UI/FighterActivationWidget.h"
 #include "UI/FighterHealthWidget.h"
+
+using AEnemyAIController = ASkaldAIController;
 
 namespace
 {
@@ -51,6 +54,7 @@ constexpr float QueuedAttackFirstRollDelaySeconds = 0.48f;
 constexpr float QueuedAttackAdditionalRollDelaySeconds = 0.4f;
 constexpr float VisualAvoidanceFloorNormalThreshold = 0.65f;
 constexpr int32 DisengageMaxDistance = 3;
+constexpr float AIDiceRollOverviewDelaySeconds = 0.7f;
 }
 
 AFighterPawn::AFighterPawn() : MaxHealth(0) {
@@ -2163,49 +2167,101 @@ bool AFighterPawn::AttemptPhysicalAttackRoll(AFighterPawn *Target) {
   return true;
 }
 
-void AFighterPawn::TriggerManualAttackRoll()
-{
-    // Safety: ensure a pending attack exists.
-    if (!bAwaitingPhysicalAttackRoll || !PendingPhysicalAttackTarget.IsValid())
-    {
-        return;
-    }
+void AFighterPawn::TriggerManualAttackRoll() {
+  if (!bAwaitingPhysicalAttackRoll || !PendingPhysicalAttackTarget.IsValid()) {
+    return;
+  }
 
-    AFighterPawn* Target = PendingPhysicalAttackTarget.Get();
-    if (!Target || Stats.AttackDice <= 0)
-    {
-        return;
-    }
+  if (Stats.AttackDice <= 0) {
+    return;
+  }
 
-    EnsureDiceManagerBinding();
-    USkaldDiceManager* DiceManager = CachedDiceManager.Get();
-    if (!DiceManager)
-    {
-        return;
-    }
+  if (ShouldDelayAIAttackRoll()) {
+    return;
+  }
 
-    const int32 DiceToRoll = FMath::Max(Stats.AttackDice, 0);
-    const FGuid RollId = DiceManager->RollDice_D6(DiceToRoll, 0, false);
-    if (!RollId.IsValid())
-    {
-        return;
-    }
+  ExecuteManualAttackRoll();
+}
 
-    PendingAttackRollId = RollId;
-    UE_LOG(LogTemp, Log,
-           TEXT("TriggerManualAttackRoll: Awaiting dice arena completion (RollId=%s, Attacker=%s, Target=%s)"),
-           *RollId.ToString(), *GetName(), *GetNameSafe(Target));
-    // keep bAwaitingPhysicalAttackRoll = true; cleared when result arrives
+void AFighterPawn::ExecuteManualAttackRoll() {
+  if (!bAwaitingPhysicalAttackRoll || !PendingPhysicalAttackTarget.IsValid()) {
+    return;
+  }
 
-    // Hide the button now that rolling has started
-    if (USkaldGameInstance* GI = Cast<USkaldGameInstance>(GetGameInstance()))
-    {
-        if (UGridBattleManager* BattleManager = GI->GridBattleManager)
-        {
-            BattleManager->HideAttackRollButtonForFighter(this);
-        }
+  AFighterPawn *Target = PendingPhysicalAttackTarget.Get();
+  if (!Target || Stats.AttackDice <= 0) {
+    return;
+  }
+
+  CancelAIDiceRollDelay();
+
+  EnsureDiceManagerBinding();
+  USkaldDiceManager *DiceManager = CachedDiceManager.Get();
+  if (!DiceManager) {
+    return;
+  }
+
+  const int32 DiceToRoll = FMath::Max(Stats.AttackDice, 0);
+  const FGuid RollId = DiceManager->RollDice_D6(DiceToRoll, 0, false);
+  if (!RollId.IsValid()) {
+    return;
+  }
+
+  PendingAttackRollId = RollId;
+  UE_LOG(LogTemp, Log,
+         TEXT("TriggerManualAttackRoll: Awaiting dice arena completion (RollId=%s, Attacker=%s, Target=%s)"),
+         *RollId.ToString(), *GetName(), *GetNameSafe(Target));
+
+  if (USkaldGameInstance *GI = Cast<USkaldGameInstance>(GetGameInstance())) {
+    if (UGridBattleManager *BattleManager = GI->GridBattleManager) {
+      BattleManager->HideAttackRollButtonForFighter(this);
     }
-} // nice clean closing brace
+  }
+}
+
+bool AFighterPawn::ShouldDelayAIAttackRoll() {
+  if (!Controller || !Controller->IsA(AEnemyAIController::StaticClass())) {
+    CancelAIDiceRollDelay();
+    return false;
+  }
+
+  if (bPendingAIDiceRollDelay) {
+    return true;
+  }
+
+  UE_LOG(LogTemp, Log, TEXT("AI Attack: Waiting for camera overview..."));
+  bPendingAIDiceRollDelay = true;
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().SetTimer(
+        AIDiceRollDelayHandle, this, &AFighterPawn::HandleAIDiceRollDelayComplete,
+        AIDiceRollOverviewDelaySeconds, false);
+  } else {
+    HandleAIDiceRollDelayComplete();
+  }
+
+  return true;
+}
+
+void AFighterPawn::HandleAIDiceRollDelayComplete() {
+  if (!bPendingAIDiceRollDelay) {
+    return;
+  }
+
+  CancelAIDiceRollDelay();
+
+  UE_LOG(LogTemp, Log, TEXT("AI Attack: Arena ready, rolling dice now."));
+
+  ExecuteManualAttackRoll();
+}
+
+void AFighterPawn::CancelAIDiceRollDelay() {
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(AIDiceRollDelayHandle);
+  }
+
+  bPendingAIDiceRollDelay = false;
+}
 
 // Server RPC Implementation  runs on the server
 void AFighterPawn::ServerShowAttackRollButtonForPlayer_Implementation()
@@ -2268,6 +2324,8 @@ void AFighterPawn::ProcessPhysicalDiceRollResults(
   if (!bAwaitingPhysicalAttackRoll || RollId != PendingAttackRollId) {
     return;
   }
+
+  CancelAIDiceRollDelay();
 
   FString ResultValuesString;
   for (int32 Index = 0; Index < Results.Num(); ++Index) {
@@ -2383,6 +2441,11 @@ void AFighterPawn::ProcessPhysicalDiceRollResults(
 
   PendingPhysicalRollValues = MoveTemp(SanitizedResults);
   DiceResult.HighStakesFaction = Faction;
+
+  if (Controller && Controller->IsA(AEnemyAIController::StaticClass())) {
+    UE_LOG(LogTemp, Log,
+           TEXT("AI Attack: Physical roll complete — applying result."));
+  }
 
   StartQueuedAttack(Target, MoveTemp(DiceResult));
 }

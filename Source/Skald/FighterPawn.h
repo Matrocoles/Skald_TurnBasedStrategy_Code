@@ -758,6 +758,10 @@ private:
 
   void HandleIncomingAttackStarted();
   void HandleIncomingAttackFinished();
+  void ExecuteManualAttackRoll();
+  bool ShouldDelayAIAttackRoll();
+  void HandleAIDiceRollDelayComplete();
+  void CancelAIDiceRollDelay();
 
   /** Index of the next pending dice outcome to resolve. */
   int32 PendingAttackOutcomeIndex = 0;
@@ -779,12 +783,16 @@ private:
 
   /** Timer driving delayed attack roll resolution. */
   FTimerHandle AttackRollTimerHandle;
+  /** Timer used to delay AI manual dice rolls until the camera finishes panning. */
+  FTimerHandle AIDiceRollDelayHandle;
 
   /** Tracks whether any pending attack roll has been processed. */
   bool bHasProcessedPendingRoll = false;
 
   /** True while waiting for the dice subsystem to resolve a live roll. */
   bool bAwaitingPhysicalAttackRoll = false;
+  /** True while an AI controlled fighter is waiting to start its physical dice roll. */
+  bool bPendingAIDiceRollDelay = false;
 
   /** Cached dice roll data to broadcast once resolution completes. */
   FDiceRollResult PendingAttackDiceResult;
