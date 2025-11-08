@@ -70,6 +70,9 @@ public:
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Combat|Dice")
   bool IsAwaitingPhysicalAttackRoll() const { return bAwaitingPhysicalAttackRoll; }
 
+  /** Returns the guid for the currently pending physical attack roll, if any. */
+  FGuid GetPendingAttackRollId() const { return PendingAttackRollId; }
+
   /**
    * Rebuild the supplied dice result using concrete physical roll values so the
    * queued attack resolves using the exact faces produced by the dice system.
