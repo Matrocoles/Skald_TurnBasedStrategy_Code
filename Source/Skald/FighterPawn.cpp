@@ -2121,58 +2121,46 @@ void AFighterPawn::CleanupDiceManagerBinding() {
   CachedDiceManager.Reset();
 }
 
-bool AFighterPawn::AttemptPhysicalAttackRoll(AFighterPawn* Target)
-{
-    if (!Target)
-    {
-        return false;
+bool AFighterPawn::AttemptPhysicalAttackRoll(AFighterPawn *Target) {
+  if (!Target) {
+    return false;
+  }
+
+  // Only use the manual physical roll flow if we actually have dice.
+  if (Stats.AttackDice <= 0) {
+    return false; // fall back to normal auto-resolution path
+  }
+
+  // Store context so we know what to resolve when the player hits Roll.
+  PendingPhysicalAttackTarget = Target;
+  PendingAttackAttackerSnapshot = Stats;
+  PendingAttackDefenderSnapshot = Target->Stats;
+  bHasPendingAttackSnapshot = true;
+
+  PendingPhysicalRollValues.Reset();
+  bPendingPhysicalRollValuesApplied = false;
+  bAwaitingPhysicalAttackRoll = true;
+
+  UE_LOG(LogTemp, Log,
+         TEXT("AttemptPhysicalAttackRoll: awaiting physical roll... (Attacker=%s, Target=%s, Dice=%d)"),
+         *GetName(), *GetNameSafe(Target), FMath::Max(0, Stats.AttackDice));
+
+  // Ask the battle manager / HUD to show the Roll button for this pawn.
+  if (USkaldGameInstance *GI = Cast<USkaldGameInstance>(GetGameInstance())) {
+    if (UGridBattleManager *BattleManager = GI->GridBattleManager) {
+      UE_LOG(LogTemp, Log,
+             TEXT("AttemptPhysicalAttackRoll: AwaitingPhysicalRoll=true, prompting dice arena for %s"),
+             *GetName());
+
+      if (HasAuthority()) {
+        ShowAttackRollButtonForPlayer();
+      } else {
+        ServerShowAttackRollButtonForPlayer();
+      }
     }
+  }
 
-    // All fighters now leverage the manual dice presentation so the same
-    // cinematic attack camera and dice flow are used for both human players and
-    // AI-controlled units.
-    ASkaldPlayerController* OwningController = Cast<ASkaldPlayerController>(GetController());
-    if (!OwningController)
-    {
-        return false;
-    }
-
-    // Only use the manual physical roll flow if we actually have dice.
-    if (Stats.AttackDice <= 0)
-    {
-        return false; // fall back to normal auto-resolution path
-    }
-
-    // Store context so we know what to resolve when the player hits Roll.
-    PendingPhysicalAttackTarget = Target;
-    PendingAttackAttackerSnapshot = Stats;
-    PendingAttackDefenderSnapshot = Target->Stats;
-    bHasPendingAttackSnapshot = true;
-    bAwaitingPhysicalAttackRoll = true;
-
-    //  Debug: confirm we actually get here
-    UE_LOG(LogTemp, Warning, TEXT("AttemptPhysicalAttackRoll: attacker %s vs target %s, Dice=%d"),
-        *GetName(), *Target->GetName(), Stats.AttackDice);
-
-    // Ask the battle manager / HUD to show the Roll button for this pawn.
-    if (USkaldGameInstance* GI = Cast<USkaldGameInstance>(GetGameInstance()))
-    {
-        if (UGridBattleManager* BattleManager = GI->GridBattleManager)
-        {
-            UE_LOG(LogTemp, Warning, TEXT("AttemptPhysicalAttackRoll: calling ShowAttackRollButtonForPlayer"));
-
-            if (HasAuthority())
-            {
-                ShowAttackRollButtonForPlayer();
-            }
-            else
-            {
-                ServerShowAttackRollButtonForPlayer();
-            }
-        }
-    }
-
-    return true;
+  return true;
 }
 
 void AFighterPawn::TriggerManualAttackRoll()
@@ -2293,8 +2281,14 @@ void AFighterPawn::ProcessPhysicalDiceRollResults(
   }
 
   UE_LOG(LogTemp, Log,
-         TEXT("ProcessPhysicalDiceRollResults: Dice arena completed (RollId=%s, Values=[%s]). Applying outcome."),
-         *RollId.ToString(), *ResultValuesString);
+         TEXT("ProcessPhysicalDiceRollResults: real physical roll received (RollId=%s, Values=[%s]) for %s."),
+         *RollId.ToString(), *ResultValuesString, *GetName());
+
+  if (!bAwaitingPhysicalAttackRoll) {
+    UE_LOG(LogTemp, Warning,
+           TEXT("ProcessPhysicalDiceRollResults: received physical roll while not awaiting one (Attacker=%s)."),
+           *GetName());
+  }
 
   bAwaitingPhysicalAttackRoll = false;
   PendingAttackRollId.Invalidate();
@@ -2492,6 +2486,13 @@ bool AFighterPawn::IsResolvingQueuedAttack() const {
 
 void AFighterPawn::StartQueuedAttack(AFighterPawn *Target,
                                      FDiceRollResult &&DiceResult) {
+  if (bAwaitingPhysicalAttackRoll) {
+    UE_LOG(LogTemp, Warning,
+           TEXT("StartQueuedAttack called while AwaitingPhysicalRoll=true for %s. Deferring until physical roll completes."),
+           *GetName());
+    return;
+  }
+
   if (UWorld *World = GetWorld()) {
     World->GetTimerManager().ClearTimer(AttackRollTimerHandle);
   }
@@ -2618,6 +2619,22 @@ void AFighterPawn::ApplyPendingPhysicalRollValues() {
                                             : (PendingAttackTarget.IsValid()
                                                    ? PendingAttackTarget->Stats
                                                    : FFighterStats());
+
+  FString PendingRollsString;
+  for (int32 Index = 0; Index < PendingPhysicalRollValues.Num(); ++Index) {
+    if (Index > 0) {
+      PendingRollsString.Append(TEXT(","));
+    }
+    PendingRollsString.AppendInt(PendingPhysicalRollValues[Index]);
+  }
+  if (PendingRollsString.IsEmpty()) {
+    PendingRollsString = TEXT("<empty>");
+  }
+
+  UE_LOG(LogTemp, Log,
+         TEXT("ApplyPendingPhysicalRollValues: applying stored rolls [%s] for attacker %s (target=%s)."),
+         *PendingRollsString, *GetName(),
+         *GetNameSafe(PendingAttackTarget.Get()));
 
   ApplyPhysicalRollResults(PendingAttackDiceResult, PendingPhysicalRollValues,
                            AttackerStats, DefenderStatsSnapshot);
