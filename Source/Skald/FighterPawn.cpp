@@ -2329,8 +2329,17 @@ void AFighterPawn::ProcessPhysicalDiceRollResults(
       UGridBattleManager::ResolveAttackDice(AttackerStats, DefenderStatsSnapshot,
                                             *RandomStream, Results);
 
-  ApplyPhysicalRollResults(DiceResult, Results, AttackerStats,
+  TArray<int32> SanitizedResults = Results;
+  if (SanitizedResults.Num() > DiceResult.DiceOutcomes.Num()) {
+    SanitizedResults.SetNum(DiceResult.DiceOutcomes.Num());
+  }
+  for (int32 &Value : SanitizedResults) {
+    Value = FMath::Clamp(Value, 1, 6);
+  }
+
+  ApplyPhysicalRollResults(DiceResult, SanitizedResults, AttackerStats,
                            DefenderStatsSnapshot);
+  PendingPhysicalRollValues = MoveTemp(SanitizedResults);
   DiceResult.HighStakesFaction = Faction;
 
   StartQueuedAttack(Target, MoveTemp(DiceResult));
@@ -2452,6 +2461,8 @@ void AFighterPawn::StartQueuedAttack(AFighterPawn *Target,
   bHasProcessedPendingRoll = false;
   bHasPendingDiceResult = true;
 
+  ApplyPendingPhysicalRollValues();
+
   if (AFighterPawn *TargetPawn = PendingAttackTarget.Get()) {
     TargetPawn->HandleIncomingAttackStarted();
   }
@@ -2542,6 +2553,24 @@ void AFighterPawn::ResolveNextAttackRoll() {
   } else {
     FinalizeQueuedAttack();
   }
+}
+
+void AFighterPawn::ApplyPendingPhysicalRollValues() {
+  if (!bHasPendingDiceResult || PendingPhysicalRollValues.Num() == 0) {
+    return;
+  }
+
+  const FFighterStats &AttackerStats =
+      bHasPendingAttackSnapshot ? PendingAttackAttackerSnapshot : Stats;
+
+  FFighterStats DefenderStatsSnapshot = bHasPendingAttackSnapshot
+                                            ? PendingAttackDefenderSnapshot
+                                            : (PendingAttackTarget.IsValid()
+                                                   ? PendingAttackTarget->Stats
+                                                   : FFighterStats());
+
+  ApplyPhysicalRollResults(PendingAttackDiceResult, PendingPhysicalRollValues,
+                           AttackerStats, DefenderStatsSnapshot);
 }
 
 void AFighterPawn::ApplyPhysicalRollResults(
@@ -2728,6 +2757,7 @@ void AFighterPawn::FinalizeQueuedAttack() {
   }
 
   if (bHasPendingDiceResult) {
+    ApplyPendingPhysicalRollValues();
     RefreshPendingAttackResultStats(Target);
 
     if (USkaldGameInstance *GI =
@@ -2802,6 +2832,7 @@ void AFighterPawn::ClearQueuedAttackState(bool bBroadcastFinalized) {
   PendingAttackAttackerSnapshot = FFighterStats();
   PendingAttackDefenderSnapshot = FFighterStats();
   bHasPendingAttackSnapshot = false;
+  PendingPhysicalRollValues.Reset();
 
   if (bBroadcastFinalized) {
     OnQueuedAttackFinalized.Broadcast();
