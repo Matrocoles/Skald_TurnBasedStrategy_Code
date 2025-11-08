@@ -2126,19 +2126,6 @@ bool AFighterPawn::AttemptPhysicalAttackRoll(AFighterPawn *Target) {
     return false;
   }
 
-  ASkaldPlayerController *ControllingPlayer =
-      Cast<ASkaldPlayerController>(GetController());
-  if (!ControllingPlayer) {
-    return false; // AI-controlled fighters bypass the manual dice flow.
-  }
-
-  if (const ASkaldPlayerState *PlayerState =
-          ControllingPlayer->GetPlayerState<ASkaldPlayerState>()) {
-    if (PlayerState->bIsAI) {
-      return false;
-    }
-  }
-
   // Only use the manual physical roll flow if we actually have dice.
   if (Stats.AttackDice <= 0) {
     return false; // fall back to normal auto-resolution path
