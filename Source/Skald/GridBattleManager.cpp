@@ -1754,12 +1754,12 @@ void UGridBattleManager::ShowAttackRollButtonForPlayer(AFighterPawn* Attacker)
             UE_LOG(LogTemp, Warning, TEXT("GridBattleManager::ShowAttackRollButtonForPlayer: %s cannot locate a dice manager; scheduling fallback."),
                 *GetNameSafe(Attacker));
             ScheduleAutoManualAttackRoll(Attacker);
-        }
-        else
-        {
-            ClearAutoManualAttackRoll(Attacker);
+            Attacker->RequestAIAutoManualAttackRoll();
+            return;
         }
 
+        ClearAutoManualAttackRoll(Attacker);
+        Attacker->CancelAIDiceRollDelay();
         Attacker->RequestAIAutoManualAttackRoll();
         return;
     }
