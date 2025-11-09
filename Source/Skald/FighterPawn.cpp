@@ -2177,11 +2177,7 @@ bool AFighterPawn::AttemptPhysicalAttackRoll(AFighterPawn *Target) {
              TEXT("AttemptPhysicalAttackRoll: AwaitingPhysicalRoll=true, prompting dice arena for %s"),
              *GetName());
 
-      if (bIsAIControlled) {
-        if (HasAuthority()) {
-          RequestAIAutoManualAttackRoll();
-        }
-      } else if (HasAuthority()) {
+      if (HasAuthority()) {
         ShowAttackRollButtonForPlayer();
       } else {
         ServerShowAttackRollButtonForPlayer();
@@ -2190,7 +2186,7 @@ bool AFighterPawn::AttemptPhysicalAttackRoll(AFighterPawn *Target) {
   }
 
   if (HasAuthority() && bIsAIControlled) {
-    if (!bAIManualRollHasPresenter) {
+    if (!bAIManualRollHasPresenter && !bAIManualRollPendingTrigger) {
       RequestAIAutoManualAttackRoll();
     }
   }
