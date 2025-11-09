@@ -7367,12 +7367,12 @@ void ASkaldPlayerController::ClientShowAttackRollButton_Implementation(
         return;
     }
 
-    if (!BattleHudWidget.IsValid())
+    if (!BattleHudWidget)
     {
         BattleHudWidget = HUD;
     }
 
-    if (!BattleHudWidget.IsValid())
+    if (!BattleHudWidget)
     {
         return;
     }

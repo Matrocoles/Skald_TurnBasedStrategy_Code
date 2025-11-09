@@ -70,6 +70,13 @@ public:
   /** Record whether any human player is expected to drive the manual dice UI. */
   void SetAIManualRollHasPresenter(bool bHasPresenter);
 
+  /** Access the dice manager responsible for physical roll orchestration. */
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Combat|Dice")
+  USkaldDiceManager *GetDiceManager() const;
+
+  /** Cancel any pending delay before an AI controlled fighter rolls dice. */
+  void CancelAIDiceRollDelay();
+
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Combat|Dice")
   AFighterPawn *GetPendingPhysicalAttackTarget() const;
 
@@ -755,7 +762,6 @@ private:
   bool AttemptPhysicalAttackRoll(class AFighterPawn* Target);
   void EnsureDiceManagerBinding();
   void CleanupDiceManagerBinding();
-  USkaldDiceManager *GetDiceManager() const;
 
   void ProcessPhysicalDiceRollResults(const FGuid &RollId,
                                       const TArray<int32> &Results);
@@ -772,7 +778,6 @@ private:
   void ExecuteManualAttackRoll();
   bool ShouldDelayAIAttackRoll();
   void HandleAIDiceRollDelayComplete();
-  void CancelAIDiceRollDelay();
   bool ShouldWaitForCameraBeforeAIRoll() const;
 
   /** Index of the next pending dice outcome to resolve. */
@@ -812,6 +817,7 @@ private:
   bool bAIManualRollLoggedOverview = false;
   bool bAIManualRollLoggedReady = false;
   bool bAIManualRollLoggedCameraTimeout = false;
+  bool bAIManualRollHasPresenter = false;
 
   static constexpr int32 MaxAICameraAckRetries = 2;
   int32 RemainingAICameraAckRetries = 0;
