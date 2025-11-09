@@ -232,13 +232,15 @@ void USkaldDiceManager::CompleteRoll(FGuid RollId)
             if (DiceActor)
             {
                 const bool bShouldSnap = DieState.bSnapToDesiredValue && DieState.DesiredValue != INDEX_NONE;
+                const bool bValueOutOfRange = Value == INDEX_NONE || Value < 1 || Value > 6;
+
                 if (bShouldSnap && DieState.DesiredValue != Value)
                 {
                     DiceActor->ForceFaceValue(DieState.DesiredValue, false);
                     Value = DieState.DesiredValue;
                 }
 
-                if (Value == INDEX_NONE)
+                if (bValueOutOfRange)
                 {
                     Value = DiceActor->SampleFaceValue();
                 }
@@ -248,7 +250,7 @@ void USkaldDiceManager::CompleteRoll(FGuid RollId)
                 Value = DieState.DesiredValue;
             }
 
-            if (Value == INDEX_NONE)
+            if (Value == INDEX_NONE || Value < 1 || Value > 6)
             {
                 Value = GenerateFallbackFace();
             }
@@ -644,8 +646,13 @@ void USkaldDiceManager::HandleDieSettled(ASkaldDiceD6* Dice, int32 FaceValue)
         if (DieState.Actor.Get() == Dice)
         {
             int32 FinalValue = FaceValue;
+            if (FinalValue < 1 || FinalValue > 6)
+            {
+                FinalValue = Dice->SampleFaceValue();
+            }
+
             const bool bShouldSnap = DieState.bSnapToDesiredValue && DieState.DesiredValue != INDEX_NONE;
-            if (bShouldSnap && DieState.DesiredValue != FaceValue)
+            if (bShouldSnap && DieState.DesiredValue != FinalValue)
             {
                 Dice->ForceFaceValue(DieState.DesiredValue, false);
                 FinalValue = DieState.DesiredValue;
