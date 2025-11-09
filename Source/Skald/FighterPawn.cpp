@@ -2136,6 +2136,8 @@ bool AFighterPawn::AttemptPhysicalAttackRoll(AFighterPawn *Target) {
     return false; // fall back to normal auto-resolution path
   }
 
+  bAIManualRollHasPresenter = false;
+
   // Store context so we know what to resolve when the player hits Roll.
   PendingPhysicalAttackTarget = Target;
   PendingAttackAttackerSnapshot = Stats;
@@ -2184,6 +2186,12 @@ bool AFighterPawn::AttemptPhysicalAttackRoll(AFighterPawn *Target) {
       } else {
         ServerShowAttackRollButtonForPlayer();
       }
+    }
+  }
+
+  if (HasAuthority() && bIsAIControlled) {
+    if (!bAIManualRollHasPresenter) {
+      RequestAIAutoManualAttackRoll();
     }
   }
 
@@ -2391,6 +2399,14 @@ void AFighterPawn::NotifyAIAttackPresentationReady() {
   }
 }
 
+void AFighterPawn::SetAIManualRollHasPresenter(bool bHasPresenter) {
+  if (!HasAuthority()) {
+    return;
+  }
+
+  bAIManualRollHasPresenter = bHasPresenter;
+}
+
 void AFighterPawn::HandleAIDiceRollDelayComplete() {
   if (!bPendingAIDiceRollDelay) {
     return;
@@ -2443,6 +2459,10 @@ void AFighterPawn::CancelAIDiceRollDelay() {
 
 bool AFighterPawn::ShouldWaitForCameraBeforeAIRoll() const {
   if (!HasAuthority()) {
+    return false;
+  }
+
+  if (!bAIManualRollHasPresenter) {
     return false;
   }
 
@@ -2532,7 +2552,7 @@ void AFighterPawn::ShowAttackRollButtonForPlayer()
     }
 
     UE_LOG(LogTemp, Warning, TEXT("ShowAttackRollButtonForPlayer: Fallback path calling ClientShowAttackRollButton for %s"), *PC->GetName());
-    PC->ClientShowAttackRollButton(this);
+    PC->ClientShowAttackRollButton(this, IsAIControlledParticipant());
 }
 
 void AFighterPawn::HandleDiceRollCompleted(const FGuid &RollId,

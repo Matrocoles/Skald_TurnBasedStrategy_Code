@@ -67,6 +67,9 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Combat|Dice")
   void NotifyAIAttackPresentationReady();
 
+  /** Record whether any human player is expected to drive the manual dice UI. */
+  void SetAIManualRollHasPresenter(bool bHasPresenter);
+
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Combat|Dice")
   AFighterPawn *GetPendingPhysicalAttackTarget() const;
 

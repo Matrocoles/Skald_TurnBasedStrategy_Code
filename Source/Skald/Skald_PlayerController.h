@@ -116,7 +116,8 @@ public:
   // === Manual Attack Roll UI Flow ===
 
   UFUNCTION(Client, Reliable)
-  void ClientShowAttackRollButton(class AFighterPawn* Attacker);
+  void ClientShowAttackRollButton(class AFighterPawn* Attacker,
+                                  bool bAutoTriggerRoll);
 
   UFUNCTION(Client, Reliable)
   void ClientHideAttackRollButton();
