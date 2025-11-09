@@ -74,6 +74,10 @@ public:
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Combat|Dice")
   bool IsAwaitingPhysicalAttackRoll() const { return bAwaitingPhysicalAttackRoll; }
 
+  /** Determine whether this fighter should be treated as AI-controlled for manual dice flows. */
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Combat|Dice")
+  bool IsAIControlledParticipant() const;
+
   /**
    * Rebuild the supplied dice result using concrete physical roll values so the
    * queued attack resolves using the exact faces produced by the dice system.
@@ -767,7 +771,6 @@ private:
   void HandleAIDiceRollDelayComplete();
   void CancelAIDiceRollDelay();
   bool ShouldWaitForCameraBeforeAIRoll() const;
-  bool IsAIControlledParticipant() const;
 
   /** Index of the next pending dice outcome to resolve. */
   int32 PendingAttackOutcomeIndex = 0;
