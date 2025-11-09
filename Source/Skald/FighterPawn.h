@@ -67,6 +67,9 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Combat|Dice")
   void NotifyAIAttackPresentationReady();
 
+  /** Record whether any human player is expected to drive the manual dice UI. */
+  void SetAIManualRollHasPresenter(bool bHasPresenter);
+
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Combat|Dice")
   AFighterPawn *GetPendingPhysicalAttackTarget() const;
 
@@ -805,6 +808,11 @@ private:
   bool bAIManualRollLoggedPanning = false;
   bool bAIManualRollLoggedOverview = false;
   bool bAIManualRollLoggedReady = false;
+  bool bAIManualRollLoggedCameraTimeout = false;
+  bool bAIManualRollHasPresenter = false;
+
+  static constexpr int32 MaxAICameraAckRetries = 2;
+  int32 RemainingAICameraAckRetries = 0;
 
   /** Cached dice roll data to broadcast once resolution completes. */
   FDiceRollResult PendingAttackDiceResult;

@@ -7347,7 +7347,8 @@ void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,
 // === Manual Attack Roll UI Flow ===
 
 // CLIENT FUNCTIONS
-void ASkaldPlayerController::ClientShowAttackRollButton_Implementation(AFighterPawn* Attacker)
+void ASkaldPlayerController::ClientShowAttackRollButton_Implementation(
+    AFighterPawn* Attacker, bool bAutoTriggerRoll)
 {
     UBattleHUDWidget* HUD = BattleHudWidget.Get();
     if (!HUD)
@@ -7360,6 +7361,28 @@ void ASkaldPlayerController::ClientShowAttackRollButton_Implementation(AFighterP
         UE_LOG(LogTemp, Warning, TEXT("[ManualDice] ClientShowAttackRollButton received for %s"), *GetNameSafe(Attacker));
         HUD->EnterManualAttackRollPrompt(Attacker);
     }
+
+    if (!bAutoTriggerRoll)
+    {
+        return;
+    }
+
+    if (!BattleHudWidget.IsValid())
+    {
+        BattleHudWidget = HUD;
+    }
+
+    if (!BattleHudWidget.IsValid())
+    {
+        return;
+    }
+
+    if (!BattleHudWidget->IsManualAttackRollPromptActive())
+    {
+        return;
+    }
+
+    HandleAttackRollRequested();
 }
 
 void ASkaldPlayerController::ClientHideAttackRollButton_Implementation()
