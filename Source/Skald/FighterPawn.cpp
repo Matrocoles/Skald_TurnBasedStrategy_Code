@@ -2153,6 +2153,8 @@ bool AFighterPawn::AttemptPhysicalAttackRoll(AFighterPawn *Target) {
   bAIManualRollLoggedPanning = false;
   bAIManualRollLoggedOverview = false;
   bAIManualRollLoggedReady = false;
+  bAIManualRollLoggedCameraTimeout = false;
+  RemainingAICameraAckRetries = 0;
 
   if (HasAuthority() && IsAIControlledParticipant()) {
     UE_LOG(LogTemp, Log, TEXT("AI Attack: Camera panning..."));
@@ -2163,14 +2165,21 @@ bool AFighterPawn::AttemptPhysicalAttackRoll(AFighterPawn *Target) {
          TEXT("AttemptPhysicalAttackRoll: awaiting physical roll... (Attacker=%s, Target=%s, Dice=%d)"),
          *GetName(), *GetNameSafe(Target), FMath::Max(0, Stats.AttackDice));
 
-  // Ask the battle manager / HUD to show the Roll button for this pawn.
+  // Ask the battle manager / HUD to show the Roll button for this pawn when a
+  // human-controlled fighter attacks. AI-controlled fighters bypass the UI and
+  // immediately follow their autonomous dice flow.
+  const bool bIsAIControlled = IsAIControlledParticipant();
   if (USkaldGameInstance *GI = Cast<USkaldGameInstance>(GetGameInstance())) {
     if (UGridBattleManager *BattleManager = GI->GridBattleManager) {
       UE_LOG(LogTemp, Log,
              TEXT("AttemptPhysicalAttackRoll: AwaitingPhysicalRoll=true, prompting dice arena for %s"),
              *GetName());
 
-      if (HasAuthority()) {
+      if (bIsAIControlled) {
+        if (HasAuthority()) {
+          RequestAIAutoManualAttackRoll();
+        }
+      } else if (HasAuthority()) {
         ShowAttackRollButtonForPlayer();
       } else {
         ServerShowAttackRollButtonForPlayer();
@@ -2210,6 +2219,9 @@ void AFighterPawn::RequestAIAutoManualAttackRoll() {
   }
 
   bAIManualRollAwaitingCamera = bShouldWaitForCamera;
+  RemainingAICameraAckRetries =
+      bShouldWaitForCamera ? MaxAICameraAckRetries : 0;
+  bAIManualRollLoggedCameraTimeout = false;
 
   if (bAIManualRollPresentationReady) {
     TriggerManualAttackRoll();
@@ -2354,6 +2366,8 @@ void AFighterPawn::NotifyAIAttackPresentationReady() {
   const bool bWasAwaitingCamera = bAIManualRollAwaitingCamera;
   CancelAIDiceRollDelay();
   bAIManualRollAwaitingCamera = false;
+  RemainingAICameraAckRetries = 0;
+  bAIManualRollLoggedCameraTimeout = false;
 
   if (!bAwaitingPhysicalAttackRoll) {
     return;
@@ -2382,12 +2396,37 @@ void AFighterPawn::HandleAIDiceRollDelayComplete() {
     return;
   }
 
-  const bool bTimedOutAwaitingCamera = bAIManualRollAwaitingCamera;
+  const bool bTimedOutAwaitingCamera =
+      bAIManualRollAwaitingCamera && bAwaitingPhysicalAttackRoll;
+  const int32 RetriesRemaining = RemainingAICameraAckRetries;
   CancelAIDiceRollDelay();
+  RemainingAICameraAckRetries = RetriesRemaining;
 
-  if (bTimedOutAwaitingCamera && HasAuthority()) {
-    UE_LOG(LogTemp, Warning,
-           TEXT("AI Attack: Camera overview acknowledgement timed out; forcing dice roll."));
+  if (bTimedOutAwaitingCamera && bAwaitingPhysicalAttackRoll) {
+    if (RemainingAICameraAckRetries > 0) {
+      --RemainingAICameraAckRetries;
+
+      if (!bAIManualRollLoggedCameraTimeout && HasAuthority()) {
+        UE_LOG(LogTemp, Warning,
+               TEXT("AI Attack: Camera overview acknowledgement still pending; deferring dice roll."));
+        bAIManualRollLoggedCameraTimeout = true;
+      }
+
+      if (UWorld *World = GetWorld()) {
+        bPendingAIDiceRollDelay = true;
+        bAIManualRollAwaitingCamera = true;
+        World->GetTimerManager().SetTimer(
+            AIDiceRollDelayHandle, this,
+            &AFighterPawn::HandleAIDiceRollDelayComplete,
+            AIDiceRollFallbackDelaySeconds, false);
+        return;
+      }
+    }
+
+    if (HasAuthority()) {
+      UE_LOG(LogTemp, Warning,
+             TEXT("AI Attack: Camera overview acknowledgement timed out; forcing dice roll."));
+    }
   }
 
   NotifyAIAttackPresentationReady();

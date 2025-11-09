@@ -1742,6 +1742,15 @@ void UGridBattleManager::ShowAttackRollButtonForPlayer(AFighterPawn* Attacker)
         return;
     }
 
+    if (Attacker->IsAIControlledParticipant())
+    {
+        UE_LOG(LogTemp, Verbose, TEXT("GridBattleManager::ShowAttackRollButtonForPlayer: %s is AI-controlled; bypassing roll button."),
+            *GetNameSafe(Attacker));
+
+        Attacker->RequestAIAutoManualAttackRoll();
+        return;
+    }
+
     TArray<ASkaldPlayerController*> TargetControllers;
     GatherOwningPlayerControllers(World, Attacker, TargetControllers);
 
