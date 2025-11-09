@@ -1742,10 +1742,23 @@ void UGridBattleManager::ShowAttackRollButtonForPlayer(AFighterPawn* Attacker)
         return;
     }
 
-    if (Attacker->IsAIControlledParticipant())
+    const bool bIsAIControlled = Attacker->IsAIControlledParticipant();
+
+    if (bIsAIControlled)
     {
-        UE_LOG(LogTemp, Verbose, TEXT("GridBattleManager::ShowAttackRollButtonForPlayer: %s is AI-controlled; bypassing roll button."),
-            *GetNameSafe(Attacker));
+        const bool bHasDicePresenter = Attacker->GetDiceManager() != nullptr;
+        Attacker->SetAIManualRollHasPresenter(bHasDicePresenter);
+
+        if (!bHasDicePresenter)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("GridBattleManager::ShowAttackRollButtonForPlayer: %s cannot locate a dice manager; scheduling fallback."),
+                *GetNameSafe(Attacker));
+            ScheduleAutoManualAttackRoll(Attacker);
+        }
+        else
+        {
+            ClearAutoManualAttackRoll(Attacker);
+        }
 
         Attacker->RequestAIAutoManualAttackRoll();
         return;
