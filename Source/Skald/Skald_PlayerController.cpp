@@ -6082,6 +6082,12 @@ void ASkaldPlayerController::HandleManualDiceOverviewReached() {
     return;
   }
 
+  if (HasAuthority()) {
+    Attacker->NotifyAIAttackPresentationReady();
+  } else {
+    ServerNotifyAIAttackOverviewComplete(Attacker);
+  }
+
   EnsureDiceManagerBindings();
 
   PendingManualSequence.bAwaitingRollCompletion = true;
@@ -7388,4 +7394,14 @@ void ASkaldPlayerController::ServerTriggerManualAttackRoll_Implementation(AFight
     UE_LOG(LogTemp, Warning, TEXT("ServerTriggerManualAttackRoll called for %s"), *GetNameSafe(Attacker));
     Attacker->NotifyAIAttackPresentationReady();
     Attacker->TriggerManualAttackRoll();
+}
+
+void ASkaldPlayerController::ServerNotifyAIAttackOverviewComplete_Implementation(AFighterPawn* Attacker)
+{
+    if (!Attacker)
+    {
+        return;
+    }
+
+    Attacker->NotifyAIAttackPresentationReady();
 }

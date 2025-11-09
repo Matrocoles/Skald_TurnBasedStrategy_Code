@@ -124,6 +124,9 @@ public:
   UFUNCTION(Server, Reliable)
   void ServerTriggerManualAttackRoll(class AFighterPawn* Attacker);
 
+  UFUNCTION(Server, Reliable)
+  void ServerNotifyAIAttackOverviewComplete(class AFighterPawn* Attacker);
+
   bool IsFriendlyFighter(const AFighterPawn *Fighter) const;
 
   /** Set the turn manager responsible for sequencing play. */
