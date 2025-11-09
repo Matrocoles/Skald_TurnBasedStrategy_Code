@@ -1888,14 +1888,12 @@ void UGridBattleManager::HandleAutoManualAttackRoll(TWeakObjectPtr<AFighterPawn>
         return;
     }
 
-    // Let the fighter handle its own AI roll timing. Triggering the manual roll
-    // here will either execute immediately (if the arena/camera presentation is
-    // already ready) or defer via AFighterPawn::ShouldDelayAIAttackRoll().
-    // Previously we explicitly marked the presentation as ready before
-    // triggering the roll which caused the AI to bypass its delay logic and roll
-    // immediately, resulting in duplicate ApplyPhysicalRollResults executions
-    // (one from the premature auto-resolution and one from the actual physical
-    // dice values). By allowing the pawn to manage the readiness state we match
-    // the player flow and ensure the AI waits for the dice arena before rolling.
-    Attacker->TriggerManualAttackRoll();
+    // Let the fighter coordinate its AI manual roll timing. When the arena is
+    // not yet ready this call simply marks the roll as pending and waits for
+    // AFighterPawn::NotifyAIAttackPresentationReady to fire once the camera/dice
+    // presentation has finished spawning. This mirrors the player flow and
+    // prevents the dice manager from falling back to procedural results before
+    // the physical arena is available (which previously produced duplicate
+    // ApplyPhysicalRollResults logs for a single attack).
+    Attacker->RequestAIAutoManualAttackRoll();
 }

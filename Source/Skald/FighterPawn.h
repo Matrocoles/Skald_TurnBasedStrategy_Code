@@ -62,6 +62,7 @@ public:
   // --- Manual Dice Roll Support ---
   UFUNCTION(BlueprintCallable, Category = "Combat|Dice")
   void TriggerManualAttackRoll();
+  void RequestAIAutoManualAttackRoll();
 
   UFUNCTION(BlueprintCallable, Category = "Combat|Dice")
   void NotifyAIAttackPresentationReady();
