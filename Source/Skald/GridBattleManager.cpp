@@ -39,7 +39,8 @@ FString DescribeFighter(const AFighterPawn* Fighter)
 }
 
 void GatherOwningPlayerControllers(UWorld* World, AFighterPawn* Fighter,
-                                   TArray<ASkaldPlayerController*>& OutControllers)
+                                   TArray<ASkaldPlayerController*>& OutControllers,
+                                   bool bIncludeOpposing /*= false*/)
 {
     if (!World)
     {
@@ -59,6 +60,7 @@ void GatherOwningPlayerControllers(UWorld* World, AFighterPawn* Fighter,
     }
 
     const bool bHasFaction = Fighter && Fighter->Faction != ESkaldFaction::None;
+    const ESkaldFaction FighterFaction = bHasFaction ? Fighter->Faction : ESkaldFaction::None;
 
     for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
     {
@@ -74,9 +76,12 @@ void GatherOwningPlayerControllers(UWorld* World, AFighterPawn* Fighter,
             continue;
         }
 
-        if (!bHasFaction || PlayerState->Faction == Fighter->Faction)
+        const bool bFactionMatches = !bHasFaction || PlayerState->Faction == FighterFaction;
+        const bool bIncludeThisOpponent = bIncludeOpposing && bHasFaction && PlayerState->Faction != FighterFaction;
+
+        if (bFactionMatches || bIncludeThisOpponent)
         {
-            OutControllers.Add(Candidate);
+            OutControllers.AddUnique(Candidate);
         }
     }
 }
@@ -1745,7 +1750,11 @@ void UGridBattleManager::ShowAttackRollButtonForPlayer(AFighterPawn* Attacker)
     const bool bIsAIControlled = Attacker->IsAIControlledParticipant();
 
     TArray<ASkaldPlayerController*> TargetControllers;
-    GatherOwningPlayerControllers(World, Attacker, TargetControllers);
+    // AI initiated attacks should still be presented to any human opponents so
+    // their clients can drive the camera pan and arena spawn before the dice roll
+    // resolves. Extend the gather call to include opposing controllers in that
+    // case.
+    GatherOwningPlayerControllers(World, Attacker, TargetControllers, bIsAIControlled);
 
     const bool bHasHumanPresenter = TargetControllers.Num() > 0;
 
@@ -1852,7 +1861,8 @@ void UGridBattleManager::HideAttackRollButtonForFighter(AFighterPawn* Attacker)
     }
 
     TArray<ASkaldPlayerController*> TargetControllers;
-    GatherOwningPlayerControllers(World, Attacker, TargetControllers);
+    const bool bIncludeOpposing = Attacker && Attacker->IsAIControlledParticipant();
+    GatherOwningPlayerControllers(World, Attacker, TargetControllers, bIncludeOpposing);
 
     if (TargetControllers.Num() == 0)
     {
