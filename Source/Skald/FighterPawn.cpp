@@ -2410,15 +2410,15 @@ bool AFighterPawn::ShouldWaitForCameraBeforeAIRoll() const {
   if (UWorld *World = GetWorld()) {
     for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator();
          It; ++It) {
-      ASkaldPlayerController *Controller =
+      ASkaldPlayerController *SkaldPlayerController =
           Cast<ASkaldPlayerController>(*It);
-      if (!Controller) {
+      if (!SkaldPlayerController) {
         continue;
       }
 
-      const ASkaldPlayerState *PlayerState =
-          Controller->GetPlayerState<ASkaldPlayerState>();
-      if (!PlayerState || !PlayerState->bIsAI) {
+      const ASkaldPlayerState *SkaldPlayerState =
+          SkaldPlayerController->GetPlayerState<ASkaldPlayerState>();
+      if (!SkaldPlayerState || !SkaldPlayerState->bIsAI) {
         return true;
       }
     }
