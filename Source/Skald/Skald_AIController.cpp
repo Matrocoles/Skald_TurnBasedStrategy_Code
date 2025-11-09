@@ -150,6 +150,17 @@ void ASkaldAIController::ShowPrepareForBattlePromptLocal(
     const FPrepareForBattlePromptData &PromptData) {
   Super::ShowPrepareForBattlePromptLocal(PromptData);
 
+  ProcessPrepareForBattlePrompt(PromptData);
+}
+
+void ASkaldAIController::HandlePrepareForBattlePromptDirect(
+    const FPrepareForBattlePromptData &PromptData) {
+  ProcessPrepareForBattlePrompt(PromptData);
+}
+
+void ASkaldAIController::ProcessPrepareForBattlePrompt(
+    const FPrepareForBattlePromptData &PromptData) {
+  
   if (bAutoRetreatPending) {
     return;
   }

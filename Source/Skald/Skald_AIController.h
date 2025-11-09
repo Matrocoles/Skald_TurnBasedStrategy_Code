@@ -32,6 +32,10 @@ public:
   virtual void ShowPrepareForBattlePromptLocal(
       const FPrepareForBattlePromptData &PromptData) override;
 
+  /** Executes the AI retreat/ready decision without invoking HUD widgets. */
+  void HandlePrepareForBattlePromptDirect(
+      const FPrepareForBattlePromptData &PromptData);
+
   /** Execute the AI's decision making for the current turn. */
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void MakeAIDecision();
@@ -154,6 +158,9 @@ private:
   float EvaluateFighterActivationPriority(AFighterPawn *Fighter) const;
   void CompleteFighterActivation();
   virtual void HandleBattleMapStateChanged(bool bInBattleMap) override;
+
+  void ProcessPrepareForBattlePrompt(
+      const FPrepareForBattlePromptData &PromptData);
 
   int32 ComputeChebyshevDistance(UGridOverlayComponent *Grid,
                                  const AFighterPawn *A,

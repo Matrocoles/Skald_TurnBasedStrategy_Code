@@ -20,6 +20,7 @@
 #include "Skald_GameState.h"
 #include "Skald_PropertyAccess.h"
 #include "Skald_PlayerController.h"
+#include "Skald_AIController.h"
 #include "Skald_PlayerState.h"
 #include "Territory.h"
 #include "UI/SkaldMainHUDWidget.h"
@@ -2462,16 +2463,47 @@ bool ATurnManager::TryAutoReadyAI(const TCHAR *Context) {
   }
 
   bool bChanged = false;
-  const auto AutoReadyParticipant = [&](int32 ParticipantId, bool bParticipantIsAI,
+  const TArray<ASkaldPlayerController *> ControllerSnapshot = GetControllers();
+  const auto HasControllerForParticipant =
+      [&ControllerSnapshot](int32 ParticipantId) {
+        if (ParticipantId == INDEX_NONE) {
+          return false;
+        }
+
+        for (ASkaldPlayerController *Controller : ControllerSnapshot) {
+          if (!Controller) {
+            continue;
+          }
+
+          if (ASkaldPlayerState *PS =
+                  Controller->GetPlayerState<ASkaldPlayerState>()) {
+            if (PS->GetPlayerId() == ParticipantId) {
+              return true;
+            }
+          }
+        }
+
+        return false;
+      };
+
+  const auto AutoReadyParticipant = [&](int32 ParticipantId,
+                                        bool bParticipantIsAI,
                                         bool &bParticipantReady,
                                         const TCHAR *ParticipantLabel) {
     if (!bParticipantIsAI || ParticipantId == INDEX_NONE || bParticipantReady) {
       return false;
     }
 
+    if (HasControllerForParticipant(ParticipantId)) {
+      UE_LOG(LogSkaldReady, Verbose,
+             TEXT("%s: awaiting decision from AI %s (PlayerID=%d)."),
+             ResolvedContext, ParticipantLabel, ParticipantId);
+      return false;
+    }
+
     UE_LOG(LogSkaldReady, Log,
-           TEXT("%s: auto-readying AI %s (PlayerID=%d)."), ResolvedContext,
-           ParticipantLabel, ParticipantId);
+           TEXT("%s: auto-readying AI %s (PlayerID=%d) due to missing controller."),
+           ResolvedContext, ParticipantLabel, ParticipantId);
     bParticipantReady = true;
     return true;
   };
@@ -2859,6 +2891,15 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
                TEXT("%s: skipping prepare prompt for AI-controlled %s (Controller=%s PlayerID=%d)."),
                LogContext, RoleLabel, *Controller->GetName(),
                PS ? PS->GetPlayerId() : INDEX_NONE);
+
+        if (ASkaldAIController *AIController =
+                Cast<ASkaldAIController>(Controller)) {
+          AIController->HandlePrepareForBattlePromptDirect(PromptData);
+        } else {
+          UE_LOG(LogSkaldReady, Warning,
+                 TEXT("%s: participant flagged as AI but controller %s is not ASkaldAIController."),
+                 LogContext, *Controller->GetName());
+        }
       } else {
         UE_LOG(LogSkaldReady, Log,
                TEXT("WidgetSpawned PC=%s Role=%s Battle=%d->%d"),
