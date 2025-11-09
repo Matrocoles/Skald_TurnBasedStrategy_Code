@@ -1079,6 +1079,9 @@ private:
   /** Timer used to retry showing a pending prepare-for-battle prompt. */
   FTimerHandle PendingReadyPromptRetryHandle;
 
+  /** Timer that defers hiding the prepare prompt after an enemy retreat. */
+  FTimerHandle EnemyRetreatHidePromptHandle;
+
   /** Number of pending presentation completions awaiting acknowledgment. */
   int32 PendingAttackPresentationNotifications = 0;
 
