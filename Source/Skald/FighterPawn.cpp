@@ -2179,6 +2179,49 @@ bool AFighterPawn::AttemptPhysicalAttackRoll(AFighterPawn *Target) {
   return true;
 }
 
+void AFighterPawn::RequestAIAutoManualAttackRoll() {
+  if (!bAwaitingPhysicalAttackRoll || !PendingPhysicalAttackTarget.IsValid()) {
+    return;
+  }
+
+  if (Stats.AttackDice <= 0) {
+    return;
+  }
+
+  if (PendingAttackRollId.IsValid()) {
+    return;
+  }
+
+  const bool bIsAIControlled =
+      Controller && Controller->IsA(AEnemyAIController::StaticClass());
+  if (!bIsAIControlled) {
+    TriggerManualAttackRoll();
+    return;
+  }
+
+  bAIManualRollPendingTrigger = true;
+
+  if (bAIManualRollPresentationReady) {
+    TriggerManualAttackRoll();
+    return;
+  }
+
+  if (bPendingAIDiceRollDelay) {
+    return;
+  }
+
+  bPendingAIDiceRollDelay = true;
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().SetTimer(
+        AIDiceRollDelayHandle, this,
+        &AFighterPawn::HandleAIDiceRollDelayComplete,
+        AIDiceRollOverviewDelaySeconds, false);
+  } else {
+    HandleAIDiceRollDelayComplete();
+  }
+}
+
 void AFighterPawn::TriggerManualAttackRoll() {
   if (!bAwaitingPhysicalAttackRoll || !PendingPhysicalAttackTarget.IsValid()) {
     return;
