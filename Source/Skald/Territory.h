@@ -208,4 +208,5 @@ protected:
     void SetSelectionDecalVisible(bool bVisible);
     void UpdateSelectionVisuals(bool bVisible);
     bool ShouldShowSelectionVisuals(int32 SelectingPlayerId) const;
+    void EnsureDynamicMaterial();
 };

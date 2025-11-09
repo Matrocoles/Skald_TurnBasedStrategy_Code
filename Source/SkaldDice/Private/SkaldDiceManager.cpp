@@ -179,6 +179,30 @@ float USkaldDiceManager::GetCleanupDelay() const
     return FMath::Max(Config->ArenaCleanupDelay, Config->DiceCleanupDelay);
 }
 
+void USkaldDiceManager::SetNextRollPlayerTintOverride(const FLinearColor& Tint)
+{
+    bHasPendingPlayerTintOverride = true;
+    PendingPlayerTint = Tint;
+}
+
+void USkaldDiceManager::SetNextRollEnemyTintOverride(const FLinearColor& Tint)
+{
+    bHasPendingEnemyTintOverride = true;
+    PendingEnemyTint = Tint;
+}
+
+void USkaldDiceManager::SetNextRollTintOverrides(const FLinearColor& PlayerTint, const FLinearColor& EnemyTint)
+{
+    SetNextRollPlayerTintOverride(PlayerTint);
+    SetNextRollEnemyTintOverride(EnemyTint);
+}
+
+void USkaldDiceManager::ClearNextRollTintOverrides()
+{
+    bHasPendingPlayerTintOverride = false;
+    bHasPendingEnemyTintOverride = false;
+}
+
 USkaldDiceManager::FActiveRoll& USkaldDiceManager::AddRoll(int32 PlayerDice, int32 EnemyDice, float Duration, const FGuid& RollId, bool bForInitiative)
 {
     FActiveRoll& Entry = ActiveRolls.FindOrAdd(RollId);
@@ -192,6 +216,12 @@ USkaldDiceManager::FActiveRoll& USkaldDiceManager::AddRoll(int32 PlayerDice, int
     Entry.ScriptedResults.Reset();
     Entry.Dice.Reset();
     Entry.Arena.Reset();
+    const FLinearColor DefaultPlayerTint = Config ? Config->PlayerTint : FLinearColor::White;
+    const FLinearColor DefaultEnemyTint = Config ? Config->EnemyTint : FLinearColor::White;
+    Entry.PlayerTint = bHasPendingPlayerTintOverride ? PendingPlayerTint : DefaultPlayerTint;
+    Entry.EnemyTint = bHasPendingEnemyTintOverride ? PendingEnemyTint : DefaultEnemyTint;
+    bHasPendingPlayerTintOverride = false;
+    bHasPendingEnemyTintOverride = false;
     return Entry;
 }
 
@@ -468,7 +498,7 @@ bool USkaldDiceManager::SpawnPhysicalRoll(FActiveRoll& Roll, const TArray<int32>
             Dice->SetDesiredFaceValue(DesiredValue);
             const bool bSnapToDesired = Roll.bIsInitiative;
             Dice->SetShouldSnapToDesired(bSnapToDesired);
-            Dice->ApplyTint(bPlayerSide ? Config->PlayerTint : Config->EnemyTint, Config->DiceTintParameter);
+            Dice->ApplyTint(bPlayerSide ? Roll.PlayerTint : Roll.EnemyTint, Config->DiceTintParameter);
             Dice->OnDiceSettled.AddDynamic(this, &USkaldDiceManager::HandleDieSettled);
             Dice->FinishSpawning(FTransform(SpawnRotation, SpawnPosition));
 

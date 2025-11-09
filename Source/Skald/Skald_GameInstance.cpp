@@ -33,6 +33,7 @@
 #include "WorldMap.h"
 #include "SkaldDiceManager.h"
 #include "DiceRollConfig.h"
+#include "SkaldFactionColorConfig.h"
 
 using Skald::PropertyAccess::ReadBoolProperty;
 using Skald::PropertyAccess::ReadIntProperty;
@@ -78,6 +79,8 @@ void USkaldGameInstance::Init() {
         this, &USkaldGameInstance::HandleNetworkFailure);
   }
 
+  InitialiseFactionColorConfig();
+
   if (bAutoInitialiseDiceSubsystem) {
     InitialiseDiceManager();
   }
@@ -105,6 +108,26 @@ USkaldGameInstance::GetFactionEmblem(ESkaldFaction InFaction) const {
   }
 
   return TSoftObjectPtr<UTexture2D>();
+}
+
+FLinearColor USkaldGameInstance::GetFactionColor(ESkaldFaction InFaction) const {
+  if (LoadedFactionColorConfig) {
+    return LoadedFactionColorConfig->GetColor(InFaction);
+  }
+
+  if (!FactionColorConfig.IsNull()) {
+    if (!FactionColorConfig.IsValid()) {
+      LoadedFactionColorConfig = FactionColorConfig.LoadSynchronous();
+    } else {
+      LoadedFactionColorConfig = FactionColorConfig.Get();
+    }
+
+    if (LoadedFactionColorConfig) {
+      return LoadedFactionColorConfig->GetColor(InFaction);
+    }
+  }
+
+  return USkaldFactionColorConfig::GetFallbackColor(InFaction);
 }
 
 void USkaldGameInstance::SetTravelState(const FSkaldTravelState &InState) {
@@ -902,6 +925,25 @@ void USkaldGameInstance::SeedCombatRandomStream(int32 Seed) {
 
 void USkaldGameInstance::ApplyDiceRollConfig() {
   InitialiseDiceManager();
+}
+
+void USkaldGameInstance::InitialiseFactionColorConfig() {
+  if (FactionColorConfig.IsNull()) {
+    LoadedFactionColorConfig = nullptr;
+    return;
+  }
+
+  if (!FactionColorConfig.IsValid()) {
+    LoadedFactionColorConfig = FactionColorConfig.LoadSynchronous();
+  } else {
+    LoadedFactionColorConfig = FactionColorConfig.Get();
+  }
+
+  if (!LoadedFactionColorConfig) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("Failed to load faction colour config '%s'"),
+           *FactionColorConfig.ToString());
+  }
 }
 
 void USkaldGameInstance::InitialiseDiceManager() {

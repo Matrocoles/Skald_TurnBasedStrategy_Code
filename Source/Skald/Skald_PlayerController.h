@@ -978,6 +978,8 @@ private:
   void ShowInitiativeResults(int32 PlayerResult, int32 EnemyResult);
   void HideInitiativeResults();
   USkaldDiceManager *ResolveDiceManager();
+  FLinearColor ResolveFactionTint(ESkaldFaction Faction) const;
+  FLinearColor ResolveLocalPlayerFactionTint() const;
 
   void StartInitiativeDiceSequence(int32 AttackerRoll, int32 DefenderRoll);
   void HandleInitiativeDiceOverviewReached();
