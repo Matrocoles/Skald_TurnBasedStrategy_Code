@@ -766,6 +766,7 @@ private:
   bool ShouldDelayAIAttackRoll();
   void HandleAIDiceRollDelayComplete();
   void CancelAIDiceRollDelay();
+  bool ShouldWaitForCameraBeforeAIRoll() const;
   bool IsAIControlledParticipant() const;
 
   /** Index of the next pending dice outcome to resolve. */
@@ -798,9 +799,11 @@ private:
   bool bAwaitingPhysicalAttackRoll = false;
   /** True while an AI controlled fighter is waiting to start its physical dice roll. */
   bool bPendingAIDiceRollDelay = false;
+  bool bAIManualRollAwaitingCamera = false;
   bool bAIManualRollPresentationReady = false;
   bool bAIManualRollPendingTrigger = false;
   bool bAIManualRollLoggedPanning = false;
+  bool bAIManualRollLoggedOverview = false;
   bool bAIManualRollLoggedReady = false;
 
   /** Cached dice roll data to broadcast once resolution completes. */
