@@ -1744,10 +1744,15 @@ void UGridBattleManager::ShowAttackRollButtonForPlayer(AFighterPawn* Attacker)
 
     const bool bIsAIControlled = Attacker->IsAIControlledParticipant();
 
+    TArray<ASkaldPlayerController*> TargetControllers;
+    GatherOwningPlayerControllers(World, Attacker, TargetControllers);
+
+    const bool bHasHumanPresenter = TargetControllers.Num() > 0;
+
     if (bIsAIControlled)
     {
         const bool bHasDicePresenter = Attacker->GetDiceManager() != nullptr;
-        Attacker->SetAIManualRollHasPresenter(bHasDicePresenter);
+        Attacker->SetAIManualRollHasPresenter(bHasHumanPresenter && bHasDicePresenter);
 
         if (!bHasDicePresenter)
         {
@@ -1760,15 +1765,34 @@ void UGridBattleManager::ShowAttackRollButtonForPlayer(AFighterPawn* Attacker)
 
         ClearAutoManualAttackRoll(Attacker);
         Attacker->CancelAIDiceRollDelay();
+
+        if (!bHasHumanPresenter)
+        {
+            UE_LOG(LogTemp, Verbose,
+                TEXT("GridBattleManager::ShowAttackRollButtonForPlayer: No human presenters for AI attacker %s; triggering automatic roll."),
+                *GetNameSafe(Attacker));
+            Attacker->RequestAIAutoManualAttackRoll();
+            return;
+        }
+
+        for (ASkaldPlayerController* PC : TargetControllers)
+        {
+            if (!PC)
+            {
+                continue;
+            }
+
+            UE_LOG(LogTemp, Warning, TEXT("[ManualDice] GridBattleManager calling ClientShowAttackRollButton for AI attacker %s (Controller=%s)"),
+                *GetNameSafe(Attacker), *GetNameSafe(PC));
+
+            PC->ClientShowAttackRollButton(Attacker, /*bAutoTriggerRoll*/ true);
+        }
+
         Attacker->RequestAIAutoManualAttackRoll();
         return;
     }
 
-    TArray<ASkaldPlayerController*> TargetControllers;
-    GatherOwningPlayerControllers(World, Attacker, TargetControllers);
-
-    const bool bHasPresenter = TargetControllers.Num() > 0;
-    Attacker->SetAIManualRollHasPresenter(bHasPresenter);
+    Attacker->SetAIManualRollHasPresenter(bHasHumanPresenter);
 
     if (TargetControllers.Num() == 0)
     {
@@ -1782,8 +1806,6 @@ void UGridBattleManager::ShowAttackRollButtonForPlayer(AFighterPawn* Attacker)
 
     ClearAutoManualAttackRoll(Attacker);
 
-    const bool bAutoTriggerRoll = Attacker->IsAIControlledParticipant();
-
     for (ASkaldPlayerController* PC : TargetControllers)
     {
         if (!PC)
@@ -1794,7 +1816,7 @@ void UGridBattleManager::ShowAttackRollButtonForPlayer(AFighterPawn* Attacker)
         UE_LOG(LogTemp, Warning, TEXT("[ManualDice] GridBattleManager calling ClientShowAttackRollButton for %s (Controller=%s)"),
             *GetNameSafe(Attacker), *GetNameSafe(PC));
 
-        PC->ClientShowAttackRollButton(Attacker, bAutoTriggerRoll);
+        PC->ClientShowAttackRollButton(Attacker, /*bAutoTriggerRoll*/ false);
     }
 }
 

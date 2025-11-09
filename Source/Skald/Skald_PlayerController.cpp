@@ -7360,6 +7360,10 @@ void ASkaldPlayerController::ClientShowAttackRollButton_Implementation(
     {
         UE_LOG(LogTemp, Warning, TEXT("[ManualDice] ClientShowAttackRollButton received for %s"), *GetNameSafe(Attacker));
         HUD->EnterManualAttackRollPrompt(Attacker);
+        if (bAutoTriggerRoll)
+        {
+            HUD->SetAttackRollButtonVisibility(false);
+        }
     }
 
     if (!bAutoTriggerRoll)
