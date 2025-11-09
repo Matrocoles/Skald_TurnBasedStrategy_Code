@@ -2384,7 +2384,7 @@ bool AFighterPawn::IsAIControlledParticipant() const {
     if (USkaldGameInstance *GameInstance =
             Cast<USkaldGameInstance>(World->GetGameInstance())) {
       if (UGridBattleManager *BattleManager = GameInstance->GridBattleManager) {
-        return BattleManager->IsSideAIControlled(bIsAttacker);
+        return BattleManager->IsSideControlledByAI(bIsAttacker);
       }
     }
   }

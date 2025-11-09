@@ -321,6 +321,11 @@ int32 UGridBattleManager::GetDefenderSurvivorCost() const
     return DefenderSurvivorArmyCost;
 }
 
+bool UGridBattleManager::IsSideControlledByAI(bool bForAttackers) const
+{
+    return IsSideAIControlled(bForAttackers);
+}
+
 AFighterPawn* UGridBattleManager::GetActiveFighter() const
 {
     return ActiveFighter;

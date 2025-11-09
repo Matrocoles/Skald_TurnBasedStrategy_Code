@@ -380,6 +380,9 @@ public:
     UFUNCTION(BlueprintCallable, Category="Battle")
     void FinishActivation(AFighterPawn* Fighter, EGridActivationFinishReason Reason = EGridActivationFinishReason::Auto);
 
+    /** Returns true if the specified side is currently controlled by AI. */
+    bool IsSideControlledByAI(bool bForAttackers) const;
+
     /** Conclude the battle and broadcast the results. */
     UFUNCTION(BlueprintCallable, Category="Battle")
     void EndBattle();
