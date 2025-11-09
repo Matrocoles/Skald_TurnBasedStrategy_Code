@@ -2483,7 +2483,11 @@ bool AFighterPawn::ShouldWaitForCameraBeforeAIRoll() const {
     }
   }
 
-  return false;
+  // When no human controllers are present we still want the AI dice flow to
+  // mirror the physical presentation so the arena can resolve the attack.
+  // AFighterPawn::RequestAIAutoManualAttackRoll arms a fallback timer, so it
+  // will eventually force the roll if the presentation never arrives.
+  return true;
 }
 
 bool AFighterPawn::IsAIControlledParticipant() const {
