@@ -2151,8 +2151,7 @@ bool AFighterPawn::AttemptPhysicalAttackRoll(AFighterPawn *Target) {
   bAIManualRollLoggedPanning = false;
   bAIManualRollLoggedReady = false;
 
-  if (HasAuthority() && Controller &&
-      Controller->IsA(AEnemyAIController::StaticClass())) {
+  if (HasAuthority() && IsAIControlledParticipant()) {
     UE_LOG(LogTemp, Log, TEXT("AI Attack: Camera panning..."));
     bAIManualRollLoggedPanning = true;
   }
@@ -2192,8 +2191,7 @@ void AFighterPawn::RequestAIAutoManualAttackRoll() {
     return;
   }
 
-  const bool bIsAIControlled =
-      Controller && Controller->IsA(AEnemyAIController::StaticClass());
+  const bool bIsAIControlled = IsAIControlledParticipant();
   if (!bIsAIControlled) {
     TriggerManualAttackRoll();
     return;
@@ -2282,8 +2280,7 @@ void AFighterPawn::ExecuteManualAttackRoll() {
 }
 
 bool AFighterPawn::ShouldDelayAIAttackRoll() {
-  const bool bIsAIControlled =
-      Controller && Controller->IsA(AEnemyAIController::StaticClass());
+  const bool bIsAIControlled = IsAIControlledParticipant();
   if (!bIsAIControlled) {
     CancelAIDiceRollDelay();
     return false;
@@ -2330,8 +2327,7 @@ bool AFighterPawn::ShouldDelayAIAttackRoll() {
 }
 
 void AFighterPawn::NotifyAIAttackPresentationReady() {
-  const bool bIsAIControlled =
-      Controller && Controller->IsA(AEnemyAIController::StaticClass());
+  const bool bIsAIControlled = IsAIControlledParticipant();
   if (!bIsAIControlled) {
     CancelAIDiceRollDelay();
     return;
@@ -2371,6 +2367,29 @@ void AFighterPawn::CancelAIDiceRollDelay() {
   }
 
   bPendingAIDiceRollDelay = false;
+}
+
+bool AFighterPawn::IsAIControlledParticipant() const {
+  if (Controller) {
+    if (Controller->IsA(AEnemyAIController::StaticClass())) {
+      return true;
+    }
+
+    if (Controller->IsPlayerController()) {
+      return false;
+    }
+  }
+
+  if (UWorld *World = GetWorld()) {
+    if (USkaldGameInstance *GameInstance =
+            Cast<USkaldGameInstance>(World->GetGameInstance())) {
+      if (UGridBattleManager *BattleManager = GameInstance->GridBattleManager) {
+        return BattleManager->IsSideAIControlled(bIsAttacker);
+      }
+    }
+  }
+
+  return true;
 }
 
 // Server RPC Implementation  runs on the server
@@ -2552,7 +2571,7 @@ void AFighterPawn::ProcessPhysicalDiceRollResults(
   PendingPhysicalRollValues = MoveTemp(SanitizedResults);
   DiceResult.HighStakesFaction = Faction;
 
-  if (Controller && Controller->IsA(AEnemyAIController::StaticClass())) {
+  if (IsAIControlledParticipant()) {
     UE_LOG(LogTemp, Log, TEXT("AI Attack: Applying roll result."));
   }
 

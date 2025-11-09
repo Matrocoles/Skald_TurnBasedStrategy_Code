@@ -766,6 +766,7 @@ private:
   bool ShouldDelayAIAttackRoll();
   void HandleAIDiceRollDelayComplete();
   void CancelAIDiceRollDelay();
+  bool IsAIControlledParticipant() const;
 
   /** Index of the next pending dice outcome to resolve. */
   int32 PendingAttackOutcomeIndex = 0;
