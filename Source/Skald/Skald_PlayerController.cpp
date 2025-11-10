@@ -5063,7 +5063,10 @@ void ASkaldPlayerController::NotifyRetreatFailed(const FText &Message) {
 }
 
 void ASkaldPlayerController::NotifyEnemyRetreated() {
-  CancelDeferredPrepareForBattlePrompt();
+  const bool bCanceledDeferredPrompt = CancelDeferredPrepareForBattlePrompt();
+  if (bCanceledDeferredPrompt) {
+    bSuppressNextDeferredPreparePrompt = true;
+  }
 
   if (!MainHUD) {
     InitializeHUDWidget();
@@ -5220,11 +5223,17 @@ void ASkaldPlayerController::ResetPendingReadyPromptState() {
 
 void ASkaldPlayerController::ShowPrepareForBattlePromptLocal(
     const FPrepareForBattlePromptData &PromptData) {
-  const bool bShouldDeferLocalAuthorityPrompt = IsLocalController() && HasAuthority();
+  const bool bIsLocalAuthority = IsLocalController() && HasAuthority();
+  const bool bShouldDeferLocalAuthorityPrompt =
+      bIsLocalAuthority && !bSuppressNextDeferredPreparePrompt;
+
+  if (bIsLocalAuthority && bSuppressNextDeferredPreparePrompt) {
+    bSuppressNextDeferredPreparePrompt = false;
+  }
 
   if (bShouldDeferLocalAuthorityPrompt) {
     if (UWorld *World = GetWorld()) {
-      CancelDeferredPrepareForBattlePrompt();
+      static_cast<void>(CancelDeferredPrepareForBattlePrompt());
 
       DeferredPreparePrompt = PromptData;
       bDeferredPreparePromptActive = true;
@@ -5238,7 +5247,7 @@ void ASkaldPlayerController::ShowPrepareForBattlePromptLocal(
     }
   }
 
-  CancelDeferredPrepareForBattlePrompt();
+  static_cast<void>(CancelDeferredPrepareForBattlePrompt());
   ShowPrepareForBattlePromptLocal_Internal(PromptData);
 }
 
@@ -5300,7 +5309,10 @@ void ASkaldPlayerController::ClientShowPrepareForBattle_Implementation(
 }
 
 void ASkaldPlayerController::HidePrepareForBattlePromptLocal() {
-  CancelDeferredPrepareForBattlePrompt();
+  const bool bCanceledDeferredPrompt = CancelDeferredPrepareForBattlePrompt();
+  if (bCanceledDeferredPrompt) {
+    bSuppressNextDeferredPreparePrompt = true;
+  }
 
   if (UWorld *World = GetWorld()) {
     World->GetTimerManager().ClearTimer(EnemyRetreatHidePromptHandle);
@@ -5319,9 +5331,9 @@ void ASkaldPlayerController::HidePrepareForBattlePromptLocal() {
   ResetPendingReadyPromptState();
 }
 
-void ASkaldPlayerController::CancelDeferredPrepareForBattlePrompt() {
+bool ASkaldPlayerController::CancelDeferredPrepareForBattlePrompt() {
   if (!bDeferredPreparePromptActive) {
-    return;
+    return false;
   }
 
   bDeferredPreparePromptActive = false;
@@ -5330,6 +5342,8 @@ void ASkaldPlayerController::CancelDeferredPrepareForBattlePrompt() {
   if (UWorld *World = GetWorld()) {
     World->GetTimerManager().ClearTimer(DeferredPreparePromptHandle);
   }
+
+  return true;
 }
 
 void ASkaldPlayerController::ExecuteDeferredPrepareForBattlePrompt() {

@@ -762,7 +762,7 @@ protected:
   void ResetPendingReadyPromptState();
   void ShowPrepareForBattlePromptLocal_Internal(
       const FPrepareForBattlePromptData &PromptData);
-  void CancelDeferredPrepareForBattlePrompt();
+  bool CancelDeferredPrepareForBattlePrompt();
   void ExecuteDeferredPrepareForBattlePrompt();
 
   virtual void OnBeginRetreatSelection(int32 DefendingTerritoryID,
@@ -1093,6 +1093,9 @@ private:
 
   /** Tracks whether a deferred prepare prompt is awaiting execution. */
   bool bDeferredPreparePromptActive = false;
+
+  /** When true, the next local authority prepare prompt should bypass deferral. */
+  bool bSuppressNextDeferredPreparePrompt = false;
 
   /** Number of pending presentation completions awaiting acknowledgment. */
   int32 PendingAttackPresentationNotifications = 0;
