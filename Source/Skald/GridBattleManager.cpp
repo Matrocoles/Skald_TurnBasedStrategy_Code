@@ -536,21 +536,24 @@ bool UGridBattleManager::RollInitiative()
 
     const bool bAttackerHasEmpireDiscipline = TeamHasLivingFaction(AttackerTeam, ESkaldFaction::Empire);
     const bool bDefenderHasEmpireDiscipline = TeamHasLivingFaction(DefenderTeam, ESkaldFaction::Empire);
-    ApplyInitiativeAdjustments(AttackerRoll, DefenderRoll, bAttackerRollProvided, bDefenderRollProvided, bAttackerHasEmpireDiscipline, bDefenderHasEmpireDiscipline);
+    ApplyInitiativeAdjustments(AttackerRoll, DefenderRoll, bAttackerRollProvided, bDefenderRollProvided, bAttackerHasEmpireDiscipline, bDefenderHasEmpireDiscipline, true, true);
 
     CompleteInitiativeRoll(AttackerRoll, DefenderRoll);
     return true;
 }
 
-void UGridBattleManager::ApplyInitiativeAdjustments(int32& AttackerRoll, int32& DefenderRoll, bool bAttackerRollProvided, bool bDefenderRollProvided, bool bAttackerHasEmpireDiscipline, bool bDefenderHasEmpireDiscipline)
+void UGridBattleManager::ApplyInitiativeAdjustments(int32& AttackerRoll, int32& DefenderRoll, bool bAttackerRollProvided, bool bDefenderRollProvided, bool bAttackerHasEmpireDiscipline, bool bDefenderHasEmpireDiscipline, bool bAllowAttackerAdjustments, bool bAllowDefenderAdjustments)
 {
-    if (bAttackerHasEmpireDiscipline && !bAttackerRollProvided)
+    const bool bCanAdjustAttacker = bAllowAttackerAdjustments && !bAttackerRollProvided;
+    const bool bCanAdjustDefender = bAllowDefenderAdjustments && !bDefenderRollProvided;
+
+    if (bCanAdjustAttacker && bAttackerHasEmpireDiscipline)
     {
         const int32 Reroll = Rng.RandRange(1, InitiativeDiceSides);
         AttackerRoll = FMath::Max(AttackerRoll, Reroll);
     }
 
-    if (bDefenderHasEmpireDiscipline && !bDefenderRollProvided)
+    if (bCanAdjustDefender && bDefenderHasEmpireDiscipline)
     {
         const int32 Reroll = Rng.RandRange(1, InitiativeDiceSides);
         DefenderRoll = FMath::Max(DefenderRoll, Reroll);
@@ -558,20 +561,41 @@ void UGridBattleManager::ApplyInitiativeAdjustments(int32& AttackerRoll, int32& 
 
     if (AttackerRoll == DefenderRoll)
     {
-        if (bAttackerRollProvided && !bDefenderRollProvided)
+        if (!bCanAdjustAttacker && !bCanAdjustDefender)
+        {
+            return;
+        }
+
+        if (bAttackerRollProvided && bCanAdjustDefender)
         {
             DefenderRoll = (DefenderRoll % InitiativeDiceSides) + 1;
         }
-        else if (!bAttackerRollProvided && bDefenderRollProvided)
+        else if (bDefenderRollProvided && bCanAdjustAttacker)
         {
             AttackerRoll = (AttackerRoll % InitiativeDiceSides) + 1;
         }
         else
         {
-            AttackerRoll = InitiativeDiceSides;
+            if (bCanAdjustAttacker)
+            {
+                AttackerRoll = InitiativeDiceSides;
+            }
+
+            if (bCanAdjustDefender && !bCanAdjustAttacker)
+            {
+                DefenderRoll = InitiativeDiceSides;
+            }
+
             if (DefenderRoll == AttackerRoll)
             {
-                DefenderRoll = FMath::Max(1, AttackerRoll - 1);
+                if (bCanAdjustDefender)
+                {
+                    DefenderRoll = FMath::Max(1, AttackerRoll - 1);
+                }
+                else if (bCanAdjustAttacker)
+                {
+                    AttackerRoll = FMath::Max(1, DefenderRoll - 1);
+                }
             }
         }
     }
@@ -663,6 +687,9 @@ void UGridBattleManager::HandleDiceRollCompleted(const FGuid& RollId, const TArr
         DefenderRoll = FMath::Clamp(Results[ResultIndex++], 1, InitiativeDiceSides);
     }
 
+    const bool bHadPlayerDice = PendingInitiativePlayerDice > 0;
+    const bool bHadEnemyDice = PendingInitiativeEnemyDice > 0;
+
     PendingInitiativePlayerDice = 0;
     PendingInitiativeEnemyDice = 0;
 
@@ -679,7 +706,10 @@ void UGridBattleManager::HandleDiceRollCompleted(const FGuid& RollId, const TArr
     const bool bAttackerHasEmpireDiscipline = TeamHasLivingFaction(AttackerTeam, ESkaldFaction::Empire);
     const bool bDefenderHasEmpireDiscipline = TeamHasLivingFaction(DefenderTeam, ESkaldFaction::Empire);
 
-    ApplyInitiativeAdjustments(AttackerRoll, DefenderRoll, bAttackerRollProvided, bDefenderRollProvided, bAttackerHasEmpireDiscipline, bDefenderHasEmpireDiscipline);
+    const bool bAllowAttackerAdjustments = !bHadPlayerDice;
+    const bool bAllowDefenderAdjustments = !bHadEnemyDice;
+
+    ApplyInitiativeAdjustments(AttackerRoll, DefenderRoll, bAttackerRollProvided, bDefenderRollProvided, bAttackerHasEmpireDiscipline, bDefenderHasEmpireDiscipline, bAllowAttackerAdjustments, bAllowDefenderAdjustments);
 
     float CleanupDelay = 0.f;
     if (USkaldDiceManager* Manager = ResolveDiceManager())
