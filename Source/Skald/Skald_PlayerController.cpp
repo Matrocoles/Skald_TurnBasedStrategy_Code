@@ -73,6 +73,8 @@ FString ResolvePlayerName(const ASkaldPlayerState *PlayerState,
 
 constexpr const TCHAR *PendingBattleAttackError =
     TEXT("A battle is already being prepared. Please wait for it to begin.");
+constexpr float PreparePromptRetryDelaySeconds = 0.05f;
+constexpr uint8 MaxPreparePromptRetryAttempts = 5;
 constexpr const TCHAR *PendingBattlePhaseError =
     TEXT("Cannot end the phase while a battle is awaiting confirmation.");
 
@@ -5063,7 +5065,11 @@ void ASkaldPlayerController::NotifyRetreatFailed(const FText &Message) {
 }
 
 void ASkaldPlayerController::NotifyEnemyRetreated() {
-  CancelDeferredPrepareForBattlePrompt();
+  const bool bCanceledDeferredPrompt = CancelDeferredPrepareForBattlePrompt();
+  if (bCanceledDeferredPrompt) {
+    bSuppressNextDeferredPreparePrompt = true;
+    DeferredPreparePromptRetryCount = 0;
+  }
 
   if (!MainHUD) {
     InitializeHUDWidget();
@@ -5098,7 +5104,12 @@ void ASkaldPlayerController::OnBeginRetreatSelection(
     int32 /*DefendingTerritoryID*/, const TArray<int32> & /*CandidateTerritoryIDs*/) {}
 
 bool ASkaldPlayerController::ShouldDisplayPrepareForBattlePrompt(
-    const FPrepareForBattlePromptData &PromptData) {
+    const FPrepareForBattlePromptData &PromptData,
+    bool *bOutShouldRetryDueToStaleState) {
+  if (bOutShouldRetryDueToStaleState) {
+    *bOutShouldRetryDueToStaleState = false;
+  }
+
   ASkaldPlayerState *LocalPS = GetPlayerState<ASkaldPlayerState>();
   if (!LocalPS) {
     UE_LOG(LogSkaldReady, Verbose,
@@ -5159,12 +5170,19 @@ bool ASkaldPlayerController::ShouldDisplayPrepareForBattlePrompt(
         UE_LOG(LogSkaldReady, Warning,
                TEXT("Skipping prepare prompt for %s: ready state attacker ID %d no longer matches local PlayerID %d."),
                *GetName(), ReadyState.AttackerPlayerID, LocalPlayerID);
+        if (bOutShouldRetryDueToStaleState &&
+            PromptData.AttackerPlayerID == LocalPlayerID) {
+          *bOutShouldRetryDueToStaleState = true;
+        }
         return false;
       }
       if (ReadyState.bAttackerIsAI) {
         UE_LOG(LogSkaldReady, Verbose,
                TEXT("Skipping prepare prompt for %s because attacker is AI-controlled."),
                *GetName());
+        if (bOutShouldRetryDueToStaleState && !LocalPS->bIsAI) {
+          *bOutShouldRetryDueToStaleState = true;
+        }
         return false;
       }
       if (ReadyState.bAttackerReady) {
@@ -5189,12 +5207,19 @@ bool ASkaldPlayerController::ShouldDisplayPrepareForBattlePrompt(
         UE_LOG(LogSkaldReady, Warning,
                TEXT("Skipping prepare prompt for %s: ready state defender ID %d no longer matches local PlayerID %d."),
                *GetName(), ReadyState.DefenderPlayerID, LocalPlayerID);
+        if (bOutShouldRetryDueToStaleState &&
+            PromptData.DefenderPlayerID == LocalPlayerID) {
+          *bOutShouldRetryDueToStaleState = true;
+        }
         return false;
       }
       if (ReadyState.bDefenderIsAI) {
         UE_LOG(LogSkaldReady, Verbose,
                TEXT("Skipping prepare prompt for %s because defender is AI-controlled."),
                *GetName());
+        if (bOutShouldRetryDueToStaleState && !LocalPS->bIsAI) {
+          *bOutShouldRetryDueToStaleState = true;
+        }
         return false;
       }
       if (ReadyState.bDefenderReady) {
@@ -5220,29 +5245,39 @@ void ASkaldPlayerController::ResetPendingReadyPromptState() {
 
 void ASkaldPlayerController::ShowPrepareForBattlePromptLocal(
     const FPrepareForBattlePromptData &PromptData) {
-  const bool bShouldDeferLocalAuthorityPrompt = IsLocalController() && HasAuthority();
+  const bool bIsLocalAuthority = IsLocalController() && HasAuthority();
+  const bool bShouldDeferLocalAuthorityPrompt =
+      bIsLocalAuthority && !bSuppressNextDeferredPreparePrompt;
+  const bool bBypassingDeferredPrompt =
+      bIsLocalAuthority && bSuppressNextDeferredPreparePrompt;
+
+  if (bBypassingDeferredPrompt) {
+    bSuppressNextDeferredPreparePrompt = false;
+  }
 
   if (bShouldDeferLocalAuthorityPrompt) {
-    if (UWorld *World = GetWorld()) {
-      CancelDeferredPrepareForBattlePrompt();
-
-      DeferredPreparePrompt = PromptData;
-      bDeferredPreparePromptActive = true;
-
-      FTimerDelegate DeferredDelegate;
-      DeferredDelegate.BindUObject(this,
-                                   &ASkaldPlayerController::ExecuteDeferredPrepareForBattlePrompt);
-      World->GetTimerManager().SetTimer(DeferredPreparePromptHandle, DeferredDelegate,
-                                        0.0f, false);
+    DeferredPreparePromptRetryCount = 0;
+    static_cast<void>(CancelDeferredPrepareForBattlePrompt());
+    if (ScheduleDeferredPreparePrompt(PromptData, 0.0f)) {
       return;
     }
   }
 
-  CancelDeferredPrepareForBattlePrompt();
-  ShowPrepareForBattlePromptLocal_Internal(PromptData);
+  DeferredPreparePromptRetryCount = 0;
+  static_cast<void>(CancelDeferredPrepareForBattlePrompt());
+  const EPreparePromptDisplayResult DisplayResult =
+      ShowPrepareForBattlePromptLocal_Internal(PromptData);
+
+  if (DisplayResult == EPreparePromptDisplayResult::RetryDueToStaleState &&
+      bIsLocalAuthority) {
+    if (!TryScheduleDeferredPreparePromptRetry(PromptData)) {
+      DeferredPreparePromptRetryCount = 0;
+    }
+  }
 }
 
-void ASkaldPlayerController::ShowPrepareForBattlePromptLocal_Internal(
+ASkaldPlayerController::EPreparePromptDisplayResult
+ASkaldPlayerController::ShowPrepareForBattlePromptLocal_Internal(
     const FPrepareForBattlePromptData &PromptData) {
   if (!MainHUD) {
     InitializeHUDWidget();
@@ -5251,12 +5286,16 @@ void ASkaldPlayerController::ShowPrepareForBattlePromptLocal_Internal(
   ShowMainHUD();
 
   if (MainHUD) {
-    if (!ShouldDisplayPrepareForBattlePrompt(PromptData)) {
+    bool bRetryDueToStaleState = false;
+    if (!ShouldDisplayPrepareForBattlePrompt(PromptData,
+                                             &bRetryDueToStaleState)) {
       UE_LOG(LogSkaldReady, Log,
              TEXT("Discarding prepare-for-battle prompt for %s; ready state no longer requires confirmation."),
              *GetName());
       ResetPendingReadyPromptState();
-      return;
+      return bRetryDueToStaleState
+                 ? EPreparePromptDisplayResult::RetryDueToStaleState
+                 : EPreparePromptDisplayResult::Skipped;
     }
 
     MainHUD->ShowPrepareForBattleDialog(PromptData);
@@ -5264,7 +5303,7 @@ void ASkaldPlayerController::ShowPrepareForBattlePromptLocal_Internal(
            TEXT("Displayed prepare-for-battle prompt for %s immediately."),
            *GetName());
     ResetPendingReadyPromptState();
-    return;
+    return EPreparePromptDisplayResult::Displayed;
   }
 
   ResetPendingReadyPromptState();
@@ -5274,6 +5313,53 @@ void ASkaldPlayerController::ShowPrepareForBattlePromptLocal_Internal(
          TEXT("MainHUD not yet available for %s; caching prepare-for-battle prompt."),
          *GetName());
   RegisterPendingReadyPromptRetry();
+  return EPreparePromptDisplayResult::CachedForHUD;
+}
+
+bool ASkaldPlayerController::ScheduleDeferredPreparePrompt(
+    const FPrepareForBattlePromptData &PromptData, float DelaySeconds) {
+  if (UWorld *World = GetWorld()) {
+    DeferredPreparePrompt = PromptData;
+    bDeferredPreparePromptActive = true;
+
+    FTimerDelegate DeferredDelegate;
+    DeferredDelegate.BindUObject(
+        this, &ASkaldPlayerController::ExecuteDeferredPrepareForBattlePrompt);
+    World->GetTimerManager().SetTimer(DeferredPreparePromptHandle,
+                                      DeferredDelegate, DelaySeconds, false);
+    return true;
+  }
+
+  return false;
+}
+
+bool ASkaldPlayerController::TryScheduleDeferredPreparePromptRetry(
+    const FPrepareForBattlePromptData &PromptData) {
+  UWorld *World = GetWorld();
+  if (!World) {
+    return false;
+  }
+
+  const uint8 NextAttempt = DeferredPreparePromptRetryCount + 1;
+  if (NextAttempt > MaxPreparePromptRetryAttempts) {
+    UE_LOG(LogSkaldReady, Warning,
+           TEXT("Abandoning prepare-for-battle prompt for %s after %d stale retries."),
+           *GetName(), DeferredPreparePromptRetryCount);
+    return false;
+  }
+
+  DeferredPreparePromptRetryCount = NextAttempt;
+  bDeferredPreparePromptActive = true;
+  DeferredPreparePrompt = PromptData;
+
+  FTimerDelegate DeferredDelegate;
+  DeferredDelegate.BindUObject(
+      this, &ASkaldPlayerController::ExecuteDeferredPrepareForBattlePrompt);
+  World->GetTimerManager().ClearTimer(DeferredPreparePromptHandle);
+  World->GetTimerManager().SetTimer(DeferredPreparePromptHandle,
+                                    DeferredDelegate,
+                                    PreparePromptRetryDelaySeconds, false);
+  return true;
 }
 
 void ASkaldPlayerController::ClientBeginRetreatSelection_Implementation(
@@ -5300,7 +5386,11 @@ void ASkaldPlayerController::ClientShowPrepareForBattle_Implementation(
 }
 
 void ASkaldPlayerController::HidePrepareForBattlePromptLocal() {
-  CancelDeferredPrepareForBattlePrompt();
+  const bool bCanceledDeferredPrompt = CancelDeferredPrepareForBattlePrompt();
+  if (bCanceledDeferredPrompt) {
+    bSuppressNextDeferredPreparePrompt = true;
+    DeferredPreparePromptRetryCount = 0;
+  }
 
   if (UWorld *World = GetWorld()) {
     World->GetTimerManager().ClearTimer(EnemyRetreatHidePromptHandle);
@@ -5319,9 +5409,9 @@ void ASkaldPlayerController::HidePrepareForBattlePromptLocal() {
   ResetPendingReadyPromptState();
 }
 
-void ASkaldPlayerController::CancelDeferredPrepareForBattlePrompt() {
+bool ASkaldPlayerController::CancelDeferredPrepareForBattlePrompt() {
   if (!bDeferredPreparePromptActive) {
-    return;
+    return false;
   }
 
   bDeferredPreparePromptActive = false;
@@ -5330,6 +5420,8 @@ void ASkaldPlayerController::CancelDeferredPrepareForBattlePrompt() {
   if (UWorld *World = GetWorld()) {
     World->GetTimerManager().ClearTimer(DeferredPreparePromptHandle);
   }
+
+  return true;
 }
 
 void ASkaldPlayerController::ExecuteDeferredPrepareForBattlePrompt() {
@@ -5345,7 +5437,16 @@ void ASkaldPlayerController::ExecuteDeferredPrepareForBattlePrompt() {
     World->GetTimerManager().ClearTimer(DeferredPreparePromptHandle);
   }
 
-  ShowPrepareForBattlePromptLocal_Internal(PromptCopy);
+  const EPreparePromptDisplayResult DisplayResult =
+      ShowPrepareForBattlePromptLocal_Internal(PromptCopy);
+
+  if (DisplayResult == EPreparePromptDisplayResult::RetryDueToStaleState) {
+    if (!TryScheduleDeferredPreparePromptRetry(PromptCopy)) {
+      DeferredPreparePromptRetryCount = 0;
+    }
+  } else {
+    DeferredPreparePromptRetryCount = 0;
+  }
 }
 
 void ASkaldPlayerController::ClientHidePrepareForBattle_Implementation() {
