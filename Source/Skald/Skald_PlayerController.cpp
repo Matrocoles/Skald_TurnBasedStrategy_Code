@@ -5196,6 +5196,19 @@ bool ASkaldPlayerController::ShouldDisplayPrepareForBattlePrompt(
                *GetName());
         return false;
       }
+      const bool bWaitingForAIDefenderDecision =
+          ReadyState.bDefenderIsAI && ReadyState.DefenderPlayerID != INDEX_NONE &&
+          !ReadyState.bDefenderReady &&
+          ReadyState.DefenderPlayerID == PromptData.DefenderPlayerID;
+      if (bWaitingForAIDefenderDecision) {
+        UE_LOG(LogSkaldReady, Verbose,
+               TEXT("Deferring prepare prompt for %s until AI defender finishes retreat decision."),
+               *GetName());
+        if (bOutShouldRetryDueToStaleState) {
+          *bOutShouldRetryDueToStaleState = true;
+        }
+        return false;
+      }
     }
   }
 
