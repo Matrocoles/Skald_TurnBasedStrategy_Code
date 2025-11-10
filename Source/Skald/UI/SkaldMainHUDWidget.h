@@ -252,7 +252,14 @@ public:
   void ShowRetreatUnavailableMessage(const FText &Message);
 
   /** Notify the player that the enemy retreated from battle. */
-  void ShowEnemyRetreatedMessage();
+  /**
+   * Notify the HUD that the opposing force successfully retreated.
+   *
+   * Returns true when the active prepare-for-battle widget displayed the
+   * retreat status message, allowing callers to defer tearing it down until
+   * after the message has been visible for a short duration.
+   */
+  bool ShowEnemyRetreatedMessage();
 
   /** Display the rolled initiative value using the configured dice visuals. */
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD|Initiative")

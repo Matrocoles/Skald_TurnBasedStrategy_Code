@@ -1533,7 +1533,6 @@ void ATurnManager::RequestDefenderRetreat(
       ActiveRetreatContext.AttackerController.Get();
 
   HidePreparePrompt(RequestingController);
-  HidePreparePrompt(AttackerController);
   NotifyEnemyRetreated(AttackerController);
   BeginSelectionForController(RequestingController);
 

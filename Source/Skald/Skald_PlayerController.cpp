@@ -5067,8 +5067,28 @@ void ASkaldPlayerController::NotifyEnemyRetreated() {
     InitializeHUDWidget();
   }
 
-  if (MainHUD) {
-    MainHUD->ShowEnemyRetreatedMessage();
+  const bool bDisplayedStatus = MainHUD && MainHUD->ShowEnemyRetreatedMessage();
+
+  if (bDisplayedStatus) {
+    if (UWorld *World = GetWorld()) {
+      FTimerManager &TimerManager = World->GetTimerManager();
+      TimerManager.ClearTimer(EnemyRetreatHidePromptHandle);
+
+      const TWeakObjectPtr<ASkaldPlayerController> WeakThis(this);
+      FTimerDelegate TimerDelegate;
+      TimerDelegate.BindLambda([WeakThis]() {
+        if (WeakThis.IsValid()) {
+          WeakThis->HidePrepareForBattlePromptLocal();
+        }
+      });
+
+      TimerManager.SetTimer(EnemyRetreatHidePromptHandle, TimerDelegate, 2.f,
+                            false);
+    } else {
+      HidePrepareForBattlePromptLocal();
+    }
+  } else {
+    HidePrepareForBattlePromptLocal();
   }
 }
 
@@ -5272,6 +5292,10 @@ void ASkaldPlayerController::ClientShowPrepareForBattle_Implementation(
 }
 
 void ASkaldPlayerController::HidePrepareForBattlePromptLocal() {
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(EnemyRetreatHidePromptHandle);
+  }
+
   if (MainHUD) {
     MainHUD->HidePrepareForBattleDialog();
   }
