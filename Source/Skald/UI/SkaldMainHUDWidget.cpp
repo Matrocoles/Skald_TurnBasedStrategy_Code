@@ -941,9 +941,27 @@ void USkaldMainHUDWidget::ShowRetreatUnavailableMessage(const FText &Message) {
   }
 }
 
-void USkaldMainHUDWidget::ShowEnemyRetreatedMessage() {
+bool USkaldMainHUDWidget::ShowEnemyRetreatedMessage() {
+  bool bDisplayedRetreatStatus = false;
+
+  if (ActivePrepareForBattleWidget) {
+    const FText RetreatMessage = NSLOCTEXT(
+        "SkaldHUD", "PrepareEnemyRetreatedStatus",
+        "Enemy retreated. Returning to map...");
+    ActivePrepareForBattleWidget->ShowRetreatStatus(RetreatMessage, 0.f);
+
+    if (ActivePrepareForBattleWidget->PrepareForBattleButton) {
+      ActivePrepareForBattleWidget->PrepareForBattleButton->SetVisibility(
+          ESlateVisibility::Collapsed);
+      ActivePrepareForBattleWidget->PrepareForBattleButton->SetIsEnabled(false);
+    }
+
+    ActivePrepareForBattleWidget->SetIsEnabled(false);
+    bDisplayedRetreatStatus = true;
+  }
+
   if (!EndingTurnText) {
-    return;
+    return bDisplayedRetreatStatus;
   }
 
   ApplyBroadcastStyle(true);
@@ -965,6 +983,8 @@ void USkaldMainHUDWidget::ShowEnemyRetreatedMessage() {
 
     TimerManager.SetTimer(TurnMessageTimerHandle, TimerDelegate, 2.f, false);
   }
+
+  return bDisplayedRetreatStatus;
 }
 
 void USkaldMainHUDWidget::HandleRetreatClicked() {

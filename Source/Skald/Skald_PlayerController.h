@@ -663,11 +663,18 @@ public:
   UFUNCTION(Client, Reliable)
   void ClientEnemyRetreated();
 
+  UFUNCTION(Client, Reliable)
+  void ClientPrepareForEnemyRetreatNotice();
+
   /** Local entry points so standalone/authority controllers can trigger the
    *  prepare-for-battle flow without relying on client RPC delivery. */
   virtual void ShowPrepareForBattlePromptLocal(
       const FPrepareForBattlePromptData &PromptData);
   virtual void HidePrepareForBattlePromptLocal();
+
+  /** Ensure the attacker retains the prepare prompt while a retreat notice is
+   *  displayed. */
+  void PrepareForEnemyRetreatNotice();
 
   /** Server-side processing of an attack request. */
   UFUNCTION(Server, Reliable)
@@ -1078,6 +1085,16 @@ private:
 
   /** Timer used to retry showing a pending prepare-for-battle prompt. */
   FTimerHandle PendingReadyPromptRetryHandle;
+
+  /** Timer that defers hiding the prepare prompt after an enemy retreat. */
+  FTimerHandle EnemyRetreatHidePromptHandle;
+
+  /** Whether an enemy retreat notice is active, deferring prepare prompt
+   *  teardown. */
+  bool bEnemyRetreatNoticeHoldActive = false;
+
+  void CompleteEnemyRetreatNotice();
+  void ForceHidePrepareForBattlePrompt();
 
   /** Number of pending presentation completions awaiting acknowledgment. */
   int32 PendingAttackPresentationNotifications = 0;

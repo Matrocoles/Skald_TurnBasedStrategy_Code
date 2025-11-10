@@ -1466,6 +1466,19 @@ void ATurnManager::RequestDefenderRetreat(
       PendingBattlePreparation.FromTerritoryID;
   ActiveRetreatContext.bAwaitingDestination = true;
 
+  if (ASkaldPlayerController *AttackerController =
+          ActiveRetreatContext.AttackerController.Get()) {
+    const bool bIsLocalController = AttackerController->IsLocalController();
+    const bool bHasClientConnection =
+        !bIsLocalController && AttackerController->GetNetConnection() != nullptr;
+    if (bIsLocalController || !bHasClientConnection) {
+      AttackerController->PrepareForEnemyRetreatNotice();
+    }
+    if (bHasClientConnection) {
+      AttackerController->ClientPrepareForEnemyRetreatNotice();
+    }
+  }
+
   PendingBattlePreparation = FS_BattlePayload();
   PendingBattleReadyState = FSkaldBattleReadyState();
   CommitPendingBattleReadyState(TEXT("RequestDefenderRetreat_ClearReady"));
@@ -1533,7 +1546,6 @@ void ATurnManager::RequestDefenderRetreat(
       ActiveRetreatContext.AttackerController.Get();
 
   HidePreparePrompt(RequestingController);
-  HidePreparePrompt(AttackerController);
   NotifyEnemyRetreated(AttackerController);
   BeginSelectionForController(RequestingController);
 

@@ -5062,13 +5062,60 @@ void ASkaldPlayerController::NotifyRetreatFailed(const FText &Message) {
   }
 }
 
+void ASkaldPlayerController::PrepareForEnemyRetreatNotice() {
+  bEnemyRetreatNoticeHoldActive = true;
+}
+
+void ASkaldPlayerController::CompleteEnemyRetreatNotice() {
+  bEnemyRetreatNoticeHoldActive = false;
+  ForceHidePrepareForBattlePrompt();
+}
+
+void ASkaldPlayerController::ForceHidePrepareForBattlePrompt() {
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(EnemyRetreatHidePromptHandle);
+  }
+
+  if (MainHUD) {
+    MainHUD->HidePrepareForBattleDialog();
+  }
+
+  if (bPendingReadyPrompt) {
+    UE_LOG(LogSkaldReady, Verbose,
+           TEXT("Clearing cached prepare-for-battle prompt for %s due to hide notification."),
+           *GetName());
+  }
+
+  ResetPendingReadyPromptState();
+}
+
 void ASkaldPlayerController::NotifyEnemyRetreated() {
   if (!MainHUD) {
     InitializeHUDWidget();
   }
 
-  if (MainHUD) {
-    MainHUD->ShowEnemyRetreatedMessage();
+  const bool bDisplayedStatus = MainHUD && MainHUD->ShowEnemyRetreatedMessage();
+
+  if (bDisplayedStatus) {
+    if (UWorld *World = GetWorld()) {
+      FTimerManager &TimerManager = World->GetTimerManager();
+      TimerManager.ClearTimer(EnemyRetreatHidePromptHandle);
+
+      const TWeakObjectPtr<ASkaldPlayerController> WeakThis(this);
+      FTimerDelegate TimerDelegate;
+      TimerDelegate.BindLambda([WeakThis]() {
+        if (WeakThis.IsValid()) {
+          WeakThis->CompleteEnemyRetreatNotice();
+        }
+      });
+
+      TimerManager.SetTimer(EnemyRetreatHidePromptHandle, TimerDelegate, 2.f,
+                            false);
+    } else {
+      CompleteEnemyRetreatNotice();
+    }
+  } else {
+    CompleteEnemyRetreatNotice();
   }
 }
 
@@ -5266,23 +5313,21 @@ void ASkaldPlayerController::ClientEnemyRetreated_Implementation() {
   NotifyEnemyRetreated();
 }
 
+void ASkaldPlayerController::ClientPrepareForEnemyRetreatNotice_Implementation() {
+  PrepareForEnemyRetreatNotice();
+}
+
 void ASkaldPlayerController::ClientShowPrepareForBattle_Implementation(
     const FPrepareForBattlePromptData &PromptData) {
   ShowPrepareForBattlePromptLocal(PromptData);
 }
 
 void ASkaldPlayerController::HidePrepareForBattlePromptLocal() {
-  if (MainHUD) {
-    MainHUD->HidePrepareForBattleDialog();
+  if (bEnemyRetreatNoticeHoldActive) {
+    return;
   }
 
-  if (bPendingReadyPrompt) {
-    UE_LOG(LogSkaldReady, Verbose,
-           TEXT("Clearing cached prepare-for-battle prompt for %s due to hide notification."),
-           *GetName());
-  }
-
-  ResetPendingReadyPromptState();
+  ForceHidePrepareForBattlePrompt();
 }
 
 void ASkaldPlayerController::ClientHidePrepareForBattle_Implementation() {
