@@ -2656,8 +2656,9 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
       return;
     }
 
+    const bool bIsLocalController = Controller->IsLocalController();
     const ENetMode NetMode = Controller->GetNetMode();
-    if (NetMode == NM_Standalone) {
+    if (NetMode == NM_Standalone || bIsLocalController) {
       Controller->HidePrepareForBattlePromptLocal();
     } else {
       Controller->ClientHidePrepareForBattle();
@@ -2921,8 +2922,9 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
                PendingBattlePreparation.FromTerritoryID,
                PendingBattlePreparation.TargetTerritoryID);
 
+        const bool bIsLocalController = Controller->IsLocalController();
         const ENetMode NetMode = Controller->GetNetMode();
-        if (NetMode == NM_Standalone) {
+        if (NetMode == NM_Standalone || bIsLocalController) {
           Controller->ShowPrepareForBattlePromptLocal(PromptData);
         } else {
           Controller->ClientShowPrepareForBattle(PromptData);
