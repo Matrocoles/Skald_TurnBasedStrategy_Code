@@ -1533,7 +1533,22 @@ void ATurnManager::RequestDefenderRetreat(
       ActiveRetreatContext.AttackerController.Get();
 
   HidePreparePrompt(RequestingController);
-  NotifyEnemyRetreated(AttackerController);
+
+  if (AttackerController) {
+    NotifyEnemyRetreated(AttackerController);
+  }
+
+  for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr :
+       Controllers) {
+    ASkaldPlayerController *Controller = ControllerPtr.Get();
+    if (!Controller || Controller == RequestingController ||
+        Controller == AttackerController) {
+      continue;
+    }
+
+    NotifyEnemyRetreated(Controller);
+  }
+
   BeginSelectionForController(RequestingController);
 
   UE_LOG(LogSkaldReady, Log,
