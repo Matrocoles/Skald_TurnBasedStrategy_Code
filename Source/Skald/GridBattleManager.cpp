@@ -643,6 +643,10 @@ void UGridBattleManager::HandleDiceRollCompleted(const FGuid& RollId, const TArr
         return;
     }
 
+    const FGuid CompletedRollId = ActiveInitiativeRollId;
+    const bool bHadPlayerDice = PendingInitiativePlayerDice > 0;
+    const bool bHadEnemyDice = PendingInitiativeEnemyDice > 0;
+
     ActiveInitiativeRollId.Invalidate();
     bInitiativeRollAwaitingResults = false;
 
@@ -680,6 +684,30 @@ void UGridBattleManager::HandleDiceRollCompleted(const FGuid& RollId, const TArr
     const bool bDefenderHasEmpireDiscipline = TeamHasLivingFaction(DefenderTeam, ESkaldFaction::Empire);
 
     ApplyInitiativeAdjustments(AttackerRoll, DefenderRoll, bAttackerRollProvided, bDefenderRollProvided, bAttackerHasEmpireDiscipline, bDefenderHasEmpireDiscipline);
+
+    if (CompletedRollId.IsValid())
+    {
+        if (USkaldDiceManager* Manager = ResolveDiceManager())
+        {
+            TArray<int32> PlayerFaces;
+            TArray<int32> EnemyFaces;
+
+            if (bHadPlayerDice && !bAttackerRollProvided)
+            {
+                PlayerFaces.Add(AttackerRoll);
+            }
+
+            if (bHadEnemyDice && !bDefenderRollProvided)
+            {
+                EnemyFaces.Add(DefenderRoll);
+            }
+
+            if (PlayerFaces.Num() > 0 || EnemyFaces.Num() > 0)
+            {
+                Manager->OverrideInitiativeDiceFaces(CompletedRollId, PlayerFaces, EnemyFaces);
+            }
+        }
+    }
 
     float CleanupDelay = 0.f;
     if (USkaldDiceManager* Manager = ResolveDiceManager())
