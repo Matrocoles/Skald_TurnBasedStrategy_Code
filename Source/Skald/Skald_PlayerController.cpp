@@ -5176,20 +5176,19 @@ bool ASkaldPlayerController::ShouldDisplayPrepareForBattlePrompt(
         }
         return false;
       }
-      if (ReadyState.bAttackerIsAI) {
-        if (!LocalPS->bIsAI) {
-          UE_LOG(LogSkaldReady, Warning,
-                 TEXT("Ready state marked attacker as AI for %s, but the local PlayerState is human-controlled; displaying prompt anyway."),
-                 *GetName());
-        } else {
-          UE_LOG(LogSkaldReady, Verbose,
-                 TEXT("Skipping prepare prompt for %s because attacker is AI-controlled."),
-                 *GetName());
-          if (bOutShouldRetryDueToStaleState && !LocalPS->bIsAI) {
-            *bOutShouldRetryDueToStaleState = true;
-          }
-          return false;
-        }
+      if (ReadyState.bAttackerIsAI && LocalPS->bIsAI) {
+        UE_LOG(LogSkaldReady, Verbose,
+               TEXT("Skipping prepare prompt for %s because attacker is AI-controlled."),
+               *GetName());
+        return false;
+      }
+      if (ReadyState.bAttackerIsAI && !LocalPS->bIsAI) {
+        // A replication race occasionally marks the human-controlled attacker as
+        // AI, which would suppress the confirmation dialog. Log and ignore the
+        // stale flag so the player can still respond.
+        UE_LOG(LogSkaldReady, Warning,
+               TEXT("Ready state marked attacker as AI for %s, but the local PlayerState is human-controlled; displaying prompt."),
+               *GetName());
       }
       if (ReadyState.bAttackerReady) {
         UE_LOG(LogSkaldReady, Verbose,
@@ -5219,20 +5218,18 @@ bool ASkaldPlayerController::ShouldDisplayPrepareForBattlePrompt(
         }
         return false;
       }
-      if (ReadyState.bDefenderIsAI) {
-        if (!LocalPS->bIsAI) {
-          UE_LOG(LogSkaldReady, Warning,
-                 TEXT("Ready state marked defender as AI for %s, but the local PlayerState is human-controlled; displaying prompt anyway."),
-                 *GetName());
-        } else {
-          UE_LOG(LogSkaldReady, Verbose,
-                 TEXT("Skipping prepare prompt for %s because defender is AI-controlled."),
-                 *GetName());
-          if (bOutShouldRetryDueToStaleState && !LocalPS->bIsAI) {
-            *bOutShouldRetryDueToStaleState = true;
-          }
-          return false;
-        }
+      if (ReadyState.bDefenderIsAI && LocalPS->bIsAI) {
+        UE_LOG(LogSkaldReady, Verbose,
+               TEXT("Skipping prepare prompt for %s because defender is AI-controlled."),
+               *GetName());
+        return false;
+      }
+      if (ReadyState.bDefenderIsAI && !LocalPS->bIsAI) {
+        // As above, keep showing the dialog if the server briefly mislabels the
+        // local defender as AI so the human participant can ready up.
+        UE_LOG(LogSkaldReady, Warning,
+               TEXT("Ready state marked defender as AI for %s, but the local PlayerState is human-controlled; displaying prompt."),
+               *GetName());
       }
       if (ReadyState.bDefenderReady) {
         UE_LOG(LogSkaldReady, Verbose,
