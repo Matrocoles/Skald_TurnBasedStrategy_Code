@@ -562,10 +562,7 @@ void USkaldDiceManager::QueueDeferredInitiativeCleanup(FActiveRoll& Roll)
         if (ASkaldDiceD6* Dice = DieState.Actor.Get())
         {
             Dice->OnDiceSettled.RemoveDynamic(this, &USkaldDiceManager::HandleDieSettled);
-
-            FDeferredInitiativeCleanup::FDeferredDie& StoredDie = Cleanup.Dice.AddDefaulted_GetRef();
-            StoredDie.Dice = Dice;
-            StoredDie.bIsPlayerDie = DieState.bIsPlayerDie;
+            Cleanup.Dice.Add(Dice);
         }
     }
 
@@ -584,9 +581,9 @@ void USkaldDiceManager::FinalizeDeferredInitiativeCleanup()
     {
         FDeferredInitiativeCleanup& Cleanup = Entry.Value;
 
-        for (FDeferredInitiativeCleanup::FDeferredDie& DieEntry : Cleanup.Dice)
+        for (TWeakObjectPtr<ASkaldDiceD6>& DiePtr : Cleanup.Dice)
         {
-            if (ASkaldDiceD6* Dice = DieEntry.Dice.Get())
+            if (ASkaldDiceD6* Dice = DiePtr.Get())
             {
                 Dice->SetLifeSpan(Cleanup.DiceLifeSpan);
             }
@@ -623,58 +620,6 @@ ADiceRollArena* USkaldDiceManager::ResolveInitiativeArenaForRoll(FActiveRoll& Ro
     }
 
     return nullptr;
-}
-
-void USkaldDiceManager::OverrideInitiativeDiceFaces(const FGuid& RollId, const TArray<int32>& PlayerValues, const TArray<int32>& EnemyValues)
-{
-    if (!RollId.IsValid())
-    {
-        return;
-    }
-
-    FDeferredInitiativeCleanup* Cleanup = DeferredInitiativeCleanups.Find(RollId);
-    if (!Cleanup)
-    {
-        return;
-    }
-
-    int32 PlayerIndex = 0;
-    int32 EnemyIndex = 0;
-
-    auto ClampValue = [](int32 Value)
-    {
-        return FMath::Clamp(Value, 1, 6);
-    };
-
-    for (FDeferredInitiativeCleanup::FDeferredDie& DieEntry : Cleanup->Dice)
-    {
-        ASkaldDiceD6* Dice = DieEntry.Dice.Get();
-        int32 TargetValue = INDEX_NONE;
-
-        if (DieEntry.bIsPlayerDie)
-        {
-            if (PlayerValues.IsValidIndex(PlayerIndex))
-            {
-                TargetValue = ClampValue(PlayerValues[PlayerIndex]);
-            }
-            PlayerIndex++;
-        }
-        else
-        {
-            if (EnemyValues.IsValidIndex(EnemyIndex))
-            {
-                TargetValue = ClampValue(EnemyValues[EnemyIndex]);
-            }
-            EnemyIndex++;
-        }
-
-        if (Dice && TargetValue > 0)
-        {
-            Dice->SetDesiredFaceValue(TargetValue);
-            Dice->SetShouldSnapToDesired(true);
-            Dice->ForceFaceValue(TargetValue, false);
-        }
-    }
 }
 
 void USkaldDiceManager::HandleDieSettled(ASkaldDiceD6* Dice, int32 FaceValue)

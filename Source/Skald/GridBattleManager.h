@@ -553,7 +553,7 @@ private:
     void ProcessDeferredPresentationFinishes();
     void ProcessPendingFighterDeaths();
 
-    void ApplyInitiativeAdjustments(int32& AttackerRoll, int32& DefenderRoll, bool bAttackerRollProvided, bool bDefenderRollProvided, bool bAttackerHasEmpireDiscipline, bool bDefenderHasEmpireDiscipline);
+    void ApplyInitiativeAdjustments(int32& AttackerRoll, int32& DefenderRoll, bool bAttackerRollProvided, bool bDefenderRollProvided, bool bAttackerHasEmpireDiscipline, bool bDefenderHasEmpireDiscipline, bool bAllowAttackerAdjustments, bool bAllowDefenderAdjustments);
     void CompleteInitiativeRoll(int32 AttackerRoll, int32 DefenderRoll);
     USkaldDiceManager* ResolveDiceManager();
 

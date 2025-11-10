@@ -61,9 +61,6 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Dice")
     FGuid PlayScriptedRoll(const TArray<int32>& PlayerResults, const TArray<int32>& EnemyResults, bool bForInitiative, float DurationOverride = -1.f);
 
-    /** Override the visible faces for an initiative roll that has already completed. */
-    void OverrideInitiativeDiceFaces(const FGuid& RollId, const TArray<int32>& PlayerValues, const TArray<int32>& EnemyValues);
-
     /** Returns the duration before arena and dice are fully cleaned up. */
     float GetCleanupDelay() const;
 
@@ -119,13 +116,7 @@ private:
 
     struct FDeferredInitiativeCleanup
     {
-        struct FDeferredDie
-        {
-            TWeakObjectPtr<ASkaldDiceD6> Dice;
-            bool bIsPlayerDie = false;
-        };
-
-        TArray<FDeferredDie> Dice;
+        TArray<TWeakObjectPtr<ASkaldDiceD6>> Dice;
         TWeakObjectPtr<ADiceRollArena> Arena;
         float DiceLifeSpan = 0.f;
         float ArenaLifeSpan = 0.f;
