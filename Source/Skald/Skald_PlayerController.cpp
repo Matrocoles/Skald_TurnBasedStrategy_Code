@@ -5063,6 +5063,8 @@ void ASkaldPlayerController::NotifyRetreatFailed(const FText &Message) {
 }
 
 void ASkaldPlayerController::NotifyEnemyRetreated() {
+  CancelDeferredPrepareForBattlePrompt();
+
   if (!MainHUD) {
     InitializeHUDWidget();
   }
@@ -5222,15 +5224,21 @@ void ASkaldPlayerController::ShowPrepareForBattlePromptLocal(
 
   if (bShouldDeferLocalAuthorityPrompt) {
     if (UWorld *World = GetWorld()) {
-      const FPrepareForBattlePromptData PromptCopy = PromptData;
-      World->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateWeakLambda(
-          this, [this, PromptCopy]() {
-            ShowPrepareForBattlePromptLocal_Internal(PromptCopy);
-          }));
+      CancelDeferredPrepareForBattlePrompt();
+
+      DeferredPreparePrompt = PromptData;
+      bDeferredPreparePromptActive = true;
+
+      FTimerDelegate DeferredDelegate;
+      DeferredDelegate.BindUObject(this,
+                                   &ASkaldPlayerController::ExecuteDeferredPrepareForBattlePrompt);
+      World->GetTimerManager().SetTimer(DeferredPreparePromptHandle, DeferredDelegate,
+                                        0.0f, false);
       return;
     }
   }
 
+  CancelDeferredPrepareForBattlePrompt();
   ShowPrepareForBattlePromptLocal_Internal(PromptData);
 }
 
@@ -5292,6 +5300,8 @@ void ASkaldPlayerController::ClientShowPrepareForBattle_Implementation(
 }
 
 void ASkaldPlayerController::HidePrepareForBattlePromptLocal() {
+  CancelDeferredPrepareForBattlePrompt();
+
   if (UWorld *World = GetWorld()) {
     World->GetTimerManager().ClearTimer(EnemyRetreatHidePromptHandle);
   }
@@ -5307,6 +5317,35 @@ void ASkaldPlayerController::HidePrepareForBattlePromptLocal() {
   }
 
   ResetPendingReadyPromptState();
+}
+
+void ASkaldPlayerController::CancelDeferredPrepareForBattlePrompt() {
+  if (!bDeferredPreparePromptActive) {
+    return;
+  }
+
+  bDeferredPreparePromptActive = false;
+  DeferredPreparePrompt = FPrepareForBattlePromptData();
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(DeferredPreparePromptHandle);
+  }
+}
+
+void ASkaldPlayerController::ExecuteDeferredPrepareForBattlePrompt() {
+  if (!bDeferredPreparePromptActive) {
+    return;
+  }
+
+  bDeferredPreparePromptActive = false;
+  FPrepareForBattlePromptData PromptCopy = DeferredPreparePrompt;
+  DeferredPreparePrompt = FPrepareForBattlePromptData();
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(DeferredPreparePromptHandle);
+  }
+
+  ShowPrepareForBattlePromptLocal_Internal(PromptCopy);
 }
 
 void ASkaldPlayerController::ClientHidePrepareForBattle_Implementation() {
