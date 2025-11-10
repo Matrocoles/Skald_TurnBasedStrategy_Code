@@ -762,8 +762,6 @@ protected:
   void ResetPendingReadyPromptState();
   void ShowPrepareForBattlePromptLocal_Internal(
       const FPrepareForBattlePromptData &PromptData);
-  void CancelDeferredPrepareForBattlePrompt();
-  void ExecuteDeferredPrepareForBattlePrompt();
 
   virtual void OnBeginRetreatSelection(int32 DefendingTerritoryID,
                                        const TArray<int32> &CandidateTerritoryIDs);
@@ -1083,16 +1081,6 @@ private:
 
   /** Timer that defers hiding the prepare prompt after an enemy retreat. */
   FTimerHandle EnemyRetreatHidePromptHandle;
-
-  /** Timer used to defer prepare prompt display when running on the
-   *  authoritative client. */
-  FTimerHandle DeferredPreparePromptHandle;
-
-  /** Cached prompt payload for deferred local presentation. */
-  FPrepareForBattlePromptData DeferredPreparePrompt;
-
-  /** Tracks whether a deferred prepare prompt is awaiting execution. */
-  bool bDeferredPreparePromptActive = false;
 
   /** Number of pending presentation completions awaiting acknowledgment. */
   int32 PendingAttackPresentationNotifications = 0;
