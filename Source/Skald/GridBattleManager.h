@@ -666,6 +666,9 @@ private:
     /** Number of defender-side dice requested from the subsystem. */
     int32 PendingInitiativeEnemyDice = 0;
 
+    /** True when the current initiative resolution expects physical dice results. */
+    bool bInitiativeRollUsingPhysicalDice = false;
+
     /** Timers used to auto-trigger manual attack rolls for AI controlled fighters. */
     TMap<TWeakObjectPtr<AFighterPawn>, FTimerHandle> PendingAutoManualAttackRolls;
 };
