@@ -257,19 +257,7 @@ FDiceRollResult UGridBattleManager::ResolveAttackDice(const FFighterStats& Attac
     Result.DiceOutcomes.Reset();
     Result.DiceOutcomes.SetNum(DiceToRoll);
 
-    const bool bHasOverrideRolls = OverrideRolls.Num() > 0;
-    if (bHasOverrideRolls)
-    {
-        const int32 ValuesToStore = FMath::Min(DiceToRoll, RollValues.Num());
-        for (int32 Index = 0; Index < ValuesToStore; ++Index)
-        {
-            Result.DiceOutcomes[Index].RollValue = FMath::Clamp(RollValues[Index], 1, 6);
-        }
-    }
-    else
-    {
-        AFighterPawn::ApplyPhysicalRollResults(Result, RollValues, AttackerStats, DefenderStats);
-    }
+    AFighterPawn::ApplyPhysicalRollResults(Result, RollValues, AttackerStats, DefenderStats);
     return Result;
 }
 
