@@ -195,7 +195,10 @@ void UGridBattleManager::InitBattle(const TArray<FFighter>& Attackers, const TAr
     bTeamsAssigned = false;
     bBattleConcluded = false;
     bAwaitingInitiativeRoll = false;
-    bInitiativeRollUsingPhysicalDice = false;
+    if (!bInitiativeRollAwaitingResults)
+    {
+        bInitiativeRollUsingPhysicalDice = false;
+    }
 
     LastInitiativeRollAttacker = 0;
     LastInitiativeRollDefender = 0;
@@ -414,7 +417,10 @@ bool UGridBattleManager::RollInitiative()
         bDefenderInitiativeRollRequested = true;
     }
 
-    bInitiativeRollUsingPhysicalDice = false;
+    if (!bInitiativeRollAwaitingResults)
+    {
+        bInitiativeRollUsingPhysicalDice = false;
+    }
 
     LastInitiativeRollAttacker = 0;
     LastInitiativeRollDefender = 0;
