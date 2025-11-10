@@ -527,6 +527,7 @@ protected:
 
   FTimerHandle InitiativeTimerHandle;
   FTimerHandle TurnMessageTimerHandle;
+  FTimerHandle RetreatPromptTeardownHandle;
   FTimerHandle StrategicInitiativeRollDelayHandle;
   FTimerHandle StrategicInitiativeDiceHideHandle;
   FTimerHandle ArmyPlacementWarningTimerHandle;

@@ -863,6 +863,10 @@ void USkaldMainHUDWidget::ShowPrepareForBattleDialog(
 }
 
 void USkaldMainHUDWidget::HidePrepareForBattleDialog() {
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(RetreatPromptTeardownHandle);
+  }
+
   if (ActivePrepareForBattleWidget) {
     ActivePrepareForBattleWidget->OnPrepareButtonClicked.RemoveAll(this);
     ActivePrepareForBattleWidget->OnRetreatButtonClicked.RemoveAll(this);
@@ -950,6 +954,9 @@ bool USkaldMainHUDWidget::ShowEnemyRetreatedMessage() {
         "Enemy retreated. Returning to map...");
     ActivePrepareForBattleWidget->ShowRetreatStatus(RetreatMessage, 0.f);
 
+    ActivePrepareForBattleWidget->SetRetreatButtonVisibility(
+        ESlateVisibility::Collapsed);
+
     if (ActivePrepareForBattleWidget->PrepareForBattleButton) {
       ActivePrepareForBattleWidget->PrepareForBattleButton->SetVisibility(
           ESlateVisibility::Collapsed);
@@ -958,6 +965,19 @@ bool USkaldMainHUDWidget::ShowEnemyRetreatedMessage() {
 
     ActivePrepareForBattleWidget->SetIsEnabled(false);
     bDisplayedRetreatStatus = true;
+
+    if (UWorld *World = GetWorld()) {
+      FTimerManager &TimerManager = World->GetTimerManager();
+      TimerManager.ClearTimer(RetreatPromptTeardownHandle);
+
+      FTimerDelegate TeardownDelegate;
+      TeardownDelegate.BindUObject(this,
+                                   &USkaldMainHUDWidget::HidePrepareForBattleDialog);
+      TimerManager.SetTimer(RetreatPromptTeardownHandle, TeardownDelegate, 2.f,
+                            false);
+    } else {
+      HidePrepareForBattleDialog();
+    }
   }
 
   if (!EndingTurnText) {
@@ -972,6 +992,7 @@ bool USkaldMainHUDWidget::ShowEnemyRetreatedMessage() {
   if (UWorld *World = GetWorld()) {
     FTimerManager &TimerManager = World->GetTimerManager();
     TimerManager.ClearTimer(TurnMessageTimerHandle);
+    TimerManager.ClearTimer(RetreatPromptTeardownHandle);
 
     const TWeakObjectPtr<USkaldMainHUDWidget> WeakThis(this);
     FTimerDelegate TimerDelegate;
