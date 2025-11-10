@@ -5177,13 +5177,19 @@ bool ASkaldPlayerController::ShouldDisplayPrepareForBattlePrompt(
         return false;
       }
       if (ReadyState.bAttackerIsAI) {
-        UE_LOG(LogSkaldReady, Verbose,
-               TEXT("Skipping prepare prompt for %s because attacker is AI-controlled."),
-               *GetName());
-        if (bOutShouldRetryDueToStaleState && !LocalPS->bIsAI) {
-          *bOutShouldRetryDueToStaleState = true;
+        if (!LocalPS->bIsAI) {
+          UE_LOG(LogSkaldReady, Warning,
+                 TEXT("Ready state marked attacker as AI for %s, but the local PlayerState is human-controlled; displaying prompt anyway."),
+                 *GetName());
+        } else {
+          UE_LOG(LogSkaldReady, Verbose,
+                 TEXT("Skipping prepare prompt for %s because attacker is AI-controlled."),
+                 *GetName());
+          if (bOutShouldRetryDueToStaleState && !LocalPS->bIsAI) {
+            *bOutShouldRetryDueToStaleState = true;
+          }
+          return false;
         }
-        return false;
       }
       if (ReadyState.bAttackerReady) {
         UE_LOG(LogSkaldReady, Verbose,
@@ -5214,13 +5220,19 @@ bool ASkaldPlayerController::ShouldDisplayPrepareForBattlePrompt(
         return false;
       }
       if (ReadyState.bDefenderIsAI) {
-        UE_LOG(LogSkaldReady, Verbose,
-               TEXT("Skipping prepare prompt for %s because defender is AI-controlled."),
-               *GetName());
-        if (bOutShouldRetryDueToStaleState && !LocalPS->bIsAI) {
-          *bOutShouldRetryDueToStaleState = true;
+        if (!LocalPS->bIsAI) {
+          UE_LOG(LogSkaldReady, Warning,
+                 TEXT("Ready state marked defender as AI for %s, but the local PlayerState is human-controlled; displaying prompt anyway."),
+                 *GetName());
+        } else {
+          UE_LOG(LogSkaldReady, Verbose,
+                 TEXT("Skipping prepare prompt for %s because defender is AI-controlled."),
+                 *GetName());
+          if (bOutShouldRetryDueToStaleState && !LocalPS->bIsAI) {
+            *bOutShouldRetryDueToStaleState = true;
+          }
+          return false;
         }
-        return false;
       }
       if (ReadyState.bDefenderReady) {
         UE_LOG(LogSkaldReady, Verbose,
