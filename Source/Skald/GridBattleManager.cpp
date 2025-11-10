@@ -195,6 +195,8 @@ void UGridBattleManager::InitBattle(const TArray<FFighter>& Attackers, const TAr
     bTeamsAssigned = false;
     bBattleConcluded = false;
     bAwaitingInitiativeRoll = false;
+    bInitiativeRollUsingPhysicalDice = false;
+
     LastInitiativeRollAttacker = 0;
     LastInitiativeRollDefender = 0;
 
@@ -412,6 +414,8 @@ bool UGridBattleManager::RollInitiative()
         bDefenderInitiativeRollRequested = true;
     }
 
+    bInitiativeRollUsingPhysicalDice = false;
+
     LastInitiativeRollAttacker = 0;
     LastInitiativeRollDefender = 0;
 
@@ -469,6 +473,7 @@ bool UGridBattleManager::RollInitiative()
                 {
                     ActiveInitiativeRollId = RollId;
                     bInitiativeRollAwaitingResults = true;
+                    bInitiativeRollUsingPhysicalDice = true;
                     return false;
                 }
 
@@ -579,6 +584,8 @@ void UGridBattleManager::ApplyInitiativeAdjustments(int32& AttackerRoll, int32& 
 
 void UGridBattleManager::CompleteInitiativeRoll(int32 AttackerRoll, int32 DefenderRoll)
 {
+    bInitiativeRollUsingPhysicalDice = false;
+
     PendingInitiativeRollAttacker.Reset();
     PendingInitiativeRollDefender.Reset();
     bAttackerInitiativeRollRequested = false;
@@ -649,6 +656,9 @@ void UGridBattleManager::HandleDiceRollCompleted(const FGuid& RollId, const TArr
     const bool bAttackerRollProvided = PendingInitiativeRollAttacker.IsSet();
     const bool bDefenderRollProvided = PendingInitiativeRollDefender.IsSet();
 
+    const bool bResolvedFromPhysicalDice = bInitiativeRollUsingPhysicalDice;
+    bInitiativeRollUsingPhysicalDice = false;
+
     int32 AttackerRoll = bAttackerRollProvided ? FMath::Clamp(PendingInitiativeRollAttacker.GetValue(), 1, InitiativeDiceSides) : 0;
     int32 DefenderRoll = bDefenderRollProvided ? FMath::Clamp(PendingInitiativeRollDefender.GetValue(), 1, InitiativeDiceSides) : 0;
 
@@ -666,20 +676,44 @@ void UGridBattleManager::HandleDiceRollCompleted(const FGuid& RollId, const TArr
     PendingInitiativePlayerDice = 0;
     PendingInitiativeEnemyDice = 0;
 
-    if (AttackerRoll <= 0)
+    if (bResolvedFromPhysicalDice)
     {
-        AttackerRoll = Rng.RandRange(1, InitiativeDiceSides);
-    }
+        if (!bAttackerRollProvided && AttackerRoll <= 0)
+        {
+            UE_LOG(LogSkaldBattle, Warning,
+                TEXT("[Battle] Initiative roll %s missing attacker dice result; defaulting to minimum value."), *RollId.ToString());
+        }
 
-    if (DefenderRoll <= 0)
+        if (!bDefenderRollProvided && DefenderRoll <= 0)
+        {
+            UE_LOG(LogSkaldBattle, Warning,
+                TEXT("[Battle] Initiative roll %s missing defender dice result; defaulting to minimum value."), *RollId.ToString());
+        }
+
+        AttackerRoll = FMath::Clamp(AttackerRoll <= 0 ? 1 : AttackerRoll, 1, InitiativeDiceSides);
+        DefenderRoll = FMath::Clamp(DefenderRoll <= 0 ? 1 : DefenderRoll, 1, InitiativeDiceSides);
+
+        UE_LOG(LogSkaldBattle, Log,
+            TEXT("[Battle] Using physical dice arena results for initiative: Attacker=%d Defender=%d"), AttackerRoll, DefenderRoll);
+    }
+    else
     {
-        DefenderRoll = Rng.RandRange(1, InitiativeDiceSides);
+        if (AttackerRoll <= 0)
+        {
+            AttackerRoll = Rng.RandRange(1, InitiativeDiceSides);
+        }
+
+        if (DefenderRoll <= 0)
+        {
+            DefenderRoll = Rng.RandRange(1, InitiativeDiceSides);
+        }
+
+        const bool bAttackerHasEmpireDiscipline = TeamHasLivingFaction(AttackerTeam, ESkaldFaction::Empire);
+        const bool bDefenderHasEmpireDiscipline = TeamHasLivingFaction(DefenderTeam, ESkaldFaction::Empire);
+
+        ApplyInitiativeAdjustments(AttackerRoll, DefenderRoll, bAttackerRollProvided, bDefenderRollProvided,
+            bAttackerHasEmpireDiscipline, bDefenderHasEmpireDiscipline);
     }
-
-    const bool bAttackerHasEmpireDiscipline = TeamHasLivingFaction(AttackerTeam, ESkaldFaction::Empire);
-    const bool bDefenderHasEmpireDiscipline = TeamHasLivingFaction(DefenderTeam, ESkaldFaction::Empire);
-
-    ApplyInitiativeAdjustments(AttackerRoll, DefenderRoll, bAttackerRollProvided, bDefenderRollProvided, bAttackerHasEmpireDiscipline, bDefenderHasEmpireDiscipline);
 
     float CleanupDelay = 0.f;
     if (USkaldDiceManager* Manager = ResolveDiceManager())
