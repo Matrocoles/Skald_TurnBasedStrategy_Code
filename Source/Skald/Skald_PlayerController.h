@@ -742,13 +742,6 @@ public:
   void HandleRevoltPhase();
 
 protected:
-  enum class EPreparePromptDisplayResult : uint8 {
-    Displayed,
-    CachedForHUD,
-    Skipped,
-    RetryDueToStaleState
-  };
-
   /** Reference to the game's turn manager.
    *  Exposed to Blueprints so BP_Skald_PlayerController can bind to
    *  turn events without keeping an external pointer that might be
@@ -765,16 +758,11 @@ protected:
   void HandlePendingReadyPromptRetry();
   bool TryShowPendingReadyPrompt();
   bool ShouldDisplayPrepareForBattlePrompt(
-      const FPrepareForBattlePromptData &PromptData,
-      bool *bOutShouldRetryDueToStaleState = nullptr);
+      const FPrepareForBattlePromptData &PromptData);
   void ResetPendingReadyPromptState();
-  EPreparePromptDisplayResult ShowPrepareForBattlePromptLocal_Internal(
+  void ShowPrepareForBattlePromptLocal_Internal(
       const FPrepareForBattlePromptData &PromptData);
-  bool CancelDeferredPrepareForBattlePrompt();
-  bool TryScheduleDeferredPreparePromptRetry(
-      const FPrepareForBattlePromptData &PromptData);
-  bool ScheduleDeferredPreparePrompt(
-      const FPrepareForBattlePromptData &PromptData, float DelaySeconds);
+  void CancelDeferredPrepareForBattlePrompt();
   void ExecuteDeferredPrepareForBattlePrompt();
 
   virtual void OnBeginRetreatSelection(int32 DefendingTerritoryID,
@@ -1105,12 +1093,6 @@ private:
 
   /** Tracks whether a deferred prepare prompt is awaiting execution. */
   bool bDeferredPreparePromptActive = false;
-
-  /** When true, the next local authority prepare prompt should bypass deferral. */
-  bool bSuppressNextDeferredPreparePrompt = false;
-
-  /** Number of deferred prepare prompt retries attempted for stale state. */
-  uint8 DeferredPreparePromptRetryCount = 0;
 
   /** Number of pending presentation completions awaiting acknowledgment. */
   int32 PendingAttackPresentationNotifications = 0;
