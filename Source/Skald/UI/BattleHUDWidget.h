@@ -220,6 +220,14 @@ public:
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UImage *AbilityIcon3;
 
+  /** Icon representing the currently bound passive ability. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UImage *PassiveAbilityIcon;
+
+  /** Icon representing the passive ability of the highlighted enemy fighter. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UImage *EnemyPassiveAbilityIcon;
+
   /** Optional label displayed under ability slot 1. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *AbilityLabel1;
@@ -311,6 +319,10 @@ public:
   /** Text displaying enemy attack dice during attack resolution. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *EnemyAttackDiceText;
+
+  /** Text that briefly displays the most recently triggered ability. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UTextBlock *AbilityTriggeredText;
 
   /** Text displaying the enemy fighter's identifier during attack resolution. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
@@ -819,6 +831,13 @@ private:
   /** Timer managing dice roll visibility. */
   FTimerHandle DiceRollerHideTimer;
 
+  /** Timer managing how long the triggered ability label remains visible. */
+  FTimerHandle AbilityTriggerHideTimer;
+
+  /** Duration the triggered ability label should remain visible. */
+  UPROPERTY(EditAnywhere, Category = "Skald|Battle|Abilities")
+  float AbilityTriggerDisplayDuration = 1.7f;
+
   /** Timer managing initiative label visibility. */
   FTimerHandle InitiativeHideTimer;
 
@@ -827,5 +846,15 @@ private:
 
   void ApplyDiceResolutionPanelLayoutInternal(const FDiceResolutionPanelLayout &Layout);
   void RefreshEndTurnButtonVisibility();
+
+  void UpdatePassiveAbilityIcon(UImage *IconWidget,
+                                const FSkaldAbilityDefinition &Definition);
+  FSkaldAbilityDefinition ResolvePassiveAbilityDefinition(AFighterPawn *Fighter) const;
+  FText BuildAbilityTooltipText(const FSkaldAbilityDefinition &Definition) const;
+  void HideAbilityTriggeredText();
+
+  UFUNCTION()
+  void HandleAbilityTriggered(USkaldAbilityComponent *AbilityComponent,
+                              const FSkaldAbilityDefinition &AbilityDefinition);
 };
 
