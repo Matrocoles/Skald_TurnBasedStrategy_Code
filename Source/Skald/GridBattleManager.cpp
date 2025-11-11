@@ -406,6 +406,8 @@ bool UGridBattleManager::RollInitiative()
         return true;
     }
 
+    bInitiativeTieRerollPending = false;
+
     if (!bAttackerInitiativeRollRequested || !bDefenderInitiativeRollRequested)
     {
         if (bAwaitingInitiativeRoll)
@@ -549,6 +551,12 @@ bool UGridBattleManager::RollInitiative()
     const bool bDefenderHasEmpireDiscipline = TeamHasLivingFaction(DefenderTeam, ESkaldFaction::Empire);
     ApplyInitiativeAdjustments(AttackerRoll, DefenderRoll, bAttackerRollProvided, bDefenderRollProvided, bAttackerHasEmpireDiscipline, bDefenderHasEmpireDiscipline);
 
+    if (bInitiativeTieRerollPending)
+    {
+        bInitiativeTieRerollPending = false;
+        return false;
+    }
+
     CompleteInitiativeRoll(AttackerRoll, DefenderRoll);
     return true;
 }
@@ -569,7 +577,11 @@ void UGridBattleManager::ApplyInitiativeAdjustments(int32& AttackerRoll, int32& 
 
     if (AttackerRoll == DefenderRoll)
     {
-        if (bAttackerRollProvided && !bDefenderRollProvided)
+        if (BeginOverviewInitiativeTieReroll(AttackerRoll, DefenderRoll))
+        {
+            return;
+        }
+        else if (bAttackerRollProvided && !bDefenderRollProvided)
         {
             DefenderRoll = (DefenderRoll % InitiativeDiceSides) + 1;
         }
@@ -586,6 +598,65 @@ void UGridBattleManager::ApplyInitiativeAdjustments(int32& AttackerRoll, int32& 
             }
         }
     }
+}
+
+bool UGridBattleManager::ShouldRerollInitiativeOnTie() const
+{
+    if (const UWorld* World = GetWorld())
+    {
+        if (const USkaldGameInstance* GameInstance = Cast<USkaldGameInstance>(World->GetGameInstance()))
+        {
+            return !GameInstance->bIsInBattleMap;
+        }
+    }
+
+    return false;
+}
+
+bool UGridBattleManager::BeginOverviewInitiativeTieReroll(int32 AttackerRoll, int32 DefenderRoll)
+{
+    if (!ShouldRerollInitiativeOnTie())
+    {
+        return false;
+    }
+
+    bInitiativeTieRerollPending = true;
+
+    UE_LOG(LogSkaldBattle, Log,
+        TEXT("[Battle] Initiative tie detected: Attacker=%d, Defender=%d — awaiting overview reroll."), AttackerRoll,
+        DefenderRoll);
+
+    PendingInitiativeRollAttacker.Reset();
+    PendingInitiativeRollDefender.Reset();
+
+    bAttackerInitiativeRollRequested = false;
+    bDefenderInitiativeRollRequested = false;
+
+    bInitiativeRollAwaitingResults = false;
+    bInitiativeRollUsingPhysicalDice = false;
+    PendingInitiativePlayerDice = 0;
+    PendingInitiativeEnemyDice = 0;
+
+    ActiveInitiativeRollId.Invalidate();
+
+    bAwaitingInitiativeRoll = true;
+
+    if (UWorld* World = GetWorld())
+    {
+        FTimerManager& TimerManager = World->GetTimerManager();
+        TimerManager.ClearTimer(InitiativeWinnerAnnouncementTimer);
+        TimerManager.ClearTimer(InitiativePresentationTimer);
+        TimerManager.ClearTimer(InitiativeAIRollTimer);
+    }
+
+    OnInitiativePhaseStarted.Broadcast(CurrentRound);
+
+    UE_LOG(LogSkaldBattle, Log,
+        TEXT("[Battle] Prompting players to reroll overview initiative using the dice arena."));
+
+    ScheduleAIRollIfNeeded();
+
+    return true;
 }
 
 void UGridBattleManager::CompleteInitiativeRoll(int32 AttackerRoll, int32 DefenderRoll)
@@ -701,6 +772,11 @@ void UGridBattleManager::HandleDiceRollCompleted(const FGuid& RollId, const TArr
 
         UE_LOG(LogSkaldBattle, Log,
             TEXT("[Battle] Using physical dice arena results for initiative: Attacker=%d Defender=%d"), AttackerRoll, DefenderRoll);
+
+        if (AttackerRoll == DefenderRoll && BeginOverviewInitiativeTieReroll(AttackerRoll, DefenderRoll))
+        {
+            return;
+        }
     }
     else
     {
@@ -719,6 +795,12 @@ void UGridBattleManager::HandleDiceRollCompleted(const FGuid& RollId, const TArr
 
         ApplyInitiativeAdjustments(AttackerRoll, DefenderRoll, bAttackerRollProvided, bDefenderRollProvided,
             bAttackerHasEmpireDiscipline, bDefenderHasEmpireDiscipline);
+
+        if (bInitiativeTieRerollPending)
+        {
+            bInitiativeTieRerollPending = false;
+            return;
+        }
     }
 
     float CleanupDelay = 0.f;
