@@ -2278,6 +2278,266 @@ bool ASkaldAIController::TryMoveTowardsNearestEnemy(AFighterPawn *Fighter) {
   return Fighter->ActionsRemaining < ActionsBefore;
 }
 
+AFighterPawn *ASkaldAIController::FindAllyToSupport(
+    const AFighterPawn *Fighter) const {
+  if (!Fighter) {
+    return nullptr;
+  }
+
+  UWorld *World = GetWorld();
+  if (!World) {
+    return nullptr;
+  }
+
+  UGridOverlayComponent *Grid = Fighter->GetGrid();
+  if (!Grid) {
+    return nullptr;
+  }
+
+  AFighterPawn *BestAlly = nullptr;
+  int32 BestPriority = TNumericLimits<int32>::Max();
+  int32 BestDistanceToSelf = TNumericLimits<int32>::Max();
+  int32 BestEnemyDistance = TNumericLimits<int32>::Max();
+
+  for (TActorIterator<AFighterPawn> It(World); It; ++It) {
+    AFighterPawn *Candidate = *It;
+    if (!Candidate || Candidate == Fighter || !Candidate->IsAlive()) {
+      continue;
+    }
+
+    if (Candidate->bIsAttacker != Fighter->bIsAttacker) {
+      continue;
+    }
+
+    if (!ControlsFighter(Candidate)) {
+      continue;
+    }
+
+    if (Candidate->GetGrid() != Grid) {
+      continue;
+    }
+
+    const int32 EnemyDistance = ComputeDistanceToNearestEnemy(Candidate);
+    const bool bEngaged = EnemyDistance <= 1;
+    const bool bThreatened = EnemyDistance <= 3;
+
+    const int32 Priority = bEngaged ? 0 : (bThreatened ? 1 : 2);
+    const int32 DistanceToSelf =
+        ComputeChebyshevDistance(Grid, Fighter, Candidate);
+
+    if (DistanceToSelf == TNumericLimits<int32>::Max()) {
+      continue;
+    }
+
+    if (!BestAlly || Priority < BestPriority ||
+        (Priority == BestPriority &&
+         (DistanceToSelf < BestDistanceToSelf ||
+          (DistanceToSelf == BestDistanceToSelf &&
+           EnemyDistance < BestEnemyDistance)))) {
+      BestPriority = Priority;
+      BestDistanceToSelf = DistanceToSelf;
+      BestEnemyDistance = EnemyDistance;
+      BestAlly = Candidate;
+    }
+  }
+
+  return BestAlly;
+}
+
+bool ASkaldAIController::TryMoveTowardsSupportAlly(AFighterPawn *Fighter) {
+  if (!Fighter || Fighter->ActionsRemaining <= 0 || Fighter->Stats.Movement <= 0) {
+    return false;
+  }
+
+  UGridOverlayComponent *Grid = Fighter->GetGrid();
+  if (!Grid) {
+    return false;
+  }
+
+  AFighterPawn *Ally = FindAllyToSupport(Fighter);
+  if (!Ally) {
+    return false;
+  }
+
+  const FIntPoint StartCell = Fighter->GetCurrentCell();
+  const FIntPoint AllyCell = Ally->GetCurrentCell();
+  if (!Grid->IsCellInBounds(StartCell) || !Grid->IsCellInBounds(AllyCell)) {
+    return false;
+  }
+
+  const TArray<FIntPoint> AllyFootprint = Ally->GetOccupiedCells();
+
+  auto ComputeDistanceFromAnchor = [&](const FIntPoint &Anchor) {
+    const TArray<FIntPoint> CandidateCells = Fighter->GetOccupiedCells(Anchor);
+    int32 BestDistance = TNumericLimits<int32>::Max();
+    for (const FIntPoint &SelfCell : CandidateCells) {
+      for (const FIntPoint &AllyCellCoord : AllyFootprint) {
+        const int32 Distance = FMath::Max(
+            FMath::Abs(SelfCell.X - AllyCellCoord.X),
+            FMath::Abs(SelfCell.Y - AllyCellCoord.Y));
+        if (Distance < BestDistance) {
+          BestDistance = Distance;
+          if (BestDistance == 0) {
+            break;
+          }
+        }
+      }
+      if (BestDistance == 0) {
+        break;
+      }
+    }
+    return BestDistance;
+  };
+
+  const int32 CurrentDistance = ComputeDistanceFromAnchor(StartCell);
+  const int32 MaxSteps = Fighter->Stats.Movement;
+
+  TSet<FIntPoint> IgnoredCells;
+  const TArray<FIntPoint> CurrentFootprint = Fighter->GetOccupiedCells();
+  for (const FIntPoint &Cell : CurrentFootprint) {
+    IgnoredCells.Add(Cell);
+  }
+
+  auto CanOccupyAnchor = [&](const FIntPoint &Anchor) {
+    const TArray<FIntPoint> CandidateCells = Fighter->GetOccupiedCells(Anchor);
+    for (const FIntPoint &Cell : CandidateCells) {
+      if (!Grid->IsCellInBounds(Cell) || Grid->IsObscured(Cell)) {
+        return false;
+      }
+      if (Grid->IsOccupied(Cell) && !IgnoredCells.Contains(Cell)) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  auto IsDiagonalStepClear = [&](const FIntPoint &From, const FIntPoint &To) {
+    if (From.X == To.X || From.Y == To.Y) {
+      return true;
+    }
+
+    const TArray<FIntPoint> FromCells = Fighter->GetOccupiedCells(From);
+    const TArray<FIntPoint> NextCells = Fighter->GetOccupiedCells(To);
+
+    TSet<FIntPoint> NextCellSet;
+    NextCellSet.Reserve(NextCells.Num());
+    for (const FIntPoint &NextCell : NextCells) {
+      NextCellSet.Add(NextCell);
+    }
+
+    auto IsBlocked = [&](const FIntPoint &CheckCell) {
+      if (!Grid->IsCellInBounds(CheckCell) || Grid->IsObscured(CheckCell)) {
+        return true;
+      }
+      if (Grid->IsOccupied(CheckCell) && !IgnoredCells.Contains(CheckCell) &&
+          !NextCellSet.Contains(CheckCell)) {
+        return true;
+      }
+      return false;
+    };
+
+    const int32 StepX = FMath::Clamp(To.X - From.X, -1, 1);
+    const int32 StepY = FMath::Clamp(To.Y - From.Y, -1, 1);
+    for (const FIntPoint &FromCell : FromCells) {
+      if (IsBlocked(FromCell + FIntPoint(StepX, 0)) ||
+          IsBlocked(FromCell + FIntPoint(0, StepY))) {
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  static const FIntPoint Directions[] = {
+      FIntPoint(1, 0),  FIntPoint(-1, 0), FIntPoint(0, 1),  FIntPoint(0, -1),
+      FIntPoint(1, 1),  FIntPoint(1, -1), FIntPoint(-1, 1), FIntPoint(-1, -1)};
+
+  struct FAIMovementFrontierNode {
+    FIntPoint Cell;
+    int32 PathCost;
+  };
+
+  auto FrontierComparator = [](const FAIMovementFrontierNode &A,
+                               const FAIMovementFrontierNode &B) {
+    return A.PathCost < B.PathCost;
+  };
+
+  TArray<FAIMovementFrontierNode> Frontier;
+  Frontier.Reserve(32);
+  Frontier.Add({StartCell, 0});
+
+  TMap<FIntPoint, int32> BestPathCosts;
+  BestPathCosts.Reserve(32);
+  BestPathCosts.Add(StartCell, 0);
+
+  FIntPoint BestAnchor = StartCell;
+  int32 BestDistance = CurrentDistance;
+  int32 BestPathCost = TNumericLimits<int32>::Max();
+
+  while (Frontier.Num() > 0) {
+    Frontier.Sort(FrontierComparator);
+
+    const FAIMovementFrontierNode Node = Frontier[0];
+    Frontier.RemoveAt(0, 1, EAllowShrinking::No);
+
+    const FIntPoint Cell = Node.Cell;
+    const int32 DistanceFromStart = Node.PathCost;
+
+    const int32 *RecordedCost = BestPathCosts.Find(Cell);
+    if (!RecordedCost || DistanceFromStart > *RecordedCost) {
+      continue;
+    }
+
+    for (const FIntPoint &Dir : Directions) {
+      const FIntPoint Next = Cell + Dir;
+
+      const int32 MovementCost =
+          FMath::Max(1, Fighter->GetMovementStepCost(Cell, Next, Grid));
+      const int32 StepCost = DistanceFromStart + MovementCost;
+      if (StepCost > MaxSteps) {
+        continue;
+      }
+
+      if (!CanOccupyAnchor(Next)) {
+        continue;
+      }
+
+      if (!IsDiagonalStepClear(Cell, Next)) {
+        continue;
+      }
+
+      const int32 *ExistingCost = BestPathCosts.Find(Next);
+      if (ExistingCost && StepCost >= *ExistingCost) {
+        continue;
+      }
+
+      BestPathCosts.Add(Next, StepCost);
+      Frontier.Add({Next, StepCost});
+
+      const int32 CandidateDistance = ComputeDistanceFromAnchor(Next);
+      if (CandidateDistance > BestDistance) {
+        continue;
+      }
+
+      if (CandidateDistance < BestDistance || StepCost < BestPathCost) {
+        BestDistance = CandidateDistance;
+        BestPathCost = StepCost;
+        BestAnchor = Next;
+      }
+    }
+  }
+
+  const FIntPoint Destination = BestAnchor;
+
+  if (Destination == StartCell) {
+    return false;
+  }
+
+  const int32 ActionsBefore = Fighter->ActionsRemaining;
+  Fighter->MoveToCell(Destination);
+  return Fighter->ActionsRemaining < ActionsBefore;
+}
+
 void ASkaldAIController::QueueActivationIntent(
     AFighterPawn *Fighter, EAIBattleActivationIntent Intent) {
   if (!Fighter) {
@@ -2378,6 +2638,9 @@ void ASkaldAIController::ProcessQueuedActivationIntent() {
     break;
   case EAIBattleActivationIntent::Move:
     bActionTaken = TryMoveTowardsNearestEnemy(Fighter);
+    if (!bActionTaken) {
+      bActionTaken = TryMoveTowardsSupportAlly(Fighter);
+    }
     if (bActionTaken && Fighter && Fighter->IsMoving()) {
       bAwaitingMovementCompletion = true;
       ScheduleMovementCompletionPoll();
