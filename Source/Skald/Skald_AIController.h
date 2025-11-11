@@ -124,6 +124,8 @@ private:
                             TArray<AFighterPawn *> &OutTargets) const;
   bool TryAttackNearestEnemy(AFighterPawn *Fighter);
   bool TryMoveTowardsNearestEnemy(AFighterPawn *Fighter);
+  bool TryMoveTowardsSupportAlly(AFighterPawn *Fighter);
+  AFighterPawn *FindAllyToSupport(const AFighterPawn *Fighter) const;
   float ComputeAbilityActivationBonus(AFighterPawn *Fighter,
                                       const FSkaldAbilityState &AbilityState) const;
   float ComputeAbilityAttackScoreBonus(AFighterPawn *Fighter,
