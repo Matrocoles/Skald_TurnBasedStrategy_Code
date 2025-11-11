@@ -101,6 +101,8 @@ void ASkaldGameMode::InitGame(const FString &Map, const FString &Options,
   PendingStrategicInitiativePlayers.Reset();
   bAwaitingStrategicInitiativeInput = false;
   bStrategicInitiativePromptIssued = false;
+  StrategicInitiativeRound = 0;
+  StrategicInitiativeRoundByPlayer.Empty();
 
   if (UWorld *World = GetWorld()) {
     FTimerManager &TimerManager = World->GetTimerManager();
@@ -1539,6 +1541,8 @@ void ASkaldGameMode::BeginStrategicInitiativePhase() {
   PendingStrategicInitiativeRolls.Empty();
   bAwaitingStrategicInitiativeInput = true;
   bStrategicInitiativePromptIssued = true;
+  StrategicInitiativeRound = 1;
+  StrategicInitiativeRoundByPlayer.Empty();
 
   EnsureStrategicInitiativeDiceBinding();
   if (USkaldDiceManager *DiceManager = ResolveDiceManager()) {
@@ -1555,6 +1559,7 @@ void ASkaldGameMode::BeginStrategicInitiativePhase() {
       }
 
       PendingStrategicInitiativeResolutionPlayers.Add(PS);
+      StrategicInitiativeRoundByPlayer.Add(PS, StrategicInitiativeRound);
 
       if (!PS->bIsAI) {
         PendingStrategicInitiativePlayers.Add(PS);
@@ -1570,7 +1575,8 @@ void ASkaldGameMode::BeginStrategicInitiativePhase() {
       ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>();
       const bool bIsAI = PS && PS->bIsAI;
       if (!bIsAI) {
-        PC->ClientPromptStrategicInitiative(/*RoundNumber*/ 1, /*RollValue*/ 0,
+        PC->ClientPromptStrategicInitiative(StrategicInitiativeRound,
+                                            /*RollValue*/ 0,
                                             /*bWonInitiative*/ false);
       }
     }
@@ -1785,6 +1791,87 @@ void ASkaldGameMode::ResolveStrategicInitiativePhase() {
     return;
   }
 
+  ASkaldGameState *GS = GetGameState<ASkaldGameState>();
+  if (!GS) {
+    return;
+  }
+
+  TMap<int32, TArray<ASkaldPlayerState *>> InitiativeBuckets;
+  for (APlayerState *PSBase : GS->PlayerArray) {
+    if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
+      if (PS->InitiativeRoll > 0) {
+        InitiativeBuckets.FindOrAdd(PS->InitiativeRoll).Add(PS);
+      }
+    }
+  }
+
+  TArray<ASkaldPlayerState *> PlayersNeedingReroll;
+  for (const TPair<int32, TArray<ASkaldPlayerState *>> &Pair : InitiativeBuckets) {
+    if (Pair.Value.Num() > 1) {
+      PlayersNeedingReroll.Append(Pair.Value);
+    }
+  }
+
+  if (PlayersNeedingReroll.Num() > 0) {
+    ++StrategicInitiativeRound;
+    if (StrategicInitiativeRound <= 0) {
+      StrategicInitiativeRound = 1;
+    }
+
+    PendingStrategicInitiativePlayers.Empty();
+    PendingStrategicInitiativeResolutionPlayers.Empty();
+    PendingStrategicInitiativeAIPlayers.Empty();
+
+    if (UWorld *World = GetWorld()) {
+      World->GetTimerManager().ClearTimer(StrategicInitiativeAIRollHandle);
+    }
+
+    for (ASkaldPlayerState *PS : PlayersNeedingReroll) {
+      if (!PS) {
+        continue;
+      }
+
+      PS->InitiativeRoll = 0;
+      PendingStrategicInitiativeResolutionPlayers.Add(PS);
+      StrategicInitiativeRoundByPlayer.Add(PS, StrategicInitiativeRound);
+
+      if (PS->bIsAI) {
+        PendingStrategicInitiativeAIPlayers.Add(PS);
+      } else {
+        PendingStrategicInitiativePlayers.Add(PS);
+      }
+    }
+
+    UE_LOG(LogSkald, Log,
+           TEXT("ResolveStrategicInitiativePhase: %d players tied on initiative; "
+                "starting reroll round %d."),
+           PlayersNeedingReroll.Num(), StrategicInitiativeRound);
+
+    if (GEngine) {
+      GEngine->AddOnScreenDebugMessage(
+          -1, 3.f, FColor::Yellow,
+          FString::Printf(TEXT("Initiative tie detected. Reroll round %d."),
+                          StrategicInitiativeRound));
+    }
+
+    for (ASkaldPlayerState *PS : PlayersNeedingReroll) {
+      if (!PS || PS->bIsAI) {
+        continue;
+      }
+
+      if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(PS->GetOwner())) {
+        PC->ClientPromptStrategicInitiative(StrategicInitiativeRound,
+                                            /*RollValue*/ 0,
+                                            /*bWonInitiative*/ false);
+      }
+    }
+
+    if (PendingStrategicInitiativePlayers.Num() == 0) {
+      ScheduleNextStrategicInitiativeAIRoll();
+    }
+    return;
+  }
+
   UE_LOG(LogSkald, Log,
          TEXT("TryInitializeWorldAndStart: Initializing world after initiative "
               "confirmations"));
@@ -1805,6 +1892,8 @@ void ASkaldGameMode::ResolveStrategicInitiativePhase() {
   PendingStrategicInitiativeAIPlayers.Empty();
   PendingStrategicInitiativeRolls.Empty();
   bStrategicInitiativePromptIssued = false;
+  StrategicInitiativeRound = 0;
+  StrategicInitiativeRoundByPlayer.Empty();
 
   if (bInitialized) {
     bWorldInitialized = true;
@@ -1824,6 +1913,15 @@ void ASkaldGameMode::NotifyStrategicInitiativeRoll(
     return;
   }
 
+  int32 DisplayRound = RoundNumber;
+  if (const ASkaldPlayerState *TargetState =
+          Controller->GetPlayerState<ASkaldPlayerState>()) {
+    if (const int32 *StoredRound =
+            StrategicInitiativeRoundByPlayer.Find(TargetState)) {
+      DisplayRound = *StoredRound;
+    }
+  }
+
   int32 EnemyRoll = 0;
   if (const ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
     const ASkaldPlayerState *TargetState =
@@ -1839,11 +1937,11 @@ void ASkaldGameMode::NotifyStrategicInitiativeRoll(
   }
 
   if (bStrategicInitiativePromptIssued) {
-    Controller->ClientDisplayStrategicInitiativeResult(RoundNumber, RollValue,
+    Controller->ClientDisplayStrategicInitiativeResult(DisplayRound, RollValue,
                                                       EnemyRoll,
                                                       bWonInitiative);
   } else {
-    Controller->ClientPromptStrategicInitiative(RoundNumber, RollValue,
+    Controller->ClientPromptStrategicInitiative(DisplayRound, RollValue,
                                                bWonInitiative);
   }
 }
@@ -3044,7 +3142,9 @@ bool ASkaldGameMode::InitializeWorld() {
         if (!bIsAI && PS) {
           const int32 RollValue = PS->InitiativeRoll;
           const bool bWon = (PS == HighestPS);
-          NotifyStrategicInitiativeRoll(PC, /*RoundNumber*/ 1, RollValue, bWon);
+          const int32 *RoundPtr = StrategicInitiativeRoundByPlayer.Find(PS);
+          const int32 PlayerRound = RoundPtr && *RoundPtr > 0 ? *RoundPtr : 1;
+          NotifyStrategicInitiativeRoll(PC, PlayerRound, RollValue, bWon);
         }
       }
     }

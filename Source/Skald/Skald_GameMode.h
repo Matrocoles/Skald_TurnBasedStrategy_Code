@@ -331,4 +331,10 @@ private:
 
   /** Active dice rolls awaiting completion for strategic initiative. */
   TMap<FGuid, TWeakObjectPtr<ASkaldPlayerState>> PendingStrategicInitiativeRolls;
+
+  /** Current strategic initiative round, including tie-breaking rerolls. */
+  int32 StrategicInitiativeRound = 0;
+
+  /** Round number assigned to each player for strategic initiative displays. */
+  TMap<const ASkaldPlayerState *, int32> StrategicInitiativeRoundByPlayer;
 };
