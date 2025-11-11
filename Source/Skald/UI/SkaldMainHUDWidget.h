@@ -489,6 +489,11 @@ public:
             meta = (BindWidgetOptional))
   UImage *InitiativeDiceBoardImage;
 
+  /** Background image that mirrors the territory panel visibility. */
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
+            meta = (BindWidgetOptional))
+  UImage *TerritoryPanelpng;
+
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
             meta = (BindWidget))
   UTextBlock *DeployableUnitsText;

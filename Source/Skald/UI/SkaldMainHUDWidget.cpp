@@ -203,6 +203,10 @@ void USkaldMainHUDWidget::NativeConstruct() {
     InitiativeDiceBoardImage->SetVisibility(ESlateVisibility::Collapsed);
   }
 
+  if (TerritoryPanelpng) {
+    TerritoryPanelpng->SetVisibility(ESlateVisibility::Collapsed);
+  }
+
   if (DiceResolutionPanel) {
     DiceResolutionPanel->OnResolutionComplete.AddDynamic(
         this, &USkaldMainHUDWidget::HandleDicePanelResolved);
@@ -441,6 +445,10 @@ void USkaldMainHUDWidget::UpdateTerritoryInfo(const FString &TerritoryName,
                                               int32 ArmyCount) {
   BP_SetTerritoryPanel(TerritoryName, OwnerName, ArmyCount);
 
+  if (TerritoryPanelpng) {
+    TerritoryPanelpng->SetVisibility(ESlateVisibility::Visible);
+  }
+
   // Keep Deploy button visibility in sync with current selection ownership.
   if (LocalPlayerID == -1) {
     const int32 ResolvedLocalId = ResolveLocalPlayerId();
@@ -482,6 +490,10 @@ void USkaldMainHUDWidget::UpdateTerritoryInfo(const FString &TerritoryName,
 
 void USkaldMainHUDWidget::ClearTerritoryInfo() {
   BP_ClearTerritoryPanel();
+
+  if (TerritoryPanelpng) {
+    TerritoryPanelpng->SetVisibility(ESlateVisibility::Collapsed);
+  }
 
   if (DeployButton) {
     DeployButton->SetVisibility(ESlateVisibility::Collapsed);
