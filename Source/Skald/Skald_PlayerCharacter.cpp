@@ -8,6 +8,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Engine/World.h"
 #include "Components/InputComponent.h"
+#include "InputCoreTypes.h"
 #include "GameFramework/PlayerController.h"
 #include "Skald_GameMode.h"
 #include "Skald_GameState.h"
@@ -32,6 +33,7 @@ ASkald_PlayerCharacter::ASkald_PlayerCharacter()
         CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
         CameraBoom->SetupAttachment(RootComponent);
         CameraBoom->bUsePawnControlRotation = true;
+        CameraBoom->bDoCollisionTest = false;
 
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
@@ -47,9 +49,11 @@ ASkald_PlayerCharacter::ASkald_PlayerCharacter()
 	CachedCameraLagSpeed = CameraBoom->CameraLagSpeed;
 	bCachedDoCollisionTest = CameraBoom->bDoCollisionTest;
 	DesiredOverviewZoom = FMath::Clamp(OverviewSpawnZoom, OverviewMinZoom, OverviewMaxZoom);
-	OverviewDefaultPitch = OverviewTopDownPitch;
-	OverviewFocusLocation = GetActorLocation();
-	OverviewWorldPivot = OverviewFocusLocation;
+        OverviewDefaultPitch = OverviewTopDownPitch;
+        OverviewFocusLocation = GetActorLocation();
+        OverviewWorldPivot = OverviewFocusLocation;
+        DesiredOverviewRotation = FRotator(OverviewDefaultPitch, GetActorRotation().Yaw, 0.f);
+        CurrentOverviewRotation = DesiredOverviewRotation;
 
         if (CameraBoom)
         {
@@ -90,6 +94,11 @@ void ASkald_PlayerCharacter::BeginPlay()
                 DesiredOverviewZoom = FMath::Clamp(OverviewSpawnZoom, OverviewMinZoom, OverviewMaxZoom);
                 CameraBoom->TargetArmLength = DesiredOverviewZoom;
                 OverviewDefaultPitch = OverviewTopDownPitch;
+                DesiredOverviewRotation = FRotator(OverviewDefaultPitch, GetActorRotation().Yaw, 0.f);
+                DesiredOverviewRotation.Pitch = FMath::Clamp(DesiredOverviewRotation.Pitch, OverviewMinPitch, OverviewMaxPitch);
+                DesiredOverviewRotation.Yaw = FMath::Clamp(DesiredOverviewRotation.Yaw, OverviewMinYaw, OverviewMaxYaw);
+                DesiredOverviewRotation.Roll = 0.f;
+                CurrentOverviewRotation = DesiredOverviewRotation;
         }
 
         RefreshOverviewPivot();
@@ -160,6 +169,21 @@ void ASkald_PlayerCharacter::RefreshOverviewPivot()
         }
 }
 
+bool ASkald_PlayerCharacter::ShouldProcessOverviewMouseInput() const
+{
+        if (bBattleCameraActive)
+        {
+                return false;
+        }
+
+        if (const APlayerController* PlayerController = Cast<APlayerController>(Controller))
+        {
+                return PlayerController->IsInputKeyDown(EKeys::RightMouseButton);
+        }
+
+        return false;
+}
+
 void ASkald_PlayerCharacter::InitializeOverviewCamera()
 {
         RefreshOverviewPivot();
@@ -170,14 +194,22 @@ void ASkald_PlayerCharacter::InitializeOverviewCamera()
                 CameraBoom->TargetArmLength = DesiredOverviewZoom;
         }
 
-        OverviewDefaultPitch = OverviewTopDownPitch;
+        const float ClampedPitch = FMath::Clamp(OverviewTopDownPitch, OverviewMinPitch, OverviewMaxPitch);
+        OverviewDefaultPitch = ClampedPitch;
 
+        FRotator TargetRotation = FRotator(ClampedPitch, DesiredOverviewRotation.Yaw, 0.f);
         if (Controller)
         {
                 FRotator ControlRotation = Controller->GetControlRotation();
-                ControlRotation.Pitch = OverviewTopDownPitch;
-                Controller->SetControlRotation(ControlRotation);
+                TargetRotation.Yaw = FMath::Clamp(ControlRotation.Yaw, OverviewMinYaw, OverviewMaxYaw);
+                TargetRotation.Roll = 0.f;
+                Controller->SetControlRotation(TargetRotation);
         }
+
+        TargetRotation.Yaw = FMath::Clamp(TargetRotation.Yaw, OverviewMinYaw, OverviewMaxYaw);
+        TargetRotation.Roll = 0.f;
+        DesiredOverviewRotation = TargetRotation;
+        CurrentOverviewRotation = TargetRotation;
 
         if (!bBattleCameraActive && !bOverviewCameraLocked && !OverviewDiceCameraState.bActive)
         {
@@ -263,20 +295,25 @@ void ASkald_PlayerCharacter::MoveForward(float Value)
                 return;
         }
 
-	if (FMath::IsNearlyZero(Value) || !Controller)
-	{
-		return;
-	}
+        if (FMath::IsNearlyZero(Value))
+        {
+                return;
+        }
 
-	if (bOverviewCameraLocked)
-	{
-		return;
-	}
+        const float DeltaTime = GetWorld() ? GetWorld()->GetDeltaSeconds() : 0.f;
+        if (DeltaTime <= 0.f)
+        {
+                return;
+        }
 
-        const FRotator ControlRotation = Controller->GetControlRotation();
-        const FRotationMatrix ControlRotMatrix(FRotator(0.f, ControlRotation.Yaw, 0.f));
-        const FVector ForwardVector = ControlRotMatrix.GetUnitAxis(EAxis::X);
-        AddMovementInput(ForwardVector, Value);
+        const float PitchDelta = Value * OverviewKeyboardPitchSpeed * DeltaTime;
+        const float NewPitch = FMath::Clamp(DesiredOverviewRotation.Pitch + PitchDelta, OverviewMinPitch, OverviewMaxPitch);
+        DesiredOverviewRotation.Pitch = NewPitch;
+
+        if (!bOverviewCameraLocked)
+        {
+                OverviewDefaultPitch = NewPitch;
+        }
 }
 
 void ASkald_PlayerCharacter::MoveRight(float Value)
@@ -300,20 +337,20 @@ void ASkald_PlayerCharacter::MoveRight(float Value)
                 return;
         }
 
-	if (FMath::IsNearlyZero(Value) || !Controller)
-	{
-		return;
-	}
+        if (FMath::IsNearlyZero(Value))
+        {
+                return;
+        }
 
-	if (bOverviewCameraLocked)
-	{
-		return;
-	}
+        const float DeltaTime = GetWorld() ? GetWorld()->GetDeltaSeconds() : 0.f;
+        if (DeltaTime <= 0.f)
+        {
+                return;
+        }
 
-        const FRotator ControlRotation = Controller->GetControlRotation();
-        const FRotationMatrix ControlRotMatrix(FRotator(0.f, ControlRotation.Yaw, 0.f));
-        const FVector RightVector = ControlRotMatrix.GetUnitAxis(EAxis::Y);
-        AddMovementInput(RightVector, Value);
+        const float YawDelta = Value * OverviewKeyboardYawSpeed * DeltaTime;
+        const float NewYaw = FMath::Clamp(DesiredOverviewRotation.Yaw + YawDelta, OverviewMinYaw, OverviewMaxYaw);
+        DesiredOverviewRotation.Yaw = NewYaw;
 }
 
 void ASkald_PlayerCharacter::MoveUp(float Value)
@@ -353,10 +390,19 @@ void ASkald_PlayerCharacter::Turn(float Value)
                 return;
         }
 
-        if (!FMath::IsNearlyZero(Value))
+        if (FMath::IsNearlyZero(Value))
         {
-                AddControllerYawInput(Value);
+                return;
         }
+
+        if (!ShouldProcessOverviewMouseInput())
+        {
+                return;
+        }
+
+        const float YawDelta = Value * OverviewMouseYawSpeed;
+        const float NewYaw = FMath::Clamp(DesiredOverviewRotation.Yaw + YawDelta, OverviewMinYaw, OverviewMaxYaw);
+        DesiredOverviewRotation.Yaw = NewYaw;
 }
 
 void ASkald_PlayerCharacter::LookUp(float Value)
@@ -376,9 +422,23 @@ void ASkald_PlayerCharacter::LookUp(float Value)
                 return;
         }
 
-        if (!FMath::IsNearlyZero(Value))
+        if (FMath::IsNearlyZero(Value))
         {
-                AddControllerPitchInput(Value);
+                return;
+        }
+
+        if (!ShouldProcessOverviewMouseInput())
+        {
+                return;
+        }
+
+        const float PitchDelta = Value * OverviewMousePitchSpeed;
+        const float NewPitch = FMath::Clamp(DesiredOverviewRotation.Pitch + PitchDelta, OverviewMinPitch, OverviewMaxPitch);
+        DesiredOverviewRotation.Pitch = NewPitch;
+
+        if (!bOverviewCameraLocked)
+        {
+                OverviewDefaultPitch = NewPitch;
         }
 }
 
@@ -479,6 +539,9 @@ void ASkald_PlayerCharacter::FocusOverviewCameraOnTerritory(ATerritory* Territor
         bOverviewCameraLocked = true;
         OverviewFocusLocation = Territory->GetActorLocation() + (FVector::UpVector * OverviewFocusHeight);
 
+        const float LockedPitch = FMath::Clamp(OverviewLockedPitch, OverviewMinPitch, OverviewMaxPitch);
+        DesiredOverviewRotation.Pitch = LockedPitch;
+
         if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
         {
                 MovementComponent->StopMovementImmediately();
@@ -492,6 +555,7 @@ void ASkald_PlayerCharacter::ClearOverviewCameraFocus()
         LockedOverviewTerritory.Reset();
         RefreshOverviewPivot();
         OverviewFocusLocation = OverviewWorldPivot;
+        DesiredOverviewRotation.Pitch = FMath::Clamp(OverviewDefaultPitch, OverviewMinPitch, OverviewMaxPitch);
 
         if (!bBattleCameraActive && !OverviewDiceCameraState.bActive)
         {
@@ -506,8 +570,14 @@ void ASkald_PlayerCharacter::ClearOverviewCameraFocus()
         if (Controller)
         {
                 FRotator ControlRotation = Controller->GetControlRotation();
-                ControlRotation.Pitch = OverviewDefaultPitch;
+                ControlRotation.Pitch = DesiredOverviewRotation.Pitch;
+                ControlRotation.Yaw = FMath::Clamp(ControlRotation.Yaw, OverviewMinYaw, OverviewMaxYaw);
+                ControlRotation.Roll = 0.f;
                 Controller->SetControlRotation(ControlRotation);
+
+                DesiredOverviewRotation.Yaw = ControlRotation.Yaw;
+                DesiredOverviewRotation.Roll = 0.f;
+                CurrentOverviewRotation = DesiredOverviewRotation;
         }
 }
 
@@ -543,7 +613,15 @@ bool ASkald_PlayerCharacter::BeginStrategicInitiativeCameraView()
         {
                 FRotator ControlRotation = OverviewDiceCameraState.OriginalControlRotation;
                 ControlRotation.Pitch = OverviewDiceCameraPitch;
+                ControlRotation.Roll = 0.f;
+                ControlRotation.Yaw = FMath::Clamp(ControlRotation.Yaw, OverviewMinYaw, OverviewMaxYaw);
                 Controller->SetControlRotation(ControlRotation);
+
+                DesiredOverviewRotation = ControlRotation;
+                DesiredOverviewRotation.Pitch = FMath::Clamp(DesiredOverviewRotation.Pitch, OverviewMinPitch, OverviewMaxPitch);
+                DesiredOverviewRotation.Yaw = FMath::Clamp(DesiredOverviewRotation.Yaw, OverviewMinYaw, OverviewMaxYaw);
+                DesiredOverviewRotation.Roll = 0.f;
+                CurrentOverviewRotation = DesiredOverviewRotation;
         }
 
         if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
@@ -572,7 +650,15 @@ void ASkald_PlayerCharacter::EndStrategicInitiativeCameraView()
 
         if (Controller)
         {
-                Controller->SetControlRotation(OverviewDiceCameraState.OriginalControlRotation);
+                FRotator ControlRotation = OverviewDiceCameraState.OriginalControlRotation;
+                ControlRotation.Pitch = FMath::Clamp(ControlRotation.Pitch, OverviewMinPitch, OverviewMaxPitch);
+                ControlRotation.Yaw = FMath::Clamp(ControlRotation.Yaw, OverviewMinYaw, OverviewMaxYaw);
+                ControlRotation.Roll = 0.f;
+                Controller->SetControlRotation(ControlRotation);
+
+                DesiredOverviewRotation = ControlRotation;
+                CurrentOverviewRotation = ControlRotation;
+                OverviewDefaultPitch = ControlRotation.Pitch;
         }
 
         SetActorLocation(OriginalLocation);
@@ -599,54 +685,56 @@ void ASkald_PlayerCharacter::EndStrategicInitiativeCameraView()
 
 void ASkald_PlayerCharacter::UpdateOverviewCamera(float DeltaTime)
 {
-	if (!CameraBoom)
-	{
-		return;
-	}
+        if (!CameraBoom)
+        {
+                return;
+        }
 
-	const float CurrentArmLength = CameraBoom->TargetArmLength;
-	const float InterpZoom = FMath::FInterpTo(CurrentArmLength, DesiredOverviewZoom, DeltaTime, OverviewZoomInterpSpeed);
-	CameraBoom->TargetArmLength = FMath::Clamp(InterpZoom, OverviewMinZoom, OverviewMaxZoom);
+        const float CurrentArmLength = CameraBoom->TargetArmLength;
+        const float InterpZoom = FMath::FInterpTo(CurrentArmLength, DesiredOverviewZoom, DeltaTime, OverviewZoomInterpSpeed);
+        CameraBoom->TargetArmLength = FMath::Clamp(InterpZoom, OverviewMinZoom, OverviewMaxZoom);
 
-	if (bOverviewCameraLocked)
-	{
-		FVector DesiredLocation = OverviewFocusLocation;
-		if (ATerritory* Territory = LockedOverviewTerritory.Get())
-		{
-			DesiredLocation = Territory->GetActorLocation() + (FVector::UpVector * OverviewFocusHeight);
-		}
-		else
-		{
-			ClearOverviewCameraFocus();
-			return;
-		}
+        if (bOverviewCameraLocked)
+        {
+                FVector DesiredLocation = OverviewFocusLocation;
+                if (ATerritory* Territory = LockedOverviewTerritory.Get())
+                {
+                        DesiredLocation = Territory->GetActorLocation() + (FVector::UpVector * OverviewFocusHeight);
+                }
+                else
+                {
+                        ClearOverviewCameraFocus();
+                        return;
+                }
 
-		OverviewFocusLocation = DesiredLocation;
+                OverviewFocusLocation = DesiredLocation;
 
-		const FVector NewLocation = FMath::VInterpTo(GetActorLocation(), DesiredLocation, DeltaTime, OverviewPanInterpSpeed);
-		SetActorLocation(NewLocation);
+                const FVector NewLocation = FMath::VInterpTo(GetActorLocation(), DesiredLocation, DeltaTime, OverviewPanInterpSpeed);
+                SetActorLocation(NewLocation);
 
-		        if (Controller)
-		{
-			FRotator ControlRotation = Controller->GetControlRotation();
-			const float TargetPitch = OverviewLockedPitch;
-			const float InterpPitch = FMath::FInterpTo(ControlRotation.Pitch, TargetPitch, DeltaTime, OverviewRotationInterpSpeed);
-			ControlRotation.Pitch = InterpPitch;
-			                Controller->SetControlRotation(ControlRotation);
-		}
-	}
-	else
-	{
-		OverviewFocusLocation = GetActorLocation();
+                const float LockedPitch = FMath::Clamp(OverviewLockedPitch, OverviewMinPitch, OverviewMaxPitch);
+                DesiredOverviewRotation.Pitch = LockedPitch;
+        }
+        else
+        {
+                OverviewFocusLocation = GetActorLocation();
+                DesiredOverviewRotation.Pitch = FMath::Clamp(DesiredOverviewRotation.Pitch, OverviewMinPitch, OverviewMaxPitch);
+        }
 
-		        if (Controller)
-		{
-			FRotator ControlRotation = Controller->GetControlRotation();
-			const float InterpPitch = FMath::FInterpTo(ControlRotation.Pitch, OverviewDefaultPitch, DeltaTime, OverviewRotationInterpSpeed);
-			ControlRotation.Pitch = InterpPitch;
-			                Controller->SetControlRotation(ControlRotation);
-		}
-	        }
+        DesiredOverviewRotation.Yaw = FMath::Clamp(DesiredOverviewRotation.Yaw, OverviewMinYaw, OverviewMaxYaw);
+        DesiredOverviewRotation.Roll = 0.f;
+
+        CurrentOverviewRotation = FMath::RInterpTo(CurrentOverviewRotation, DesiredOverviewRotation, DeltaTime, OverviewRotationInterpSpeed);
+
+        if (Controller)
+        {
+                Controller->SetControlRotation(CurrentOverviewRotation);
+        }
+
+        if (!bOverviewCameraLocked)
+        {
+                OverviewDefaultPitch = CurrentOverviewRotation.Pitch;
+        }
 }
 
 void ASkald_PlayerCharacter::SetBattleCameraActive(bool bActive)

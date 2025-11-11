@@ -248,7 +248,7 @@ protected:
 
         /** Minimum allowed zoom distance on the overview map. */
         UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
-        float OverviewMinZoom = 650.f;
+        float OverviewMinZoom = 0.f;
 
         /** Maximum allowed zoom distance on the overview map. */
         UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
@@ -272,7 +272,7 @@ protected:
 
         /** Height offset applied when focusing above a selected territory. */
         UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
-        float OverviewFocusHeight = 100.f;
+        float OverviewFocusHeight = 3200.f;
 
         /** Pitch applied while the overview camera is locked onto a territory. */
         UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
@@ -282,10 +282,10 @@ protected:
         float OverviewTopDownPitch = -85.f;
 
         UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
-        float OverviewSpawnZoom = 2200.f;
+        float OverviewSpawnZoom = 0.f;
 
         UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
-        FVector OverviewPivotOffset = FVector(0.f, 0.f, 100.f);
+        FVector OverviewPivotOffset = FVector(0.f, 0.f, 3200.f);
 
         UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
         float OverviewDiceCameraZoom = 2000.f;
@@ -296,6 +296,38 @@ protected:
         UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
         FVector OverviewDiceCameraOffset = FVector::ZeroVector;
 
+        /** Minimum pitch allowed while rotating the overview camera. */
+        UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
+        float OverviewMinPitch = -89.f;
+
+        /** Maximum pitch allowed while rotating the overview camera. */
+        UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
+        float OverviewMaxPitch = -45.f;
+
+        /** Minimum yaw allowed while rotating the overview camera. */
+        UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
+        float OverviewMinYaw = -175.f;
+
+        /** Maximum yaw allowed while rotating the overview camera. */
+        UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
+        float OverviewMaxYaw = 175.f;
+
+        /** Keyboard pitch speed (degrees per second) applied in overview mode. */
+        UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
+        float OverviewKeyboardPitchSpeed = 90.f;
+
+        /** Keyboard yaw speed (degrees per second) applied in overview mode. */
+        UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
+        float OverviewKeyboardYawSpeed = 120.f;
+
+        /** Mouse sensitivity multiplier applied to yaw updates in overview mode. */
+        UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
+        float OverviewMouseYawSpeed = 1.f;
+
+        /** Mouse sensitivity multiplier applied to pitch updates in overview mode. */
+        UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
+        float OverviewMousePitchSpeed = 1.f;
+
 private:
         /** Perform per-frame updates while the battle camera is active. */
         void UpdateBattleCamera(float DeltaTime);
@@ -304,10 +336,11 @@ private:
         void ClearBattleCameraLock();
 
 	/** Update the strategic overview camera each frame. */
-	void UpdateOverviewCamera(float DeltaTime);
-	void InitializeOverviewCamera();
-	FVector ComputeOverviewPivotLocation() const;
-	void RefreshOverviewPivot();
+        void UpdateOverviewCamera(float DeltaTime);
+        void InitializeOverviewCamera();
+        FVector ComputeOverviewPivotLocation() const;
+        void RefreshOverviewPivot();
+        bool ShouldProcessOverviewMouseInput() const;
 
         /** True if the tactical battle camera behaviour is enabled. */
         bool bBattleCameraActive = false;
@@ -335,6 +368,12 @@ private:
 
         /** Cached default pitch restored when releasing the overview focus. */
         float OverviewDefaultPitch = 0.f;
+
+        /** Desired camera rotation for the overview map. */
+        FRotator DesiredOverviewRotation = FRotator::ZeroRotator;
+
+        /** Smoothed rotation applied to the controller while in overview. */
+        FRotator CurrentOverviewRotation = FRotator::ZeroRotator;
 
 	/** Current desired focus location for the overview camera. */
 	FVector OverviewFocusLocation = FVector::ZeroVector;
