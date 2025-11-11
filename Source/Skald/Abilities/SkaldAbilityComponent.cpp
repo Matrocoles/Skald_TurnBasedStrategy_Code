@@ -202,6 +202,11 @@ void USkaldAbilityComponent::RefreshAbilityLoadout(const FFighterStats& InStats,
             SlotState.CooldownRemaining = 0;
             SlotState.bHasBeenUsed = false;
             SlotState.bIsOnCooldown = false;
+
+            if (GetOwnerRole() == ROLE_Authority && ActiveAbility.AbilityId == TEXT("Ability_Undead_Elite"))
+            {
+                bDeathlessAdvanceReady = true;
+            }
         }
     }
 
