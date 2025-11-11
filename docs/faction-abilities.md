@@ -14,43 +14,43 @@ Individual armies can nudge thresholds up or down if data-table tuning warrants 
 
 * **Passive – Coordinated Volley:** After a Human fighter spends an action to attack, adjacent Human allies gain `+1 AttackDice` on their next attack before the round ends.
 * **Skirmish Ability – Rallying Shot (Action):** Make a ranged attack. If at least one hit lands, choose an ally within `AttackRange`; that ally gains `+1 Movement` until the end of the round and may immediately shift 1 square.
-* **Line Ability – Shield Wall Pivot (Reaction):** When an adjacent ally is targeted, expend the reaction to grant that ally `+1 Defence` for that attack and swap positions after damage is resolved if the ally survives.
-* **Elite Ability – Tactical Reserves (Action):** Skip this fighter’s attack to instead ready nearby troops. Up to two allies within 3 squares immediately refresh one spent action or reaction (designer’s choice) but cannot take the same ability twice per round.
+* **Line Ability – Shield Wall Rally (Action, cooldown 2 rounds):** Spend an action to choose an adjacent ally and reform the line. You and the ally each gain `+1 Defence` until the start of your next activation and may immediately shift 1 square, swapping positions if desired.
+* **Elite Ability – Tactical Reserves (Action, cooldown 2 rounds):** Spend an action to direct reinforcements. Choose up to two allies within 5 squares; each may immediately move up to 2 squares and gains `+1 AttackDice` on their next attack this round.
 
 ## Orc Faction
 
 * **Passive – Blood Frenzy:** When an Orc fighter scores at least one critical hit, it gains `+1 Strength` until it misses an attack.
-* **Skirmish Ability – Brutal Charge (Action):** Move up to `Movement + 2` toward a visible enemy. If the fighter moved at least 4 squares, add `+1 AttackDamage` for this attack.
+* **Skirmish Ability – Brutal Charge (Action, cooldown 2 rounds):** Begin a rush gaining `+2 Movement` toward a visible enemy. If the fighter travels at least 4 squares, their next attack this activation gains `+1 AttackDamage` and `+1 AttackDice`.
 * **Line Ability – Smash Through (Action):** Make an attack. On any hit, push the target 1 square and reduce its `Defence` by 1 (stacking) until the end of the round.
-* **Elite Ability – WAAAGH! Roar (Free, once per battle):** Trigger after rolling initiative. All Orc allies gain `+1 AttackDice` on their first attack this round and ignore difficult terrain for their first move.
+* **Elite Ability – WAAAGH! Roar (Action, spend 2 actions, cooldown 3 rounds):** After this fighter activates, unleash a deafening roar. All Orc allies gain `+2 Movement`, `+1 AttackDice`, ignore difficult terrain on their first movement, and score critical hits on rolls of 5-6 until the round ends.
 
 ## Dwarf Faction
 
 * **Passive – Stalwart Line:** Dwarven fighters standing adjacent to at least one Dwarf ally gain `+1 Defence` and cannot be pushed more than 1 square per effect.
-* **Skirmish Ability – Forgeguard Brace (Reaction):** When charged from 2+ squares away, deal `1` automatic damage before the attack roll and gain `+2 Defence` against that attack.
-* **Line Ability – Rune-etched Riposte (Action):** Expend an action to ready a rune. Until the fighter next attacks, the first melee attacker that hits them suffers `AttackDamage` back as retaliatory damage.
+* **Skirmish Ability – Forgeguard Brace (Action, cooldown 2 rounds):** Spend an action to lock shields. Gain `+2 Defence` until the start of your next activation. The first enemy that moves adjacent during that time suffers `1` automatic damage and `-1 Movement` until end of round.
+* **Line Ability – Rune-etched Riposte (Action, cooldown 2 rounds):** Spend an action to etch retaliatory runes. Until the fighter next attacks, the first melee attacker that targets them suffers `AttackDamage` for each miss rolled during that attack.
 * **Elite Ability – Deep Delve Mortar (Action, cooldown 2 rounds):** Choose a point within 6 squares and roll an attack with `AttackDice - 1` dice. On a hit, deal full `AttackDamage` to the target and half to adjacent enemies; on a critical, also inflict `-2 Movement` until their next activation.
 
 ## Elf Faction
 
 * **Passive – Grace of the Sylphs:** After an Elf fighter resolves movement without taking damage, they gain `+1 Evasion` equivalent (treat incoming attack rolls as having `-1 AttackDice`) until hit.
 * **Skirmish Ability – Veil Step (Action):** Teleport up to 3 squares to a visible empty tile. The next attack this turn gains `+1 AttackRange`.
-* **Line Ability – Moonlance Flurry (Action):** Make two attacks with `-1 AttackDice` each; critical hits restore 1 spent reaction.
+* **Line Ability – Moonlance Flurry (Action):** Make a single sweeping attack with `+1 AttackDice`.
 * **Elite Ability – Starfall Invocation (Action, once per battle):** Select a target within 8 squares. Roll an attack with `+1 AttackDice`; on a hit, deal normal damage and blind the target (they roll `-1 AttackDice`) until the end of their next activation.
 
 ## LizardFolk Faction
 
 * **Passive – Cold-blooded Focus:** Lizardfolk ignore the first `-1` penalty applied to their `Strength` or `AttackDice` each round.
-* **Skirmish Ability – Tail Sweep (Action):** Attack all adjacent enemies with `AttackDice - 1` dice. Any enemy hit suffers `-1 Movement` until end of round.
-* **Line Ability – Amphibious Rush (Action):** When entering or starting in water terrain, gain `+2 Movement` and `+1 AttackDice` for the turn.
-* **Elite Ability – Primeval Regeneration (Free, cooldown 3 rounds):** At the start of this fighter’s activation, restore `1d3` Health (capped by max) and cleanse one debuff (e.g. slowed, weakened).
+* **Skirmish Ability – Tail Sweep (Action, cooldown 2 rounds):** Attack all adjacent enemies with `AttackDice - 1` dice. Any enemy hit suffers `-1 Movement` until end of round.
+* **Line Ability – Amphibious Rush (Action):** When entering or starting in difficult terrain, gain `+2 Movement` and `+1 AttackDice` for the turn.
+* **Elite Ability – Primeval Regeneration (Free, cooldown 3 rounds):** At the start of this fighter’s activation, restore `3` Health (capped by max) and cleanse one debuff (e.g. slowed, weakened).
 
 ## Undead Faction
 
-* **Passive – Necrotic Resilience:** When reduced to 1 Health, Undead fighters gain `+1 Defence` and `+1 AttackDice` until they heal above 1 Health and ignore morale-based effects.
-* **Skirmish Ability – Grave Grasp (Action):** Attack a target within 3 squares. On a hit, root the enemy (Movement becomes 0) until end of its next activation.
-* **Line Ability – Soul Harvest (Action):** After defeating an enemy this activation, immediately gain `+1 AttackDice` and heal 1 Health (cannot exceed max). If no enemy dies, regain the action instead.
-* **Elite Ability – Deathless Advance (Free, once per battle):** When reduced to 0 Health, stand back up at 1 Health and gain `+2 AttackDice` for the rest of the round; afterwards, remove this ability.
+* **Passive – Necrotic Resilience:** When reduced to 5 Health, Undead fighters gain `+1 Defence` and `+1 AttackDice` until they heal above 5 Health and ignore morale-based effects.
+* **Skirmish Ability – Grave Grasp (Action, cooldown 2 rounds):** Attack a target within 3 squares. On a hit, root the enemy (Movement becomes 0) until end of its next activation.
+* **Line Ability – Soul Harvest (Action, cooldown 2 rounds):** Make an attack with `+1 AttackDice`. Heal `+1 Health` for each hit scored on this attack (cannot exceed max).
+* **Elite Ability – Deathless Advance (Passive, cooldown 10 rounds):** When reduced to 0 Health, immediately rise again with `5 Health`. This passive cannot trigger again until 10 rounds have passed.
 
 ## Gnoll Faction
 
@@ -61,23 +61,23 @@ Individual armies can nudge thresholds up or down if data-table tuning warrants 
 
 ## IronLegion Faction
 
-* **Passive – Iron Discipline:** IronLegion units can reroll one initiative die per round and choose either result.
+* **Passive – Iron Discipline:** Iron Legion fighters shrug off hesitation, ignoring the first `-1` penalty from fear or debuff effects applied to them each round.
 * **Skirmish Ability – Suppressing Fire (Action):** Attack at range with `-1 AttackDamage`; on hit, the target suffers `-2 Movement` and cannot take reactions until its next activation.
 * **Line Ability – Officer’s Command (Free, once per round):** After rolling attack dice, may transfer one unused hit to an adjacent ally’s pending attack before results are resolved.
-* **Elite Ability – Artillery Strike (Action, setup):** Spend an action to call artillery on a visible tile. At end of the round, roll an attack with `+2 AttackDamage` against all units within 2 squares (allies take half damage). Ability recharges after two rounds.
+* **Elite Ability – Artillery Strike (Action, spend 2 actions, cooldown 2 rounds):** Spend 2 actions to call artillery on a visible tile. Immediately roll an attack with `+2 AttackDamage` against all units within 2 squares (allies take half damage).
 
 ## The Inflicted Faction
 
 * **Passive – Unstable Mutation:** When an Inflicted fighter is targeted by an attack, roll a die: on 4+, gain either `+1 Defence` or `+1 AttackDamage` (player choice) until end of round.
-* **Skirmish Ability – Viral Lash (Action):** Make an attack; on hit, apply a contagion that causes the target to suffer `-1 Defence` and spread the debuff to adjacent enemies if they take damage this round.
+* **Skirmish Ability – Viral Lash (Action, cooldown 2 rounds):** Make an attack; on hit, apply a contagion that causes the target to suffer `-1 Defence` (once per fighter) and spread the debuff to adjacent enemies if they take damage this round.
 * **Line Ability – Mutagenic Surge (Free, cooldown 2 rounds):** Before rolling attack dice, choose to gain `+2 AttackDice` and suffer `-1 Defence` until next activation.
 * **Elite Ability – Aberrant Bloom (Action, once per battle):** Transform adjacent empty squares into hazardous terrain until end of battle. Enemies entering or starting in the hazard take `AttackDamage` and suffer `-1 Movement` (stacking once).
 
 ## ToadFolk Faction
 
-* **Passive – Mire Masters:** ToadFolk treat water and swamp tiles as normal terrain and impose `-1 Movement` on enemies who start adjacent to them.
-* **Skirmish Ability – Tongue Snare (Action):** Pull a target within 4 squares 1 square closer and reduce its `AttackDice` by 1 until end of round.
-* **Line Ability – Bubble Ward (Reaction):** When an ally within 3 squares is hit by a ranged attack, negate one hit and slide the ally 1 square.
+* **Passive – Mire Masters:** ToadFolk ignore penalties from water or swamp tiles and leave clinging mire behind. Squares they exit become difficult terrain for enemies until the end of the round.
+* **Skirmish Ability – Tongue Snare (Action, cooldown 2 rounds):** Pull a target within 4 squares 1 square closer and reduce its `AttackDice` by 1 until end of round.
+* **Line Ability – Bubble Ward (Action, cooldown 2 rounds):** Envelope an ally within 3 squares in a buoyant ward. Until the start of your next activation, that ally gains `+1 Defence` and the next ranged attack against them loses one success before damage is applied.
 * **Elite Ability – Raincaller Deluge (Action, cooldown 2 rounds):** Create a rainstorm template (radius 2) for one round. Enemies inside suffer `-1 AttackDice`, allies gain `+1 Defence` and amphibious movement bonuses.
 
 ## Ravpack Faction
@@ -85,7 +85,7 @@ Individual armies can nudge thresholds up or down if data-table tuning warrants 
 * **Passive – Scavenged Momentum:** After a Ravpack fighter defeats an enemy or picks up loot, they gain `+2 Movement` on their next activation.
 * **Skirmish Ability – Scrapper Feint (Action):** Make a melee attack; on any miss, the fighter may immediately move 2 squares without provoking reactions.
 * **Line Ability – Jury-rigged Explosive (Action):** Plant a proximity charge on an adjacent tile. When an enemy enters, roll an attack with `AttackDice` dice dealing `AttackDamage + CriticalBonusDamage` on critical hits.
-* **Elite Ability – Overclock Harness (Free, cooldown 2 rounds):** At the start of activation, gain `+1 AttackDice` and `+1 Movement` for the turn; at end of activation, suffer 1 damage if you attacked.
+* **Elite Ability – Overclock Harness (Free, cooldown 2 rounds):** After completing this fighter’s activation, engage the harness to gain `+1 AttackDice` and `+1 Movement` until the start of their next activation; suffer 1 damage if they attacked before triggering it.
 
 ## Implementation Notes
 

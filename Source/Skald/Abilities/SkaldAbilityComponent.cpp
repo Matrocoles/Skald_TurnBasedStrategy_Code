@@ -1036,7 +1036,8 @@ void USkaldAbilityComponent::ApplyAbilityEffects(const FSkaldAbilityDefinition& 
             AddActiveModifier(MoveTemp(Modifier));
         }
     }
-    else if (Definition.AbilityId == TEXT("Ability_Lizardfolk_Skirmish"))
+    else if (Definition.AbilityId == TEXT("Ability_Lizardfolk_Skirmish")
+        || Definition.AbilityId == TEXT("Ability_Lizard_Skirmish"))
     {
         if (GetOwnerRole() == ROLE_Authority)
         {
@@ -1070,7 +1071,8 @@ void USkaldAbilityComponent::ApplyAbilityEffects(const FSkaldAbilityDefinition& 
             AddActiveModifier(MoveTemp(OwnerModifier));
         }
     }
-    else if (Definition.AbilityId == TEXT("Ability_Lizardfolk_Line"))
+    else if (Definition.AbilityId == TEXT("Ability_Lizardfolk_Line")
+        || Definition.AbilityId == TEXT("Ability_Lizard_Line"))
     {
         FSkaldActiveAbilityModifier Modifier;
         Modifier.SourceAbilityId = Definition.AbilityId;
@@ -1079,7 +1081,8 @@ void USkaldAbilityComponent::ApplyAbilityEffects(const FSkaldAbilityDefinition& 
         Modifier.bRemoveOnActivationEnd = true;
         AddActiveModifier(MoveTemp(Modifier));
     }
-    else if (Definition.AbilityId == TEXT("Ability_Lizardfolk_Elite"))
+    else if (Definition.AbilityId == TEXT("Ability_Lizardfolk_Elite")
+        || Definition.AbilityId == TEXT("Ability_Lizard_Elite"))
     {
         if (GetOwnerRole() == ROLE_Authority)
         {
@@ -1291,7 +1294,8 @@ void USkaldAbilityComponent::ApplyAbilityEffects(const FSkaldAbilityDefinition& 
             ConsumeOncePerBattleAbility(Definition.AbilityId);
         }
     }
-    else if (Definition.AbilityId == TEXT("Ability_Frogfolk_Skirmish"))
+    else if (Definition.AbilityId == TEXT("Ability_Frogfolk_Skirmish")
+        || Definition.AbilityId == TEXT("Ability_Frog_Skirmish"))
     {
         if (GetOwnerRole() == ROLE_Authority)
         {
@@ -1327,7 +1331,8 @@ void USkaldAbilityComponent::ApplyAbilityEffects(const FSkaldAbilityDefinition& 
             }
         }
     }
-    else if (Definition.AbilityId == TEXT("Ability_Frogfolk_Line"))
+    else if (Definition.AbilityId == TEXT("Ability_Frogfolk_Line")
+        || Definition.AbilityId == TEXT("Ability_Frog_Line"))
     {
         if (GetOwnerRole() == ROLE_Authority)
         {
@@ -1366,7 +1371,8 @@ void USkaldAbilityComponent::ApplyAbilityEffects(const FSkaldAbilityDefinition& 
             }
         }
     }
-    else if (Definition.AbilityId == TEXT("Ability_Frogfolk_Elite"))
+    else if (Definition.AbilityId == TEXT("Ability_Frogfolk_Elite")
+        || Definition.AbilityId == TEXT("Ability_Frog_Elite"))
     {
         if (GetOwnerRole() == ROLE_Authority)
         {
@@ -2537,7 +2543,8 @@ void USkaldAbilityComponent::HandleBattleAttackResolved(AFighterPawn* Attacker, 
             HandlePassiveEffectRemoved(PassiveAbility.AbilityId);
         }
 
-        if (bRuneRiposteReady && Result.HitCount > 0)
+        const bool bMeleeAttack = Attacker && Attacker->GetAttackType() == EFighterAttackType::Melee;
+        if (bRuneRiposteReady && bMeleeAttack)
         {
             HandleRuneRiposteTriggered(Attacker, Result);
             bRuneRiposteReady = false;
@@ -2670,23 +2677,25 @@ void USkaldAbilityComponent::HandleRuneRiposteTriggered(AFighterPawn* Attacker, 
         return;
     }
 
-    if (OwnerFighter->GetAttackType() != EFighterAttackType::Melee)
+    if (Attacker->GetAttackType() != EFighterAttackType::Melee)
     {
         return;
     }
 
-    const int32 DamageToApply = FMath::Max(0, OwnerFighter->Stats.AttackDamage);
-    if (DamageToApply <= 0)
+    const int32 BaseDamage = FMath::Max(0, OwnerFighter->Stats.AttackDamage);
+    if (BaseDamage <= 0)
     {
         return;
     }
 
-    const int32 PreviousHealth = Attacker->Stats.Health;
-    Attacker->Stats.Health = FMath::Max(0, Attacker->Stats.Health - DamageToApply);
-    if (Attacker->Stats.Health != PreviousHealth)
+    const int32 MissCount = FMath::Max(0, Result.MissCount);
+    if (MissCount <= 0)
     {
-        Attacker->OnHealthChanged.Broadcast(Attacker->Stats.Health);
+        return;
     }
+
+    const int32 DamageToApply = BaseDamage * MissCount;
+    ApplyDamageToFighter(Attacker, DamageToApply);
 }
 
 void USkaldAbilityComponent::HandleOwnerHealthChanged(int32 NewHealth)

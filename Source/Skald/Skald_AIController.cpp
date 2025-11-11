@@ -54,7 +54,9 @@ EAIFactionAbilityCategory ResolveFactionAbilityCategory(const FName &AbilityId) 
       {TEXT("Ability_Gnoll_Elite"), EAIFactionAbilityCategory::AttackDamageBuff},
       {TEXT("Ability_Ravpack_Elite"), EAIFactionAbilityCategory::AttackDamageBuff},
       {TEXT("Ability_Lizardfolk_Line"), EAIFactionAbilityCategory::AttackDamageBuff},
+      {TEXT("Ability_Lizard_Line"), EAIFactionAbilityCategory::AttackDamageBuff},
       {TEXT("Ability_Lizardfolk_Elite"), EAIFactionAbilityCategory::AoEAttack},
+      {TEXT("Ability_Lizard_Elite"), EAIFactionAbilityCategory::AoEAttack},
       {TEXT("Ability_Goblin_Elite"), EAIFactionAbilityCategory::AttackDamageBuff},
       {TEXT("Ability_Elf_Elite"), EAIFactionAbilityCategory::AttackDamageBuff},
       {TEXT("Ability_Elf_Line"), EAIFactionAbilityCategory::AttackDamageBuff},
@@ -72,10 +74,13 @@ EAIFactionAbilityCategory ResolveFactionAbilityCategory(const FName &AbilityId) 
       {TEXT("Ability_Human_Line"), EAIFactionAbilityCategory::AllySupport},
       {TEXT("Ability_Human_Elite"), EAIFactionAbilityCategory::AllySupport},
       {TEXT("Ability_Frogfolk_Line"), EAIFactionAbilityCategory::AllySupport},
+      {TEXT("Ability_Frog_Line"), EAIFactionAbilityCategory::AllySupport},
       {TEXT("Ability_Frogfolk_Elite"), EAIFactionAbilityCategory::AllySupport},
+      {TEXT("Ability_Frog_Elite"), EAIFactionAbilityCategory::AllySupport},
       {TEXT("Ability_Orc_Skirmish"), EAIFactionAbilityCategory::MovementBuff},
       {TEXT("Ability_Orc_Elite"), EAIFactionAbilityCategory::AllySupport},
       {TEXT("Ability_Lizardfolk_Skirmish"), EAIFactionAbilityCategory::AttackDebuffEnemy},
+      {TEXT("Ability_Lizard_Skirmish"), EAIFactionAbilityCategory::AttackDebuffEnemy},
       {TEXT("Ability_Ravpack_Line"), EAIFactionAbilityCategory::AttackDebuffEnemy},
       {TEXT("Ability_Dwarf_Line"), EAIFactionAbilityCategory::AttackDebuffEnemy},
       {TEXT("Ability_Dwarf_Skirmish"), EAIFactionAbilityCategory::AttackDamageBuff},
@@ -1549,7 +1554,8 @@ float ASkaldAIController::ComputeAbilityAttackScoreBonus(
       if (Nearby > 0) {
         Bonus += Nearby * 25.f;
       }
-    } else if (AbilityId == TEXT("Ability_Lizardfolk_Line")) {
+    } else if (AbilityId == TEXT("Ability_Lizardfolk_Line") ||
+               AbilityId == TEXT("Ability_Lizard_Line")) {
       Bonus += 15.f;
     }
     break;
