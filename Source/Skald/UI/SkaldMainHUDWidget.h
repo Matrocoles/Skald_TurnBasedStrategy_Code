@@ -197,6 +197,10 @@ public:
   void UpdateTerritoryInfo(const FString &TerritoryName,
                            const FString &OwnerName, int32 ArmyCount);
 
+  /** Hide the territory info panel when no selection is active. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
+  void ClearTerritoryInfo();
+
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
   void RefreshPlayerList(const TArray<FS_PlayerData> &Players);
 
@@ -384,6 +388,9 @@ public:
   UFUNCTION(BlueprintImplementableEvent, Category = "Skald|HUD")
   void BP_SetTerritoryPanel(const FString &TerritoryName,
                             const FString &OwnerName, int32 ArmyCount);
+
+  UFUNCTION(BlueprintImplementableEvent, Category = "Skald|HUD")
+  void BP_ClearTerritoryPanel();
 
   UFUNCTION(BlueprintImplementableEvent, Category = "Skald|HUD")
   void BP_SetPhaseButtons(ETurnPhase InPhase, bool bIsMyTurn);

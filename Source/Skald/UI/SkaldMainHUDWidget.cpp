@@ -480,6 +480,15 @@ void USkaldMainHUDWidget::UpdateTerritoryInfo(const FString &TerritoryName,
   }
 }
 
+void USkaldMainHUDWidget::ClearTerritoryInfo() {
+  BP_ClearTerritoryPanel();
+
+  if (DeployButton) {
+    DeployButton->SetVisibility(ESlateVisibility::Collapsed);
+    DeployButton->SetIsEnabled(false);
+  }
+}
+
 void USkaldMainHUDWidget::RefreshPlayerList(
     const TArray<FS_PlayerData> &Players) {
   CachedPlayers = Players;

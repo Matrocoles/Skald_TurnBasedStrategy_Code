@@ -3678,7 +3678,12 @@ void ASkaldPlayerController::HandleRevoltPhase() {
 }
 
 void ASkaldPlayerController::HandleTerritorySelected(ATerritory *Terr) {
-  if (!Terr || !MainHUD) {
+  if (!MainHUD) {
+    return;
+  }
+
+  if (!Terr) {
+    MainHUD->ClearTerritoryInfo();
     return;
   }
 
@@ -5035,6 +5040,8 @@ bool ASkaldPlayerController::TryShowPendingReadyPrompt() {
 
 void ASkaldPlayerController::BeginRetreatSelectionLocal(
     int32 DefendingTerritoryID, const TArray<int32> &CandidateTerritoryIDs) {
+  ServerSelectTerritory(-1);
+
   if (!MainHUD) {
     InitializeHUDWidget();
   }

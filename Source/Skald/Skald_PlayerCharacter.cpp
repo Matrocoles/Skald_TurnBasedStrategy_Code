@@ -33,19 +33,22 @@ ASkald_PlayerCharacter::ASkald_PlayerCharacter()
         CameraBoom->SetupAttachment(RootComponent);
         CameraBoom->bUsePawnControlRotation = true;
 
-        FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
-        FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
-        FollowCamera->bUsePawnControlRotation = false;
+	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
+	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
+	FollowCamera->bUsePawnControlRotation = false;
 
-        CachedDefaultArmLength = CameraBoom->TargetArmLength;
-        CachedDefaultBoomRotation = CameraBoom->GetRelativeRotation();
-        bCachedUsePawnControlRotation = CameraBoom->bUsePawnControlRotation;
-        bCachedInheritPitch = CameraBoom->bInheritPitch;
-        bCachedInheritYaw = CameraBoom->bInheritYaw;
-        bCachedInheritRoll = CameraBoom->bInheritRoll;
-        bCachedCameraLag = CameraBoom->bEnableCameraLag;
-        CachedCameraLagSpeed = CameraBoom->CameraLagSpeed;
-        bCachedDoCollisionTest = CameraBoom->bDoCollisionTest;
+	CachedDefaultArmLength = CameraBoom->TargetArmLength;
+	CachedDefaultBoomRotation = CameraBoom->GetRelativeRotation();
+	bCachedUsePawnControlRotation = CameraBoom->bUsePawnControlRotation;
+	bCachedInheritPitch = CameraBoom->bInheritPitch;
+	bCachedInheritYaw = CameraBoom->bInheritYaw;
+	bCachedInheritRoll = CameraBoom->bInheritRoll;
+	bCachedCameraLag = CameraBoom->bEnableCameraLag;
+	CachedCameraLagSpeed = CameraBoom->CameraLagSpeed;
+	bCachedDoCollisionTest = CameraBoom->bDoCollisionTest;
+	DesiredOverviewZoom = CachedDefaultArmLength;
+	OverviewDefaultPitch = CachedDefaultBoomRotation.Pitch;
+	OverviewFocusLocation = GetActorLocation();
 
         DesiredBattleZoom = FMath::Clamp(DefaultBattleZoom, MinBattleZoom, MaxBattleZoom);
         const float InitialYaw = GetActorRotation().Yaw;
@@ -78,7 +81,11 @@ void ASkald_PlayerCharacter::BeginPlay()
                 bCachedCameraLag = CameraBoom->bEnableCameraLag;
                 CachedCameraLagSpeed = CameraBoom->CameraLagSpeed;
                 bCachedDoCollisionTest = CameraBoom->bDoCollisionTest;
+                DesiredOverviewZoom = CameraBoom->TargetArmLength;
+                OverviewDefaultPitch = CameraBoom->GetRelativeRotation().Pitch;
         }
+
+        OverviewFocusLocation = GetActorLocation();
 
         TryCacheWorldMap();
 
@@ -96,6 +103,7 @@ void ASkald_PlayerCharacter::TryCacheWorldMap()
                         WorldMap = Found;
                         WorldMap->OnTerritorySelected.AddUniqueDynamic(this, &ASkald_PlayerCharacter::HandleTerritorySelected);
                         GetWorldTimerManager().ClearTimer(WorldMapSearchHandle);
+                        HandleTerritorySelected(WorldMap->SelectedTerritory);
                 }
                 else
                 {
@@ -120,6 +128,10 @@ void ASkald_PlayerCharacter::Tick(float DeltaTime)
                         UpdateBattleCamera(DeltaTime);
                 }
         }
+        else
+        {
+                UpdateOverviewCamera(DeltaTime);
+        }
 
         // Example tick behavior: keep track of selection validity
         if (!IsValid(CurrentSelection))
@@ -137,7 +149,7 @@ void ASkald_PlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerIn
 
         PlayerInputComponent->BindAxis("MoveForward", this, &ASkald_PlayerCharacter::MoveForward);
         PlayerInputComponent->BindAxis("MoveRight", this, &ASkald_PlayerCharacter::MoveRight);
-       PlayerInputComponent->BindAxis("MoveUp", this, &ASkald_PlayerCharacter::MoveUp);
+        PlayerInputComponent->BindAxis("MoveUp", this, &ASkald_PlayerCharacter::MoveUp);
         PlayerInputComponent->BindAxis("Turn", this, &ASkald_PlayerCharacter::Turn);
         PlayerInputComponent->BindAxis("LookUp", this, &ASkald_PlayerCharacter::LookUp);
         PlayerInputComponent->BindAxis("BattleZoom", this, &ASkald_PlayerCharacter::AdjustZoom);
@@ -149,7 +161,7 @@ void ASkald_PlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerIn
 
 void ASkald_PlayerCharacter::MoveForward(float Value)
 {
-        if (bBattleCameraActive)
+	if (bBattleCameraActive)
         {
                 if (bBattleCameraLocked)
                 {
@@ -169,10 +181,15 @@ void ASkald_PlayerCharacter::MoveForward(float Value)
                 return;
         }
 
-        if (FMath::IsNearlyZero(Value) || !Controller)
-        {
-                return;
-        }
+	if (FMath::IsNearlyZero(Value) || !Controller)
+	{
+		return;
+	}
+
+	if (bOverviewCameraLocked)
+	{
+		return;
+	}
 
         const FRotator ControlRotation = Controller->GetControlRotation();
         const FRotationMatrix ControlRotMatrix(FRotator(0.f, ControlRotation.Yaw, 0.f));
@@ -182,7 +199,7 @@ void ASkald_PlayerCharacter::MoveForward(float Value)
 
 void ASkald_PlayerCharacter::MoveRight(float Value)
 {
-        if (bBattleCameraActive)
+	if (bBattleCameraActive)
         {
                 if (bBattleCameraLocked)
                 {
@@ -201,10 +218,15 @@ void ASkald_PlayerCharacter::MoveRight(float Value)
                 return;
         }
 
-        if (FMath::IsNearlyZero(Value) || !Controller)
-        {
-                return;
-        }
+	if (FMath::IsNearlyZero(Value) || !Controller)
+	{
+		return;
+	}
+
+	if (bOverviewCameraLocked)
+	{
+		return;
+	}
 
         const FRotator ControlRotation = Controller->GetControlRotation();
         const FRotationMatrix ControlRotMatrix(FRotator(0.f, ControlRotation.Yaw, 0.f));
@@ -214,10 +236,15 @@ void ASkald_PlayerCharacter::MoveRight(float Value)
 
 void ASkald_PlayerCharacter::MoveUp(float Value)
 {
-        if (bBattleCameraActive)
-        {
-                return;
-        }
+	if (bBattleCameraActive)
+	{
+		return;
+	}
+
+	if (bOverviewCameraLocked)
+	{
+		return;
+	}
 
         if (!FMath::IsNearlyZero(Value))
         {
@@ -229,7 +256,7 @@ void ASkald_PlayerCharacter::MoveUp(float Value)
 
 void ASkald_PlayerCharacter::Turn(float Value)
 {
-        if (bBattleCameraActive)
+	if (bBattleCameraActive)
         {
                 if (!FMath::IsNearlyZero(Value))
                 {
@@ -252,7 +279,7 @@ void ASkald_PlayerCharacter::Turn(float Value)
 
 void ASkald_PlayerCharacter::LookUp(float Value)
 {
-        if (bBattleCameraActive)
+	if (bBattleCameraActive)
         {
                 if (!FMath::IsNearlyZero(Value))
                 {
@@ -300,7 +327,19 @@ void ASkald_PlayerCharacter::Select()
 
 void ASkald_PlayerCharacter::HandleTerritorySelected(ATerritory* Territory)
 {
-        CurrentSelection = Territory;
+	CurrentSelection = Territory;
+
+	if (!bBattleCameraActive)
+	{
+		if (Territory)
+		{
+			FocusOverviewCameraOnTerritory(Territory);
+		}
+		else
+		{
+			ClearOverviewCameraFocus();
+		}
+	}
 }
 
 void ASkald_PlayerCharacter::AbilityOne()
@@ -329,13 +368,105 @@ void ASkald_PlayerCharacter::AbilityThree()
 
 void ASkald_PlayerCharacter::AdjustZoom(float Value)
 {
-        if (!bBattleCameraActive || FMath::IsNearlyZero(Value))
-        {
-                return;
-        }
+	if (FMath::IsNearlyZero(Value))
+	{
+		return;
+	}
 
-        const float TargetZoom = DesiredBattleZoom - (Value * BattleZoomStep);
-        DesiredBattleZoom = FMath::Clamp(TargetZoom, MinBattleZoom, MaxBattleZoom);
+	if (bBattleCameraActive)
+{
+		const float TargetZoom = DesiredBattleZoom - (Value * BattleZoomStep);
+		DesiredBattleZoom = FMath::Clamp(TargetZoom, MinBattleZoom, MaxBattleZoom);
+	}
+	else
+{
+		const float TargetZoom = DesiredOverviewZoom - (Value * OverviewZoomStep);
+		DesiredOverviewZoom = FMath::Clamp(TargetZoom, OverviewMinZoom, OverviewMaxZoom);
+	}
+}
+
+void ASkald_PlayerCharacter::FocusOverviewCameraOnTerritory(ATerritory* Territory)
+{
+	if (!Territory)
+	{
+		ClearOverviewCameraFocus();
+		return;
+	}
+
+	LockedOverviewTerritory = Territory;
+	bOverviewCameraLocked = true;
+	OverviewFocusLocation = Territory->GetActorLocation() + (FVector::UpVector * OverviewFocusHeight);
+
+	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+	{
+		MovementComponent->StopMovementImmediately();
+	}
+}
+
+void ASkald_PlayerCharacter::ClearOverviewCameraFocus()
+{
+	bOverviewCameraLocked = false;
+	LockedOverviewTerritory.Reset();
+	OverviewFocusLocation = GetActorLocation();
+
+	if (Controller)
+	{
+		FRotator ControlRotation = Controller->GetControlRotation();
+		ControlRotation.Pitch = OverviewDefaultPitch;
+		Controller->SetControlRotation(ControlRotation);
+	}
+}
+
+void ASkald_PlayerCharacter::UpdateOverviewCamera(float DeltaTime)
+{
+	if (!CameraBoom)
+	{
+		return;
+	}
+
+	const float CurrentArmLength = CameraBoom->TargetArmLength;
+	const float InterpZoom = FMath::FInterpTo(CurrentArmLength, DesiredOverviewZoom, DeltaTime, OverviewZoomInterpSpeed);
+	CameraBoom->TargetArmLength = FMath::Clamp(InterpZoom, OverviewMinZoom, OverviewMaxZoom);
+
+	if (bOverviewCameraLocked)
+	{
+		FVector DesiredLocation = OverviewFocusLocation;
+		if (ATerritory* Territory = LockedOverviewTerritory.Get())
+		{
+			DesiredLocation = Territory->GetActorLocation() + (FVector::UpVector * OverviewFocusHeight);
+		}
+		else
+		{
+			ClearOverviewCameraFocus();
+			return;
+		}
+
+		OverviewFocusLocation = DesiredLocation;
+
+		const FVector NewLocation = FMath::VInterpTo(GetActorLocation(), DesiredLocation, DeltaTime, OverviewPanInterpSpeed);
+		SetActorLocation(NewLocation);
+
+		if (Controller)
+		{
+			FRotator ControlRotation = Controller->GetControlRotation();
+			const float TargetPitch = OverviewLockedPitch;
+			const float InterpPitch = FMath::FInterpTo(ControlRotation.Pitch, TargetPitch, DeltaTime, OverviewRotationInterpSpeed);
+			ControlRotation.Pitch = InterpPitch;
+			Controller->SetControlRotation(ControlRotation);
+		}
+	}
+	else
+	{
+		OverviewFocusLocation = GetActorLocation();
+
+		if (Controller)
+		{
+			FRotator ControlRotation = Controller->GetControlRotation();
+			const float InterpPitch = FMath::FInterpTo(ControlRotation.Pitch, OverviewDefaultPitch, DeltaTime, OverviewRotationInterpSpeed);
+			ControlRotation.Pitch = InterpPitch;
+			Controller->SetControlRotation(ControlRotation);
+		}
+	}
 }
 
 void ASkald_PlayerCharacter::SetBattleCameraActive(bool bActive)
@@ -359,6 +490,8 @@ void ASkald_PlayerCharacter::SetBattleCameraActive(bool bActive)
 
         if (bActive)
         {
+                ClearOverviewCameraFocus();
+
                 CachedDefaultArmLength = CameraBoom->TargetArmLength;
                 CachedDefaultBoomRotation = CameraBoom->GetRelativeRotation();
                 bCachedUsePawnControlRotation = CameraBoom->bUsePawnControlRotation;
@@ -415,6 +548,8 @@ void ASkald_PlayerCharacter::SetBattleCameraActive(bool bActive)
                 CameraBoom->bDoCollisionTest = bCachedDoCollisionTest;
                 CameraBoom->SetRelativeRotation(CachedDefaultBoomRotation);
                 CameraBoom->TargetArmLength = CachedDefaultArmLength;
+                DesiredOverviewZoom = CameraBoom->TargetArmLength;
+                OverviewDefaultPitch = CameraBoom->GetRelativeRotation().Pitch;
 
                 bUseControllerRotationYaw = true;
                 bUseControllerRotationPitch = true;
@@ -582,7 +717,7 @@ void ASkald_PlayerCharacter::UpdateBattleCamera(float DeltaTime)
                 const FVector NewLocation = GetActorLocation() + BattleCameraVelocity * DeltaTime;
                 SetActorLocation(NewLocation);
         }
-        else
+	else
         {
                 BattleCameraVelocity = FVector::ZeroVector;
         }
