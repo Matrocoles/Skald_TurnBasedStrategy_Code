@@ -494,6 +494,11 @@ public:
             meta = (BindWidgetOptional))
   UImage *TerritoryPanelpng;
 
+  /** Container holding the territory name/owner/army details. */
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
+            meta = (BindWidgetOptional))
+  UWidget *TerritoryInfoPanel;
+
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
             meta = (BindWidget))
   UTextBlock *DeployableUnitsText;
