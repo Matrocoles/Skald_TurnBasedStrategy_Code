@@ -104,6 +104,16 @@ void UBattleHUDWidget::NativeConstruct() {
     AbilityIcon3->SetVisibility(ESlateVisibility::Collapsed);
   }
 
+  if (PassiveAbilityIcon) {
+    PassiveAbilityIcon->SetToolTipText(FText::GetEmpty());
+    PassiveAbilityIcon->SetVisibility(ESlateVisibility::Collapsed);
+  }
+
+  if (EnemyPassiveAbilityIcon) {
+    EnemyPassiveAbilityIcon->SetToolTipText(FText::GetEmpty());
+    EnemyPassiveAbilityIcon->SetVisibility(ESlateVisibility::Collapsed);
+  }
+
   if (AbilityLabel1) {
     AbilityLabel1->SetVisibility(ESlateVisibility::Collapsed);
   }
@@ -112,6 +122,11 @@ void UBattleHUDWidget::NativeConstruct() {
   }
   if (AbilityLabel3) {
     AbilityLabel3->SetVisibility(ESlateVisibility::Collapsed);
+  }
+
+  if (AbilityTriggeredText) {
+    AbilityTriggeredText->SetText(FText::GetEmpty());
+    AbilityTriggeredText->SetVisibility(ESlateVisibility::Collapsed);
   }
 
   ClearEnemyStatPanel();
@@ -166,6 +181,16 @@ void UBattleHUDWidget::NativeDestruct() {
         this, &UBattleHUDWidget::HandleDiceOutcomeRevealed);
   }
 
+  if (BoundAbilityComponent.IsValid()) {
+    if (USkaldAbilityComponent *Existing = BoundAbilityComponent.Get()) {
+      Existing->OnAbilityStateChanged.RemoveDynamic(
+          this, &UBattleHUDWidget::HandleAbilityComponentUpdated);
+      Existing->OnAbilityTriggered.RemoveDynamic(
+          this, &UBattleHUDWidget::HandleAbilityTriggered);
+    }
+    BoundAbilityComponent = nullptr;
+  }
+
   PendingDiceResolutions.Reset();
   bDiceResolutionActive = false;
   ActiveDiceResolution = FBattleQueuedDiceResolution();
@@ -216,13 +241,10 @@ void UBattleHUDWidget::NativeDestruct() {
 
   ClearHealthTextHold();
 
-  if (BoundAbilityComponent.IsValid()) {
-    if (USkaldAbilityComponent *Existing = BoundAbilityComponent.Get()) {
-      Existing->OnAbilityStateChanged.RemoveDynamic(
-          this, &UBattleHUDWidget::HandleAbilityComponentUpdated);
-    }
-    BoundAbilityComponent = nullptr;
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(AbilityTriggerHideTimer);
   }
+  HideAbilityTriggeredText();
 
   Super::NativeDestruct();
 }
@@ -779,6 +801,8 @@ void UBattleHUDWidget::BindToFighter(AFighterPawn *Fighter) {
     if (USkaldAbilityComponent *Existing = BoundAbilityComponent.Get()) {
       Existing->OnAbilityStateChanged.RemoveDynamic(
           this, &UBattleHUDWidget::HandleAbilityComponentUpdated);
+      Existing->OnAbilityTriggered.RemoveDynamic(
+          this, &UBattleHUDWidget::HandleAbilityTriggered);
     }
     BoundAbilityComponent = nullptr;
   }
@@ -791,6 +815,11 @@ void UBattleHUDWidget::BindToFighter(AFighterPawn *Fighter) {
 
   BoundFighter = Fighter;
   bBoundFighterIsFriendly = bShouldDisplayAsFriendly;
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(AbilityTriggerHideTimer);
+  }
+  HideAbilityTriggeredText();
 
   if (BoundFighter && bBoundFighterIsFriendly) {
     BoundFighter->OnHealthChanged.AddDynamic(
@@ -805,6 +834,8 @@ void UBattleHUDWidget::BindToFighter(AFighterPawn *Fighter) {
       BoundAbilityComponent = AbilityComp;
       AbilityComp->OnAbilityStateChanged.AddDynamic(
           this, &UBattleHUDWidget::HandleAbilityComponentUpdated);
+      AbilityComp->OnAbilityTriggered.AddDynamic(
+          this, &UBattleHUDWidget::HandleAbilityTriggered);
     }
 
     UpdateStatPanel();
@@ -1054,6 +1085,9 @@ void UBattleHUDWidget::UpdateEnemyStatPanel(AFighterPawn *Fighter) {
       EnemyFighterImage->SetVisibility(ESlateVisibility::Collapsed);
     }
   }
+
+  UpdatePassiveAbilityIcon(EnemyPassiveAbilityIcon,
+                           ResolvePassiveAbilityDefinition(Fighter));
 }
 
 void UBattleHUDWidget::ClearEnemyStatPanel() {
@@ -1086,6 +1120,8 @@ void UBattleHUDWidget::ClearEnemyStatPanel() {
     EnemyFighterImage->SetBrushFromTexture(nullptr);
     EnemyFighterImage->SetVisibility(ESlateVisibility::Collapsed);
   }
+
+  UpdatePassiveAbilityIcon(EnemyPassiveAbilityIcon, FSkaldAbilityDefinition());
 }
 
 void UBattleHUDWidget::ApplyPrimaryFighterDisplay(AFighterPawn *Fighter) {
@@ -1287,6 +1323,7 @@ void UBattleHUDWidget::RefreshAbilityDisplay() {
   USkaldAbilityComponent *AbilityComp = BoundAbilityComponent.Get();
   if (!AbilityComp) {
     PassiveAbilityDefinition = FSkaldAbilityDefinition();
+    UpdatePassiveAbilityIcon(PassiveAbilityIcon, PassiveAbilityDefinition);
     OnAbilityDisplayChanged.Broadcast(PassiveAbilityDefinition,
                                       AbilitySlotDefinitions);
     UpdateAbilityButtons();
@@ -1294,6 +1331,7 @@ void UBattleHUDWidget::RefreshAbilityDisplay() {
   }
 
   PassiveAbilityDefinition = AbilityComp->GetPassiveAbility();
+  UpdatePassiveAbilityIcon(PassiveAbilityIcon, PassiveAbilityDefinition);
   const ESkaldAbilitySlot SlotOrder[] = {ESkaldAbilitySlot::Ability1,
                                          ESkaldAbilitySlot::Ability2,
                                          ESkaldAbilitySlot::Ability3};
@@ -1449,6 +1487,115 @@ UBattleHUDWidget::FindAbilityDisplay(ESkaldAbilitySlot AbilitySlot) const {
     }
   }
   return nullptr;
+}
+
+void UBattleHUDWidget::HandleAbilityTriggered(
+    USkaldAbilityComponent *AbilityComponent,
+    const FSkaldAbilityDefinition &AbilityDefinition) {
+  if (!BoundAbilityComponent.IsValid() ||
+      BoundAbilityComponent.Get() != AbilityComponent) {
+    return;
+  }
+
+  if (!AbilityTriggeredText) {
+    return;
+  }
+
+  const FText AbilityLabel = !AbilityDefinition.AbilityName.IsEmpty()
+                                 ? AbilityDefinition.AbilityName
+                                 : AbilityDefinition.AbilityDescription;
+
+  if (AbilityLabel.IsEmpty()) {
+    HideAbilityTriggeredText();
+    return;
+  }
+
+  AbilityTriggeredText->SetText(AbilityLabel);
+  AbilityTriggeredText->SetVisibility(ESlateVisibility::HitTestInvisible);
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(AbilityTriggerHideTimer);
+    World->GetTimerManager().SetTimer(
+        AbilityTriggerHideTimer, this,
+        &UBattleHUDWidget::HideAbilityTriggeredText,
+        AbilityTriggerDisplayDuration, false);
+  }
+}
+
+void UBattleHUDWidget::HideAbilityTriggeredText() {
+  if (!AbilityTriggeredText) {
+    return;
+  }
+
+  AbilityTriggeredText->SetText(FText::GetEmpty());
+  AbilityTriggeredText->SetVisibility(ESlateVisibility::Collapsed);
+}
+
+FSkaldAbilityDefinition
+UBattleHUDWidget::ResolvePassiveAbilityDefinition(AFighterPawn *Fighter) const {
+  if (!Fighter) {
+    return FSkaldAbilityDefinition();
+  }
+
+  if (USkaldAbilityComponent *AbilityComponent =
+          Fighter->GetAbilityComponent()) {
+    return AbilityComponent->GetPassiveAbility();
+  }
+
+  return FSkaldAbilityDefinition();
+}
+
+FText UBattleHUDWidget::BuildAbilityTooltipText(
+    const FSkaldAbilityDefinition &Definition) const {
+  if (!Definition.IsValid()) {
+    return FText::GetEmpty();
+  }
+
+  const bool bHasName = !Definition.AbilityName.IsEmpty();
+  const bool bHasDescription = !Definition.AbilityDescription.IsEmpty();
+
+  if (bHasName && bHasDescription) {
+    return FText::Format(NSLOCTEXT("SkaldBattleHUD",
+                                   "PassiveAbilityTooltipNameDescription",
+                                   "{0}\n{1}"),
+                         Definition.AbilityName, Definition.AbilityDescription);
+  }
+
+  if (bHasName) {
+    return Definition.AbilityName;
+  }
+
+  if (bHasDescription) {
+    return Definition.AbilityDescription;
+  }
+
+  return FText::GetEmpty();
+}
+
+void UBattleHUDWidget::UpdatePassiveAbilityIcon(
+    UImage *IconWidget, const FSkaldAbilityDefinition &Definition) {
+  if (!IconWidget) {
+    return;
+  }
+
+  if (!Definition.IsValid()) {
+    IconWidget->SetBrushFromTexture(nullptr);
+    IconWidget->SetVisibility(ESlateVisibility::Collapsed);
+    IconWidget->SetToolTipText(FText::GetEmpty());
+    return;
+  }
+
+  UTexture2D *IconTexture = nullptr;
+  if (!Definition.AbilityIcon.IsNull()) {
+    IconTexture = Definition.AbilityIcon.Get();
+    if (!IconTexture) {
+      IconTexture = Definition.AbilityIcon.LoadSynchronous();
+    }
+  }
+
+  IconWidget->SetBrushFromTexture(IconTexture);
+  IconWidget->SetVisibility(ESlateVisibility::Visible);
+  IconWidget->SetToolTipText(BuildAbilityTooltipText(Definition));
 }
 
 void UBattleHUDWidget::SetRoundInfo(const FText &RoundLabel,
