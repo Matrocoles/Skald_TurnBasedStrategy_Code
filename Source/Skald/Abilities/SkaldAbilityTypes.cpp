@@ -76,16 +76,16 @@ TMap<ESkaldFaction, FSkaldFactionAbilitySet> BuildFactionAbilityMap()
             0);
         Set.LineAbility = MakeActive(
             TEXT("Ability_Human_Line"),
-            NSLOCTEXT("SkaldAbilities", "HumanLineName", "Shield Wall Pivot"),
-            NSLOCTEXT("SkaldAbilities", "HumanLineDesc", "When an adjacent ally is targeted, expend the reaction to grant that ally +1 Defence for that attack and swap positions after damage resolves if the ally survives."),
-            ESkaldAbilityCostType::Reaction,
-            0);
+            NSLOCTEXT("SkaldAbilities", "HumanLineName", "Shield Wall Rally"),
+            NSLOCTEXT("SkaldAbilities", "HumanLineDesc", "Spend an action to choose an adjacent ally and reform the line. You and the ally each gain +1 Defence until the start of your next activation and may immediately shift 1 square, swapping positions if desired."),
+            ESkaldAbilityCostType::Action,
+            2);
         Set.EliteAbility = MakeActive(
             TEXT("Ability_Human_Elite"),
             NSLOCTEXT("SkaldAbilities", "HumanEliteName", "Tactical Reserves"),
-            NSLOCTEXT("SkaldAbilities", "HumanEliteDesc", "Skip this fighter’s attack to ready nearby troops. Up to two allies within 3 squares immediately refresh one spent action or reaction but cannot take the same ability twice per round."),
+            NSLOCTEXT("SkaldAbilities", "HumanEliteDesc", "Spend an action to direct reinforcements. Choose up to two allies within 5 squares; each may immediately move up to 2 squares and gains +1 Attack Dice on their next attack this round."),
             ESkaldAbilityCostType::Action,
-            1);
+            2);
         Result.Add(ESkaldFaction::Human, Set);
         RegisterAbilityDefinition(Set.Passive);
         RegisterAbilityDefinition(Set.SkirmishAbility);
@@ -102,9 +102,9 @@ TMap<ESkaldFaction, FSkaldFactionAbilitySet> BuildFactionAbilityMap()
         Set.SkirmishAbility = MakeActive(
             TEXT("Ability_Orc_Skirmish"),
             NSLOCTEXT("SkaldAbilities", "OrcSkirmishName", "Brutal Charge"),
-            NSLOCTEXT("SkaldAbilities", "OrcSkirmishDesc", "Move up to Movement + 2 toward a visible enemy. If the fighter moved at least 4 squares, add +1 Attack Damage for this attack."),
+            NSLOCTEXT("SkaldAbilities", "OrcSkirmishDesc", "Begin a rush gaining +2 Movement for this move toward a visible enemy. If the fighter travels at least 4 squares, their next attack this activation gains +1 Attack Damage and +1 Attack Dice."),
             ESkaldAbilityCostType::Action,
-            0);
+            2);
         Set.LineAbility = MakeActive(
             TEXT("Ability_Orc_Line"),
             NSLOCTEXT("SkaldAbilities", "OrcLineName", "Smash Through"),
@@ -114,10 +114,9 @@ TMap<ESkaldFaction, FSkaldFactionAbilitySet> BuildFactionAbilityMap()
         Set.EliteAbility = MakeActive(
             TEXT("Ability_Orc_Elite"),
             NSLOCTEXT("SkaldAbilities", "OrcEliteName", "WAAAGH! Roar"),
-            NSLOCTEXT("SkaldAbilities", "OrcEliteDesc", "Trigger after rolling initiative. All Orc allies gain +1 Attack Dice on their first attack this round and ignore difficult terrain for their first move."),
-            ESkaldAbilityCostType::Free,
-            0,
-            true);
+            NSLOCTEXT("SkaldAbilities", "OrcEliteDesc", "After this fighter activates, unleash a deafening roar by spending 2 actions. All Orc allies gain +2 Movement, +1 Attack Dice, ignore difficult terrain on their first movement, and score critical hits on rolls of 5-6 until the round ends."),
+            ESkaldAbilityCostType::Action,
+            3);
         Result.Add(ESkaldFaction::Orc, Set);
         RegisterAbilityDefinition(Set.Passive);
         RegisterAbilityDefinition(Set.SkirmishAbility);
@@ -134,15 +133,15 @@ TMap<ESkaldFaction, FSkaldFactionAbilitySet> BuildFactionAbilityMap()
         Set.SkirmishAbility = MakeActive(
             TEXT("Ability_Dwarf_Skirmish"),
             NSLOCTEXT("SkaldAbilities", "DwarfSkirmishName", "Forgeguard Brace"),
-            NSLOCTEXT("SkaldAbilities", "DwarfSkirmishDesc", "When charged from 2+ squares away, deal 1 automatic damage before the attack roll and gain +2 Defence against that attack."),
-            ESkaldAbilityCostType::Reaction,
-            0);
+            NSLOCTEXT("SkaldAbilities", "DwarfSkirmishDesc", "Spend an action to lock shields. Gain +2 Defence until the start of your next activation. The first enemy that moves adjacent during that time suffers 1 automatic damage and -1 Movement until end of round."),
+            ESkaldAbilityCostType::Action,
+            2);
         Set.LineAbility = MakeActive(
             TEXT("Ability_Dwarf_Line"),
             NSLOCTEXT("SkaldAbilities", "DwarfLineName", "Rune-etched Riposte"),
-            NSLOCTEXT("SkaldAbilities", "DwarfLineDesc", "Expend an action to ready a rune. Until the fighter next attacks, the first melee attacker that hits them suffers Attack Damage back as retaliatory damage."),
+            NSLOCTEXT("SkaldAbilities", "DwarfLineDesc", "Spend an action to etch retaliatory runes. Until the fighter next attacks, the first melee attacker that targets them suffers Attack Damage for each miss rolled during that attack."),
             ESkaldAbilityCostType::Action,
-            1);
+            2);
         Set.EliteAbility = MakeActive(
             TEXT("Ability_Dwarf_Elite"),
             NSLOCTEXT("SkaldAbilities", "DwarfEliteName", "Deep Delve Mortar"),
@@ -171,7 +170,7 @@ TMap<ESkaldFaction, FSkaldFactionAbilitySet> BuildFactionAbilityMap()
         Set.LineAbility = MakeActive(
             TEXT("Ability_Elf_Line"),
             NSLOCTEXT("SkaldAbilities", "ElfLineName", "Moonlance Flurry"),
-            NSLOCTEXT("SkaldAbilities", "ElfLineDesc", "Make two attacks with -1 Attack Dice each; critical hits restore 1 spent reaction."),
+            NSLOCTEXT("SkaldAbilities", "ElfLineDesc", "Make a single sweeping attack with +1 Attack Dice."),
             ESkaldAbilityCostType::Action,
             0);
         Set.EliteAbility = MakeActive(
@@ -199,17 +198,17 @@ TMap<ESkaldFaction, FSkaldFactionAbilitySet> BuildFactionAbilityMap()
             NSLOCTEXT("SkaldAbilities", "LizardSkirmishName", "Tail Sweep"),
             NSLOCTEXT("SkaldAbilities", "LizardSkirmishDesc", "Attack all adjacent enemies with Attack Dice - 1 dice. Any enemy hit suffers -1 Movement until end of round."),
             ESkaldAbilityCostType::Action,
-            1);
+            2);
         Set.LineAbility = MakeActive(
             TEXT("Ability_Lizard_Line"),
             NSLOCTEXT("SkaldAbilities", "LizardLineName", "Amphibious Rush"),
-            NSLOCTEXT("SkaldAbilities", "LizardLineDesc", "When entering or starting in water terrain, gain +2 Movement and +1 Attack Dice for the turn."),
+            NSLOCTEXT("SkaldAbilities", "LizardLineDesc", "When entering or starting in difficult terrain, gain +2 Movement and +1 Attack Dice for the turn."),
             ESkaldAbilityCostType::Action,
             0);
         Set.EliteAbility = MakeActive(
             TEXT("Ability_Lizard_Elite"),
             NSLOCTEXT("SkaldAbilities", "LizardEliteName", "Primeval Regeneration"),
-            NSLOCTEXT("SkaldAbilities", "LizardEliteDesc", "At the start of this fighter’s activation, restore 1d3 Health (capped by max) and cleanse one debuff."),
+            NSLOCTEXT("SkaldAbilities", "LizardEliteDesc", "At the start of this fighter’s activation, restore 3 Health (capped by max) and cleanse one debuff."),
             ESkaldAbilityCostType::Free,
             3);
         Result.Add(ESkaldFaction::LizardFolk, Set);
@@ -224,26 +223,24 @@ TMap<ESkaldFaction, FSkaldFactionAbilitySet> BuildFactionAbilityMap()
         Set.Passive = MakePassive(
             TEXT("Ability_Undead_Passive"),
             NSLOCTEXT("SkaldAbilities", "UndeadPassiveName", "Necrotic Resilience"),
-            NSLOCTEXT("SkaldAbilities", "UndeadPassiveDesc", "When reduced to 1 Health, Undead fighters gain +1 Defence and +1 Attack Dice until they heal above 1 Health and ignore morale-based effects."));
+            NSLOCTEXT("SkaldAbilities", "UndeadPassiveDesc", "When reduced to 5 Health, Undead fighters gain +1 Defence and +1 Attack Dice until they heal above 5 Health and ignore morale-based effects."));
         Set.SkirmishAbility = MakeActive(
             TEXT("Ability_Undead_Skirmish"),
             NSLOCTEXT("SkaldAbilities", "UndeadSkirmishName", "Grave Grasp"),
             NSLOCTEXT("SkaldAbilities", "UndeadSkirmishDesc", "Attack a target within 3 squares. On a hit, root the enemy (Movement becomes 0) until end of its next activation."),
             ESkaldAbilityCostType::Action,
-            0);
+            2);
         Set.LineAbility = MakeActive(
             TEXT("Ability_Undead_Line"),
             NSLOCTEXT("SkaldAbilities", "UndeadLineName", "Soul Harvest"),
-            NSLOCTEXT("SkaldAbilities", "UndeadLineDesc", "After defeating an enemy this activation, immediately gain +1 Attack Dice and heal 1 Health (cannot exceed max). If no enemy dies, regain the action instead."),
+            NSLOCTEXT("SkaldAbilities", "UndeadLineDesc", "Make an attack with +1 Attack Dice. Heal 1 Health for each hit scored on this attack (cannot exceed max)."),
             ESkaldAbilityCostType::Action,
-            1);
-        Set.EliteAbility = MakeActive(
+            2);
+        Set.EliteAbility = MakePassive(
             TEXT("Ability_Undead_Elite"),
             NSLOCTEXT("SkaldAbilities", "UndeadEliteName", "Deathless Advance"),
-            NSLOCTEXT("SkaldAbilities", "UndeadEliteDesc", "When reduced to 0 Health, stand back up at 1 Health and gain +2 Attack Dice for the rest of the round; afterwards, remove this ability."),
-            ESkaldAbilityCostType::Free,
-            0,
-            true);
+            NSLOCTEXT("SkaldAbilities", "UndeadEliteDesc", "When reduced to 0 Health, immediately rise again with 5 Health. This passive cannot trigger again for 10 rounds."));
+        Set.EliteAbility.CooldownRounds = 10;
         Result.Add(ESkaldFaction::Undead, Set);
         RegisterAbilityDefinition(Set.Passive);
         RegisterAbilityDefinition(Set.SkirmishAbility);
@@ -318,7 +315,7 @@ TMap<ESkaldFaction, FSkaldFactionAbilitySet> BuildFactionAbilityMap()
         Set.Passive = MakePassive(
             TEXT("Ability_Empire_Passive"),
             NSLOCTEXT("SkaldAbilities", "EmpirePassiveName", "Iron Discipline"),
-            NSLOCTEXT("SkaldAbilities", "EmpirePassiveDesc", "IronLegion units can reroll one initiative die per round and choose either result."));
+            NSLOCTEXT("SkaldAbilities", "EmpirePassiveDesc", "Iron Legion fighters shrug off hesitation, ignoring the first -1 penalty from fear or debuff effects applied to them each round."));
         Set.SkirmishAbility = MakeActive(
             TEXT("Ability_Empire_Skirmish"),
             NSLOCTEXT("SkaldAbilities", "EmpireSkirmishName", "Suppressing Fire"),
@@ -334,7 +331,7 @@ TMap<ESkaldFaction, FSkaldFactionAbilitySet> BuildFactionAbilityMap()
         Set.EliteAbility = MakeActive(
             TEXT("Ability_Empire_Elite"),
             NSLOCTEXT("SkaldAbilities", "EmpireEliteName", "Artillery Strike"),
-            NSLOCTEXT("SkaldAbilities", "EmpireEliteDesc", "Spend an action to call artillery on a visible tile. At end of the round, roll an attack with +2 Attack Damage against all units within 2 squares (allies take half damage). Ability recharges after two rounds."),
+            NSLOCTEXT("SkaldAbilities", "EmpireEliteDesc", "Spend 2 actions to call artillery on a visible tile. Immediately roll an attack with +2 Attack Damage against all units within 2 squares (allies take half damage). Ability recharges after two rounds."),
             ESkaldAbilityCostType::Action,
             2);
         Result.Add(ESkaldFaction::Empire, Set);
@@ -353,9 +350,9 @@ TMap<ESkaldFaction, FSkaldFactionAbilitySet> BuildFactionAbilityMap()
         Set.SkirmishAbility = MakeActive(
             TEXT("Ability_Inflicted_Skirmish"),
             NSLOCTEXT("SkaldAbilities", "InflictedSkirmishName", "Viral Lash"),
-            NSLOCTEXT("SkaldAbilities", "InflictedSkirmishDesc", "Make an attack; on hit, apply a contagion that causes the target to suffer -1 Defence and spread the debuff to adjacent enemies if they take damage this round."),
+            NSLOCTEXT("SkaldAbilities", "InflictedSkirmishDesc", "Make an attack; on hit, apply a contagion that causes the target to suffer -1 Defence (once per fighter) and spread the debuff to adjacent enemies if they take damage this round."),
             ESkaldAbilityCostType::Action,
-            0);
+            2);
         Set.LineAbility = MakeActive(
             TEXT("Ability_Inflicted_Line"),
             NSLOCTEXT("SkaldAbilities", "InflictedLineName", "Mutagenic Surge"),
@@ -381,19 +378,19 @@ TMap<ESkaldFaction, FSkaldFactionAbilitySet> BuildFactionAbilityMap()
         Set.Passive = MakePassive(
             TEXT("Ability_Frog_Passive"),
             NSLOCTEXT("SkaldAbilities", "FrogPassiveName", "Mire Masters"),
-            NSLOCTEXT("SkaldAbilities", "FrogPassiveDesc", "ToadFolk treat water and swamp tiles as normal terrain and impose -1 Movement on enemies who start adjacent to them."));
+            NSLOCTEXT("SkaldAbilities", "FrogPassiveDesc", "ToadFolk ignore penalties from water or swamp tiles and leave clinging mire behind. Squares they exit become difficult terrain for enemies until the end of the round."));
         Set.SkirmishAbility = MakeActive(
             TEXT("Ability_Frog_Skirmish"),
             NSLOCTEXT("SkaldAbilities", "FrogSkirmishName", "Tongue Snare"),
             NSLOCTEXT("SkaldAbilities", "FrogSkirmishDesc", "Pull a target within 4 squares 1 square closer and reduce its Attack Dice by 1 until end of round."),
             ESkaldAbilityCostType::Action,
-            0);
+            2);
         Set.LineAbility = MakeActive(
             TEXT("Ability_Frog_Line"),
             NSLOCTEXT("SkaldAbilities", "FrogLineName", "Bubble Ward"),
-            NSLOCTEXT("SkaldAbilities", "FrogLineDesc", "When an ally within 3 squares is hit by a ranged attack, negate one hit and slide the ally 1 square."),
-            ESkaldAbilityCostType::Reaction,
-            1);
+            NSLOCTEXT("SkaldAbilities", "FrogLineDesc", "Envelope an ally within 3 squares in a buoyant ward. Until the start of your next activation, that ally gains +1 Defence and the next ranged attack against them loses one success before damage is applied."),
+            ESkaldAbilityCostType::Action,
+            2);
         Set.EliteAbility = MakeActive(
             TEXT("Ability_Frog_Elite"),
             NSLOCTEXT("SkaldAbilities", "FrogEliteName", "Raincaller Deluge"),
@@ -428,7 +425,7 @@ TMap<ESkaldFaction, FSkaldFactionAbilitySet> BuildFactionAbilityMap()
         Set.EliteAbility = MakeActive(
             TEXT("Ability_Ravpack_Elite"),
             NSLOCTEXT("SkaldAbilities", "RavpackEliteName", "Overclock Harness"),
-            NSLOCTEXT("SkaldAbilities", "RavpackEliteDesc", "At the start of activation, gain +1 Attack Dice and +1 Movement for the turn; at end of activation, suffer 1 damage if you attacked."),
+            NSLOCTEXT("SkaldAbilities", "RavpackEliteDesc", "After completing this fighter’s activation, engage the harness to gain +1 Attack Dice and +1 Movement until the start of their next activation; suffer 1 damage if they attacked before triggering it."),
             ESkaldAbilityCostType::Free,
             2);
         Result.Add(ESkaldFaction::Ravpack, Set);
