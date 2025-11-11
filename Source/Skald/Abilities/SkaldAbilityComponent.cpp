@@ -91,6 +91,7 @@ USkaldAbilityComponent::USkaldAbilityComponent()
     bSoulHarvestActive = false;
     bSoulHarvestKillSecured = false;
     bHarrierDashActive = false;
+    bHarrierDashDefencePenaltyConsumed = false;
     bSuppressingFireActive = false;
     bRendAndTearActive = false;
     bArtilleryStrikePending = false;
@@ -168,6 +169,8 @@ void USkaldAbilityComponent::RefreshAbilityLoadout(const FFighterStats& InStats,
     bGoblinNetActive = false;
     bGoblinAmbushActive = false;
     bGoblinAmbushPenaltyPending = false;
+    bHarrierDashActive = false;
+    bHarrierDashDefencePenaltyConsumed = false;
     bElfEvasionActive = false;
     bLizardPenaltyConsumedThisRound = false;
     bRavpackMomentumPending = false;
@@ -1118,12 +1121,6 @@ void USkaldAbilityComponent::ApplyAbilityEffects(const FSkaldAbilityDefinition& 
         if (GetOwnerRole() == ROLE_Authority)
         {
             bHarrierDashActive = true;
-
-            FSkaldActiveAbilityModifier Modifier;
-            Modifier.SourceAbilityId = Definition.AbilityId;
-            Modifier.Delta.AttackDamage = -1;
-            Modifier.bRemoveOnActivationEnd = true;
-            AddActiveModifier(MoveTemp(Modifier));
         }
     }
     else if (Definition.AbilityId == TEXT("Ability_Gnoll_Line"))
@@ -1758,6 +1755,16 @@ void USkaldAbilityComponent::HandleIncomingAttackStarted()
 
 void USkaldAbilityComponent::HandleIncomingAttackFinished()
 {
+}
+
+bool USkaldAbilityComponent::HasHarrierDashDefencePenalty() const
+{
+    return bHarrierDashDefencePenaltyConsumed;
+}
+
+void USkaldAbilityComponent::MarkHarrierDashDefencePenaltyConsumed()
+{
+    bHarrierDashDefencePenaltyConsumed = true;
 }
 
 void USkaldAbilityComponent::RefreshPassiveState()
@@ -2409,11 +2416,18 @@ void USkaldAbilityComponent::HandleBattleAttackResolved(AFighterPawn* Attacker, 
         {
             if (Defender && Result.HitCount > 0)
             {
-                FSkaldActiveAbilityModifier Modifier;
-                Modifier.SourceAbilityId = TEXT("Ability_Gnoll_Skirmish");
-                Modifier.Delta.Defence = -1;
-                Modifier.bRemoveOnRoundStart = true;
-                ApplyModifierToTarget(Defender, MoveTemp(Modifier));
+                if (USkaldAbilityComponent* DefenderAbility = Defender->GetAbilityComponent())
+                {
+                    if (!DefenderAbility->HasHarrierDashDefencePenalty())
+                    {
+                        FSkaldActiveAbilityModifier Modifier;
+                        Modifier.SourceAbilityId = TEXT("Ability_Gnoll_Skirmish");
+                        Modifier.Delta.Defence = -1;
+                        Modifier.bRemoveOnRoundStart = true;
+                        ApplyModifierToTarget(Defender, MoveTemp(Modifier));
+                        DefenderAbility->MarkHarrierDashDefencePenaltyConsumed();
+                    }
+                }
             }
 
             bHarrierDashActive = false;
