@@ -260,9 +260,9 @@ TMap<ESkaldFaction, FSkaldFactionAbilitySet> BuildFactionAbilityMap()
         Set.SkirmishAbility = MakeActive(
             TEXT("Ability_Gnoll_Skirmish"),
             NSLOCTEXT("SkaldAbilities", "GnollSkirmishName", "Harrier Dash"),
-            NSLOCTEXT("SkaldAbilities", "GnollSkirmishDesc", "Move up to Movement without provoking reactions, then make an attack with -1 Attack Damage that causes -1 Defence on hit."),
+            NSLOCTEXT("SkaldAbilities", "GnollSkirmishDesc", "Move up to Movement without provoking reactions, then make an attack that causes -1 Defence on hit (each fighter can only be affected once)."),
             ESkaldAbilityCostType::Action,
-            0);
+            2);
         Set.LineAbility = MakeActive(
             TEXT("Ability_Gnoll_Line"),
             NSLOCTEXT("SkaldAbilities", "GnollLineName", "Howl of the Alpha"),

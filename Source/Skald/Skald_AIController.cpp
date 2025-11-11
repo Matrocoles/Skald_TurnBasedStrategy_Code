@@ -1565,9 +1565,16 @@ float ASkaldAIController::ComputeAbilityAttackScoreBonus(
         Target->Stats.Defence <= 1) {
       Bonus *= 0.5f;
     }
-    if (AbilityId == TEXT("Ability_Gnoll_Skirmish") &&
-        Target->Stats.Defence <= 0) {
-      Bonus *= 0.5f;
+    if (AbilityId == TEXT("Ability_Gnoll_Skirmish")) {
+      if (const USkaldAbilityComponent *TargetAbility =
+              Target->GetAbilityComponent()) {
+        if (TargetAbility->HasHarrierDashDefencePenalty()) {
+          Bonus *= 0.5f;
+        }
+      }
+      if (Target->Stats.Defence <= 0) {
+        Bonus *= 0.5f;
+      }
     }
     break;
   }

@@ -224,6 +224,9 @@ public:
     void HandleIncomingAttackStarted();
     void HandleIncomingAttackFinished();
 
+    bool HasHarrierDashDefencePenalty() const;
+    void MarkHarrierDashDefencePenaltyConsumed();
+
 protected:
     virtual void BeginPlay() override;
 
@@ -334,6 +337,7 @@ protected:
     bool bSoulHarvestActive = false;
     bool bSoulHarvestKillSecured = false;
     bool bHarrierDashActive = false;
+    bool bHarrierDashDefencePenaltyConsumed = false;
     bool bSuppressingFireActive = false;
     bool bRendAndTearActive = false;
     bool bArtilleryStrikePending = false;

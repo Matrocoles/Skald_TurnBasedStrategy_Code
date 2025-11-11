@@ -55,7 +55,7 @@ Individual armies can nudge thresholds up or down if data-table tuning warrants 
 ## Gnoll Faction
 
 * **Passive – Pack Instincts:** Gnoll fighters gain `+1 AttackDice` when an ally has already attacked the same target this round.
-* **Skirmish Ability – Harrier Dash (Action):** Move up to `Movement` without provoking reactions, then make an attack with `-1 AttackDamage` that causes `-1 Defence` on hit.
+* **Skirmish Ability – Harrier Dash (Action, cooldown 2 rounds):** Move up to `Movement` without provoking reactions, then make an attack that causes `-1 Defence` on hit (each fighter can only be affected once).
 * **Line Ability – Howl of the Alpha (Action):** Emit a rallying howl. All allies within 4 squares gain `+1 Movement` and may ignore disengage penalties until end of round.
 * **Elite Ability – Rend and Tear (Action):** Make an attack; for each hit scored, inflict a stacking bleed that deals 1 damage at the start of the target’s activation (max 3 stacks).
 
