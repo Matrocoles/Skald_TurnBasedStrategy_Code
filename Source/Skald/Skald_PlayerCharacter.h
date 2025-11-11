@@ -58,6 +58,8 @@ public:
 protected:
         /** Called when the game starts or when spawned */
         virtual void BeginPlay() override;
+        virtual void PossessedBy(AController* NewController) override;
+        virtual void OnRep_Controller() override;
 
         /** Reference to the world map actor for selection and movement */
         UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Selection", meta=(ExposeOnSpawn=true))
@@ -91,7 +93,11 @@ protected:
 	void FocusOverviewCameraOnTerritory(ATerritory* Territory);
 
 	/** Clear any active overview camera lock. */
-	void ClearOverviewCameraFocus();
+        void ClearOverviewCameraFocus();
+
+        bool BeginStrategicInitiativeCameraView();
+        void EndStrategicInitiativeCameraView();
+        bool IsStrategicInitiativeCameraActive() const { return OverviewDiceCameraState.bActive; }
 
 public:
         /** Called every frame */
@@ -267,6 +273,24 @@ protected:
         UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
         float OverviewLockedPitch = -70.f;
 
+        UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
+        float OverviewTopDownPitch = -85.f;
+
+        UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
+        float OverviewSpawnZoom = 2200.f;
+
+        UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
+        FVector OverviewPivotOffset = FVector(0.f, 0.f, 100.f);
+
+        UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
+        float OverviewDiceCameraZoom = 2000.f;
+
+        UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
+        float OverviewDiceCameraPitch = -85.f;
+
+        UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
+        FVector OverviewDiceCameraOffset = FVector::ZeroVector;
+
 private:
         /** Perform per-frame updates while the battle camera is active. */
         void UpdateBattleCamera(float DeltaTime);
@@ -274,8 +298,11 @@ private:
         /** Reset any active camera lock. */
         void ClearBattleCameraLock();
 
-        /** Update the strategic overview camera each frame. */
-        void UpdateOverviewCamera(float DeltaTime);
+	/** Update the strategic overview camera each frame. */
+	void UpdateOverviewCamera(float DeltaTime);
+	void InitializeOverviewCamera();
+	FVector ComputeOverviewPivotLocation() const;
+	void RefreshOverviewPivot();
 
         /** True if the tactical battle camera behaviour is enabled. */
         bool bBattleCameraActive = false;
@@ -304,14 +331,30 @@ private:
         /** Cached default pitch restored when releasing the overview focus. */
         float OverviewDefaultPitch = 0.f;
 
-        /** Current desired focus location for the overview camera. */
-        FVector OverviewFocusLocation = FVector::ZeroVector;
+	/** Current desired focus location for the overview camera. */
+	FVector OverviewFocusLocation = FVector::ZeroVector;
+	/** Cached pivot location representing the centre of the world map. */
+	FVector OverviewWorldPivot = FVector::ZeroVector;
 
         /** True while the overview camera is locked onto a territory. */
         bool bOverviewCameraLocked = false;
 
         /** Territory currently used as the overview focus point. */
         TWeakObjectPtr<ATerritory> LockedOverviewTerritory;
+
+	struct FOverviewDiceCameraState
+	{
+		bool bActive = false;
+		bool bWasLocked = false;
+		FVector OriginalLocation = FVector::ZeroVector;
+		FVector OriginalFocusLocation = FVector::ZeroVector;
+		FRotator OriginalControlRotation = FRotator::ZeroRotator;
+		float OriginalZoom = 0.f;
+		TWeakObjectPtr<ATerritory> OriginalLockedTerritory;
+	};
+
+	FOverviewDiceCameraState OverviewDiceCameraState;
+	bool bHasInitializedOverviewCamera = false;
 
         /** Tracks if the player has manually rotated the camera while locked on. */
         bool bHasManuallyRotatedWhileLocked = false;

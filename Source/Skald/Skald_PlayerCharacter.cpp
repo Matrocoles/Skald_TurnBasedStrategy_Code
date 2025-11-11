@@ -46,9 +46,15 @@ ASkald_PlayerCharacter::ASkald_PlayerCharacter()
 	bCachedCameraLag = CameraBoom->bEnableCameraLag;
 	CachedCameraLagSpeed = CameraBoom->CameraLagSpeed;
 	bCachedDoCollisionTest = CameraBoom->bDoCollisionTest;
-	DesiredOverviewZoom = CachedDefaultArmLength;
-	OverviewDefaultPitch = CachedDefaultBoomRotation.Pitch;
+	DesiredOverviewZoom = FMath::Clamp(OverviewSpawnZoom, OverviewMinZoom, OverviewMaxZoom);
+	OverviewDefaultPitch = OverviewTopDownPitch;
 	OverviewFocusLocation = GetActorLocation();
+	OverviewWorldPivot = OverviewFocusLocation;
+
+        if (CameraBoom)
+        {
+                CameraBoom->TargetArmLength = DesiredOverviewZoom;
+        }
 
         DesiredBattleZoom = FMath::Clamp(DefaultBattleZoom, MinBattleZoom, MaxBattleZoom);
         const float InitialYaw = GetActorRotation().Yaw;
@@ -81,11 +87,13 @@ void ASkald_PlayerCharacter::BeginPlay()
                 bCachedCameraLag = CameraBoom->bEnableCameraLag;
                 CachedCameraLagSpeed = CameraBoom->CameraLagSpeed;
                 bCachedDoCollisionTest = CameraBoom->bDoCollisionTest;
-                DesiredOverviewZoom = CameraBoom->TargetArmLength;
-                OverviewDefaultPitch = CameraBoom->GetRelativeRotation().Pitch;
+                DesiredOverviewZoom = FMath::Clamp(OverviewSpawnZoom, OverviewMinZoom, OverviewMaxZoom);
+                CameraBoom->TargetArmLength = DesiredOverviewZoom;
+                OverviewDefaultPitch = OverviewTopDownPitch;
         }
 
-        OverviewFocusLocation = GetActorLocation();
+        RefreshOverviewPivot();
+        InitializeOverviewCamera();
 
         TryCacheWorldMap();
 
@@ -94,6 +102,22 @@ void ASkald_PlayerCharacter::BeginPlay()
         CachedGameInstance = GetGameInstance<USkaldGameInstance>();
 }
 
+void ASkald_PlayerCharacter::PossessedBy(AController* NewController)
+{
+        Super::PossessedBy(NewController);
+
+        InitializeOverviewCamera();
+}
+
+
+void ASkald_PlayerCharacter::OnRep_Controller()
+{
+        Super::OnRep_Controller();
+
+        InitializeOverviewCamera();
+}
+
+
 void ASkald_PlayerCharacter::TryCacheWorldMap()
 {
         if (!WorldMap)
@@ -101,6 +125,8 @@ void ASkald_PlayerCharacter::TryCacheWorldMap()
                 if (AWorldMap* Found = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass())))
                 {
                         WorldMap = Found;
+                        RefreshOverviewPivot();
+                        InitializeOverviewCamera();
                         WorldMap->OnTerritorySelected.AddUniqueDynamic(this, &ASkald_PlayerCharacter::HandleTerritorySelected);
                         GetWorldTimerManager().ClearTimer(WorldMapSearchHandle);
                         HandleTerritorySelected(WorldMap->SelectedTerritory);
@@ -111,6 +137,62 @@ void ASkald_PlayerCharacter::TryCacheWorldMap()
                 }
         }
 }
+
+FVector ASkald_PlayerCharacter::ComputeOverviewPivotLocation() const
+{
+        FVector PivotLocation = GetActorLocation();
+
+        if (WorldMap)
+        {
+                PivotLocation = WorldMap->GetActorLocation() + OverviewPivotOffset;
+        }
+
+        return PivotLocation;
+}
+
+void ASkald_PlayerCharacter::RefreshOverviewPivot()
+{
+        OverviewWorldPivot = ComputeOverviewPivotLocation();
+
+        if (!bBattleCameraActive && !bOverviewCameraLocked && !OverviewDiceCameraState.bActive)
+        {
+                OverviewFocusLocation = OverviewWorldPivot;
+        }
+}
+
+void ASkald_PlayerCharacter::InitializeOverviewCamera()
+{
+        RefreshOverviewPivot();
+
+        if (CameraBoom)
+        {
+                DesiredOverviewZoom = FMath::Clamp(OverviewSpawnZoom, OverviewMinZoom, OverviewMaxZoom);
+                CameraBoom->TargetArmLength = DesiredOverviewZoom;
+        }
+
+        OverviewDefaultPitch = OverviewTopDownPitch;
+
+        if (Controller)
+        {
+                FRotator ControlRotation = Controller->GetControlRotation();
+                ControlRotation.Pitch = OverviewTopDownPitch;
+                Controller->SetControlRotation(ControlRotation);
+        }
+
+        if (!bBattleCameraActive && !bOverviewCameraLocked && !OverviewDiceCameraState.bActive)
+        {
+                SetActorLocation(OverviewWorldPivot);
+                OverviewFocusLocation = OverviewWorldPivot;
+
+                if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+                {
+                        MovementComponent->StopMovementImmediately();
+                }
+        }
+
+        bHasInitializedOverviewCamera = true;
+}
+
 
 // Called every frame
 void ASkald_PlayerCharacter::Tick(float DeltaTime)
@@ -339,7 +421,7 @@ void ASkald_PlayerCharacter::HandleTerritorySelected(ATerritory* Territory)
 		{
 			ClearOverviewCameraFocus();
 		}
-	}
+	        }
 }
 
 void ASkald_PlayerCharacter::AbilityOne()
@@ -382,39 +464,137 @@ void ASkald_PlayerCharacter::AdjustZoom(float Value)
 {
 		const float TargetZoom = DesiredOverviewZoom - (Value * OverviewZoomStep);
 		DesiredOverviewZoom = FMath::Clamp(TargetZoom, OverviewMinZoom, OverviewMaxZoom);
-	}
+	        }
 }
 
 void ASkald_PlayerCharacter::FocusOverviewCameraOnTerritory(ATerritory* Territory)
 {
-	if (!Territory)
-	{
-		ClearOverviewCameraFocus();
-		return;
-	}
+        if (!Territory)
+        {
+                ClearOverviewCameraFocus();
+                return;
+        }
 
-	LockedOverviewTerritory = Territory;
-	bOverviewCameraLocked = true;
-	OverviewFocusLocation = Territory->GetActorLocation() + (FVector::UpVector * OverviewFocusHeight);
+        LockedOverviewTerritory = Territory;
+        bOverviewCameraLocked = true;
+        OverviewFocusLocation = Territory->GetActorLocation() + (FVector::UpVector * OverviewFocusHeight);
 
-	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
-	{
-		MovementComponent->StopMovementImmediately();
-	}
+        if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+        {
+                MovementComponent->StopMovementImmediately();
+        }
 }
+
 
 void ASkald_PlayerCharacter::ClearOverviewCameraFocus()
 {
-	bOverviewCameraLocked = false;
-	LockedOverviewTerritory.Reset();
-	OverviewFocusLocation = GetActorLocation();
+        bOverviewCameraLocked = false;
+        LockedOverviewTerritory.Reset();
+        RefreshOverviewPivot();
+        OverviewFocusLocation = OverviewWorldPivot;
 
-	if (Controller)
-	{
-		FRotator ControlRotation = Controller->GetControlRotation();
-		ControlRotation.Pitch = OverviewDefaultPitch;
-		Controller->SetControlRotation(ControlRotation);
-	}
+        if (!bBattleCameraActive && !OverviewDiceCameraState.bActive)
+        {
+                SetActorLocation(OverviewWorldPivot);
+
+                if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+                {
+                        MovementComponent->StopMovementImmediately();
+                }
+        }
+
+        if (Controller)
+        {
+                FRotator ControlRotation = Controller->GetControlRotation();
+                ControlRotation.Pitch = OverviewDefaultPitch;
+                Controller->SetControlRotation(ControlRotation);
+        }
+}
+
+bool ASkald_PlayerCharacter::BeginStrategicInitiativeCameraView()
+{
+        if (bBattleCameraActive || OverviewDiceCameraState.bActive)
+        {
+                return false;
+        }
+
+        OverviewDiceCameraState.bActive = true;
+        OverviewDiceCameraState.bWasLocked = bOverviewCameraLocked;
+        OverviewDiceCameraState.OriginalLocation = GetActorLocation();
+        OverviewDiceCameraState.OriginalFocusLocation = OverviewFocusLocation;
+        OverviewDiceCameraState.OriginalZoom = CameraBoom ? CameraBoom->TargetArmLength : DesiredOverviewZoom;
+        OverviewDiceCameraState.OriginalControlRotation = Controller ? Controller->GetControlRotation() : FRotator::ZeroRotator;
+        OverviewDiceCameraState.OriginalLockedTerritory = LockedOverviewTerritory;
+
+        bOverviewCameraLocked = false;
+
+        RefreshOverviewPivot();
+        const FVector ArenaFocus = OverviewWorldPivot + OverviewDiceCameraOffset;
+        OverviewFocusLocation = ArenaFocus;
+        SetActorLocation(ArenaFocus);
+
+        if (CameraBoom)
+        {
+                DesiredOverviewZoom = FMath::Clamp(OverviewDiceCameraZoom, OverviewMinZoom, OverviewMaxZoom);
+                CameraBoom->TargetArmLength = DesiredOverviewZoom;
+        }
+
+        if (Controller)
+        {
+                FRotator ControlRotation = OverviewDiceCameraState.OriginalControlRotation;
+                ControlRotation.Pitch = OverviewDiceCameraPitch;
+                Controller->SetControlRotation(ControlRotation);
+        }
+
+        if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+        {
+                MovementComponent->StopMovementImmediately();
+        }
+
+        return true;
+}
+
+void ASkald_PlayerCharacter::EndStrategicInitiativeCameraView()
+{
+        if (!OverviewDiceCameraState.bActive)
+        {
+                return;
+        }
+
+        const FVector OriginalLocation = OverviewDiceCameraState.OriginalLocation;
+        const FVector OriginalFocus = OverviewDiceCameraState.OriginalFocusLocation;
+
+        if (CameraBoom)
+        {
+                DesiredOverviewZoom = FMath::Clamp(OverviewDiceCameraState.OriginalZoom, OverviewMinZoom, OverviewMaxZoom);
+                CameraBoom->TargetArmLength = DesiredOverviewZoom;
+        }
+
+        if (Controller)
+        {
+                Controller->SetControlRotation(OverviewDiceCameraState.OriginalControlRotation);
+        }
+
+        SetActorLocation(OriginalLocation);
+        OverviewFocusLocation = OriginalFocus;
+
+        if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+        {
+                MovementComponent->StopMovementImmediately();
+        }
+
+        if (OverviewDiceCameraState.bWasLocked && OverviewDiceCameraState.OriginalLockedTerritory.IsValid())
+        {
+                FocusOverviewCameraOnTerritory(OverviewDiceCameraState.OriginalLockedTerritory.Get());
+        }
+        else
+        {
+                bOverviewCameraLocked = false;
+                LockedOverviewTerritory = OverviewDiceCameraState.OriginalLockedTerritory;
+        }
+
+        OverviewDiceCameraState = FOverviewDiceCameraState();
+        RefreshOverviewPivot();
 }
 
 void ASkald_PlayerCharacter::UpdateOverviewCamera(float DeltaTime)
@@ -446,27 +626,27 @@ void ASkald_PlayerCharacter::UpdateOverviewCamera(float DeltaTime)
 		const FVector NewLocation = FMath::VInterpTo(GetActorLocation(), DesiredLocation, DeltaTime, OverviewPanInterpSpeed);
 		SetActorLocation(NewLocation);
 
-		if (Controller)
+		        if (Controller)
 		{
 			FRotator ControlRotation = Controller->GetControlRotation();
 			const float TargetPitch = OverviewLockedPitch;
 			const float InterpPitch = FMath::FInterpTo(ControlRotation.Pitch, TargetPitch, DeltaTime, OverviewRotationInterpSpeed);
 			ControlRotation.Pitch = InterpPitch;
-			Controller->SetControlRotation(ControlRotation);
+			                Controller->SetControlRotation(ControlRotation);
 		}
 	}
 	else
 	{
 		OverviewFocusLocation = GetActorLocation();
 
-		if (Controller)
+		        if (Controller)
 		{
 			FRotator ControlRotation = Controller->GetControlRotation();
 			const float InterpPitch = FMath::FInterpTo(ControlRotation.Pitch, OverviewDefaultPitch, DeltaTime, OverviewRotationInterpSpeed);
 			ControlRotation.Pitch = InterpPitch;
-			Controller->SetControlRotation(ControlRotation);
+			                Controller->SetControlRotation(ControlRotation);
 		}
-	}
+	        }
 }
 
 void ASkald_PlayerCharacter::SetBattleCameraActive(bool bActive)
@@ -529,7 +709,7 @@ void ASkald_PlayerCharacter::SetBattleCameraActive(bool bActive)
                 if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
                 {
                         MovementComponent->StopMovementImmediately();
-                }
+        }
 
                 bBattleCameraActive = true;
         }
@@ -656,7 +836,7 @@ void ASkald_PlayerCharacter::UpdateCameraTransition(float DeltaTime)
                 DesiredBattleRotation = CameraTransitionTargetRotation;
                 CurrentBattleRotation = CameraTransitionTargetRotation;
 
-                if (CameraBoom)
+                        if (CameraBoom)
                 {
                         CameraBoom->SetWorldRotation(CameraTransitionTargetRotation);
                         CameraBoom->TargetArmLength = CameraTransitionTargetZoom;
