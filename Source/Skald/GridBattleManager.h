@@ -555,8 +555,6 @@ private:
 
     void ApplyInitiativeAdjustments(int32& AttackerRoll, int32& DefenderRoll, bool bAttackerRollProvided, bool bDefenderRollProvided, bool bAttackerHasEmpireDiscipline, bool bDefenderHasEmpireDiscipline);
     void CompleteInitiativeRoll(int32 AttackerRoll, int32 DefenderRoll);
-    bool ShouldRerollInitiativeOnTie() const;
-    bool BeginOverviewInitiativeTieReroll(int32 AttackerRoll, int32 DefenderRoll);
     USkaldDiceManager* ResolveDiceManager();
 
     UFUNCTION()
@@ -598,9 +596,6 @@ private:
 
     /** Whether we are waiting for a player-driven initiative roll. */
     bool bAwaitingInitiativeRoll = false;
-
-    /** True when an overview-map initiative reroll has been requested due to a tie. */
-    bool bInitiativeTieRerollPending = false;
 
     /** Timer used to pause round start while dice are displayed. */
     FTimerHandle InitiativePresentationTimer;
