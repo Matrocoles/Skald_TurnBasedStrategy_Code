@@ -95,10 +95,6 @@ protected:
 	/** Clear any active overview camera lock. */
         void ClearOverviewCameraFocus();
 
-        bool BeginStrategicInitiativeCameraView();
-        void EndStrategicInitiativeCameraView();
-        bool IsStrategicInitiativeCameraActive() const { return OverviewDiceCameraState.bActive; }
-
 public:
         /** Called every frame */
         virtual void Tick(float DeltaTime) override;
@@ -143,6 +139,15 @@ public:
 
         UFUNCTION(BlueprintCallable, Category="Abilities")
         void AbilityThree();
+
+        /** Begin the strategic initiative camera sequence. */
+        bool BeginStrategicInitiativeCameraView();
+
+        /** End the strategic initiative camera sequence. */
+        void EndStrategicInitiativeCameraView();
+
+        /** True if the strategic initiative camera is currently active. */
+        bool IsStrategicInitiativeCameraActive() const { return OverviewDiceCameraState.bActive; }
 
 protected:
         /** Camera boom positioning the camera behind the character */
