@@ -84,8 +84,14 @@ protected:
         void TryCacheWorldMap();
 
         /** Update current selection when the world map changes */
-        UFUNCTION()
-        void HandleTerritorySelected(ATerritory* Territory);
+	UFUNCTION()
+	void HandleTerritorySelected(ATerritory* Territory);
+
+	/** Focus the overview camera on the supplied territory. */
+	void FocusOverviewCameraOnTerritory(ATerritory* Territory);
+
+	/** Clear any active overview camera lock. */
+	void ClearOverviewCameraFocus();
 
 public:
         /** Called every frame */
@@ -102,9 +108,9 @@ public:
         UFUNCTION(BlueprintCallable, Category="Input")
         void MoveRight(float Value);
 
-       /** Handle up/down movement input */
-       UFUNCTION(BlueprintCallable, Category="Input")
-       void MoveUp(float Value);
+        /** Handle up/down movement input */
+        UFUNCTION(BlueprintCallable, Category="Input")
+        void MoveUp(float Value);
 
         /** Handle yaw input */
         UFUNCTION(BlueprintCallable, Category="Input")
@@ -229,12 +235,47 @@ protected:
         UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Battle")
         float BattleKeyboardPitchSpeed = 90.f;
 
+        /** Minimum allowed zoom distance on the overview map. */
+        UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
+        float OverviewMinZoom = 650.f;
+
+        /** Maximum allowed zoom distance on the overview map. */
+        UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
+        float OverviewMaxZoom = 3200.f;
+
+        /** Amount applied to the overview zoom each time the mouse wheel turns. */
+        UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
+        float OverviewZoomStep = 180.f;
+
+        /** Interpolation speed when smoothing overview zoom updates. */
+        UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
+        float OverviewZoomInterpSpeed = 6.f;
+
+        /** Interpolation speed when sliding the overview camera toward a focus point. */
+        UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
+        float OverviewPanInterpSpeed = 5.f;
+
+        /** Interpolation speed applied when pitching toward the locked overview angle. */
+        UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
+        float OverviewRotationInterpSpeed = 5.f;
+
+        /** Height offset applied when focusing above a selected territory. */
+        UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
+        float OverviewFocusHeight = 100.f;
+
+        /** Pitch applied while the overview camera is locked onto a territory. */
+        UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
+        float OverviewLockedPitch = -70.f;
+
 private:
         /** Perform per-frame updates while the battle camera is active. */
         void UpdateBattleCamera(float DeltaTime);
 
         /** Reset any active camera lock. */
         void ClearBattleCameraLock();
+
+        /** Update the strategic overview camera each frame. */
+        void UpdateOverviewCamera(float DeltaTime);
 
         /** True if the tactical battle camera behaviour is enabled. */
         bool bBattleCameraActive = false;
@@ -256,6 +297,21 @@ private:
 
         /** Smoothed velocity applied when panning the battle camera. */
         FVector BattleCameraVelocity = FVector::ZeroVector;
+
+        /** Desired zoom level for the overview camera. */
+        float DesiredOverviewZoom = 0.f;
+
+        /** Cached default pitch restored when releasing the overview focus. */
+        float OverviewDefaultPitch = 0.f;
+
+        /** Current desired focus location for the overview camera. */
+        FVector OverviewFocusLocation = FVector::ZeroVector;
+
+        /** True while the overview camera is locked onto a territory. */
+        bool bOverviewCameraLocked = false;
+
+        /** Territory currently used as the overview focus point. */
+        TWeakObjectPtr<ATerritory> LockedOverviewTerritory;
 
         /** Tracks if the player has manually rotated the camera while locked on. */
         bool bHasManuallyRotatedWhileLocked = false;
