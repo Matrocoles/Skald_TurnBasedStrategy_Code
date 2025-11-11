@@ -4896,7 +4896,23 @@ void ASkaldPlayerController::ShowPendingStrategicInitiativeResult() {
   const int32 EnemyResult =
       PendingStrategicInitiativeEnemyRoll > 0 ? PendingStrategicInitiativeEnemyRoll
                                               : INDEX_NONE;
-  TriggerInitiativeDicePresentation(PendingStrategicInitiativeRoll, EnemyResult);
+  PendingStrategicInitiativeRollId.Invalidate();
+
+  ASkald_PlayerCharacter *CameraPawn = Cast<ASkald_PlayerCharacter>(GetPawn());
+  if (CameraPawn && !CameraPawn->IsBattleCameraActive() && CameraPawn->BeginStrategicInitiativeCameraView()) {
+    bStrategicInitiativeCameraActive = true;
+    EnsureDiceManagerBindings();
+  }
+
+  const FGuid RollId = TriggerInitiativeDicePresentation(PendingStrategicInitiativeRoll, EnemyResult);
+
+  if (bStrategicInitiativeCameraActive) {
+    if (RollId.IsValid()) {
+      PendingStrategicInitiativeRollId = RollId;
+    } else {
+      RestoreStrategicInitiativeCamera();
+    }
+  }
 
   if (bPendingStrategicInitiativeWin && InitiativeWinSound && IsLocalController()) {
     UGameplayStatics::PlaySound2D(this, InitiativeWinSound);
@@ -6356,6 +6372,11 @@ void ASkaldPlayerController::HandlePhysicalDiceRollCompleted(
     return;
   }
 
+  if (bStrategicInitiativeCameraActive &&
+      (!PendingStrategicInitiativeRollId.IsValid() || PendingStrategicInitiativeRollId == RollId)) {
+    RestoreStrategicInitiativeCamera();
+  }
+
   if (PendingInitiativeSequence.bActive) {
     if (PendingInitiativeSequence.ActiveRollId.IsValid() &&
         PendingInitiativeSequence.ActiveRollId != RollId) {
@@ -6577,6 +6598,20 @@ void ASkaldPlayerController::EnsureDiceManagerBindings() {
           this, &ASkaldPlayerController::HandleDiceRollStarted);
     }
     bDiceDelegatesBound = true;
+  }
+}
+
+void ASkaldPlayerController::RestoreStrategicInitiativeCamera() {
+  PendingStrategicInitiativeRollId.Invalidate();
+
+  if (!bStrategicInitiativeCameraActive) {
+    return;
+  }
+
+  bStrategicInitiativeCameraActive = false;
+
+  if (ASkald_PlayerCharacter *CameraPawn = Cast<ASkald_PlayerCharacter>(GetPawn())) {
+    CameraPawn->EndStrategicInitiativeCameraView();
   }
 }
 

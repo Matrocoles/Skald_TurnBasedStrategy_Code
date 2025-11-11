@@ -1002,6 +1002,7 @@ private:
                                            FRotator &OutRotation,
                                            float &OutZoom) const;
   void EnsureDiceManagerBindings();
+  void RestoreStrategicInitiativeCamera();
 
   UFUNCTION()
   void HandlePhysicalDiceRollCompleted(const FGuid &RollId,
@@ -1049,6 +1050,9 @@ private:
 
   /** Whether the cached strategic initiative roll was the winning value. */
   bool bPendingStrategicInitiativeWin = false;
+
+  FGuid PendingStrategicInitiativeRollId;
+  bool bStrategicInitiativeCameraActive = false;
 
   /** Whether the main HUD is waiting for the player to roll strategic initiative. */
   bool bAwaitingStrategicInitiativeRoll = false;
