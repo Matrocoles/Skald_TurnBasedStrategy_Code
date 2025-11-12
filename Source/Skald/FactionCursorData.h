@@ -11,7 +11,7 @@ class USoundBase;
 class UNiagaraSystem;
 
 USTRUCT(BlueprintType)
-struct FFactionCursorDefinition
+struct SKALD_API FFactionCursorDefinition
 {
   GENERATED_BODY()
 
