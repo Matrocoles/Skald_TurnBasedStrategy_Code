@@ -36,7 +36,10 @@ class UWorld;
 class ASkald_BattleGameMode;
 class USoundBase;
 class UCameraShakeBase;
+class UNiagaraComponent;
 class UNiagaraSystem;
+class UFactionCursorData;
+struct FFactionCursorDefinition;
 class ASkald_PlayerCharacter;
 class USkaldDiceOverlayWidget;
 class USkaldDiceResultWidget;
@@ -92,6 +95,8 @@ public:
   virtual void OnRep_PlayerState() override;
 
   virtual void OnPossess(APawn *InPawn) override;
+
+  virtual void PlayerTick(float DeltaTime) override;
 
   virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty> &OutLifetimeProps) const override;
 
@@ -172,6 +177,22 @@ public:
 
   UFUNCTION(BlueprintCallable, Category = "UI")
   void HideInGameMenu();
+
+  /** Applies the cursor visual/audio/FX for the currently selected faction. */
+  UFUNCTION(BlueprintCallable, Category = "Cursor")
+  void ApplyFactionCursor();
+
+  /** Clears any faction cursor overrides returning to the default pointer. */
+  UFUNCTION(BlueprintCallable, Category = "Cursor")
+  void ClearFactionCursor();
+
+  /** Plays the configured hover sound for the active faction cursor. */
+  UFUNCTION(BlueprintCallable, Category = "Cursor")
+  void PlayCursorHoverSound();
+
+  /** Plays the configured click sound for the active faction cursor. */
+  UFUNCTION(BlueprintCallable, Category = "Cursor")
+  void PlayCursorClickSound();
 
   /** Attempt to trigger the active fighter ability mapped to the given slot. */
   UFUNCTION(BlueprintCallable, Category = "Skald|Battle")
@@ -432,6 +453,27 @@ protected:
   UPROPERTY(BlueprintReadOnly, Category = "UI",
             meta = (AllowPrivateAccess = "true"))
   UUserWidget *BattleResultWidget;
+
+  /** Data-driven cursor configuration used for faction specific visuals. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cursor",
+            meta = (AllowPrivateAccess = "true"))
+  TObjectPtr<UFactionCursorData> FactionCursorData = nullptr;
+
+  /** Faction currently applied to the local player's cursor. */
+  UPROPERTY(BlueprintReadOnly, Category = "Cursor",
+            meta = (AllowPrivateAccess = "true"))
+  ESkaldFaction CurrentFaction = ESkaldFaction::None;
+
+  /** Niagara component providing the active cursor trail effect. */
+  UPROPERTY()
+  TObjectPtr<UNiagaraComponent> ActiveCursorTrailFX = nullptr;
+
+  /** Template Niagara system backing the active cursor trail. */
+  UPROPERTY()
+  TWeakObjectPtr<UNiagaraSystem> ActiveCursorTrailTemplate;
+
+  /** Tracks whether the cursor was hovering an interactable widget last tick. */
+  bool bWasHoveringInteractable = false;
 
   /** Fighter selection widget used during battle setup. */
   UPROPERTY(BlueprintReadOnly, Category = "UI",
@@ -797,6 +839,18 @@ private:
 
   /** Attempt to locate the world map and bind to its selection event. */
   void TryBindWorldMap();
+
+  /** Handle playing the click sound when interacting with UI. */
+  void HandleCursorClickSound();
+
+  /** Update cursor trail FX to follow the hardware cursor. */
+  void UpdateCursorFX();
+
+  /** Determine which faction cursor should be active and apply it. */
+  void RefreshFactionCursorFromState();
+
+  /** Resolve the cursor definition for the currently active faction. */
+  const FFactionCursorDefinition *ResolveCursorDefinition() const;
 
   /** Cached pointer to the active world map to manage delegate bindings safely. */
   TWeakObjectPtr<AWorldMap> CachedWorldMap;
