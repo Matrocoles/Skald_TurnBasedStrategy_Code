@@ -25,6 +25,7 @@
 #include "TimerManager.h"
 #include "Styling/CoreStyle.h"
 #include "UI/SkaldUIHelpers.h"
+#include "UI/SkaldMainHUDWidget.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/SOverlay.h"
@@ -216,6 +217,55 @@ void USkaldGameInstance::SetTravelPending(bool bInPending) {
       TravelLoadingOverlay.Reset();
     }
   }
+}
+
+void USkaldGameInstance::ShowGlobalStatusMessage(const FText &Message,
+                                                 float DisplayDuration,
+                                                 bool bPersistUntilCleared) {
+  ActiveStatusMessage = Message;
+  bStatusMessagePersistent = bPersistUntilCleared;
+  ActiveStatusMessageDuration = DisplayDuration;
+
+  if (UWorld *World = GetWorld()) {
+    for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator();
+         It; ++It) {
+      ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(*It);
+      if (!PC) {
+        continue;
+      }
+
+      if (USkaldMainHUDWidget *HUD = PC->GetHUDWidget()) {
+        HUD->ShowStatusMessage(Message, DisplayDuration);
+      }
+    }
+  }
+}
+
+void USkaldGameInstance::HideGlobalStatusMessage() {
+  ActiveStatusMessage = FText::GetEmpty();
+  bStatusMessagePersistent = false;
+  ActiveStatusMessageDuration = 0.f;
+
+  if (UWorld *World = GetWorld()) {
+    for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator();
+         It; ++It) {
+      ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(*It);
+      if (!PC) {
+        continue;
+      }
+
+      if (USkaldMainHUDWidget *HUD = PC->GetHUDWidget()) {
+        HUD->HideStatusMessage();
+      }
+    }
+  }
+}
+
+void USkaldGameInstance::QueuePendingStatusMessage(const FText &Message,
+                                                   bool bPersistUntilCleared) {
+  PendingStatusMessage = Message;
+  bHasPendingStatusMessage = !Message.IsEmpty();
+  bPendingStatusPersistent = bPersistUntilCleared;
 }
 
 bool USkaldGameInstance::CacheWorldMapSnapshot(UWorld *InWorldContext) {
@@ -675,6 +725,16 @@ void USkaldGameInstance::HandleWorldBeginPlay(UWorld *LoadedWorld) {
 
   SetTravelPending(false);
 
+  if (bHasPendingStatusMessage && !PendingStatusMessage.IsEmpty()) {
+    ShowGlobalStatusMessage(PendingStatusMessage, 0.f, bPendingStatusPersistent);
+    if (!bPendingStatusPersistent) {
+      PendingStatusMessage = FText::GetEmpty();
+      bHasPendingStatusMessage = false;
+    }
+  } else if (!ActiveStatusMessage.IsEmpty() && bStatusMessagePersistent) {
+    ShowGlobalStatusMessage(ActiveStatusMessage, 0.f, true);
+  }
+
   if (LoadedWorld->GetNetMode() == NM_Client) {
     return;
   }
@@ -1123,4 +1183,10 @@ void USkaldGameInstance::ResetSessionState() {
     DeployWidget->RemoveFromParent();
     DeployWidget = nullptr;
   }
+
+  ActiveStatusMessage = FText::GetEmpty();
+  bStatusMessagePersistent = false;
+  PendingStatusMessage = FText::GetEmpty();
+  bHasPendingStatusMessage = false;
+  bPendingStatusPersistent = true;
 }

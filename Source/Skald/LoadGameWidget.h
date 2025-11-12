@@ -60,6 +60,9 @@ private:
     void CleanupAndReturnToMenu();
     bool IsValidSlotIndex(int32 SlotIndex) const;
 
+    void ShowLoadingIndicator();
+    void HideLoadingIndicator();
+
     UPROPERTY()
     /** Weak reference back to the lobby so it can be re-enabled when closing. */
     TWeakObjectPtr<UUserWidget> OwningMenu;

@@ -126,6 +126,9 @@ void USkaldMainHUDWidget::NativeConstruct() {
   RetreatCandidateIds.Empty();
   bHasActivePreparePrompt = false;
   bLocalPlayerIsDefender = false;
+  CachedStatusMessage = FText::GetEmpty();
+  CachedStatusMessageDuration = 0.f;
+  bStatusMessageVisible = false;
 
   // Ensure the full-screen HUD doesn't swallow world clicks.
   if (UWidget *Root = GetRootWidget()) {
@@ -236,6 +239,22 @@ void USkaldMainHUDWidget::NativeConstruct() {
       FloaterPool->FloaterWidgetClass = FloaterWidgetClass;
     }
   }
+
+  if (GameInstance) {
+    const FText ActiveStatus = GameInstance->GetActiveStatusMessage();
+    if (!ActiveStatus.IsEmpty()) {
+      const bool bPersistent = GameInstance->IsActiveStatusMessagePersistent();
+      const float ActiveDuration = GameInstance->GetActiveStatusMessageDuration();
+      const float EffectiveDuration = bPersistent ? 0.f : ActiveDuration;
+      ShowStatusMessage(ActiveStatus, EffectiveDuration);
+
+      if (bPersistent && EffectiveDuration > KINDA_SMALL_NUMBER) {
+        if (UWorld *World = GetWorld()) {
+          World->GetTimerManager().ClearTimer(StatusMessageTimerHandle);
+        }
+      }
+    }
+  }
 }
 
 void USkaldMainHUDWidget::NativeTick(const FGeometry &MyGeometry,
@@ -249,6 +268,10 @@ void USkaldMainHUDWidget::NativeDestruct() {
   bRetreatRequestPending = false;
   bHasActivePreparePrompt = false;
   bLocalPlayerIsDefender = false;
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(StatusMessageTimerHandle);
+  }
 
   if (DiceResolutionPanel) {
     DiceResolutionPanel->OnResolutionComplete.RemoveDynamic(
@@ -1432,6 +1455,42 @@ void USkaldMainHUDWidget::ShowErrorMessage(const FString &Message) {
     GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Red, Message);
   }
   BP_ShowErrorMessage(Message);
+}
+
+void USkaldMainHUDWidget::ShowStatusMessage(const FText &Message,
+                                            float DisplayDuration) {
+  if (Message.IsEmpty()) {
+    HideStatusMessage();
+    return;
+  }
+
+  CachedStatusMessage = Message;
+  CachedStatusMessageDuration = DisplayDuration;
+  bStatusMessageVisible = true;
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(StatusMessageTimerHandle);
+
+    if (DisplayDuration > KINDA_SMALL_NUMBER) {
+      World->GetTimerManager().SetTimer(
+          StatusMessageTimerHandle, this,
+          &USkaldMainHUDWidget::HideStatusMessage, DisplayDuration, false);
+    }
+  }
+
+  BP_ShowStatusMessage(Message, DisplayDuration);
+}
+
+void USkaldMainHUDWidget::HideStatusMessage() {
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(StatusMessageTimerHandle);
+  }
+
+  CachedStatusMessage = FText::GetEmpty();
+  CachedStatusMessageDuration = 0.f;
+  bStatusMessageVisible = false;
+
+  BP_HideStatusMessage();
 }
 
 void USkaldMainHUDWidget::ClearTerritoryHighlights() {

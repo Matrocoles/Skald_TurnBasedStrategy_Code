@@ -321,6 +321,14 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
   virtual void ShowErrorMessage(const FString &Message);
 
+  /** Display a transient status message centered on the HUD. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
+  void ShowStatusMessage(const FText &Message, float DisplayDuration);
+
+  /** Hide the active status message if one is visible. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
+  void HideStatusMessage();
+
   /** Display a temporary warning about the army placement limit. */
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
   void ShowArmyPlacementLimitWarning(const FText &Message);
@@ -332,6 +340,14 @@ public:
   /** Blueprint hook to draw the error message. */
   UFUNCTION(BlueprintImplementableEvent, Category = "Skald|HUD")
   void BP_ShowErrorMessage(const FString &Message);
+
+  /** Blueprint hook for showing the global status message. */
+  UFUNCTION(BlueprintImplementableEvent, Category = "Skald|HUD")
+  void BP_ShowStatusMessage(const FText &Message, float DisplayDuration);
+
+  /** Blueprint hook for hiding the global status message. */
+  UFUNCTION(BlueprintImplementableEvent, Category = "Skald|HUD")
+  void BP_HideStatusMessage();
 
   /** Display floating combat text anchored to a world position. */
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD|Floaters")
@@ -548,11 +564,15 @@ protected:
   FTimerHandle StrategicInitiativeRollDelayHandle;
   FTimerHandle StrategicInitiativeDiceHideHandle;
   FTimerHandle ArmyPlacementWarningTimerHandle;
+  FTimerHandle StatusMessageTimerHandle;
   FText PendingSelectionPromptText;
   bool bPendingSelectionPromptVisible = false;
   FText CachedSelectionPromptText;
   bool bCachedSelectionPromptVisible = false;
   bool bArmyPlacementWarningActive = false;
+  FText CachedStatusMessage;
+  float CachedStatusMessageDuration = 0.f;
+  bool bStatusMessageVisible = false;
 
   // Internal handlers for widget actions
   UFUNCTION()

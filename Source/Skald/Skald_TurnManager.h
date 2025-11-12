@@ -189,6 +189,36 @@ public:
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Turn")
   bool HasTurnsStarted() const { return bHasTurnsStarted; }
 
+  /** Retrieve the payload for a pending battle, if any. */
+  const FS_BattlePayload &GetPendingBattlePayload() const { return PendingBattle; }
+
+  /** Retrieve the cached battle preparation payload. */
+  const FS_BattlePayload &GetPendingBattlePreparation() const
+  {
+    return PendingBattlePreparation;
+  }
+
+  /** Retrieve the cached ready state for the pending battle. */
+  const FSkaldBattleReadyState &GetPendingBattleReadyState() const
+  {
+    return PendingBattleReadyState;
+  }
+
+  /** Snapshot the movement action usage tracked for each player. */
+  TMap<int32, int32> GetMovementActionsSnapshot() const { return MovementActionsTaken; }
+
+  /** Restore movement action usage from a previously saved snapshot. */
+  void SetMovementActionsSnapshot(const TMap<int32, int32> &InActions);
+
+  /** Restore the pending battle payload from a saved game. */
+  void SetPendingBattlePayload(const FS_BattlePayload &Battle);
+
+  /** Restore the pending battle preparation payload from a saved game. */
+  void SetPendingBattlePreparation(const FS_BattlePayload &Battle);
+
+  /** Restore the cached ready state from a saved game. */
+  void SetPendingBattleReadyState(const FSkaldBattleReadyState &ReadyState);
+
   /** Mark the specified player as ready to travel to the battle map. */
   UFUNCTION(BlueprintCallable, Category = "Battle")
   void NotifyPlayerReadyForBattle(int32 PlayerID, bool bReady);

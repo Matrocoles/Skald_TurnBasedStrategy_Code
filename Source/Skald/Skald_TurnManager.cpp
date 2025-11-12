@@ -1268,6 +1268,26 @@ void ATurnManager::ResetMovementActionsForActivePlayer() {
   }
 }
 
+void ATurnManager::SetMovementActionsSnapshot(const TMap<int32, int32> &InActions)
+{
+  MovementActionsTaken = InActions;
+}
+
+void ATurnManager::SetPendingBattlePayload(const FS_BattlePayload &Battle)
+{
+  PendingBattle = Battle;
+}
+
+void ATurnManager::SetPendingBattlePreparation(const FS_BattlePayload &Battle)
+{
+  PendingBattlePreparation = Battle;
+}
+
+void ATurnManager::SetPendingBattleReadyState(const FSkaldBattleReadyState &ReadyState)
+{
+  PendingBattleReadyState = ReadyState;
+}
+
 int32 ATurnManager::GetActivePlayerId() const {
   if (!Controllers.IsValidIndex(CurrentIndex)) {
     return INDEX_NONE;
