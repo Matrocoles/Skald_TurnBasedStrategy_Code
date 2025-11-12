@@ -91,10 +91,10 @@ public:
 
   /** Resolve the configured colour for a given faction. */
   UFUNCTION(BlueprintCallable, Category = "Player")
-  FLinearColor GetFactionColor(ESkaldFaction Faction) const;
+  FLinearColor GetFactionColor(ESkaldFaction InFaction) const;
 
   /** Default faction colours used when no override has been configured. */
-  static FLinearColor GetDefaultFactionColor(ESkaldFaction Faction);
+  static FLinearColor GetDefaultFactionColor(ESkaldFaction InFaction);
 
   /** Player chosen display name. */
   UPROPERTY(BlueprintReadWrite, Category = "Player")
