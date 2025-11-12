@@ -1393,15 +1393,18 @@ void AFighterPawn::UpdateFloatingStatusText() {
 }
 
 void AFighterPawn::UpdateFloatingStatusWidgetFacing() {
-  const FRotator DesiredRotation = ResolveCameraFacingRotation();
+  const auto UpdateComponentFacing = [&](UWidgetComponent *Component) {
+    if (!Component) {
+      return;
+    }
 
-  if (BuffStatusWidget) {
-    BuffStatusWidget->SetWorldRotation(DesiredRotation);
-  }
+    const FRotator DesiredRotation =
+        ResolveCameraFacingRotation(Component->GetComponentLocation());
+    Component->SetWorldRotation(DesiredRotation);
+  };
 
-  if (DebuffStatusWidget) {
-    DebuffStatusWidget->SetWorldRotation(DesiredRotation);
-  }
+  UpdateComponentFacing(BuffStatusWidget);
+  UpdateComponentFacing(DebuffStatusWidget);
 }
 
 void AFighterPawn::ApplyStatusLinesToWidget(UWidgetComponent *Component,
@@ -1551,11 +1554,19 @@ void AFighterPawn::RebuildActiveStatusArrays() {
   OnRep_ActiveDebuffs();
 }
 
-FRotator AFighterPawn::ResolveCameraFacingRotation() const {
+FRotator AFighterPawn::ResolveCameraFacingRotation(
+    const FVector &WidgetLocation) const {
   if (UWorld *World = GetWorld()) {
     if (APlayerCameraManager *Camera =
             UGameplayStatics::GetPlayerCameraManager(World, 0)) {
-      return Camera->GetCameraRotation();
+      const FVector CameraLocation = Camera->GetCameraLocation();
+      const FVector DirectionToCamera = CameraLocation - WidgetLocation;
+
+      if (!DirectionToCamera.IsNearlyZero()) {
+        return DirectionToCamera.Rotation();
+      }
+
+      return (CameraLocation - GetActorLocation()).Rotation();
     }
   }
 
