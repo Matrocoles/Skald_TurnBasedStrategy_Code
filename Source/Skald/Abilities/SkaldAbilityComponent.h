@@ -286,8 +286,10 @@ protected:
     void RefreshPassiveState();
     void RefreshAllPassiveStates();
     void RefreshDwarfPassive();
+    void RefreshEmpirePassive();
     void ApplyActivationPassiveEffects();
     int32 CountAdjacentFactionAllies(AFighterPawn* Fighter, ESkaldFaction Faction) const;
+    int32 CountAdjacentEnemies(AFighterPawn* Fighter) const;
     void HandlePassiveEffectApplied(const FSkaldAbilityDefinition& Definition);
     void HandlePassiveEffectRemoved(FName AbilityId);
     bool HasFactionAttackedOwnerThisRound(ESkaldFaction Faction) const;
@@ -344,6 +346,7 @@ protected:
     bool bShieldWallPivotActive = false;
     TWeakObjectPtr<AFighterPawn> ShieldWallPivotProtectedAlly;
     TSet<TWeakObjectPtr<AFighterPawn>> TacticalReservesRefreshedThisRound;
+    bool bEmpirePassiveDefenceBonusActive = false;
     bool bSmashThroughActive = false;
     bool bForgeguardBraceReady = false;
     bool bDeepDelveMortarPending = false;

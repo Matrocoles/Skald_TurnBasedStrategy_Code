@@ -314,8 +314,8 @@ TMap<ESkaldFaction, FSkaldFactionAbilitySet> BuildFactionAbilityMap()
         FSkaldFactionAbilitySet Set;
         Set.Passive = MakePassive(
             TEXT("Ability_Empire_Passive"),
-            NSLOCTEXT("SkaldAbilities", "EmpirePassiveName", "Iron Discipline"),
-            NSLOCTEXT("SkaldAbilities", "EmpirePassiveDesc", "Iron Legion fighters shrug off hesitation, ignoring the first -1 penalty from fear or debuff effects applied to them each round."));
+            NSLOCTEXT("SkaldAbilities", "EmpirePassiveName", "Iron Resolve"),
+            NSLOCTEXT("SkaldAbilities", "EmpirePassiveDesc", "When an Iron Legion fighter is adjacent to two or more enemies, they gain +1 Defence."));
         Set.SkirmishAbility = MakeActive(
             TEXT("Ability_Empire_Skirmish"),
             NSLOCTEXT("SkaldAbilities", "EmpireSkirmishName", "Suppressing Fire"),
