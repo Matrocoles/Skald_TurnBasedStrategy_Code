@@ -2696,7 +2696,14 @@ void AFighterPawn::ExecuteManualAttackRoll() {
   }
 
   const int32 DiceToRoll = FMath::Max(Stats.AttackDice, 0);
-  const FGuid RollId = DiceManager->RollDice_D6(DiceToRoll, 0, false);
+  FLinearColor FactionColor = FLinearColor::Transparent;
+  if (USkaldGameInstance *GI = Cast<USkaldGameInstance>(GetGameInstance())) {
+    FactionColor = GI->GetFactionColor(Faction);
+  } else {
+    FactionColor = USkaldGameInstance::GetDefaultFactionColor(Faction);
+  }
+  const FGuid RollId = DiceManager->RollDice_D6(DiceToRoll, 0, false,
+                                                FactionColor, FLinearColor::Transparent);
   if (!RollId.IsValid()) {
     return;
   }

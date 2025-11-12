@@ -37,6 +37,9 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Dice|Overlay")
     void SetConfig(UDiceRollConfig* InConfig);
 
+    void SetPlayerTint(const FLinearColor& InColor);
+    void SetEnemyTint(const FLinearColor& InColor);
+
 protected:
     UFUNCTION()
     void HandleRollStarted(const FGuid& RollId);
@@ -128,4 +131,9 @@ protected:
     TObjectPtr<UDiceRollConfig> LoadedConfig;
 
     FGuid ActiveRollId;
+
+    bool bHasDynamicPlayerTint = false;
+    bool bHasDynamicEnemyTint = false;
+    FLinearColor DynamicPlayerTint = FLinearColor::White;
+    FLinearColor DynamicEnemyTint = FLinearColor::White;
 };

@@ -32,7 +32,9 @@ public:
     FOnDiceRollCompleted OnDiceRollCompleted;
 
     UFUNCTION(BlueprintCallable, Category = "Dice")
-    FGuid RollDice_D6(int32 NumPlayerDice, int32 NumEnemyDice, bool bForInitiative);
+    FGuid RollDice_D6(int32 NumPlayerDice, int32 NumEnemyDice, bool bForInitiative,
+        FLinearColor PlayerColor = FLinearColor::Transparent,
+        FLinearColor EnemyColor = FLinearColor::Transparent);
 
     UFUNCTION(BlueprintCallable, Category = "Dice")
     void SetConfig(UDiceRollConfig* InConfig);
@@ -59,7 +61,10 @@ public:
      * @param DurationOverride Optional fixed duration for the presentation. Negative values use config timing.
      */
     UFUNCTION(BlueprintCallable, Category = "Dice")
-    FGuid PlayScriptedRoll(const TArray<int32>& PlayerResults, const TArray<int32>& EnemyResults, bool bForInitiative, float DurationOverride = -1.f);
+    FGuid PlayScriptedRoll(const TArray<int32>& PlayerResults, const TArray<int32>& EnemyResults,
+        bool bForInitiative, float DurationOverride = -1.f,
+        FLinearColor PlayerColor = FLinearColor::Transparent,
+        FLinearColor EnemyColor = FLinearColor::Transparent);
 
     /** Returns the duration before arena and dice are fully cleaned up. */
     float GetCleanupDelay() const;
@@ -83,6 +88,8 @@ private:
         bool bIsInitiative = false;
         TArray<int32> ScriptedResults;
         TWeakObjectPtr<ADiceRollArena> Arena;
+        FLinearColor PlayerColor = FLinearColor::Transparent;
+        FLinearColor EnemyColor = FLinearColor::Transparent;
 
         struct FDieState
         {
@@ -99,7 +106,8 @@ private:
     FRandomStream DeterministicStream;
     bool bDeterministic = false;
 
-    FActiveRoll& AddRoll(int32 PlayerDice, int32 EnemyDice, float Duration, const FGuid& RollId, bool bForInitiative);
+    FActiveRoll& AddRoll(int32 PlayerDice, int32 EnemyDice, float Duration, const FGuid& RollId,
+        bool bForInitiative, FLinearColor PlayerColor, FLinearColor EnemyColor);
     void CompleteRoll(FGuid RollId);
     void BroadcastInterim(FGuid RollId);
     bool SpawnPhysicalRoll(FActiveRoll& Roll, const TArray<int32>* PlayerResults = nullptr, const TArray<int32>* EnemyResults = nullptr);

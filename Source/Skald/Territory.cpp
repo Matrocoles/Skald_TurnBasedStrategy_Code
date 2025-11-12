@@ -16,39 +16,21 @@
 #include "SkaldTypes.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
+#include "Skald_GameInstance.h"
 #include "UObject/ConstructorHelpers.h"
 #include "WorldMap.h"
 
 namespace {
-FLinearColor GetFactionColor(ESkaldFaction Faction) {
-  switch (Faction) {
-  case ESkaldFaction::Human:
-    return FLinearColor::Blue;
-  case ESkaldFaction::Orc:
-    return FLinearColor::Red;
-  case ESkaldFaction::Dwarf:
-    return FLinearColor(0.55f, 0.35f, 0.15f, 1.f); // Brown
-  case ESkaldFaction::Elf:
-    return FLinearColor(0.05f, 0.18f, 0.08f, 1.f); // Dark vine green
-  case ESkaldFaction::LizardFolk:
-    return FLinearColor(0.0f, 0.5f, 0.5f, 1.f); // Teal
-  case ESkaldFaction::Undead:
-    return FLinearColor::Black;
-  case ESkaldFaction::Gnoll:
-    return FLinearColor(1.0f, 0.45f, 0.05f, 1.f); // Orange
-  case ESkaldFaction::Goblin:
-    return FLinearColor(0.196f, 0.804f, 0.196f, 1.f); // Lime green
-  case ESkaldFaction::Empire:
-    return FLinearColor(0.5f, 0.0f, 0.5f, 1.f); // Purple (IronLegion)
-  case ESkaldFaction::Inflicted:
-    return FLinearColor(1.0f, 0.85f, 0.1f, 1.f); // Yellow
-  case ESkaldFaction::FrogFolk:
-    return FLinearColor(1.f, 0.31f, 0.55f, 1.f); // Rose (ToadFolk)
-  case ESkaldFaction::Ravpack:
-    return FLinearColor(0.54f, 0.f, 0.54f, 1.f); // Violet
-  default:
-    return FLinearColor::White;
+FLinearColor ResolveFactionColor(const UObject *WorldContext,
+                                 ESkaldFaction Faction) {
+  if (const UWorld *World = WorldContext ? WorldContext->GetWorld() : nullptr) {
+    if (const USkaldGameInstance *GI =
+            World->GetGameInstance<USkaldGameInstance>()) {
+      return GI->GetFactionColor(Faction);
+    }
   }
+
+  return USkaldGameInstance::GetDefaultFactionColor(Faction);
 }
 } // namespace
 
@@ -327,7 +309,7 @@ void ATerritory::UpdateTerritoryColor() {
 
   FLinearColor NewColor = DefaultColor;
   if (IsValid(OwningPlayer)) {
-    NewColor = GetFactionColor(OwningPlayer->Faction);
+    NewColor = ResolveFactionColor(this, OwningPlayer->Faction);
   }
 
   DynamicMaterial->SetVectorParameterValue(FName("Color"), NewColor);

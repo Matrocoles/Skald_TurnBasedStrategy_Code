@@ -17,7 +17,7 @@ public:
   /** Update the displayed outcome text. */
   UFUNCTION(BlueprintCallable, Category = "Skald|Battle")
   void SetBattleOutcome(bool bPlayerWon, bool bPlayerLost, int32 AttackerCasualties,
-                        int32 DefenderCasualties);
+                        int32 DefenderCasualties, const FLinearColor &PlayerColor);
 
 private:
   void EnsureLayout();

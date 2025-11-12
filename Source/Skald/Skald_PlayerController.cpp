@@ -6018,7 +6018,7 @@ void ASkaldPlayerController::HandleAttackResolved(AFighterPawn *Attacker,
     return;
   }
 
-  TriggerAttackDicePresentation(Attacker, Result);
+  TriggerAttackDicePresentation(Attacker, Defender, Result);
   ProcessAttackResolutionPresentation(Attacker, Defender, Result);
 }
 
@@ -6257,7 +6257,7 @@ void ASkaldPlayerController::StartAttackDiceSequence(
 
   if (!IsLocalController() || !bAutoPresentDiceRolls ||
       Result.DiceOutcomes.Num() == 0) {
-    TriggerAttackDicePresentation(Attacker, Result);
+    TriggerAttackDicePresentation(Attacker, Defender, Result);
     ProcessAttackResolutionPresentation(Attacker, Defender, Result);
     return;
   }
@@ -6269,7 +6269,7 @@ void ASkaldPlayerController::StartAttackDiceSequence(
       CameraPawn && bIsBattleMap && CameraPawn->IsBattleCameraActive();
 
   if (!bHasBattleCamera) {
-    FGuid RollId = TriggerAttackDicePresentation(Attacker, Result);
+    FGuid RollId = TriggerAttackDicePresentation(Attacker, Defender, Result);
     if (!RollId.IsValid()) {
       ProcessAttackResolutionPresentation(Attacker, Defender, Result);
     }
@@ -6305,7 +6305,7 @@ void ASkaldPlayerController::StartAttackDiceSequence(
           PendingAttackSequence.OriginalRotation.Yaw, OverviewLocation,
           OverviewRotation, OverviewZoom)) {
     ResetAttackDiceSequence();
-    FGuid RollId = TriggerAttackDicePresentation(Attacker, Result);
+    FGuid RollId = TriggerAttackDicePresentation(Attacker, Defender, Result);
     if (!RollId.IsValid()) {
       ProcessAttackResolutionPresentation(Attacker, Defender, Result);
     }
@@ -6338,7 +6338,8 @@ void ASkaldPlayerController::HandleAttackDiceOverviewReached() {
   }
 
   PendingAttackSequence.ActiveRollId = TriggerAttackDicePresentation(
-      PendingAttackSequence.Attacker.Get(), PendingAttackSequence.Result);
+      PendingAttackSequence.Attacker.Get(),
+      PendingAttackSequence.Defender.Get(), PendingAttackSequence.Result);
 
   if (!PendingAttackSequence.ActiveRollId.IsValid()) {
     HandleAttackDiceCleanupFinished();
@@ -6874,8 +6875,37 @@ USkaldDiceManager *ASkaldPlayerController::ResolveDiceManager() {
   return GI ? GI->GetSubsystem<USkaldDiceManager>() : nullptr;
 }
 
+FLinearColor ASkaldPlayerController::ResolveFactionColor(ESkaldFaction Faction) {
+  USkaldGameInstance *GI = CachedGameInstance;
+  if (!GI) {
+    GI = GetGameInstance<USkaldGameInstance>();
+    CachedGameInstance = GI;
+  }
+
+  return GI ? GI->GetFactionColor(Faction)
+            : USkaldGameInstance::GetDefaultFactionColor(Faction);
+}
+
+FLinearColor ASkaldPlayerController::ResolveBattleFactionColor(bool bAttackerSide) {
+  USkaldGameInstance *GI = CachedGameInstance;
+  if (!GI) {
+    GI = GetGameInstance<USkaldGameInstance>();
+    CachedGameInstance = GI;
+  }
+
+  if (!GI) {
+    return USkaldGameInstance::GetDefaultFactionColor(ESkaldFaction::None);
+  }
+
+  const FS_BattlePayload &Battle = GI->PendingBattle;
+  const ESkaldFaction Faction =
+      bAttackerSide ? Battle.AttackerFaction : Battle.DefenderFaction;
+  return GI->GetFactionColor(Faction);
+}
+
 FGuid ASkaldPlayerController::TriggerAttackDicePresentation(
-    AFighterPawn *Attacker, const FDiceRollResult &Result) {
+    AFighterPawn *Attacker, AFighterPawn *Defender,
+    const FDiceRollResult &Result) {
   if (!IsLocalController() || !bAutoPresentDiceRolls) {
     return FGuid();
   }
@@ -6898,6 +6928,13 @@ FGuid ASkaldPlayerController::TriggerAttackDicePresentation(
   PlayerResults.Reserve(Result.DiceOutcomes.Num());
   EnemyResults.Reserve(Result.DiceOutcomes.Num());
 
+  const FLinearColor AttackerColor = Attacker
+                                         ? ResolveFactionColor(Attacker->Faction)
+                                         : ResolveBattleFactionColor(true);
+  const FLinearColor DefenderColor = Defender
+                                         ? ResolveFactionColor(Defender->Faction)
+                                         : ResolveBattleFactionColor(false);
+
   for (const FDiceRollOutcome &Outcome : Result.DiceOutcomes) {
     const int32 RollValue = FMath::Clamp(Outcome.RollValue, 1, 6);
     if (bFriendlyAttack) {
@@ -6911,7 +6948,16 @@ FGuid ASkaldPlayerController::TriggerAttackDicePresentation(
     return FGuid();
   }
 
-  FGuid RollId = DiceManager->PlayScriptedRoll(PlayerResults, EnemyResults, false);
+  const FLinearColor PlayerTint = bFriendlyAttack ? AttackerColor : DefenderColor;
+  const FLinearColor EnemyTint = bFriendlyAttack ? DefenderColor : AttackerColor;
+
+  if (DiceOverlayWidget) {
+    DiceOverlayWidget->SetPlayerTint(PlayerTint);
+    DiceOverlayWidget->SetEnemyTint(EnemyTint);
+  }
+
+  FGuid RollId = DiceManager->PlayScriptedRoll(PlayerResults, EnemyResults, false,
+                                               -1.f, PlayerTint, EnemyTint);
 
   if (DiceOverlayWidget) {
     DiceOverlayWidget->SetOverlayMode(ESkaldDiceOverlayMode::Attack);
@@ -6985,6 +7031,25 @@ FGuid ASkaldPlayerController::TriggerInitiativeDicePresentation(int32 AttackerRo
         AppendValue(DefenderRoll, false);
     }
 
+    FLinearColor PlayerTint = ResolveBattleFactionColor(true);
+    FLinearColor EnemyTint = ResolveBattleFactionColor(false);
+    if (bPlayerIsDefender)
+    {
+        PlayerTint = ResolveBattleFactionColor(false);
+        EnemyTint = ResolveBattleFactionColor(true);
+    }
+    else if (bPlayerIsAttacker)
+    {
+        PlayerTint = ResolveBattleFactionColor(true);
+        EnemyTint = ResolveBattleFactionColor(false);
+    }
+
+    if (DiceOverlayWidget)
+    {
+        DiceOverlayWidget->SetPlayerTint(PlayerTint);
+        DiceOverlayWidget->SetEnemyTint(EnemyTint);
+    }
+
     FGuid RollId;
 
     // Only clients show the dice physically.
@@ -6997,7 +7062,8 @@ FGuid ASkaldPlayerController::TriggerInitiativeDicePresentation(int32 AttackerRo
     else if (DiceManager && (PlayerResults.Num() > 0 || EnemyResults.Num() > 0))
     {
         // Client: show physical dice roll and result
-        RollId = DiceManager->PlayScriptedRoll(PlayerResults, EnemyResults, true);
+        RollId = DiceManager->PlayScriptedRoll(PlayerResults, EnemyResults, true, -1.f,
+            PlayerTint, EnemyTint);
     }
 
     // The overlay can be safely set client-side
@@ -7373,12 +7439,16 @@ void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,
 
   bool bPlayerWon = false;
   bool bPlayerLost = false;
+  FLinearColor PlayerFactionColor = ResolveFactionColor(ESkaldFaction::None);
+
   if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
     if (WinningFaction != ESkaldFaction::None && PS->Faction == WinningFaction) {
       bPlayerWon = true;
     } else if (WinningFaction != ESkaldFaction::None) {
       bPlayerLost = true;
     }
+
+    PlayerFactionColor = ResolveFactionColor(PS->Faction);
   }
 
   if (!VictoryWidgetClass) {
@@ -7395,7 +7465,7 @@ void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,
             CreateWidget<UUserWidget>(this, VictoryWidgetClass)) {
       if (UBattleResultWidget *ResultWidget = Cast<UBattleResultWidget>(Widget)) {
         ResultWidget->SetBattleOutcome(bPlayerWon, bPlayerLost, AttackerCasualties,
-                                       DefenderCasualties);
+                                       DefenderCasualties, PlayerFactionColor);
       }
       BattleResultWidget = Widget;
       BattleResultWidget->AddToViewport();

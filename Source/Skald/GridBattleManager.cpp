@@ -476,7 +476,25 @@ bool UGridBattleManager::RollInitiative()
 
             if (PendingInitiativePlayerDice > 0 || PendingInitiativeEnemyDice > 0)
             {
-                const FGuid RollId = Manager->RollDice_D6(PendingInitiativePlayerDice, PendingInitiativeEnemyDice, true);
+                FLinearColor PlayerColor = FLinearColor::Transparent;
+                FLinearColor EnemyColor = FLinearColor::Transparent;
+                if (UWorld* World = GetWorld())
+                {
+                    if (USkaldGameInstance* GameInstance = Cast<USkaldGameInstance>(World->GetGameInstance()))
+                    {
+                        if (AttackerTeam.Num() > 0)
+                        {
+                            PlayerColor = GameInstance->GetFactionColor(AttackerTeam[0].Faction);
+                        }
+                        if (DefenderTeam.Num() > 0)
+                        {
+                            EnemyColor = GameInstance->GetFactionColor(DefenderTeam[0].Faction);
+                        }
+                    }
+                }
+
+                const FGuid RollId = Manager->RollDice_D6(PendingInitiativePlayerDice, PendingInitiativeEnemyDice, true,
+                    PlayerColor, EnemyColor);
                 if (RollId.IsValid())
                 {
                     ActiveInitiativeRollId = RollId;
