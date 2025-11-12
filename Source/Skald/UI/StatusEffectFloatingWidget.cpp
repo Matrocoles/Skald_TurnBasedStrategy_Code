@@ -3,7 +3,6 @@
 #include "SlateOptMacros.h"
 #include "Styling/CoreStyle.h"
 #include "Widgets/Layout/SBox.h"
-#include "Widgets/Layout/SVerticalBox.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/SWidget.h"
 #include "Widgets/Text/STextBlock.h"
