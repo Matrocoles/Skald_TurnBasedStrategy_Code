@@ -162,6 +162,15 @@ void ALobbyGameMode::Logout(AController* Exiting)
 
     Super::Logout(Exiting);
 
+    if (AGameStateBase* GS = GetGameState<AGameStateBase>())
+    {
+        bSlotConfigurationLocked = GS->PlayerArray.Num() > 1;
+    }
+    else
+    {
+        bSlotConfigurationLocked = false;
+    }
+
     RefreshReplicatedLobbyState();
 }
 
@@ -176,6 +185,11 @@ void ALobbyGameMode::SetTotalSlots(int32 InTotalSlots)
     AuthorityTotalSlots = FMath::Clamp(InTotalSlots, MinLobbySlots, MaxLobbySlots);
     AuthorityAISlots = FMath::Clamp(AuthorityAISlots, 0, AuthorityTotalSlots - 1);
     RefreshReplicatedLobbyState();
+
+    if (CachedLobbyState && CachedLobbyState->AreAllSlotsReady())
+    {
+        TryLaunchMatch(nullptr);
+    }
 }
 
 void ALobbyGameMode::SetAISlots(int32 InAISlots)
@@ -188,6 +202,11 @@ void ALobbyGameMode::SetAISlots(int32 InAISlots)
 
     AuthorityAISlots = FMath::Clamp(InAISlots, 0, AuthorityTotalSlots - 1);
     RefreshReplicatedLobbyState();
+
+    if (CachedLobbyState && CachedLobbyState->AreAllSlotsReady())
+    {
+        TryLaunchMatch(nullptr);
+    }
 }
 
 void ALobbyGameMode::AssignPlayerToSlot(ASkaldPlayerState* PlayerState)
@@ -310,7 +329,6 @@ bool ALobbyGameMode::LockInPlayer(int32 PlayerId)
             MatchedPlayerState->Faction = Slot.Faction;
         }
 
-        bSlotConfigurationLocked = true;
         break;
     }
 
