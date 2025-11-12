@@ -55,17 +55,114 @@
 #include "UObject/UObjectGlobals.h"
 #endif
 
+#include "Engine/Texture2D.h"
 #include "Framework/Application/SlateApplication.h"
 #include "GenericPlatform/ICursor.h"
 #include "Layout/WidgetPath.h"
+#include "PixelFormat.h"
 #include "Widgets/SWidget.h"
 #include "Widgets/SWindow.h"
 
-#include "Rendering/SlateRenderer.h"
+#if PLATFORM_WINDOWS
+#include "Windows/AllowWindowsPlatformTypes.h"
+#include <windows.h>
+#include "Windows/HideWindowsPlatformTypes.h"
+#endif
 
 #include "Net/UnrealNetwork.h"
 
 namespace {
+#if PLATFORM_WINDOWS
+void *CreateCursorHandleFromTexture(UTexture2D *Texture,
+                                    const FVector2D &CursorHotspot) {
+  if (!Texture) {
+    return nullptr;
+  }
+
+  FTexturePlatformData *PlatformData = Texture->GetPlatformData();
+  if (!PlatformData || PlatformData->Mips.Num() == 0 ||
+      PlatformData->PixelFormat != PF_B8G8R8A8) {
+    return nullptr;
+  }
+
+  const int32 Width = PlatformData->SizeX;
+  const int32 Height = PlatformData->SizeY;
+  if (Width <= 0 || Height <= 0) {
+    return nullptr;
+  }
+
+  FTexture2DMipMap &Mip = PlatformData->Mips[0];
+  const int32 PixelCount = Width * Height;
+  if (PixelCount <= 0) {
+    return nullptr;
+  }
+
+  const void *SourceData = Mip.BulkData.LockReadOnly();
+  if (!SourceData) {
+    return nullptr;
+  }
+
+  TArray<FColor> Pixels;
+  Pixels.SetNumUninitialized(PixelCount);
+  FMemory::Memcpy(Pixels.GetData(), SourceData, PixelCount * sizeof(FColor));
+  Mip.BulkData.Unlock();
+
+  BITMAPV5HEADER BitmapHeader = {};
+  BitmapHeader.bV5Size = sizeof(BITMAPV5HEADER);
+  BitmapHeader.bV5Width = Width;
+  BitmapHeader.bV5Height = -Height; // top-down bitmap
+  BitmapHeader.bV5Planes = 1;
+  BitmapHeader.bV5BitCount = 32;
+  BitmapHeader.bV5Compression = BI_BITFIELDS;
+  BitmapHeader.bV5RedMask = 0x00FF0000;
+  BitmapHeader.bV5GreenMask = 0x0000FF00;
+  BitmapHeader.bV5BlueMask = 0x000000FF;
+  BitmapHeader.bV5AlphaMask = 0xFF000000;
+
+  void *BitmapMemory = nullptr;
+  HDC DC = GetDC(nullptr);
+  HBITMAP ColorBitmap = CreateDIBSection(
+      DC, reinterpret_cast<BITMAPINFO *>(&BitmapHeader), DIB_RGB_COLORS,
+      &BitmapMemory, nullptr, 0);
+  ReleaseDC(nullptr, DC);
+
+  if (!ColorBitmap || !BitmapMemory) {
+    if (ColorBitmap) {
+      DeleteObject(ColorBitmap);
+    }
+    return nullptr;
+  }
+
+  FMemory::Memcpy(BitmapMemory, Pixels.GetData(), PixelCount * sizeof(FColor));
+
+  HBITMAP MaskBitmap = CreateBitmap(Width, Height, 1, 1, nullptr);
+  if (!MaskBitmap) {
+    DeleteObject(ColorBitmap);
+    return nullptr;
+  }
+
+  ICONINFO IconInfo = {};
+  IconInfo.fIcon = FALSE;
+  IconInfo.xHotspot = FMath::Clamp<int32>(FMath::RoundToInt(CursorHotspot.X), 0,
+                                          Width - 1);
+  IconInfo.yHotspot = FMath::Clamp<int32>(FMath::RoundToInt(CursorHotspot.Y), 0,
+                                          Height - 1);
+  IconInfo.hbmColor = ColorBitmap;
+  IconInfo.hbmMask = MaskBitmap;
+
+  HCURSOR CursorHandle = CreateIconIndirect(&IconInfo);
+
+  DeleteObject(ColorBitmap);
+  DeleteObject(MaskBitmap);
+
+  return CursorHandle;
+}
+#else
+void *CreateCursorHandleFromTexture(UTexture2D *, const FVector2D &) {
+  return nullptr;
+}
+#endif
+
 FString ResolvePlayerName(const ASkaldPlayerState *PlayerState,
                           const TCHAR *Context) {
   if (!PlayerState) {
@@ -1722,26 +1819,17 @@ void ASkaldPlayerController::ApplyFactionCursor() {
     FSlateApplication &SlateApplication = FSlateApplication::Get();
     if (TSharedPtr<ICursor> PlatformCursor =
             SlateApplication.GetPlatformCursor()) {
-      ActiveCursorShape.Reset();
+      PlatformCursor->SetTypeShape(EMouseCursor::Default, nullptr);
+      ReleaseActiveCursorHandle();
 
       if (UTexture2D *Texture = Definition->CursorTexture.LoadSynchronous()) {
-        if (FSlateRenderer *Renderer = SlateApplication.GetRenderer()) {
-          const TSharedPtr<ICursor> GeneratedCursor =
-              Renderer->CreateCursorFromTexture(Texture,
-                                                Definition->CursorHotspot);
-
-          if (GeneratedCursor.IsValid()) {
-            ActiveCursorShape = GeneratedCursor;
-            PlatformCursor->SetTypeShape(EMouseCursor::Default,
-                                         ActiveCursorShape);
-          } else {
-            PlatformCursor->SetTypeShape(EMouseCursor::Default, nullptr);
-          }
-        } else {
-          PlatformCursor->SetTypeShape(EMouseCursor::Default, nullptr);
+        if (void *GeneratedCursor =
+                CreateCursorHandleFromTexture(Texture,
+                                             Definition->CursorHotspot)) {
+          ActiveCursorHandle = GeneratedCursor;
+          PlatformCursor->SetTypeShape(EMouseCursor::Default,
+                                       ActiveCursorHandle);
         }
-      } else {
-        PlatformCursor->SetTypeShape(EMouseCursor::Default, nullptr);
       }
     }
   }
@@ -1782,13 +1870,24 @@ void ASkaldPlayerController::ApplyFactionCursor() {
   }
 }
 
+void ASkaldPlayerController::ReleaseActiveCursorHandle() {
+#if PLATFORM_WINDOWS
+  if (ActiveCursorHandle) {
+    DestroyCursor(static_cast<HCURSOR>(ActiveCursorHandle));
+    ActiveCursorHandle = nullptr;
+  }
+#else
+  ActiveCursorHandle = nullptr;
+#endif
+}
+
 void ASkaldPlayerController::ClearFactionCursor() {
   if (ActiveCursorTrailFX) {
     ActiveCursorTrailFX->DestroyComponent();
     ActiveCursorTrailFX = nullptr;
   }
   ActiveCursorTrailTemplate.Reset();
-  ActiveCursorShape.Reset();
+  ReleaseActiveCursorHandle();
 
   if (IsLocalController() && FSlateApplication::IsInitialized()) {
     if (TSharedPtr<ICursor> PlatformCursor =
