@@ -7,6 +7,7 @@
 #include "GameFramework/Pawn.h"
 #include "GridBattleManager.h"
 #include "TimerManager.h"
+#include "Abilities/SkaldAbilityComponent.h"
 #include "Abilities/SkaldAbilityTypes.h"
 #include "FighterPawn.generated.h"
 

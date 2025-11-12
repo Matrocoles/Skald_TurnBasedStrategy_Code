@@ -23,7 +23,7 @@
 #include "GridBattleManager.h"
 #include "GridOverlayComponent.h"
 #include "Kismet/GameplayStatics.h"
-#include "GameFramework/PlayerCameraManager.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
