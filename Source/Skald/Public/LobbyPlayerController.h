@@ -25,9 +25,9 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Lobby")
     void RequestAICount(int32 AICount);
 
-    /** Called by UI to toggle the local ready state. */
+    /** Called by UI once the local player confirms their selection. */
     UFUNCTION(BlueprintCallable, Category = "Lobby")
-    void ToggleReadyState(bool bReady);
+    void RequestLockIn();
 
     /** Called by UI when the local player selects a faction. */
     UFUNCTION(BlueprintCallable, Category = "Lobby")
@@ -76,9 +76,6 @@ protected:
     void ServerSetAICount(int32 AICount);
 
     UFUNCTION(Server, Reliable)
-    void ServerSetReady(bool bReady);
-
-    UFUNCTION(Server, Reliable)
     void ServerSetFaction(ESkaldFaction Faction);
 
     UFUNCTION(Server, Reliable)
@@ -86,6 +83,9 @@ protected:
 
     UFUNCTION(Server, Reliable)
     void ServerLaunchMatch();
+
+    UFUNCTION(Server, Reliable)
+    void ServerLockInSelection();
 
     /** Server-side validation to ensure only the lobby host can modify lobby state. */
     bool IsLobbyHostOnServer() const;
