@@ -472,6 +472,9 @@ protected:
   UPROPERTY()
   TWeakObjectPtr<UNiagaraSystem> ActiveCursorTrailTemplate;
 
+  /** Cached platform cursor shape generated from the faction texture. */
+  TSharedPtr<class ICursor> ActiveCursorShape;
+
   /** Tracks whether the cursor was hovering an interactable widget last tick. */
   bool bWasHoveringInteractable = false;
 
