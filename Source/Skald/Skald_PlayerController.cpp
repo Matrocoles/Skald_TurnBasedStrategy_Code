@@ -59,7 +59,7 @@
 #if UE_VERSION_OLDER_THAN(5, 5, 0)
 #include "Framework/Application/IPlatformCursor.h"
 #else
-#include "Framework/Application/ICursor.h"
+#include "GenericPlatform/ICursor.h"
 #endif
 #include "Layout/WidgetPath.h"
 #include "Widgets/SWidget.h"
