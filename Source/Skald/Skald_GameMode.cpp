@@ -310,6 +310,33 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
     PlayerDataArray.SetNum(GS->PlayerArray.Num());
   }
 
+  if (GI && (PS->Faction == ESkaldFaction::None || PS->PlayerDisplayName.IsEmpty())) {
+    FS_PlayerData LobbyData;
+    const FString ExistingDisplayName = PS->PlayerDisplayName;
+    if (GI->ConsumePendingLobbyPlayerData(PS->GetPlayerId(), ExistingDisplayName,
+                                          LobbyData)) {
+      if (PS->Faction == ESkaldFaction::None &&
+          LobbyData.Faction != ESkaldFaction::None) {
+        PS->Faction = LobbyData.Faction;
+        GI->TakenFactions.AddUnique(LobbyData.Faction);
+      }
+
+      if (PS->PlayerDisplayName.IsEmpty() && !LobbyData.DisplayName.IsEmpty()) {
+        PS->PlayerDisplayName = LobbyData.DisplayName;
+      }
+
+      if (!LobbyData.PlayerName.IsEmpty()) {
+        const FString DesiredName = LobbyData.PlayerName;
+        if (PS->GetPlayerName().IsEmpty() || PS->GetPlayerName() != DesiredName) {
+          PS->SetPlayerName(DesiredName);
+        }
+      } else if (!PS->PlayerDisplayName.IsEmpty() &&
+                 PS->GetPlayerName() != PS->PlayerDisplayName) {
+        PS->SetPlayerName(PS->PlayerDisplayName);
+      }
+    }
+  }
+
   if (GI && PC && PC->IsLocalController()) {
     if (PS->Faction == ESkaldFaction::None) {
       PS->Faction = GI->Faction;

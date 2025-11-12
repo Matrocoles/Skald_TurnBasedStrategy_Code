@@ -52,6 +52,8 @@ void USkaldGameInstance::Init() {
     TakenFactions.Add(Faction);
   }
 
+  PendingLobbyPlayers.Reset();
+
   if (!PostWorldBeginPlayHandle.IsValid()) {
 #if UE_VERSION_OLDER_THAN(5, 5, 0)
     PostWorldBeginPlayHandle =
@@ -1136,6 +1138,7 @@ void USkaldGameInstance::ResetSessionState() {
     TakenFactions.Add(Faction);
   }
   PendingLobbyAIPlayers.Reset();
+  PendingLobbyPlayers.Reset();
   OnFactionsUpdated.Broadcast();
 
   PendingBattle = FS_BattlePayload();
@@ -1189,4 +1192,40 @@ void USkaldGameInstance::ResetSessionState() {
   PendingStatusMessage = FText::GetEmpty();
   bHasPendingStatusMessage = false;
   bPendingStatusPersistent = true;
+}
+
+bool USkaldGameInstance::ConsumePendingLobbyPlayerData(int32 PlayerId,
+                                                       const FString &DisplayName,
+                                                       FS_PlayerData &OutData) {
+  auto Normalise = [](const FString &InValue) {
+    FString Result = InValue;
+    Result.TrimStartAndEndInline();
+    Result.ToLowerInline();
+    return Result;
+  };
+
+  int32 MatchedIndex = INDEX_NONE;
+  if (PlayerId > 0) {
+    MatchedIndex = PendingLobbyPlayers.IndexOfByPredicate(
+        [PlayerId](const FS_PlayerData &Data) { return Data.PlayerID == PlayerId; });
+  }
+
+  if (MatchedIndex == INDEX_NONE) {
+    const FString NormalisedName = Normalise(DisplayName);
+    if (!NormalisedName.IsEmpty()) {
+      MatchedIndex = PendingLobbyPlayers.IndexOfByPredicate(
+          [&NormalisedName, &Normalise](const FS_PlayerData &Data) {
+            return Normalise(Data.DisplayName) == NormalisedName ||
+                   Normalise(Data.PlayerName) == NormalisedName;
+          });
+    }
+  }
+
+  if (MatchedIndex == INDEX_NONE) {
+    return false;
+  }
+
+  OutData = PendingLobbyPlayers[MatchedIndex];
+  PendingLobbyPlayers.RemoveAtSwap(MatchedIndex);
+  return true;
 }
