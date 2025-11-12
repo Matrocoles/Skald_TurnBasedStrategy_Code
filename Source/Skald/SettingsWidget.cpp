@@ -3,12 +3,14 @@
 #include "Components/ComboBoxString.h"
 #include "Components/Slider.h"
 #include "GameFramework/GameUserSettings.h"
+#include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/Engine.h"
 #include "Sound/SoundClass.h"
 #include "Sound/SoundMix.h"
 #include "Skald_GameUserSettings.h"
 #include "UI/InGameMenuWidget.h"
+#include "UI/QuitConfirmationWidget.h"
 #include "LobbyMenuWidget.h"
 
 void USettingsWidget::SetLobbyMenu(ULobbyMenuWidget* InMenu)
@@ -37,6 +39,11 @@ void USettingsWidget::NativeConstruct()
     if (MainMenuButton)
     {
         MainMenuButton->OnClicked.AddDynamic(this, &USettingsWidget::OnMainMenu);
+    }
+
+    if (ExitButton)
+    {
+        ExitButton->OnClicked.AddDynamic(this, &USettingsWidget::OnExit);
     }
 
     if (DisplaySizeCombo)
@@ -143,6 +150,28 @@ void USettingsWidget::NativeConstruct()
     }
 }
 
+void USettingsWidget::NativeDestruct()
+{
+    if (ApplyButton)
+    {
+        ApplyButton->OnClicked.RemoveDynamic(this, &USettingsWidget::OnApply);
+    }
+
+    if (MainMenuButton)
+    {
+        MainMenuButton->OnClicked.RemoveDynamic(this, &USettingsWidget::OnMainMenu);
+    }
+
+    if (ExitButton)
+    {
+        ExitButton->OnClicked.RemoveDynamic(this, &USettingsWidget::OnExit);
+    }
+
+    ClearExitConfirmation();
+
+    Super::NativeDestruct();
+}
+
 void USettingsWidget::OnApply()
 {
     if (USkaldGameUserSettings* SkaldSettings = USkaldGameUserSettings::GetSkaldGameUserSettings())
@@ -171,6 +200,8 @@ void USettingsWidget::OnApply()
 
 void USettingsWidget::OnMainMenu()
 {
+    ClearExitConfirmation();
+
     // Hide the settings widget before showing the main menu again
     SetVisibility(ESlateVisibility::Hidden);
     RemoveFromParent();
@@ -182,6 +213,33 @@ void USettingsWidget::OnMainMenu()
             Menu->HandleSubMenuClosed(this);
         }
         OwningMenu->SetVisibility(ESlateVisibility::Visible);
+    }
+}
+
+void USettingsWidget::OnExit()
+{
+    if (ExitConfirmationWidget.IsValid())
+    {
+        return;
+    }
+
+    if (APlayerController* PC = GetOwningPlayer())
+    {
+        if (UQuitConfirmationWidget* Widget = CreateWidget<UQuitConfirmationWidget>(PC, UQuitConfirmationWidget::StaticClass()))
+        {
+            Widget->SetOwningSettings(this);
+            Widget->AddToViewport(100);
+            ExitConfirmationWidget = Widget;
+        }
+    }
+    else if (UWorld* World = GetWorld())
+    {
+        if (UQuitConfirmationWidget* Widget = CreateWidget<UQuitConfirmationWidget>(World, UQuitConfirmationWidget::StaticClass()))
+        {
+            Widget->SetOwningSettings(this);
+            Widget->AddToViewport(100);
+            ExitConfirmationWidget = Widget;
+        }
     }
 }
 
@@ -229,6 +287,24 @@ void USettingsWidget::HandleBattleActionDelayChanged(float Value)
         !FMath::IsNearlyEqual(BattleActionDelaySlider->GetValue(), PendingBattleActionDelay))
     {
         BattleActionDelaySlider->SetValue(PendingBattleActionDelay);
+    }
+}
+
+void USettingsWidget::HandleExitDeclined()
+{
+    ClearExitConfirmation();
+    OnMainMenu();
+}
+
+void USettingsWidget::ClearExitConfirmation()
+{
+    if (ExitConfirmationWidget.IsValid())
+    {
+        if (ExitConfirmationWidget->IsInViewport())
+        {
+            ExitConfirmationWidget->RemoveFromParent();
+        }
+        ExitConfirmationWidget.Reset();
     }
 }
 
