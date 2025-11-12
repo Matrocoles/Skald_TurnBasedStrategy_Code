@@ -56,7 +56,7 @@
 #endif
 
 #include "Framework/Application/SlateApplication.h"
-#include "Framework/Application/IPlatformCursor.h"
+#include "GenericPlatform/ICursor.h"
 #include "Layout/WidgetPath.h"
 #include "Widgets/SWidget.h"
 #include "Widgets/SWindow.h"
@@ -1720,7 +1720,7 @@ void ASkaldPlayerController::ApplyFactionCursor() {
 
   if (FSlateApplication::IsInitialized()) {
     FSlateApplication &SlateApplication = FSlateApplication::Get();
-    if (TSharedPtr<IPlatformCursor> PlatformCursor =
+    if (TSharedPtr<ICursor> PlatformCursor =
             SlateApplication.GetPlatformCursor()) {
       ActiveCursorShape.Reset();
 
@@ -1791,7 +1791,7 @@ void ASkaldPlayerController::ClearFactionCursor() {
   ActiveCursorShape.Reset();
 
   if (IsLocalController() && FSlateApplication::IsInitialized()) {
-    if (TSharedPtr<IPlatformCursor> PlatformCursor =
+    if (TSharedPtr<ICursor> PlatformCursor =
             FSlateApplication::Get().GetPlatformCursor()) {
       PlatformCursor->SetTypeShape(EMouseCursor::Default, nullptr);
     }
