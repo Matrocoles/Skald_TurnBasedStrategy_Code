@@ -2077,6 +2077,29 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
     }
   }
 
+  TMap<int32, ASkaldPlayerController *> HumanControllerById;
+  TArray<ASkaldPlayerController *> AvailableHumanControllers;
+  TSet<ASkaldPlayerController *> AssignedHumanControllers;
+  if (UWorld *MutableWorld = GetWorld()) {
+    for (FConstPlayerControllerIterator It =
+             MutableWorld->GetPlayerControllerIterator();
+         It; ++It) {
+      ASkaldPlayerController *PlayerController =
+          Cast<ASkaldPlayerController>(*It);
+      if (!PlayerController || PlayerController->IsA<ASkaldAIController>()) {
+        continue;
+      }
+
+      AvailableHumanControllers.Add(PlayerController);
+
+      if (ASkaldPlayerState *ExistingState =
+              PlayerController->GetPlayerState<ASkaldPlayerState>()) {
+        HumanControllerById.Add(ExistingState->GetPlayerId(),
+                                PlayerController);
+      }
+    }
+  }
+
   if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
     GI->AIPlayersToSpawn = FMath::Max(SavedAIControllers, 0);
   }
@@ -2098,6 +2121,62 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
         ControllerSavePtr ? *ControllerSavePtr : nullptr;
     const bool bIsAIPlayer = ControllerSave ? ControllerSave->bIsAI : false;
 
+    ASkaldPlayerController *AssignedController = nullptr;
+    ASkaldPlayerState *PlayerState = nullptr;
+    if (!bIsAIPlayer) {
+      auto FindControllerForPlayerId =
+          [&](int32 PlayerId) -> ASkaldPlayerController * {
+        if (PlayerId <= 0) {
+          return nullptr;
+        }
+
+        if (ASkaldPlayerController **FoundController =
+                HumanControllerById.Find(PlayerId)) {
+          if (!AssignedHumanControllers.Contains(*FoundController)) {
+            return *FoundController;
+          }
+        }
+
+        return nullptr;
+      };
+
+      if (ControllerSave) {
+        AssignedController = FindControllerForPlayerId(ControllerSave->PlayerId);
+      }
+
+      if (!AssignedController) {
+        AssignedController = FindControllerForPlayerId(PlayerSave.PlayerID);
+      }
+
+      if (!AssignedController) {
+        for (ASkaldPlayerController *Candidate : AvailableHumanControllers) {
+          if (!AssignedHumanControllers.Contains(Candidate)) {
+            AssignedController = Candidate;
+            break;
+          }
+        }
+      }
+
+      if (AssignedController) {
+        AssignedHumanControllers.Add(AssignedController);
+        for (auto It = HumanControllerById.CreateIterator(); It; ++It) {
+          if (It.Value() == AssignedController) {
+            It.RemoveCurrent();
+          }
+        }
+        PlayerState =
+            AssignedController->GetPlayerState<ASkaldPlayerState>();
+
+        if (!PlayerState) {
+          PlayerState = GetWorld()->SpawnActor<ASkaldPlayerState>();
+          if (PlayerState) {
+            AssignedController->PlayerState = PlayerState;
+            PlayerState->SetOwner(AssignedController);
+          }
+        }
+      }
+    }
+
     FS_PlayerData Data;
     Data.PlayerID = PlayerSave.PlayerID;
     Data.PlayerName = PlayerSave.PlayerName;
@@ -2118,25 +2197,37 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
       continue;
     }
 
-    ASkaldPlayerState *PS = GetWorld()->SpawnActor<ASkaldPlayerState>();
-    if (!PS) {
+    if (!PlayerState) {
+      PlayerState = GetWorld()->SpawnActor<ASkaldPlayerState>();
+    }
+
+    if (!PlayerState) {
       continue;
     }
 
-    PS->SetPlayerId(PlayerSave.PlayerID);
-    PS->PlayerDisplayName = PlayerSave.PlayerName;
-    PS->SetPlayerName(PlayerSave.PlayerName);
-    PS->Faction = PlayerSave.Faction;
-    PS->Resources = PlayerSave.Resources;
-    PS->IsEliminated = PlayerSave.IsEliminated;
-    PS->bIsAI = false;
+    PlayerState->SetPlayerId(PlayerSave.PlayerID);
+    PlayerState->PlayerDisplayName = PlayerSave.PlayerName;
+    PlayerState->SetPlayerName(PlayerSave.PlayerName);
+    PlayerState->Faction = PlayerSave.Faction;
+    PlayerState->Resources = PlayerSave.Resources;
+    PlayerState->IsEliminated = PlayerSave.IsEliminated;
+    PlayerState->bIsAI = bIsAIPlayer;
+
+    if (AssignedController && AssignedController->PlayerState != PlayerState) {
+      AssignedController->PlayerState = PlayerState;
+      PlayerState->SetOwner(AssignedController);
+    }
+
+    if (AssignedController) {
+      HumanControllerById.Add(PlayerState->GetPlayerId(), AssignedController);
+    }
 
     if (GS) {
-      GS->AddPlayerState(PS);
+      GS->AddPlayerState(PlayerState);
     }
 
     if (TurnManager) {
-      TurnManager->BroadcastResources(PS);
+      TurnManager->BroadcastResources(PlayerState);
     }
 
     PlayerDataArray.Add(Data);
