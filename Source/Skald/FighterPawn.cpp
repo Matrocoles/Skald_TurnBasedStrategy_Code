@@ -2,6 +2,7 @@
 #include "Skald_PlayerController.h"
 #include "Abilities/SkaldAbilityComponent.h"
 #include "Algo/Reverse.h"
+#include "Algo/Sort.h"
 #include "Blueprint/UserWidget.h"
 #include "CollisionQueryParams.h"
 #include "CollisionShape.h"
@@ -22,6 +23,7 @@
 #include "GridBattleManager.h"
 #include "GridOverlayComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "GameFramework/PlayerCameraManager.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
@@ -36,6 +38,7 @@
 #include "UObject/ConstructorHelpers.h"
 #include "UI/FighterActivationWidget.h"
 #include "UI/FighterHealthWidget.h"
+#include "UI/StatusEffectFloatingWidget.h"
 
 using AEnemyAIController = ASkaldAIController;
 
@@ -109,6 +112,38 @@ AFighterPawn::AFighterPawn() : MaxHealth(0) {
   HealthWidgetBack->SetCanEverAffectNavigation(false);
   HealthWidgetBack->SetWidgetSpace(EWidgetSpace::World);
   HealthWidgetBack->SetDrawAtDesiredSize(true);
+
+  BuffStatusWidget =
+      CreateDefaultSubobject<UWidgetComponent>(TEXT("BuffStatusWidget"));
+  BuffStatusWidget->SetupAttachment(DisplayMesh);
+  BuffStatusWidget->SetTwoSided(true);
+  BuffStatusWidget->SetWidgetSpace(EWidgetSpace::World);
+  BuffStatusWidget->SetDrawAtDesiredSize(true);
+  BuffStatusWidget->SetRelativeLocation(
+      FVector(0.f, WidgetMirrorSeparation, BuffStatusWidgetHeight));
+  BuffStatusWidget->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+  BuffStatusWidget->SetCollisionProfileName(
+      UCollisionProfile::NoCollision_ProfileName);
+  BuffStatusWidget->SetGenerateOverlapEvents(false);
+  BuffStatusWidget->SetCanEverAffectNavigation(false);
+  BuffStatusWidget->SetVisibility(false);
+  BuffStatusWidget->SetHiddenInGame(true);
+
+  DebuffStatusWidget =
+      CreateDefaultSubobject<UWidgetComponent>(TEXT("DebuffStatusWidget"));
+  DebuffStatusWidget->SetupAttachment(DisplayMesh);
+  DebuffStatusWidget->SetTwoSided(true);
+  DebuffStatusWidget->SetWidgetSpace(EWidgetSpace::World);
+  DebuffStatusWidget->SetDrawAtDesiredSize(true);
+  DebuffStatusWidget->SetRelativeLocation(
+      FVector(0.f, WidgetMirrorSeparation, DebuffStatusWidgetHeight));
+  DebuffStatusWidget->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+  DebuffStatusWidget->SetCollisionProfileName(
+      UCollisionProfile::NoCollision_ProfileName);
+  DebuffStatusWidget->SetGenerateOverlapEvents(false);
+  DebuffStatusWidget->SetCanEverAffectNavigation(false);
+  DebuffStatusWidget->SetVisibility(false);
+  DebuffStatusWidget->SetHiddenInGame(true);
 
   ActivationWidget =
       CreateDefaultSubobject<UWidgetComponent>(TEXT("ActivationWidget"));
@@ -193,6 +228,9 @@ AFighterPawn::AFighterPawn() : MaxHealth(0) {
 
   ActivationWidgetTemplate = UFighterActivationWidget::StaticClass();
 
+  BuffStatusWidgetTemplate = UBuffFloatingTextWidget::StaticClass();
+  DebuffStatusWidgetTemplate = UDebuffFloatingTextWidget::StaticClass();
+
   ActionsRemaining = 0;
   bHasActivatedThisRound = false;
   bIsCurrentlyActive = false;
@@ -230,6 +268,8 @@ void AFighterPawn::GetLifetimeReplicatedProps(
   DOREPLIFETIME(AFighterPawn, MaxHealth);
   DOREPLIFETIME(AFighterPawn, AttackType);
   DOREPLIFETIME(AFighterPawn, AttackFX);
+  DOREPLIFETIME(AFighterPawn, ActiveBuffs);
+  DOREPLIFETIME(AFighterPawn, ActiveDebuffs);
 }
 
 void AFighterPawn::OnConstruction(const FTransform &Transform) {
@@ -247,6 +287,14 @@ void AFighterPawn::OnConstruction(const FTransform &Transform) {
   RefreshPassiveBuffDecalMaterial();
   SetPassiveBuffVisible(false);
   SetTargetedIndicatorVisible(false);
+  if (BuffStatusWidget) {
+    BuffStatusWidget->SetRelativeLocation(
+        FVector(0.f, WidgetMirrorSeparation, BuffStatusWidgetHeight));
+  }
+  if (DebuffStatusWidget) {
+    DebuffStatusWidget->SetRelativeLocation(
+        FVector(0.f, WidgetMirrorSeparation, DebuffStatusWidgetHeight));
+  }
   RefreshDisplayMeshYawOffset();
   const float IncomingSpawnYaw = Transform.GetRotation().Rotator().Yaw;
   const bool bShouldOverride = ShouldOverrideSpawnFacingYaw();
@@ -296,6 +344,30 @@ void AFighterPawn::BeginPlay() {
 
   InitializeHealthWidgetComponent(HealthWidget);
   InitializeHealthWidgetComponent(HealthWidgetBack);
+
+  const auto InitializeStatusWidgetComponent =
+      [&](UWidgetComponent *Component,
+          TSubclassOf<UStatusEffectFloatingWidget> Template) {
+        if (!Component) {
+          return;
+        }
+
+        if (Template) {
+          Component->SetWidgetClass(Template);
+        }
+        Component->InitWidget();
+
+        if (UUserWidget *StatusWidget = Component->GetUserWidgetObject()) {
+          StatusWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
+        }
+
+        Component->SetVisibility(false);
+        Component->SetHiddenInGame(true);
+      };
+
+  InitializeStatusWidgetComponent(BuffStatusWidget, BuffStatusWidgetTemplate);
+  InitializeStatusWidgetComponent(DebuffStatusWidget,
+                                  DebuffStatusWidgetTemplate);
 
   if (ActivationWidget) {
     if (ActivationWidgetTemplate) {
@@ -369,10 +441,13 @@ void AFighterPawn::BeginPlay() {
 
   RecalculateBattleEngagement();
 
+  UpdateFloatingStatusText();
+
   EnsureDiceManagerBinding();
 }
 
 void AFighterPawn::EndPlay(const EEndPlayReason::Type EndPlayReason) {
+  ClearFloatingStatusEffects();
   CleanupDiceManagerBinding();
   Super::EndPlay(EndPlayReason);
 }
@@ -405,11 +480,16 @@ void AFighterPawn::SetAttackType(EFighterAttackType InAttackType) {
 
 void AFighterPawn::OnRep_AttackType() {}
 
+void AFighterPawn::OnRep_ActiveBuffs() { UpdateFloatingStatusText(); }
+
+void AFighterPawn::OnRep_ActiveDebuffs() { UpdateFloatingStatusText(); }
+
 void AFighterPawn::Tick(float DeltaSeconds) {
   Super::Tick(DeltaSeconds);
 
   UpdateHitFlash(DeltaSeconds);
   TickActiveProjectileFX(DeltaSeconds);
+  UpdateFloatingStatusWidgetFacing();
 
   const bool bShouldRunMovement =
       bIsMoving && (HasAuthority() || IsLocallyControlled());
@@ -1257,6 +1337,320 @@ void AFighterPawn::NotifyPassiveBuffRemoved(FName AbilityId) {
 void AFighterPawn::ClearAllPassiveBuffIndicators() {
   ActivePassiveBuffSources.Empty();
   SetPassiveBuffVisible(false);
+}
+
+void AFighterPawn::NotifyStatusEffectApplied(
+    FName AbilityId, const FText &AbilityName,
+    const FSkaldAbilityStatDelta &Delta) {
+  if (!HasAuthority()) {
+    return;
+  }
+
+  if (!HasAnyDeltaMagnitude(Delta)) {
+    return;
+  }
+
+  ApplyStatusEffectDelta(AbilityId, AbilityName, Delta, true);
+}
+
+void AFighterPawn::NotifyStatusEffectRemoved(
+    FName AbilityId, const FText &AbilityName,
+    const FSkaldAbilityStatDelta &Delta) {
+  if (!HasAuthority()) {
+    return;
+  }
+
+  if (!HasAnyDeltaMagnitude(Delta)) {
+    return;
+  }
+
+  ApplyStatusEffectDelta(AbilityId, AbilityName, Delta, false);
+}
+
+void AFighterPawn::ClearFloatingStatusEffects() {
+  ActiveStatusAggregates.Empty();
+  ActiveBuffs.Reset();
+  ActiveDebuffs.Reset();
+
+  if (HasAuthority()) {
+    OnRep_ActiveBuffs();
+    OnRep_ActiveDebuffs();
+  } else {
+    UpdateFloatingStatusText();
+  }
+}
+
+void AFighterPawn::UpdateFloatingStatusText() {
+  TArray<FText> BuffLines;
+  BuildBuffStatusLines(BuffLines);
+  ApplyStatusLinesToWidget(BuffStatusWidget, BuffLines);
+
+  TArray<FText> DebuffLines;
+  BuildDebuffStatusLines(DebuffLines);
+  ApplyStatusLinesToWidget(DebuffStatusWidget, DebuffLines);
+}
+
+void AFighterPawn::UpdateFloatingStatusWidgetFacing() {
+  const FRotator DesiredRotation = ResolveCameraFacingRotation();
+
+  if (BuffStatusWidget) {
+    BuffStatusWidget->SetWorldRotation(DesiredRotation);
+  }
+
+  if (DebuffStatusWidget) {
+    DebuffStatusWidget->SetWorldRotation(DesiredRotation);
+  }
+}
+
+void AFighterPawn::ApplyStatusLinesToWidget(UWidgetComponent *Component,
+                                            const TArray<FText> &Lines) {
+  if (!Component) {
+    return;
+  }
+
+  const bool bShouldBeVisible = Lines.Num() > 0;
+  Component->SetVisibility(bShouldBeVisible);
+  Component->SetHiddenInGame(!bShouldBeVisible);
+
+  if (UStatusEffectFloatingWidget *StatusWidget =
+          Cast<UStatusEffectFloatingWidget>(Component->GetUserWidgetObject())) {
+    StatusWidget->SetStatusLines(Lines);
+  }
+}
+
+void AFighterPawn::BuildBuffStatusLines(TArray<FText> &OutLines) const {
+  OutLines.Reset();
+  OutLines.Reserve(ActiveBuffs.Num());
+
+  for (const FActiveBuff &Buff : ActiveBuffs) {
+    const FString Fragment = BuildDeltaFragment(Buff.Delta, true);
+    if (Fragment.IsEmpty()) {
+      continue;
+    }
+
+    const FText AbilityText =
+        FText::IsEmptyOrWhitespace(Buff.DisplayName)
+            ? FText::FromName(Buff.SourceAbilityId)
+            : Buff.DisplayName;
+
+    FString Combined = AbilityText.ToString();
+    if (!Fragment.IsEmpty()) {
+      Combined = FString::Printf(TEXT("%s %s"), *Combined, *Fragment);
+    }
+
+    OutLines.Add(FText::FromString(Combined));
+  }
+}
+
+void AFighterPawn::BuildDebuffStatusLines(TArray<FText> &OutLines) const {
+  OutLines.Reset();
+  OutLines.Reserve(ActiveDebuffs.Num());
+
+  for (const FActiveDebuff &Debuff : ActiveDebuffs) {
+    const FString Fragment = BuildDeltaFragment(Debuff.Delta, false);
+    if (Fragment.IsEmpty()) {
+      continue;
+    }
+
+    const FText AbilityText =
+        FText::IsEmptyOrWhitespace(Debuff.DisplayName)
+            ? FText::FromName(Debuff.SourceAbilityId)
+            : Debuff.DisplayName;
+
+    FString Combined = AbilityText.ToString();
+    if (!Fragment.IsEmpty()) {
+      Combined = FString::Printf(TEXT("%s %s"), *Combined, *Fragment);
+    }
+
+    OutLines.Add(FText::FromString(Combined));
+  }
+}
+
+void AFighterPawn::ApplyStatusEffectDelta(
+    FName AbilityId, const FText &AbilityName,
+    const FSkaldAbilityStatDelta &Delta, bool bIsApplying) {
+  if (!HasAuthority()) {
+    return;
+  }
+
+  if (!HasAnyDeltaMagnitude(Delta)) {
+    return;
+  }
+
+  FName AggregatedKey = AbilityId;
+  if (AggregatedKey.IsNone()) {
+    const FString NameString =
+        FText::IsEmptyOrWhitespace(AbilityName)
+            ? FString(TEXT("StatusEffect_None"))
+            : AbilityName.ToString();
+    AggregatedKey = FName(*NameString);
+  }
+
+  FStatusEffectAggregate &Aggregate =
+      ActiveStatusAggregates.FindOrAdd(AggregatedKey);
+
+  if (!FText::IsEmptyOrWhitespace(AbilityName)) {
+    Aggregate.DisplayName = AbilityName;
+  }
+
+  const int32 Direction = bIsApplying ? 1 : -1;
+  AccumulateDelta(Aggregate.Delta, Delta, Direction);
+
+  if (!HasAnyDeltaMagnitude(Aggregate.Delta)) {
+    ActiveStatusAggregates.Remove(AggregatedKey);
+  }
+
+  RebuildActiveStatusArrays();
+}
+
+void AFighterPawn::RebuildActiveStatusArrays() {
+  if (!HasAuthority()) {
+    return;
+  }
+
+  ActiveBuffs.Reset();
+  ActiveDebuffs.Reset();
+
+  for (const TPair<FName, FStatusEffectAggregate> &Pair :
+       ActiveStatusAggregates) {
+    const FStatusEffectAggregate &Aggregate = Pair.Value;
+    const FText AbilityText = FText::IsEmptyOrWhitespace(Aggregate.DisplayName)
+                                  ? FText::FromName(Pair.Key)
+                                  : Aggregate.DisplayName;
+
+    const FSkaldAbilityStatDelta PositiveDelta =
+        ExtractPositiveDelta(Aggregate.Delta);
+    const FSkaldAbilityStatDelta NegativeDelta =
+        ExtractNegativeDelta(Aggregate.Delta);
+
+    if (HasAnyDeltaMagnitude(PositiveDelta)) {
+      FActiveBuff Buff;
+      Buff.SourceAbilityId = Pair.Key;
+      Buff.DisplayName = AbilityText;
+      Buff.Delta = PositiveDelta;
+      ActiveBuffs.Add(Buff);
+    }
+
+    if (HasAnyDeltaMagnitude(NegativeDelta)) {
+      FActiveDebuff Debuff;
+      Debuff.SourceAbilityId = Pair.Key;
+      Debuff.DisplayName = AbilityText;
+      Debuff.Delta = NegativeDelta;
+      ActiveDebuffs.Add(Debuff);
+    }
+  }
+
+  ActiveBuffs.Sort([](const FActiveBuff &A, const FActiveBuff &B) {
+    return A.SourceAbilityId.LexicalLess(B.SourceAbilityId);
+  });
+
+  ActiveDebuffs.Sort([](const FActiveDebuff &A, const FActiveDebuff &B) {
+    return A.SourceAbilityId.LexicalLess(B.SourceAbilityId);
+  });
+
+  OnRep_ActiveBuffs();
+  OnRep_ActiveDebuffs();
+}
+
+FRotator AFighterPawn::ResolveCameraFacingRotation() const {
+  if (UWorld *World = GetWorld()) {
+    if (APlayerCameraManager *Camera =
+            UGameplayStatics::GetPlayerCameraManager(World, 0)) {
+      return Camera->GetCameraRotation();
+    }
+  }
+
+  return GetActorRotation();
+}
+
+bool AFighterPawn::HasAnyDeltaMagnitude(const FSkaldAbilityStatDelta &Delta) {
+  return Delta.AttackDice != 0 || Delta.AttackDamage != 0 ||
+         Delta.MeleeAttackDamage != 0 || Delta.RangedAttackDamage != 0 ||
+         Delta.AttackRange != 0 || Delta.Movement != 0 ||
+         Delta.Defence != 0 || Delta.Strength != 0 ||
+         Delta.CriticalBonusDamage != 0;
+}
+
+FSkaldAbilityStatDelta AFighterPawn::ExtractPositiveDelta(
+    const FSkaldAbilityStatDelta &Delta) {
+  FSkaldAbilityStatDelta Result = Delta;
+  Result.AttackDice = FMath::Max(0, Result.AttackDice);
+  Result.AttackDamage = FMath::Max(0, Result.AttackDamage);
+  Result.MeleeAttackDamage = FMath::Max(0, Result.MeleeAttackDamage);
+  Result.RangedAttackDamage = FMath::Max(0, Result.RangedAttackDamage);
+  Result.AttackRange = FMath::Max(0, Result.AttackRange);
+  Result.Movement = FMath::Max(0, Result.Movement);
+  Result.Defence = FMath::Max(0, Result.Defence);
+  Result.Strength = FMath::Max(0, Result.Strength);
+  Result.CriticalBonusDamage = FMath::Max(0, Result.CriticalBonusDamage);
+  return Result;
+}
+
+FSkaldAbilityStatDelta AFighterPawn::ExtractNegativeDelta(
+    const FSkaldAbilityStatDelta &Delta) {
+  FSkaldAbilityStatDelta Result = Delta;
+  Result.AttackDice = FMath::Min(0, Result.AttackDice);
+  Result.AttackDamage = FMath::Min(0, Result.AttackDamage);
+  Result.MeleeAttackDamage = FMath::Min(0, Result.MeleeAttackDamage);
+  Result.RangedAttackDamage = FMath::Min(0, Result.RangedAttackDamage);
+  Result.AttackRange = FMath::Min(0, Result.AttackRange);
+  Result.Movement = FMath::Min(0, Result.Movement);
+  Result.Defence = FMath::Min(0, Result.Defence);
+  Result.Strength = FMath::Min(0, Result.Strength);
+  Result.CriticalBonusDamage = FMath::Min(0, Result.CriticalBonusDamage);
+  return Result;
+}
+
+void AFighterPawn::AccumulateDelta(FSkaldAbilityStatDelta &Target,
+                                   const FSkaldAbilityStatDelta &Source,
+                                   int32 Direction) {
+  Target.AttackDice += Source.AttackDice * Direction;
+  Target.AttackDamage += Source.AttackDamage * Direction;
+  Target.MeleeAttackDamage += Source.MeleeAttackDamage * Direction;
+  Target.RangedAttackDamage += Source.RangedAttackDamage * Direction;
+  Target.AttackRange += Source.AttackRange * Direction;
+  Target.Movement += Source.Movement * Direction;
+  Target.Defence += Source.Defence * Direction;
+  Target.Strength += Source.Strength * Direction;
+  Target.CriticalBonusDamage += Source.CriticalBonusDamage * Direction;
+}
+
+FString AFighterPawn::BuildDeltaFragment(const FSkaldAbilityStatDelta &Delta,
+                                         bool bPositive) {
+  struct FStatusStatDescriptor {
+    int32 FSkaldAbilityStatDelta::*Member;
+    const TCHAR *Label;
+  };
+
+  static const FStatusStatDescriptor Descriptors[] = {
+      {&FSkaldAbilityStatDelta::AttackDice, TEXT("ATK Dice")},
+      {&FSkaldAbilityStatDelta::AttackDamage, TEXT("DMG")},
+      {&FSkaldAbilityStatDelta::MeleeAttackDamage, TEXT("Melee DMG")},
+      {&FSkaldAbilityStatDelta::RangedAttackDamage, TEXT("Ranged DMG")},
+      {&FSkaldAbilityStatDelta::AttackRange, TEXT("RNG")},
+      {&FSkaldAbilityStatDelta::Movement, TEXT("MOVE")},
+      {&FSkaldAbilityStatDelta::Defence, TEXT("DEF")},
+      {&FSkaldAbilityStatDelta::Strength, TEXT("STR")},
+      {&FSkaldAbilityStatDelta::CriticalBonusDamage, TEXT("CRIT DMG")},
+  };
+
+  TArray<FString> Tokens;
+  Tokens.Reserve(UE_ARRAY_COUNT(Descriptors));
+
+  for (const FStatusStatDescriptor &Descriptor : Descriptors) {
+    const int32 Value = Delta.*(Descriptor.Member);
+    if (bPositive) {
+      if (Value > 0) {
+        Tokens.Add(FString::Printf(TEXT("+%d %s"), Value, Descriptor.Label));
+      }
+    } else {
+      if (Value < 0) {
+        Tokens.Add(FString::Printf(TEXT("%d %s"), Value, Descriptor.Label));
+      }
+    }
+  }
+
+  return Tokens.Num() > 0 ? FString::Join(Tokens, TEXT(" ")) : FString();
 }
 
 FIntPoint AFighterPawn::GetCurrentCell() const { return CurrentCell; }
