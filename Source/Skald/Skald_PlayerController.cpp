@@ -56,7 +56,6 @@
 #endif
 
 #include "Engine/Texture2D.h"
-#include "Engine/Texture2DMipMap.h"
 #include "Framework/Application/SlateApplication.h"
 #include "GenericPlatform/ICursor.h"
 #include "Layout/WidgetPath.h"
