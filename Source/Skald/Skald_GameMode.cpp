@@ -1480,6 +1480,8 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
 
   bool bAllLockedIn = true;
   bool bAllHaveControllers = true;
+  bool bAllHumansHaveFactions = true;
+  bool bAllHumansHaveNames = true;
   for (APlayerState *PSBase : GS->PlayerArray) {
     ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase);
     if (!PS || !PS->bHasLockedIn) {
@@ -1495,6 +1497,16 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
           TEXT("TryInitializeWorldAndStart: PlayerState %s missing controller"),
           *GetNameSafe(PS));
     }
+    if (PS && !PS->bIsAI) {
+      if (PS->Faction == ESkaldFaction::None) {
+        bAllHumansHaveFactions = false;
+      }
+      const bool bHasDisplayName =
+          !PS->PlayerDisplayName.IsEmpty() || !PS->GetPlayerName().IsEmpty();
+      if (!bHasDisplayName) {
+        bAllHumansHaveNames = false;
+      }
+    }
     if (!bAllLockedIn || !bAllHaveControllers) {
       break;
     }
@@ -1502,16 +1514,20 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
 
   const int32 CurrentPlayerCount = UniqueControllers.Num();
   const bool bReadyToStart =
-      bAllLockedIn && bAllHaveControllers &&
+      bAllLockedIn && bAllHaveControllers && bAllHumansHaveFactions &&
+      bAllHumansHaveNames &&
       CurrentPlayerCount >= MinPlayerCount && TurnManager &&
       TurnManager->GetControllerCount() >= CurrentPlayerCount;
 
   UE_LOG(
       LogSkald, Log,
       TEXT("TryInitializeWorldAndStart: bAllLockedIn=%s bAllHaveControllers=%s "
-           "CurrentPlayerCount=%d ControllerCount=%d bReadyToStart=%s"),
+           "bAllHumansHaveFactions=%s bAllHumansHaveNames=%s CurrentPlayerCount=%d "
+           "ControllerCount=%d bReadyToStart=%s"),
       bAllLockedIn ? TEXT("true") : TEXT("false"),
-      bAllHaveControllers ? TEXT("true") : TEXT("false"), CurrentPlayerCount,
+      bAllHaveControllers ? TEXT("true") : TEXT("false"),
+      bAllHumansHaveFactions ? TEXT("true") : TEXT("false"),
+      bAllHumansHaveNames ? TEXT("true") : TEXT("false"), CurrentPlayerCount,
       TurnManager ? TurnManager->GetControllerCount() : 0,
       bReadyToStart ? TEXT("true") : TEXT("false"));
 
@@ -1520,6 +1536,22 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
         -1, 4.f, FColor::Yellow,
         FString::Printf(TEXT("Waiting for players: %d/%d ready"),
                         CurrentPlayerCount, MinPlayerCount));
+  }
+
+  if (GEngine && (!bAllHumansHaveFactions || !bAllHumansHaveNames)) {
+    FString Reason;
+    if (!bAllHumansHaveFactions) {
+      Reason = TEXT("faction selections");
+    }
+    if (!bAllHumansHaveNames) {
+      if (!Reason.IsEmpty()) {
+        Reason += TEXT(" & ");
+      }
+      Reason += TEXT("display names");
+    }
+    GEngine->AddOnScreenDebugMessage(
+        -1, 4.f, FColor::Yellow,
+        FString::Printf(TEXT("Waiting for lobby data: missing %s"), *Reason));
   }
 
   if (!bWorldInitialized && bReadyToStart) {
