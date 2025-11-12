@@ -56,6 +56,7 @@
 #endif
 
 #include "Engine/Texture2D.h"
+#include "Engine/Texture2DMipMap.h"
 #include "Framework/Application/SlateApplication.h"
 #include "GenericPlatform/ICursor.h"
 #include "Layout/WidgetPath.h"
@@ -96,15 +97,21 @@ void *CreateCursorHandleFromTexture(UTexture2D *Texture,
     return nullptr;
   }
 
-  const void *SourceData = PlatformData->Mips[0].BulkData.LockReadOnly();
+  TArray<FColor> Pixels;
+  Pixels.SetNumUninitialized(PixelCount);
+
+#if WITH_EDITORONLY_DATA
+  const FTexture2DMipMap &FirstMip = PlatformData->Mips[0];
+  const void *SourceData = FirstMip.BulkData.LockReadOnly();
   if (!SourceData) {
     return nullptr;
   }
 
-  TArray<FColor> Pixels;
-  Pixels.SetNumUninitialized(PixelCount);
   FMemory::Memcpy(Pixels.GetData(), SourceData, PixelCount * sizeof(FColor));
-  PlatformData->Mips[0].BulkData.Unlock();
+  FirstMip.BulkData.Unlock();
+#else
+  return nullptr;
+#endif
 
   BITMAPV5HEADER BitmapHeader = {};
   BitmapHeader.bV5Size = sizeof(BITMAPV5HEADER);
