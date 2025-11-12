@@ -12,36 +12,36 @@ struct FFighterStats;
 struct FDiceRollResult;
 class UGridBattleManager;
 
-USTRUCT()
+USTRUCT(BlueprintType)
 struct FSkaldAbilityStatDelta
 {
     GENERATED_BODY();
 
-    UPROPERTY()
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ability|Stats")
     int32 AttackDice = 0;
 
-    UPROPERTY()
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ability|Stats")
     int32 AttackDamage = 0;
 
-    UPROPERTY()
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ability|Stats")
     int32 MeleeAttackDamage = 0;
 
-    UPROPERTY()
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ability|Stats")
     int32 RangedAttackDamage = 0;
 
-    UPROPERTY()
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ability|Stats")
     int32 AttackRange = 0;
 
-    UPROPERTY()
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ability|Stats")
     int32 Movement = 0;
 
-    UPROPERTY()
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ability|Stats")
     int32 Defence = 0;
 
-    UPROPERTY()
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ability|Stats")
     int32 Strength = 0;
 
-    UPROPERTY()
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ability|Stats")
     int32 CriticalBonusDamage = 0;
 };
 
