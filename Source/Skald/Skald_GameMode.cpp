@@ -2,6 +2,8 @@
 #include "Algo/RandomShuffle.h"
 #include "Algo/Sort.h"
 #include "Camera/CameraComponent.h"
+#include "Components/AudioComponent.h"
+#include "GameFramework/SpringArmComponent.h"
 #include "Engine/DataTable.h"
 #include "Engine/Engine.h"
 #include "Engine/Level.h"
@@ -28,6 +30,7 @@
 #include "UI/SkaldMainHUDWidget.h"
 #include "UObject/Package.h"
 #include "UObject/UnrealType.h"
+#include "UObject/UObjectIterator.h"
 #include "WorldMap.h"
 #include "Containers/Set.h"
 
@@ -2062,6 +2065,21 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
     GI->CachedWorldMapTerritories = LoadedGame->Territories;
   }
 
+  TMap<int32, const FSkaldControllerSaveData *> ControllerSaveById;
+  int32 SavedAIControllers = 0;
+  for (const FSkaldControllerSaveData &ControllerSave : LoadedGame->Controllers) {
+    if (ControllerSave.PlayerId > 0) {
+      ControllerSaveById.Add(ControllerSave.PlayerId, &ControllerSave);
+    }
+    if (ControllerSave.bIsAI) {
+      ++SavedAIControllers;
+    }
+  }
+
+  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+    GI->AIPlayersToSpawn = FMath::Max(SavedAIControllers, 0);
+  }
+
   ASkaldGameState *GS = GetGameState<ASkaldGameState>();
   if (GS) {
     GS->Players.Empty();
@@ -2070,38 +2088,132 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
   }
 
   PlayerDataArray.Empty();
+  TArray<FPlayerSaveStruct> PendingAISaves;
+  TArray<int32> PendingAIPlayerDataIndices;
   for (const FPlayerSaveStruct &PlayerSave : LoadedGame->Players) {
+    const FSkaldControllerSaveData *const *ControllerSavePtr =
+        ControllerSaveById.Find(PlayerSave.PlayerID);
+    const FSkaldControllerSaveData *ControllerSave =
+        ControllerSavePtr ? *ControllerSavePtr : nullptr;
+    const bool bIsAIPlayer = ControllerSave ? ControllerSave->bIsAI : false;
+
+    FS_PlayerData Data;
+    Data.PlayerID = PlayerSave.PlayerID;
+    Data.PlayerName = PlayerSave.PlayerName;
+    Data.DisplayName = PlayerSave.PlayerName;
+    Data.Faction = PlayerSave.Faction;
+    Data.Resources = PlayerSave.Resources;
+    Data.IsEliminated = PlayerSave.IsEliminated;
+    Data.IsHuman = !bIsAIPlayer;
+    Data.IsAI = bIsAIPlayer;
+    Data.IsAlive = false;
+    Data.CapitalsOwned = 0;
+    Data.TroopsCount = 0;
+    Data.TerritoriesOwned = 0;
+    if (bIsAIPlayer) {
+      const int32 PlayerDataIndex = PlayerDataArray.Add(Data);
+      PendingAISaves.Add(PlayerSave);
+      PendingAIPlayerDataIndices.Add(PlayerDataIndex);
+      continue;
+    }
+
     ASkaldPlayerState *PS = GetWorld()->SpawnActor<ASkaldPlayerState>();
     if (!PS) {
       continue;
     }
+
     PS->SetPlayerId(PlayerSave.PlayerID);
     PS->PlayerDisplayName = PlayerSave.PlayerName;
     PS->SetPlayerName(PlayerSave.PlayerName);
     PS->Faction = PlayerSave.Faction;
     PS->Resources = PlayerSave.Resources;
+    PS->IsEliminated = PlayerSave.IsEliminated;
+    PS->bIsAI = false;
+
     if (GS) {
       GS->AddPlayerState(PS);
     }
 
-    FS_PlayerData Data;
-    Data.PlayerID = PlayerSave.PlayerID;
-    Data.PlayerName = PlayerSave.PlayerName;
-    Data.Faction = PlayerSave.Faction;
-    Data.Resources = PlayerSave.Resources;
-    Data.IsEliminated = true;
-    Data.IsHuman = !PS->bIsAI;
-    Data.IsAI = PS->bIsAI;
-    Data.IsAlive = false;
-    Data.CapitalsOwned = 0;
-    Data.TroopsCount = 0;
-    Data.TerritoriesOwned = 0;
-    PlayerDataArray.Add(Data);
-
     if (TurnManager) {
       TurnManager->BroadcastResources(PS);
     }
+
+    PlayerDataArray.Add(Data);
   }
+
+  const auto RestoreAISavesFromSnapshot =
+      [&](const TArray<FPlayerSaveStruct> &AISaves,
+          const TArray<int32> &AIDataIndices) -> bool {
+    if (AISaves.Num() == 0) {
+      return false;
+    }
+
+    if (!GS) {
+      return false;
+    }
+
+    if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+      GI->AIPlayersToSpawn = AISaves.Num();
+    }
+
+    PopulateAIPlayers();
+
+    TArray<ASkaldPlayerState *> SpawnedAIStates;
+    for (ASkaldPlayerState *PlayerState : GS->Players) {
+      if (PlayerState && PlayerState->bIsAI) {
+        SpawnedAIStates.Add(PlayerState);
+      }
+    }
+
+    const int32 RestoredCount =
+        FMath::Min(AISaves.Num(), SpawnedAIStates.Num());
+    for (int32 Index = 0; Index < RestoredCount; ++Index) {
+      ASkaldPlayerState *AIState = SpawnedAIStates[Index];
+      if (!AIState) {
+        continue;
+      }
+
+      const FPlayerSaveStruct &PlayerSave = AISaves[Index];
+      AIState->bIsAI = true;
+      if (AIState->GetPlayerId() != PlayerSave.PlayerID) {
+        AIState->SetPlayerId(PlayerSave.PlayerID);
+      }
+      AIState->PlayerDisplayName = PlayerSave.PlayerName;
+      AIState->SetPlayerName(PlayerSave.PlayerName);
+      AIState->Faction = PlayerSave.Faction;
+      AIState->Resources = PlayerSave.Resources;
+      AIState->IsEliminated = PlayerSave.IsEliminated;
+
+      if (TurnManager) {
+        TurnManager->BroadcastResources(AIState);
+      }
+
+      if (PlayerDataArray.IsValidIndex(AIDataIndices[Index])) {
+        FS_PlayerData &PlayerData = PlayerDataArray[AIDataIndices[Index]];
+        PlayerData.PlayerID = PlayerSave.PlayerID;
+        PlayerData.PlayerName = PlayerSave.PlayerName;
+        PlayerData.DisplayName = PlayerSave.PlayerName;
+        PlayerData.Faction = PlayerSave.Faction;
+        PlayerData.Resources = PlayerSave.Resources;
+        PlayerData.IsEliminated = PlayerSave.IsEliminated;
+        PlayerData.IsAI = true;
+        PlayerData.IsHuman = false;
+        PlayerData.IsAlive = false;
+        PlayerData.CapitalsOwned = 0;
+      }
+    }
+
+    if (RestoredCount < AISaves.Num()) {
+      UE_LOG(LogSkald, Warning,
+             TEXT("ApplyLoadedGame: Restored %d/%d AI players from save."),
+             RestoredCount, AISaves.Num());
+    }
+
+    return RestoredCount > 0;
+  };
+
+  const bool bRestoredAISaves =
+      RestoreAISavesFromSnapshot(PendingAISaves, PendingAIPlayerDataIndices);
 
   TMap<int32, FS_PlayerData *> PlayerDataById;
   for (FS_PlayerData &Data : PlayerDataArray) {
@@ -2122,6 +2234,16 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
     for (ASkaldPlayerState *PlayerState : GS->Players) {
       if (PlayerState) {
         PlayerStateById.Add(PlayerState->GetPlayerId(), PlayerState);
+      }
+    }
+  }
+  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+    GI->TakenFactions.Reset();
+    if (GS) {
+      for (ASkaldPlayerState *PlayerState : GS->Players) {
+        if (PlayerState && PlayerState->Faction != ESkaldFaction::None) {
+          GI->TakenFactions.AddUnique(PlayerState->Faction);
+        }
       }
     }
   }
@@ -2194,6 +2316,50 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
     }
   }
 
+  if (WorldMap && LoadedGame->WorldState.SelectedTerritoryId != INDEX_NONE) {
+    if (ATerritory *Selected =
+            WorldMap->GetTerritoryById(LoadedGame->WorldState.SelectedTerritoryId)) {
+      WorldMap->SelectTerritory(Selected, false,
+                                LoadedGame->WorldState.SelectedByPlayerId);
+    }
+  }
+
+  if (UWorld *MutableWorld = GetWorld()) {
+    if (LoadedGame->WorldState.ActiveAudio.Num() > 0) {
+      TArray<UAudioComponent *> AudioComponents;
+      for (TObjectIterator<UAudioComponent> It; It; ++It) {
+        if (It->GetWorld() == MutableWorld) {
+          AudioComponents.Add(*It);
+        }
+      }
+
+      TSet<UAudioComponent *> Processed;
+      for (const FSkaldAudioComponentSaveData &AudioSave :
+           LoadedGame->WorldState.ActiveAudio) {
+        const FSoftObjectPath SoundPath = AudioSave.Sound.ToSoftObjectPath();
+        if (!SoundPath.IsValid()) {
+          continue;
+        }
+
+        for (UAudioComponent *Audio : AudioComponents) {
+          if (!Audio || Processed.Contains(Audio) || !Audio->Sound) {
+            continue;
+          }
+
+          if (Audio->Sound->GetPathName() == SoundPath.ToString()) {
+            if (AudioSave.bWasPlaying) {
+              Audio->Play();
+            } else {
+              Audio->Stop();
+            }
+            Processed.Add(Audio);
+            break;
+          }
+        }
+      }
+    }
+  }
+
   for (TPair<int32, ASkaldPlayerState *> &Entry : PlayerStateById) {
     ASkaldPlayerState *PlayerState = Entry.Value;
     if (!PlayerState) {
@@ -2220,22 +2386,81 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
     }
   }
 
+  if (!bRestoredAISaves) {
+    PopulateAIPlayers();
+  }
+
   if (WorldMap && WorldMap->SelectedTerritory &&
       !TerritoryById.Contains(WorldMap->SelectedTerritory->TerritoryID)) {
     WorldMap->SelectedTerritory = nullptr;
   }
 
-  if (APlayerController *PC = UGameplayStatics::GetPlayerController(this, 0)) {
-    if (APawn *Pawn = PC->GetPawn()) {
-      FVector Loc = Pawn->GetActorLocation();
-      Loc.X = LoadedGame->SavedViewOffset.X;
-      Loc.Y = LoadedGame->SavedViewOffset.Y;
-      Pawn->SetActorLocation(Loc);
+  bool bAppliedControllerCamera = false;
+  if (LoadedGame->Controllers.Num() > 0) {
+    if (UWorld *MutableWorld = GetWorld()) {
+      for (FConstPlayerControllerIterator It =
+               MutableWorld->GetPlayerControllerIterator();
+           It; ++It) {
+        ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(*It);
+        if (!PC) {
+          continue;
+        }
 
-      if (UCameraComponent *Camera =
-              Pawn->FindComponentByClass<UCameraComponent>()) {
-        if (LoadedGame->SavedZoomAmount > 0.f) {
-          Camera->SetFieldOfView(LoadedGame->SavedZoomAmount);
+        ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>();
+        const int32 PlayerId = PS ? PS->GetPlayerId() : INDEX_NONE;
+        if (PlayerId == INDEX_NONE) {
+          continue;
+        }
+
+        const FSkaldControllerSaveData *const *ControllerSavePtr =
+            ControllerSaveById.Find(PlayerId);
+        if (!ControllerSavePtr || !*ControllerSavePtr) {
+          continue;
+        }
+
+        const FSkaldControllerSaveData &ControllerSave = **ControllerSavePtr;
+        if (APawn *Pawn = PC->GetPawn()) {
+          Pawn->SetActorLocation(ControllerSave.Camera.Location);
+          PC->SetControlRotation(ControllerSave.Camera.Rotation);
+
+          if (USpringArmComponent *SpringArm =
+                  Pawn->FindComponentByClass<USpringArmComponent>()) {
+            SpringArm->TargetArmLength = ControllerSave.Camera.Zoom;
+          } else if (UCameraComponent *Camera =
+                         Pawn->FindComponentByClass<UCameraComponent>()) {
+            Camera->SetFieldOfView(ControllerSave.Camera.Zoom);
+          }
+
+          if (ASkald_PlayerCharacter *CharacterPawn =
+                  Cast<ASkald_PlayerCharacter>(Pawn)) {
+            if (CharacterPawn->IsBattleCameraActive() !=
+                ControllerSave.Camera.bBattleCameraActive) {
+              CharacterPawn->SetBattleCameraActive(
+                  ControllerSave.Camera.bBattleCameraActive);
+            }
+          }
+
+          if (PC->IsLocalController()) {
+            bAppliedControllerCamera = true;
+          }
+        }
+      }
+    }
+  }
+
+  if (!bAppliedControllerCamera) {
+    if (APlayerController *PC = UGameplayStatics::GetPlayerController(this, 0)) {
+      if (APawn *Pawn = PC->GetPawn()) {
+        FVector Loc = Pawn->GetActorLocation();
+        Loc.X = LoadedGame->SavedViewOffset.X;
+        Loc.Y = LoadedGame->SavedViewOffset.Y;
+        Pawn->SetActorLocation(Loc);
+
+        if (UCameraComponent *Camera =
+                Pawn->FindComponentByClass<UCameraComponent>()) {
+          if (LoadedGame->SavedZoomAmount > 0.f) {
+            Camera->SetFieldOfView(LoadedGame->SavedZoomAmount);
+          }
         }
       }
     }
@@ -2248,15 +2473,36 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
   }
 
   if (TurnManager) {
+    TMap<int32, int32> MovementSnapshot;
+    for (const FSkaldMovementActionSaveData &Action :
+         LoadedGame->GameFlow.MovementActions) {
+      if (Action.PlayerId > 0) {
+        MovementSnapshot.Add(Action.PlayerId, Action.ActionsTaken);
+      }
+    }
+
+    TurnManager->SetMovementActionsSnapshot(MovementSnapshot);
+    TurnManager->SetPendingBattlePayload(LoadedGame->GameFlow.PendingBattle);
+    TurnManager->SetPendingBattlePreparation(
+        LoadedGame->GameFlow.PendingBattlePreparation);
+    TurnManager->SetPendingBattleReadyState(
+        LoadedGame->GameFlow.PendingReadyState);
+
     TurnManager->SortControllersByInitiative();
 
     USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
     bool bResumedTurns = false;
     if (GI) {
-      GI->SavedTurnIndex = LoadedGame->SavedTurnIndex;
-      GI->SavedTurnPlayerId = LoadedGame->SavedTurnPlayerID;
-      GI->SavedTurnPhase = LoadedGame->SavedTurnPhase;
-      GI->bResumeTurns = LoadedGame->bTurnsStarted;
+      GI->SavedTurnIndex = LoadedGame->GameFlow.ActiveTurnIndex;
+      int32 SavedPlayerId = LoadedGame->SavedTurnPlayerID;
+      if (SavedPlayerId <= 0 &&
+          LoadedGame->GameFlow.TurnOrder.IsValidIndex(GI->SavedTurnIndex)) {
+        SavedPlayerId =
+            LoadedGame->GameFlow.TurnOrder[GI->SavedTurnIndex].PlayerId;
+      }
+      GI->SavedTurnPlayerId = SavedPlayerId;
+      GI->SavedTurnPhase = LoadedGame->GameFlow.CurrentPhase;
+      GI->bResumeTurns = LoadedGame->GameFlow.bTurnsStarted;
 
       if (GI->bResumeTurns) {
         bResumedTurns = TurnManager->AttemptResumeSavedTurnState();
@@ -2305,6 +2551,10 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
         }
       }
     }
+  }
+
+  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+    GI->HideGlobalStatusMessage();
   }
 }
 
@@ -3182,7 +3432,14 @@ void ASkaldGameMode::FillSaveGame(USkaldSaveGame *SaveGameObject) const {
     return;
   }
 
-  if (const UWorld *World = GetWorld()) {
+  SaveGameObject->Controllers.Reset();
+  SaveGameObject->Territories.Reset();
+  SaveGameObject->Players.Reset();
+  SaveGameObject->WorldState = FSkaldWorldStateSaveData();
+  SaveGameObject->GameFlow = FSkaldGameFlowSaveData();
+
+  const UWorld *World = GetWorld();
+  if (World) {
     FString MapPath;
     if (const ULevel *PersistentLevel = World->PersistentLevel) {
       if (const UPackage *Package = PersistentLevel->GetOutermost()) {
@@ -3226,57 +3483,12 @@ void ASkaldGameMode::FillSaveGame(USkaldSaveGame *SaveGameObject) const {
     }
   }
 
-  // Store basic turn information.
-  SaveGameObject->TurnNumber = 0; // Turn tracking not yet implemented
-  SaveGameObject->SavedTurnPhase = ETurnPhase::Reinforcement;
-  SaveGameObject->SavedTurnIndex = 0;
-  SaveGameObject->SavedTurnPlayerID = 0;
-  SaveGameObject->bTurnsStarted = false;
-  if (const ATurnManager *Manager = GetTurnManager()) {
-    SaveGameObject->SavedTurnPhase = Manager->GetCurrentPhase();
-    SaveGameObject->SavedTurnIndex = Manager->GetCurrentControllerIndex();
-    SaveGameObject->bTurnsStarted = Manager->HasTurnsStarted();
-
-    const TArray<ASkaldPlayerController *> Controllers =
-        Manager->GetControllers();
-    if (Controllers.IsValidIndex(SaveGameObject->SavedTurnIndex)) {
-      if (ASkaldPlayerController *ActiveController =
-              Controllers[SaveGameObject->SavedTurnIndex]) {
-        if (ASkaldPlayerState *ActiveState =
-                ActiveController->GetPlayerState<ASkaldPlayerState>()) {
-          SaveGameObject->SavedTurnPlayerID = ActiveState->GetPlayerId();
-        }
-      }
-    }
+  const USkaldGameInstance *GameInstance = GetGameInstance<USkaldGameInstance>();
+  if (GameInstance) {
+    SaveGameObject->RandomSeed = GameInstance->CombatRandomStream.GetCurrentSeed();
   }
 
-  if (const ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
-    SaveGameObject->CurrentPlayerIndex = GS->CurrentTurnIndex;
-    if (SaveGameObject->SavedTurnPlayerID <= 0 &&
-        GS->PlayerArray.IsValidIndex(GS->CurrentTurnIndex)) {
-      if (const ASkaldPlayerState *ActiveState =
-              Cast<ASkaldPlayerState>(GS->PlayerArray[GS->CurrentTurnIndex])) {
-        SaveGameObject->SavedTurnPlayerID = ActiveState->GetPlayerId();
-      }
-    }
-  }
-
-  // Preserve current camera position and zoom so the view can be restored
-  // when the game is loaded again.
-  if (APlayerController *PC = UGameplayStatics::GetPlayerController(this, 0)) {
-    if (APawn *Pawn = PC->GetPawn()) {
-      const FVector Loc = Pawn->GetActorLocation();
-      SaveGameObject->SavedViewOffset = FVector2D(Loc.X, Loc.Y);
-
-      if (UCameraComponent *Camera =
-              Pawn->FindComponentByClass<UCameraComponent>()) {
-        SaveGameObject->SavedZoomAmount = Camera->FieldOfView;
-      }
-    }
-  }
-
-  // Copy player data.
-  SaveGameObject->Players.Empty();
+  // Copy persistent player data from the runtime snapshots.
   for (const FS_PlayerData &Data : PlayerDataArray) {
     FPlayerSaveStruct PlayerSave;
     PlayerSave.PlayerID = Data.PlayerID;
@@ -3288,15 +3500,21 @@ void ASkaldGameMode::FillSaveGame(USkaldSaveGame *SaveGameObject) const {
     SaveGameObject->Players.Add(PlayerSave);
   }
 
-  // Capture current territory state.
-  SaveGameObject->Territories.Empty();
+  TMap<int32, TArray<int32>> OwnedTerritoriesByPlayer;
   if (WorldMap) {
+    if (WorldMap->SelectedTerritory) {
+      SaveGameObject->WorldState.SelectedTerritoryId =
+          WorldMap->SelectedTerritory->TerritoryID;
+      SaveGameObject->WorldState.SelectedByPlayerId = WorldMap->SelectedByPlayerId;
+    }
+
+    SaveGameObject->Territories.Reserve(WorldMap->Territories.Num());
     for (ATerritory *Territory : WorldMap->Territories) {
-      if (!Territory) {
+      if (!IsValid(Territory)) {
         continue;
       }
 
-      FS_Territory TerrData;
+      FS_Territory &TerrData = SaveGameObject->Territories.Emplace_GetRef();
       TerrData.TerritoryID = Territory->TerritoryID;
       TerrData.TerritoryName = Territory->TerritoryName;
       TerrData.OwnerPlayerID =
@@ -3305,11 +3523,6 @@ void ASkaldGameMode::FillSaveGame(USkaldSaveGame *SaveGameObject) const {
       TerrData.CapitalOwner = TerrData.OwnerPlayerID;
       TerrData.ArmyUnits = Territory->ArmyUnits;
       TerrData.ContinentID = Territory->ContinentID;
-      for (ATerritory *Adj : Territory->AdjacentTerritories) {
-        if (Adj) {
-          TerrData.AdjacentIDs.Add(Adj->TerritoryID);
-        }
-      }
       TerrData.Location = Territory->GetActorLocation();
       TerrData.HasTreasure = Territory->bHasTreasure;
       TerrData.TreasureAttachedUnitID =
@@ -3317,19 +3530,221 @@ void ASkaldGameMode::FillSaveGame(USkaldSaveGame *SaveGameObject) const {
       TerrData.FortificationLevel =
           ReadIntProperty(Territory, TEXT("FortificationLevel"));
       TerrData.Moat = ReadBoolProperty(Territory, TEXT("Moat"));
-      TerrData.WallHealth =
-          ReadIntProperty(Territory, TEXT("WallHealth"));
+      TerrData.WallHealth = ReadIntProperty(Territory, TEXT("WallHealth"));
       TerrData.BuiltSiegeID = Territory->BuiltSiegeID;
       TerrData.ConqueredTurn =
           ReadIntProperty(Territory, TEXT("ConqueredTurn"));
       TerrData.IsNeutralSpawn =
           ReadBoolProperty(Territory, TEXT("IsNeutralSpawn"));
-      SaveGameObject->Territories.Add(TerrData);
+
+      TerrData.AdjacentIDs.Reset();
+      for (ATerritory *Adj : Territory->AdjacentTerritories) {
+        if (IsValid(Adj)) {
+          TerrData.AdjacentIDs.AddUnique(Adj->TerritoryID);
+        }
+      }
+
+      if (TerrData.OwnerPlayerID > 0) {
+        OwnedTerritoriesByPlayer.FindOrAdd(TerrData.OwnerPlayerID)
+            .Add(TerrData.TerritoryID);
+      }
     }
   }
 
-  // Store current siege equipment state.
+  // Capture world audio state so ambience resumes after loading.
+  if (World) {
+    SaveGameObject->WorldState.ActiveAudio.Reset();
+    for (TObjectIterator<UAudioComponent> It; It; ++It) {
+      UAudioComponent *Audio = *It;
+      if (!Audio || Audio->GetWorld() != World) {
+        continue;
+      }
+      if (!Audio->Sound) {
+        continue;
+      }
+
+      FSkaldAudioComponentSaveData &AudioData =
+          SaveGameObject->WorldState.ActiveAudio.Emplace_GetRef();
+      AudioData.Sound = Audio->Sound;
+      AudioData.bWasPlaying = Audio->IsPlaying();
+      AudioData.PlaybackTime = 0.f;
+    }
+  }
+
+  const ATurnManager *Manager = GetTurnManager();
+  const ASkaldGameState *GameState = GetGameState<ASkaldGameState>();
+  const TArray<ASkaldPlayerController *> Controllers =
+      Manager ? Manager->GetControllers() : TArray<ASkaldPlayerController *>();
+
+  SaveGameObject->GameFlow.CurrentPhase =
+      Manager ? Manager->GetCurrentPhase() : ETurnPhase::Reinforcement;
+  SaveGameObject->GameFlow.ActiveTurnIndex =
+      Manager ? Manager->GetCurrentControllerIndex() : 0;
+  SaveGameObject->GameFlow.bTurnsStarted =
+      Manager ? Manager->HasTurnsStarted() : false;
+  if (Manager) {
+    SaveGameObject->GameFlow.PendingBattle = Manager->GetPendingBattlePayload();
+    SaveGameObject->GameFlow.PendingBattlePreparation =
+        Manager->GetPendingBattlePreparation();
+    SaveGameObject->GameFlow.PendingReadyState =
+        Manager->GetPendingBattleReadyState();
+
+    const TMap<int32, int32> MovementSnapshot =
+        Manager->GetMovementActionsSnapshot();
+    for (const TPair<int32, int32> &Entry : MovementSnapshot) {
+      if (Entry.Key <= 0) {
+        continue;
+      }
+
+      FSkaldMovementActionSaveData &ActionData =
+          SaveGameObject->GameFlow.MovementActions.Emplace_GetRef();
+      ActionData.PlayerId = Entry.Key;
+      ActionData.ActionsTaken = Entry.Value;
+    }
+  }
+
+  int32 ControllerCount = Controllers.Num();
+  if (ControllerCount == 0 && GameState) {
+    ControllerCount = GameState->PlayerArray.Num();
+  }
+
+  int32 ActivePlayerId = INDEX_NONE;
+  auto ResolveFactionColor = [](ESkaldFaction Faction) {
+    switch (Faction) {
+    case ESkaldFaction::Human:
+      return FLinearColor::Blue;
+    case ESkaldFaction::Orc:
+      return FLinearColor::Red;
+    case ESkaldFaction::Dwarf:
+      return FLinearColor(0.55f, 0.35f, 0.15f, 1.f);
+    case ESkaldFaction::Elf:
+      return FLinearColor(0.05f, 0.18f, 0.08f, 1.f);
+    case ESkaldFaction::LizardFolk:
+      return FLinearColor(0.0f, 0.5f, 0.5f, 1.f);
+    case ESkaldFaction::Undead:
+      return FLinearColor::Black;
+    case ESkaldFaction::Gnoll:
+      return FLinearColor(1.0f, 0.45f, 0.05f, 1.f);
+    case ESkaldFaction::Goblin:
+      return FLinearColor(0.196f, 0.804f, 0.196f, 1.f);
+    case ESkaldFaction::Empire:
+      return FLinearColor(0.5f, 0.0f, 0.5f, 1.f);
+    case ESkaldFaction::Inflicted:
+      return FLinearColor(1.0f, 0.85f, 0.1f, 1.f);
+    case ESkaldFaction::FrogFolk:
+      return FLinearColor(1.f, 0.31f, 0.55f, 1.f);
+    case ESkaldFaction::Ravpack:
+      return FLinearColor(0.54f, 0.f, 0.54f, 1.f);
+    default:
+      return FLinearColor::White;
+    }
+  };
+
+  for (int32 Index = 0; Index < Controllers.Num(); ++Index) {
+    ASkaldPlayerController *Controller = Controllers[Index];
+    if (!Controller) {
+      continue;
+    }
+
+    FSkaldControllerSaveData ControllerSave;
+    ControllerSave.bIsAI = Controller->IsA<ASkaldAIController>();
+    ControllerSave.TurnOrderIndex = Index;
+
+    if (ASkaldPlayerState *PS =
+            Controller->GetPlayerState<ASkaldPlayerState>()) {
+      ControllerSave.PlayerId = PS->GetPlayerId();
+      ControllerSave.PlayerName = PS->PlayerDisplayName;
+      ControllerSave.Faction = PS->Faction;
+      if (GameInstance) {
+        ControllerSave.FactionEmblem =
+            GameInstance->GetFactionEmblem(PS->Faction);
+      }
+      ControllerSave.PlayerColor = ResolveFactionColor(PS->Faction);
+
+      if (ControllerSave.PlayerId > 0) {
+        if (const TArray<int32> *Owned =
+                OwnedTerritoriesByPlayer.Find(ControllerSave.PlayerId)) {
+          ControllerSave.OwnedTerritoryIds = *Owned;
+        }
+      }
+
+      if (Index == SaveGameObject->GameFlow.ActiveTurnIndex) {
+        ActivePlayerId = PS->GetPlayerId();
+      }
+    }
+
+    FSkaldCameraSaveData CameraSave;
+    if (APawn *Pawn = Controller->GetPawn()) {
+      CameraSave.Location = Pawn->GetActorLocation();
+      CameraSave.Rotation = Controller->GetControlRotation();
+
+      if (USpringArmComponent *SpringArm =
+              Pawn->FindComponentByClass<USpringArmComponent>()) {
+        CameraSave.Zoom = SpringArm->TargetArmLength;
+      } else if (UCameraComponent *Camera =
+                     Pawn->FindComponentByClass<UCameraComponent>()) {
+        CameraSave.Zoom = Camera->FieldOfView;
+      }
+
+      if (const ASkald_PlayerCharacter *CharacterPawn =
+              Cast<ASkald_PlayerCharacter>(Pawn)) {
+        CameraSave.bBattleCameraActive =
+            CharacterPawn->IsBattleCameraActive();
+      }
+    }
+
+    if (WorldMap && ControllerSave.PlayerId > 0 &&
+        WorldMap->SelectedTerritory &&
+        WorldMap->SelectedByPlayerId == ControllerSave.PlayerId) {
+      CameraSave.bHasLockedTerritory = true;
+      CameraSave.LockedTerritoryId =
+          WorldMap->SelectedTerritory->TerritoryID;
+    }
+
+    ControllerSave.Camera = CameraSave;
+    SaveGameObject->Controllers.Add(ControllerSave);
+
+    FSkaldTurnParticipantSaveData &TurnEntry =
+        SaveGameObject->GameFlow.TurnOrder.Emplace_GetRef();
+    TurnEntry.PlayerId = ControllerSave.PlayerId;
+    TurnEntry.bIsAI = ControllerSave.bIsAI;
+    if (ASkaldPlayerState *PS =
+            Controller->GetPlayerState<ASkaldPlayerState>()) {
+      TurnEntry.Initiative = PS->InitiativeRoll;
+    }
+  }
+
   SaveGameObject->Sieges = SiegePool;
+
+  if (GameState) {
+    SaveGameObject->CurrentPlayerIndex = GameState->CurrentTurnIndex;
+    int32 EffectiveControllerCount = FMath::Max(ControllerCount, 1);
+    int32 DerivedTurnNumber =
+        (GameState->CurrentTurnIndex / EffectiveControllerCount) + 1;
+    SaveGameObject->TurnNumber = DerivedTurnNumber;
+    SaveGameObject->GameFlow.TurnNumber = DerivedTurnNumber;
+  }
+
+  SaveGameObject->SavedTurnPhase = SaveGameObject->GameFlow.CurrentPhase;
+  SaveGameObject->SavedTurnIndex = SaveGameObject->GameFlow.ActiveTurnIndex;
+  SaveGameObject->bTurnsStarted = SaveGameObject->GameFlow.bTurnsStarted;
+
+  if (SaveGameObject->SavedTurnPlayerID <= 0) {
+    SaveGameObject->SavedTurnPlayerID = ActivePlayerId;
+  }
+
+  // Legacy overview camera information for backwards compatibility.
+  if (APlayerController *PC = UGameplayStatics::GetPlayerController(this, 0)) {
+    if (APawn *Pawn = PC->GetPawn()) {
+      const FVector Loc = Pawn->GetActorLocation();
+      SaveGameObject->SavedViewOffset = FVector2D(Loc.X, Loc.Y);
+
+      if (UCameraComponent *Camera =
+              Pawn->FindComponentByClass<UCameraComponent>()) {
+        SaveGameObject->SavedZoomAmount = Camera->FieldOfView;
+      }
+    }
+  }
 }
 
 void ASkaldGameMode::CheckVictoryConditions() {

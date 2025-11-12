@@ -215,6 +215,30 @@ public:
   UPROPERTY(BlueprintReadWrite, Category = "Lobby")
   TArray<FSkaldAIPlayerConfig> PendingLobbyAIPlayers;
 
+  /** Active global status message broadcast to all HUDs. */
+  UPROPERTY(Transient)
+  FText ActiveStatusMessage;
+
+  /** Duration that the active status message should remain visible (0 for indefinite). */
+  UPROPERTY(Transient)
+  float ActiveStatusMessageDuration = 0.f;
+
+  /** True when the active status message should persist until explicitly cleared. */
+  UPROPERTY(Transient)
+  bool bStatusMessagePersistent = false;
+
+  /** Pending status message queued for the next world activation. */
+  UPROPERTY(Transient)
+  FText PendingStatusMessage;
+
+  /** Whether a pending status message should be applied when the next world begins play. */
+  UPROPERTY(Transient)
+  bool bHasPendingStatusMessage = false;
+
+  /** Persist flag corresponding to PendingStatusMessage. */
+  UPROPERTY(Transient)
+  bool bPendingStatusPersistent = true;
+
   /** Resolve the configured emblem for a given faction, if one exists. */
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "UI")
   TSoftObjectPtr<UTexture2D> GetFactionEmblem(ESkaldFaction InFaction) const;
@@ -252,6 +276,26 @@ public:
   /** Toggle the travel pending guard and log the change. */
   UFUNCTION(BlueprintCallable)
   void SetTravelPending(bool bInPending);
+
+  /** Display a global status message across all player HUDs. */
+  UFUNCTION(BlueprintCallable, Category = "UI")
+  void ShowGlobalStatusMessage(const FText &Message, float DisplayDuration, bool bPersistUntilCleared);
+
+  /** Hide any active global status message. */
+  UFUNCTION(BlueprintCallable, Category = "UI")
+  void HideGlobalStatusMessage();
+
+  /** Retrieve the current active status message, if any. */
+  FText GetActiveStatusMessage() const { return ActiveStatusMessage; }
+
+  /** Retrieve the duration for the current active status message. */
+  float GetActiveStatusMessageDuration() const { return ActiveStatusMessageDuration; }
+
+  /** Whether the current active status message persists until cleared. */
+  bool IsActiveStatusMessagePersistent() const { return bStatusMessagePersistent; }
+
+  /** Queue a status message that should appear when the next world becomes active. */
+  void QueuePendingStatusMessage(const FText &Message, bool bPersistUntilCleared = true);
 
   /** Capture the overworld state so it can be restored after travelling. */
   bool CacheWorldMapSnapshot(UWorld *InWorldContext = nullptr);

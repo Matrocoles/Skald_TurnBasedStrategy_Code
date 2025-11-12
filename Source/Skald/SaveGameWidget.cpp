@@ -5,10 +5,13 @@
 #include "Skald.h"
 #include "SkaldLogging.h"
 #include "SkaldSaveGame.h"
+#include "Skald_GameInstance.h"
 #include "Skald_GameMode.h"
+#include "Skald_PlayerController.h"
 #include "SlotNameConstants.h"
 #include "Templates/UnrealTemplate.h"
 #include "UI/InGameMenuWidget.h"
+#include "UI/SkaldMainHUDWidget.h"
 #include "LobbyMenuWidget.h"
 
 void USaveGameWidget::SetLobbyMenu(ULobbyMenuWidget* InMenu)
@@ -89,10 +92,13 @@ void USaveGameWidget::HandleSaveSlot(int32 SlotIndex)
         return;
     }
 
+    ShowSavingIndicator();
+
     USkaldSaveGame* SaveGameObject = Cast<USkaldSaveGame>(UGameplayStatics::CreateSaveGameObject(USkaldSaveGame::StaticClass()));
     if (!SaveGameObject)
     {
         UE_LOG(LogSkald, Error, TEXT("Failed to create save game object for slot %d"), SlotIndex);
+        HideSavingIndicator();
         return;
     }
 
@@ -103,11 +109,13 @@ void USaveGameWidget::HandleSaveSlot(int32 SlotIndex)
 
     if (UGameplayStatics::SaveGameToSlot(SaveGameObject, SlotNames[SlotIndex], 0))
     {
+        HideSavingIndicator();
         ReturnToOwningMenu();
     }
     else
     {
         UE_LOG(LogSkald, Error, TEXT("Failed to save slot %s"), SlotNames[SlotIndex]);
+        HideSavingIndicator();
     }
 }
 
@@ -123,5 +131,41 @@ void USaveGameWidget::ReturnToOwningMenu()
         }
 
         OwningMenu->SetVisibility(ESlateVisibility::Visible);
+    }
+}
+
+void USaveGameWidget::ShowSavingIndicator()
+{
+    const FText SavingText = NSLOCTEXT("SkaldHUD", "SavingIndicator", "Saving...");
+
+    if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>())
+    {
+        GI->ShowGlobalStatusMessage(SavingText, 0.f, true);
+        return;
+    }
+
+    if (ASkaldPlayerController *PC = GetOwningPlayer<ASkaldPlayerController>())
+    {
+        if (USkaldMainHUDWidget *HUD = PC->GetHUDWidget())
+        {
+            HUD->ShowStatusMessage(SavingText, 0.f);
+        }
+    }
+}
+
+void USaveGameWidget::HideSavingIndicator()
+{
+    if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>())
+    {
+        GI->HideGlobalStatusMessage();
+        return;
+    }
+
+    if (ASkaldPlayerController *PC = GetOwningPlayer<ASkaldPlayerController>())
+    {
+        if (USkaldMainHUDWidget *HUD = PC->GetHUDWidget())
+        {
+            HUD->HideStatusMessage();
+        }
     }
 }

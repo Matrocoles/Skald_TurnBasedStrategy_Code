@@ -56,6 +56,9 @@ private:
 
     void ReturnToOwningMenu();
 
+    void ShowSavingIndicator();
+    void HideSavingIndicator();
+
     UPROPERTY()
     TWeakObjectPtr<UUserWidget> OwningMenu;
 };

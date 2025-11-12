@@ -8,10 +8,12 @@
 #include "GameFramework/PlayerController.h"
 #include "SkaldSaveGame.h"
 #include "Skald_GameInstance.h"
+#include "Skald_PlayerController.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Templates/UnrealTemplate.h"
 #include "UI/InGameMenuWidget.h"
 #include "LobbyMenuWidget.h"
+#include "UI/SkaldMainHUDWidget.h"
 
 void ULoadGameWidget::SetLobbyMenu(ULobbyMenuWidget* InMenu)
 {
@@ -70,12 +72,15 @@ void ULoadGameWidget::HandleLoadSlot(int32 SlotIndex)
         return;
     }
 
+    ShowLoadingIndicator();
+
     USkaldSaveGame* LoadedGame = Cast<USkaldSaveGame>(UGameplayStatics::LoadGameFromSlot(SlotNames[SlotIndex], 0));
     if (LoadedGame)
     {
         if (USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>())
         {
             GI->LoadedSaveGame = LoadedGame;
+            GI->QueuePendingStatusMessage(NSLOCTEXT("SkaldHUD", "LoadingIndicator", "Loading..."));
         }
 
         if (APlayerController* PC = GetOwningPlayer())
@@ -93,6 +98,7 @@ void ULoadGameWidget::HandleLoadSlot(int32 SlotIndex)
     else
     {
         UE_LOG(LogSkald, Error, TEXT("Failed to load save slot %s"), SlotNames[SlotIndex]);
+        HideLoadingIndicator();
     }
 }
 
@@ -136,6 +142,8 @@ void ULoadGameWidget::InitialiseSlotButton(UButton* Button, int32 SlotIndex, FNa
 
 void ULoadGameWidget::CleanupAndReturnToMenu()
 {
+    HideLoadingIndicator();
+
     RemoveFromParent();
 
     // Ensure no other widgets linger on the viewport and steal input
@@ -164,5 +172,41 @@ void ULoadGameWidget::CleanupAndReturnToMenu()
 bool ULoadGameWidget::IsValidSlotIndex(int32 SlotIndex) const
 {
     return ensure(SlotIndex >= 0 && SlotIndex < UE_ARRAY_COUNT(SlotNames));
+}
+
+void ULoadGameWidget::ShowLoadingIndicator()
+{
+    const FText LoadingText = NSLOCTEXT("SkaldHUD", "LoadingIndicator", "Loading...");
+
+    if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>())
+    {
+        GI->ShowGlobalStatusMessage(LoadingText, 0.f, true);
+        return;
+    }
+
+    if (ASkaldPlayerController *PC = GetOwningPlayer<ASkaldPlayerController>())
+    {
+        if (USkaldMainHUDWidget *HUD = PC->GetHUDWidget())
+        {
+            HUD->ShowStatusMessage(LoadingText, 0.f);
+        }
+    }
+}
+
+void ULoadGameWidget::HideLoadingIndicator()
+{
+    if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>())
+    {
+        GI->HideGlobalStatusMessage();
+        return;
+    }
+
+    if (ASkaldPlayerController *PC = GetOwningPlayer<ASkaldPlayerController>())
+    {
+        if (USkaldMainHUDWidget *HUD = PC->GetHUDWidget())
+        {
+            HUD->HideStatusMessage();
+        }
+    }
 }
 
