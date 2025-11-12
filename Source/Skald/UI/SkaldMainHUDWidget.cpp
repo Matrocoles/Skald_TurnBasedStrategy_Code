@@ -942,6 +942,11 @@ void USkaldMainHUDWidget::ShowPrepareForBattleDialog(
       AttackerPlayerText, AttackerTerritoryText, AttackerEmblem,
       DefenderPlayerText, DefenderTerritoryText, DefenderEmblem,
       PromptData.AttackerCommittedArmy, PromptData.DefenderArmyCount);
+  const FLinearColor AttackerColor =
+      ResolveFactionColor(PromptData.AttackerFaction);
+  const FLinearColor DefenderColor =
+      ResolveFactionColor(PromptData.DefenderFaction);
+  ActivePrepareForBattleWidget->SetFactionColors(AttackerColor, DefenderColor);
   ActivePrepareForBattleWidget->ShowRetreatStatus(FText::GetEmpty(), 0.f);
   if (ActivePrepareForBattleWidget->PrepareForBattleButton) {
     const bool bLocalIsParticipant = bLocalIsAttacker || bLocalIsDefender;

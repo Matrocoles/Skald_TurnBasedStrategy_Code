@@ -10,6 +10,7 @@
 #include "Engine/World.h"
 #include "Internationalization/Text.h"
 #include "Math/UnrealMathUtility.h"
+#include "Styling/SlateColor.h"
 #include "Types/SlateEnums.h"
 #include "Types/SlateStructs.h"
 #include "Blueprint/WidgetTree.h"
@@ -83,6 +84,13 @@ void UPrepareForBattleWidget::HandleRetreatButtonClicked() {
   OnRetreatButtonClicked.Broadcast();
 }
 
+void UPrepareForBattleWidget::SetFactionColors(FLinearColor InAttackerColor,
+                                               FLinearColor InDefenderColor) {
+  AttackerFactionColor = InAttackerColor;
+  DefenderFactionColor = InDefenderColor;
+  ApplyFactionColors();
+}
+
 void UPrepareForBattleWidget::RefreshTextWidgets() {
   if (AttackingPlayerName) {
     AttackingPlayerName->SetText(AttackingPlayerNameText);
@@ -140,6 +148,8 @@ void UPrepareForBattleWidget::RefreshTextWidgets() {
 
   ApplyFactionEmblem(AttackingFactionEmblem, AttackingFactionTexture);
   ApplyFactionEmblem(DefendingFactionEmblem, DefendingFactionTexture);
+
+  ApplyFactionColors();
 }
 
 void UPrepareForBattleWidget::ShowRetreatStatus(const FText &StatusMessage,
@@ -180,6 +190,21 @@ void UPrepareForBattleWidget::ClearRetreatStatus() {
   if (UWorld *World = GetWorld()) {
     World->GetTimerManager().ClearTimer(RetreatStatusTimerHandle);
   }
+}
+
+void UPrepareForBattleWidget::ApplyFactionColors() {
+  auto AssignColor = [](UTextBlock *TextWidget, const FLinearColor &Color) {
+    if (TextWidget) {
+      TextWidget->SetColorAndOpacity(FSlateColor(Color));
+    }
+  };
+
+  AssignColor(AttackingPlayerName, AttackerFactionColor);
+  AssignColor(AttackingTerritoryName, AttackerFactionColor);
+  AssignColor(AttackingUnitsText, AttackerFactionColor);
+  AssignColor(DefendingPlayerName, DefenderFactionColor);
+  AssignColor(DefendingTerritoryName, DefenderFactionColor);
+  AssignColor(DefendingUnitsText, DefenderFactionColor);
 }
 
 void UPrepareForBattleWidget::BuildFallbackWidgetTree() {
@@ -364,5 +389,7 @@ void UPrepareForBattleWidget::BuildFallbackWidgetTree() {
       StatusSlot->SetPadding(FMargin(8.f, 6.f, 8.f, 0.f));
     }
   }
+
+  ApplyFactionColors();
 }
 
