@@ -7,6 +7,7 @@
 #include "GameFramework/Pawn.h"
 #include "GridBattleManager.h"
 #include "TimerManager.h"
+#include "Abilities/SkaldAbilityTypes.h"
 #include "FighterPawn.generated.h"
 
 class UGridOverlayComponent;
@@ -24,11 +25,42 @@ class UMaterialInterface;
 class USkaldAbilityComponent;
 class USkaldDiceManager;
 class ASkaldPlayerController;
+class UStatusEffectFloatingWidget;
+class UBuffFloatingTextWidget;
+class UDebuffFloatingTextWidget;
 
 UENUM(BlueprintType)
 enum class EFighterPawnFootprint : uint8 {
   SingleCell UMETA(DisplayName = "1 Cell"),
   FourCells UMETA(DisplayName = "4 Cells")
+};
+
+USTRUCT(BlueprintType)
+struct FActiveBuff {
+  GENERATED_BODY();
+
+  UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|Buffs")
+  FName SourceAbilityId = NAME_None;
+
+  UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|Buffs")
+  FText DisplayName;
+
+  UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|Buffs")
+  FSkaldAbilityStatDelta Delta;
+};
+
+USTRUCT(BlueprintType)
+struct FActiveDebuff {
+  GENERATED_BODY();
+
+  UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|Buffs")
+  FName SourceAbilityId = NAME_None;
+
+  UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|Buffs")
+  FText DisplayName;
+
+  UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|Buffs")
+  FSkaldAbilityStatDelta Delta;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHealthChanged, int32, NewHealth);
@@ -323,6 +355,20 @@ public:
   /** Clear any lingering passive buff visuals. */
   void ClearAllPassiveBuffIndicators();
 
+  /** Register a newly applied modifier for floating status presentation. */
+  void NotifyStatusEffectApplied(FName AbilityId, const FText &AbilityName,
+                                 const FSkaldAbilityStatDelta &Delta);
+
+  /** Remove a modifier contribution from floating status presentation. */
+  void NotifyStatusEffectRemoved(FName AbilityId, const FText &AbilityName,
+                                 const FSkaldAbilityStatDelta &Delta);
+
+  /** Reset all floating status indicators. */
+  void ClearFloatingStatusEffects();
+
+  /** Refresh the floating buff/debuff widgets immediately. */
+  void UpdateFloatingStatusText();
+
   /** Remaining actions for the active turn. */
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Fighter")
   int32 GetActionsRemaining() const { return ActionsRemaining; }
@@ -372,9 +418,33 @@ public:
   UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|UI")
   UWidgetComponent *HealthWidgetBack;
 
+  /** Widget used to display currently active buffs. */
+  UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|UI")
+  UWidgetComponent *BuffStatusWidget;
+
+  /** Widget used to display currently active debuffs. */
+  UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|UI")
+  UWidgetComponent *DebuffStatusWidget;
+
   /** Widget class used for the health display. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Fighter|UI")
   TSubclassOf<UUserWidget> HealthWidgetTemplate;
+
+  /** Widget class used when spawning the floating buff indicator. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Fighter|UI")
+  TSubclassOf<UStatusEffectFloatingWidget> BuffStatusWidgetTemplate;
+
+  /** Widget class used when spawning the floating debuff indicator. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Fighter|UI")
+  TSubclassOf<UStatusEffectFloatingWidget> DebuffStatusWidgetTemplate;
+
+  /** Height offset applied to the buff status widget. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|UI")
+  float BuffStatusWidgetHeight = 380.f;
+
+  /** Height offset applied to the debuff status widget. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|UI")
+  float DebuffStatusWidgetHeight = 440.f;
 
   /** Decal shown when the fighter is selected. */
   UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|Selection")
@@ -383,6 +453,16 @@ public:
   /** Decal shown while passive buffs affect the fighter. */
   UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|Buffs")
   UDecalComponent *PassiveBuffDecal = nullptr;
+
+  /** Active positive modifiers affecting this fighter. */
+  UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_ActiveBuffs,
+            Category = "Fighter|Buffs")
+  TArray<FActiveBuff> ActiveBuffs;
+
+  /** Active negative modifiers affecting this fighter. */
+  UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_ActiveDebuffs,
+            Category = "Fighter|Buffs")
+  TArray<FActiveDebuff> ActiveDebuffs;
 
   /** Material used for the selection decal. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Selection")
@@ -607,6 +687,12 @@ private:
   UFUNCTION()
   void OnRep_AttackType();
 
+  UFUNCTION()
+  void OnRep_ActiveBuffs();
+
+  UFUNCTION()
+  void OnRep_ActiveDebuffs();
+
   UFUNCTION(NetMulticast, Reliable)
   void MulticastPlayPreAttackFX(AFighterPawn *Target);
 
@@ -725,6 +811,49 @@ private:
 
   /** Project a movement path point onto the underlying terrain surface. */
   void ConformPathPointToGround(FVector &Location) const;
+
+  /** Update buff/debuff widgets so they continue facing the active camera. */
+  void UpdateFloatingStatusWidgetFacing();
+
+  /** Apply a set of status lines to a floating widget component. */
+  void ApplyStatusLinesToWidget(UWidgetComponent *Component,
+                                const TArray<FText> &Lines);
+
+  /** Build display strings for all active buffs. */
+  void BuildBuffStatusLines(TArray<FText> &OutLines) const;
+
+  /** Build display strings for all active debuffs. */
+  void BuildDebuffStatusLines(TArray<FText> &OutLines) const;
+
+  /** Apply a modifier delta to the internal status aggregate map. */
+  void ApplyStatusEffectDelta(FName AbilityId, const FText &AbilityName,
+                              const FSkaldAbilityStatDelta &Delta,
+                              bool bIsApplying);
+
+  /** Recalculate replicated status arrays from the aggregate map. */
+  void RebuildActiveStatusArrays();
+
+  /** Resolve the rotation used to face floating widgets towards the camera. */
+  FRotator ResolveCameraFacingRotation() const;
+
+  static bool HasAnyDeltaMagnitude(const FSkaldAbilityStatDelta &Delta);
+  static FSkaldAbilityStatDelta ExtractPositiveDelta(
+      const FSkaldAbilityStatDelta &Delta);
+  static FSkaldAbilityStatDelta ExtractNegativeDelta(
+      const FSkaldAbilityStatDelta &Delta);
+  static void AccumulateDelta(FSkaldAbilityStatDelta &Target,
+                              const FSkaldAbilityStatDelta &Source,
+                              int32 Direction);
+  static FString BuildDeltaFragment(const FSkaldAbilityStatDelta &Delta,
+                                    bool bPositive);
+
+  struct FStatusEffectAggregate {
+    FText DisplayName;
+    FSkaldAbilityStatDelta Delta;
+  };
+
+  /** Aggregated status effects keyed by their source ability identifier. */
+  TMap<FName, FStatusEffectAggregate> ActiveStatusAggregates;
 
   /** Prepare and cache dynamic materials used for hit feedback. */
   void InitializeDisplayMeshMaterials();

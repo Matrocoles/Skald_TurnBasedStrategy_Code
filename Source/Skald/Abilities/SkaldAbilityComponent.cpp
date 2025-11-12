@@ -134,6 +134,7 @@ void USkaldAbilityComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
     if (AFighterPawn* Fighter = CachedFighter.Get())
     {
         Fighter->ClearAllPassiveBuffIndicators();
+        Fighter->ClearFloatingStatusEffects();
     }
     Super::EndPlay(EndPlayReason);
 }
@@ -182,6 +183,7 @@ void USkaldAbilityComponent::RefreshAbilityLoadout(const FFighterStats& InStats,
     if (AFighterPawn* Fighter = CachedFighter.Get())
     {
         Fighter->ClearAllPassiveBuffIndicators();
+        Fighter->ClearFloatingStatusEffects();
         LastKnownHealth = Fighter->Stats.Health;
     }
 
@@ -1471,7 +1473,15 @@ void USkaldAbilityComponent::AddActiveModifier(FSkaldActiveAbilityModifier&& Mod
     ApplyDefaultModifierDuration(Modifier);
     ApplyStatDeltaToOwner(Modifier.Delta, true);
     const FName SourceAbility = Modifier.SourceAbilityId;
+    const FSkaldAbilityStatDelta ModifierDelta = Modifier.Delta;
     ActiveModifiers.Add(MoveTemp(Modifier));
+
+    if (AFighterPawn* Fighter = CachedFighter.Get())
+    {
+        const FSkaldAbilityDefinition Definition = GetAbilityDefinitionById(SourceAbility);
+        const FText AbilityName = Definition.IsValid() ? Definition.AbilityName : FText::FromName(SourceAbility);
+        Fighter->NotifyStatusEffectApplied(SourceAbility, AbilityName, ModifierDelta);
+    }
 
     if (IsPassiveAbilityId(SourceAbility))
     {
@@ -1494,6 +1504,13 @@ void USkaldAbilityComponent::RemoveActiveModifier(int32 Index)
     const FSkaldActiveAbilityModifier RemovedModifier = ActiveModifiers[Index];
     ApplyStatDeltaToOwner(RemovedModifier.Delta, false);
     ActiveModifiers.RemoveAtSwap(Index);
+
+    if (AFighterPawn* Fighter = CachedFighter.Get())
+    {
+        const FSkaldAbilityDefinition Definition = GetAbilityDefinitionById(RemovedModifier.SourceAbilityId);
+        const FText AbilityName = Definition.IsValid() ? Definition.AbilityName : FText::FromName(RemovedModifier.SourceAbilityId);
+        Fighter->NotifyStatusEffectRemoved(RemovedModifier.SourceAbilityId, AbilityName, RemovedModifier.Delta);
+    }
 
     if (RemovedModifier.SourceAbilityId == LowHealthPenaltyId)
     {
@@ -2868,6 +2885,13 @@ void USkaldAbilityComponent::ApplyModifierToTarget(AFighterPawn* Target, FSkaldA
     ApplyIntDelta(Target->Stats.Defence, Modifier.Delta.Defence);
     ApplyIntDelta(Target->Stats.Strength, Modifier.Delta.Strength);
     ApplyIntDelta(Target->Stats.CriticalBonusDamage, Modifier.Delta.CriticalBonusDamage);
+
+    if (GetOwnerRole() == ROLE_Authority)
+    {
+        const FSkaldAbilityDefinition Definition = GetAbilityDefinitionById(Modifier.SourceAbilityId);
+        const FText AbilityName = Definition.IsValid() ? Definition.AbilityName : FText::FromName(Modifier.SourceAbilityId);
+        Target->NotifyStatusEffectApplied(Modifier.SourceAbilityId, AbilityName, Modifier.Delta);
+    }
 }
 
 void USkaldAbilityComponent::RemoveModifiersByAbilityId(FName AbilityId)
