@@ -32,6 +32,9 @@ public:
     UButton* MainMenuButton;
 
     UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta = (BindWidgetOptional))
+    UButton* ExitButton;
+
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta = (BindWidgetOptional))
     UComboBoxString* DisplaySizeCombo;
 
     UPROPERTY(BlueprintReadOnly, Category="Skald|Widgets", meta = (BindWidgetOptional))
@@ -60,12 +63,16 @@ public:
 
 protected:
     virtual void NativeConstruct() override;
+    virtual void NativeDestruct() override;
 
     UFUNCTION(BlueprintCallable)
     void OnApply();
 
     UFUNCTION(BlueprintCallable, Category="Skald|Widgets")
     void OnMainMenu();
+
+    UFUNCTION(BlueprintCallable, Category="Skald|Widgets")
+    void OnExit();
 
     UFUNCTION(BlueprintCallable, Category="Skald|Widgets")
     void HandleResolutionChanged(FString SelectedItem, ESelectInfo::Type SelectionType);
@@ -82,6 +89,13 @@ protected:
     UFUNCTION(BlueprintCallable, Category="Skald|Widgets")
     void HandleBattleActionDelayChanged(float Value);
 
+public:
+    /** Called when the exit confirmation dialog is dismissed without quitting. */
+    void HandleExitDeclined();
+
+    /** Clear the active exit confirmation widget if present. */
+    void ClearExitConfirmation();
+
 private:
     UPROPERTY()
     TWeakObjectPtr<UUserWidget> OwningMenu;
@@ -94,5 +108,7 @@ private:
     float PendingAudioVolume;
     float PendingEnemyTurnDelay;
     float PendingBattleActionDelay;
+
+    TWeakObjectPtr<class UQuitConfirmationWidget> ExitConfirmationWidget;
 };
 
