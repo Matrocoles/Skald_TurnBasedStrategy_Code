@@ -2,8 +2,11 @@
 
 #include "Internationalization/Text.h"
 #include "Math/UnrealMathUtility.h"
+#include "SkaldGameInstance.h"
+#include "Engine/World.h"
 #include "Components/TextBlock.h"
 #include "Components/Widget.h"
+#include "Styling/SlateColor.h"
 
 void USkaldPlayerListEntryWidget::SetupPlayerEntry(const FS_PlayerData& InPlayerData,
                                                    int32 InTerritoryCount)
@@ -34,7 +37,19 @@ void USkaldPlayerListEntryWidget::NativeOnPlayerDataUpdated()
 
   if (FactionNameText)
   {
+    const USkaldGameInstance *GameInstance = nullptr;
+    if (const UWorld *World = GetWorld())
+    {
+      GameInstance = World->GetGameInstance<USkaldGameInstance>();
+    }
+
+    const FLinearColor FactionColor = GameInstance
+                                          ? GameInstance->GetFactionColor(PlayerData.Faction)
+                                          : USkaldGameInstance::GetDefaultFactionColor(
+                                                PlayerData.Faction);
+
     FactionNameText->SetText(FactionDisplayName);
+    FactionNameText->SetColorAndOpacity(FSlateColor(FactionColor));
   }
 
   if (TerritoryCountText)

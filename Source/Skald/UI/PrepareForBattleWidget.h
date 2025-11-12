@@ -37,6 +37,11 @@ public:
                           int32 InAttackingUnits,
                           int32 InDefendingUnits);
 
+  /** Apply faction colours to the various text blocks. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Battle")
+  void SetFactionColors(FLinearColor InAttackerColor,
+                        FLinearColor InDefenderColor);
+
   /** Text block displaying the attacking player's name. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
   UTextBlock *AttackingPlayerName;
@@ -150,5 +155,11 @@ protected:
   FTimerHandle RetreatStatusTimerHandle;
 
   void ClearRetreatStatus();
+
+  /** Cached colours used for the attacker/defender text elements. */
+  FLinearColor AttackerFactionColor = FLinearColor::White;
+  FLinearColor DefenderFactionColor = FLinearColor::White;
+
+  void ApplyFactionColors();
 };
 
