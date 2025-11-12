@@ -111,6 +111,9 @@ public:
   UPROPERTY(BlueprintReadWrite, Category = "Player")
   int32 AIPlayersToSpawn = 1;
 
+  /** Cached lobby selections for human players while travelling to the overworld. */
+  TArray<FS_PlayerData> PendingLobbyPlayers;
+
   /** Factions that have already been selected by players or AI. */
   UPROPERTY(BlueprintReadWrite, Category = "Player")
   TArray<ESkaldFaction> TakenFactions;
@@ -296,6 +299,11 @@ public:
 
   /** Queue a status message that should appear when the next world becomes active. */
   void QueuePendingStatusMessage(const FText &Message, bool bPersistUntilCleared = true);
+
+  /** Consume cached lobby data for the specified player if available. */
+  bool ConsumePendingLobbyPlayerData(int32 PlayerId,
+                                     const FString &DisplayName,
+                                     FS_PlayerData &OutData);
 
   /** Capture the overworld state so it can be restored after travelling. */
   bool CacheWorldMapSnapshot(UWorld *InWorldContext = nullptr);

@@ -498,6 +498,9 @@ void ALobbyGameMode::TryLaunchMatch(APlayerController* RequestingController)
 
         if (AGameStateBase* LocalGameState = GetGameState<AGameStateBase>())
         {
+            TArray<FS_PlayerData> LobbyPlayers;
+            LobbyPlayers.Reserve(LocalGameState->PlayerArray.Num());
+
             for (APlayerState* PlayerStateBase : LocalGameState->PlayerArray)
             {
                 if (ASkaldPlayerState* PlayerState = Cast<ASkaldPlayerState>(PlayerStateBase))
@@ -515,9 +518,22 @@ void ALobbyGameMode::TryLaunchMatch(APlayerController* RequestingController)
                             PlayerState->SetPlayerName(ResolvedName);
                         }
                         GI->TakenFactions.AddUnique(Slot.Faction);
+
+                        if (!PlayerState->bIsAI)
+                        {
+                            FS_PlayerData PlayerData;
+                            PlayerData.PlayerID = PlayerState->GetPlayerId();
+                            PlayerData.PlayerName = PlayerState->GetPlayerName();
+                            PlayerData.DisplayName = PlayerState->PlayerDisplayName;
+                            PlayerData.IsAI = false;
+                            PlayerData.Faction = PlayerState->Faction;
+                            LobbyPlayers.Add(PlayerData);
+                        }
                     }
                 }
             }
+
+            GI->PendingLobbyPlayers = MoveTemp(LobbyPlayers);
         }
 
         for (const FLobbyPlayerSlot& Slot : AuthoritySlots)
