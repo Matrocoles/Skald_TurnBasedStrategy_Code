@@ -2,7 +2,7 @@
 
 #include "Internationalization/Text.h"
 #include "Math/UnrealMathUtility.h"
-#include "SkaldGameInstance.h"
+#include "Skald_GameInstance.h"
 #include "Engine/World.h"
 #include "Components/TextBlock.h"
 #include "Components/Widget.h"
