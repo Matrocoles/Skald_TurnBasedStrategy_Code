@@ -25,6 +25,7 @@
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
 #include "Skald_TurnManager.h"
+#include "Sound/SoundBase.h"
 #include "Territory.h"
 #include "TimerManager.h"
 #include "UI/SkaldMainHUDWidget.h"
@@ -2346,7 +2347,8 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
             continue;
           }
 
-          if (Audio->Sound->GetPathName() == SoundPath.ToString()) {
+          if (USoundBase *const Sound = Audio->Sound.Get();
+              Sound && Sound->GetPathName() == SoundPath.ToString()) {
             if (AudioSave.bWasPlaying) {
               Audio->Play();
             } else {
@@ -3572,7 +3574,7 @@ void ASkaldGameMode::FillSaveGame(USkaldSaveGame *SaveGameObject) const {
   }
 
   const ATurnManager *Manager = GetTurnManager();
-  const ASkaldGameState *GameState = GetGameState<ASkaldGameState>();
+  const ASkaldGameState *SkaldGameState = GetGameState<ASkaldGameState>();
   const TArray<ASkaldPlayerController *> Controllers =
       Manager ? Manager->GetControllers() : TArray<ASkaldPlayerController *>();
 
@@ -3604,8 +3606,8 @@ void ASkaldGameMode::FillSaveGame(USkaldSaveGame *SaveGameObject) const {
   }
 
   int32 ControllerCount = Controllers.Num();
-  if (ControllerCount == 0 && GameState) {
-    ControllerCount = GameState->PlayerArray.Num();
+  if (ControllerCount == 0 && SkaldGameState) {
+    ControllerCount = SkaldGameState->PlayerArray.Num();
   }
 
   int32 ActivePlayerId = INDEX_NONE;
