@@ -3718,11 +3718,11 @@ void ASkaldGameMode::FillSaveGame(USkaldSaveGame *SaveGameObject) const {
 
   SaveGameObject->Sieges = SiegePool;
 
-  if (GameState) {
-    SaveGameObject->CurrentPlayerIndex = GameState->CurrentTurnIndex;
+  if (SkaldGameState) {
+    SaveGameObject->CurrentPlayerIndex = SkaldGameState->CurrentTurnIndex;
     int32 EffectiveControllerCount = FMath::Max(ControllerCount, 1);
     int32 DerivedTurnNumber =
-        (GameState->CurrentTurnIndex / EffectiveControllerCount) + 1;
+        (SkaldGameState->CurrentTurnIndex / EffectiveControllerCount) + 1;
     SaveGameObject->TurnNumber = DerivedTurnNumber;
     SaveGameObject->GameFlow.TurnNumber = DerivedTurnNumber;
   }
