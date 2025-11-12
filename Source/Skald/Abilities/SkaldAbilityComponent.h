@@ -79,6 +79,21 @@ struct FSkaldActiveAbilityModifier
 };
 
 USTRUCT()
+struct FSkaldExternalTargetModifier
+{
+    GENERATED_BODY();
+
+    UPROPERTY()
+    TWeakObjectPtr<AFighterPawn> Target;
+
+    UPROPERTY()
+    FName SourceAbilityId = NAME_None;
+
+    UPROPERTY()
+    FSkaldAbilityStatDelta Delta;
+};
+
+USTRUCT()
 struct FSkaldAbilityTrapState
 {
     GENERATED_BODY();
@@ -247,12 +262,14 @@ protected:
     void ApplyAbilityEffects(const FSkaldAbilityDefinition& Definition);
     void AddActiveModifier(FSkaldActiveAbilityModifier&& Modifier);
     void RemoveActiveModifier(int32 Index);
+    void RemoveTargetModifiersByAbilityId(FName AbilityId);
     int32 FindPendingTrapIndex(FName AbilityId) const;
     void RemoveTrapAtIndex(int32 Index);
     void ClearAllTraps();
     UDecalComponent* SpawnTrapVisualAtCell(const FIntPoint& Cell);
     void RemoveExpiredModifiers(ESkaldAbilityModifierPhase Phase);
     void ApplyStatDeltaToOwner(const FSkaldAbilityStatDelta& Delta, bool bApply);
+    FSkaldAbilityStatDelta ApplyTargetStatDelta(AFighterPawn* Target, const FSkaldAbilityStatDelta& Delta, bool bApply);
     bool TryResolveFactionAbilitySet(ESkaldFaction InFaction, FSkaldFactionAbilitySet& OutSet);
     FSkaldAbilityDefinition ResolveActiveAbilityForCost(const FSkaldFactionAbilitySet& AbilitySet, int32 ArmyCost) const;
     UDataTable* GetFactionAbilityDataTable();
@@ -381,6 +398,10 @@ protected:
     /** Transient list of active stat modifiers granted by abilities. */
     UPROPERTY()
     TArray<FSkaldActiveAbilityModifier> ActiveModifiers;
+
+    /** Modifiers applied directly to external targets without their own ability component. */
+    UPROPERTY()
+    TArray<FSkaldExternalTargetModifier> ActiveTargetModifiers;
 
     /** Tracks whether the owning fighter has made an attack during its current activation. */
     UPROPERTY()
