@@ -56,18 +56,19 @@ void UBattleResultWidget::EnsureLayout() {
 
 void UBattleResultWidget::SetBattleOutcome(bool bPlayerWon, bool bPlayerLost,
                                            int32 AttackerCasualties,
-                                           int32 DefenderCasualties) {
+                                           int32 DefenderCasualties,
+                                           const FLinearColor &PlayerColor) {
   EnsureLayout();
 
   if (BattleResultText) {
     if (bPlayerWon) {
       BattleResultText->SetText(
           NSLOCTEXT("BattleResultWidget", "VictoryLarge", "Victory!!"));
-      BattleResultText->SetColorAndOpacity(FSlateColor(FLinearColor::Green));
+      BattleResultText->SetColorAndOpacity(FSlateColor(PlayerColor));
     } else if (bPlayerLost) {
       BattleResultText->SetText(
           NSLOCTEXT("BattleResultWidget", "DefeatLarge", "Defeat!!"));
-      BattleResultText->SetColorAndOpacity(FSlateColor(FLinearColor::Red));
+      BattleResultText->SetColorAndOpacity(FSlateColor(PlayerColor));
     } else {
       BattleResultText->SetText(FText::GetEmpty());
       BattleResultText->SetColorAndOpacity(FSlateColor(FLinearColor::White));

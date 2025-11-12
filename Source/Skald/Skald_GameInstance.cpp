@@ -38,6 +38,82 @@
 using Skald::PropertyAccess::ReadBoolProperty;
 using Skald::PropertyAccess::ReadIntProperty;
 using Skald::PropertyAccess::WriteBoolProperty;
+
+namespace {
+FLinearColor ResolveDefaultFactionColor(ESkaldFaction Faction) {
+  switch (Faction) {
+  case ESkaldFaction::Human:
+    return FLinearColor::Blue;
+  case ESkaldFaction::Orc:
+    return FLinearColor::Red;
+  case ESkaldFaction::Dwarf:
+    return FLinearColor(0.55f, 0.35f, 0.15f, 1.f);
+  case ESkaldFaction::Elf:
+    return FLinearColor(0.05f, 0.18f, 0.08f, 1.f);
+  case ESkaldFaction::LizardFolk:
+    return FLinearColor(0.0f, 0.5f, 0.5f, 1.f);
+  case ESkaldFaction::Undead:
+    return FLinearColor::Black;
+  case ESkaldFaction::Gnoll:
+    return FLinearColor(1.0f, 0.45f, 0.05f, 1.f);
+  case ESkaldFaction::Goblin:
+    return FLinearColor(0.196f, 0.804f, 0.196f, 1.f);
+  case ESkaldFaction::Empire:
+    return FLinearColor(0.5f, 0.0f, 0.5f, 1.f);
+  case ESkaldFaction::Inflicted:
+    return FLinearColor(1.0f, 0.85f, 0.1f, 1.f);
+  case ESkaldFaction::FrogFolk:
+    return FLinearColor(1.f, 0.31f, 0.55f, 1.f);
+  case ESkaldFaction::Ravpack:
+    return FLinearColor(0.54f, 0.f, 0.54f, 1.f);
+  case ESkaldFaction::None:
+  default:
+    return FLinearColor::White;
+  }
+}
+} // namespace
+
+USkaldGameInstance::USkaldGameInstance() {
+  FactionColors.Reserve(static_cast<int32>(ESkaldFaction::Ravpack) + 2);
+  FactionColors.Add(ESkaldFaction::None,
+                    GetDefaultFactionColor(ESkaldFaction::None));
+  FactionColors.Add(ESkaldFaction::Human,
+                    GetDefaultFactionColor(ESkaldFaction::Human));
+  FactionColors.Add(ESkaldFaction::Orc,
+                    GetDefaultFactionColor(ESkaldFaction::Orc));
+  FactionColors.Add(ESkaldFaction::Dwarf,
+                    GetDefaultFactionColor(ESkaldFaction::Dwarf));
+  FactionColors.Add(ESkaldFaction::Elf,
+                    GetDefaultFactionColor(ESkaldFaction::Elf));
+  FactionColors.Add(ESkaldFaction::LizardFolk,
+                    GetDefaultFactionColor(ESkaldFaction::LizardFolk));
+  FactionColors.Add(ESkaldFaction::Undead,
+                    GetDefaultFactionColor(ESkaldFaction::Undead));
+  FactionColors.Add(ESkaldFaction::Gnoll,
+                    GetDefaultFactionColor(ESkaldFaction::Gnoll));
+  FactionColors.Add(ESkaldFaction::Goblin,
+                    GetDefaultFactionColor(ESkaldFaction::Goblin));
+  FactionColors.Add(ESkaldFaction::Empire,
+                    GetDefaultFactionColor(ESkaldFaction::Empire));
+  FactionColors.Add(ESkaldFaction::Inflicted,
+                    GetDefaultFactionColor(ESkaldFaction::Inflicted));
+  FactionColors.Add(ESkaldFaction::FrogFolk,
+                    GetDefaultFactionColor(ESkaldFaction::FrogFolk));
+  FactionColors.Add(ESkaldFaction::Ravpack,
+                    GetDefaultFactionColor(ESkaldFaction::Ravpack));
+}
+
+FLinearColor USkaldGameInstance::GetFactionColor(ESkaldFaction Faction) const {
+  if (const FLinearColor *Color = FactionColors.Find(Faction)) {
+    return *Color;
+  }
+
+  return GetDefaultFactionColor(Faction);
+}
+
+FLinearColor USkaldGameInstance::GetDefaultFactionColor(ESkaldFaction Faction) {
+  return ResolveDefaultFactionColor(Faction);
+}
 using Skald::PropertyAccess::WriteIntProperty;
 
 namespace {

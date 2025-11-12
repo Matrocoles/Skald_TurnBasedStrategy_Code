@@ -554,6 +554,10 @@ protected:
 
   /** Apply the appropriate color for player/enemy broadcast messages. */
   void ApplyBroadcastStyle(bool bIsPlayerMessage);
+  const FS_PlayerData *FindPlayerDataById(int32 PlayerId) const;
+  FLinearColor ResolveFactionColor(ESkaldFaction Faction) const;
+  FLinearColor ResolvePlayerColor(int32 PlayerId) const;
+  FLinearColor ResolveLocalPlayerColor() const;
 
   UFUNCTION()
   void HideInitiativeText();

@@ -82,10 +82,19 @@ class SKALD_API USkaldGameInstance : public UGameInstance {
   GENERATED_BODY()
 
 public:
+  USkaldGameInstance();
+
   /** Initialize the game instance. */
   virtual void Init() override;
 
   virtual void Shutdown() override;
+
+  /** Resolve the configured colour for a given faction. */
+  UFUNCTION(BlueprintCallable, Category = "Player")
+  FLinearColor GetFactionColor(ESkaldFaction Faction) const;
+
+  /** Default faction colours used when no override has been configured. */
+  static FLinearColor GetDefaultFactionColor(ESkaldFaction Faction);
 
   /** Player chosen display name. */
   UPROPERTY(BlueprintReadWrite, Category = "Player")
@@ -197,6 +206,10 @@ public:
   /** Widget class used when showing the deploy overlay via the viewport. */
   UPROPERTY(EditDefaultsOnly, Category = "UI")
   TSubclassOf<UUserWidget> DeployWidgetClass;
+
+  /** Editor configurable palette mapping factions to their UI colours. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player")
+  TMap<ESkaldFaction, FLinearColor> FactionColors;
 
   /** Dice roll configuration asset automatically supplied to the dice subsystem. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Dice")

@@ -82,6 +82,26 @@ void USkaldDiceOverlayWidget::SetConfig(UDiceRollConfig* InConfig)
     ApplyConfigTints();
 }
 
+void USkaldDiceOverlayWidget::SetPlayerTint(const FLinearColor& InColor)
+{
+    bHasDynamicPlayerTint = true;
+    DynamicPlayerTint = InColor;
+    if (PlayerTintImage)
+    {
+        PlayerTintImage->SetColorAndOpacity(InColor);
+    }
+}
+
+void USkaldDiceOverlayWidget::SetEnemyTint(const FLinearColor& InColor)
+{
+    bHasDynamicEnemyTint = true;
+    DynamicEnemyTint = InColor;
+    if (EnemyTintImage)
+    {
+        EnemyTintImage->SetColorAndOpacity(InColor);
+    }
+}
+
 void USkaldDiceOverlayWidget::HandleRollStarted(const FGuid& RollId)
 {
     ActiveRollId = RollId;
@@ -153,17 +173,21 @@ void USkaldDiceOverlayWidget::ApplyConfigTints()
     const UDiceRollConfig* EffectiveConfig = Config ? Config.Get() : LoadedConfig.Get();
     if (PlayerTintImage)
     {
-        const FLinearColor Tint = (bOverridePlayerTint || !EffectiveConfig)
-                                      ? PlayerTintOverride
-                                      : EffectiveConfig->PlayerTint;
+        const FLinearColor Tint = bHasDynamicPlayerTint
+                                      ? DynamicPlayerTint
+                                      : ((bOverridePlayerTint || !EffectiveConfig)
+                                             ? PlayerTintOverride
+                                             : EffectiveConfig->PlayerTint);
         PlayerTintImage->SetColorAndOpacity(Tint);
     }
 
     if (EnemyTintImage)
     {
-        const FLinearColor Tint = (bOverrideEnemyTint || !EffectiveConfig)
-                                      ? EnemyTintOverride
-                                      : EffectiveConfig->EnemyTint;
+        const FLinearColor Tint = bHasDynamicEnemyTint
+                                      ? DynamicEnemyTint
+                                      : ((bOverrideEnemyTint || !EffectiveConfig)
+                                             ? EnemyTintOverride
+                                             : EffectiveConfig->EnemyTint);
         EnemyTintImage->SetColorAndOpacity(Tint);
     }
 }

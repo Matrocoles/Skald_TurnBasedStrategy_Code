@@ -374,9 +374,63 @@ void USkaldMainHUDWidget::ApplyBroadcastStyle(bool bIsPlayerMessage) {
     return;
   }
 
-  const FLinearColor PlayerColor = FLinearColor::Green;
-  const FLinearColor EnemyColor = FLinearColor::Red;
-  EndingTurnText->SetColorAndOpacity(bIsPlayerMessage ? PlayerColor : EnemyColor);
+  const FLinearColor PlayerColor = ResolveLocalPlayerColor();
+  FLinearColor MessageColor = PlayerColor;
+  if (!bIsPlayerMessage) {
+    const FLinearColor EnemyColor = ResolvePlayerColor(CurrentPlayerID);
+    MessageColor = EnemyColor;
+  }
+
+  EndingTurnText->SetColorAndOpacity(MessageColor);
+}
+
+const FS_PlayerData *USkaldMainHUDWidget::FindPlayerDataById(int32 PlayerId) const {
+  if (PlayerId == INDEX_NONE) {
+    return nullptr;
+  }
+
+  for (const FS_PlayerData &Player : CachedPlayers) {
+    if (Player.PlayerID == PlayerId) {
+      return &Player;
+    }
+  }
+
+  return nullptr;
+}
+
+FLinearColor USkaldMainHUDWidget::ResolveFactionColor(ESkaldFaction Faction) const {
+  if (GameInstance) {
+    return GameInstance->GetFactionColor(Faction);
+  }
+
+  if (const UWorld *World = GetWorld()) {
+    if (const USkaldGameInstance *GI =
+            World->GetGameInstance<USkaldGameInstance>()) {
+      return GI->GetFactionColor(Faction);
+    }
+  }
+
+  return USkaldGameInstance::GetDefaultFactionColor(Faction);
+}
+
+FLinearColor USkaldMainHUDWidget::ResolvePlayerColor(int32 PlayerId) const {
+  if (const FS_PlayerData *Data = FindPlayerDataById(PlayerId)) {
+    return ResolveFactionColor(Data->Faction);
+  }
+
+  return ResolveFactionColor(ESkaldFaction::None);
+}
+
+FLinearColor USkaldMainHUDWidget::ResolveLocalPlayerColor() const {
+  if (LocalPlayerID != -1) {
+    return ResolvePlayerColor(LocalPlayerID);
+  }
+
+  if (GameInstance) {
+    return ResolveFactionColor(GameInstance->Faction);
+  }
+
+  return ResolveFactionColor(ESkaldFaction::None);
 }
 
 void USkaldMainHUDWidget::HandleEndTurnClicked() {

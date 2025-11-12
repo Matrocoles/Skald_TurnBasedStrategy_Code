@@ -979,6 +979,8 @@ private:
   void ShowInitiativeResults(int32 PlayerResult, int32 EnemyResult);
   void HideInitiativeResults();
   USkaldDiceManager *ResolveDiceManager();
+  FLinearColor ResolveFactionColor(ESkaldFaction Faction);
+  FLinearColor ResolveBattleFactionColor(bool bAttackerSide);
 
   void StartInitiativeDiceSequence(int32 AttackerRoll, int32 DefenderRoll);
   void HandleInitiativeDiceOverviewReached();

@@ -1771,7 +1771,17 @@ bool ASkaldGameMode::StartStrategicInitiativeRoll(
     EnsureStrategicInitiativeDiceBinding();
     const int32 PlayerDice = bUsePlayerTint ? 1 : 0;
     const int32 EnemyDice = bUsePlayerTint ? 0 : 1;
-    const FGuid RollId = DiceManager->RollDice_D6(PlayerDice, EnemyDice, true);
+    USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+    const FLinearColor FactionColor = GI
+                                          ? GI->GetFactionColor(PlayerState->Faction)
+                                          : USkaldGameInstance::GetDefaultFactionColor(
+                                                PlayerState->Faction);
+    const FLinearColor PlayerTint =
+        bUsePlayerTint ? FactionColor : FLinearColor::Transparent;
+    const FLinearColor EnemyTint =
+        bUsePlayerTint ? FLinearColor::Transparent : FactionColor;
+    const FGuid RollId = DiceManager->RollDice_D6(PlayerDice, EnemyDice, true,
+                                                 PlayerTint, EnemyTint);
     if (RollId.IsValid()) {
       PendingStrategicInitiativeRolls.Add(RollId, PlayerState);
       return true;
@@ -3761,36 +3771,6 @@ void ASkaldGameMode::FillSaveGame(USkaldSaveGame *SaveGameObject) const {
   }
 
   int32 ActivePlayerId = INDEX_NONE;
-  auto ResolveFactionColor = [](ESkaldFaction Faction) {
-    switch (Faction) {
-    case ESkaldFaction::Human:
-      return FLinearColor::Blue;
-    case ESkaldFaction::Orc:
-      return FLinearColor::Red;
-    case ESkaldFaction::Dwarf:
-      return FLinearColor(0.55f, 0.35f, 0.15f, 1.f);
-    case ESkaldFaction::Elf:
-      return FLinearColor(0.05f, 0.18f, 0.08f, 1.f);
-    case ESkaldFaction::LizardFolk:
-      return FLinearColor(0.0f, 0.5f, 0.5f, 1.f);
-    case ESkaldFaction::Undead:
-      return FLinearColor::Black;
-    case ESkaldFaction::Gnoll:
-      return FLinearColor(1.0f, 0.45f, 0.05f, 1.f);
-    case ESkaldFaction::Goblin:
-      return FLinearColor(0.196f, 0.804f, 0.196f, 1.f);
-    case ESkaldFaction::Empire:
-      return FLinearColor(0.5f, 0.0f, 0.5f, 1.f);
-    case ESkaldFaction::Inflicted:
-      return FLinearColor(1.0f, 0.85f, 0.1f, 1.f);
-    case ESkaldFaction::FrogFolk:
-      return FLinearColor(1.f, 0.31f, 0.55f, 1.f);
-    case ESkaldFaction::Ravpack:
-      return FLinearColor(0.54f, 0.f, 0.54f, 1.f);
-    default:
-      return FLinearColor::White;
-    }
-  };
 
   for (int32 Index = 0; Index < Controllers.Num(); ++Index) {
     ASkaldPlayerController *Controller = Controllers[Index];
@@ -3811,7 +3791,10 @@ void ASkaldGameMode::FillSaveGame(USkaldSaveGame *SaveGameObject) const {
         ControllerSave.FactionEmblem =
             GameInstance->GetFactionEmblem(PS->Faction);
       }
-      ControllerSave.PlayerColor = ResolveFactionColor(PS->Faction);
+      const FLinearColor PlayerColor =
+          GameInstance ? GameInstance->GetFactionColor(PS->Faction)
+                       : USkaldGameInstance::GetDefaultFactionColor(PS->Faction);
+      ControllerSave.PlayerColor = PlayerColor;
 
       if (ControllerSave.PlayerId > 0) {
         if (const TArray<int32> *Owned =
