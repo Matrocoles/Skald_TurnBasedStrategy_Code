@@ -2088,43 +2088,132 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
   }
 
   PlayerDataArray.Empty();
+  TArray<FPlayerSaveStruct> PendingAISaves;
+  TArray<int32> PendingAIPlayerDataIndices;
   for (const FPlayerSaveStruct &PlayerSave : LoadedGame->Players) {
+    const FSkaldControllerSaveData *const *ControllerSavePtr =
+        ControllerSaveById.Find(PlayerSave.PlayerID);
+    const FSkaldControllerSaveData *ControllerSave =
+        ControllerSavePtr ? *ControllerSavePtr : nullptr;
+    const bool bIsAIPlayer = ControllerSave ? ControllerSave->bIsAI : false;
+
+    FS_PlayerData Data;
+    Data.PlayerID = PlayerSave.PlayerID;
+    Data.PlayerName = PlayerSave.PlayerName;
+    Data.DisplayName = PlayerSave.PlayerName;
+    Data.Faction = PlayerSave.Faction;
+    Data.Resources = PlayerSave.Resources;
+    Data.IsEliminated = PlayerSave.IsEliminated;
+    Data.IsHuman = !bIsAIPlayer;
+    Data.IsAI = bIsAIPlayer;
+    Data.IsAlive = false;
+    Data.CapitalsOwned = 0;
+    Data.TroopsCount = 0;
+    Data.TerritoriesOwned = 0;
+    if (bIsAIPlayer) {
+      const int32 PlayerDataIndex = PlayerDataArray.Add(Data);
+      PendingAISaves.Add(PlayerSave);
+      PendingAIPlayerDataIndices.Add(PlayerDataIndex);
+      continue;
+    }
+
     ASkaldPlayerState *PS = GetWorld()->SpawnActor<ASkaldPlayerState>();
     if (!PS) {
       continue;
     }
+
     PS->SetPlayerId(PlayerSave.PlayerID);
     PS->PlayerDisplayName = PlayerSave.PlayerName;
     PS->SetPlayerName(PlayerSave.PlayerName);
     PS->Faction = PlayerSave.Faction;
     PS->Resources = PlayerSave.Resources;
-    if (const FSkaldControllerSaveData *const *ControllerSavePtr =
-            ControllerSaveById.Find(PlayerSave.PlayerID)) {
-      const FSkaldControllerSaveData *ControllerSave = *ControllerSavePtr;
-      PS->bIsAI = ControllerSave ? ControllerSave->bIsAI : PS->bIsAI;
-    }
+    PS->IsEliminated = PlayerSave.IsEliminated;
+    PS->bIsAI = false;
+
     if (GS) {
       GS->AddPlayerState(PS);
     }
 
-    FS_PlayerData Data;
-    Data.PlayerID = PlayerSave.PlayerID;
-    Data.PlayerName = PlayerSave.PlayerName;
-    Data.Faction = PlayerSave.Faction;
-    Data.Resources = PlayerSave.Resources;
-    Data.IsEliminated = true;
-    Data.IsHuman = !PS->bIsAI;
-    Data.IsAI = PS->bIsAI;
-    Data.IsAlive = false;
-    Data.CapitalsOwned = 0;
-    Data.TroopsCount = 0;
-    Data.TerritoriesOwned = 0;
-    PlayerDataArray.Add(Data);
-
     if (TurnManager) {
       TurnManager->BroadcastResources(PS);
     }
+
+    PlayerDataArray.Add(Data);
   }
+
+  const auto RestoreAISavesFromSnapshot =
+      [&](const TArray<FPlayerSaveStruct> &AISaves,
+          const TArray<int32> &AIDataIndices) -> bool {
+    if (AISaves.Num() == 0) {
+      return false;
+    }
+
+    if (!GS) {
+      return false;
+    }
+
+    if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+      GI->AIPlayersToSpawn = AISaves.Num();
+    }
+
+    PopulateAIPlayers();
+
+    TArray<ASkaldPlayerState *> SpawnedAIStates;
+    for (ASkaldPlayerState *PlayerState : GS->Players) {
+      if (PlayerState && PlayerState->bIsAI) {
+        SpawnedAIStates.Add(PlayerState);
+      }
+    }
+
+    const int32 RestoredCount =
+        FMath::Min(AISaves.Num(), SpawnedAIStates.Num());
+    for (int32 Index = 0; Index < RestoredCount; ++Index) {
+      ASkaldPlayerState *AIState = SpawnedAIStates[Index];
+      if (!AIState) {
+        continue;
+      }
+
+      const FPlayerSaveStruct &PlayerSave = AISaves[Index];
+      AIState->bIsAI = true;
+      if (AIState->GetPlayerId() != PlayerSave.PlayerID) {
+        AIState->SetPlayerId(PlayerSave.PlayerID);
+      }
+      AIState->PlayerDisplayName = PlayerSave.PlayerName;
+      AIState->SetPlayerName(PlayerSave.PlayerName);
+      AIState->Faction = PlayerSave.Faction;
+      AIState->Resources = PlayerSave.Resources;
+      AIState->IsEliminated = PlayerSave.IsEliminated;
+
+      if (TurnManager) {
+        TurnManager->BroadcastResources(AIState);
+      }
+
+      if (PlayerDataArray.IsValidIndex(AIDataIndices[Index])) {
+        FS_PlayerData &PlayerData = PlayerDataArray[AIDataIndices[Index]];
+        PlayerData.PlayerID = PlayerSave.PlayerID;
+        PlayerData.PlayerName = PlayerSave.PlayerName;
+        PlayerData.DisplayName = PlayerSave.PlayerName;
+        PlayerData.Faction = PlayerSave.Faction;
+        PlayerData.Resources = PlayerSave.Resources;
+        PlayerData.IsEliminated = PlayerSave.IsEliminated;
+        PlayerData.IsAI = true;
+        PlayerData.IsHuman = false;
+        PlayerData.IsAlive = false;
+        PlayerData.CapitalsOwned = 0;
+      }
+    }
+
+    if (RestoredCount < AISaves.Num()) {
+      UE_LOG(LogSkald, Warning,
+             TEXT("ApplyLoadedGame: Restored %d/%d AI players from save."),
+             RestoredCount, AISaves.Num());
+    }
+
+    return RestoredCount > 0;
+  };
+
+  const bool bRestoredAISaves =
+      RestoreAISavesFromSnapshot(PendingAISaves, PendingAIPlayerDataIndices);
 
   TMap<int32, FS_PlayerData *> PlayerDataById;
   for (FS_PlayerData &Data : PlayerDataArray) {
@@ -2145,6 +2234,16 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
     for (ASkaldPlayerState *PlayerState : GS->Players) {
       if (PlayerState) {
         PlayerStateById.Add(PlayerState->GetPlayerId(), PlayerState);
+      }
+    }
+  }
+  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+    GI->TakenFactions.Reset();
+    if (GS) {
+      for (ASkaldPlayerState *PlayerState : GS->Players) {
+        if (PlayerState && PlayerState->Faction != ESkaldFaction::None) {
+          GI->TakenFactions.AddUnique(PlayerState->Faction);
+        }
       }
     }
   }
@@ -2287,7 +2386,9 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
     }
   }
 
-  PopulateAIPlayers();
+  if (!bRestoredAISaves) {
+    PopulateAIPlayers();
+  }
 
   if (WorldMap && WorldMap->SelectedTerritory &&
       !TerritoryById.Contains(WorldMap->SelectedTerritory->TerritoryID)) {
