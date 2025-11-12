@@ -131,6 +131,28 @@ void USkaldAbilityComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
     ClearAllTraps();
     RemoveBattleDelegates();
+    if (GetOwnerRole() == ROLE_Authority)
+    {
+        while (ActiveTargetModifiers.Num() > 0)
+        {
+            const int32 LastIndex = ActiveTargetModifiers.Num() - 1;
+            const FSkaldExternalTargetModifier Modifier = ActiveTargetModifiers[LastIndex];
+            if (!Modifier.SourceAbilityId.IsNone())
+            {
+                RemoveTargetModifiersByAbilityId(Modifier.SourceAbilityId);
+                continue;
+            }
+
+            if (AFighterPawn* Target = Modifier.Target.Get())
+            {
+                const FText AbilityName = FText::FromName(Modifier.SourceAbilityId);
+                ApplyTargetStatDelta(Target, Modifier.Delta, false);
+                Target->NotifyStatusEffectRemoved(Modifier.SourceAbilityId, AbilityName, Modifier.Delta);
+            }
+
+            ActiveTargetModifiers.RemoveAtSwap(LastIndex);
+        }
+    }
     if (AFighterPawn* Fighter = CachedFighter.Get())
     {
         Fighter->ClearAllPassiveBuffIndicators();
@@ -1523,6 +1545,34 @@ void USkaldAbilityComponent::RemoveActiveModifier(int32 Index)
     }
 }
 
+void USkaldAbilityComponent::RemoveTargetModifiersByAbilityId(FName AbilityId)
+{
+    if (GetOwnerRole() != ROLE_Authority || AbilityId.IsNone())
+    {
+        return;
+    }
+
+    for (int32 Index = ActiveTargetModifiers.Num() - 1; Index >= 0; --Index)
+    {
+        const FSkaldExternalTargetModifier& ExternalModifier = ActiveTargetModifiers[Index];
+        if (ExternalModifier.SourceAbilityId != AbilityId)
+        {
+            continue;
+        }
+
+        if (AFighterPawn* Target = ExternalModifier.Target.Get())
+        {
+            ApplyTargetStatDelta(Target, ExternalModifier.Delta, false);
+
+            const FSkaldAbilityDefinition Definition = GetAbilityDefinitionById(AbilityId);
+            const FText AbilityName = Definition.IsValid() ? Definition.AbilityName : FText::FromName(AbilityId);
+            Target->NotifyStatusEffectRemoved(AbilityId, AbilityName, ExternalModifier.Delta);
+        }
+
+        ActiveTargetModifiers.RemoveAtSwap(Index);
+    }
+}
+
 int32 USkaldAbilityComponent::FindPendingTrapIndex(FName AbilityId) const
 {
     for (int32 Index = ActiveTraps.Num() - 1; Index >= 0; --Index)
@@ -2833,6 +2883,75 @@ void USkaldAbilityComponent::HandleOwnerHealthChanged(int32 NewHealth)
     BroadcastStateChanged();
 }
 
+FSkaldAbilityStatDelta USkaldAbilityComponent::ApplyTargetStatDelta(AFighterPawn* Target, const FSkaldAbilityStatDelta& Delta, bool bApply)
+{
+    if (!Target)
+    {
+        return FSkaldAbilityStatDelta();
+    }
+
+    FSkaldAbilityStatDelta AppliedDelta;
+
+    auto ApplyIntDelta = [bApply](int32& Stat, int32 Amount)
+    {
+        if (Amount == 0)
+        {
+            return;
+        }
+
+        const int32 DeltaValue = bApply ? Amount : -Amount;
+        Stat = FMath::Max(0, Stat + DeltaValue);
+    };
+
+    auto ApplyIntDeltaAndRecord = [&](int32& Stat, int32 Amount, int32& OutRecorded)
+    {
+        if (Amount == 0)
+        {
+            return;
+        }
+
+        ApplyIntDelta(Stat, Amount);
+        if (bApply)
+        {
+            OutRecorded = Amount;
+        }
+    };
+
+    ApplyIntDeltaAndRecord(Target->Stats.AttackDice, Delta.AttackDice, AppliedDelta.AttackDice);
+    ApplyIntDeltaAndRecord(Target->Stats.AttackDamage, Delta.AttackDamage, AppliedDelta.AttackDamage);
+
+    auto ApplyTypedAttackDamage = [&](int32 Amount, EFighterAttackType RequiredType, int32& OutRecorded)
+    {
+        if (Amount == 0)
+        {
+            return;
+        }
+
+        const bool bShouldApply = bApply ? Target->GetAttackType() == RequiredType : true;
+        if (!bShouldApply)
+        {
+            return;
+        }
+
+        const int32 DeltaValue = bApply ? Amount : -Amount;
+        Target->Stats.AttackDamage = FMath::Max(0, Target->Stats.AttackDamage + DeltaValue);
+
+        if (bApply)
+        {
+            OutRecorded = Amount;
+        }
+    };
+
+    ApplyTypedAttackDamage(Delta.MeleeAttackDamage, EFighterAttackType::Melee, AppliedDelta.MeleeAttackDamage);
+    ApplyTypedAttackDamage(Delta.RangedAttackDamage, EFighterAttackType::Ranged, AppliedDelta.RangedAttackDamage);
+    ApplyIntDeltaAndRecord(Target->Stats.Movement, Delta.Movement, AppliedDelta.Movement);
+    ApplyIntDeltaAndRecord(Target->Stats.Defence, Delta.Defence, AppliedDelta.Defence);
+    ApplyIntDeltaAndRecord(Target->Stats.Strength, Delta.Strength, AppliedDelta.Strength);
+    ApplyIntDeltaAndRecord(Target->Stats.CriticalBonusDamage, Delta.CriticalBonusDamage, AppliedDelta.CriticalBonusDamage);
+
+    return AppliedDelta;
+}
+
 void USkaldAbilityComponent::ApplyModifierToTarget(AFighterPawn* Target, FSkaldActiveAbilityModifier&& Modifier)
 {
     if (!Target)
@@ -2851,47 +2970,16 @@ void USkaldAbilityComponent::ApplyModifierToTarget(AFighterPawn* Target, FSkaldA
         return;
     }
 
-    auto ApplyIntDelta = [](int32& Stat, int32 Amount)
-    {
-        if (Amount == 0)
-        {
-            return;
-        }
+    const FSkaldAbilityStatDelta AppliedDelta = ApplyTargetStatDelta(Target, Modifier.Delta, true);
 
-        Stat = FMath::Max(0, Stat + Amount);
-    };
+    const FSkaldAbilityDefinition Definition = GetAbilityDefinitionById(Modifier.SourceAbilityId);
+    const FText AbilityName = Definition.IsValid() ? Definition.AbilityName : FText::FromName(Modifier.SourceAbilityId);
+    Target->NotifyStatusEffectApplied(Modifier.SourceAbilityId, AbilityName, AppliedDelta);
 
-    ApplyIntDelta(Target->Stats.AttackDice, Modifier.Delta.AttackDice);
-    ApplyIntDelta(Target->Stats.AttackDamage, Modifier.Delta.AttackDamage);
-
-    auto ApplyTypedAttackDamage = [&](int32 Amount, EFighterAttackType RequiredType)
-    {
-        if (Amount == 0)
-        {
-            return;
-        }
-
-        if (Target->GetAttackType() != RequiredType)
-        {
-            return;
-        }
-
-        Target->Stats.AttackDamage = FMath::Max(0, Target->Stats.AttackDamage + Amount);
-    };
-
-    ApplyTypedAttackDamage(Modifier.Delta.MeleeAttackDamage, EFighterAttackType::Melee);
-    ApplyTypedAttackDamage(Modifier.Delta.RangedAttackDamage, EFighterAttackType::Ranged);
-    ApplyIntDelta(Target->Stats.Movement, Modifier.Delta.Movement);
-    ApplyIntDelta(Target->Stats.Defence, Modifier.Delta.Defence);
-    ApplyIntDelta(Target->Stats.Strength, Modifier.Delta.Strength);
-    ApplyIntDelta(Target->Stats.CriticalBonusDamage, Modifier.Delta.CriticalBonusDamage);
-
-    if (GetOwnerRole() == ROLE_Authority)
-    {
-        const FSkaldAbilityDefinition Definition = GetAbilityDefinitionById(Modifier.SourceAbilityId);
-        const FText AbilityName = Definition.IsValid() ? Definition.AbilityName : FText::FromName(Modifier.SourceAbilityId);
-        Target->NotifyStatusEffectApplied(Modifier.SourceAbilityId, AbilityName, Modifier.Delta);
-    }
+    FSkaldExternalTargetModifier& ExternalModifier = ActiveTargetModifiers.Emplace_GetRef();
+    ExternalModifier.Target = Target;
+    ExternalModifier.SourceAbilityId = Modifier.SourceAbilityId;
+    ExternalModifier.Delta = AppliedDelta;
 }
 
 void USkaldAbilityComponent::RemoveModifiersByAbilityId(FName AbilityId)
@@ -2908,6 +2996,8 @@ void USkaldAbilityComponent::RemoveModifiersByAbilityId(FName AbilityId)
             RemoveActiveModifier(Index);
         }
     }
+
+    RemoveTargetModifiersByAbilityId(AbilityId);
 }
 
 void USkaldAbilityComponent::ConsumeOncePerBattleAbility(FName AbilityId)
