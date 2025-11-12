@@ -973,6 +973,7 @@ private:
   void HandlePendingPresentationTimerTick();
   void EnsureDiceWidgets();
   FGuid TriggerAttackDicePresentation(AFighterPawn *Attacker,
+                                      AFighterPawn *Defender,
                                       const FDiceRollResult &Result);
   FGuid TriggerInitiativeDicePresentation(int32 AttackerRoll,
                                           int32 DefenderRoll);

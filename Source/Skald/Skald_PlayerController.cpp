@@ -6018,7 +6018,7 @@ void ASkaldPlayerController::HandleAttackResolved(AFighterPawn *Attacker,
     return;
   }
 
-  TriggerAttackDicePresentation(Attacker, Result);
+  TriggerAttackDicePresentation(Attacker, Defender, Result);
   ProcessAttackResolutionPresentation(Attacker, Defender, Result);
 }
 
@@ -6257,7 +6257,7 @@ void ASkaldPlayerController::StartAttackDiceSequence(
 
   if (!IsLocalController() || !bAutoPresentDiceRolls ||
       Result.DiceOutcomes.Num() == 0) {
-    TriggerAttackDicePresentation(Attacker, Result);
+    TriggerAttackDicePresentation(Attacker, Defender, Result);
     ProcessAttackResolutionPresentation(Attacker, Defender, Result);
     return;
   }
@@ -6269,7 +6269,7 @@ void ASkaldPlayerController::StartAttackDiceSequence(
       CameraPawn && bIsBattleMap && CameraPawn->IsBattleCameraActive();
 
   if (!bHasBattleCamera) {
-    FGuid RollId = TriggerAttackDicePresentation(Attacker, Result);
+    FGuid RollId = TriggerAttackDicePresentation(Attacker, Defender, Result);
     if (!RollId.IsValid()) {
       ProcessAttackResolutionPresentation(Attacker, Defender, Result);
     }
@@ -6305,7 +6305,7 @@ void ASkaldPlayerController::StartAttackDiceSequence(
           PendingAttackSequence.OriginalRotation.Yaw, OverviewLocation,
           OverviewRotation, OverviewZoom)) {
     ResetAttackDiceSequence();
-    FGuid RollId = TriggerAttackDicePresentation(Attacker, Result);
+    FGuid RollId = TriggerAttackDicePresentation(Attacker, Defender, Result);
     if (!RollId.IsValid()) {
       ProcessAttackResolutionPresentation(Attacker, Defender, Result);
     }
@@ -6338,7 +6338,8 @@ void ASkaldPlayerController::HandleAttackDiceOverviewReached() {
   }
 
   PendingAttackSequence.ActiveRollId = TriggerAttackDicePresentation(
-      PendingAttackSequence.Attacker.Get(), PendingAttackSequence.Result);
+      PendingAttackSequence.Attacker.Get(),
+      PendingAttackSequence.Defender.Get(), PendingAttackSequence.Result);
 
   if (!PendingAttackSequence.ActiveRollId.IsValid()) {
     HandleAttackDiceCleanupFinished();
@@ -6903,7 +6904,8 @@ FLinearColor ASkaldPlayerController::ResolveBattleFactionColor(bool bAttackerSid
 }
 
 FGuid ASkaldPlayerController::TriggerAttackDicePresentation(
-    AFighterPawn *Attacker, const FDiceRollResult &Result) {
+    AFighterPawn *Attacker, AFighterPawn *Defender,
+    const FDiceRollResult &Result) {
   if (!IsLocalController() || !bAutoPresentDiceRolls) {
     return FGuid();
   }
