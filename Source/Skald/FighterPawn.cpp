@@ -1428,10 +1428,9 @@ void AFighterPawn::BuildBuffStatusLines(TArray<FText> &OutLines) const {
       continue;
     }
 
-    const FText AbilityText =
-        FText::IsEmptyOrWhitespace(Buff.DisplayName)
-            ? FText::FromName(Buff.SourceAbilityId)
-            : Buff.DisplayName;
+    const FText AbilityText = Buff.DisplayName.IsEmptyOrWhitespace()
+                                 ? FText::FromName(Buff.SourceAbilityId)
+                                 : Buff.DisplayName;
 
     FString Combined = AbilityText.ToString();
     if (!Fragment.IsEmpty()) {
@@ -1452,10 +1451,9 @@ void AFighterPawn::BuildDebuffStatusLines(TArray<FText> &OutLines) const {
       continue;
     }
 
-    const FText AbilityText =
-        FText::IsEmptyOrWhitespace(Debuff.DisplayName)
-            ? FText::FromName(Debuff.SourceAbilityId)
-            : Debuff.DisplayName;
+    const FText AbilityText = Debuff.DisplayName.IsEmptyOrWhitespace()
+                                 ? FText::FromName(Debuff.SourceAbilityId)
+                                 : Debuff.DisplayName;
 
     FString Combined = AbilityText.ToString();
     if (!Fragment.IsEmpty()) {
@@ -1479,17 +1477,16 @@ void AFighterPawn::ApplyStatusEffectDelta(
 
   FName AggregatedKey = AbilityId;
   if (AggregatedKey.IsNone()) {
-    const FString NameString =
-        FText::IsEmptyOrWhitespace(AbilityName)
-            ? FString(TEXT("StatusEffect_None"))
-            : AbilityName.ToString();
+    const FString NameString = AbilityName.IsEmptyOrWhitespace()
+                                   ? FString(TEXT("StatusEffect_None"))
+                                   : AbilityName.ToString();
     AggregatedKey = FName(*NameString);
   }
 
   FStatusEffectAggregate &Aggregate =
       ActiveStatusAggregates.FindOrAdd(AggregatedKey);
 
-  if (!FText::IsEmptyOrWhitespace(AbilityName)) {
+  if (!AbilityName.IsEmptyOrWhitespace()) {
     Aggregate.DisplayName = AbilityName;
   }
 
@@ -1514,7 +1511,7 @@ void AFighterPawn::RebuildActiveStatusArrays() {
   for (const TPair<FName, FStatusEffectAggregate> &Pair :
        ActiveStatusAggregates) {
     const FStatusEffectAggregate &Aggregate = Pair.Value;
-    const FText AbilityText = FText::IsEmptyOrWhitespace(Aggregate.DisplayName)
+    const FText AbilityText = Aggregate.DisplayName.IsEmptyOrWhitespace()
                                   ? FText::FromName(Pair.Key)
                                   : Aggregate.DisplayName;
 
