@@ -302,7 +302,7 @@ public:
 
   /** Consume cached lobby data for the specified player if available. */
   bool ConsumePendingLobbyPlayerData(int32 PlayerId,
-                                     const FString &DisplayName,
+                                     const FString &InDisplayName,
                                      FS_PlayerData &OutData);
 
   /** Capture the overworld state so it can be restored after travelling. */
