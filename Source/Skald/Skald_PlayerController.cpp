@@ -11,6 +11,7 @@
 #include "EngineUtils.h"
 #include "FighterDataLibrary.h"
 #include "FighterPawn.h"
+#include "FactionCursorData.h"
 #include "Abilities/SkaldAbilityComponent.h"
 #include "Abilities/SkaldAbilityTypes.h"
 #include "GridBattleManager.h"
@@ -55,9 +56,12 @@
 #endif
 
 #include "Framework/Application/SlateApplication.h"
+#include "Framework/Application/IPlatformCursor.h"
 #include "Layout/WidgetPath.h"
 #include "Widgets/SWidget.h"
 #include "Widgets/SWindow.h"
+
+#include "Rendering/SlateRenderer.h"
 
 #include "Net/UnrealNetwork.h"
 
@@ -130,6 +134,10 @@ ASkaldPlayerController::ASkaldPlayerController() {
   BattleResultWidget = nullptr;
   CurrentCommandMode = EBattleCommandMode::None;
   bHasInitialized = false;
+  CurrentFaction = ESkaldFaction::None;
+  ActiveCursorTrailFX = nullptr;
+  ActiveCursorTrailTemplate.Reset();
+  bWasHoveringInteractable = false;
 
   bShowMouseCursor = true;
   bEnableClickEvents = true;
@@ -1433,6 +1441,7 @@ void ASkaldPlayerController::BeginPlay() {
       HandleFactionLockedIn();
     }
     InitializeFighterSelectionIfNeeded();
+    RefreshFactionCursorFromState();
   }
 
   TryBindWorldMap();
@@ -1447,6 +1456,8 @@ void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
 #endif
     PostWorldBeginPlayHandle.Reset();
   }
+
+  ClearFactionCursor();
 
   if (CachedGameInstance) {
     CachedGameInstance->OnBattleMapStateChanged.RemoveDynamic(
@@ -1661,6 +1672,177 @@ void ASkaldPlayerController::TryBindWorldMap() {
   }
 }
 
+const FFactionCursorDefinition *ASkaldPlayerController::ResolveCursorDefinition() const {
+  if (!FactionCursorData || CurrentFaction == ESkaldFaction::None) {
+    return nullptr;
+  }
+
+  return FactionCursorData->FactionCursors.Find(CurrentFaction);
+}
+
+void ASkaldPlayerController::RefreshFactionCursorFromState() {
+  if (!IsLocalController()) {
+    return;
+  }
+
+  ESkaldFaction DesiredFaction = ESkaldFaction::None;
+  if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+    DesiredFaction = PS->Faction;
+  }
+
+  if (DesiredFaction == ESkaldFaction::None && CachedGameInstance) {
+    DesiredFaction = CachedGameInstance->Faction;
+  }
+
+  if (DesiredFaction == ESkaldFaction::None || !FactionCursorData ||
+      !FactionCursorData->FactionCursors.Contains(DesiredFaction)) {
+    ClearFactionCursor();
+    return;
+  }
+
+  if (CurrentFaction != DesiredFaction) {
+    CurrentFaction = DesiredFaction;
+  }
+
+  ApplyFactionCursor();
+}
+
+void ASkaldPlayerController::ApplyFactionCursor() {
+  if (!IsLocalController()) {
+    return;
+  }
+
+  const FFactionCursorDefinition *Definition = ResolveCursorDefinition();
+  if (!Definition) {
+    ClearFactionCursor();
+    return;
+  }
+
+  if (FSlateApplication::IsInitialized()) {
+    FSlateApplication &SlateApplication = FSlateApplication::Get();
+    if (TSharedPtr<IPlatformCursor> PlatformCursor =
+            SlateApplication.GetPlatformCursor()) {
+      TSharedPtr<ICursor> NewCursorShape;
+
+      if (UTexture2D *Texture = Definition->CursorTexture.LoadSynchronous()) {
+        ISlateRenderer &Renderer = SlateApplication.GetRenderer();
+        const TSharedPtr<ICursor> GeneratedCursor =
+            Renderer.CreateCursorFromTexture(Texture,
+                                             Definition->CursorHotspot);
+        if (GeneratedCursor.IsValid()) {
+          NewCursorShape = GeneratedCursor;
+        }
+      }
+
+      ActiveCursorShape = NewCursorShape;
+      PlatformCursor->SetTypeShape(EMouseCursor::Default, ActiveCursorShape);
+    }
+  }
+
+  if (Definition->CursorTrailFX.IsNull()) {
+    if (ActiveCursorTrailFX) {
+      ActiveCursorTrailFX->DestroyComponent();
+      ActiveCursorTrailFX = nullptr;
+      ActiveCursorTrailTemplate.Reset();
+    }
+  } else {
+    UNiagaraSystem *Trail = Definition->CursorTrailFX.LoadSynchronous();
+    if (Trail) {
+      const bool bNeedsNewTrail =
+          !ActiveCursorTrailFX || ActiveCursorTrailTemplate.Get() != Trail;
+      if (bNeedsNewTrail) {
+        if (ActiveCursorTrailFX) {
+          ActiveCursorTrailFX->DestroyComponent();
+          ActiveCursorTrailFX = nullptr;
+        }
+
+        ActiveCursorTrailFX = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+            this, Trail, FVector::ZeroVector, FRotator::ZeroRotator,
+            FVector::OneVector, /*bAutoDestroy*/ false,
+            /*bAutoActivate*/ true);
+        if (ActiveCursorTrailFX) {
+          ActiveCursorTrailFX->SetUsingAbsoluteLocation(true);
+          ActiveCursorTrailFX->SetUsingAbsoluteRotation(true);
+          ActiveCursorTrailFX->SetUsingAbsoluteScale(true);
+        }
+        ActiveCursorTrailTemplate = Trail;
+      }
+    } else if (ActiveCursorTrailFX) {
+      ActiveCursorTrailFX->DestroyComponent();
+      ActiveCursorTrailFX = nullptr;
+      ActiveCursorTrailTemplate.Reset();
+    }
+  }
+}
+
+void ASkaldPlayerController::ClearFactionCursor() {
+  if (ActiveCursorTrailFX) {
+    ActiveCursorTrailFX->DestroyComponent();
+    ActiveCursorTrailFX = nullptr;
+  }
+  ActiveCursorTrailTemplate.Reset();
+  ActiveCursorShape.Reset();
+
+  if (IsLocalController() && FSlateApplication::IsInitialized()) {
+    if (TSharedPtr<IPlatformCursor> PlatformCursor =
+            FSlateApplication::Get().GetPlatformCursor()) {
+      PlatformCursor->SetTypeShape(EMouseCursor::Default, nullptr);
+    }
+  }
+
+  CurrentFaction = ESkaldFaction::None;
+}
+
+void ASkaldPlayerController::PlayCursorHoverSound() {
+  if (!IsLocalController()) {
+    return;
+  }
+
+  const FFactionCursorDefinition *Definition = ResolveCursorDefinition();
+  if (!Definition) {
+    return;
+  }
+
+  if (USoundBase *Hover = Definition->HoverSound.LoadSynchronous()) {
+    UGameplayStatics::PlaySound2D(this, Hover);
+  }
+}
+
+void ASkaldPlayerController::PlayCursorClickSound() {
+  if (!IsLocalController()) {
+    return;
+  }
+
+  const FFactionCursorDefinition *Definition = ResolveCursorDefinition();
+  if (!Definition) {
+    return;
+  }
+
+  if (USoundBase *Click = Definition->ClickSound.LoadSynchronous()) {
+    UGameplayStatics::PlaySound2D(this, Click);
+  }
+}
+
+void ASkaldPlayerController::UpdateCursorFX() {
+  if (!ActiveCursorTrailFX) {
+    return;
+  }
+
+  FVector2D MousePos;
+  if (!GetMousePosition(MousePos.X, MousePos.Y)) {
+    return;
+  }
+
+  FVector WorldPos;
+  FVector WorldDir;
+  if (!DeprojectScreenPositionToWorld(MousePos.X, MousePos.Y, WorldPos,
+                                      WorldDir)) {
+    return;
+  }
+
+  ActiveCursorTrailFX->SetWorldLocation(WorldPos + WorldDir * 50.f);
+}
+
 void ASkaldPlayerController::OnRep_PlayerState() {
   Super::OnRep_PlayerState();
 
@@ -1668,6 +1850,8 @@ void ASkaldPlayerController::OnRep_PlayerState() {
       CachedGameInstance->bIsMultiplayer) {
     AutoInitializeFromLobbySelection();
   }
+
+  RefreshFactionCursorFromState();
 
   if (!MainHUD) {
     return;
@@ -1689,6 +1873,22 @@ void ASkaldPlayerController::OnPossess(APawn *InPawn) {
   }
 
   UpdateBattleCameraMode();
+}
+
+void ASkaldPlayerController::PlayerTick(float DeltaTime) {
+  Super::PlayerTick(DeltaTime);
+
+  if (!IsLocalController()) {
+    return;
+  }
+
+  UpdateCursorFX();
+
+  const bool bIsHoveringInteractable = IsCursorOverInteractableSlateWidget();
+  if (bIsHoveringInteractable && !bWasHoveringInteractable) {
+    PlayCursorHoverSound();
+  }
+  bWasHoveringInteractable = bIsHoveringInteractable;
 }
 
 void ASkaldPlayerController::ServerInitPlayerState_Implementation(
@@ -3877,6 +4077,7 @@ void ASkaldPlayerController::HandleFactionsUpdated() {
 void ASkaldPlayerController::HandleBattleMapStateChanged(bool /*bInBattleMap*/) {
   DetectBattleMap();
   InitializeFighterSelectionIfNeeded();
+  RefreshFactionCursorFromState();
 }
 
 void ASkaldPlayerController::HandleWorldStateChanged() {
@@ -3972,6 +4173,7 @@ void ASkaldPlayerController::HandleFactionLockedIn() {
   DefaultMouseCaptureMode = EMouseCaptureMode::NoCapture;
   SetIgnoreMoveInput(false);
   SetIgnoreLookInput(false);
+  RefreshFactionCursorFromState();
   TryBindWorldMap();
 
   // Refresh the HUD after any AI opponents have been spawned by the game
@@ -4088,6 +4290,8 @@ void ASkaldPlayerController::SetupInputComponent() {
   if (InputComponent) {
     InputComponent->BindKey(EKeys::LeftMouseButton, IE_Pressed, this,
                             &ASkaldPlayerController::HandleGridClick);
+    InputComponent->BindKey(EKeys::LeftMouseButton, IE_Pressed, this,
+                            &ASkaldPlayerController::HandleCursorClickSound);
     InputComponent->BindKey(EKeys::RightMouseButton, IE_Pressed, this,
                             &ASkaldPlayerController::HandleRightClick);
     InputComponent->BindKey(EKeys::O, IE_Pressed, this,
@@ -4694,6 +4898,16 @@ void ASkaldPlayerController::HandleEndTurnPressed() {
     UpdateBattleHUDButtons();
   }
   CancelCommandMode();
+}
+
+void ASkaldPlayerController::HandleCursorClickSound() {
+  if (!IsLocalController()) {
+    return;
+  }
+
+  if (IsCursorOverInteractableSlateWidget()) {
+    PlayCursorClickSound();
+  }
 }
 
 void ASkaldPlayerController::HandleRightClick() {
