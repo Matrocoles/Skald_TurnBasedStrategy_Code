@@ -472,8 +472,8 @@ protected:
   UPROPERTY()
   TWeakObjectPtr<UNiagaraSystem> ActiveCursorTrailTemplate;
 
-  /** Cached platform cursor shape generated from the faction texture. */
-  TSharedPtr<class ICursor> ActiveCursorShape;
+  /** Cached platform cursor handle generated from the faction texture. */
+  void *ActiveCursorHandle = nullptr;
 
   /** Tracks whether the cursor was hovering an interactable widget last tick. */
   bool bWasHoveringInteractable = false;
@@ -851,6 +851,9 @@ private:
 
   /** Determine which faction cursor should be active and apply it. */
   void RefreshFactionCursorFromState();
+
+  /** Destroy any cached platform cursor handle to avoid leaks. */
+  void ReleaseActiveCursorHandle();
 
   /** Resolve the cursor definition for the currently active faction. */
   const FFactionCursorDefinition *ResolveCursorDefinition() const;
