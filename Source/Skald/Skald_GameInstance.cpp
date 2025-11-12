@@ -40,8 +40,8 @@ using Skald::PropertyAccess::ReadIntProperty;
 using Skald::PropertyAccess::WriteBoolProperty;
 
 namespace {
-FLinearColor ResolveDefaultFactionColor(ESkaldFaction Faction) {
-  switch (Faction) {
+FLinearColor ResolveDefaultFactionColor(ESkaldFaction InFaction) {
+  switch (InFaction) {
   case ESkaldFaction::Human:
     return FLinearColor::Blue;
   case ESkaldFaction::Orc:
@@ -103,16 +103,16 @@ USkaldGameInstance::USkaldGameInstance() {
                     GetDefaultFactionColor(ESkaldFaction::Ravpack));
 }
 
-FLinearColor USkaldGameInstance::GetFactionColor(ESkaldFaction Faction) const {
-  if (const FLinearColor *Color = FactionColors.Find(Faction)) {
+FLinearColor USkaldGameInstance::GetFactionColor(ESkaldFaction InFaction) const {
+  if (const FLinearColor *Color = FactionColors.Find(InFaction)) {
     return *Color;
   }
 
-  return GetDefaultFactionColor(Faction);
+  return GetDefaultFactionColor(InFaction);
 }
 
-FLinearColor USkaldGameInstance::GetDefaultFactionColor(ESkaldFaction Faction) {
-  return ResolveDefaultFactionColor(Faction);
+FLinearColor USkaldGameInstance::GetDefaultFactionColor(ESkaldFaction InFaction) {
+  return ResolveDefaultFactionColor(InFaction);
 }
 using Skald::PropertyAccess::WriteIntProperty;
 
