@@ -31,7 +31,7 @@ struct FLobbyPlayerSlot
     UPROPERTY(BlueprintReadOnly, EditAnywhere)
     ESkaldFaction Faction = ESkaldFaction::None;
 
-    /** Ready toggle replicated to clients. */
+    /** True once the player has locked in their lobby selection. */
     UPROPERTY(BlueprintReadOnly, EditAnywhere)
     bool bIsReady = false;
 };

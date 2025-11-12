@@ -35,8 +35,8 @@ public:
     /** Assign a newly connected player to the next available human slot. */
     void AssignPlayerToSlot(ASkaldPlayerState* PlayerState);
 
-    /** Update the ready toggle for the supplied player. */
-    void SetPlayerReady(int32 PlayerId, bool bReady);
+    /** Finalise the lobby selection for the supplied player. */
+    bool LockInPlayer(int32 PlayerId);
 
     /** Update the faction choice for the supplied player. */
     bool SetPlayerFaction(int32 PlayerId, ESkaldFaction Faction);
@@ -81,5 +81,8 @@ protected:
 
     /** Once true the host can no longer change slot counts. */
     bool bSlotConfigurationLocked = false;
+
+    /** Prevents launching the match multiple times. */
+    bool bMatchLaunchInitiated = false;
 };
 

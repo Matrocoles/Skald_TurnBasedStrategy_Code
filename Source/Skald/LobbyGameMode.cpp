@@ -98,6 +98,7 @@ ALobbyGameMode::ALobbyGameMode()
     , AuthorityTotalSlots(MinLobbySlots)
     , AuthorityAISlots(0)
     , bSlotConfigurationLocked(false)
+    , bMatchLaunchInitiated(false)
 {
     bUseSeamlessTravel = true;
     GameStateClass = ALobbyGameState::StaticClass();
@@ -161,6 +162,15 @@ void ALobbyGameMode::Logout(AController* Exiting)
 
     Super::Logout(Exiting);
 
+    if (AGameStateBase* GS = GetGameState<AGameStateBase>())
+    {
+        bSlotConfigurationLocked = GS->PlayerArray.Num() > 1;
+    }
+    else
+    {
+        bSlotConfigurationLocked = false;
+    }
+
     RefreshReplicatedLobbyState();
 }
 
@@ -175,6 +185,11 @@ void ALobbyGameMode::SetTotalSlots(int32 InTotalSlots)
     AuthorityTotalSlots = FMath::Clamp(InTotalSlots, MinLobbySlots, MaxLobbySlots);
     AuthorityAISlots = FMath::Clamp(AuthorityAISlots, 0, AuthorityTotalSlots - 1);
     RefreshReplicatedLobbyState();
+
+    if (CachedLobbyState && CachedLobbyState->AreAllSlotsReady())
+    {
+        TryLaunchMatch(nullptr);
+    }
 }
 
 void ALobbyGameMode::SetAISlots(int32 InAISlots)
@@ -187,6 +202,11 @@ void ALobbyGameMode::SetAISlots(int32 InAISlots)
 
     AuthorityAISlots = FMath::Clamp(InAISlots, 0, AuthorityTotalSlots - 1);
     RefreshReplicatedLobbyState();
+
+    if (CachedLobbyState && CachedLobbyState->AreAllSlotsReady())
+    {
+        TryLaunchMatch(nullptr);
+    }
 }
 
 void ALobbyGameMode::AssignPlayerToSlot(ASkaldPlayerState* PlayerState)
@@ -235,18 +255,96 @@ void ALobbyGameMode::AssignPlayerToSlot(ASkaldPlayerState* PlayerState)
     }
 }
 
-void ALobbyGameMode::SetPlayerReady(int32 PlayerId, bool bReady)
+bool ALobbyGameMode::LockInPlayer(int32 PlayerId)
 {
+    bool bUpdated = false;
+
     for (FLobbyPlayerSlot& Slot : AuthoritySlots)
     {
-        if (Slot.PlayerId == PlayerId)
+        if (Slot.PlayerId != PlayerId)
         {
-            Slot.bIsReady = bReady;
-            break;
+            continue;
         }
+
+        if (!Slot.bIsActive || Slot.bIsAI)
+        {
+            return false;
+        }
+
+        if (Slot.bIsReady)
+        {
+            return true;
+        }
+
+        if (Slot.Faction == ESkaldFaction::None)
+        {
+            if (AGameStateBase* GS = GetGameState<AGameStateBase>())
+            {
+                for (APlayerState* PSBase : GS->PlayerArray)
+                {
+                    if (ASkaldPlayerState* PlayerState = Cast<ASkaldPlayerState>(PSBase))
+                    {
+                        if (PlayerState->GetPlayerId() == PlayerId)
+                        {
+                            if (APlayerController* OwningPC = PlayerState->GetOwner<APlayerController>())
+                            {
+                                OwningPC->ClientMessage(TEXT("Select a faction before locking in."));
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        ASkaldPlayerState* MatchedPlayerState = nullptr;
+        if (AGameStateBase* GS = GetGameState<AGameStateBase>())
+        {
+            for (APlayerState* PSBase : GS->PlayerArray)
+            {
+                if (ASkaldPlayerState* PlayerState = Cast<ASkaldPlayerState>(PSBase))
+                {
+                    if (PlayerState->GetPlayerId() == PlayerId)
+                    {
+                        MatchedPlayerState = PlayerState;
+                        break;
+                    }
+                }
+            }
+        }
+
+        const FString ResolvedName = ResolveLobbyDisplayName(MatchedPlayerState, Slot.DisplayName);
+        Slot.DisplayName = ResolvedName;
+        Slot.bIsReady = true;
+        bUpdated = true;
+
+        if (MatchedPlayerState)
+        {
+            MatchedPlayerState->PlayerDisplayName = ResolvedName;
+            if (MatchedPlayerState->GetPlayerName() != ResolvedName)
+            {
+                MatchedPlayerState->SetPlayerName(ResolvedName);
+            }
+            MatchedPlayerState->Faction = Slot.Faction;
+        }
+
+        break;
+    }
+
+    if (!bUpdated)
+    {
+        return false;
     }
 
     RefreshReplicatedLobbyState();
+
+    if (CachedLobbyState && CachedLobbyState->AreAllSlotsReady())
+    {
+        TryLaunchMatch(nullptr);
+    }
+
+    return true;
 }
 
 bool ALobbyGameMode::SetPlayerFaction(int32 PlayerId, ESkaldFaction Faction)
@@ -270,6 +368,11 @@ bool ALobbyGameMode::SetPlayerFaction(int32 PlayerId, ESkaldFaction Faction)
     {
         if (Slot.PlayerId == PlayerId)
         {
+            if (Slot.bIsReady)
+            {
+                return false;
+            }
+
             Slot.Faction = Faction;
             bUpdated = true;
             break;
@@ -314,6 +417,8 @@ bool ALobbyGameMode::SetPlayerFaction(int32 PlayerId, ESkaldFaction Faction)
 
 void ALobbyGameMode::SetPlayerDisplayName(int32 PlayerId, const FString& DisplayName)
 {
+    bool bUpdated = false;
+    bool bLockedSlot = false;
     for (FLobbyPlayerSlot& Slot : AuthoritySlots)
     {
         if (Slot.PlayerId == PlayerId)
@@ -335,7 +440,14 @@ void ALobbyGameMode::SetPlayerDisplayName(int32 PlayerId, const FString& Display
             }
 
             const FString ResolvedName = ResolveLobbyDisplayName(MatchedPlayerState, DisplayName);
+            if (Slot.bIsReady)
+            {
+                bLockedSlot = true;
+                break;
+            }
+
             Slot.DisplayName = ResolvedName;
+            bUpdated = true;
 
             if (MatchedPlayerState)
             {
@@ -349,7 +461,10 @@ void ALobbyGameMode::SetPlayerDisplayName(int32 PlayerId, const FString& Display
         }
     }
 
-    RefreshReplicatedLobbyState();
+    if (bUpdated || bLockedSlot)
+    {
+        RefreshReplicatedLobbyState();
+    }
 }
 
 void ALobbyGameMode::TryLaunchMatch(APlayerController* RequestingController)
@@ -363,10 +478,17 @@ void ALobbyGameMode::TryLaunchMatch(APlayerController* RequestingController)
     {
         if (RequestingController)
         {
-            RequestingController->ClientMessage(TEXT("All players must be ready."));
+            RequestingController->ClientMessage(TEXT("All players must lock in."));
         }
         return;
     }
+
+    if (bMatchLaunchInitiated)
+    {
+        return;
+    }
+
+    bMatchLaunchInitiated = true;
 
     if (USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>())
     {

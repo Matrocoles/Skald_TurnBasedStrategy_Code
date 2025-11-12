@@ -118,12 +118,32 @@ void ALobbyPlayerController::RequestAICount(int32 AICount)
     }
 }
 
-void ALobbyPlayerController::ToggleReadyState(bool bReady)
+void ALobbyPlayerController::RequestLockIn()
 {
-    if (IsLocalController())
+    if (!IsLocalController())
     {
-        ServerSetReady(bReady);
+        return;
     }
+
+    if (const UWorld* World = GetWorld())
+    {
+        if (const ALobbyGameState* LobbyState = World->GetGameState<ALobbyGameState>())
+        {
+            if (const ASkaldPlayerState* LocalPlayerState = GetPlayerState<ASkaldPlayerState>())
+            {
+                const int32 SlotIndex = LobbyState->FindSlotIndexForPlayer(LocalPlayerState->GetPlayerId());
+                if (const FLobbyPlayerSlot* Slot = LobbyState->GetSlot(SlotIndex))
+                {
+                    if (Slot->bIsReady)
+                    {
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    ServerLockInSelection();
 }
 
 void ALobbyPlayerController::RequestFactionSelection(ESkaldFaction Faction)
@@ -184,17 +204,6 @@ void ALobbyPlayerController::ServerSetAICount_Implementation(int32 AICount)
     }
 }
 
-void ALobbyPlayerController::ServerSetReady_Implementation(bool bReady)
-{
-    if (ALobbyGameMode* GM = GetWorld() ? GetWorld()->GetAuthGameMode<ALobbyGameMode>() : nullptr)
-    {
-        if (ASkaldPlayerState* PS = GetPlayerState<ASkaldPlayerState>())
-        {
-            GM->SetPlayerReady(PS->GetPlayerId(), bReady);
-        }
-    }
-}
-
 void ALobbyPlayerController::ServerSetFaction_Implementation(ESkaldFaction Faction)
 {
     if (ALobbyGameMode* GM = GetWorld() ? GetWorld()->GetAuthGameMode<ALobbyGameMode>() : nullptr)
@@ -227,6 +236,17 @@ void ALobbyPlayerController::ServerLaunchMatch_Implementation()
     if (ALobbyGameMode* GM = GetWorld() ? GetWorld()->GetAuthGameMode<ALobbyGameMode>() : nullptr)
     {
         GM->TryLaunchMatch(this);
+    }
+}
+
+void ALobbyPlayerController::ServerLockInSelection_Implementation()
+{
+    if (ALobbyGameMode* GM = GetWorld() ? GetWorld()->GetAuthGameMode<ALobbyGameMode>() : nullptr)
+    {
+        if (ASkaldPlayerState* PS = GetPlayerState<ASkaldPlayerState>())
+        {
+            GM->LockInPlayer(PS->GetPlayerId());
+        }
     }
 }
 

@@ -491,7 +491,7 @@ void ULobbySessionWidget::RefreshSlot(int32 SlotIndex, const FLobbyPlayerSlot& S
 
     if (Widgets.NameEdit)
     {
-        Widgets.NameEdit->SetIsEnabled(SlotData.bIsActive && !bIsAI && bIsLocal);
+        Widgets.NameEdit->SetIsEnabled(SlotData.bIsActive && !bIsAI && bIsLocal && !SlotData.bIsReady);
         Widgets.NameEdit->SetText(FText::FromString(SlotData.DisplayName));
     }
 
@@ -511,14 +511,14 @@ void ULobbySessionWidget::RefreshSlot(int32 SlotIndex, const FLobbyPlayerSlot& S
             Widgets.FactionCombo->SetSelectedOption(FactionPlaceholder);
         }
 
-        Widgets.FactionCombo->SetIsEnabled(SlotData.bIsActive && !bIsAI && bIsLocal);
+        Widgets.FactionCombo->SetIsEnabled(SlotData.bIsActive && !bIsAI && bIsLocal && !SlotData.bIsReady);
     }
 
     if (Widgets.ReadyButton && Widgets.ReadyLabel)
     {
         Widgets.ReadyButton->SetVisibility(SlotData.bIsActive && !bIsAI ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
-        Widgets.ReadyButton->SetIsEnabled(bIsLocal && !bIsAI);
-        Widgets.ReadyLabel->SetText(SlotData.bIsReady ? NSLOCTEXT("Lobby", "Unready", "Unready") : NSLOCTEXT("Lobby", "ReadyAction", "Ready"));
+        Widgets.ReadyButton->SetIsEnabled(bIsLocal && !bIsAI && !SlotData.bIsReady);
+        Widgets.ReadyLabel->SetText(SlotData.bIsReady ? NSLOCTEXT("Lobby", "LockedLabel", "Locked") : NSLOCTEXT("Lobby", "LockInAction", "Lock In"));
     }
 
     if (Widgets.StatusText)
@@ -530,12 +530,12 @@ void ULobbySessionWidget::RefreshSlot(int32 SlotIndex, const FLobbyPlayerSlot& S
         }
         else if (bIsAI)
         {
-            Widgets.StatusText->SetText(NSLOCTEXT("Lobby", "AIReady", "AI Ready"));
+            Widgets.StatusText->SetText(NSLOCTEXT("Lobby", "AILocked", "AI Locked"));
             Widgets.StatusText->SetColorAndOpacity(FSlateColor(ReadyColor));
         }
         else
         {
-            Widgets.StatusText->SetText(SlotData.bIsReady ? NSLOCTEXT("Lobby", "ReadyStatus", "Ready") : NSLOCTEXT("Lobby", "NotReadyStatus", "Not Ready"));
+            Widgets.StatusText->SetText(SlotData.bIsReady ? NSLOCTEXT("Lobby", "LockedStatus", "Locked In") : NSLOCTEXT("Lobby", "WaitingStatus", "Awaiting Lock In"));
             Widgets.StatusText->SetColorAndOpacity(FSlateColor(SlotData.bIsReady ? ReadyColor : NotReadyColor));
         }
     }
@@ -636,7 +636,10 @@ void ULobbySessionWidget::HandleReadyClicked(int32 SlotIndex)
 
     if (const FLobbyPlayerSlot* SlotData = CachedGameState->GetSlot(SlotIndex))
     {
-        CachedController->ToggleReadyState(!SlotData->bIsReady);
+        if (!SlotData->bIsReady)
+        {
+            CachedController->RequestLockIn();
+        }
     }
 }
 
