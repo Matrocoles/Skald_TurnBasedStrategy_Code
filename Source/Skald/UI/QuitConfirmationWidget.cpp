@@ -7,8 +7,8 @@
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
-#include "Kismet/KismetSystemLibrary.h"
 #include "SettingsWidget.h"
+#include "Skald_GameInstance.h"
 
 namespace
 {
@@ -158,15 +158,11 @@ void UQuitConfirmationWidget::HandleYesClicked()
         OwningSettings->ClearExitConfirmation();
     }
 
-    if (APlayerController* PC = GetOwningPlayer())
+    if (UWorld* World = GetWorld())
     {
-        UKismetSystemLibrary::QuitGame(this, PC, EQuitPreference::Quit, false);
-    }
-    else if (UWorld* World = GetWorld())
-    {
-        if (APlayerController* WorldPC = World->GetFirstPlayerController())
+        if (USkaldGameInstance* GameInstance = World->GetGameInstance<USkaldGameInstance>())
         {
-            UKismetSystemLibrary::QuitGame(this, WorldPC, EQuitPreference::Quit, false);
+            GameInstance->ReturnToMainMenu();
         }
     }
 }
