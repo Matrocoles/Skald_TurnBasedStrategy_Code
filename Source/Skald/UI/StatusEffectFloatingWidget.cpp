@@ -94,12 +94,12 @@ void UStatusEffectFloatingWidget::SetStatusLines(const TArray<FText>& Lines)
 UBuffFloatingTextWidget::UBuffFloatingTextWidget(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer)
 {
-    TextColor = FLinearColor(0.25f, 0.95f, 0.45f, 1.f);
+    TextColor = FLinearColor(0.2f, 0.55f, 1.f, 1.f);
 }
 
 UDebuffFloatingTextWidget::UDebuffFloatingTextWidget(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer)
 {
-    TextColor = FLinearColor(0.95f, 0.35f, 0.35f, 1.f);
+    TextColor = FLinearColor(0.7f, 0.35f, 0.95f, 1.f);
 }
 
