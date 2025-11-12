@@ -2896,11 +2896,14 @@ FSkaldAbilityStatDelta USkaldAbilityComponent::ApplyTargetStatDelta(AFighterPawn
     {
         if (Amount == 0)
         {
-            return;
+            return 0;
         }
 
         const int32 DeltaValue = bApply ? Amount : -Amount;
+        const int32 PreviousValue = Stat;
         Stat = FMath::Max(0, Stat + DeltaValue);
+
+        return Stat - PreviousValue;
     };
 
     auto ApplyIntDeltaAndRecord = [&](int32& Stat, int32 Amount, int32& OutRecorded)
@@ -2910,10 +2913,10 @@ FSkaldAbilityStatDelta USkaldAbilityComponent::ApplyTargetStatDelta(AFighterPawn
             return;
         }
 
-        ApplyIntDelta(Stat, Amount);
+        const int32 AppliedAmount = ApplyIntDelta(Stat, Amount);
         if (bApply)
         {
-            OutRecorded = Amount;
+            OutRecorded = AppliedAmount;
         }
     };
 
@@ -2934,11 +2937,12 @@ FSkaldAbilityStatDelta USkaldAbilityComponent::ApplyTargetStatDelta(AFighterPawn
         }
 
         const int32 DeltaValue = bApply ? Amount : -Amount;
+        const int32 PreviousValue = Target->Stats.AttackDamage;
         Target->Stats.AttackDamage = FMath::Max(0, Target->Stats.AttackDamage + DeltaValue);
 
         if (bApply)
         {
-            OutRecorded = Amount;
+            OutRecorded = Target->Stats.AttackDamage - PreviousValue;
         }
     };
 
