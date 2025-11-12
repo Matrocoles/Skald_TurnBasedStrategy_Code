@@ -835,7 +835,7 @@ private:
   void RebuildActiveStatusArrays();
 
   /** Resolve the rotation used to face floating widgets towards the camera. */
-  FRotator ResolveCameraFacingRotation() const;
+  FRotator ResolveCameraFacingRotation(const FVector &WidgetLocation) const;
 
   static bool HasAnyDeltaMagnitude(const FSkaldAbilityStatDelta &Delta);
   static FSkaldAbilityStatDelta ExtractPositiveDelta(
