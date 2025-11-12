@@ -11,6 +11,7 @@ class UUserWidget;
 class USaveGameWidget;
 class ULoadGameWidget;
 class USettingsWidget;
+class UQuitConfirmationWidget;
 /**
  * Lightweight in-game pause/menu widget surfaced from the player controller.
  */
@@ -71,6 +72,12 @@ private:
     UPROPERTY(EditDefaultsOnly, Category="Skald|Widgets")
     TSubclassOf<USettingsWidget> SettingsWidgetClass;
 
+    UPROPERTY(EditDefaultsOnly, Category="Skald|Widgets", meta=(AllowPrivateAccess="true"))
+    TSubclassOf<UQuitConfirmationWidget> QuitConfirmationWidgetClass;
+
     UPROPERTY(Transient)
     TWeakObjectPtr<UUserWidget> ActiveChildWidget;
+
+    UPROPERTY(Transient)
+    TWeakObjectPtr<UQuitConfirmationWidget> QuitConfirmationWidget;
 };

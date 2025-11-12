@@ -8,7 +8,7 @@
 #include "LoadGameWidget.h"
 #include "SaveGameWidget.h"
 #include "SettingsWidget.h"
-#include "Skald_GameInstance.h"
+#include "UI/QuitConfirmationWidget.h"
 #include "Skald_PlayerController.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Widgets/SWidget.h"
@@ -68,6 +68,8 @@ UInGameMenuWidget::UInGameMenuWidget(const FObjectInitializer& ObjectInitializer
     {
         SettingsWidgetClass = SettingsBP.Class;
     }
+
+    QuitConfirmationWidgetClass = UQuitConfirmationWidget::StaticClass();
 }
 
 void UInGameMenuWidget::NativeConstruct()
@@ -217,21 +219,35 @@ void UInGameMenuWidget::HandleSettingsClicked()
 
 void UInGameMenuWidget::HandleMainMenuClicked()
 {
-    if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(GetOwningPlayer()))
+    if (QuitConfirmationWidget.IsValid())
     {
-        FInputModeGameAndUI Mode;
-        // Clear focus explicitly with an empty shared ptr (safer than nullptr on some UE builds)
-        Mode.SetWidgetToFocus(TSharedPtr<SWidget>());
-        Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-        Mode.SetHideCursorDuringCapture(false);
-        PC->SetInputMode(Mode);
+        if (!QuitConfirmationWidget->IsInViewport())
+        {
+            QuitConfirmationWidget->AddToViewport(100);
+        }
+        return;
     }
 
-    if (UWorld* World = GetWorld())
+    const TSubclassOf<UQuitConfirmationWidget> WidgetClass = QuitConfirmationWidgetClass ? QuitConfirmationWidgetClass : UQuitConfirmationWidget::StaticClass();
+    if (!WidgetClass)
     {
-        if (USkaldGameInstance* GI = World->GetGameInstance<USkaldGameInstance>())
+        return;
+    }
+
+    if (APlayerController* PC = GetOwningPlayer())
+    {
+        if (UQuitConfirmationWidget* Widget = CreateWidget<UQuitConfirmationWidget>(PC, WidgetClass))
         {
-            GI->ReturnToMainMenu();
+            Widget->AddToViewport(100);
+            QuitConfirmationWidget = Widget;
+        }
+    }
+    else if (UWorld* World = GetWorld())
+    {
+        if (UQuitConfirmationWidget* Widget = CreateWidget<UQuitConfirmationWidget>(World, WidgetClass))
+        {
+            Widget->AddToViewport(100);
+            QuitConfirmationWidget = Widget;
         }
     }
 }
