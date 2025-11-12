@@ -56,7 +56,11 @@
 #endif
 
 #include "Framework/Application/SlateApplication.h"
+#if UE_VERSION_OLDER_THAN(5, 5, 0)
 #include "Framework/Application/IPlatformCursor.h"
+#else
+#include "Framework/Application/ICursor.h"
+#endif
 #include "Layout/WidgetPath.h"
 #include "Widgets/SWidget.h"
 #include "Widgets/SWindow.h"
@@ -84,6 +88,13 @@ constexpr float FighterDeathEffectHeightOffset = 120.f;
 constexpr int32 VeilStepRange = 3;
 const FColor VeilStepHighlightColor(128, 64, 255, 215);
 const FName VeilStepAbilityId(TEXT("Ability_Elf_Skirmish"));
+using FSkaldPlatformCursorPtr =
+#if UE_VERSION_OLDER_THAN(5, 5, 0)
+    TSharedPtr<IPlatformCursor>;
+#else
+    TSharedPtr<ICursor>;
+#endif
+
 bool IsCursorOverInteractableSlateWidget() {
   if (!FSlateApplication::IsInitialized()) {
     return false;
@@ -1720,7 +1731,7 @@ void ASkaldPlayerController::ApplyFactionCursor() {
 
   if (FSlateApplication::IsInitialized()) {
     FSlateApplication &SlateApplication = FSlateApplication::Get();
-    if (TSharedPtr<IPlatformCursor> PlatformCursor =
+    if (FSkaldPlatformCursorPtr PlatformCursor =
             SlateApplication.GetPlatformCursor()) {
       TSharedPtr<ICursor> NewCursorShape;
 
@@ -1784,7 +1795,7 @@ void ASkaldPlayerController::ClearFactionCursor() {
   ActiveCursorShape.Reset();
 
   if (IsLocalController() && FSlateApplication::IsInitialized()) {
-    if (TSharedPtr<IPlatformCursor> PlatformCursor =
+    if (FSkaldPlatformCursorPtr PlatformCursor =
             FSlateApplication::Get().GetPlatformCursor()) {
       PlatformCursor->SetTypeShape(EMouseCursor::Default, nullptr);
     }

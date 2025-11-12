@@ -44,6 +44,7 @@ class ASkald_PlayerCharacter;
 class USkaldDiceOverlayWidget;
 class USkaldDiceResultWidget;
 class USkaldDiceManager;
+class ICursor;
 
 /** Command issued by the player during a battle. */
 UENUM()
