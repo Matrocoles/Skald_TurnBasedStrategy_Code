@@ -228,7 +228,11 @@ void UInGameMenuWidget::HandleMainMenuClicked()
         return;
     }
 
-    const TSubclassOf<UQuitConfirmationWidget> WidgetClass = QuitConfirmationWidgetClass ? QuitConfirmationWidgetClass : UQuitConfirmationWidget::StaticClass();
+    TSubclassOf<UQuitConfirmationWidget> WidgetClass = QuitConfirmationWidgetClass;
+    if (!WidgetClass)
+    {
+        WidgetClass = UQuitConfirmationWidget::StaticClass();
+    }
     if (!WidgetClass)
     {
         return;
