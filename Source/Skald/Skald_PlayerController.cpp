@@ -91,13 +91,12 @@ void *CreateCursorHandleFromTexture(UTexture2D *Texture,
     return nullptr;
   }
 
-  FTexture2DMipMap &Mip = PlatformData->Mips[0];
   const int32 PixelCount = Width * Height;
   if (PixelCount <= 0) {
     return nullptr;
   }
 
-  const void *SourceData = Mip.BulkData.LockReadOnly();
+  const void *SourceData = PlatformData->Mips[0].BulkData.LockReadOnly();
   if (!SourceData) {
     return nullptr;
   }
@@ -105,7 +104,7 @@ void *CreateCursorHandleFromTexture(UTexture2D *Texture,
   TArray<FColor> Pixels;
   Pixels.SetNumUninitialized(PixelCount);
   FMemory::Memcpy(Pixels.GetData(), SourceData, PixelCount * sizeof(FColor));
-  Mip.BulkData.Unlock();
+  PlatformData->Mips[0].BulkData.Unlock();
 
   BITMAPV5HEADER BitmapHeader = {};
   BitmapHeader.bV5Size = sizeof(BITMAPV5HEADER);
@@ -142,7 +141,7 @@ void *CreateCursorHandleFromTexture(UTexture2D *Texture,
   }
 
   ICONINFO IconInfo = {};
-  IconInfo.fIcon = FALSE;
+  IconInfo.fIcon = false;
   IconInfo.xHotspot = FMath::Clamp<int32>(FMath::RoundToInt(CursorHotspot.X), 0,
                                           Width - 1);
   IconInfo.yHotspot = FMath::Clamp<int32>(FMath::RoundToInt(CursorHotspot.Y), 0,
