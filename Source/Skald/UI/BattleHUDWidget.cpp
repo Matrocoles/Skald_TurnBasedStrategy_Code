@@ -11,6 +11,7 @@
 #include "Engine/CanvasRenderTarget2D.h"
 #include "Engine/Engine.h"
 #include "Styling/SlateBrush.h"
+#include "Styling/SlateColor.h"
 #include "Engine/World.h"
 #include "FighterPawn.h"
 #include "GridOverlayComponent.h"
@@ -26,6 +27,59 @@
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
 #include "UObject/WeakObjectPtrTemplates.h"
+
+namespace {
+void AccumulateStatDelta(FSkaldAbilityStatDelta &Target,
+                         const FSkaldAbilityStatDelta &Source) {
+  Target.AttackDice += Source.AttackDice;
+  Target.AttackDamage += Source.AttackDamage;
+  Target.MeleeAttackDamage += Source.MeleeAttackDamage;
+  Target.RangedAttackDamage += Source.RangedAttackDamage;
+  Target.AttackRange += Source.AttackRange;
+  Target.Movement += Source.Movement;
+  Target.Defence += Source.Defence;
+  Target.Strength += Source.Strength;
+  Target.CriticalBonusDamage += Source.CriticalBonusDamage;
+}
+
+FSkaldAbilityStatDelta GatherNetStatDelta(const AFighterPawn *Fighter) {
+  FSkaldAbilityStatDelta TotalDelta;
+  if (!Fighter) {
+    return TotalDelta;
+  }
+
+  for (const FActiveBuff &Buff : Fighter->ActiveBuffs) {
+    AccumulateStatDelta(TotalDelta, Buff.Delta);
+  }
+
+  for (const FActiveDebuff &Debuff : Fighter->ActiveDebuffs) {
+    AccumulateStatDelta(TotalDelta, Debuff.Delta);
+  }
+
+  return TotalDelta;
+}
+
+int32 ResolveAttackDamageDelta(const AFighterPawn *Fighter,
+                               const FSkaldAbilityStatDelta &Delta) {
+  int32 Result = Delta.AttackDamage;
+  if (!Fighter) {
+    return Result;
+  }
+
+  switch (Fighter->GetAttackType()) {
+  case EFighterAttackType::Melee:
+    Result += Delta.MeleeAttackDamage;
+    break;
+  case EFighterAttackType::Ranged:
+    Result += Delta.RangedAttackDamage;
+    break;
+  default:
+    break;
+  }
+
+  return Result;
+}
+} // namespace
 
 UBattleHUDWidget::UBattleHUDWidget(const FObjectInitializer &ObjectInitializer)
     : Super(ObjectInitializer) {
@@ -165,6 +219,25 @@ void UBattleHUDWidget::NativeConstruct() {
       FloaterPool->FloaterWidgetClass = FloaterWidgetClass;
     }
   }
+
+  CacheDefaultTextColor(HealthText);
+  CacheDefaultTextColor(AttackText);
+  CacheDefaultTextColor(CriticalDamageText);
+  CacheDefaultTextColor(MoveText);
+  CacheDefaultTextColor(ActionsText);
+  CacheDefaultTextColor(StrengthText);
+  CacheDefaultTextColor(DefenceText);
+  CacheDefaultTextColor(AttackRangeText);
+  CacheDefaultTextColor(AttackDiceText);
+  CacheDefaultTextColor(EnemyHealthText);
+  CacheDefaultTextColor(EnemyAttackText);
+  CacheDefaultTextColor(EnemyCriticalDamageText);
+  CacheDefaultTextColor(EnemyMoveText);
+  CacheDefaultTextColor(EnemyActionsText);
+  CacheDefaultTextColor(EnemyStrengthText);
+  CacheDefaultTextColor(EnemyDefenceText);
+  CacheDefaultTextColor(EnemyAttackRangeText);
+  CacheDefaultTextColor(EnemyAttackDiceText);
 }
 
 void UBattleHUDWidget::NativeTick(const FGeometry &MyGeometry,
@@ -987,9 +1060,7 @@ void UBattleHUDWidget::HandleHealthChanged(int32 NewHealth) {
     return;
   }
 
-  if (HealthText) {
-    HealthText->SetText(FText::AsNumber(NewHealth));
-  }
+  ApplyStatText(HealthText, NewHealth, 0);
 }
 
 void UBattleHUDWidget::HandleActionsChanged(int32 NewActions) {
@@ -997,9 +1068,7 @@ void UBattleHUDWidget::HandleActionsChanged(int32 NewActions) {
     return;
   }
 
-  if (ActionsText) {
-    ActionsText->SetText(FText::AsNumber(NewActions));
-  }
+  ApplyStatText(ActionsText, NewActions, 0);
 
   UpdateActionButtonVisibility();
   RefreshAbilityDisplay();
@@ -1031,53 +1100,63 @@ void UBattleHUDWidget::UpdateStatPanel() {
 }
 
 void UBattleHUDWidget::UpdateEnemyStatPanel(AFighterPawn *Fighter) {
-  DisplayedEnemyStatFighter = Fighter;
-  if (Fighter) {
-    KnownEnemyFighters.Add(Fighter);
+  AFighterPawn *ResolvedFighter = Fighter;
+  if (ResolvedFighter && IsFriendlyCandidate(ResolvedFighter)) {
+    ResolvedFighter = nullptr;
   }
-  if (!Fighter) {
+
+  if (!ResolvedFighter) {
     ClearEnemyStatPanel();
     return;
   }
 
-  const auto SetTextAndVisibility = [](UTextBlock *Widget, const FText &Value) {
-    if (Widget) {
-      Widget->SetText(Value);
-      Widget->SetVisibility(ESlateVisibility::HitTestInvisible);
-    }
-  };
+  DisplayedEnemyStatFighter = ResolvedFighter;
+  KnownEnemyFighters.Add(ResolvedFighter);
 
-  SetTextAndVisibility(EnemyHealthText, FText::AsNumber(Fighter->Stats.Health));
-  SetTextAndVisibility(EnemyAttackText,
-                       FText::AsNumber(Fighter->Stats.AttackDamage));
+  const FSkaldAbilityStatDelta NetDelta = GatherNetStatDelta(ResolvedFighter);
+  const int32 AttackDamageDelta =
+      ResolveAttackDamageDelta(ResolvedFighter, NetDelta);
+  const int32 CriticalDamageDelta =
+      AttackDamageDelta + NetDelta.CriticalBonusDamage;
+
+  ApplyStatTextWithVisibility(EnemyHealthText,
+                              ResolvedFighter->Stats.Health, 0);
+  ApplyStatTextWithVisibility(EnemyAttackText,
+                              ResolvedFighter->Stats.AttackDamage,
+                              AttackDamageDelta);
 
   if (EnemyCriticalDamageText) {
-    const int32 CriticalDamage = Fighter->Stats.AttackDamage +
-                                 Fighter->Stats.CriticalBonusDamage;
-    SetTextAndVisibility(EnemyCriticalDamageText,
-                         FText::AsNumber(CriticalDamage));
+    const int32 CriticalDamage = ResolvedFighter->Stats.AttackDamage +
+                                 ResolvedFighter->Stats.CriticalBonusDamage;
+    ApplyStatTextWithVisibility(EnemyCriticalDamageText, CriticalDamage,
+                                CriticalDamageDelta);
   }
 
-  SetTextAndVisibility(EnemyMoveText,
-                       FText::AsNumber(Fighter->Stats.Movement));
-  SetTextAndVisibility(EnemyActionsText,
-                       FText::AsNumber(Fighter->ActionsRemaining));
-  SetTextAndVisibility(EnemyStrengthText,
-                       FText::AsNumber(Fighter->Stats.Strength));
-  SetTextAndVisibility(EnemyDefenceText,
-                       FText::AsNumber(Fighter->Stats.Defence));
-  SetTextAndVisibility(EnemyAttackRangeText,
-                       FText::AsNumber(Fighter->Stats.AttackRange));
-  SetTextAndVisibility(EnemyAttackDiceText,
-                       FText::AsNumber(Fighter->Stats.AttackDice));
+  ApplyStatTextWithVisibility(EnemyMoveText, ResolvedFighter->Stats.Movement,
+                              NetDelta.Movement);
+  ApplyStatTextWithVisibility(EnemyActionsText,
+                              ResolvedFighter->ActionsRemaining, 0);
+  ApplyStatTextWithVisibility(EnemyStrengthText,
+                              ResolvedFighter->Stats.Strength,
+                              NetDelta.Strength);
+  ApplyStatTextWithVisibility(EnemyDefenceText,
+                              ResolvedFighter->Stats.Defence,
+                              NetDelta.Defence);
+  ApplyStatTextWithVisibility(EnemyAttackRangeText,
+                              ResolvedFighter->Stats.AttackRange,
+                              NetDelta.AttackRange);
+  ApplyStatTextWithVisibility(EnemyAttackDiceText,
+                              ResolvedFighter->Stats.AttackDice,
+                              NetDelta.AttackDice);
 
   if (EnemyFighterNameText) {
-    EnemyFighterNameText->SetText(FText::FromName(Fighter->GetFighterId()));
+    EnemyFighterNameText->SetText(
+        FText::FromName(ResolvedFighter->GetFighterId()));
     EnemyFighterNameText->SetVisibility(ESlateVisibility::HitTestInvisible);
   }
 
   if (EnemyFighterImage) {
-    if (UTexture2D *PortraitTexture = Fighter->GetPortraitTexture()) {
+    if (UTexture2D *PortraitTexture = ResolvedFighter->GetPortraitTexture()) {
       EnemyFighterImage->SetBrushFromTexture(PortraitTexture);
       EnemyFighterImage->SetVisibility(ESlateVisibility::HitTestInvisible);
     } else {
@@ -1087,7 +1166,7 @@ void UBattleHUDWidget::UpdateEnemyStatPanel(AFighterPawn *Fighter) {
   }
 
   UpdatePassiveAbilityIcon(EnemyPassiveAbilityIcon,
-                           ResolvePassiveAbilityDefinition(Fighter));
+                           ResolvePassiveAbilityDefinition(ResolvedFighter));
 }
 
 void UBattleHUDWidget::ClearEnemyStatPanel() {
@@ -1116,6 +1195,16 @@ void UBattleHUDWidget::ClearEnemyStatPanel() {
   ClearTextAndHide(EnemyAttackDiceText);
   ClearTextAndHide(EnemyFighterNameText);
 
+  ResetStatTextColor(EnemyHealthText);
+  ResetStatTextColor(EnemyAttackText);
+  ResetStatTextColor(EnemyCriticalDamageText);
+  ResetStatTextColor(EnemyMoveText);
+  ResetStatTextColor(EnemyActionsText);
+  ResetStatTextColor(EnemyStrengthText);
+  ResetStatTextColor(EnemyDefenceText);
+  ResetStatTextColor(EnemyAttackRangeText);
+  ResetStatTextColor(EnemyAttackDiceText);
+
   if (EnemyFighterImage) {
     EnemyFighterImage->SetBrushFromTexture(nullptr);
     EnemyFighterImage->SetVisibility(ESlateVisibility::Collapsed);
@@ -1131,25 +1220,23 @@ void UBattleHUDWidget::ApplyPrimaryFighterDisplay(AFighterPawn *Fighter) {
     return;
   }
 
-  const auto SetNumericText = [](UTextBlock *Widget, int32 Value) {
-    if (Widget) {
-      Widget->SetText(FText::AsNumber(Value));
-    }
-  };
+  const FSkaldAbilityStatDelta NetDelta = GatherNetStatDelta(Fighter);
+  const int32 AttackDamageDelta = ResolveAttackDamageDelta(Fighter, NetDelta);
+  const int32 CriticalDamageDelta = AttackDamageDelta + NetDelta.CriticalBonusDamage;
 
-  SetNumericText(HealthText, Fighter->Stats.Health);
-  SetNumericText(AttackText, Fighter->Stats.AttackDamage);
-  SetNumericText(MoveText, Fighter->Stats.Movement);
-  SetNumericText(ActionsText, Fighter->ActionsRemaining);
-  SetNumericText(StrengthText, Fighter->Stats.Strength);
-  SetNumericText(DefenceText, Fighter->Stats.Defence);
-  SetNumericText(AttackRangeText, Fighter->Stats.AttackRange);
-  SetNumericText(AttackDiceText, Fighter->Stats.AttackDice);
+  ApplyStatText(HealthText, Fighter->Stats.Health, 0);
+  ApplyStatText(AttackText, Fighter->Stats.AttackDamage, AttackDamageDelta);
+  ApplyStatText(MoveText, Fighter->Stats.Movement, NetDelta.Movement);
+  ApplyStatText(ActionsText, Fighter->ActionsRemaining, 0);
+  ApplyStatText(StrengthText, Fighter->Stats.Strength, NetDelta.Strength);
+  ApplyStatText(DefenceText, Fighter->Stats.Defence, NetDelta.Defence);
+  ApplyStatText(AttackRangeText, Fighter->Stats.AttackRange, NetDelta.AttackRange);
+  ApplyStatText(AttackDiceText, Fighter->Stats.AttackDice, NetDelta.AttackDice);
 
   if (CriticalDamageText) {
     const int32 CriticalDamage =
         Fighter->Stats.AttackDamage + Fighter->Stats.CriticalBonusDamage;
-    CriticalDamageText->SetText(FText::AsNumber(CriticalDamage));
+    ApplyStatText(CriticalDamageText, CriticalDamage, CriticalDamageDelta);
   }
 
   if (FighterNameText) {
@@ -1185,6 +1272,16 @@ void UBattleHUDWidget::ClearPrimaryStatPanel() {
   ClearText(DefenceText);
   ClearText(AttackRangeText);
   ClearText(AttackDiceText);
+
+  ResetStatTextColor(HealthText);
+  ResetStatTextColor(AttackText);
+  ResetStatTextColor(CriticalDamageText);
+  ResetStatTextColor(MoveText);
+  ResetStatTextColor(ActionsText);
+  ResetStatTextColor(StrengthText);
+  ResetStatTextColor(DefenceText);
+  ResetStatTextColor(AttackRangeText);
+  ResetStatTextColor(AttackDiceText);
 
   if (FighterNameText) {
     FighterNameText->SetText(FText::GetEmpty());
@@ -2447,6 +2544,55 @@ UCombatFloaterPoolSubsystem *UBattleHUDWidget::ResolveFloaterPool() {
   }
 
   return nullptr;
+}
+
+void UBattleHUDWidget::CacheDefaultTextColor(UTextBlock *Widget) {
+  if (!Widget) {
+    return;
+  }
+
+  if (!CachedDefaultTextColors.Contains(Widget)) {
+    CachedDefaultTextColors.Add(Widget, Widget->GetColorAndOpacity());
+  }
+}
+
+void UBattleHUDWidget::ResetStatTextColor(UTextBlock *Widget) {
+  if (!Widget) {
+    return;
+  }
+
+  if (const FSlateColor *DefaultColor = CachedDefaultTextColors.Find(Widget)) {
+    Widget->SetColorAndOpacity(*DefaultColor);
+  }
+}
+
+void UBattleHUDWidget::ApplyStatText(UTextBlock *Widget, int32 Value,
+                                     int32 NetDelta) {
+  if (!Widget) {
+    return;
+  }
+
+  CacheDefaultTextColor(Widget);
+  Widget->SetText(FText::AsNumber(Value));
+
+  if (NetDelta > 0) {
+    Widget->SetColorAndOpacity(FSlateColor(BuffStatTextColor));
+  } else if (NetDelta < 0) {
+    Widget->SetColorAndOpacity(FSlateColor(DebuffStatTextColor));
+  } else {
+    ResetStatTextColor(Widget);
+  }
+}
+
+void UBattleHUDWidget::ApplyStatTextWithVisibility(UTextBlock *Widget,
+                                                   int32 Value,
+                                                   int32 NetDelta) {
+  if (!Widget) {
+    return;
+  }
+
+  Widget->SetVisibility(ESlateVisibility::HitTestInvisible);
+  ApplyStatText(Widget, Value, NetDelta);
 }
 
 void UBattleHUDWidget::SetDefaultDiceResolutionPanelLayout(

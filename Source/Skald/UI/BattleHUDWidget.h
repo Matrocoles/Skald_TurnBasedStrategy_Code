@@ -6,6 +6,7 @@
 #include "TimerManager.h"
 #include "UI/W_DiceResolutionPanel.h"
 #include "Abilities/SkaldAbilityComponent.h"
+#include "Styling/SlateColor.h"
 #include "BattleHUDWidget.generated.h"
 
 class UButton;
@@ -319,6 +320,14 @@ public:
   /** Text displaying enemy attack dice during attack resolution. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *EnemyAttackDiceText;
+
+  /** Tint applied to stats that are currently buffed. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skald|Battle|Stats")
+  FLinearColor BuffStatTextColor = FLinearColor(0.2f, 0.55f, 1.f, 1.f);
+
+  /** Tint applied to stats that are currently debuffed. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skald|Battle|Stats")
+  FLinearColor DebuffStatTextColor = FLinearColor(0.7f, 0.35f, 0.95f, 1.f);
 
   /** Text that briefly displays the most recently triggered ability. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
@@ -676,6 +685,11 @@ private:
   void UpdateCombatFloaters(float DeltaSeconds);
   void ReleaseFloaterAtIndex(int32 Index);
   UCombatFloaterPoolSubsystem *ResolveFloaterPool();
+  void CacheDefaultTextColor(class UTextBlock *Widget);
+  void ResetStatTextColor(class UTextBlock *Widget);
+  void ApplyStatText(class UTextBlock *Widget, int32 Value, int32 NetDelta);
+  void ApplyStatTextWithVisibility(class UTextBlock *Widget, int32 Value,
+                                   int32 NetDelta);
 
   /** Class used to spawn floaters via the shared subsystem. */
   UPROPERTY(EditAnywhere, Category = "Skald|Battle|Floaters")
@@ -752,6 +766,9 @@ private:
   bool bHealthTextHoldActive = false;
   bool bHasPendingHealthTextValue = false;
   int32 PendingHealthTextValue = 0;
+
+  /** Default colours captured from stat text widgets. */
+  TMap<UTextBlock *, FSlateColor> CachedDefaultTextColors;
 
   /** Whether movement preview is currently shown. */
   bool bMoveSelected = false;

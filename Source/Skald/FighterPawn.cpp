@@ -121,6 +121,7 @@ AFighterPawn::AFighterPawn() : MaxHealth(0) {
   BuffStatusWidget->SetDrawAtDesiredSize(true);
   BuffStatusWidget->SetRelativeLocation(
       FVector(0.f, WidgetMirrorSeparation, BuffStatusWidgetHeight));
+  BuffStatusWidget->SetRelativeRotation(FRotator(0.f, 90.f, 0.f));
   BuffStatusWidget->SetCollisionEnabled(ECollisionEnabled::NoCollision);
   BuffStatusWidget->SetCollisionProfileName(
       UCollisionProfile::NoCollision_ProfileName);
@@ -137,6 +138,7 @@ AFighterPawn::AFighterPawn() : MaxHealth(0) {
   DebuffStatusWidget->SetDrawAtDesiredSize(true);
   DebuffStatusWidget->SetRelativeLocation(
       FVector(0.f, WidgetMirrorSeparation, DebuffStatusWidgetHeight));
+  DebuffStatusWidget->SetRelativeRotation(FRotator(0.f, 90.f, 0.f));
   DebuffStatusWidget->SetCollisionEnabled(ECollisionEnabled::NoCollision);
   DebuffStatusWidget->SetCollisionProfileName(
       UCollisionProfile::NoCollision_ProfileName);
