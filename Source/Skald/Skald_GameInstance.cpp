@@ -1195,7 +1195,7 @@ void USkaldGameInstance::ResetSessionState() {
 }
 
 bool USkaldGameInstance::ConsumePendingLobbyPlayerData(int32 PlayerId,
-                                                       const FString &DisplayName,
+                                                       const FString &InDisplayName,
                                                        FS_PlayerData &OutData) {
   auto Normalise = [](const FString &InValue) {
     FString Result = InValue;
@@ -1211,7 +1211,7 @@ bool USkaldGameInstance::ConsumePendingLobbyPlayerData(int32 PlayerId,
   }
 
   if (MatchedIndex == INDEX_NONE) {
-    const FString NormalisedName = Normalise(DisplayName);
+    const FString NormalisedName = Normalise(InDisplayName);
     if (!NormalisedName.IsEmpty()) {
       MatchedIndex = PendingLobbyPlayers.IndexOfByPredicate(
           [&NormalisedName, &Normalise](const FS_PlayerData &Data) {
