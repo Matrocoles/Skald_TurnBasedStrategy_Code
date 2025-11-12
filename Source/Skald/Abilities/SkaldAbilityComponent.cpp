@@ -81,6 +81,7 @@ USkaldAbilityComponent::USkaldAbilityComponent()
     bShieldWallPivotActive = false;
     ShieldWallPivotProtectedAlly.Reset();
     TacticalReservesRefreshedThisRound.Empty();
+    bEmpirePassiveDefenceBonusActive = false;
     bSmashThroughActive = false;
     bForgeguardBraceReady = false;
     bDeepDelveMortarPending = false;
@@ -202,6 +203,7 @@ void USkaldAbilityComponent::RefreshAbilityLoadout(const FFighterStats& InStats,
     DwarfPassiveAdjacentCount = 0;
     PassiveVisualStackCounts.Empty();
     FactionsThatAttackedOwnerThisRound.Reset();
+    bEmpirePassiveDefenceBonusActive = false;
     if (AFighterPawn* Fighter = CachedFighter.Get())
     {
         Fighter->ClearAllPassiveBuffIndicators();
@@ -210,6 +212,7 @@ void USkaldAbilityComponent::RefreshAbilityLoadout(const FFighterStats& InStats,
     }
 
     RemoveModifiersByAbilityId(LowHealthPenaltyId);
+    RemoveModifiersByAbilityId(TEXT("Ability_Empire_Passive"));
 
     FSkaldFactionAbilitySet AbilitySet;
     const bool bFoundAbilitySet = TryResolveFactionAbilitySet(InFaction, AbilitySet);
@@ -1856,6 +1859,10 @@ void USkaldAbilityComponent::RefreshPassiveState()
     {
         RefreshDwarfPassive();
     }
+    else if (PassiveAbility.AbilityId == TEXT("Ability_Empire_Passive"))
+    {
+        RefreshEmpirePassive();
+    }
 }
 
 void USkaldAbilityComponent::RefreshAllPassiveStates()
@@ -1921,6 +1928,43 @@ void USkaldAbilityComponent::RefreshDwarfPassive()
         FSkaldActiveAbilityModifier Modifier;
         Modifier.SourceAbilityId = PassiveAbility.AbilityId;
         Modifier.Delta.Defence = AdjacentCount;
+        AddActiveModifier(MoveTemp(Modifier));
+    }
+}
+
+void USkaldAbilityComponent::RefreshEmpirePassive()
+{
+    if (!CachedFighter.IsValid())
+    {
+        return;
+    }
+
+    if (!CachedBattleManager.IsValid())
+    {
+        TryRegisterBattleDelegates();
+    }
+
+    if (!CachedBattleManager.IsValid())
+    {
+        return;
+    }
+
+    AFighterPawn* Fighter = CachedFighter.Get();
+    const bool bShouldBeActive = CountAdjacentEnemies(Fighter) >= 2;
+
+    if (bShouldBeActive == bEmpirePassiveDefenceBonusActive)
+    {
+        return;
+    }
+
+    RemoveModifiersByAbilityId(PassiveAbility.AbilityId);
+    bEmpirePassiveDefenceBonusActive = bShouldBeActive;
+
+    if (bEmpirePassiveDefenceBonusActive)
+    {
+        FSkaldActiveAbilityModifier Modifier;
+        Modifier.SourceAbilityId = PassiveAbility.AbilityId;
+        Modifier.Delta.Defence = 1;
         AddActiveModifier(MoveTemp(Modifier));
     }
 }
@@ -2003,6 +2047,36 @@ int32 USkaldAbilityComponent::CountAdjacentFactionAllies(
         }
 
         if (Other->Faction != Faction || Other->Stats.Health <= 0)
+        {
+            continue;
+        }
+
+        if (Fighter->GetFootprintDistanceToFighter(Other) <= 1)
+        {
+            ++Count;
+        }
+    }
+
+    return Count;
+}
+
+int32 USkaldAbilityComponent::CountAdjacentEnemies(AFighterPawn* Fighter) const
+{
+    if (!Fighter || !CachedBattleManager.IsValid())
+    {
+        return 0;
+    }
+
+    int32 Count = 0;
+    const TArray<AFighterPawn*> Fighters = CachedBattleManager->GetInitiativeOrderSnapshot();
+    for (AFighterPawn* Other : Fighters)
+    {
+        if (!Other || Other == Fighter)
+        {
+            continue;
+        }
+
+        if (Other->Faction == Fighter->Faction || Other->Stats.Health <= 0)
         {
             continue;
         }

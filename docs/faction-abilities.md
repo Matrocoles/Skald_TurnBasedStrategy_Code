@@ -61,7 +61,7 @@ Individual armies can nudge thresholds up or down if data-table tuning warrants 
 
 ## IronLegion Faction
 
-* **Passive – Iron Discipline:** Iron Legion fighters shrug off hesitation, ignoring the first `-1` penalty from fear or debuff effects applied to them each round.
+* **Passive – Iron Resolve:** When an Iron Legion fighter is adjacent to two or more enemies, they gain `+1 Defence`.
 * **Skirmish Ability – Suppressing Fire (Action):** Attack at range with `-1 AttackDamage`; on hit, the target suffers `-2 Movement` and cannot take reactions until its next activation.
 * **Line Ability – Officer’s Command (Free, once per round):** After rolling attack dice, may transfer one unused hit to an adjacent ally’s pending attack before results are resolved.
 * **Elite Ability – Artillery Strike (Action, spend 2 actions, cooldown 2 rounds):** Spend 2 actions to call artillery on a visible tile. Immediately roll an attack with `+2 AttackDamage` against all units within 2 squares (allies take half damage).
