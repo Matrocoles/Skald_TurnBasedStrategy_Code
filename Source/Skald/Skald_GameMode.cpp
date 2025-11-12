@@ -281,7 +281,7 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
     GS->AddPlayerState(PS);
   }
 
-  if (!TurnManager && !bIsMultiplayer) {
+  if (!TurnManager) {
     TurnManager = ResolveTurnManager();
   }
 
