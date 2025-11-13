@@ -26,6 +26,7 @@ class ASkaldPlayerState;
 class UTexture2D;
 class UDiceRollConfig;
 class USkaldDiceManager;
+class USkaldToolTipWidget;
 
 USTRUCT(BlueprintType)
 struct FSkaldTravelState
@@ -95,6 +96,10 @@ public:
 
   /** Default faction colours used when no override has been configured. */
   static FLinearColor GetDefaultFactionColor(ESkaldFaction InFaction);
+
+  /** Tooltip widget type applied globally to all UMG tooltips. */
+  UPROPERTY(EditDefaultsOnly, Category = "UI")
+  TSubclassOf<UUserWidget> ToolTipWidgetClass;
 
   /** Player chosen display name. */
   UPROPERTY(BlueprintReadWrite, Category = "Player")
