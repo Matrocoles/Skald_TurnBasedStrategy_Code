@@ -210,6 +210,7 @@ ASkaldPlayerController::ASkaldPlayerController() {
   CurrentFaction = ESkaldFaction::None;
   ActiveCursorTrailFX = nullptr;
   ActiveCursorTrailTemplate.Reset();
+  ActiveCursorTrailOffset = FVector::ZeroVector;
   bWasHoveringInteractable = false;
 
   bShowMouseCursor = true;
@@ -1785,11 +1786,14 @@ void ASkaldPlayerController::ApplyFactionCursor() {
     return;
   }
 
+  ActiveCursorTrailOffset = FVector::ZeroVector;
   const FFactionCursorDefinition *Definition = ResolveCursorDefinition();
   if (!Definition) {
     ClearFactionCursor();
     return;
   }
+
+  ActiveCursorTrailOffset = Definition->CursorTrailOffset;
 
   UTexture2D *CursorTexture =
       Definition->CursorTexture.IsNull()
@@ -1827,6 +1831,7 @@ void ASkaldPlayerController::ApplyFactionCursor() {
       ActiveCursorTrailFX = nullptr;
       ActiveCursorTrailTemplate.Reset();
     }
+    ActiveCursorTrailOffset = FVector::ZeroVector;
   } else {
     UNiagaraSystem *Trail = Definition->CursorTrailFX.LoadSynchronous();
     if (Trail) {
@@ -1863,6 +1868,7 @@ void ASkaldPlayerController::ClearFactionCursor() {
     ActiveCursorTrailFX = nullptr;
   }
   ActiveCursorTrailTemplate.Reset();
+  ActiveCursorTrailOffset = FVector::ZeroVector;
   if (IsLocalController()) {
     SetMouseCursorWidget(EMouseCursor::Default, nullptr);
     if (ActiveCursorWidget) {
@@ -1921,7 +1927,8 @@ void ASkaldPlayerController::UpdateCursorFX() {
     return;
   }
 
-  ActiveCursorTrailFX->SetWorldLocation(WorldPos + WorldDir * 50.f);
+  ActiveCursorTrailFX->SetWorldLocation(WorldPos + WorldDir * 50.f +
+                                        ActiveCursorTrailOffset);
 }
 
 void ASkaldPlayerController::OnRep_PlayerState() {
