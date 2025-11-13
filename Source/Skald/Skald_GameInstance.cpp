@@ -2,7 +2,6 @@
 
 #include "Engine/World.h"
 #include "Engine/Engine.h"
-#include "Framework/Application/SlateApplication.h"
 #include "Misc/EngineVersionComparison.h"
 #include "Misc/CoreDelegates.h"
 #if UE_VERSION_OLDER_THAN(5, 5, 0)
@@ -27,7 +26,6 @@
 #include "Styling/CoreStyle.h"
 #include "UI/SkaldUIHelpers.h"
 #include "UI/SkaldMainHUDWidget.h"
-#include "UI/SkaldToolTipWidget.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/SOverlay.h"
@@ -76,7 +74,6 @@ FLinearColor ResolveDefaultFactionColor(ESkaldFaction InFaction) {
 } // namespace
 
 USkaldGameInstance::USkaldGameInstance() {
-  ToolTipWidgetClass = USkaldToolTipWidget::StaticClass();
   FactionColors.Reserve(static_cast<int32>(ESkaldFaction::Ravpack) + 2);
   FactionColors.Add(ESkaldFaction::None,
                     GetDefaultFactionColor(ESkaldFaction::None));
@@ -125,13 +122,6 @@ constexpr float SnapshotRetryDelaySeconds = 0.01f;
 
 void USkaldGameInstance::Init() {
   Super::Init();
-  if (FSlateApplication::IsInitialized()) {
-    UClass *DesiredToolTipClass =
-        ToolTipWidgetClass ? ToolTipWidgetClass.Get()
-                           : USkaldToolTipWidget::StaticClass();
-    FSlateApplication::Get().SetDefaultToolTipType(DesiredToolTipClass);
-    FSlateApplication::Get().SetToolTipForceFieldEnabled(true);
-  }
   SeedCombatRandomStream(FMath::Rand());
   TakenFactions.Empty();
   if (Faction != ESkaldFaction::None) {
