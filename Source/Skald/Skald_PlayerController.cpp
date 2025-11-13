@@ -56,16 +56,10 @@
 #endif
 
 #include "Framework/Application/SlateApplication.h"
-#if UE_VERSION_OLDER_THAN(5, 5, 0)
-#include "Framework/Application/IPlatformCursor.h"
-#else
 #include "GenericPlatform/ICursor.h"
-#endif
 #include "Layout/WidgetPath.h"
 #include "Widgets/SWidget.h"
 #include "Widgets/SWindow.h"
-
-#include "Rendering/SlateRenderer.h"
 
 #include "Net/UnrealNetwork.h"
 
@@ -116,11 +110,6 @@ bool IsCursorOverInteractableSlateWidget() {
 }
 }
 
-#if UE_VERSION_OLDER_THAN(5, 5, 0)
-using FSkaldPlatformCursorPtr = TSharedPtr<IPlatformCursor>;
-#else
-using FSkaldPlatformCursorPtr = TSharedPtr<ICursor>;
-#endif
 
 ASkald_BattleGameMode *ASkaldPlayerController::ResolveBattleGameMode() {
   if (UWorld *World = GetWorld()) {
@@ -1731,22 +1720,21 @@ void ASkaldPlayerController::ApplyFactionCursor() {
 
   if (FSlateApplication::IsInitialized()) {
     FSlateApplication &SlateApplication = FSlateApplication::Get();
-    if (FSkaldPlatformCursorPtr PlatformCursor =
-            SlateApplication.GetPlatformCursor()) {
-      TSharedPtr<ICursor> NewCursorShape;
+    const TSharedPtr<ICursor> PlatformCursor = SlateApplication.GetPlatformCursor();
+    if (PlatformCursor.IsValid()) {
+      const FString CursorPath =
+          Definition->CursorTexture.IsNull()
+              ? FString()
+              : Definition->CursorTexture.ToSoftObjectPath().ToString();
 
-      if (UTexture2D *Texture = Definition->CursorTexture.LoadSynchronous()) {
-        ISlateRenderer &Renderer = SlateApplication.GetRenderer();
-        const TSharedPtr<ICursor> GeneratedCursor =
-            Renderer.CreateCursorFromTexture(Texture,
-                                             Definition->CursorHotspot);
-        if (GeneratedCursor.IsValid()) {
-          NewCursorShape = GeneratedCursor;
-        }
+      if (!CursorPath.IsEmpty()) {
+        SlateApplication.SetHardwareCursor(EMouseCursor::Default,
+                                           FName(*CursorPath),
+                                           Definition->CursorHotspot);
+      } else {
+        SlateApplication.SetHardwareCursor(EMouseCursor::Default, NAME_None,
+                                           FVector2D::ZeroVector);
       }
-
-      ActiveCursorShape = NewCursorShape;
-      PlatformCursor->SetTypeShape(EMouseCursor::Default, ActiveCursorShape);
     }
   }
 
@@ -1792,12 +1780,12 @@ void ASkaldPlayerController::ClearFactionCursor() {
     ActiveCursorTrailFX = nullptr;
   }
   ActiveCursorTrailTemplate.Reset();
-  ActiveCursorShape.Reset();
-
   if (IsLocalController() && FSlateApplication::IsInitialized()) {
-    if (FSkaldPlatformCursorPtr PlatformCursor =
-            FSlateApplication::Get().GetPlatformCursor()) {
-      PlatformCursor->SetTypeShape(EMouseCursor::Default, nullptr);
+    const TSharedPtr<ICursor> PlatformCursor =
+        FSlateApplication::Get().GetPlatformCursor();
+    if (PlatformCursor.IsValid()) {
+      FSlateApplication::Get().SetHardwareCursor(EMouseCursor::Default, NAME_None,
+                                                FVector2D::ZeroVector);
     }
   }
 
