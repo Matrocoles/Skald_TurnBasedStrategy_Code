@@ -935,6 +935,7 @@ private:
   void UpdatePassiveAbilityIcon(UImage *IconWidget,
                                 const FSkaldAbilityDefinition &Definition);
   FSkaldAbilityDefinition ResolvePassiveAbilityDefinition(AFighterPawn *Fighter) const;
+  FSkaldAbilityDefinition ResolveTieredAbilityDefinition(AFighterPawn *Fighter) const;
   FText BuildAbilityTooltipText(const FSkaldAbilityDefinition &Definition) const;
   void ApplyTooltipToWidget(UWidget *Widget, const FText &TooltipText) const;
   void HideAbilityTriggeredText();

@@ -1183,9 +1183,12 @@ void UBattleHUDWidget::UpdateEnemyStatPanel(AFighterPawn *Fighter) {
     }
   }
 
+  const FSkaldAbilityDefinition TieredAbility =
+      ResolveTieredAbilityDefinition(ResolvedFighter);
+  UpdateEnemyAbilityText(TieredAbility);
+
   const FSkaldAbilityDefinition PassiveAbility =
       ResolvePassiveAbilityDefinition(ResolvedFighter);
-  UpdateEnemyAbilityText(PassiveAbility);
   UpdatePassiveAbilityIcon(EnemyPassiveAbilityIcon, PassiveAbility);
 }
 
@@ -1249,7 +1252,11 @@ void UBattleHUDWidget::UpdateEnemyAbilityText(
 
   EnemyAbilityText->SetText(Definition.AbilityName);
   EnemyAbilityText->SetVisibility(ESlateVisibility::HitTestInvisible);
-  ApplyTooltipToWidget(EnemyAbilityText, BuildAbilityTooltipText(Definition));
+
+  const FText TooltipText = !Definition.AbilityDescription.IsEmpty()
+                                ? Definition.AbilityDescription
+                                : BuildAbilityTooltipText(Definition);
+  ApplyTooltipToWidget(EnemyAbilityText, TooltipText);
 }
 
 void UBattleHUDWidget::ApplyPrimaryFighterDisplay(AFighterPawn *Fighter) {
@@ -1705,6 +1712,23 @@ UBattleHUDWidget::ResolvePassiveAbilityDefinition(AFighterPawn *Fighter) const {
   if (USkaldAbilityComponent *AbilityComponent =
           Fighter->GetAbilityComponent()) {
     return AbilityComponent->GetPassiveAbility();
+  }
+
+  return FSkaldAbilityDefinition();
+}
+
+FSkaldAbilityDefinition
+UBattleHUDWidget::ResolveTieredAbilityDefinition(AFighterPawn *Fighter) const {
+  if (!Fighter) {
+    return FSkaldAbilityDefinition();
+  }
+
+  if (USkaldAbilityComponent *AbilityComponent =
+          Fighter->GetAbilityComponent()) {
+    if (const FSkaldAbilityState *TieredAbilityState =
+            AbilityComponent->FindAbilityState(ESkaldAbilitySlot::Ability1)) {
+      return TieredAbilityState->Definition;
+    }
   }
 
   return FSkaldAbilityDefinition();
