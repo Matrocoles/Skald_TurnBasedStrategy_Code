@@ -34,6 +34,7 @@
 #include "WorldMap.h"
 #include "SkaldDiceManager.h"
 #include "DiceRollConfig.h"
+#include "Framework/Application/SlateApplication.h"
 
 using Skald::PropertyAccess::ReadBoolProperty;
 using Skald::PropertyAccess::ReadIntProperty;
@@ -122,6 +123,14 @@ constexpr float SnapshotRetryDelaySeconds = 0.01f;
 
 void USkaldGameInstance::Init() {
   Super::Init();
+
+#if !UE_SERVER
+  if (FSlateApplication::IsInitialized()) {
+    FSlateApplication::Get().SetAllowTooltips(true);
+    FSlateApplication::Get().SetToolTipOffset(FVector2D(40.f, 40.f));
+  }
+#endif // !UE_SERVER
+
   SeedCombatRandomStream(FMath::Rand());
   TakenFactions.Empty();
   if (Faction != ESkaldFaction::None) {
