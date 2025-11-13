@@ -239,6 +239,8 @@ void UBattleHUDWidget::NativeConstruct() {
   CacheDefaultTextColor(EnemyDefenceText);
   CacheDefaultTextColor(EnemyAttackRangeText);
   CacheDefaultTextColor(EnemyAttackDiceText);
+
+  UpgradeStatIconTooltips();
 }
 
 void UBattleHUDWidget::NativeTick(const FGeometry &MyGeometry,
@@ -1632,6 +1634,30 @@ void UBattleHUDWidget::HideAbilityTriggeredText() {
 void UBattleHUDWidget::ApplyTooltipToWidget(UWidget *Widget,
                                             const FText &TooltipText) const {
   USkaldTooltipStatics::ApplyTooltip(Widget, UniversalTooltipClass, TooltipText);
+}
+
+void UBattleHUDWidget::UpgradeStatIconTooltips() const {
+  UpgradeWidgetTooltip(HealthImage);
+  UpgradeWidgetTooltip(StrengthImage);
+  UpgradeWidgetTooltip(DefenceImage);
+  UpgradeWidgetTooltip(AttackDiceImage);
+  UpgradeWidgetTooltip(AttackDamageImage);
+  UpgradeWidgetTooltip(AttackRangeImage);
+  UpgradeWidgetTooltip(MovementImage);
+  UpgradeWidgetTooltip(EnemyAttackDiceImage);
+  UpgradeWidgetTooltip(EnemyStrengthImage);
+  UpgradeWidgetTooltip(EnemyDefenceImage);
+  UpgradeWidgetTooltip(EnemyAttackDamageImage);
+  UpgradeWidgetTooltip(EnemyAttackRangeImage);
+  UpgradeWidgetTooltip(EnemyMovementImage);
+}
+
+void UBattleHUDWidget::UpgradeWidgetTooltip(UWidget *Widget) const {
+  if (!Widget) {
+    return;
+  }
+
+  USkaldTooltipStatics::UpgradeExistingTooltip(Widget, UniversalTooltipClass);
 }
 
 FSkaldAbilityDefinition

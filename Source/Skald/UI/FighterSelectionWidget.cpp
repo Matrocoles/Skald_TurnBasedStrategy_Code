@@ -39,6 +39,14 @@ void UFighterEntryWidget::NativeConstruct() {
     RemoveButton->OnClicked.AddDynamic(this,
                                        &UFighterEntryWidget::HandleRemoveClicked);
   }
+
+  UpgradeTooltipToUniversal(HealthImage);
+  UpgradeTooltipToUniversal(StrengthImage);
+  UpgradeTooltipToUniversal(DefenceImage);
+  UpgradeTooltipToUniversal(AttackDiceImage);
+  UpgradeTooltipToUniversal(AttackDamageImage);
+  UpgradeTooltipToUniversal(AttackRangeImage);
+  UpgradeTooltipToUniversal(MovementImage);
 }
 
 void UFighterEntryWidget::Init(const FFighterDefinition &InFighter,
@@ -179,6 +187,14 @@ void UFighterEntryWidget::HandleRemoveClicked() {
 void UFighterEntryWidget::ApplyUniversalTooltip(UWidget *Widget,
                                                 const FText &TooltipText) const {
   USkaldTooltipStatics::ApplyTooltip(Widget, UniversalTooltipClass, TooltipText);
+}
+
+void UFighterEntryWidget::UpgradeTooltipToUniversal(UWidget *Widget) const {
+  if (!Widget) {
+    return;
+  }
+
+  USkaldTooltipStatics::UpgradeExistingTooltip(Widget, UniversalTooltipClass);
 }
 
 UTexture2D* UFighterEntryWidget::GetPortraitTexture() const
