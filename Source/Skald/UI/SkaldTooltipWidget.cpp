@@ -7,11 +7,11 @@ USkaldTooltipWidget::USkaldTooltipWidget(
     const FObjectInitializer &ObjectInitializer)
     : Super(ObjectInitializer) {}
 
-void USkaldTooltipWidget::SetTooltipText(const FText &InText) {
-  TooltipText = InText;
+void USkaldTooltipWidget::SetTooltipLabelText(const FText &InText) {
+  TooltipLabelText = InText;
 
   if (TooltipLabel) {
-    TooltipLabel->SetText(TooltipText);
+    TooltipLabel->SetText(TooltipLabelText);
   }
 }
 
@@ -33,7 +33,7 @@ void USkaldTooltipWidget::RefreshAppearance() {
 
   if (TooltipLabel) {
     TooltipLabel->SetFont(TooltipFont);
-    TooltipLabel->SetText(TooltipText);
+    TooltipLabel->SetText(TooltipLabelText);
   }
 
   SetRenderTranslation(TooltipOffset);
