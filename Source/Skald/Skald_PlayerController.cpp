@@ -46,6 +46,10 @@
 #include "UI/SkaldUIHelpers.h"
 #include "UObject/ConstructorHelpers.h"
 #include "WorldMap.h"
+#include "Blueprint/WidgetTree.h"
+#include "Components/CanvasPanel.h"
+#include "Components/CanvasPanelSlot.h"
+#include "Components/Image.h"
 
 #include "Misc/EngineVersionComparison.h"
 #include "Misc/CoreDelegates.h"
@@ -62,6 +66,72 @@
 #include "Widgets/SWindow.h"
 
 #include "Net/UnrealNetwork.h"
+
+void UFactionCursorWidget::InitializeCursor(UTexture2D *InTexture,
+                                            const FVector2D &InHotspot,
+                                            const FVector2D &InDrawSize) {
+  CursorTexture = InTexture;
+  CursorHotspot = InHotspot;
+  CursorDrawSize = InDrawSize;
+  RefreshCursorAppearance();
+}
+
+TSharedRef<SWidget> UFactionCursorWidget::RebuildWidget() {
+  CursorImage = nullptr;
+  RootPanel = nullptr;
+
+  if (!WidgetTree) {
+    WidgetTree = NewObject<UWidgetTree>(this, TEXT("FactionCursorTree"));
+  } else {
+    WidgetTree->RootWidget = nullptr;
+  }
+
+  RootPanel = WidgetTree->ConstructWidget<UCanvasPanel>(
+      UCanvasPanel::StaticClass(), TEXT("CursorRoot"));
+  WidgetTree->RootWidget = RootPanel;
+
+  CursorImage = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(),
+                                                    TEXT("CursorImage"));
+  if (RootPanel && CursorImage) {
+    if (UCanvasPanelSlot *Slot = RootPanel->AddChildToCanvas(CursorImage)) {
+      Slot->SetAutoSize(true);
+      Slot->SetAnchors(FAnchors(0.f));
+      Slot->SetAlignment(FVector2D::ZeroVector);
+    }
+  }
+
+  RefreshCursorAppearance();
+  return Super::RebuildWidget();
+}
+
+void UFactionCursorWidget::ReleaseSlateResources(bool bReleaseChildren) {
+  Super::ReleaseSlateResources(bReleaseChildren);
+  CursorImage = nullptr;
+  RootPanel = nullptr;
+}
+
+void UFactionCursorWidget::RefreshCursorAppearance() {
+  if (!CursorImage) {
+    return;
+  }
+
+  if (CursorTexture) {
+    const FVector2D TextureSize(CursorTexture->GetSizeX(),
+                                CursorTexture->GetSizeY());
+    const FVector2D DesiredSize = CursorDrawSize.IsNearlyZero()
+                                      ? TextureSize
+                                      : CursorDrawSize;
+    CursorImage->SetBrushFromTexture(CursorTexture);
+    CursorImage->SetBrushSize(DesiredSize);
+  } else {
+    CursorImage->SetBrushFromTexture(nullptr);
+    CursorImage->SetBrushSize(FVector2D::ZeroVector);
+  }
+
+  if (UCanvasPanelSlot *Slot = Cast<UCanvasPanelSlot>(CursorImage->Slot)) {
+    Slot->SetPosition(-CursorHotspot);
+  }
+}
 
 namespace {
 FString ResolvePlayerName(const ASkaldPlayerState *PlayerState,
@@ -1718,36 +1788,33 @@ void ASkaldPlayerController::ApplyFactionCursor() {
     return;
   }
 
-  if (FSlateApplication::IsInitialized()) {
-    FSlateApplication &SlateApplication = FSlateApplication::Get();
-    const TSharedPtr<ICursor> PlatformCursor = SlateApplication.GetPlatformCursor();
-    if (PlatformCursor.IsValid()) {
-      const FString CursorPath =
-          Definition->CursorTexture.IsNull()
-              ? FString()
-              : Definition->CursorTexture.ToSoftObjectPath().ToString();
+  UTexture2D *CursorTexture =
+      Definition->CursorTexture.IsNull()
+          ? nullptr
+          : Definition->CursorTexture.LoadSynchronous();
 
-#if ENGINE_MAJOR_VERSION < 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION < 5)
-      if (!CursorPath.IsEmpty()) {
-        SlateApplication.SetHardwareCursor(EMouseCursor::Default,
-                                           FName(*CursorPath),
-                                           Definition->CursorHotspot);
-      } else {
-        SlateApplication.SetHardwareCursor(EMouseCursor::Default, NAME_None,
-                                           FVector2D::ZeroVector);
-      }
-#else
-      if (!CursorPath.IsEmpty()) {
-        UE_LOG(
-            LogSkald,
-            Verbose,
-            TEXT("Hardware cursor textures are no longer set directly via "
-                 "FSlateApplication in this engine version. Falling back to "
-                 "the default cursor for %s."),
-            *CursorPath);
-      }
-      PlatformCursor->SetType(EMouseCursor::Default);
-#endif
+  if (CursorTexture) {
+    if (!ActiveCursorWidget) {
+      ActiveCursorWidget =
+          CreateWidget<UFactionCursorWidget>(this, UFactionCursorWidget::StaticClass());
+    }
+
+    if (ActiveCursorWidget) {
+      const FVector2D DesiredSize = Definition->CursorDrawSize.IsNearlyZero()
+                                        ? FVector2D(CursorTexture->GetSizeX(),
+                                                    CursorTexture->GetSizeY())
+                                        : Definition->CursorDrawSize;
+      ActiveCursorWidget->InitializeCursor(CursorTexture, Definition->CursorHotspot,
+                                           DesiredSize);
+      SetMouseCursorWidget(EMouseCursor::Default, ActiveCursorWidget);
+    } else {
+      SetMouseCursorWidget(EMouseCursor::Default, nullptr);
+    }
+  } else {
+    SetMouseCursorWidget(EMouseCursor::Default, nullptr);
+    if (ActiveCursorWidget) {
+      ActiveCursorWidget->RemoveFromParent();
+      ActiveCursorWidget = nullptr;
     }
   }
 
@@ -1793,18 +1860,13 @@ void ASkaldPlayerController::ClearFactionCursor() {
     ActiveCursorTrailFX = nullptr;
   }
   ActiveCursorTrailTemplate.Reset();
-  if (IsLocalController() && FSlateApplication::IsInitialized()) {
-    const TSharedPtr<ICursor> PlatformCursor =
-        FSlateApplication::Get().GetPlatformCursor();
-    if (PlatformCursor.IsValid()) {
-#if ENGINE_MAJOR_VERSION < 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION < 5)
-      FSlateApplication::Get().SetHardwareCursor(EMouseCursor::Default, NAME_None,
-                                                FVector2D::ZeroVector);
-#else
-      PlatformCursor->SetType(EMouseCursor::Default);
-#endif
+  if (IsLocalController()) {
+    SetMouseCursorWidget(EMouseCursor::Default, nullptr);
+    if (ActiveCursorWidget) {
+      ActiveCursorWidget->RemoveFromParent();
     }
   }
+  ActiveCursorWidget = nullptr;
 
   CurrentFaction = ESkaldFaction::None;
 }

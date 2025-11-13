@@ -34,6 +34,10 @@ struct SKALD_API FFactionCursorDefinition
   /** Hotspot of the cursor texture in pixels. */
   UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Cursor|Meta")
   FVector2D CursorHotspot = FVector2D(0.f, 0.f);
+
+  /** Optional override for the rendered cursor size (leave zero to use texture). */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Cursor|Meta")
+  FVector2D CursorDrawSize = FVector2D::ZeroVector;
 };
 
 /** Data asset configuring per-faction cursor visuals, audio and FX. */

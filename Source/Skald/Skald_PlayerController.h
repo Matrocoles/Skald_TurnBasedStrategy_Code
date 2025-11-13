@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Engine/EngineTypes.h"
 #include "GameFramework/PlayerController.h"
+#include "Blueprint/UserWidget.h"
 #include "GridBattleManager.h"
 #include "SkaldTypes.h"
 #include "Abilities/SkaldAbilityTypes.h"
@@ -38,6 +39,7 @@ class USoundBase;
 class UCameraShakeBase;
 class UNiagaraComponent;
 class UNiagaraSystem;
+class UTexture2D;
 class UFactionCursorData;
 struct FFactionCursorDefinition;
 class ASkald_PlayerCharacter;
@@ -45,6 +47,9 @@ class USkaldDiceOverlayWidget;
 class USkaldDiceResultWidget;
 class USkaldDiceManager;
 class ICursor;
+class UImage;
+class UCanvasPanel;
+class UFactionCursorWidget;
 
 /** Command issued by the player during a battle. */
 UENUM()
@@ -72,6 +77,35 @@ struct FPendingAbilityCommand {
   ESkaldAbilitySlot Slot = ESkaldAbilitySlot::Ability1;
   FName AbilityId = NAME_None;
   FSkaldAbilityTargetingInfo Targeting;
+};
+
+/** Simple Slate-backed widget used to render custom cursor art. */
+UCLASS()
+class SKALD_API UFactionCursorWidget : public UUserWidget {
+  GENERATED_BODY()
+
+public:
+  void InitializeCursor(UTexture2D *InTexture, const FVector2D &InHotspot,
+                        const FVector2D &InDrawSize);
+
+protected:
+  virtual TSharedRef<SWidget> RebuildWidget() override;
+  virtual void ReleaseSlateResources(bool bReleaseChildren) override;
+
+private:
+  void RefreshCursorAppearance();
+
+  UPROPERTY(Transient)
+  TObjectPtr<UImage> CursorImage = nullptr;
+
+  UPROPERTY(Transient)
+  TObjectPtr<UCanvasPanel> RootPanel = nullptr;
+
+  UPROPERTY(Transient)
+  TObjectPtr<UTexture2D> CursorTexture = nullptr;
+
+  FVector2D CursorHotspot = FVector2D::ZeroVector;
+  FVector2D CursorDrawSize = FVector2D::ZeroVector;
 };
 
 /**
@@ -464,6 +498,10 @@ protected:
   UPROPERTY(BlueprintReadOnly, Category = "Cursor",
             meta = (AllowPrivateAccess = "true"))
   ESkaldFaction CurrentFaction = ESkaldFaction::None;
+
+  /** Widget instance responsible for rendering the custom cursor texture. */
+  UPROPERTY(Transient)
+  TObjectPtr<UFactionCursorWidget> ActiveCursorWidget = nullptr;
 
   /** Niagara component providing the active cursor trail effect. */
   UPROPERTY()
