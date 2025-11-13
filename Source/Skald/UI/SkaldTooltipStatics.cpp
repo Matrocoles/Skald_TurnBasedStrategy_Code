@@ -20,7 +20,7 @@ void USkaldTooltipStatics::ApplyTooltip(
   if (UWorld *World = TargetWidget->GetWorld()) {
     if (USkaldTooltipWidget *TooltipWidget =
             CreateWidget<USkaldTooltipWidget>(World, TooltipClass)) {
-      TooltipWidget->SetTooltipText(TooltipText);
+      TooltipWidget->SetTooltipLabelText(TooltipText);
       TargetWidget->SetToolTip(TooltipWidget);
       return;
     }

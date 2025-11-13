@@ -20,10 +20,10 @@ public:
 
   /** Text displayed inside the tooltip. */
   UFUNCTION(BlueprintCallable, Category = "Skald|Tooltip")
-  void SetTooltipText(const FText &InText);
+  void SetTooltipLabelText(const FText &InText);
 
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Skald|Tooltip")
-  const FText &GetTooltipText() const { return TooltipText; }
+  const FText &GetTooltipLabelText() const { return TooltipLabelText; }
 
   /** Translation applied so the tooltip spawns away from the cursor. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Tooltip")
@@ -58,6 +58,6 @@ private:
 
   /** Cached tooltip text so it can be re-applied when the widget rebuilds. */
   UPROPERTY(Transient)
-  FText TooltipText;
+  FText TooltipLabelText;
 };
 
