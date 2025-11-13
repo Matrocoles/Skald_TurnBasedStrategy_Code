@@ -7835,13 +7835,13 @@ void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,
       bPlayerWasAttacker ? BattleSnapshot.DefenderDisplayName
                          : BattleSnapshot.AttackerDisplayName;
 
-  auto ResolveNameText = [&](const ASkaldPlayerState *PlayerState,
+  auto ResolveNameText = [&](const ASkaldPlayerState *PlayerStateArg,
                              const FString &PayloadName) -> FText {
-    if (PlayerState) {
+    if (PlayerStateArg) {
       const FString ResolvedName =
-          !PlayerState->PlayerDisplayName.IsEmpty()
-              ? PlayerState->PlayerDisplayName
-              : PlayerState->GetPlayerName();
+          !PlayerStateArg->PlayerDisplayName.IsEmpty()
+              ? PlayerStateArg->PlayerDisplayName
+              : PlayerStateArg->GetPlayerName();
       if (!ResolvedName.IsEmpty()) {
         return FText::FromString(ResolvedName);
       }
