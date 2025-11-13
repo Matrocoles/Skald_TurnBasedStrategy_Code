@@ -247,6 +247,9 @@ public:
   /** Handle a locked-in fighter entry being selected from the HUD. */
   void RequestLockedInEntrySelection(AFighterPawn *Fighter);
 
+  /** Handle an enemy locked-in fighter entry being selected from the HUD. */
+  void RequestEnemyLockedInEntrySelection(AFighterPawn *Fighter);
+
   /** Send the local player's initial data to the server for replication. */
   UFUNCTION(Server, Reliable)
   void ServerInitPlayerState(const FString &Name, ESkaldFaction Faction,
@@ -1011,6 +1014,8 @@ private:
                             const FText &Reason);
   UFUNCTION()
   void HandleLockedInEntrySelected(AFighterPawn *Fighter);
+  UFUNCTION()
+  void HandleEnemyLockedInEntrySelected(AFighterPawn *Fighter);
   UFUNCTION()
   void HandleTrackedFighterDestroyed(AActor *DestroyedActor);
   bool TryBeginVeilStepTargeting(ESkaldAbilitySlot Slot);

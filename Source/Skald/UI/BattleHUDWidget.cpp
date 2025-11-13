@@ -513,6 +513,19 @@ void UBattleHUDWidget::SetHighlightedEnemyLockedInFighter(AFighterPawn *Fighter)
   }
 }
 
+void UBattleHUDWidget::HandleEnemyLockedInEntryClicked(AFighterPawn *Fighter) {
+  if (!Fighter) {
+    return;
+  }
+
+  SetHighlightedEnemyLockedInFighter(Fighter);
+
+  if (ASkaldPlayerController *SkaldController =
+          Cast<ASkaldPlayerController>(GetOwningPlayer())) {
+    SkaldController->RequestEnemyLockedInEntrySelection(Fighter);
+  }
+}
+
 void UBattleHUDWidget::HandleSelectedFighterChanged(AFighterPawn *Fighter) {
   const bool bIsFriendly = IsKnownFriendlyFighter(Fighter);
   const bool bHasEnemyEntry = IsKnownEnemyFighter(Fighter);
@@ -711,6 +724,8 @@ UBattleHUDWidget::FindOrCreateEnemyLockedInEntry(AFighterPawn *Fighter) {
 
   if (ULockedInFighterEntryWidget *NewEntry =
           CreateWidget<ULockedInFighterEntryWidget>(this, LockedInFighterEntryClass)) {
+    NewEntry->OnEntryClicked.AddDynamic(
+        this, &UBattleHUDWidget::HandleEnemyLockedInEntryClicked);
     NewEntry->OnEntryRemoved.AddDynamic(
         this, &UBattleHUDWidget::HandleEnemyLockedInEntryRemoved);
     EnemyLockedInFighterEntries.Add(Fighter, NewEntry);
@@ -1168,8 +1183,10 @@ void UBattleHUDWidget::UpdateEnemyStatPanel(AFighterPawn *Fighter) {
     }
   }
 
-  UpdatePassiveAbilityIcon(EnemyPassiveAbilityIcon,
-                           ResolvePassiveAbilityDefinition(ResolvedFighter));
+  const FSkaldAbilityDefinition PassiveAbility =
+      ResolvePassiveAbilityDefinition(ResolvedFighter);
+  UpdateEnemyAbilityText(PassiveAbility);
+  UpdatePassiveAbilityIcon(EnemyPassiveAbilityIcon, PassiveAbility);
 }
 
 void UBattleHUDWidget::ClearEnemyStatPanel() {
@@ -1213,7 +1230,26 @@ void UBattleHUDWidget::ClearEnemyStatPanel() {
     EnemyFighterImage->SetVisibility(ESlateVisibility::Collapsed);
   }
 
+  UpdateEnemyAbilityText(FSkaldAbilityDefinition());
   UpdatePassiveAbilityIcon(EnemyPassiveAbilityIcon, FSkaldAbilityDefinition());
+}
+
+void UBattleHUDWidget::UpdateEnemyAbilityText(
+    const FSkaldAbilityDefinition &Definition) {
+  if (!EnemyAbilityText) {
+    return;
+  }
+
+  if (!Definition.IsValid()) {
+    EnemyAbilityText->SetText(FText::GetEmpty());
+    EnemyAbilityText->SetVisibility(ESlateVisibility::Collapsed);
+    ApplyTooltipToWidget(EnemyAbilityText, FText::GetEmpty());
+    return;
+  }
+
+  EnemyAbilityText->SetText(Definition.AbilityName);
+  EnemyAbilityText->SetVisibility(ESlateVisibility::HitTestInvisible);
+  ApplyTooltipToWidget(EnemyAbilityText, BuildAbilityTooltipText(Definition));
 }
 
 void UBattleHUDWidget::ApplyPrimaryFighterDisplay(AFighterPawn *Fighter) {

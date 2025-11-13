@@ -355,6 +355,10 @@ public:
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *EnemyAttackDiceText;
 
+  /** Text displaying the currently selected enemy fighter's faction ability. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UTextBlock *EnemyAbilityText;
+
   /** Icon image associated with enemy attack dice. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UImage *EnemyAttackDiceImage;
@@ -479,6 +483,9 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Skald|Battle")
   void SetHighlightedEnemyLockedInFighter(AFighterPawn *Fighter);
 
+  UFUNCTION()
+  void HandleEnemyLockedInEntryClicked(AFighterPawn *Fighter);
+
   /** Highlight the enemy entry for the fighter whose activation is in progress. */
   UFUNCTION(BlueprintCallable, Category = "Skald|Battle")
   void SetActiveEnemyLockedInFighter(AFighterPawn *Fighter);
@@ -602,6 +609,7 @@ public:
 private:
   void UpdateEnemyStatPanel(AFighterPawn *Fighter);
   void ClearEnemyStatPanel();
+  void UpdateEnemyAbilityText(const FSkaldAbilityDefinition &Definition);
   void ApplyPrimaryFighterDisplay(AFighterPawn *Fighter);
   void ClearPrimaryStatPanel();
   AFighterPawn *ResolveFriendlyStatFighter(AFighterPawn *Attacker,
