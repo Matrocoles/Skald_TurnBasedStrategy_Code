@@ -7773,7 +7773,28 @@ void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,
   bool bPlayerLost = false;
   FLinearColor PlayerFactionColor = ResolveFactionColor(ESkaldFaction::None);
 
-  if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+  const FText UnknownCommanderText =
+      NSLOCTEXT("BattleResultWidget", "UnknownCommander", "Unknown Commander");
+  const FText UnknownFactionText =
+      NSLOCTEXT("BattleResultWidget", "UnknownFaction", "Unknown Faction");
+
+  FText PlayerNameText = UnknownCommanderText;
+  FText EnemyNameText = UnknownCommanderText;
+  FText PlayerFactionText = UnknownFactionText;
+  FText EnemyFactionText = UnknownFactionText;
+  bool bPlayerWasAttacker = true;
+
+  if (!CachedGameInstance) {
+    CachedGameInstance = GetGameInstance<USkaldGameInstance>();
+  }
+
+  FS_BattlePayload BattleSnapshot;
+  if (CachedGameInstance) {
+    BattleSnapshot = CachedGameInstance->PendingBattle;
+  }
+
+  ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
+  if (PS) {
     if (WinningFaction != ESkaldFaction::None && PS->Faction == WinningFaction) {
       bPlayerWon = true;
     } else if (WinningFaction != ESkaldFaction::None) {
@@ -7782,6 +7803,85 @@ void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,
 
     PlayerFactionColor = ResolveFactionColor(PS->Faction);
   }
+
+  const int32 PlayerId = PS ? PS->GetPlayerId() : INDEX_NONE;
+  bool bWasAttacker = PlayerId != INDEX_NONE &&
+                      PlayerId == BattleSnapshot.AttackerPlayerID;
+  const bool bWasDefender = PlayerId != INDEX_NONE &&
+                            PlayerId == BattleSnapshot.DefenderPlayerID;
+  if (!bWasAttacker && !bWasDefender) {
+    bWasAttacker = true;
+  }
+  bPlayerWasAttacker = bWasAttacker;
+
+  ASkaldGameState *SkaldGameState = nullptr;
+  if (UWorld *World = GetWorld()) {
+    SkaldGameState = World->GetGameState<ASkaldGameState>();
+  }
+
+  ASkaldPlayerState *EnemyPS = nullptr;
+  if (SkaldGameState) {
+    const int32 EnemyPlayerId = bPlayerWasAttacker ? BattleSnapshot.DefenderPlayerID
+                                                   : BattleSnapshot.AttackerPlayerID;
+    if (EnemyPlayerId > 0) {
+      EnemyPS = SkaldGameState->GetPlayerById(EnemyPlayerId);
+    }
+  }
+
+  const FString PlayerPayloadName =
+      bPlayerWasAttacker ? BattleSnapshot.AttackerDisplayName
+                         : BattleSnapshot.DefenderDisplayName;
+  const FString EnemyPayloadName =
+      bPlayerWasAttacker ? BattleSnapshot.DefenderDisplayName
+                         : BattleSnapshot.AttackerDisplayName;
+
+  auto ResolveNameText = [&](const ASkaldPlayerState *PlayerState,
+                             const FString &PayloadName) -> FText {
+    if (PlayerState) {
+      const FString ResolvedName =
+          !PlayerState->PlayerDisplayName.IsEmpty()
+              ? PlayerState->PlayerDisplayName
+              : PlayerState->GetPlayerName();
+      if (!ResolvedName.IsEmpty()) {
+        return FText::FromString(ResolvedName);
+      }
+    }
+
+    if (!PayloadName.IsEmpty()) {
+      return FText::FromString(PayloadName);
+    }
+
+    return UnknownCommanderText;
+  };
+
+  auto ResolveFactionText = [&](ESkaldFaction FactionValue) -> FText {
+    if (FactionValue != ESkaldFaction::None) {
+      if (const UEnum *FactionEnum = StaticEnum<ESkaldFaction>()) {
+        return FactionEnum->GetDisplayNameTextByValue(
+            static_cast<int64>(FactionValue));
+      }
+    }
+
+    return UnknownFactionText;
+  };
+
+  PlayerNameText = ResolveNameText(PS, PlayerPayloadName);
+  EnemyNameText = ResolveNameText(EnemyPS, EnemyPayloadName);
+
+  ESkaldFaction PlayerFactionValue = PS ? PS->Faction : ESkaldFaction::None;
+  if (PlayerFactionValue == ESkaldFaction::None) {
+    PlayerFactionValue = bPlayerWasAttacker ? BattleSnapshot.AttackerFaction
+                                            : BattleSnapshot.DefenderFaction;
+  }
+
+  ESkaldFaction EnemyFactionValue = EnemyPS ? EnemyPS->Faction : ESkaldFaction::None;
+  if (EnemyFactionValue == ESkaldFaction::None) {
+    EnemyFactionValue = bPlayerWasAttacker ? BattleSnapshot.DefenderFaction
+                                           : BattleSnapshot.AttackerFaction;
+  }
+
+  PlayerFactionText = ResolveFactionText(PlayerFactionValue);
+  EnemyFactionText = ResolveFactionText(EnemyFactionValue);
 
   if (!VictoryWidgetClass) {
     VictoryWidgetClass = UBattleResultWidget::StaticClass();
@@ -7797,7 +7897,10 @@ void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,
             CreateWidget<UUserWidget>(this, VictoryWidgetClass)) {
       if (UBattleResultWidget *ResultWidget = Cast<UBattleResultWidget>(Widget)) {
         ResultWidget->SetBattleOutcome(bPlayerWon, bPlayerLost, AttackerCasualties,
-                                       DefenderCasualties, PlayerFactionColor);
+                                       DefenderCasualties, PlayerFactionColor,
+                                       PlayerNameText, PlayerFactionText,
+                                       EnemyNameText, EnemyFactionText,
+                                       bPlayerWasAttacker);
       }
       BattleResultWidget = Widget;
       BattleResultWidget->AddToViewport();
