@@ -9,6 +9,7 @@
 #include "Internationalization/Text.h"
 #include "SkaldLogging.h"
 #include "Skald_PlayerController.h"
+#include "UI/SkaldTooltipStatics.h"
 
 bool UFighterSelectionWidget::Initialize()
 {
@@ -92,6 +93,12 @@ void UFighterEntryWidget::Init(const FFighterDefinition &InFighter,
           NSLOCTEXT("SkaldAbilities", "PassiveEntryNone",
                      "No faction passive available."));
     }
+
+    const FText PassiveTooltip = PassiveAbilityDefinition.IsValid()
+                                     ? USkaldTooltipStatics::BuildBasicAbilityTooltip(
+                                           PassiveAbilityDefinition)
+                                     : PassiveAbilityText->GetText();
+    ApplyUniversalTooltip(PassiveAbilityText, PassiveTooltip);
   }
 
   if (ActiveAbilityText) {
@@ -112,15 +119,18 @@ void UFighterEntryWidget::Init(const FFighterDefinition &InFighter,
                        "Cooldown: none");
       }
 
-      ActiveAbilityText->SetText(FText::Format(
+      const FText ActiveDisplayText = FText::Format(
           NSLOCTEXT("SkaldAbilities", "ActiveEntryFormat",
                      "{0} ({1})\n{2}\n{3}"),
           ActiveAbilityDefinition.AbilityName, CostLabel,
-          ActiveAbilityDefinition.AbilityDescription, CooldownLabel));
+          ActiveAbilityDefinition.AbilityDescription, CooldownLabel);
+      ActiveAbilityText->SetText(ActiveDisplayText);
+      ApplyUniversalTooltip(ActiveAbilityText, ActiveDisplayText);
     } else {
-      ActiveAbilityText->SetText(
-          NSLOCTEXT("SkaldAbilities", "ActiveEntryNone",
-                     "No active ability assigned."));
+      const FText NoActiveAbilityText = NSLOCTEXT(
+          "SkaldAbilities", "ActiveEntryNone", "No active ability assigned.");
+      ActiveAbilityText->SetText(NoActiveAbilityText);
+      ApplyUniversalTooltip(ActiveAbilityText, NoActiveAbilityText);
     }
   }
 
@@ -164,6 +174,11 @@ void UFighterEntryWidget::HandleRemoveClicked() {
   if (Owner) {
     Owner->RemoveFighter(Fighter);
   }
+}
+
+void UFighterEntryWidget::ApplyUniversalTooltip(UWidget *Widget,
+                                                const FText &TooltipText) const {
+  USkaldTooltipStatics::ApplyTooltip(Widget, UniversalTooltipClass, TooltipText);
 }
 
 UTexture2D* UFighterEntryWidget::GetPortraitTexture() const
