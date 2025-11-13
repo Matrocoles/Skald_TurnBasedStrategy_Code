@@ -2790,12 +2790,43 @@ void ASkaldPlayerController::RequestLockedInEntrySelection(AFighterPawn *Fighter
   HandleLockedInEntrySelected(Fighter);
 }
 
+void ASkaldPlayerController::RequestEnemyLockedInEntrySelection(
+    AFighterPawn *Fighter) {
+  HandleEnemyLockedInEntrySelected(Fighter);
+}
+
 void ASkaldPlayerController::HandleLockedInEntrySelected(AFighterPawn *Fighter) {
   if (!Fighter || !IsFriendlyFighter(Fighter)) {
     return;
   }
 
   SetSelectedFighter(Fighter, true);
+  if (UGridOverlayComponent *Grid = FindGridOverlay()) {
+    const FIntPoint FighterCell = Fighter->GetCurrentCell();
+    if (Grid->IsCellInBounds(FighterCell)) {
+      HighlightClickedCell(Grid, FighterCell);
+    }
+    Grid->HighlightSelection(Fighter);
+  }
+  UpdateLockedInSelectionHighlight();
+
+  if (IsLocalController() && bIsBattleMap) {
+    if (Fighter->IsAlive()) {
+      if (ASkald_PlayerCharacter *CameraPawn = Cast<ASkald_PlayerCharacter>(GetPawn())) {
+        CameraPawn->FocusCameraOnActor(Fighter);
+      }
+    }
+  }
+}
+
+void ASkaldPlayerController::HandleEnemyLockedInEntrySelected(
+    AFighterPawn *Fighter) {
+  if (!Fighter || IsFriendlyFighter(Fighter)) {
+    return;
+  }
+
+  SetSelectedFighter(Fighter, true);
+
   if (UGridOverlayComponent *Grid = FindGridOverlay()) {
     const FIntPoint FighterCell = Fighter->GetCurrentCell();
     if (Grid->IsCellInBounds(FighterCell)) {
@@ -4850,6 +4881,12 @@ void ASkaldPlayerController::HandleGridClick() {
     }
 
     SetSelectedFighter(CellFighter);
+
+    if (!IsFriendlyFighter(CellFighter) && IsLocalController() && bIsBattleMap) {
+      if (ASkald_PlayerCharacter *CameraPawn = Cast<ASkald_PlayerCharacter>(GetPawn())) {
+        CameraPawn->FocusCameraOnActor(CellFighter);
+      }
+    }
     return;
   }
 
