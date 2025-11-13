@@ -1,6 +1,7 @@
 #include "UI/BattleResultWidget.h"
 
 #include "Blueprint/WidgetTree.h"
+#include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
@@ -10,10 +11,24 @@
 void UBattleResultWidget::NativeConstruct() {
   Super::NativeConstruct();
   EnsureLayout();
+
+  if (CloseButton &&
+      !CloseButton->OnClicked.IsAlreadyBound(this, &UBattleResultWidget::HandleCloseClicked)) {
+    CloseButton->OnClicked.AddDynamic(this, &UBattleResultWidget::HandleCloseClicked);
+  }
+}
+
+void UBattleResultWidget::NativeDestruct() {
+  if (CloseButton) {
+    CloseButton->OnClicked.RemoveAll(this);
+  }
+
+  Super::NativeDestruct();
 }
 
 void UBattleResultWidget::EnsureLayout() {
-  if (OutcomeText && CasualtyText) {
+  if (ResultsText && PlayersName && PlayersFaction && Casualties &&
+      EnemyPlayersName && EnemyPlayersFaction && EnemyCasualties && CloseButton) {
     return;
   }
 
@@ -28,28 +43,48 @@ void UBattleResultWidget::EnsureLayout() {
   }
 
   if (UVerticalBox *Box = Cast<UVerticalBox>(WidgetTree->RootWidget)) {
-    if (!BattleResultText) {
-      BattleResultText = WidgetTree->ConstructWidget<UTextBlock>(
-          UTextBlock::StaticClass(), TEXT("BattleResultText"));
-      BattleResultText->SetJustification(ETextJustify::Center);
-      FSlateFontInfo ResultFont = BattleResultText->GetFont();
-      ResultFont.Size = 72;
-      BattleResultText->SetFont(ResultFont);
-      Box->AddChildToVerticalBox(BattleResultText);
-    }
+    auto EnsureTextBlock = [this, Box](UTextBlock *&TextPtr, const TCHAR *Name,
+                                       int32 FontSize) {
+      if (TextPtr) {
+        return;
+      }
 
-    if (!OutcomeText) {
-      OutcomeText = WidgetTree->ConstructWidget<UTextBlock>(
-          UTextBlock::StaticClass(), TEXT("OutcomeText"));
-      OutcomeText->SetJustification(ETextJustify::Center);
-      Box->AddChildToVerticalBox(OutcomeText);
-    }
+      TextPtr = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), Name);
+      if (!TextPtr) {
+        return;
+      }
 
-    if (!CasualtyText) {
-      CasualtyText = WidgetTree->ConstructWidget<UTextBlock>(
-          UTextBlock::StaticClass(), TEXT("CasualtyText"));
-      CasualtyText->SetJustification(ETextJustify::Center);
-      Box->AddChildToVerticalBox(CasualtyText);
+      TextPtr->SetJustification(ETextJustify::Center);
+      if (FontSize > 0) {
+        FSlateFontInfo FontInfo = TextPtr->GetFont();
+        FontInfo.Size = FontSize;
+        TextPtr->SetFont(FontInfo);
+      }
+
+      Box->AddChildToVerticalBox(TextPtr);
+    };
+
+    EnsureTextBlock(BattleResultText, TEXT("BattleResultText"), 72);
+    EnsureTextBlock(ResultsText, TEXT("ResultsText"), 40);
+    EnsureTextBlock(PlayersName, TEXT("PlayersName"), 32);
+    EnsureTextBlock(PlayersFaction, TEXT("PlayersFaction"), 28);
+    EnsureTextBlock(Casualties, TEXT("Casualties"), 28);
+    EnsureTextBlock(EnemyPlayersName, TEXT("EnemyPlayersName"), 32);
+    EnsureTextBlock(EnemyPlayersFaction, TEXT("EnemyPlayersFaction"), 28);
+    EnsureTextBlock(EnemyCasualties, TEXT("EnemyCasualties"), 28);
+
+    if (!CloseButton) {
+      CloseButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("Close"));
+      if (CloseButton) {
+        if (UTextBlock *CloseLabel = WidgetTree->ConstructWidget<UTextBlock>(
+                UTextBlock::StaticClass(), TEXT("CloseLabel"))) {
+          CloseLabel->SetJustification(ETextJustify::Center);
+          CloseLabel->SetText(NSLOCTEXT("BattleResultWidget", "Close", "Close"));
+          CloseButton->AddChild(CloseLabel);
+        }
+
+        Box->AddChildToVerticalBox(CloseButton);
+      }
     }
   }
 }
@@ -57,7 +92,12 @@ void UBattleResultWidget::EnsureLayout() {
 void UBattleResultWidget::SetBattleOutcome(bool bPlayerWon, bool bPlayerLost,
                                            int32 AttackerCasualties,
                                            int32 DefenderCasualties,
-                                           const FLinearColor &PlayerColor) {
+                                           const FLinearColor &PlayerColor,
+                                           const FText &PlayerName,
+                                           const FText &PlayerFaction,
+                                           const FText &EnemyPlayerName,
+                                           const FText &EnemyFaction,
+                                           bool bPlayerWasAttacker) {
   EnsureLayout();
 
   if (BattleResultText) {
@@ -75,7 +115,10 @@ void UBattleResultWidget::SetBattleOutcome(bool bPlayerWon, bool bPlayerLost,
     }
   }
 
-  if (OutcomeText) {
+  const int32 PlayerCasualties = bPlayerWasAttacker ? AttackerCasualties : DefenderCasualties;
+  const int32 EnemyCasualtyCount = bPlayerWasAttacker ? DefenderCasualties : AttackerCasualties;
+
+  if (ResultsText) {
     FText OutcomeLabel;
     if (bPlayerWon) {
       OutcomeLabel = NSLOCTEXT("BattleResultWidget", "Victory", "Victory!");
@@ -84,16 +127,31 @@ void UBattleResultWidget::SetBattleOutcome(bool bPlayerWon, bool bPlayerLost,
     } else {
       OutcomeLabel = NSLOCTEXT("BattleResultWidget", "Complete", "Battle Complete");
     }
-    OutcomeText->SetText(OutcomeLabel);
+    ResultsText->SetText(OutcomeLabel);
   }
 
-  if (CasualtyText) {
-    const FText CasualtyLabel = FText::Format(
-        NSLOCTEXT("BattleResultWidget", "CasualtiesFormat",
-                  "Attacker losses: {0}\nDefender losses: {1}"),
-        FText::AsNumber(AttackerCasualties),
-        FText::AsNumber(DefenderCasualties));
-    CasualtyText->SetText(CasualtyLabel);
+  if (PlayersName) {
+    PlayersName->SetText(PlayerName);
+  }
+
+  if (PlayersFaction) {
+    PlayersFaction->SetText(PlayerFaction);
+  }
+
+  if (Casualties) {
+    Casualties->SetText(FText::AsNumber(PlayerCasualties));
+  }
+
+  if (EnemyPlayersName) {
+    EnemyPlayersName->SetText(EnemyPlayerName);
+  }
+
+  if (EnemyPlayersFaction) {
+    EnemyPlayersFaction->SetText(EnemyFaction);
+  }
+
+  if (EnemyCasualties) {
+    EnemyCasualties->SetText(FText::AsNumber(EnemyCasualtyCount));
   }
 
   if (bPlayerWon) {
@@ -105,4 +163,8 @@ void UBattleResultWidget::SetBattleOutcome(bool bPlayerWon, bool bPlayerLost,
       UGameplayStatics::PlaySound2D(this, DefeatSound);
     }
   }
+}
+
+void UBattleResultWidget::HandleCloseClicked() {
+  RemoveFromParent();
 }
