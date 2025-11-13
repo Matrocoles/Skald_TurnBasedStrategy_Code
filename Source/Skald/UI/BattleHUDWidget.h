@@ -22,6 +22,8 @@ class UCombatFloaterPoolSubsystem;
 class UW_DiceResolutionPanel;
 class UW_FloatingText;
 class ULockedInFighterEntryWidget;
+class USkaldTooltipWidget;
+class UWidget;
 
 USTRUCT(BlueprintType)
 struct SKALD_API FSkaldFloaterStyle {
@@ -164,6 +166,10 @@ public:
 
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Battle|Abilities")
   TArray<FBattleAbilitySlotDisplay> AbilitySlotDefinitions;
+
+  /** Tooltip widget used to render ability and fighter stat tooltips. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Battle|Abilities")
+  TSubclassOf<USkaldTooltipWidget> UniversalTooltipClass;
 
   /** Returns true while dice resolutions or combat floaters are still animating. */
   UFUNCTION(BlueprintPure, Category = "Skald|Battle")
@@ -868,6 +874,7 @@ private:
                                 const FSkaldAbilityDefinition &Definition);
   FSkaldAbilityDefinition ResolvePassiveAbilityDefinition(AFighterPawn *Fighter) const;
   FText BuildAbilityTooltipText(const FSkaldAbilityDefinition &Definition) const;
+  void ApplyTooltipToWidget(UWidget *Widget, const FText &TooltipText) const;
   void HideAbilityTriggeredText();
 
   UFUNCTION()

@@ -17,6 +17,7 @@
 #include "GridOverlayComponent.h"
 #include "UI/CombatFloaterPoolSubsystem.h"
 #include "UI/LockedInFighterEntryWidget.h"
+#include "UI/SkaldTooltipStatics.h"
 #include "UI/W_DiceResolutionPanel.h"
 #include "UI/W_FloatingText.h"
 #include "Math/UnrealMathUtility.h"
@@ -159,12 +160,12 @@ void UBattleHUDWidget::NativeConstruct() {
   }
 
   if (PassiveAbilityIcon) {
-    PassiveAbilityIcon->SetToolTipText(FText::GetEmpty());
+    ApplyTooltipToWidget(PassiveAbilityIcon, FText::GetEmpty());
     PassiveAbilityIcon->SetVisibility(ESlateVisibility::Collapsed);
   }
 
   if (EnemyPassiveAbilityIcon) {
-    EnemyPassiveAbilityIcon->SetToolTipText(FText::GetEmpty());
+    ApplyTooltipToWidget(EnemyPassiveAbilityIcon, FText::GetEmpty());
     EnemyPassiveAbilityIcon->SetVisibility(ESlateVisibility::Collapsed);
   }
 
@@ -1479,7 +1480,7 @@ void UBattleHUDWidget::UpdateAbilityButtonForSlot(ESkaldAbilitySlot AbilitySlot,
   if (!Display) {
     Button->SetVisibility(ESlateVisibility::Collapsed);
     Button->SetIsEnabled(false);
-    Button->SetToolTipText(FText::GetEmpty());
+    ApplyTooltipToWidget(Button, FText::GetEmpty());
     if (IconWidget) {
       IconWidget->SetBrushFromTexture(nullptr);
       IconWidget->SetVisibility(ESlateVisibility::Collapsed);
@@ -1573,7 +1574,7 @@ void UBattleHUDWidget::UpdateAbilityButtonForSlot(ESkaldAbilitySlot AbilitySlot,
     TooltipText = AbilityName;
   }
 
-  Button->SetToolTipText(TooltipText);
+  ApplyTooltipToWidget(Button, TooltipText);
 }
 
 const FBattleAbilitySlotDisplay *
@@ -1628,6 +1629,11 @@ void UBattleHUDWidget::HideAbilityTriggeredText() {
   AbilityTriggeredText->SetVisibility(ESlateVisibility::Collapsed);
 }
 
+void UBattleHUDWidget::ApplyTooltipToWidget(UWidget *Widget,
+                                            const FText &TooltipText) const {
+  USkaldTooltipStatics::ApplyTooltip(Widget, UniversalTooltipClass, TooltipText);
+}
+
 FSkaldAbilityDefinition
 UBattleHUDWidget::ResolvePassiveAbilityDefinition(AFighterPawn *Fighter) const {
   if (!Fighter) {
@@ -1644,29 +1650,7 @@ UBattleHUDWidget::ResolvePassiveAbilityDefinition(AFighterPawn *Fighter) const {
 
 FText UBattleHUDWidget::BuildAbilityTooltipText(
     const FSkaldAbilityDefinition &Definition) const {
-  if (!Definition.IsValid()) {
-    return FText::GetEmpty();
-  }
-
-  const bool bHasName = !Definition.AbilityName.IsEmpty();
-  const bool bHasDescription = !Definition.AbilityDescription.IsEmpty();
-
-  if (bHasName && bHasDescription) {
-    return FText::Format(NSLOCTEXT("SkaldBattleHUD",
-                                   "PassiveAbilityTooltipNameDescription",
-                                   "{0}\n{1}"),
-                         Definition.AbilityName, Definition.AbilityDescription);
-  }
-
-  if (bHasName) {
-    return Definition.AbilityName;
-  }
-
-  if (bHasDescription) {
-    return Definition.AbilityDescription;
-  }
-
-  return FText::GetEmpty();
+  return USkaldTooltipStatics::BuildBasicAbilityTooltip(Definition);
 }
 
 void UBattleHUDWidget::UpdatePassiveAbilityIcon(
@@ -1678,7 +1662,7 @@ void UBattleHUDWidget::UpdatePassiveAbilityIcon(
   if (!Definition.IsValid()) {
     IconWidget->SetBrushFromTexture(nullptr);
     IconWidget->SetVisibility(ESlateVisibility::Collapsed);
-    IconWidget->SetToolTipText(FText::GetEmpty());
+    ApplyTooltipToWidget(IconWidget, FText::GetEmpty());
     return;
   }
 
@@ -1692,7 +1676,7 @@ void UBattleHUDWidget::UpdatePassiveAbilityIcon(
 
   IconWidget->SetBrushFromTexture(IconTexture);
   IconWidget->SetVisibility(ESlateVisibility::Visible);
-  IconWidget->SetToolTipText(BuildAbilityTooltipText(Definition));
+  ApplyTooltipToWidget(IconWidget, BuildAbilityTooltipText(Definition));
 }
 
 void UBattleHUDWidget::SetRoundInfo(const FText &RoundLabel,

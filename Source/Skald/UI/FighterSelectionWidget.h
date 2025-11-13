@@ -11,6 +11,8 @@ class UImage;
 class UScrollBox;
 class UTextBlock;
 class UFighterSelectionWidget; // forward declare for entry widget
+class USkaldTooltipWidget;
+class UWidget;
 
 /**
  * Entry widget representing a single fighter option in the list.
@@ -100,6 +102,10 @@ public:
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Fighter|Abilities")
   FSkaldAbilityDefinition ActiveAbilityDefinition;
 
+  /** Tooltip widget shared by all fighter stat/ability tooltips. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Fighter|Abilities")
+  TSubclassOf<USkaldTooltipWidget> UniversalTooltipClass;
+
   /** Returns the portrait texture for this fighter, if loaded. */
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Skald|Fighter")
   UTexture2D *GetPortraitTexture() const;
@@ -116,6 +122,8 @@ private:
   /** Owning selection widget. */
   UPROPERTY()
   UFighterSelectionWidget *Owner;
+
+  void ApplyUniversalTooltip(UWidget *Widget, const FText &TooltipText) const;
 };
 
 /** Delegate fired when the player locks in their fighter selections. */
