@@ -31,6 +31,10 @@ struct SKALD_API FFactionCursorDefinition
   UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Cursor|VFX")
   TSoftObjectPtr<UNiagaraSystem> CursorTrailFX;
 
+  /** Offset applied to the Niagara trail relative to the cursor world position. */
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Cursor|VFX")
+  FVector CursorTrailOffset = FVector::ZeroVector;
+
   /** Hotspot of the cursor texture in pixels. */
   UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Cursor|Meta")
   FVector2D CursorHotspot = FVector2D(0.f, 0.f);

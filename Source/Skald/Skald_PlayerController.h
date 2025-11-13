@@ -514,6 +514,9 @@ protected:
   UPROPERTY()
   TWeakObjectPtr<UNiagaraSystem> ActiveCursorTrailTemplate;
 
+  /** Offset applied to the active cursor trail FX in world space. */
+  FVector ActiveCursorTrailOffset = FVector::ZeroVector;
+
   /** Tracks whether the cursor was hovering an interactable widget last tick. */
   bool bWasHoveringInteractable = false;
 
