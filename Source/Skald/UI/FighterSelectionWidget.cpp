@@ -102,11 +102,6 @@ void UFighterEntryWidget::Init(const FFighterDefinition &InFighter,
                      "No faction passive available."));
     }
 
-    const FText PassiveTooltip = PassiveAbilityDefinition.IsValid()
-                                     ? USkaldTooltipStatics::BuildBasicAbilityTooltip(
-                                           PassiveAbilityDefinition)
-                                     : PassiveAbilityText->GetText();
-    ApplyUniversalTooltip(PassiveAbilityText, PassiveTooltip);
   }
 
   if (ActiveAbilityText) {
@@ -133,12 +128,10 @@ void UFighterEntryWidget::Init(const FFighterDefinition &InFighter,
           ActiveAbilityDefinition.AbilityName, CostLabel,
           ActiveAbilityDefinition.AbilityDescription, CooldownLabel);
       ActiveAbilityText->SetText(ActiveDisplayText);
-      ApplyUniversalTooltip(ActiveAbilityText, ActiveDisplayText);
     } else {
       const FText NoActiveAbilityText = NSLOCTEXT(
           "SkaldAbilities", "ActiveEntryNone", "No active ability assigned.");
       ActiveAbilityText->SetText(NoActiveAbilityText);
-      ApplyUniversalTooltip(ActiveAbilityText, NoActiveAbilityText);
     }
   }
 
