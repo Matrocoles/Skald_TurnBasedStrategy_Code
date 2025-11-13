@@ -50,6 +50,7 @@
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/Image.h"
+#include "Sound/SoundBase.h"
 
 #include "Misc/EngineVersionComparison.h"
 #include "Misc/CoreDelegates.h"
@@ -93,10 +94,11 @@ TSharedRef<SWidget> UFactionCursorWidget::RebuildWidget() {
   CursorImage = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(),
                                                     TEXT("CursorImage"));
   if (RootPanel && CursorImage) {
-    if (UCanvasPanelSlot *Slot = RootPanel->AddChildToCanvas(CursorImage)) {
-      Slot->SetAutoSize(true);
-      Slot->SetAnchors(FAnchors(0.f));
-      Slot->SetAlignment(FVector2D::ZeroVector);
+    if (UCanvasPanelSlot *CanvasSlot =
+            RootPanel->AddChildToCanvas(CursorImage)) {
+      CanvasSlot->SetAutoSize(true);
+      CanvasSlot->SetAnchors(FAnchors(0.f));
+      CanvasSlot->SetAlignment(FVector2D::ZeroVector);
     }
   }
 
@@ -122,14 +124,15 @@ void UFactionCursorWidget::RefreshCursorAppearance() {
                                       ? TextureSize
                                       : CursorDrawSize;
     CursorImage->SetBrushFromTexture(CursorTexture);
-    CursorImage->SetBrushSize(DesiredSize);
+    CursorImage->SetDesiredSizeOverride(DesiredSize);
   } else {
     CursorImage->SetBrushFromTexture(nullptr);
-    CursorImage->SetBrushSize(FVector2D::ZeroVector);
+    CursorImage->SetDesiredSizeOverride(FVector2D::ZeroVector);
   }
 
-  if (UCanvasPanelSlot *Slot = Cast<UCanvasPanelSlot>(CursorImage->Slot)) {
-    Slot->SetPosition(-CursorHotspot);
+  if (UCanvasPanelSlot *CursorCanvasSlot =
+          Cast<UCanvasPanelSlot>(CursorImage->Slot)) {
+    CursorCanvasSlot->SetPosition(-CursorHotspot);
   }
 }
 
