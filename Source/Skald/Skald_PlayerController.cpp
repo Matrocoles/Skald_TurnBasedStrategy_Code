@@ -56,13 +56,7 @@
 #endif
 
 #include "Framework/Application/SlateApplication.h"
-#if UE_VERSION_OLDER_THAN(5, 5, 0)
-#include "GenericPlatform/IPlatformCursor.h"
-using FSkaldCursorPtr = TSharedPtr<IPlatformCursor>;
-#else
 #include "GenericPlatform/ICursor.h"
-using FSkaldCursorPtr = TSharedPtr<ICursor>;
-#endif
 #include "Layout/WidgetPath.h"
 #include "Widgets/SWidget.h"
 #include "Widgets/SWindow.h"
@@ -1726,7 +1720,7 @@ void ASkaldPlayerController::ApplyFactionCursor() {
 
   if (FSlateApplication::IsInitialized()) {
     FSlateApplication &SlateApplication = FSlateApplication::Get();
-    const FSkaldCursorPtr PlatformCursor = SlateApplication.GetPlatformCursor();
+    const TSharedPtr<ICursor> PlatformCursor = SlateApplication.GetPlatformCursor();
     if (PlatformCursor.IsValid()) {
       const FString CursorPath =
           Definition->CursorTexture.IsNull()
@@ -1787,7 +1781,7 @@ void ASkaldPlayerController::ClearFactionCursor() {
   }
   ActiveCursorTrailTemplate.Reset();
   if (IsLocalController() && FSlateApplication::IsInitialized()) {
-    const FSkaldCursorPtr PlatformCursor =
+    const TSharedPtr<ICursor> PlatformCursor =
         FSlateApplication::Get().GetPlatformCursor();
     if (PlatformCursor.IsValid()) {
       FSlateApplication::Get().SetHardwareCursor(EMouseCursor::Default, NAME_None,
