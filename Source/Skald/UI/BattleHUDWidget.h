@@ -275,6 +275,34 @@ public:
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
   UTextBlock *DefenceText;
 
+  /** Icon image associated with health value. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UImage *HealthImage;
+
+  /** Icon image associated with strength value. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UImage *StrengthImage;
+
+  /** Icon image associated with defence value. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UImage *DefenceImage;
+
+  /** Icon image associated with attack dice value. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UImage *AttackDiceImage;
+
+  /** Icon image associated with attack damage value. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UImage *AttackDamageImage;
+
+  /** Icon image associated with attack range value. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UImage *AttackRangeImage;
+
+  /** Icon image associated with movement value. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UImage *MovementImage;
+
   /** Text displaying attack range. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
   UTextBlock *AttackRangeText;
@@ -326,6 +354,30 @@ public:
   /** Text displaying enemy attack dice during attack resolution. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *EnemyAttackDiceText;
+
+  /** Icon image associated with enemy attack dice. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UImage *EnemyAttackDiceImage;
+
+  /** Icon image associated with enemy strength. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UImage *EnemyStrengthImage;
+
+  /** Icon image associated with enemy defence. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UImage *EnemyDefenceImage;
+
+  /** Icon image associated with enemy attack damage. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UImage *EnemyAttackDamageImage;
+
+  /** Icon image associated with enemy attack range. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UImage *EnemyAttackRangeImage;
+
+  /** Icon image associated with enemy movement. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UImage *EnemyMovementImage;
 
   /** Tint applied to stats that are currently buffed. */
   UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skald|Battle|Stats")
@@ -696,6 +748,8 @@ private:
   void ApplyStatText(class UTextBlock *Widget, int32 Value, int32 NetDelta);
   void ApplyStatTextWithVisibility(class UTextBlock *Widget, int32 Value,
                                    int32 NetDelta);
+  void UpgradeStatIconTooltips() const;
+  void UpgradeWidgetTooltip(UWidget *Widget) const;
 
   /** Class used to spawn floaters via the shared subsystem. */
   UPROPERTY(EditAnywhere, Category = "Skald|Battle|Floaters")

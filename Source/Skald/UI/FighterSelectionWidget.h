@@ -50,21 +50,41 @@ public:
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *StrengthText;
 
+  /** Strength icon image. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UImage *StrengthImage;
+
   /** Defence display text. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *DefenceText;
+
+  /** Defence icon image. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UImage *DefenceImage;
 
   /** Health display text. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *HealthText;
 
+  /** Health icon image. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UImage *HealthImage;
+
   /** Attack range display text. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *AttackRangeText;
 
+  /** Attack range icon image. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UImage *AttackRangeImage;
+
   /** Attack damage display text. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *AttackDamageText;
+
+  /** Attack damage icon image. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UImage *AttackDamageImage;
 
   /** Critical damage display text. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
@@ -74,9 +94,17 @@ public:
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *AttackDiceText;
 
+  /** Attack dice icon image. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UImage *AttackDiceImage;
+
   /** Movement display text. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
   UTextBlock *MovementText;
+
+  /** Movement icon image. */
+  UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+  UImage *MovementImage;
 
   /** Army cost display text. */
   UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
@@ -124,6 +152,7 @@ private:
   UFighterSelectionWidget *Owner;
 
   void ApplyUniversalTooltip(UWidget *Widget, const FText &TooltipText) const;
+  void UpgradeTooltipToUniversal(UWidget *Widget) const;
 };
 
 /** Delegate fired when the player locks in their fighter selections. */
