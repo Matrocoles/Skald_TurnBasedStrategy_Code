@@ -1727,6 +1727,7 @@ void ASkaldPlayerController::ApplyFactionCursor() {
               ? FString()
               : Definition->CursorTexture.ToSoftObjectPath().ToString();
 
+#if ENGINE_MAJOR_VERSION < 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION < 5)
       if (!CursorPath.IsEmpty()) {
         SlateApplication.SetHardwareCursor(EMouseCursor::Default,
                                            FName(*CursorPath),
@@ -1735,6 +1736,18 @@ void ASkaldPlayerController::ApplyFactionCursor() {
         SlateApplication.SetHardwareCursor(EMouseCursor::Default, NAME_None,
                                            FVector2D::ZeroVector);
       }
+#else
+      if (!CursorPath.IsEmpty()) {
+        UE_LOG(
+            LogSkald,
+            Verbose,
+            TEXT("Hardware cursor textures are no longer set directly via "
+                 "FSlateApplication in this engine version. Falling back to "
+                 "the default cursor for %s."),
+            *CursorPath);
+      }
+      PlatformCursor->SetType(EMouseCursor::Default);
+#endif
     }
   }
 
@@ -1784,8 +1797,12 @@ void ASkaldPlayerController::ClearFactionCursor() {
     const TSharedPtr<ICursor> PlatformCursor =
         FSlateApplication::Get().GetPlatformCursor();
     if (PlatformCursor.IsValid()) {
+#if ENGINE_MAJOR_VERSION < 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION < 5)
       FSlateApplication::Get().SetHardwareCursor(EMouseCursor::Default, NAME_None,
                                                 FVector2D::ZeroVector);
+#else
+      PlatformCursor->SetType(EMouseCursor::Default);
+#endif
     }
   }
 
