@@ -209,8 +209,8 @@ void ULockedInFighterEntryWidget::BindToFighter(AFighterPawn *Fighter) {
   BoundFighter = Fighter;
   CachedMaxHealth = FMath::Max(Fighter->GetMaxHealth(), 1);
 
-  Fighter->OnHealthChanged.AddDynamic(this,
-                                      &ULockedInFighterEntryWidget::HandleFighterHealthChanged);
+  Fighter->OnHealthDisplayUpdated.AddDynamic(
+      this, &ULockedInFighterEntryWidget::HandleFighterHealthChanged);
   Fighter->OnActionsChanged.AddDynamic(
       this, &ULockedInFighterEntryWidget::HandleFighterActionsChanged);
   Fighter->OnDestroyed.AddDynamic(this,
@@ -222,7 +222,7 @@ void ULockedInFighterEntryWidget::BindToFighter(AFighterPawn *Fighter) {
 
 void ULockedInFighterEntryWidget::UnbindFromFighter() {
   if (AFighterPawn *Fighter = BoundFighter.Get()) {
-    Fighter->OnHealthChanged.RemoveDynamic(
+    Fighter->OnHealthDisplayUpdated.RemoveDynamic(
         this, &ULockedInFighterEntryWidget::HandleFighterHealthChanged);
     Fighter->OnActionsChanged.RemoveDynamic(
         this, &ULockedInFighterEntryWidget::HandleFighterActionsChanged);

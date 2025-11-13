@@ -697,9 +697,16 @@ private:
   /** Update the visibility state of action buttons. */
   void UpdateActionButtonVisibility();
 
+  /** Maintain bindings for the fighter currently shown in the enemy stat panel. */
+  void UpdateEnemyStatFighterBinding(AFighterPawn *NewFighter);
+
   /** Respond to health changes from the fighter. */
   UFUNCTION()
   void HandleHealthChanged(int32 NewHealth);
+
+  /** Respond to enemy health display updates. */
+  UFUNCTION()
+  void HandleEnemyHealthDisplayChanged(int32 NewHealth);
 
   /** Respond to action count changes from the fighter. */
   UFUNCTION()

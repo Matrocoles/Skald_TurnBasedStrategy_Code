@@ -3796,6 +3796,7 @@ void AFighterPawn::UpdateHealthDisplay(int32 NewHealth) {
   ApplyHealthToComponent(HealthWidgetBack);
 
   LastKnownHealth = NewHealth;
+  OnHealthDisplayUpdated.Broadcast(NewHealth);
 }
 
 void AFighterPawn::HandleHealthChanged(int32 NewHealth) {

@@ -70,6 +70,8 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnActionsChanged, int32,
 DECLARE_MULTICAST_DELEGATE(FOnQueuedAttackFinalized);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnEngagementChanged, bool,
                                             bIsEngaged);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHealthDisplayUpdated, int32,
+                                            DisplayedHealth);
 
 /** Pawn representing a fighter in grid battles. */
 UCLASS()
@@ -558,6 +560,10 @@ public:
   /** Event broadcast when the fighter enters or leaves engagement. */
   UPROPERTY(BlueprintAssignable, Category = "Fighter|Events")
   FOnEngagementChanged OnEngagementChanged;
+
+  /** Event broadcast when the health display is updated. */
+  UPROPERTY(BlueprintAssignable, Category = "Fighter|Events")
+  FOnHealthDisplayUpdated OnHealthDisplayUpdated;
 
   /** Retrieve the identifier associated with this fighter. */
   FName GetFighterId() const { return FighterId; }

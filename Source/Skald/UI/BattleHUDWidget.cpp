@@ -880,7 +880,7 @@ void UBattleHUDWidget::RefreshStats() { UpdateStatPanel(); }
 
 void UBattleHUDWidget::BindToFighter(AFighterPawn *Fighter) {
   if (BoundFighter) {
-    BoundFighter->OnHealthChanged.RemoveDynamic(
+    BoundFighter->OnHealthDisplayUpdated.RemoveDynamic(
         this, &UBattleHUDWidget::HandleHealthChanged);
     BoundFighter->OnActionsChanged.RemoveDynamic(
         this, &UBattleHUDWidget::HandleActionsChanged);
@@ -913,7 +913,7 @@ void UBattleHUDWidget::BindToFighter(AFighterPawn *Fighter) {
   HideAbilityTriggeredText();
 
   if (BoundFighter && bBoundFighterIsFriendly) {
-    BoundFighter->OnHealthChanged.AddDynamic(
+    BoundFighter->OnHealthDisplayUpdated.AddDynamic(
         this, &UBattleHUDWidget::HandleHealthChanged);
     BoundFighter->OnActionsChanged.AddDynamic(
         this, &UBattleHUDWidget::HandleActionsChanged);
@@ -1081,6 +1081,14 @@ void UBattleHUDWidget::HandleHealthChanged(int32 NewHealth) {
   ApplyStatText(HealthText, NewHealth, 0);
 }
 
+void UBattleHUDWidget::HandleEnemyHealthDisplayChanged(int32 NewHealth) {
+  if (!DisplayedEnemyStatFighter.IsValid()) {
+    return;
+  }
+
+  ApplyStatTextWithVisibility(EnemyHealthText, NewHealth, 0);
+}
+
 void UBattleHUDWidget::HandleActionsChanged(int32 NewActions) {
   if (!bBoundFighterIsFriendly) {
     return;
@@ -1117,6 +1125,25 @@ void UBattleHUDWidget::UpdateStatPanel() {
   UpdateActionButtonVisibility();
 }
 
+void UBattleHUDWidget::UpdateEnemyStatFighterBinding(AFighterPawn *NewFighter) {
+  AFighterPawn *CurrentDisplayed = DisplayedEnemyStatFighter.Get();
+  if (CurrentDisplayed == NewFighter) {
+    return;
+  }
+
+  if (CurrentDisplayed) {
+    CurrentDisplayed->OnHealthDisplayUpdated.RemoveDynamic(
+        this, &UBattleHUDWidget::HandleEnemyHealthDisplayChanged);
+  }
+
+  DisplayedEnemyStatFighter = NewFighter;
+
+  if (NewFighter) {
+    NewFighter->OnHealthDisplayUpdated.AddDynamic(
+        this, &UBattleHUDWidget::HandleEnemyHealthDisplayChanged);
+  }
+}
+
 void UBattleHUDWidget::UpdateEnemyStatPanel(AFighterPawn *Fighter) {
   AFighterPawn *ResolvedFighter = Fighter;
   if (ResolvedFighter && IsFriendlyCandidate(ResolvedFighter)) {
@@ -1128,7 +1155,7 @@ void UBattleHUDWidget::UpdateEnemyStatPanel(AFighterPawn *Fighter) {
     return;
   }
 
-  DisplayedEnemyStatFighter = ResolvedFighter;
+  UpdateEnemyStatFighterBinding(ResolvedFighter);
   KnownEnemyFighters.Add(ResolvedFighter);
 
   const FSkaldAbilityStatDelta NetDelta = GatherNetStatDelta(ResolvedFighter);
@@ -1198,7 +1225,7 @@ void UBattleHUDWidget::ClearEnemyStatPanel() {
     return;
   }
 
-  DisplayedEnemyStatFighter.Reset();
+  UpdateEnemyStatFighterBinding(nullptr);
 
   const auto ClearTextAndHide = [](UTextBlock *Widget) {
     if (Widget) {
