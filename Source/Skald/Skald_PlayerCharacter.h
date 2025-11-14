@@ -274,9 +274,17 @@ protected:
         UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
         float OverviewFocusHeight = 3200.f;
 
-        /** Pitch applied while the overview camera is locked onto a territory. */
+        /** Pitch applied when the overview camera initially locks onto a territory. */
         UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
         float OverviewLockedPitch = -70.f;
+
+        /** Minimum pitch allowed while rotating the overview camera while locked onto a territory. */
+        UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
+        float OverviewLockedMinPitch = -89.f;
+
+        /** Maximum pitch allowed while rotating the overview camera while locked onto a territory. */
+        UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
+        float OverviewLockedMaxPitch = -45.f;
 
         UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Overview")
         float OverviewTopDownPitch = -85.f;
@@ -341,6 +349,7 @@ private:
         FVector ComputeOverviewPivotLocation() const;
         void RefreshOverviewPivot();
         bool ShouldProcessOverviewMouseInput() const;
+        FVector2D GetLockedOverviewPitchRange() const;
 
         /** True if the tactical battle camera behaviour is enabled. */
         bool bBattleCameraActive = false;
