@@ -457,6 +457,10 @@ public:
   UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|Buffs")
   UDecalComponent *PassiveBuffDecal = nullptr;
 
+  /** Decal shown while negative status effects affect the fighter. */
+  UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|Buffs")
+  UDecalComponent *DebuffDecal = nullptr;
+
   /** Active positive modifiers affecting this fighter. */
   UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_ActiveBuffs,
             Category = "Fighter|Buffs")
@@ -475,6 +479,10 @@ public:
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Buffs")
   TObjectPtr<UMaterialInterface> PassiveBuffDecalMaterial;
 
+  /** Material used for the debuff decal. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Buffs")
+  TObjectPtr<UMaterialInterface> DebuffDecalMaterial;
+
   /** Size used for the selection decal on single-cell fighters. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Selection")
   FVector SelectionDecalSizeSingleCell = FVector(32.f, 160.f, 160.f);
@@ -482,6 +490,10 @@ public:
   /** Size used for the passive buff decal on single-cell fighters. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Buffs")
   FVector PassiveBuffDecalSizeSingleCell = FVector(32.f, 160.f, 160.f);
+
+  /** Size used for the debuff decal on single-cell fighters. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Buffs")
+  FVector DebuffDecalSizeSingleCell = FVector(32.f, 160.f, 160.f);
 
   /** Size used for the selection decal on four-cell fighters. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Selection")
@@ -491,6 +503,10 @@ public:
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Buffs")
   FVector PassiveBuffDecalSizeFourCells = FVector(64.f, 320.f, 320.f);
 
+  /** Size used for the debuff decal on four-cell fighters. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Buffs")
+  FVector DebuffDecalSizeFourCells = FVector(64.f, 320.f, 320.f);
+
   /** Additional vertical offset applied to the selection decal. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Selection")
   float SelectionDecalFloorOffset = 0.f;
@@ -498,6 +514,10 @@ public:
   /** Additional vertical offset applied to the passive buff decal. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Buffs")
   float PassiveBuffDecalFloorOffset = 0.f;
+
+  /** Additional vertical offset applied to the debuff decal. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Buffs")
+  float DebuffDecalFloorOffset = 0.f;
 
   /** Decal shown when the fighter is targeted for an incoming attack. */
   UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Fighter|Targeting")
@@ -781,6 +801,18 @@ private:
 
   /** Apply the configured material to the passive buff decal. */
   void RefreshPassiveBuffDecalMaterial();
+
+  /** Toggle the debuff decal visibility. */
+  void SetDebuffDecalVisible(bool bVisible);
+
+  /** Resize the debuff decal based on the current footprint. */
+  void UpdateDebuffDecalSize();
+
+  /** Align the debuff decal with the ground plane. */
+  void UpdateDebuffDecalTransform();
+
+  /** Apply the configured material to the debuff decal. */
+  void RefreshDebuffDecalMaterial();
 
   /** Resolve and cache an activation icon texture. */
   UTexture2D *ResolveActivationIcon(TSoftObjectPtr<UTexture2D> &IconSource,
