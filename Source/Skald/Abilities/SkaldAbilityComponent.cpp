@@ -3449,10 +3449,12 @@ void USkaldAbilityComponent::SpawnRaincallerTemplate(const FSkaldAbilityDefiniti
                     continue;
                 }
 
-                if (!ProcessedCells.Add(Candidate))
+                if (ProcessedCells.Contains(Candidate))
                 {
                     continue;
                 }
+
+                ProcessedCells.Add(Candidate);
 
                 FSkaldRaincallerCell& Cell = RaincallerTemplateCells.Emplace_GetRef();
                 Cell.Cell = Candidate;
@@ -3532,7 +3534,7 @@ int32 USkaldAbilityComponent::FindRaincallerOccupantIndex(AFighterPawn* Fighter)
 
     for (int32 Index = RaincallerOccupants.Num() - 1; Index >= 0; --Index)
     {
-        const FRaincallerOccupantState& Entry = RaincallerOccupants[Index];
+        const FSkaldRaincallerOccupantState& Entry = RaincallerOccupants[Index];
         if (Entry.Fighter.IsValid() && Entry.Fighter.Get() == Fighter)
         {
             return Index;
@@ -3549,7 +3551,7 @@ void USkaldAbilityComponent::RemoveRaincallerOccupantAtIndex(int32 Index)
         return;
     }
 
-    const FRaincallerOccupantState Entry = RaincallerOccupants[Index];
+    const FSkaldRaincallerOccupantState Entry = RaincallerOccupants[Index];
     if (AFighterPawn* Fighter = Entry.Fighter.Get())
     {
         ApplyTargetStatDelta(Fighter, Entry.AppliedDelta, false);
@@ -3664,7 +3666,7 @@ void USkaldAbilityComponent::UpdateRaincallerEffectForFighter(AFighterPawn* Figh
             }
         }
 
-        FRaincallerOccupantState& Entry = RaincallerOccupants.Emplace_GetRef();
+        FSkaldRaincallerOccupantState& Entry = RaincallerOccupants.Emplace_GetRef();
         Entry.Fighter = Fighter;
         Entry.bIsAlly = bIsAlly;
         Entry.bAmphibiousApplied = bAmphibiousApplied;

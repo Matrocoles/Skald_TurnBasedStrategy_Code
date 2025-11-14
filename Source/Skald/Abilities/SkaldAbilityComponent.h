@@ -9,6 +9,7 @@ class AFighterPawn;
 class UDataTable;
 class UDecalComponent;
 class UNiagaraSystem;
+class UGridOverlayComponent;
 struct FFighterStats;
 struct FDiceRollResult;
 class UGridBattleManager;
@@ -339,6 +340,7 @@ public:
 
     bool HasHarrierDashDefencePenalty() const;
     void MarkHarrierDashDefencePenaltyConsumed();
+    bool TryPerformHarrierDashAdvance(AFighterPawn* Target);
 
 protected:
     virtual void BeginPlay() override;
@@ -386,7 +388,6 @@ protected:
     bool TrySwapAdjacentWithAlly(AFighterPawn* Owner, AFighterPawn* Ally) const;
     bool TryShiftFighterOneCell(AFighterPawn* Fighter, const AFighterPawn* Reference) const;
     void TryShiftFighterMultipleCells(AFighterPawn* Fighter, const AFighterPawn* Reference, int32 MaxSteps) const;
-    bool TryPerformHarrierDashAdvance(AFighterPawn* Target);
     void HandleBrutalChargeResolved(AFighterPawn* Defender, const FDiceRollResult& Result);
     void HandleRuneRiposteTriggered(AFighterPawn* Attacker, const FDiceRollResult& Result);
     void ApplyModifierToTarget(AFighterPawn* Target, FSkaldActiveAbilityModifier&& Modifier);
