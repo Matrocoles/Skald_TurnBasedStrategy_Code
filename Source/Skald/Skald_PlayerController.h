@@ -324,6 +324,10 @@ protected:
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Audio")
   USoundBase *WorldTurnStartSound = nullptr;
 
+  /** Sound to play for the local player when an enemy world map turn begins. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Audio")
+  USoundBase *EnemyTurnSFX = nullptr;
+
   /** Sound to play for the local player when their grid battle turn begins. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Audio")
   USoundBase *BattleTurnStartSound = nullptr;

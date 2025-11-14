@@ -2961,6 +2961,16 @@ void ASkaldPlayerController::ShowTurnAnnouncement(const FString &PlayerName,
     const FString Message = FString::Printf(TEXT("%s's Turn"), *PlayerName);
     GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Yellow, Message);
   }
+
+  const bool bShouldPlayEnemyCue = !bIsMyTurn && EnemyTurnSFX && IsLocalController();
+  if (bShouldPlayEnemyCue) {
+    const bool bOnWorldMap =
+        !bIsBattleMap &&
+        !(CachedGameInstance && CachedGameInstance->bIsInBattleMap);
+    if (bOnWorldMap) {
+      UGameplayStatics::PlaySound2D(this, EnemyTurnSFX);
+    }
+  }
 }
 
 void ASkaldPlayerController::NotifyTurnEnded(const FString &PlayerName) {
