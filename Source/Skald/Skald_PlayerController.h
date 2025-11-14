@@ -911,8 +911,6 @@ public:
 private:
   /** Display the stored strategic initiative roll if one is pending. */
   void ShowPendingStrategicInitiativeResult();
-  /** Finalise the strategic initiative result when dice presentation is suppressed. */
-  void CompleteStrategicInitiativeResultWithoutDice();
   void ShowStrategicInitiativeSpectatorRoll(int32 RollerPlayerId,
                                             int32 RoundNumber, int32 RollValue,
                                             const FLinearColor &RollerTint);
