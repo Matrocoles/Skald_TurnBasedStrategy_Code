@@ -2,7 +2,7 @@
 
 #include "Components/ActorComponent.h"
 #include "Abilities/SkaldAbilityTypes.h"
-#include "Templates/Optional.h"
+#include "Templates/SharedPointer.h"
 #include "SkaldAbilityComponent.generated.h"
 
 class AFighterPawn;
