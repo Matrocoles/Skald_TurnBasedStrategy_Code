@@ -539,7 +539,9 @@ void AWorldMap::SelectTerritory(ATerritory *Territory,
                                           : (bIsGlobalSelection ||
                                              IsSelectingPlayerLocal(
                                                  SelectingPlayerId));
-  if (!bAffectsLocalSelection) {
+  const bool bHasAuthority = HasAuthority();
+
+  if (!bAffectsLocalSelection && !bHasAuthority) {
     UE_LOG(LogSkald, VeryVerbose,
            TEXT("WorldMap %s ignoring non-local selection from player %d"),
            *GetName(), SelectingPlayerId);
@@ -576,8 +578,8 @@ void AWorldMap::SelectTerritory(ATerritory *Territory,
       SoundToPlay = TerritorySelectedSound;
     }
 
-    bShouldPlaySound = bPlaySelectionSound && SoundToPlay &&
-                      GetNetMode() != NM_DedicatedServer &&
+    bShouldPlaySound = bAffectsLocalSelection && bPlaySelectionSound &&
+                      SoundToPlay && GetNetMode() != NM_DedicatedServer &&
                       SelectedTerritory->IsSelectionVisibleToLocalPlayer();
   }
 
@@ -585,7 +587,9 @@ void AWorldMap::SelectTerritory(ATerritory *Territory,
     UGameplayStatics::PlaySound2D(this, SoundToPlay, VolumeMultiplier);
   }
 
-  OnTerritorySelected.Broadcast(SelectedTerritory);
+  if (bAffectsLocalSelection) {
+    OnTerritorySelected.Broadcast(SelectedTerritory);
+  }
 }
 
 void AWorldMap::MulticastSelectTerritory_Implementation(int32 TerritoryID,
