@@ -557,6 +557,8 @@ private:
     void CompleteInitiativeRoll(int32 AttackerRoll, int32 DefenderRoll);
     bool ShouldRerollInitiativeOnTie() const;
     bool BeginOverviewInitiativeTieReroll(int32 AttackerRoll, int32 DefenderRoll);
+    void UpdateGameStateRoundData();
+    int32 CountAvailableActivations(bool bForAttackers) const;
     USkaldDiceManager* ResolveDiceManager();
 
     UFUNCTION()

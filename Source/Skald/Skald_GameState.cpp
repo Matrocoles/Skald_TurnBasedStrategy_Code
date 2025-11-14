@@ -25,6 +25,11 @@ void ASkaldGameState::GetLifetimeReplicatedProps(
     DOREPLIFETIME(ASkaldGameState, LastDefenderCasualties);
     DOREPLIFETIME(ASkaldGameState, BattlePhase);
     DOREPLIFETIME(ASkaldGameState, PendingBattleReadyState);
+    DOREPLIFETIME(ASkaldGameState, CurrentBattleRound);
+    DOREPLIFETIME(ASkaldGameState, BattleInitiativeWinner);
+    DOREPLIFETIME(ASkaldGameState, RemainingAttackerActivations);
+    DOREPLIFETIME(ASkaldGameState, RemainingDefenderActivations);
+    DOREPLIFETIME(ASkaldGameState, bBattleAttackerTurn);
 }
 
 void ASkaldGameState::AddPlayerState(APlayerState* PlayerState)
@@ -130,6 +135,52 @@ void ASkaldGameState::SetPendingBattleReady(const FSkaldBattleReadyState& NewSta
     OnRep_PendingBattleReady();
 }
 
+void ASkaldGameState::SetBattleRoundState(int32 RoundNumber, ESkaldFaction InitiativeWinner, int32 AttackerActivations,
+                                          int32 DefenderActivations, bool bIsAttackerTurn)
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    bool bChanged = false;
+
+    if (CurrentBattleRound != RoundNumber)
+    {
+        CurrentBattleRound = RoundNumber;
+        bChanged = true;
+    }
+
+    if (BattleInitiativeWinner != InitiativeWinner)
+    {
+        BattleInitiativeWinner = InitiativeWinner;
+        bChanged = true;
+    }
+
+    if (RemainingAttackerActivations != AttackerActivations)
+    {
+        RemainingAttackerActivations = AttackerActivations;
+        bChanged = true;
+    }
+
+    if (RemainingDefenderActivations != DefenderActivations)
+    {
+        RemainingDefenderActivations = DefenderActivations;
+        bChanged = true;
+    }
+
+    if (bBattleAttackerTurn != bIsAttackerTurn)
+    {
+        bBattleAttackerTurn = bIsAttackerTurn;
+        bChanged = true;
+    }
+
+    if (bChanged)
+    {
+        OnRep_BattleRoundState();
+    }
+}
+
 bool ASkaldGameState::AreAllRequiredPartiesReady() const
 {
     const bool bAttackerReady =
@@ -141,6 +192,11 @@ bool ASkaldGameState::AreAllRequiredPartiesReady() const
         PendingBattleReadyState.bDefenderReady;
 
     return bAttackerReady && bDefenderReady;
+}
+
+int32 ASkaldGameState::GetRemainingActivations(bool bForAttackers) const
+{
+    return bForAttackers ? RemainingAttackerActivations : RemainingDefenderActivations;
 }
 
 void ASkaldGameState::OnRep_BattleSummary()
@@ -159,6 +215,12 @@ void ASkaldGameState::OnRep_PendingBattleReady()
            PendingBattleReadyState.bDefenderReady ? TEXT("true") : TEXT("false"),
            PendingBattleReadyState.bDefenderIsAI ? TEXT("true") : TEXT("false"),
            PendingBattleReadyState.LastUpdatedTimeSeconds);
+}
+
+void ASkaldGameState::OnRep_BattleRoundState()
+{
+    OnBattleRoundUpdated.Broadcast(CurrentBattleRound, BattleInitiativeWinner, RemainingAttackerActivations,
+                                   RemainingDefenderActivations, bBattleAttackerTurn);
 }
 
 void ASkaldGameState::ClampTurnIndex()

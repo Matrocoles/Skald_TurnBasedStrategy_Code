@@ -748,6 +748,10 @@ public:
                                   ESkaldFaction InitiativeWinner);
 
   UFUNCTION()
+  void HandleReplicatedBattleRound(int32 RoundNumber, ESkaldFaction InitiativeWinner, int32 AttackerActivations,
+                                   int32 DefenderActivations, bool bIsAttackerTurn);
+
+  UFUNCTION()
   void HandleInitiativePhaseStarted(int32 RoundNumber);
 
   UFUNCTION()

@@ -2444,6 +2444,12 @@ void ASkaldPlayerController::InitializeBattleHUD() {
     CachedGameInstance = GI;
   }
 
+  ASkaldGameState *GameState = CachedGameState;
+  if (!GameState && GetWorld()) {
+    GameState = GetWorld()->GetGameState<ASkaldGameState>();
+    CachedGameState = GameState;
+  }
+
   AFighterPawn *ActiveFighter = nullptr;
   bool bPendingInitiativePrompt = false;
   int32 PendingInitiativeRound = 0;
@@ -2484,6 +2490,19 @@ void ASkaldPlayerController::InitializeBattleHUD() {
     PendingInitiativeRound = CurrentRound;
   } else {
     CachedBattleManager.Reset();
+  }
+
+  if (GameState) {
+    GameState->OnBattleRoundUpdated.RemoveDynamic(
+        this, &ASkaldPlayerController::HandleReplicatedBattleRound);
+    GameState->OnBattleRoundUpdated.AddDynamic(
+        this, &ASkaldPlayerController::HandleReplicatedBattleRound);
+
+    if ((!GI || !GI->GridBattleManager) &&
+        GameState->GetReplicatedBattleRound() > 0) {
+      UpdateBattleRoundDisplay(GameState->GetReplicatedBattleRound(),
+                               GameState->GetBattleInitiativeWinner());
+    }
   }
 
   if (BattleHudWidget) {
@@ -5290,6 +5309,30 @@ void ASkaldPlayerController::HandleRoundStarted(int32 RoundNumber,
   RefreshLockedInFighterList();
 }
 
+void ASkaldPlayerController::HandleReplicatedBattleRound(
+    int32 RoundNumber, ESkaldFaction InitiativeWinner, int32 AttackerActivations,
+    int32 DefenderActivations, bool bIsAttackerTurn) {
+  (void)AttackerActivations;
+  (void)DefenderActivations;
+  (void)bIsAttackerTurn;
+
+  USkaldGameInstance *GI = CachedGameInstance;
+  if (!GI) {
+    GI = GetGameInstance<USkaldGameInstance>();
+    CachedGameInstance = GI;
+  }
+
+  if (GI && GI->GridBattleManager) {
+    return;
+  }
+
+  if (RoundNumber > 0) {
+    UpdateBattleRoundDisplay(RoundNumber, InitiativeWinner);
+  }
+
+  UpdateBattlePlayersTurnDisplay();
+}
+
 void ASkaldPlayerController::HandleInitiativePhaseStarted(int32 RoundNumber) {
   if (!BattleHudWidget) {
     return;
@@ -6157,8 +6200,18 @@ void ASkaldPlayerController::UpdateBattlePlayersTurnDisplay() {
   bool bAttackerTurn = true;
   if (GI->GridBattleManager) {
     bAttackerTurn = GI->GridBattleManager->IsAttackerTurn();
-  } else if (LockedActiveFighter) {
-    bAttackerTurn = LockedActiveFighter->bIsAttacker;
+  } else {
+    ASkaldGameState *GameState = CachedGameState;
+    if (!GameState && GetWorld()) {
+      GameState = GetWorld()->GetGameState<ASkaldGameState>();
+      CachedGameState = GameState;
+    }
+
+    if (GameState && GameState->GetReplicatedBattleRound() > 0) {
+      bAttackerTurn = GameState->IsBattleAttackerTurn();
+    } else if (LockedActiveFighter) {
+      bAttackerTurn = LockedActiveFighter->bIsAttacker;
+    }
   }
 
   const FS_BattlePayload &Battle = GI->PendingBattle;

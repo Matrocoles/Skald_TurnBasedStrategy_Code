@@ -12,6 +12,9 @@ class ASkaldPlayerState;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSkaldPlayersUpdated);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSkaldTurnIndexChanged, int32, NewTurnIndex);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FFighterRosterUpdated);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(FSkaldBattleRoundUpdated, int32, RoundNumber, ESkaldFaction,
+                                             InitiativeWinner, int32, AttackerActivations, int32, DefenderActivations,
+                                             bool, bIsAttackerTurn);
 
 UENUM(BlueprintType)
 enum class EBattlePhase : uint8
@@ -59,6 +62,26 @@ public:
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_PendingBattleReady,
               Category="GameState|Battle")
     FSkaldBattleReadyState PendingBattleReadyState;
+
+    /** Current grid-battle round number (replicated for clients without a battle manager). */
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_BattleRoundState, Category="GameState|Battle")
+    int32 CurrentBattleRound = 0;
+
+    /** Winner of the most recent initiative roll. */
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_BattleRoundState, Category="GameState|Battle")
+    ESkaldFaction BattleInitiativeWinner = ESkaldFaction::None;
+
+    /** Remaining attacker activations for the current round. */
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_BattleRoundState, Category="GameState|Battle")
+    int32 RemainingAttackerActivations = 0;
+
+    /** Remaining defender activations for the current round. */
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_BattleRoundState, Category="GameState|Battle")
+    int32 RemainingDefenderActivations = 0;
+
+    /** Whether attackers currently have priority to activate a fighter. */
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_BattleRoundState, Category="GameState|Battle")
+    bool bBattleAttackerTurn = true;
 
     // ---- Battle Summary (replicated) ----
     /** Winner of the last completed battle. */
@@ -123,6 +146,26 @@ public:
         return PendingBattleReadyState;
     }
 
+    /** Server-only helper used by the battle manager to update round data. */
+    void SetBattleRoundState(int32 RoundNumber, ESkaldFaction InitiativeWinner, int32 AttackerActivations,
+                             int32 DefenderActivations, bool bIsAttackerTurn);
+
+    /** Access the current replicated grid-battle round number. */
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="GameState|Battle")
+    int32 GetReplicatedBattleRound() const { return CurrentBattleRound; }
+
+    /** Returns the faction that won the most recent initiative roll. */
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="GameState|Battle")
+    ESkaldFaction GetBattleInitiativeWinner() const { return BattleInitiativeWinner; }
+
+    /** True when the attackers currently have the next activation. */
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="GameState|Battle")
+    bool IsBattleAttackerTurn() const { return bBattleAttackerTurn; }
+
+    /** Number of remaining activations for the requested side. */
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="GameState|Battle")
+    int32 GetRemainingActivations(bool bForAttackers) const;
+
     /** Request a short-lived global slowdown for cinematic feedback. */
     void RequestTransientSlowdown(float TargetDilation, float DurationSeconds);
 
@@ -147,6 +190,9 @@ protected:
     UFUNCTION()
     void OnRep_PendingBattleReady();
 
+    UFUNCTION()
+    void OnRep_BattleRoundState();
+
     /** Keep CurrentTurnIndex in bounds after roster changes. */
     void ClampTurnIndex();
 
@@ -159,5 +205,10 @@ protected:
     float OriginalTimeDilation = 1.f;
     float ActiveTimeDilation = 1.f;
     bool bTimeDilationRequestActive = false;
+
+public:
+    /** Broadcast whenever the replicated battle round state changes. */
+    UPROPERTY(BlueprintAssignable, Category="GameState|Events")
+    FSkaldBattleRoundUpdated OnBattleRoundUpdated;
 };
 

@@ -709,6 +709,8 @@ void UGridBattleManager::CompleteInitiativeRoll(int32 AttackerRoll, int32 Defend
         OnInitiativeRollCompleted.Broadcast(CurrentRound, LastInitiativeRollAttacker, LastInitiativeRollDefender, InitiativeWinnerFaction);
     }
 
+    UpdateGameStateRoundData();
+
     ScheduleRoundStart(bHasPresentationListeners);
 }
 
@@ -869,6 +871,8 @@ void UGridBattleManager::StartRound()
     }
 
     ++CurrentRound;
+    InitiativeWinnerFaction = ESkaldFaction::None;
+    UpdateGameStateRoundData();
 
     const int32 LivingAttackers = CountFighters(InitiativeOrder, true);
     const int32 LivingDefenders = CountFighters(InitiativeOrder, false);
@@ -1056,6 +1060,8 @@ void UGridBattleManager::FinalizeRoundStart()
             Fighter->ResetActivationState();
         }
     }
+
+    UpdateGameStateRoundData();
 
     OnRoundStarted.Broadcast(CurrentRound, InitiativeWinnerFaction);
     OnActiveFighterChanged.Broadcast(nullptr);
@@ -1569,6 +1575,7 @@ void UGridBattleManager::EvaluateRoundProgress(bool bPreviousWasAttacker)
     {
         bIsAttackerTurn = !bPreviousWasAttacker;
         UE_LOG(LogSkaldBattle, Log, TEXT("[Battle] Switching turn to %s"), bIsAttackerTurn ? TEXT("Attackers") : TEXT("Defenders"));
+        UpdateGameStateRoundData();
         return;
     }
 
@@ -1576,11 +1583,43 @@ void UGridBattleManager::EvaluateRoundProgress(bool bPreviousWasAttacker)
     {
         bIsAttackerTurn = bPreviousWasAttacker;
         UE_LOG(LogSkaldBattle, Log, TEXT("[Battle] Keeping turn with %s"), bIsAttackerTurn ? TEXT("Attackers") : TEXT("Defenders"));
+        UpdateGameStateRoundData();
         return;
     }
 
     UE_LOG(LogSkaldBattle, Log, TEXT("[Battle] No fighters remain with actions. Advancing to next round."));
     StartRound();
+}
+
+void UGridBattleManager::UpdateGameStateRoundData()
+{
+    if (UWorld* World = GetWorld())
+    {
+        if (ASkaldGameState* GameState = World->GetGameState<ASkaldGameState>())
+        {
+            GameState->SetBattleRoundState(CurrentRound, InitiativeWinnerFaction, CountAvailableActivations(true),
+                                           CountAvailableActivations(false), bIsAttackerTurn);
+        }
+    }
+}
+
+int32 UGridBattleManager::CountAvailableActivations(bool bForAttackers) const
+{
+    int32 Remaining = 0;
+    for (AFighterPawn* Fighter : InitiativeOrder)
+    {
+        if (!Fighter || !Fighter->IsAlive() || Fighter->bIsAttacker != bForAttackers)
+        {
+            continue;
+        }
+
+        if (!Fighter->HasActivatedThisRound())
+        {
+            ++Remaining;
+        }
+    }
+
+    return Remaining;
 }
 
 void UGridBattleManager::ClearInactiveFighters()
