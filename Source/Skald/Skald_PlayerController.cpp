@@ -848,6 +848,8 @@ FSkaldAbilityTargetingInfo ASkaldPlayerController::GetAbilityTargetingInfo(
     int32 RangeOverride = INDEX_NONE;
     bool bRequireLineOfSight = true;
     bool bAllowEmptyCell = false;
+    bool bAllowSelfTarget = false;
+    bool bPerformAttack = true;
   };
 
   // Maintain the per-ability targeting defaults in a single table so we can
@@ -858,15 +860,23 @@ FSkaldAbilityTargetingInfo ASkaldPlayerController::GetAbilityTargetingInfo(
   static const TMap<FName, FAbilityTargetingPreset> TargetingPresets = {
       {TEXT("Ability_Human_Skirmish"),
        {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
+      {TEXT("Ability_Human_Line"),
+       {EBattleCommandMode::AbilityTargetAlly, 1, false}},
       {TEXT("Ability_Orc_Skirmish"),
        {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
       {TEXT("Ability_Inflicted_Skirmish"),
        {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
       {TEXT("Ability_Ravpack_Skirmish"),
        {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
+      {TEXT("Ability_Frog_Skirmish"),
+       {EBattleCommandMode::AbilityTargetEnemy, 4, true, false, false,
+        false}},
+      {TEXT("Ability_Frogfolk_Skirmish"),
+       {EBattleCommandMode::AbilityTargetEnemy, 4, true, false, false,
+        false}},
       {TEXT("Ability_Orc_Line"), {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
       {TEXT("Ability_Dwarf_Elite"),
-       {EBattleCommandMode::AbilityTargetEnemy, 6}},
+       {EBattleCommandMode::AbilityTargetCell, 6, true, true}},
       {TEXT("Ability_Elf_Line"), {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
       {TEXT("Ability_Undead_Line"),
        {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
@@ -877,9 +887,9 @@ FSkaldAbilityTargetingInfo ASkaldPlayerController::GetAbilityTargetingInfo(
       {TEXT("Ability_Empire_Skirmish"),
        {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
       {TEXT("Ability_Empire_Elite"),
-       {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
+       {EBattleCommandMode::AbilityTargetCell, INDEX_NONE, true, true}},
       {TEXT("Ability_Ravpack_Line"),
-       {EBattleCommandMode::AbilityTargetCell, 1, true, true}},
+       {EBattleCommandMode::AbilityTargetCell, 1, true, true, false, false}},
       {TEXT("Ability_Elf_Elite"), {EBattleCommandMode::AbilityTargetEnemy, 8}},
       {TEXT("Ability_Undead_Skirmish"),
        {EBattleCommandMode::AbilityTargetEnemy, 3}},
@@ -890,6 +900,8 @@ FSkaldAbilityTargetingInfo ASkaldPlayerController::GetAbilityTargetingInfo(
     Info.RangeOverride = Preset->RangeOverride;
     Info.bRequireLineOfSight = Preset->bRequireLineOfSight;
     Info.bAllowEmptyCell = Preset->bAllowEmptyCell;
+    Info.bAllowSelfTarget = Preset->bAllowSelfTarget;
+    Info.bPerformAttack = Preset->bPerformAttack;
     return Info;
   }
 
@@ -1076,8 +1088,11 @@ bool ASkaldPlayerController::ExecuteAbilityCommandInternal(
       return false;
     }
 
+    const bool bPerformAttack = Command.Targeting.CommandMode ==
+                                    EBattleCommandMode::AbilityTargetEnemy &&
+                                Command.Targeting.bPerformAttack;
     if (!TryExecuteAbilityOnFighter(Source, Command.Slot, TargetFighter,
-                                    FailureReason)) {
+                                    FailureReason, bPerformAttack)) {
       if (OutError) {
         *OutError = FailureReason;
       }
@@ -1104,8 +1119,7 @@ bool ASkaldPlayerController::ExecuteAbilityCommandInternal(
       return false;
     }
 
-    if (!TryExecuteAbilityAtCell(Source, Command.Slot, *TargetCell,
-                                 FailureReason)) {
+    if (!TryExecuteAbilityAtCell(Command, *TargetCell, FailureReason)) {
       if (OutError) {
         *OutError = FailureReason;
       }
@@ -1178,50 +1192,10 @@ void ASkaldPlayerController::ServerExecuteAbilityAtCell_Implementation(
 
 bool ASkaldPlayerController::TryExecuteAbilityOnFighter(
     AFighterPawn *Source, ESkaldAbilitySlot Slot, AFighterPawn *Target,
-    FText &OutError) {
+    FText &OutError, bool bPerformAttack) {
   OutError = FText::GetEmpty();
 
   if (!Source || !Target) {
-    OutError = NSLOCTEXT("SkaldAbilities", "AbilityRequiresTarget",
-                         "Select a valid target.");
-    return false;
-  }
-
-  USkaldAbilityComponent *AbilityComponent = Source->GetAbilityComponent();
-  if (!AbilityComponent) {
-    OutError = NSLOCTEXT("SkaldAbilities", "AbilityComponentMissing",
-                         "This fighter has no abilities configured.");
-    return false;
-  }
-
-  FText FailureReason;
-  if (!AbilityComponent->TryBeginAbility(Slot, FailureReason)) {
-    OutError = FailureReason;
-    return false;
-  }
-
-  const FSkaldAbilityState *State =
-      AbilityComponent->FindAbilityState(Slot);
-  if (State &&
-      State->Definition.CostType == ESkaldAbilityCostType::Action) {
-    Source->TryRestoreAction();
-  }
-
-  Source->PerformAttack(Target);
-
-  if (State && State->Definition.AbilityId == TEXT("Ability_Elf_Line")) {
-    Source->TryRestoreAction();
-  }
-  return true;
-}
-
-bool ASkaldPlayerController::TryExecuteAbilityAtCell(AFighterPawn *Source,
-                                                     ESkaldAbilitySlot Slot,
-                                                     const FIntPoint &Cell,
-                                                     FText &OutError) {
-  OutError = FText::GetEmpty();
-
-  if (!Source) {
     OutError = NSLOCTEXT("SkaldAbilities", "AbilityRequiresTarget",
                          "Select a valid target.");
     return false;
@@ -1241,24 +1215,175 @@ bool ASkaldPlayerController::TryExecuteAbilityAtCell(AFighterPawn *Source,
     return false;
   }
 
+  FSkaldAbilityContext AbilityContext;
+  AbilityContext.AbilityId = State->Definition.AbilityId;
+  AbilityContext.TargetFighter = Target;
+  AbilityComponent->SetPendingAbilityContext(AbilityContext);
+
+  FText FailureReason;
+  if (!AbilityComponent->TryBeginAbility(Slot, FailureReason)) {
+    AbilityComponent->ClearPendingAbilityContext();
+    OutError = FailureReason;
+    return false;
+  }
+
+  if (!bPerformAttack) {
+    return true;
+  }
+
+  if (State->Definition.CostType == ESkaldAbilityCostType::Action) {
+    Source->TryRestoreAction();
+  }
+
+  Source->PerformAttack(Target);
+
+  if (State->Definition.AbilityId == TEXT("Ability_Elf_Line")) {
+    Source->TryRestoreAction();
+  }
+  return true;
+}
+
+bool ASkaldPlayerController::TryExecuteAbilityAtCell(
+    const FPendingAbilityCommand &Command, const FIntPoint &Cell,
+    FText &OutError) {
+  OutError = FText::GetEmpty();
+
+  AFighterPawn *Source = Command.SourceFighter.Get();
+  if (!Source) {
+    OutError = NSLOCTEXT("SkaldAbilities", "AbilityRequiresTarget",
+                         "Select a valid target.");
+    return false;
+  }
+
+  USkaldAbilityComponent *AbilityComponent = Source->GetAbilityComponent();
+  if (!AbilityComponent) {
+    OutError = NSLOCTEXT("SkaldAbilities", "AbilityComponentMissing",
+                         "This fighter has no abilities configured.");
+    return false;
+  }
+
+  const FSkaldAbilityState *State =
+      AbilityComponent->FindAbilityState(Command.Slot);
+  if (!State || !State->Definition.IsValid()) {
+    OutError = NSLOCTEXT("SkaldAbilities", "AbilityUnavailable",
+                         "No ability is assigned to that slot.");
+    return false;
+  }
+
   const FName AbilityId = State->Definition.AbilityId;
-  const bool bHasPendingTrap = AbilityComponent->HasPendingTrapForAbility(AbilityId);
+  const bool bHasPendingTrap =
+      AbilityComponent->HasPendingTrapForAbility(AbilityId);
+
+  AFighterPawn *AttackTarget = nullptr;
+  const bool bPerformAttack = Command.Targeting.bPerformAttack;
+  if (bPerformAttack) {
+    AttackTarget = ResolveCellAbilityPrimaryTarget(Command, Cell);
+    if (!AttackTarget) {
+      OutError = NSLOCTEXT("SkaldAbilities", "AbilityCellNoEnemy",
+                           "No enemies are threatened by that location.");
+      return false;
+    }
+  }
 
   if (!bHasPendingTrap) {
+    FSkaldAbilityContext AbilityContext;
+    AbilityContext.AbilityId = AbilityId;
+    AbilityContext.TargetCell = Cell;
+    AbilityContext.bHasTargetCell = true;
+    AbilityContext.TargetFighter = AttackTarget;
+    AbilityComponent->SetPendingAbilityContext(AbilityContext);
     FText FailureReason;
-    if (!AbilityComponent->TryBeginAbility(Slot, FailureReason)) {
+    if (!AbilityComponent->TryBeginAbility(Command.Slot, FailureReason)) {
+      AbilityComponent->ClearPendingAbilityContext();
       OutError = FailureReason;
       return false;
     }
   }
 
-  FText PlacementError;
-  if (!AbilityComponent->DeployTrapAtCell(Cell, AbilityId, PlacementError)) {
-    OutError = PlacementError;
-    return false;
+  if (bHasPendingTrap) {
+    FText PlacementError;
+    if (!AbilityComponent->DeployTrapAtCell(Cell, AbilityId, PlacementError)) {
+      OutError = PlacementError;
+      return false;
+    }
+    return true;
+  }
+
+  if (!bPerformAttack || !AttackTarget) {
+    return true;
+  }
+
+  if (State->Definition.CostType == ESkaldAbilityCostType::Action) {
+    Source->TryRestoreAction();
+  }
+
+  Source->PerformAttack(AttackTarget);
+
+  if (AbilityId == TEXT("Ability_Elf_Line")) {
+    Source->TryRestoreAction();
   }
 
   return true;
+}
+
+AFighterPawn *ASkaldPlayerController::FindCellAbilityAttackTarget(
+    const AFighterPawn *Source, const FIntPoint &Cell, int32 Radius) const {
+  if (!Source || Radius < 0) {
+    return nullptr;
+  }
+
+  UGridBattleManager *BattleManager = GetBattleManager();
+  if (!BattleManager) {
+    return nullptr;
+  }
+
+  AFighterPawn *OccupyingEnemy = nullptr;
+  AFighterPawn *BestEnemy = nullptr;
+  int32 BestDistance = Radius + 1;
+
+  const TArray<AFighterPawn *> Fighters =
+      BattleManager->GetInitiativeOrderSnapshot();
+  for (AFighterPawn *Fighter : Fighters) {
+    if (!Fighter || !Fighter->IsAlive() ||
+        Fighter->Faction == Source->Faction) {
+      continue;
+    }
+
+    const int32 Distance = Fighter->GetFootprintDistanceToCell(Cell);
+    if (Distance > Radius) {
+      continue;
+    }
+
+    if (Fighter->OccupiesCell(Cell)) {
+      OccupyingEnemy = Fighter;
+      break;
+    }
+
+    if (Distance < BestDistance) {
+      BestEnemy = Fighter;
+      BestDistance = Distance;
+    }
+  }
+
+  return OccupyingEnemy ? OccupyingEnemy : BestEnemy;
+}
+
+AFighterPawn *ASkaldPlayerController::ResolveCellAbilityPrimaryTarget(
+    const FPendingAbilityCommand &Command, const FIntPoint &Cell) const {
+  AFighterPawn *Source = Command.SourceFighter.Get();
+  if (!Source) {
+    return nullptr;
+  }
+
+  if (Command.AbilityId == TEXT("Ability_Dwarf_Elite")) {
+    return FindCellAbilityAttackTarget(Source, Cell, 1);
+  }
+
+  if (Command.AbilityId == TEXT("Ability_Empire_Elite")) {
+    return FindCellAbilityAttackTarget(Source, Cell, 2);
+  }
+
+  return nullptr;
 }
 
 void ASkaldPlayerController::InitializeHUDWidget() {
