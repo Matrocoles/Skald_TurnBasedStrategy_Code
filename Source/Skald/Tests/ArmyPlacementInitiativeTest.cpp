@@ -37,16 +37,6 @@ int32 GetCurrentTurnManagerIndex(ATurnManager *TurnManager) {
   return INDEX_NONE;
 }
 
-void AttachGameModeToWorld(UWorld *World, ASkaldGameMode *GameMode) {
-  if (!World || !GameMode) {
-    return;
-  }
-  if (FObjectProperty *Prop =
-          FindFProperty<FObjectProperty>(UWorld::StaticClass(), TEXT("AuthorityGameMode"))) {
-    Prop->SetObjectPropertyValue_InContainer(World, GameMode);
-  }
-}
-
 void ConfigureController(ASkaldPlayerController *Controller, ASkaldPlayerState *PlayerState,
                          int32 PlayerId, const FString &DisplayName, int32 Initiative) {
   if (!Controller || !PlayerState) {
@@ -98,7 +88,7 @@ bool FArmyPlacementInitiativeOrderTest::RunTest(const FString &Parameters) {
     return false;
   }
 
-  AttachGameModeToWorld(World, GameMode);
+  Skald::Tests::AttachGameModeToWorld(World, GameMode);
   GameMode->InitGameState();
   ASkaldGameState *GameState = GameMode->GetGameState<ASkaldGameState>();
   TestNotNull(TEXT("GameState initialised"), GameState);

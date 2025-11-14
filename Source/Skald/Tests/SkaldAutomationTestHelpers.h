@@ -8,11 +8,13 @@
 #include "CoreMinimal.h"
 
 class UWorld;
+class ASkaldGameMode;
 
 namespace Skald::Tests
 {
 UWorld* CreateAutomationTestWorld();
 void DestroyAutomationTestWorld(UWorld* World);
+void AttachGameModeToWorld(UWorld* World, ASkaldGameMode* GameMode);
 
 class FScopedAutomationTestWorld
 {

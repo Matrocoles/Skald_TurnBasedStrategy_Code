@@ -13,22 +13,6 @@
 #include "Tests/SkaldGameModeAutomationAccessor.h"
 #include "UObject/UnrealType.h"
 
-namespace
-{
-void AttachGameModeToWorld(UWorld* World, ASkaldGameMode* GameMode)
-{
-    if (!World || !GameMode)
-    {
-        return;
-    }
-
-    if (FObjectProperty* Prop = FindFProperty<FObjectProperty>(UWorld::StaticClass(), TEXT("AuthorityGameMode")))
-    {
-        Prop->SetObjectPropertyValue_InContainer(World, GameMode);
-    }
-}
-} // namespace
-
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRegisterPlayerRetriesPlayerStateTest,
                                  "Skald.GameMode.RegisterPlayerRetriesPlayerState",
                                  EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -55,7 +39,7 @@ bool FRegisterPlayerRetriesPlayerStateTest::RunTest(const FString& Parameters)
         return false;
     }
 
-    AttachGameModeToWorld(World, GameMode);
+    Skald::Tests::AttachGameModeToWorld(World, GameMode);
     GameMode->InitGameState();
     ASkaldGameState* GameState = GameMode->GetGameState<ASkaldGameState>();
     TestNotNull(TEXT("GameState initialised"), GameState);
