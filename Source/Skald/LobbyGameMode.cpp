@@ -490,6 +490,13 @@ void ALobbyGameMode::TryLaunchMatch(APlayerController* RequestingController)
 
     bMatchLaunchInitiated = true;
 
+    if (CachedLobbyState)
+    {
+        CachedLobbyState->bMatchLaunchInProgress = true;
+        CachedLobbyState->ForceNetUpdate();
+        CachedLobbyState->OnLobbySlotsUpdated.Broadcast();
+    }
+
     if (USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>())
     {
         GI->AIPlayersToSpawn = AuthorityAISlots;
