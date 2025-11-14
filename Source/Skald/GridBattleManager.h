@@ -145,6 +145,10 @@ struct FFighterAttackFXDefinition
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Attack FX")
     FVector PreAttackOffset = FVector::ZeroVector;
 
+    /** Optional yaw/pitch/roll offset applied after aiming at the target. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Attack FX")
+    FRotator PreAttackAimOffset = FRotator::ZeroRotator;
+
     /** Projectile Niagara effect spawned for ranged attacks. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Attack FX")
     TSoftObjectPtr<UNiagaraSystem> ProjectileEffect;
@@ -160,6 +164,15 @@ struct FFighterAttackFXDefinition
     /** Offset (in local space) applied when spawning ranged projectiles. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Attack FX")
     FVector ProjectileOffset = FVector::ZeroVector;
+
+    /** Spawn a bespoke projectile actor instead of Niagara when true. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Attack FX")
+    bool bUseProjectileActor = false;
+
+    /** Optional actor class used when spawning projectile actors. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Attack FX",
+              meta = (EditCondition = "bUseProjectileActor"))
+    TSubclassOf<AActor> ProjectileActorClass = nullptr;
 
     /** Speed (units per second) used when animating projectile travel. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Attack FX", meta=(ClampMin="0.0"))
