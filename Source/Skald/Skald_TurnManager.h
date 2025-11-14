@@ -256,8 +256,12 @@ protected:
   UPROPERTY(BlueprintReadOnly, Category = "Turn")
   int32 CurrentIndex;
 
-  UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Turn")
+  UPROPERTY(BlueprintReadWrite, EditAnywhere, ReplicatedUsing = OnRep_CurrentPhase,
+            Category = "Turn")
   ETurnPhase CurrentPhase = ETurnPhase::Reinforcement;
+
+  UFUNCTION()
+  void OnRep_CurrentPhase(ETurnPhase PreviousPhase);
 
   UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Turn")
   FS_BattlePayload PendingBattle;
