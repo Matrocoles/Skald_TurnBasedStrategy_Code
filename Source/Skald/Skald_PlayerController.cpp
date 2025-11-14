@@ -7769,11 +7769,26 @@ void ASkaldPlayerController::ShowInitiativeResults(int32 PlayerResult,
     return;
   }
 
+  DetermineControlledBattleSide();
+  const bool bPlayerIsAttacker = bControlsAttackerSide && !bControlsDefenderSide;
+  const bool bPlayerIsDefender = bControlsDefenderSide && !bControlsAttackerSide;
+
+  FLinearColor PlayerTint = ResolveBattleFactionColor(true);
+  FLinearColor EnemyTint = ResolveBattleFactionColor(false);
+  if (bPlayerIsDefender) {
+    PlayerTint = ResolveBattleFactionColor(false);
+    EnemyTint = ResolveBattleFactionColor(true);
+  } else if (!bPlayerIsAttacker && !bPlayerIsDefender) {
+    PlayerTint = ResolveBattleFactionColor(true);
+    EnemyTint = ResolveBattleFactionColor(false);
+  }
+
   if (UWorld *World = GetWorld()) {
     World->GetTimerManager().ClearTimer(InitiativeResultHideTimer);
   }
 
   DiceResultWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
+  DiceResultWidget->SetResultColors(PlayerTint, EnemyTint);
   DiceResultWidget->ShowResults(PlayerResult, EnemyResult);
 
   if (InitiativeResultLingerSeconds > 0.f) {
