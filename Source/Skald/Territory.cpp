@@ -270,11 +270,32 @@ void ATerritory::HandleClicked(UPrimitiveComponent *TouchedComponent,
   UE_LOG(LogSkald, Log, TEXT("Territory %d clicked; currently %s"), TerritoryID,
          bIsSelected ? TEXT("selected") : TEXT("not selected"));
 
-  if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(
-          UGameplayStatics::GetPlayerController(this, 0))) {
-    const bool bDeselected = bIsSelected;
-    PC->ServerSelectTerritory(bDeselected ? -1 : TerritoryID);
+  UWorld *World = GetWorld();
+  if (!World) {
+    return;
   }
+
+  ASkaldPlayerController *LocalController = nullptr;
+  for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator();
+       It; ++It) {
+    if (ASkaldPlayerController *Candidate = Cast<ASkaldPlayerController>(*It)) {
+      if (Candidate->IsLocalController()) {
+        LocalController = Candidate;
+        break;
+      }
+    }
+  }
+
+  if (!LocalController) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("Territory %d clicked but no local SkaldPlayerController was "
+                "found"),
+           TerritoryID);
+    return;
+  }
+
+  const bool bDeselected = bIsSelected;
+  LocalController->ServerSelectTerritory(bDeselected ? -1 : TerritoryID);
 }
 
 void ATerritory::SetSelectionDecalAdditionalHeightOffset(float AdditionalOffset) {
