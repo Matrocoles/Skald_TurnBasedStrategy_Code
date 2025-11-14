@@ -1125,6 +1125,22 @@ void UBattleHUDWidget::UpdateStatPanel() {
   UpdateActionButtonVisibility();
 }
 
+void UBattleHUDWidget::RefreshEnemyDisplayAfterResolution() {
+  AFighterPawn *DesiredEnemy = nullptr;
+
+  if (ManualAttackRollTarget.IsValid()) {
+    DesiredEnemy = ManualAttackRollTarget.Get();
+  } else if (HighlightedEnemyLockedInFighter.IsValid()) {
+    DesiredEnemy = HighlightedEnemyLockedInFighter.Get();
+  } else if (ActiveEnemyLockedInFighter.IsValid()) {
+    DesiredEnemy = ActiveEnemyLockedInFighter.Get();
+  } else if (DisplayedEnemyStatFighter.IsValid()) {
+    DesiredEnemy = DisplayedEnemyStatFighter.Get();
+  }
+
+  UpdateEnemyStatPanel(DesiredEnemy);
+}
+
 void UBattleHUDWidget::UpdateEnemyStatFighterBinding(AFighterPawn *NewFighter) {
   AFighterPawn *CurrentDisplayed = DisplayedEnemyStatFighter.Get();
   if (CurrentDisplayed == NewFighter) {
@@ -2426,8 +2442,8 @@ void UBattleHUDWidget::ProcessNextDiceResolution() {
     ReleaseHealthTextHold(ActiveDiceResolution.Defender.Get());
     bDiceResolutionActive = false;
     bManualDiceResolutionActive = false;
-    ClearEnemyStatPanel();
     UpdateStatPanel();
+    RefreshEnemyDisplayAfterResolution();
     ProcessNextDiceResolution();
     return;
   }
@@ -2457,8 +2473,8 @@ void UBattleHUDWidget::HandleDicePanelResolved(
     SetAttackRollButtonVisibility(false);
     ReleaseHealthTextHold(nullptr);
     OnResolutionComplete.Broadcast(nullptr, nullptr, Result);
-    ClearEnemyStatPanel();
     UpdateStatPanel();
+    RefreshEnemyDisplayAfterResolution();
     return;
   }
 
@@ -2472,8 +2488,8 @@ void UBattleHUDWidget::HandleDicePanelResolved(
   ActiveDiceResolution = FBattleQueuedDiceResolution();
   bManualDiceResolutionActive = false;
   SetAttackRollButtonVisibility(false);
-  ClearEnemyStatPanel();
   UpdateStatPanel();
+  RefreshEnemyDisplayAfterResolution();
 
   ProcessNextDiceResolution();
 }

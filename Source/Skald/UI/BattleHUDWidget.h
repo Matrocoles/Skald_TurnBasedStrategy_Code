@@ -608,6 +608,7 @@ public:
 
 private:
   void UpdateEnemyStatPanel(AFighterPawn *Fighter);
+  void RefreshEnemyDisplayAfterResolution();
   void ClearEnemyStatPanel();
   void UpdateEnemyAbilityText(const FSkaldAbilityDefinition &Definition);
   void ApplyPrimaryFighterDisplay(AFighterPawn *Fighter);
