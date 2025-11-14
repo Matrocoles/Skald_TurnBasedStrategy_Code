@@ -240,6 +240,10 @@ public:
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category = "Battle")
   TArray<TSoftObjectPtr<UWorld>> BattleMaps;
 
+  /** Maps reserved for capital battles. Falls back to BattleMaps when empty. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category = "Battle")
+  TArray<TSoftObjectPtr<UWorld>> CapitalMaps;
+
   /** Optional per-map configuration including streaming preferences. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category = "Battle",
             meta = (TitleProperty = "Map"))

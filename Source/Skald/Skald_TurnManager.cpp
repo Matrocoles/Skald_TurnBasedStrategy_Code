@@ -403,6 +403,7 @@ void ATurnManager::GetLifetimeReplicatedProps(
     TArray<FLifetimeProperty> &OutLifetimeProps) const {
   Super::GetLifetimeReplicatedProps(OutLifetimeProps);
   DOREPLIFETIME(ATurnManager, BattleMaps);
+  DOREPLIFETIME(ATurnManager, CapitalMaps);
   DOREPLIFETIME(ATurnManager, BattleMapEntries);
 }
 
@@ -2205,9 +2206,17 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
       GI = GetGameInstance<USkaldGameInstance>();
     }
 
+    const bool bIsCapitalAttack = SeededBattle.IsCapitalAttack;
     bool bShouldStreamSelectedMap = true;
     TSoftObjectPtr<UWorld> SelectedBattleMap;
-    if (BattleMapEntries.Num() > 0) {
+    if (bIsCapitalAttack && CapitalMaps.Num() > 0) {
+      const int32 Index = FMath::RandRange(0, CapitalMaps.Num() - 1);
+      SelectedBattleMap = CapitalMaps[Index];
+      bShouldStreamSelectedMap = true;
+      UE_LOG(LogSkald, Verbose,
+             TEXT("TriggerGridBattle: capital attack selecting map '%s'."),
+             *SelectedBattleMap.ToString());
+    } else if (BattleMapEntries.Num() > 0) {
       const int32 Index = FMath::RandRange(0, BattleMapEntries.Num() - 1);
       const FBattleMapDescriptor &Entry = BattleMapEntries[Index];
       SelectedBattleMap = Entry.Map;
@@ -2216,6 +2225,9 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
       const int32 Index = FMath::RandRange(0, BattleMaps.Num() - 1);
       SelectedBattleMap = BattleMaps[Index];
       bShouldStreamSelectedMap = true;
+    } else if (bIsCapitalAttack) {
+      UE_LOG(LogSkald, Warning,
+             TEXT("TriggerGridBattle: capital attack has no CapitalMaps configured; falling back to default map."));
     }
     if (SelectedBattleMap.IsNull()) {
       SelectedBattleMap = TSoftObjectPtr<UWorld>(
