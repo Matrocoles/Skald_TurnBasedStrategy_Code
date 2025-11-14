@@ -336,6 +336,7 @@ void UW_DiceResolutionPanel::NativeConstruct()
     Super::NativeConstruct();
     InitializeOutcomeScrollContainer();
     ResetPanel();
+    ApplyParticipantTextColors();
 }
 
 void UW_DiceResolutionPanel::NativeDestruct()
@@ -415,6 +416,14 @@ void UW_DiceResolutionPanel::SetManualRevealEnabled(bool bEnabled)
 {
     bManualRevealEnabled = bEnabled;
     bAwaitingManualInput = false;
+}
+
+void UW_DiceResolutionPanel::SetParticipantColors(const FLinearColor& PlayerColor, const FLinearColor& EnemyColor)
+{
+    PendingPlayerTextColor = PlayerColor;
+    PendingEnemyTextColor = EnemyColor;
+    bHasParticipantColors = true;
+    ApplyParticipantTextColors();
 }
 
 bool UW_DiceResolutionPanel::AdvanceManualReveal()
@@ -661,6 +670,24 @@ void UW_DiceResolutionPanel::ConfigureOutcomeScrollBox(UScrollBox& ScrollBox) co
     ScrollBox.SetAlwaysShowScrollbar(false);
     ScrollBox.SetAnimateWheelScrolling(false);
     ScrollBox.SetConsumeMouseWheel(EConsumeMouseWheel::WhenScrollingPossible);
+}
+
+void UW_DiceResolutionPanel::ApplyParticipantTextColors()
+{
+    if (!bHasParticipantColors)
+    {
+        return;
+    }
+
+    if (PlayerResultsText)
+    {
+        PlayerResultsText->SetColorAndOpacity(FSlateColor(PendingPlayerTextColor));
+    }
+
+    if (EnemyResultsText)
+    {
+        EnemyResultsText->SetColorAndOpacity(FSlateColor(PendingEnemyTextColor));
+    }
 }
 
 float UW_DiceResolutionPanel::GetOutcomeScrollWindowHeight() const

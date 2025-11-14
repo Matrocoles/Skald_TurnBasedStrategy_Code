@@ -40,6 +40,8 @@ marked as *Is Variable* so they can be bound to the properties declared in
 | `CritCountText` | `TextBlock` | `CritCountText` | Optional tally label. |
 | `TotalDamageText` | `TextBlock` | `TotalDamageText` | Optional summary label. |
 | `HealthSummaryText` | `TextBlock` | `HealthSummaryText` | Optional summary label. |
+| `PlayerResultsText` | `TextBlock` | `PlayerResultsText` | Optional label that describes the local player's outcome summary. The runtime tints it using the player's faction colour. |
+| `EnemyResultsText` | `TextBlock` | `EnemyResultsText` | Optional label that describes the opposing player's outcome summary. The runtime tints it using the enemy faction colour. |
 
 Only `OutcomeList` is strictly required for the automatic scroll behaviour. The other bindings
 are optional, but if they are present in the blueprint they must keep the exact names shown in

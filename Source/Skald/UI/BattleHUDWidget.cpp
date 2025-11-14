@@ -1,6 +1,7 @@
 #include "UI/BattleHUDWidget.h"
 #include "SkaldLogging.h"
 #include "Skald_PlayerController.h"
+#include "Skald_GameInstance.h"
 #include "Components/Button.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/CanvasPanelSlot.h"
@@ -79,6 +80,21 @@ int32 ResolveAttackDamageDelta(const AFighterPawn *Fighter,
   }
 
   return Result;
+}
+
+FLinearColor ResolveFighterFactionColor(const AFighterPawn *Fighter) {
+  if (!Fighter) {
+    return FLinearColor::White;
+  }
+
+  const UWorld *World = Fighter->GetWorld();
+  const USkaldGameInstance *GameInstance =
+      World ? World->GetGameInstance<USkaldGameInstance>() : nullptr;
+  if (GameInstance) {
+    return GameInstance->GetFactionColor(Fighter->Faction);
+  }
+
+  return USkaldGameInstance::GetDefaultFactionColor(Fighter->Faction);
 }
 } // namespace
 
@@ -2364,12 +2380,34 @@ void UBattleHUDWidget::QueueDiceResolution(
     const FDiceRollResult& Result,
     bool bManualReveal)
 {
-    FBattleQueuedDiceResolution Entry;
-    Entry.Attacker = Attacker;
-    Entry.Defender = Defender;
-    Entry.Result = Result;
+  FBattleQueuedDiceResolution Entry;
+  Entry.Attacker = Attacker;
+  Entry.Defender = Defender;
+  Entry.Result = Result;
 
-    // Manual reveal has been retired so the full resolution plays automatically
+  AFighterPawn *FriendlyForColours =
+      ResolveFriendlyStatFighter(Attacker, Defender);
+  AFighterPawn *EnemyForColours =
+      ResolveEnemyStatFighter(Attacker, Defender);
+
+  if (!FriendlyForColours) {
+    FriendlyForColours = Attacker ? Attacker : Defender;
+  }
+
+  if (!EnemyForColours) {
+    if (FriendlyForColours == Attacker) {
+      EnemyForColours = Defender;
+    } else if (FriendlyForColours == Defender) {
+      EnemyForColours = Attacker;
+    } else {
+      EnemyForColours = Attacker ? Attacker : Defender;
+    }
+  }
+
+  Entry.PlayerColor = ResolveFighterFactionColor(FriendlyForColours);
+  Entry.EnemyColor = ResolveFighterFactionColor(EnemyForColours);
+
+  // Manual reveal has been retired so the full resolution plays automatically
     // once the dice roll completes. Retain the parameter to avoid widespread
     // signature churn but clamp behaviour to the fully-automatic flow.
     const bool bEnableManualReveal = false;
@@ -2437,6 +2475,8 @@ void UBattleHUDWidget::ProcessNextDiceResolution() {
       ActiveDiceResolution.Result);
   ApplyDiceResolutionPanelLayoutInternal(Layout);
 
+  DiceResolutionPanel->SetParticipantColors(ActiveDiceResolution.PlayerColor,
+                                            ActiveDiceResolution.EnemyColor);
   DiceResolutionPanel->SetManualRevealEnabled(bManualDiceResolutionActive);
 
   DiceResolutionPanel->BeginResolution(ActiveDiceResolution.Result);

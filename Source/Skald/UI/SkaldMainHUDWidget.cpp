@@ -1420,6 +1420,30 @@ void USkaldMainHUDWidget::QueueDiceResolution(AFighterPawn *Attacker,
   Entry.Attacker = MakeWeakObjectPtr(Attacker);
   Entry.Defender = MakeWeakObjectPtr(Defender);
   Entry.Result = Result;
+
+  const auto ResolveFighterColor = [this](AFighterPawn *Fighter) {
+    return Fighter ? ResolveFactionColor(Fighter->Faction)
+                   : ResolveFactionColor(ESkaldFaction::None);
+  };
+
+  const ESkaldFaction LocalFaction = GameInstance ? GameInstance->Faction
+                                                  : ESkaldFaction::None;
+  const bool bAttackerMatchesLocal =
+      Attacker && Attacker->Faction == LocalFaction;
+  const bool bDefenderMatchesLocal =
+      Defender && Defender->Faction == LocalFaction;
+
+  if (bAttackerMatchesLocal) {
+    Entry.PlayerColor = ResolveFighterColor(Attacker);
+    Entry.EnemyColor = ResolveFighterColor(Defender);
+  } else if (bDefenderMatchesLocal) {
+    Entry.PlayerColor = ResolveFighterColor(Defender);
+    Entry.EnemyColor = ResolveFighterColor(Attacker);
+  } else {
+    Entry.PlayerColor = ResolveFighterColor(Attacker);
+    Entry.EnemyColor = ResolveFighterColor(Defender);
+  }
+
   PendingDiceResolutions.Add(MoveTemp(Entry));
 
   if (!bDiceResolutionActive) {
@@ -1454,6 +1478,8 @@ void USkaldMainHUDWidget::ProcessNextDiceResolution() {
       ActiveDiceResolution.Result);
   ApplyDiceResolutionPanelLayoutInternal(Layout);
 
+  DiceResolutionPanel->SetParticipantColors(ActiveDiceResolution.PlayerColor,
+                                            ActiveDiceResolution.EnemyColor);
   DiceResolutionPanel->BeginResolution(ActiveDiceResolution.Result);
 }
 

@@ -677,6 +677,8 @@ protected:
     TWeakObjectPtr<AFighterPawn> Attacker;
     TWeakObjectPtr<AFighterPawn> Defender;
     FDiceRollResult Result;
+    FLinearColor PlayerColor = FLinearColor::White;
+    FLinearColor EnemyColor = FLinearColor::White;
   };
 
   TArray<FQueuedDiceResolution> PendingDiceResolutions;
