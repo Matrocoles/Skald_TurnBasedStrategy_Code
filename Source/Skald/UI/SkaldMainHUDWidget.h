@@ -18,6 +18,7 @@ class ATerritory;
 class UConfirmAttackWidget;
 class UPrepareForBattleWidget;
 class UDeployWidget;
+class UEngineeringWidget;
 class UWidget;
 class SWidget;
 class ASkaldGameMode;
@@ -29,6 +30,7 @@ class UTexture2D;
 class UW_FloatingText;
 class UW_DiceResolutionPanel;
 class AFighterPawn;
+class USiegeTransferPromptWidget;
 
 struct FSkaldActiveFloater {
   TWeakObjectPtr<UW_FloatingText> Floater;
@@ -51,12 +53,13 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FSkaldBuildSiegeRequested, int32,
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSkaldEndAttackRequested, bool,
                                             bConfirmed);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FSkaldEngineeringRequested, int32,
-                                             CapitalID, uint8, UpgradeType);
+                                             CapitalID, EEngineeringAction,
+                                             UpgradeType);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSkaldDigTreasureRequested, int32,
                                             TerritoryID);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FSkaldMoveRequested, int32,
-                                               FromID, int32, ToID, int32,
-                                               Troops);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FSkaldMoveRequested, int32,
+                                              FromID, int32, ToID, int32,
+                                              Troops, bool, bTransferSiege);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSkaldEndMovementRequested, bool,
                                             bConfirmed);
 
@@ -77,6 +80,8 @@ class SKALD_API USkaldMainHUDWidget : public UUserWidget {
   GENERATED_BODY()
 
   friend class UDeployWidget;
+  friend class UEngineeringWidget;
+  friend class USiegeTransferPromptWidget;
 
 public:
   USkaldMainHUDWidget(const FObjectInitializer& ObjectInitializer);
@@ -114,12 +119,21 @@ public:
   UPROPERTY(BlueprintReadWrite, Category = "Skald|Selection")
   bool bSelectingForMove = false;
 
+  UPROPERTY(BlueprintReadWrite, Category = "Skald|Engineering")
+  bool bSelectingForEngineering = false;
+
   /** Sound played whenever a new world round begins. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skald|Audio")
   USoundBase *RoundStartSound = nullptr;
 
   UPROPERTY(BlueprintReadWrite, Category = "Skald|Siege")
   bool bUseSiegeForNextAttack = false;
+
+  UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Skald|Engineering")
+  TSubclassOf<UEngineeringWidget> EngineeringWidgetClass;
+
+  UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Skald|Siege")
+  TSubclassOf<USiegeTransferPromptWidget> SiegeTransferPromptClass;
 
   // Cached list of players for UI list building
   UPROPERTY(BlueprintReadWrite, Category = "Skald|Data")
@@ -313,9 +327,13 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
   virtual void UpdateDeployableUnits(int32 UnitsRemaining);
 
-  /** Update the resource display. */
+  /** Update the player's visible gold total. */
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
-  void UpdateResources(int32 ResourceAmount);
+  void UpdateGold(int32 GoldAmount);
+
+  /** Retrieve the gold cost for the requested siege weapon. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Engineering")
+  int32 GetSiegeGoldCost(ESiegeWeapon SiegeType) const;
 
   /** Display an error message to the player. */
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
@@ -372,7 +390,8 @@ public:
   void BeginMoveSelection();
 
   UFUNCTION(BlueprintCallable, Category = "Skald|Selection")
-  void SubmitMove(int32 FromID, int32 ToID, int32 Troops);
+  void SubmitMove(int32 FromID, int32 ToID, int32 Troops,
+                  bool bTransferSiege);
 
   UFUNCTION(BlueprintCallable, Category = "Skald|Selection")
   void CancelMoveSelection();
@@ -387,6 +406,18 @@ public:
 
   UFUNCTION(BlueprintCallable, Category = "Skald|Selection")
   void OnTerritoryClickedUI(ATerritory *Territory);
+
+  UFUNCTION(BlueprintCallable, Category = "Skald|Engineering")
+  void BeginEngineeringSelection();
+
+  UFUNCTION(BlueprintCallable, Category = "Skald|Engineering")
+  void CancelEngineeringSelection();
+
+  UFUNCTION(BlueprintCallable, Category = "Skald|Engineering")
+  void SubmitEngineeringAction(int32 CapitalID, EEngineeringAction Action);
+
+  UFUNCTION(BlueprintCallable, Category = "Skald|Movement")
+  void HandleMoveAmountChosen(int32 FromID, int32 ToID, int32 Troops);
 
   UFUNCTION(BlueprintCallable, Category = "Skald|Siege")
   void BuildSiege(int32 TerritoryID, ESiegeWeapon SiegeType);
@@ -520,8 +551,13 @@ public:
   UTextBlock *DeployableUnitsText;
 
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
-            meta = (BindWidget))
-  UTextBlock *ResourcesText;
+            meta = (BindWidgetOptional))
+  UTextBlock *GoldText = nullptr;
+
+  /** Legacy binding retained for widgets that still expose a ResourcesText field. */
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
+            meta = (BindWidgetOptional))
+  UTextBlock *ResourcesText = nullptr;
 
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Widgets",
             meta = (BindWidgetOptional))
@@ -625,6 +661,14 @@ protected:
   void HandleRetreatClicked();
 
   void ClearDeployWidget();
+  void ClearEngineeringWidget();
+  bool ValidateEngineeringActionRequest(int32 CapitalID,
+                                        FString &OutError) const;
+  void PromptSiegeTransfer();
+  void ResolveSiegeTransferChoice(bool bBringSiege);
+  void BeginSiegePlacement(int32 CapitalID);
+  void HandleSiegePlacementTarget(ATerritory *Territory);
+  bool DoesTerritoryContainSiege(int32 TerritoryID) const;
 
   UPROPERTY()
   UConfirmAttackWidget *ActiveConfirmWidget = nullptr;
@@ -690,6 +734,36 @@ protected:
 
   UPROPERTY()
   UDeployWidget *ActiveDeployWidget = nullptr;
+
+  UPROPERTY()
+  UEngineeringWidget *ActiveEngineeringWidget = nullptr;
+
+  UPROPERTY()
+  USiegeTransferPromptWidget *ActiveSiegeTransferPrompt = nullptr;
+
+  UPROPERTY()
+  int32 SelectedEngineeringCapitalID = -1;
+
+  UPROPERTY()
+  bool bSelectingSiegeDestination = false;
+
+  UPROPERTY()
+  int32 PendingSiegeCapitalID = -1;
+
+  UPROPERTY()
+  TArray<int32> PendingSiegeDestinationIDs;
+
+  UPROPERTY()
+  ESiegeWeapon PendingSiegeType = ESiegeWeapon::BatteringRam;
+
+  UPROPERTY()
+  int32 PendingMoveFromID = -1;
+
+  UPROPERTY()
+  int32 PendingMoveToID = -1;
+
+  UPROPERTY()
+  int32 PendingMoveTroops = 0;
 
   /** Prevent reconfiguring the broadcast text multiple times. */
   bool bBroadcastTextConfigured = false;

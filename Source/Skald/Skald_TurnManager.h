@@ -9,6 +9,7 @@
 
 class ASkaldPlayerController;
 class ASkaldPlayerState;
+class ATerritory;
 class AWorldMap;
 class UWorld;
 class USkaldGameInstance;
@@ -85,9 +86,9 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void BroadcastDeployableUnits(class ASkaldPlayerState *ForPlayer);
 
-  /** Update all HUDs with the specified player's resources. */
+  /** Update all HUDs with the specified player's gold. */
   UFUNCTION(BlueprintCallable, Category = "Turn")
-  void BroadcastResources(class ASkaldPlayerState *ForPlayer);
+  void BroadcastGold(class ASkaldPlayerState *ForPlayer);
 
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void SortControllersByInitiative();
@@ -371,10 +372,10 @@ protected:
   void QueuePhaseBroadcastRetry(ETurnPhase Phase);
 
   /**
-   * Calculate and apply reinforcements and resource gains for the specified
+   * Calculate and apply reinforcements and gold income for the specified
    * player state based on owned territories.
    */
-  void ApplyReinforcementsAndResources(ASkaldPlayerState *PS,
+  void ApplyReinforcementsAndGold(ASkaldPlayerState *PS,
                                        const TCHAR *Caller);
 
   /** Internal: set GameState.CurrentTurnIndex (and broadcast) to match CurrentIndex. */
@@ -388,6 +389,12 @@ protected:
 
   /** Capture the most recent grid battle resolution before travelling back. */
   bool CapturePendingBattleResolution(USkaldGameInstance *GameInstance);
+
+  void HandleSiegesAfterBattle(const FS_BattlePayload &Battle,
+                               const FGridBattleResolution &Resolution,
+                               ATerritory *Source, ATerritory *Target,
+                               ASkaldPlayerState *AttackerPS,
+                               ASkaldPlayerState *DefenderPS);
 
   bool bBattleReturnPending = false;
 

@@ -107,8 +107,8 @@ void UDeployWidget::HandleAccept() {
       }
     } else if (Mode == EDeployWidgetMode::Transfer) {
       if (OwningHUD.IsValid() && TargetTerritory) {
-        OwningHUD->SubmitMove(SourceTerritory->TerritoryID,
-                              TargetTerritory->TerritoryID, Selected);
+        OwningHUD->HandleMoveAmountChosen(SourceTerritory->TerritoryID,
+                                          TargetTerritory->TerritoryID, Selected);
       }
     }
   }

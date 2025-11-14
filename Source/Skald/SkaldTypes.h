@@ -12,6 +12,16 @@ namespace SkaldConstants
 {
     // Minimum army units required to attack a capital
     static constexpr int32 CapitalAttackArmyRequirement = 10;
+    // Default gold cost applied to engineering actions and siege builds
+    static constexpr int32 EngineeringActionGoldCost = 10;
+    // Amount of health granted to a main gate per upgrade action
+    static constexpr int32 MainGateUpgradeHealthBonus = 10;
+    // Default base health for capital main gates before upgrades
+    static constexpr int32 DefaultMainGateHealth = 40;
+    // Amount of gold granted per army-cost point when a fighter dies
+    static constexpr int32 FighterGoldMultiplier = 100;
+    // Fallback siege gold cost used when no override exists
+    static constexpr int32 DefaultSiegeGoldCost = 100;
 }
 
 // Utility helpers for gameplay checks
@@ -66,13 +76,27 @@ enum class ESiegeWeapon : uint8
 };
 
 UENUM(BlueprintType)
+enum class EEngineeringAction : uint8
+{
+    None             UMETA(DisplayName = "None"),
+    UpgradeMainGate  UMETA(DisplayName = "UpgradeMainGate"),
+    BuildMoat        UMETA(DisplayName = "BuildMoat"),
+    BuildSiegeWeapon UMETA(DisplayName = "BuildSiegeWeapon"),
+};
+
+UENUM(BlueprintType)
 enum class EBattleStats : uint8
 {
-    // Example entries; keep your real ones
-    Attack       UMETA(DisplayName = "Attack"),
-    Defense      UMETA(DisplayName = "Defense"),
-    Speed        UMETA(DisplayName = "Speed"),
-    // ...
+    Health              UMETA(DisplayName = "Health"),
+    Defence             UMETA(DisplayName = "Defence"),
+    Strength            UMETA(DisplayName = "Strength"),
+    AttackDice          UMETA(DisplayName = "AttackDice"),
+    AttackRange         UMETA(DisplayName = "AttackRange"),
+    Movement            UMETA(DisplayName = "Movement"),
+    AttackDamage        UMETA(DisplayName = "AttackDamage"),
+    CriticalBonusDamage UMETA(DisplayName = "CriticalBonusDamage"),
+    ArmyCost            UMETA(DisplayName = "ArmyCost"),
+    Count               UMETA(Hidden),
 };
 
 USTRUCT(BlueprintType)
@@ -166,8 +190,28 @@ struct SKALD_API FS_BattlePayload
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     bool IsCapitalAttack = false;
 
+    /** True when the defending capital has an active moat on the world map. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    bool bDefenderHasMoat = false;
+
+    /**
+     * Siege weapons committed by the attacker.
+     * Legacy name maintained for save game backwards compatibility.
+     */
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     TArray<int32> AssignedSiegeIDs;
+
+    /** Siege weapons automatically granted to the defender when a territory is attacked. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    TArray<int32> DefenderSiegeIDs;
+
+    /** Snapshot of attacker siege data so battle maps can spawn pawns without querying the world map. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    TArray<FS_Siege> AttackerSieges;
+
+    /** Snapshot of defender siege data so battle maps can spawn pawns without querying the world map. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    TArray<FS_Siege> DefenderSieges;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     bool TreasureFlag = false;
@@ -371,7 +415,7 @@ struct SKALD_API FS_PlayerData
     int32 TroopsCount = 0;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
-    int32 Resources = 0;
+    int32 Gold = 0;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     int32 TerritoriesOwned = 0;
@@ -408,6 +452,14 @@ struct SKALD_API FS_Siege
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     TArray<int32> BattleStats;
+
+    /** Optional portrait that should represent this siege when displayed in the battle HUD. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    TSoftObjectPtr<UTexture2D> Portrait;
+
+    /** Gold cost paid to construct this siege weapon. */
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    int32 GoldCost = 0;
 };
 
 USTRUCT(BlueprintType)
@@ -482,7 +534,7 @@ struct SKALD_API FPlayerSaveStruct
     ESkaldFaction Faction = ESkaldFaction::Human;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
-    int32 Resources = 0;
+    int32 Gold = 0;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     TArray<int32> CapitalTerritoryIDs;

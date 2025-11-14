@@ -10,6 +10,10 @@
 class AAIController;
 class ASkaldAIController;
 class AController;
+class AFighterPawn;
+class AMainGateFighterPawn;
+class AMoatGridObstacleActor;
+struct FDiceRollResult;
 
 /** GameMode dedicated to resolving grid-based battles. */
 UCLASS()
@@ -50,6 +54,11 @@ public:
   UFUNCTION(BlueprintCallable)
   void OnControllerReady(AController *Controller);
 
+  UFUNCTION()
+  void HandleBattleAttackResolved(class AFighterPawn *Attacker,
+                                  class AFighterPawn *Defender,
+                                  const struct FDiceRollResult &Result);
+
   /** Move controller pawns near the active battle grid, if available. */
   bool RelocateControllersNearBattleGrid(
       const TArray<AController *> &Controllers,
@@ -63,6 +72,11 @@ public:
   void NotifyBattleLevelActivated();
 
 private:
+  struct FPendingGateRegistration {
+    TWeakObjectPtr<AMainGateFighterPawn> Gate;
+    FFighterStats Stats;
+  };
+
   void SetupPendingBattle();
   void AutoCommitAIArmy(ASkaldPlayerState *PlayerState, int32 Budget) const;
   void SpawnFighterSide(const TArray<FFighterDefinition> &Roster, bool bAsAttacker);
@@ -81,6 +95,15 @@ private:
   void EnsureBattleControllers();
   void ProcessDeferredControllers();
   void ProcessStreamingActivation();
+  void DisableUnusedMainGates() const;
+  void DisableAllCapitalMoats() const;
+  void EnableMoatsForTerritory(int32 TerritoryID) const;
+  void AppendCapitalGateFighters(int32 TargetTerritoryID, int32 FortificationBonus,
+                                 ESkaldFaction DefenderFaction,
+                                 TArray<FFighter> &DefenderFighters,
+                                 TArray<FPendingGateRegistration> &OutRegistrations);
+  void ApplyGateRegistrations(const TArray<FPendingGateRegistration> &GateRegistrations,
+                              ESkaldFaction DefenderFaction);
 
   /** Controllers waiting for bootstrap while we rebuild the roster. */
   TArray<TWeakObjectPtr<AController>> DeferredReadyControllers;
@@ -113,5 +136,13 @@ private:
 
   /** True when NotifyBattleLevelActivated ran before BeginPlay completed. */
   bool bPendingStreamingActivation = false;
+
+  /** Cached battle participants for reward routing. */
+  TWeakObjectPtr<class ASkaldPlayerState> CachedAttackerState;
+  TWeakObjectPtr<class ASkaldPlayerState> CachedDefenderState;
+
+  ASkaldPlayerState *ResolveParticipantForFighter(const class AFighterPawn *Fighter) const;
+  void AwardKillGold(ASkaldPlayerState *Recipient, class AFighterPawn *Defender,
+                     int32 GoldAmount);
 };
 
