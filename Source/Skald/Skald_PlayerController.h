@@ -600,6 +600,16 @@ protected:
   UFUNCTION()
   void HandleWorldBeginPlay(UWorld *LoadedWorld);
 
+  void ExecuteLocalTurnStart();
+  void ShowTurnAnnouncementLocal(const FString &PlayerName, bool bIsMyTurn);
+  void NotifyTurnEndedLocal(const FString &PlayerName);
+  void HandleAttackPhaseLocal();
+  void HandleEngineeringPhaseLocal();
+  void HandleTreasurePhaseLocal();
+  void HandleMovementPhaseLocal();
+  void HandleEndTurnPhaseLocal();
+  void HandleRevoltPhaseLocal();
+
   /** Shared implementation for ending the current phase on the server. */
   void HandleEndPhaseInternal();
 
@@ -786,6 +796,18 @@ public:
 
   UFUNCTION(Client, Reliable)
   void ClientEnemyRetreated();
+
+  UFUNCTION(Client, Reliable)
+  void ClientShowTurnAnnouncement(const FString &PlayerName, bool bIsMyTurn);
+
+  UFUNCTION(Client, Reliable)
+  void ClientNotifyTurnEnded(const FString &PlayerName);
+
+  UFUNCTION(Client, Reliable)
+  void ClientStartTurnInternal();
+
+  UFUNCTION(Client, Reliable)
+  void ClientHandlePhaseChanged(ETurnPhase NewPhase);
 
   /** Local entry points so standalone/authority controllers can trigger the
    *  prepare-for-battle flow without relying on client RPC delivery. */

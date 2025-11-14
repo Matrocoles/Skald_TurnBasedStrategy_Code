@@ -3015,6 +3015,16 @@ void ASkaldPlayerController::HandleWorldBeginPlay(UWorld *LoadedWorld) {
 
 void ASkaldPlayerController::ShowTurnAnnouncement(const FString &PlayerName,
                                                   bool bIsMyTurn) {
+  if (!IsLocalController()) {
+    ClientShowTurnAnnouncement(PlayerName, bIsMyTurn);
+    return;
+  }
+
+  ShowTurnAnnouncementLocal(PlayerName, bIsMyTurn);
+}
+
+void ASkaldPlayerController::ShowTurnAnnouncementLocal(
+    const FString &PlayerName, bool bIsMyTurn) {
   if (MainHUD) {
     MainHUD->ShowTurnAnnouncement(PlayerName);
     MainHUD->ShowTurnMessage(bIsMyTurn);
@@ -3023,7 +3033,7 @@ void ASkaldPlayerController::ShowTurnAnnouncement(const FString &PlayerName,
     GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Yellow, Message);
   }
 
-  const bool bShouldPlayEnemyCue = !bIsMyTurn && EnemyTurnSFX && IsLocalController();
+  const bool bShouldPlayEnemyCue = !bIsMyTurn && EnemyTurnSFX;
   if (bShouldPlayEnemyCue) {
     const bool bOnWorldMap =
         !bIsBattleMap &&
@@ -3035,9 +3045,32 @@ void ASkaldPlayerController::ShowTurnAnnouncement(const FString &PlayerName,
 }
 
 void ASkaldPlayerController::NotifyTurnEnded(const FString &PlayerName) {
+  if (!IsLocalController()) {
+    ClientNotifyTurnEnded(PlayerName);
+    return;
+  }
+
+  NotifyTurnEndedLocal(PlayerName);
+}
+
+void ASkaldPlayerController::NotifyTurnEndedLocal(const FString &PlayerName) {
   if (MainHUD) {
     MainHUD->ShowTurnEnded(PlayerName);
   }
+}
+
+void ASkaldPlayerController::ClientShowTurnAnnouncement_Implementation(
+    const FString &PlayerName, bool bIsMyTurn) {
+  ShowTurnAnnouncementLocal(PlayerName, bIsMyTurn);
+}
+
+void ASkaldPlayerController::ClientNotifyTurnEnded_Implementation(
+    const FString &PlayerName) {
+  NotifyTurnEndedLocal(PlayerName);
+}
+
+void ASkaldPlayerController::ClientStartTurnInternal_Implementation() {
+  ExecuteLocalTurnStart();
 }
 
 bool ASkaldPlayerController::IsMyTurn() const {
@@ -3060,6 +3093,26 @@ bool ASkaldPlayerController::IsMyTurn() const {
 }
 
 void ASkaldPlayerController::StartTurn() {
+  if (IsLocalController()) {
+    ExecuteLocalTurnStart();
+  } else {
+    ClientStartTurnInternal();
+  }
+
+  if (HasAuthority()) {
+    if (ASkaldGameState *GS = GetWorld()->GetGameState<ASkaldGameState>()) {
+      if (ASkaldPlayerState *MyPS = GetPlayerState<ASkaldPlayerState>()) {
+        const int32 NewIndex = GS->PlayerArray.IndexOfByKey(MyPS);
+        if (NewIndex != INDEX_NONE) {
+          GS->CurrentTurnIndex = NewIndex;
+          GS->OnTurnIndexChanged.Broadcast(NewIndex);
+        }
+      }
+    }
+  }
+}
+
+void ASkaldPlayerController::ExecuteLocalTurnStart() {
   UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
       this, nullptr, EMouseLockMode::DoNotLock, false);
   bShowMouseCursor = true;
@@ -3071,22 +3124,8 @@ void ASkaldPlayerController::StartTurn() {
       !bIsBattleMap &&
       !(CachedGameInstance && CachedGameInstance->bIsInBattleMap);
 
-  if (bOnWorldMap && IsLocalController() && WorldTurnStartSound) {
+  if (bOnWorldMap && WorldTurnStartSound) {
     UGameplayStatics::PlaySound2D(this, WorldTurnStartSound);
-  }
-
-  // Drive GameState turn index so HUDs can react on all clients.
-  if (ASkaldGameState *GS = GetWorld()->GetGameState<ASkaldGameState>()) {
-    if (ASkaldPlayerState *MyPS = GetPlayerState<ASkaldPlayerState>()) {
-      const int32 NewIndex = GS->PlayerArray.IndexOfByKey(MyPS);
-      if (NewIndex != INDEX_NONE) {
-        GS->CurrentTurnIndex =
-            NewIndex; // RepNotify will fire OnTurnIndexChanged
-        // If you haven't applied RepNotifies yet, you can optionally
-        // direct-broadcast:
-        GS->OnTurnIndexChanged.Broadcast(NewIndex);
-      }
-    }
   }
 }
 
@@ -3985,6 +4024,15 @@ void ASkaldPlayerController::ServerDigTreasure_Implementation(
 }
 
 void ASkaldPlayerController::HandleAttackPhase() {
+  if (!IsLocalController()) {
+    ClientHandlePhaseChanged(ETurnPhase::Attack);
+    return;
+  }
+
+  HandleAttackPhaseLocal();
+}
+
+void ASkaldPlayerController::HandleAttackPhaseLocal() {
   if (const UWorld *W = GetWorld()) {
     if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
       if (GI->bTravelPending) {
@@ -4002,6 +4050,15 @@ void ASkaldPlayerController::HandleAttackPhase() {
 }
 
 void ASkaldPlayerController::HandleEngineeringPhase() {
+  if (!IsLocalController()) {
+    ClientHandlePhaseChanged(ETurnPhase::Engineering);
+    return;
+  }
+
+  HandleEngineeringPhaseLocal();
+}
+
+void ASkaldPlayerController::HandleEngineeringPhaseLocal() {
   if (const UWorld *W = GetWorld()) {
     if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
       if (GI->bTravelPending) {
@@ -4019,6 +4076,15 @@ void ASkaldPlayerController::HandleEngineeringPhase() {
 }
 
 void ASkaldPlayerController::HandleTreasurePhase() {
+  if (!IsLocalController()) {
+    ClientHandlePhaseChanged(ETurnPhase::Treasure);
+    return;
+  }
+
+  HandleTreasurePhaseLocal();
+}
+
+void ASkaldPlayerController::HandleTreasurePhaseLocal() {
   if (const UWorld *W = GetWorld()) {
     if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
       if (GI->bTravelPending) {
@@ -4036,6 +4102,15 @@ void ASkaldPlayerController::HandleTreasurePhase() {
 }
 
 void ASkaldPlayerController::HandleMovementPhase() {
+  if (!IsLocalController()) {
+    ClientHandlePhaseChanged(ETurnPhase::Movement);
+    return;
+  }
+
+  HandleMovementPhaseLocal();
+}
+
+void ASkaldPlayerController::HandleMovementPhaseLocal() {
   if (const UWorld *W = GetWorld()) {
     if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
       if (GI->bTravelPending) {
@@ -4053,6 +4128,15 @@ void ASkaldPlayerController::HandleMovementPhase() {
 }
 
 void ASkaldPlayerController::HandleEndTurnPhase() {
+  if (!IsLocalController()) {
+    ClientHandlePhaseChanged(ETurnPhase::EndTurn);
+    return;
+  }
+
+  HandleEndTurnPhaseLocal();
+}
+
+void ASkaldPlayerController::HandleEndTurnPhaseLocal() {
   if (const UWorld *W = GetWorld()) {
     if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
       if (GI->bTravelPending) {
@@ -4071,6 +4155,15 @@ void ASkaldPlayerController::HandleEndTurnPhase() {
 }
 
 void ASkaldPlayerController::HandleRevoltPhase() {
+  if (!IsLocalController()) {
+    ClientHandlePhaseChanged(ETurnPhase::Revolt);
+    return;
+  }
+
+  HandleRevoltPhaseLocal();
+}
+
+void ASkaldPlayerController::HandleRevoltPhaseLocal() {
   if (const UWorld *W = GetWorld()) {
     if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
       if (GI->bTravelPending) {
@@ -4085,6 +4178,32 @@ void ASkaldPlayerController::HandleRevoltPhase() {
     MainHUD->CancelMoveSelection();
     MainHUD->HideEndingTurn();
     MainHUD->UpdateInitiativeText(TEXT("Revolt Phase"));
+  }
+}
+
+void ASkaldPlayerController::ClientHandlePhaseChanged_Implementation(
+    ETurnPhase NewPhase) {
+  switch (NewPhase) {
+  case ETurnPhase::Attack:
+    HandleAttackPhaseLocal();
+    break;
+  case ETurnPhase::Engineering:
+    HandleEngineeringPhaseLocal();
+    break;
+  case ETurnPhase::Treasure:
+    HandleTreasurePhaseLocal();
+    break;
+  case ETurnPhase::Movement:
+    HandleMovementPhaseLocal();
+    break;
+  case ETurnPhase::EndTurn:
+    HandleEndTurnPhaseLocal();
+    break;
+  case ETurnPhase::Revolt:
+    HandleRevoltPhaseLocal();
+    break;
+  default:
+    break;
   }
 }
 
