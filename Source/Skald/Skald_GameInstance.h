@@ -120,6 +120,10 @@ public:
   UPROPERTY(BlueprintReadWrite, Category = "Player")
   int32 AIPlayersToSpawn = 1;
 
+  /** Number of human players that locked in before leaving the lobby. */
+  UPROPERTY(BlueprintReadWrite, Category = "Player")
+  int32 ExpectedLobbyPlayerCount = 0;
+
   /** Cached lobby selections for human players while travelling to the overworld. */
   TArray<FS_PlayerData> PendingLobbyPlayers;
 
