@@ -94,6 +94,14 @@ public:
     /** True if the local player should currently see selection visuals. */
     bool IsSelectionVisibleToLocalPlayer() const;
 
+    /**
+     * Whether selection events from the specified player should be visible on
+     * this client. Exposed publicly so that systems like the world map can
+     * avoid triggering redundant selection updates when nothing would change
+     * visually.
+     */
+    bool ShouldAffectLocalSelection(int32 SelectingPlayerId) const;
+
     /** Sound to play when this territory becomes selected locally, if set. */
     USoundBase *GetSelectionSound() const;
 

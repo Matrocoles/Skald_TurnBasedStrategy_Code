@@ -415,6 +415,10 @@ bool ATerritory::IsSelectionVisibleToLocalPlayer() const {
   return ShouldShowSelectionVisuals(LastSelectingPlayerId);
 }
 
+bool ATerritory::ShouldAffectLocalSelection(int32 SelectingPlayerId) const {
+  return ShouldShowSelectionVisuals(SelectingPlayerId);
+}
+
 USoundBase *ATerritory::GetSelectionSound() const { return SelectionSound; }
 
 float ATerritory::GetSelectionSoundVolumeMultiplier() const {
