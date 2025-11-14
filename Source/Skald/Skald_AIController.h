@@ -107,7 +107,7 @@ private:
   bool ShouldPauseForBattleTransition() const;
   void StartArmyPlacementAnimation(
       const TArray<FAnimatedArmyPlacementStep> &PlacementOrder,
-      ASkaldPlayerState *PlayerState);
+      ASkaldPlayerState *InPlayerState);
   void HandleArmyPlacementAnimationStep();
   void CompleteArmyPlacementAnimation(bool bAdvancePhase);
 
