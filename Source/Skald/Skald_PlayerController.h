@@ -769,15 +769,6 @@ public:
   void ClientClearStrategicInitiativeOverlay();
 
   UFUNCTION(Client, Reliable)
-  void ClientSpectateStrategicInitiativeRoll(int32 RollerPlayerId,
-                                             int32 RoundNumber, int32 RollValue,
-                                             FLinearColor RollerTint,
-                                             bool bIsRollingPlayer);
-
-  UFUNCTION(Client, Reliable)
-  void ClientSetStrategicInitiativeDiceHold(bool bHold);
-
-  UFUNCTION(Client, Reliable)
   void ClientShowPrepareForBattle(const FPrepareForBattlePromptData &PromptData);
 
   UFUNCTION(Client, Reliable)
@@ -911,10 +902,6 @@ public:
 private:
   /** Display the stored strategic initiative roll if one is pending. */
   void ShowPendingStrategicInitiativeResult();
-  void ShowStrategicInitiativeSpectatorRoll(int32 RollerPlayerId,
-                                            int32 RoundNumber, int32 RollValue,
-                                            const FLinearColor &RollerTint);
-  void EnableStrategicInitiativeDiceHold(bool bHold);
 
   ASkald_BattleGameMode *ResolveBattleGameMode();
 
@@ -1210,12 +1197,6 @@ private:
 
   /** Whether the main HUD is waiting for the player to roll strategic initiative. */
   bool bAwaitingStrategicInitiativeRoll = false;
-
-  /** Tracks remote initiative rolls already presented this round. */
-  TSet<int64> SpectatedStrategicInitiativeRolls;
-
-  /** True when the local dice manager is reusing initiative arenas. */
-  bool bStrategicInitiativeDiceHoldEnabled = false;
 
   /** Cached prompt data that should be displayed once the HUD is available. */
   FPrepareForBattlePromptData PendingReadyPrompt;
