@@ -405,6 +405,16 @@ void ATurnManager::GetLifetimeReplicatedProps(
   DOREPLIFETIME(ATurnManager, BattleMaps);
   DOREPLIFETIME(ATurnManager, CapitalMaps);
   DOREPLIFETIME(ATurnManager, BattleMapEntries);
+  DOREPLIFETIME(ATurnManager, CurrentPhase);
+}
+
+void ATurnManager::OnRep_CurrentPhase(ETurnPhase PreviousPhase) {
+  const FString PreviousLabel = UEnum::GetValueAsString(PreviousPhase);
+  const FString NewLabel = UEnum::GetValueAsString(CurrentPhase);
+  UE_LOG(LogSkald, Verbose, TEXT("OnRep_CurrentPhase: %s -> %s"), *PreviousLabel,
+         *NewLabel);
+
+  OnWorldStateChanged.Broadcast();
 }
 
 void ATurnManager::BeginPlay() {
