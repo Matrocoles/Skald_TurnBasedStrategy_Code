@@ -947,6 +947,9 @@ private:
   /** Handle playing the click sound when interacting with UI. */
   void HandleCursorClickSound();
 
+  /** Clear map or battle selections when the clear-selection keybind is used. */
+  void HandleClearSelectionPressed();
+
   /** Update cursor trail FX to follow the hardware cursor. */
   void UpdateCursorFX();
 

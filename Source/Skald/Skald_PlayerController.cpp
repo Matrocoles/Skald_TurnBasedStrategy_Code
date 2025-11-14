@@ -4622,6 +4622,8 @@ void ASkaldPlayerController::SetupInputComponent() {
                             &ASkaldPlayerController::HandleCursorClickSound);
     InputComponent->BindKey(EKeys::RightMouseButton, IE_Pressed, this,
                             &ASkaldPlayerController::HandleRightClick);
+    InputComponent->BindKey(EKeys::SpaceBar, IE_Pressed, this,
+                            &ASkaldPlayerController::HandleClearSelectionPressed);
     InputComponent->BindKey(EKeys::O, IE_Pressed, this,
                             &ASkaldPlayerController::ToggleInGameMenu);
     InputComponent->BindKey(EKeys::Escape, IE_Pressed, this,
@@ -4685,8 +4687,6 @@ void ASkaldPlayerController::HandleGridClick() {
     GetHitResultUnderCursor(ECC_Visibility, /*bTraceComplex*/ true, Hit);
     if (ATerritory *Terr = Cast<ATerritory>(Hit.GetActor())) {
       ServerSelectTerritory(Terr->TerritoryID);
-    } else {
-      ServerSelectTerritory(-1);
     }
     return;
   }
@@ -5106,9 +5106,6 @@ void ASkaldPlayerController::HandleGridClick() {
     return;
   }
 
-  if (!LockedActiveFighter) {
-    ClearSelectedFighter();
-  }
 }
 
 void ASkaldPlayerController::HandleActivatePressed() {
@@ -5242,6 +5239,19 @@ void ASkaldPlayerController::HandleCursorClickSound() {
   if (IsCursorOverInteractableSlateWidget()) {
     PlayCursorClickSound();
   }
+}
+
+void ASkaldPlayerController::HandleClearSelectionPressed() {
+  if (!IsLocalController()) {
+    return;
+  }
+
+  if (!bIsBattleMap) {
+    ServerSelectTerritory(-1);
+    return;
+  }
+
+  ClearSelectedFighter();
 }
 
 void ASkaldPlayerController::HandleRightClick() {

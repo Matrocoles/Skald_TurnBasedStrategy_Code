@@ -367,8 +367,8 @@ void ASkald_PlayerCharacter::MoveUp(float Value)
 
         if (!FMath::IsNearlyZero(Value))
         {
-                // Move strictly along world Z to ensure SpaceBar and LeftControl
-                // translate vertically regardless of character rotation
+                // Move strictly along world Z to ensure keyboard vertical inputs translate
+                // along the global up axis regardless of character rotation
                 AddMovementInput(FVector::UpVector, Value);
         }
 }
@@ -458,12 +458,6 @@ void ASkald_PlayerCharacter::Select()
                         // ATerritory::HandleClicked already issues the RPC with toggle state
                         return;
                 }
-        }
-
-        // Clicked empty space; request deselection
-        if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(PlayerController))
-        {
-                PC->ServerSelectTerritory(-1);
         }
 }
 
