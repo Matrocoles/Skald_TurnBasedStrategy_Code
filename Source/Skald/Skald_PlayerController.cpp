@@ -5255,14 +5255,16 @@ void ASkaldPlayerController::HandleClearSelectionPressed() {
 }
 
 void ASkaldPlayerController::HandleRightClick() {
-  if (!IsLocalController())
+  if (!IsLocalController()) {
     return;
+  }
 
-  if (!bIsBattleMap)
+  if (!bIsBattleMap) {
     return;
+  }
 
-  CancelCommandMode();
-  UpdateBattleHUDButtons();
+  // Intentionally left blank - right-clicking during grid battles should no longer
+  // clear selections or cancel active command modes.
 }
 
 void ASkaldPlayerController::HandleRoundStarted(int32 RoundNumber,
