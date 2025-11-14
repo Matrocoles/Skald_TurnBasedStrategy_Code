@@ -45,7 +45,7 @@ bool FSkaldFullTurnFlowTest::RunTest(const FString &Parameters) {
   HUD->EndingTurnText = NewObject<UTextBlock>(HUD);
   HUD->InitiativeText = NewObject<UTextBlock>(HUD);
   HUD->DeployableUnitsText = NewObject<UTextBlock>(HUD);
-  HUD->ResourcesText = NewObject<UTextBlock>(HUD);
+  HUD->GoldText = NewObject<UTextBlock>(HUD);
 
   FObjectProperty *HUDProp = FindFProperty<FObjectProperty>(
       ASkaldPlayerController::StaticClass(), TEXT("MainHUD"));
@@ -81,7 +81,7 @@ bool FSkaldFullTurnFlowTest::RunTest(const FString &Parameters) {
   T2->AdjacentTerritories = {T1};
   Map->Territories = {T1, T2};
 
-  PS->Resources = 20;
+  PS->Gold = 20;
 
   TM->StartTurns();
   TestEqual(TEXT("Start in reinforcement"), TM->GetCurrentPhase(),
@@ -91,14 +91,16 @@ bool FSkaldFullTurnFlowTest::RunTest(const FString &Parameters) {
   PC->EndPhase(); // to engineering
   TestEqual(TEXT("Engineering phase"), TM->GetCurrentPhase(),
             ETurnPhase::Engineering);
-  HUD->OnTerritoryClickedUI(T1);
-  TestEqual(TEXT("Resources after engineering"), PS->Resources, 10);
+  HUD->BeginEngineeringSelection();
+  HUD->SubmitEngineeringAction(T1->TerritoryID,
+                               EEngineeringAction::UpgradeMainGate);
+  TestEqual(TEXT("Gold after engineering"), PS->Gold, 10);
 
   PC->EndPhase(); // to treasure
   TestEqual(TEXT("Treasure phase"), TM->GetCurrentPhase(),
             ETurnPhase::Treasure);
   HUD->OnTerritoryClickedUI(T1);
-  TestEqual(TEXT("Resources after treasure"), PS->Resources, 15);
+  TestEqual(TEXT("Gold after treasure"), PS->Gold, 15);
   TestFalse(TEXT("Treasure cleared"), T1->bHasTreasure);
 
   PC->EndPhase(); // to movement
@@ -106,7 +108,7 @@ bool FSkaldFullTurnFlowTest::RunTest(const FString &Parameters) {
             ETurnPhase::Movement);
   HUD->OnTerritoryClickedUI(T1);
   HUD->OnTerritoryClickedUI(T2);
-  HUD->SubmitMove(T1->TerritoryID, T2->TerritoryID, 2);
+  HUD->SubmitMove(T1->TerritoryID, T2->TerritoryID, 2, false);
   TestEqual(TEXT("Source after move"), T1->ArmyUnits, 3);
   TestEqual(TEXT("Target after move"), T2->ArmyUnits, 2);
 

@@ -170,6 +170,18 @@ public:
   UPROPERTY(BlueprintReadWrite, Category = "Battle")
   bool bIsInBattleMap = false;
 
+  /** Custom gold costs for each siege weapon type. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battle|Economy")
+  TMap<ESiegeWeapon, int32> SiegeGoldCosts;
+
+  /** Default gold cost applied when a siege weapon type lacks an explicit override. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Battle|Economy")
+  int32 DefaultSiegeGoldCost = SkaldConstants::DefaultSiegeGoldCost;
+
+  /** Resolve the gold cost required to construct the requested siege weapon. */
+  UFUNCTION(BlueprintCallable, Category = "Battle|Economy")
+  int32 GetSiegeGoldCost(ESiegeWeapon SiegeType) const;
+
   /** True while a ServerTravel call is in flight. */
   UPROPERTY(Transient)
   bool bTravelPending = false;

@@ -341,6 +341,10 @@ public:
             Category = "Fighter")
   bool bIsCurrentlyActive;
 
+  /** Immediately end the activation as soon as it begins when true. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fighter|Turn")
+  bool bAutoSkipActivation = false;
+
   /** Expose whether this fighter is actively taking a turn. */
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Fighter")
   bool IsCurrentlyActive() const { return bIsCurrentlyActive; }

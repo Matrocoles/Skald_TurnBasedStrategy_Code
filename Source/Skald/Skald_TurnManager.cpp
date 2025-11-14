@@ -898,13 +898,13 @@ void ATurnManager::StartArmyPlacementPhase() {
   BroadcastCurrentPhase();
 }
 
-void ATurnManager::ApplyReinforcementsAndResources(ASkaldPlayerState *PS,
+void ATurnManager::ApplyReinforcementsAndGold(ASkaldPlayerState *PS,
                                                    const TCHAR *Caller) {
   if (!PS) {
     return;
   }
   int32 Owned = 0;
-  int32 ResourceGain = 0;
+  int32 GoldIncome = 0;
   if (AWorldMap *WorldMap = ResolveWorldMap()) {
     if (WorldMap->Territories.Num() == 0) {
       UE_LOG(LogSkald, Error, TEXT("%s: WorldMap %s has no territories"),
@@ -919,7 +919,7 @@ void ATurnManager::ApplyReinforcementsAndResources(ASkaldPlayerState *PS,
       for (ATerritory *Terr : WorldMap->Territories) {
         if (Terr && Terr->OwningPlayer == PS) {
           ++Owned;
-          ResourceGain += Terr->Resources;
+          GoldIncome += Terr->GoldYield;
         }
       }
     }
@@ -933,9 +933,9 @@ void ATurnManager::ApplyReinforcementsAndResources(ASkaldPlayerState *PS,
   }
   const int32 Reinforcements = FMath::CeilToInt(Owned / 3.0f);
   PS->DeployableUnits += Reinforcements;
-  PS->Resources += ResourceGain;
+  PS->Gold += GoldIncome;
   BroadcastDeployableUnits(PS);
-  BroadcastResources(PS);
+  BroadcastGold(PS);
 }
 
 /** Internal: set GameState.CurrentTurnIndex (and broadcast) to match
@@ -1081,7 +1081,7 @@ void ATurnManager::StartTurns(ASkaldPlayerController *StartingController) {
   ASkaldPlayerState *PS = CurrentController->GetPlayerState<ASkaldPlayerState>();
   const FString PlayerName =
       GetResolvedPlayerName(PS, TEXT("StartTurns_Current"));
-  ApplyReinforcementsAndResources(PS, TEXT("StartTurns"));
+  ApplyReinforcementsAndGold(PS, TEXT("StartTurns"));
 
   CurrentPhase = ETurnPhase::Reinforcement;
   for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr :
@@ -1191,7 +1191,7 @@ void ATurnManager::AdvanceTurn() {
     const FString PlayerName =
         GetResolvedPlayerName(PS, TEXT("AdvanceTurn_Current"));
     ResetMovementActionsForActivePlayer();
-    ApplyReinforcementsAndResources(PS, TEXT("AdvanceTurn"));
+    ApplyReinforcementsAndGold(PS, TEXT("AdvanceTurn"));
 
     CurrentPhase = ETurnPhase::Reinforcement;
     for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr :
@@ -2360,7 +2360,7 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
           Snapshot.IsAI = SkaldPS->bIsAI;
           Snapshot.IsHuman = !SkaldPS->bIsAI;
           Snapshot.IsEliminated = SkaldPS->IsEliminated;
-          Snapshot.Resources = SkaldPS->Resources;
+          Snapshot.Gold = SkaldPS->Gold;
           Snapshot.Faction = SkaldPS->Faction;
           TravelState.PlayerSnapshots.Add(MoveTemp(Snapshot));
         }
@@ -2409,7 +2409,7 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
         SnapshotPtr->IsAI = SkaldPS->bIsAI;
         SnapshotPtr->IsHuman = !SkaldPS->bIsAI;
         SnapshotPtr->IsEliminated = SkaldPS->IsEliminated;
-        SnapshotPtr->Resources = SkaldPS->Resources;
+        SnapshotPtr->Gold = SkaldPS->Gold;
         SnapshotPtr->Faction = SkaldPS->Faction;
       }
 
@@ -3646,6 +3646,9 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
   Source->RefreshAppearance();
   Target->RefreshAppearance();
 
+  HandleSiegesAfterBattle(Battle, Resolution, Source, Target, AttackerPS,
+                          DefenderPS);
+
   bool bUpdatedSnapshot = false;
   if (GI) {
     bUpdatedSnapshot = GI->CacheWorldMapSnapshot(GetWorld());
@@ -4079,7 +4082,7 @@ void ATurnManager::BroadcastDeployableUnits(ASkaldPlayerState *ForPlayer) {
   OnWorldStateChanged.Broadcast();
 }
 
-void ATurnManager::BroadcastResources(ASkaldPlayerState *ForPlayer) {
+void ATurnManager::BroadcastGold(ASkaldPlayerState *ForPlayer) {
   if (const UWorld *W = GetWorld()) {
     if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
       if (GI->bTravelPending) {
@@ -4093,14 +4096,20 @@ void ATurnManager::BroadcastResources(ASkaldPlayerState *ForPlayer) {
   }
 
   if (ASkaldGameMode *GM = GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
-    GM->UpdatePlayerResources(ForPlayer);
+    GM->UpdatePlayerGold(ForPlayer);
   }
 
   for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr :
        Controllers) {
     if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
+      ASkaldPlayerState *ControllerPS =
+          Controller->GetPlayerState<ASkaldPlayerState>();
+      if (ControllerPS != ForPlayer) {
+        continue;
+      }
+
       if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
-        HUD->UpdateResources(ForPlayer->Resources);
+        HUD->UpdateGold(ForPlayer->Gold);
       }
     }
   }
@@ -4203,6 +4212,71 @@ void ATurnManager::QueuePhaseBroadcastRetry(ETurnPhase Phase) {
 
     TimerManager.SetTimer(PhaseBroadcastRetryHandle, RetryDelegate,
                           RetryDelaySeconds, false);
+  }
+}
+
+void ATurnManager::HandleSiegesAfterBattle(const FS_BattlePayload &Battle,
+                                           const FGridBattleResolution &Resolution,
+                                           ATerritory *Source, ATerritory *Target,
+                                           ASkaldPlayerState *AttackerPS,
+                                           ASkaldPlayerState *DefenderPS) {
+  if ((Battle.AssignedSiegeIDs.Num() == 0 &&
+       Battle.DefenderSiegeIDs.Num() == 0) ||
+      !GetWorld()) {
+    return;
+  }
+
+  ASkaldGameMode *GameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
+  if (!GameMode) {
+    return;
+  }
+
+  TArray<ATerritory *> AttackerTerritories;
+  if (Source && AttackerPS && Source->OwningPlayer == AttackerPS) {
+    AttackerTerritories.Add(Source);
+  }
+  if (Target && AttackerPS && Target->OwningPlayer == AttackerPS &&
+      Target != Source) {
+    AttackerTerritories.Add(Target);
+  }
+
+  auto TryAssignSiegeToAttacker = [&](int32 SiegeID) {
+    for (ATerritory *Candidate : AttackerTerritories) {
+      if (!Candidate || Candidate->BuiltSiegeID != 0) {
+        continue;
+      }
+      if (GameMode->AssignExistingSiegeToTerritory(SiegeID, Candidate)) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const bool bAttackerHasSurvivors = Resolution.AttackerSurvivorArmyCost > 0;
+  for (int32 SiegeID : Battle.AssignedSiegeIDs) {
+    if (SiegeID == 0) {
+      continue;
+    }
+
+    const bool bPlaced = bAttackerHasSurvivors &&
+                         AttackerTerritories.Num() > 0 &&
+                         TryAssignSiegeToAttacker(SiegeID);
+    if (!bPlaced) {
+      GameMode->RemoveSiege(SiegeID);
+    }
+  }
+
+  const bool bDefenderStillControlsTarget =
+      Target && DefenderPS && Target->OwningPlayer == DefenderPS;
+  if (bDefenderStillControlsTarget) {
+    return;
+  }
+
+  for (int32 SiegeID : Battle.DefenderSiegeIDs) {
+    if (SiegeID == 0) {
+      continue;
+    }
+    GameMode->RemoveSiege(SiegeID);
   }
 }
 

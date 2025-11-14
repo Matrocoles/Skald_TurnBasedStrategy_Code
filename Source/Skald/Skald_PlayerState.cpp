@@ -10,7 +10,7 @@
 #include "UI/SkaldMainHUDWidget.h"
 
 ASkaldPlayerState::ASkaldPlayerState()
-    : DeployableUnits(0), InitiativeRoll(0), Resources(0),
+    : DeployableUnits(0), InitiativeRoll(0), Gold(0),
       PlayerDisplayName(TEXT("")), Faction(ESkaldFaction::None), bIsAI(false),
       bHasLockedIn(false), IsEliminated(false) {}
 
@@ -42,7 +42,7 @@ void ASkaldPlayerState::GetLifetimeReplicatedProps(
   DOREPLIFETIME(ASkaldPlayerState, bIsAI);
   DOREPLIFETIME(ASkaldPlayerState, DeployableUnits);
   DOREPLIFETIME(ASkaldPlayerState, InitiativeRoll);
-  DOREPLIFETIME(ASkaldPlayerState, Resources);
+  DOREPLIFETIME(ASkaldPlayerState, Gold);
   DOREPLIFETIME(ASkaldPlayerState, bHasLockedIn);
   DOREPLIFETIME(ASkaldPlayerState, IsEliminated);
 }
@@ -53,6 +53,22 @@ void ASkaldPlayerState::OnRep_DeployableUnits() {
       if (USkaldMainHUDWidget *HUD = SkaldPC->GetHUDWidget()) {
         HUD->UpdateDeployableUnits(DeployableUnits);
       }
+    }
+  }
+}
+
+void ASkaldPlayerState::OnRep_Gold() {
+  if (APlayerController *PC = GetOwner<APlayerController>()) {
+    if (ASkaldPlayerController *SkaldPC = Cast<ASkaldPlayerController>(PC)) {
+      if (USkaldMainHUDWidget *HUD = SkaldPC->GetHUDWidget()) {
+        HUD->UpdateGold(Gold);
+      }
+    }
+  }
+
+  if (UWorld *World = GetWorld()) {
+    if (ASkaldGameState *GS = World->GetGameState<ASkaldGameState>()) {
+      GS->OnPlayersUpdated.Broadcast();
     }
   }
 }

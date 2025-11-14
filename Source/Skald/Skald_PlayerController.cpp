@@ -25,6 +25,7 @@
 #include "Camera/PlayerCameraManager.h"
 #include "Skald.h"
 #include "SkaldTypes.h"
+#include "Skald_PropertyAccess.h"
 #include "Skald_GameInstance.h"
 #include "Skald_GameMode.h"
 #include "Skald_BattleGameMode.h"
@@ -2008,7 +2009,7 @@ void ASkaldPlayerController::OnRep_PlayerState() {
 
   if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
     MainHUD->LocalPlayerID = PS->GetPlayerId();
-    MainHUD->UpdateResources(PS->Resources);
+    MainHUD->UpdateGold(PS->Gold);
     MainHUD->SyncPhaseButtons(MainHUD->CurrentPlayerID ==
                                     MainHUD->LocalPlayerID);
   }
@@ -3496,10 +3497,33 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
             if (SiegeID > 0)
             {
                 Battle.AssignedSiegeIDs.Add(SiegeID);
+                FS_Siege SiegeData;
+                if (CachedGameMode->TryCopySiegeById(SiegeID, SiegeData))
+                {
+                    Battle.AttackerSieges.Add(SiegeData);
+                }
             }
         }
 
         Battle.DefenderArmyCount = Target ? Target->ArmyUnits : 0;
+        if (Target)
+        {
+            Battle.bDefenderHasMoat =
+                Skald::PropertyAccess::ReadBoolProperty(Target, TEXT("Moat"));
+        }
+
+        if (Target && Target->BuiltSiegeID != 0)
+        {
+            Battle.DefenderSiegeIDs.Add(Target->BuiltSiegeID);
+            if (CachedGameMode)
+            {
+                FS_Siege SiegeData;
+                if (CachedGameMode->TryCopySiegeById(Target->BuiltSiegeID, SiegeData))
+                {
+                    Battle.DefenderSieges.Add(SiegeData);
+                }
+            }
+        }
 
         if (!CachedGameMode)
         {
@@ -3644,7 +3668,7 @@ void ASkaldPlayerController::ServerConfirmRetreatDestination_Implementation(
 }
 
 void ASkaldPlayerController::HandleMoveRequested(int32 FromID, int32 ToID,
-    int32 Troops) {
+    int32 Troops, bool bTransferSiege) {
     UE_LOG(LogSkald, Log, TEXT("HUD move from %d to %d with %d"), FromID, ToID,
         Troops);
 
@@ -3681,13 +3705,14 @@ void ASkaldPlayerController::HandleMoveRequested(int32 FromID, int32 ToID,
         return;
     }
 
-    ServerHandleMove(FromID, ToID, Troops);
+    ServerHandleMove(FromID, ToID, Troops, bTransferSiege);
 }
 
 
 void ASkaldPlayerController::ServerHandleMove_Implementation(int32 FromID,
                                                              int32 ToID,
-                                                             int32 Troops) {
+                                                             int32 Troops,
+                                                             bool bTransferSiege) {
   FString Error;
   if (!EnsureTurnManager(TEXT("ServerHandleMove"))) {
     Error = TEXT("Unable to resolve turn manager");
@@ -3736,6 +3761,15 @@ void ASkaldPlayerController::ServerHandleMove_Implementation(int32 FromID,
     return;
   }
 
+  if (bTransferSiege) {
+    if (!CachedGameMode) {
+      CachedGameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
+    }
+    if (CachedGameMode) {
+      CachedGameMode->TransferSiegeBetweenTerritories(FromID, ToID);
+    }
+  }
+
   TurnManager->RecordMovementAction(PlayerID);
   const int32 RemainingMoves = TurnManager->GetMovementActionsRemaining(PlayerID);
   FString SuccessMessage;
@@ -3769,8 +3803,66 @@ void ASkaldPlayerController::ServerHandleMove_Implementation(int32 FromID,
 
 void ASkaldPlayerController::ServerBuildSiege_Implementation(
     int32 TerritoryID, ESiegeWeapon SiegeType) {
-  if (CachedGameMode) {
-    CachedGameMode->BuildSiegeAtTerritory(TerritoryID, SiegeType);
+  if (!EnsureTurnManager(TEXT("ServerBuildSiege"))) {
+    NotifyActionError(TEXT("Unable to resolve turn manager."));
+    return;
+  }
+
+  if (!IsMyTurn()) {
+    NotifyActionError(TEXT("You may only build siege weapons during your turn."));
+    return;
+  }
+
+  if (TurnManager->GetCurrentPhase() != ETurnPhase::Engineering) {
+    NotifyActionError(TEXT("Siege weapons can only be built during the engineering phase."));
+    return;
+  }
+
+  ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
+  if (!PS) {
+    NotifyActionError(TEXT("Unable to resolve player state."));
+    return;
+  }
+
+  AWorldMap *WorldMap = Cast<AWorldMap>(
+      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
+  if (!WorldMap) {
+    NotifyActionError(TEXT("World map unavailable."));
+    return;
+  }
+
+  ATerritory *Territory = WorldMap->GetTerritoryById(TerritoryID);
+  if (!Territory || Territory->OwningPlayer != PS || Territory->BuiltSiegeID != 0) {
+    NotifyActionError(TEXT("Invalid territory for siege construction."));
+    return;
+  }
+
+  if (!CachedGameMode) {
+    CachedGameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
+  }
+
+  if (!CachedGameMode) {
+    NotifyActionError(TEXT("Game mode unavailable for siege construction."));
+    return;
+  }
+
+  const int32 SiegeCost = CachedGameMode->GetSiegeGoldCost(SiegeType);
+  if (PS->Gold < SiegeCost) {
+    NotifyActionError(
+        FString::Printf(TEXT("You need %d gold to build that siege weapon."),
+                        SiegeCost));
+    return;
+  }
+
+  const int32 SiegeID = CachedGameMode->BuildSiegeAtTerritory(TerritoryID, SiegeType);
+  if (SiegeID == 0) {
+    NotifyActionError(TEXT("Unable to build a siege weapon here."));
+    return;
+  }
+
+  PS->Gold = FMath::Max(0, PS->Gold - SiegeCost);
+  if (TurnManager) {
+    TurnManager->BroadcastGold(PS);
   }
 }
 
@@ -3998,13 +4090,113 @@ void ASkaldPlayerController::HandleEndMovementRequested(bool bConfirmed) {
 }
 
 void ASkaldPlayerController::HandleEngineeringRequested(int32 CapitalID,
-                                                        uint8 UpgradeType) {
-  if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
-    const int32 Cost = 10;
-    PS->Resources = FMath::Max(0, PS->Resources - Cost);
-    if (TurnManager) {
-      TurnManager->BroadcastResources(PS);
-    }
+                                                        EEngineeringAction UpgradeType) {
+  if (UpgradeType == EEngineeringAction::BuildSiegeWeapon ||
+      UpgradeType == EEngineeringAction::None) {
+    return;
+  }
+
+  if (!IsMyTurn()) {
+    NotifyActionError(TEXT("You may only engineer during your turn."));
+    return;
+  }
+
+  if (!TurnManager || TurnManager->GetCurrentPhase() != ETurnPhase::Engineering) {
+    NotifyActionError(TEXT("Engineering actions are only available during the engineering phase."));
+    return;
+  }
+
+  ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
+  if (!PS) {
+    NotifyActionError(TEXT("Unable to resolve player state."));
+    return;
+  }
+
+  if (PS->Gold < SkaldConstants::EngineeringActionGoldCost) {
+    NotifyActionError(TEXT("Not enough gold for engineering."));
+    return;
+  }
+
+  ServerHandleEngineeringAction(CapitalID, UpgradeType);
+}
+
+void ASkaldPlayerController::ServerHandleEngineeringAction_Implementation(
+    int32 CapitalID, EEngineeringAction UpgradeType) {
+  if (UpgradeType == EEngineeringAction::BuildSiegeWeapon ||
+      UpgradeType == EEngineeringAction::None) {
+    return;
+  }
+
+  if (!EnsureTurnManager(TEXT("ServerHandleEngineeringAction"))) {
+    NotifyActionError(TEXT("Unable to resolve turn manager."));
+    return;
+  }
+
+  if (!IsMyTurn()) {
+    NotifyActionError(TEXT("You may only engineer during your turn."));
+    return;
+  }
+
+  if (TurnManager->GetCurrentPhase() != ETurnPhase::Engineering) {
+    NotifyActionError(TEXT("Engineering actions are only available during the engineering phase."));
+    return;
+  }
+
+  ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
+  if (!PS) {
+    NotifyActionError(TEXT("Unable to resolve player state."));
+    return;
+  }
+
+  if (PS->Gold < SkaldConstants::EngineeringActionGoldCost) {
+    NotifyActionError(TEXT("Not enough gold for engineering."));
+    return;
+  }
+
+  AWorldMap *WorldMap = Cast<AWorldMap>(
+      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
+  if (!WorldMap) {
+    NotifyActionError(TEXT("World map unavailable."));
+    return;
+  }
+
+  ATerritory *Capital = WorldMap->GetTerritoryById(CapitalID);
+  if (!Capital || !Capital->bIsCapital || Capital->OwningPlayer != PS) {
+    NotifyActionError(TEXT("You must select one of your capitals."));
+    return;
+  }
+
+  if (!CachedGameMode) {
+    CachedGameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
+  }
+
+  if (!CachedGameMode) {
+    NotifyActionError(TEXT("Game mode unavailable for engineering."));
+    return;
+  }
+
+  bool bApplied = false;
+  switch (UpgradeType) {
+  case EEngineeringAction::UpgradeMainGate:
+    bApplied = CachedGameMode->UpgradeCapitalGate(
+        Capital, SkaldConstants::MainGateUpgradeHealthBonus);
+    break;
+  case EEngineeringAction::BuildMoat:
+    bApplied = CachedGameMode->EnableCapitalMoat(Capital);
+    break;
+  default:
+    break;
+  }
+
+  if (!bApplied) {
+    NotifyActionError(TEXT("Unable to apply engineering upgrade."));
+    return;
+  }
+
+  PS->Gold = FMath::Max(0, PS->Gold -
+                                    SkaldConstants::EngineeringActionGoldCost);
+  if (TurnManager) {
+    TurnManager->BroadcastGold(PS);
   }
 }
 
@@ -4034,9 +4226,9 @@ void ASkaldPlayerController::ServerDigTreasure_Implementation(
     if (Terr->OwningPlayer == PS && Terr->bHasTreasure) {
       Terr->bHasTreasure = false;
       Terr->RefreshAppearance();
-      PS->Resources += 5;
+      PS->Gold += 5;
       if (TurnManager) {
-        TurnManager->BroadcastResources(PS);
+        TurnManager->BroadcastGold(PS);
       }
     }
   }
@@ -4383,12 +4575,17 @@ void ASkaldPlayerController::BuildPlayerDataArray(
       Data.PlayerName = PS->GetResolvedPlayerName(TEXT("BuildPlayerDataArray"));
       Data.IsAI = PS->bIsAI;
       Data.Faction = PS->Faction;
-      Data.Resources = PS->Resources;
+      Data.Gold = PS->Gold;
       Data.IsEliminated = PS->IsEliminated;
       Data.TerritoriesOwned = TerritoryCounts.FindRef(Data.PlayerID);
       OutPlayers.Add(Data);
     }
   }
+}
+
+void ASkaldPlayerController::GatherPlayerListData(
+    TArray<FS_PlayerData> &OutPlayers) const {
+  BuildPlayerDataArray(OutPlayers);
 }
 
 void ASkaldPlayerController::HandlePlayersUpdated() {
@@ -4398,7 +4595,7 @@ void ASkaldPlayerController::HandlePlayersUpdated() {
     MainHUD->RefreshPlayerList(Players);
 
     if (ASkaldPlayerState *LocalPS = GetPlayerState<ASkaldPlayerState>()) {
-      MainHUD->UpdateResources(LocalPS->Resources);
+      MainHUD->UpdateGold(LocalPS->Gold);
     }
   }
 
@@ -4415,7 +4612,7 @@ void ASkaldPlayerController::HandleFactionsUpdated() {
   MainHUD->RefreshPlayerList(Players);
 
   if (ASkaldPlayerState *LocalPS = GetPlayerState<ASkaldPlayerState>()) {
-    MainHUD->UpdateResources(LocalPS->Resources);
+    MainHUD->UpdateGold(LocalPS->Gold);
   }
 }
 
@@ -4473,7 +4670,7 @@ void ASkaldPlayerController::HandleWorldStateChanged() {
   // Update deploy/phase banners.
   if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
     MainHUD->UpdateDeployableUnits(PS->DeployableUnits);
-    MainHUD->UpdateResources(PS->Resources);
+    MainHUD->UpdateGold(PS->Gold);
   }
   if (TurnManager) {
     MainHUD->UpdatePhaseBanner(TurnManager->GetCurrentPhase());
@@ -4509,7 +4706,7 @@ void ASkaldPlayerController::HandleFactionLockedIn() {
     if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
       MainHUD->LocalPlayerID = PS->GetPlayerId();
       MainHUD->UpdateDeployableUnits(PS->DeployableUnits);
-      MainHUD->UpdateResources(PS->Resources);
+      MainHUD->UpdateGold(PS->Gold);
       MainHUD->SyncPhaseButtons(MainHUD->CurrentPlayerID ==
                                       MainHUD->LocalPlayerID);
     }
@@ -8278,6 +8475,31 @@ void ASkaldPlayerController::ClientHideAttackRollButton_Implementation()
     {
         UE_LOG(LogTemp, Warning, TEXT("PC: BattleHUD is null!"));
     }
+}
+
+void ASkaldPlayerController::ClientNotifyGoldReward_Implementation(
+    FVector WorldLocation, int32 GoldAmount) {
+  if (GoldAmount <= 0) {
+    return;
+  }
+
+  const FText RewardText = FText::Format(
+      NSLOCTEXT("SkaldHUD", "GoldRewardFloater", "+ {0} gold"),
+      FText::AsNumber(GoldAmount));
+
+  if (BattleHudWidget) {
+    BattleHudWidget->ShowCombatFloater(WorldLocation, RewardText,
+                                       GoldRewardFloaterColor, 1.f, false,
+                                       1.2f);
+  }
+
+  if (MainHUD) {
+    MainHUD->ShowFloatingTextAtLocation(WorldLocation, RewardText,
+                                        GoldRewardFloaterColor, 1.f, 1.2f);
+    if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+      MainHUD->UpdateGold(PS->Gold);
+    }
+  }
 }
 
 // SERVER FUNCTION
