@@ -32,6 +32,8 @@ constexpr TCHAR EnemyPlanningMessage[] =
     TEXT("Enemy is planning their next move...");
 constexpr TCHAR EnemyBattleTransitionMessage[] =
     TEXT("Enemy is preparing for battle...");
+constexpr TCHAR EnemyAwaitingResultsMessage[] =
+    TEXT("Enemy is reviewing battle results...");
 constexpr TCHAR EnemyStrategyPlanningMessage[] =
     TEXT("Enemy is evaluating the battlefield...");
 constexpr float StrategyPlanningDelayFraction = 0.5f;
@@ -268,6 +270,12 @@ void ASkaldAIController::ProcessCurrentPhase() {
     UE_LOG(LogSkald, Warning,
            TEXT("ProcessCurrentPhase called without a valid TurnManager"));
     EndTurn();
+    return;
+  }
+
+  if (TurnManager->IsAwaitingBattleResultAcknowledgement()) {
+    BroadcastEnemyTurnStatus(FString(EnemyAwaitingResultsMessage));
+    ScheduleNextDecisionStep(EnemyBattleTransitionPollDelay);
     return;
   }
 
