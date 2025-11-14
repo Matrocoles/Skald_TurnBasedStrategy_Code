@@ -475,19 +475,25 @@ void ASkald_PlayerCharacter::Select()
 
 void ASkald_PlayerCharacter::HandleTerritorySelected(ATerritory* Territory)
 {
-	CurrentSelection = Territory;
+ATerritory* LocalSelection = Territory;
+if (Territory && !Territory->IsSelectionVisibleToLocalPlayer())
+{
+LocalSelection = nullptr;
+}
 
-	if (!bBattleCameraActive)
-	{
-		if (Territory)
-		{
-			FocusOverviewCameraOnTerritory(Territory);
-		}
-		else
-		{
-			ClearOverviewCameraFocus();
-		}
-	        }
+CurrentSelection = LocalSelection;
+
+if (!bBattleCameraActive)
+{
+if (LocalSelection)
+{
+FocusOverviewCameraOnTerritory(LocalSelection);
+}
+else
+{
+ClearOverviewCameraFocus();
+}
+}
 }
 
 void ASkald_PlayerCharacter::AbilityOne()
