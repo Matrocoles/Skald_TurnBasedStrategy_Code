@@ -5,6 +5,8 @@
 
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "Skald_GameMode.h"
+#include "UObject/UnrealType.h"
 
 namespace Skald::Tests
 {
@@ -49,6 +51,20 @@ void DestroyAutomationTestWorld(UWorld* World)
     }
 
     World->DestroyWorld(false);
+}
+
+void AttachGameModeToWorld(UWorld* World, ASkaldGameMode* GameMode)
+{
+    if (!World || !GameMode)
+    {
+        return;
+    }
+
+    if (FObjectProperty* Prop =
+            FindFProperty<FObjectProperty>(UWorld::StaticClass(), TEXT("AuthorityGameMode")))
+    {
+        Prop->SetObjectPropertyValue_InContainer(World, GameMode);
+    }
 }
 
 FScopedAutomationTestWorld::FScopedAutomationTestWorld()
