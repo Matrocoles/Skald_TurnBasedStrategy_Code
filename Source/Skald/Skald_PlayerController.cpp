@@ -4231,18 +4231,20 @@ void ASkaldPlayerController::HandleTerritorySelected(ATerritory *Terr) {
     return;
   }
 
-  ATerritory *LocalSelection =
-      Terr && Terr->IsSelectionVisibleToLocalPlayer() ? Terr : nullptr;
-  if (!LocalSelection) {
+  if (!Terr) {
     MainHUD->ClearTerritoryInfo();
     return;
   }
 
-  const FString OwnerName = ResolvePlayerName(LocalSelection->OwningPlayer,
+  if (!Terr->IsSelectionVisibleToLocalPlayer()) {
+    return;
+  }
+
+  const FString OwnerName = ResolvePlayerName(Terr->OwningPlayer,
                                               TEXT("HandleTerritorySelected"));
-  MainHUD->UpdateTerritoryInfo(LocalSelection->TerritoryName, OwnerName,
-                               LocalSelection->ArmyUnits);
-  MainHUD->OnTerritoryClickedUI(LocalSelection);
+  MainHUD->UpdateTerritoryInfo(Terr->TerritoryName, OwnerName,
+                               Terr->ArmyUnits);
+  MainHUD->OnTerritoryClickedUI(Terr);
 }
 
 void ASkaldPlayerController::NotifyActionError_Implementation(
