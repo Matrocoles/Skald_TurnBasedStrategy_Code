@@ -349,7 +349,7 @@ protected:
     void OnRep_AbilitySlots();
 
     UFUNCTION(NetMulticast, Reliable)
-    void MulticastAbilityTriggered(const FSkaldAbilityDefinition& Definition);
+    void MulticastAbilityTriggered(const FSkaldAbilityDefinition& Definition, AFighterPawn* TargetFighter, bool bHasTargetCell, FIntPoint TargetCell);
 
     void BroadcastStateChanged();
 
@@ -366,7 +366,7 @@ protected:
     int32 FindPendingTrapIndex(FName AbilityId) const;
     void RemoveTrapAtIndex(int32 Index);
     void ClearAllTraps();
-    UDecalComponent* SpawnTrapVisualAtCell(const FIntPoint& Cell);
+    UDecalComponent* SpawnTrapVisualAtCell(const FIntPoint& Cell, const FSkaldAbilityDefinition* SourceAbility = nullptr);
     void HandleModifierApplied(FName AbilityId);
     void HandleModifierRemoved(FName AbilityId);
     void RemoveExpiredModifiers(ESkaldAbilityModifierPhase Phase);
@@ -388,6 +388,9 @@ protected:
     bool TrySwapAdjacentWithAlly(AFighterPawn* Owner, AFighterPawn* Ally) const;
     bool TryShiftFighterOneCell(AFighterPawn* Fighter, const AFighterPawn* Reference) const;
     void TryShiftFighterMultipleCells(AFighterPawn* Fighter, const AFighterPawn* Reference, int32 MaxSteps) const;
+    void ApplyAbilityContextFromReplication(const FName& AbilityId, AFighterPawn* TargetFighter, bool bHasTargetCell, const FIntPoint& TargetCell);
+    void SpawnTargetCellVisuals(const FSkaldAbilityDefinition& Definition);
+    void ApplyTerrainVisualOverrides(const FSkaldAbilityDefinition& Definition, const FIntPoint& Cell, UDecalComponent* Decal, UGridOverlayComponent* Grid);
     void HandleBrutalChargeResolved(AFighterPawn* Defender, const FDiceRollResult& Result);
     void HandleRuneRiposteTriggered(AFighterPawn* Attacker, const FDiceRollResult& Result);
     void ApplyModifierToTarget(AFighterPawn* Target, FSkaldActiveAbilityModifier&& Modifier);
@@ -435,7 +438,7 @@ protected:
     void HandleOwnerHealthChanged(int32 NewHealth);
 
     UFUNCTION(NetMulticast, Reliable)
-    void MulticastTrapPlaced(const FIntPoint& Cell);
+    void MulticastTrapPlaced(const FIntPoint& Cell, FName SourceAbilityId);
 
     UFUNCTION(NetMulticast, Reliable)
     void MulticastTrapRemoved(const FIntPoint& Cell);

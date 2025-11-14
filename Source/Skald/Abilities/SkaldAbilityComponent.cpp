@@ -12,6 +12,7 @@
 #include "GridBattleManager.h"
 #include "GridOverlayComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
 #include "NiagaraFunctionLibrary.h"
 #include "SkaldLogging.h"
@@ -577,9 +578,25 @@ bool USkaldAbilityComponent::TryBeginAbility(ESkaldAbilitySlot Slot, FText& OutF
 
     UpdateReplicatedAbilitySlots();
 
+    AFighterPawn* ContextTarget = nullptr;
+    bool bHasContextCell = false;
+    FIntPoint ContextCell(INDEX_NONE, INDEX_NONE);
+    if (const FSkaldAbilityContext* PendingContext = GetPendingAbilityContext())
+    {
+        if (PendingContext->AbilityId == State->Definition.AbilityId)
+        {
+            ContextTarget = PendingContext->TargetFighter.Get();
+            bHasContextCell = PendingContext->bHasTargetCell;
+            if (bHasContextCell)
+            {
+                ContextCell = PendingContext->TargetCell;
+            }
+        }
+    }
+
     if (GetOwnerRole() == ROLE_Authority)
     {
-        MulticastAbilityTriggered(State->Definition);
+        MulticastAbilityTriggered(State->Definition, ContextTarget, bHasContextCell, ContextCell);
     }
     else
     {
@@ -797,19 +814,28 @@ void USkaldAbilityComponent::HandleAbilityTriggeredLocal(const FSkaldAbilityDefi
     ClearPendingAbilityContext();
 }
 
-void USkaldAbilityComponent::MulticastAbilityTriggered_Implementation(const FSkaldAbilityDefinition& Definition)
+void USkaldAbilityComponent::MulticastAbilityTriggered_Implementation(const FSkaldAbilityDefinition& Definition, AFighterPawn* TargetFighter, bool bHasTargetCell, FIntPoint TargetCell)
 {
+    ApplyAbilityContextFromReplication(Definition.AbilityId, TargetFighter, bHasTargetCell, TargetCell);
     HandleAbilityTriggeredLocal(Definition);
 }
 
-void USkaldAbilityComponent::MulticastTrapPlaced_Implementation(const FIntPoint& Cell)
+void USkaldAbilityComponent::MulticastTrapPlaced_Implementation(const FIntPoint& Cell, FName SourceAbilityId)
 {
     if (GetOwnerRole() == ROLE_Authority)
     {
         return;
     }
 
-    SpawnTrapVisualAtCell(Cell);
+    FSkaldAbilityDefinition AbilityDefinition;
+    const bool bHasAbility = !SourceAbilityId.IsNone();
+    if (bHasAbility)
+    {
+        AbilityDefinition = GetAbilityDefinitionById(SourceAbilityId);
+    }
+
+    const FSkaldAbilityDefinition* DefinitionPtr = (bHasAbility && AbilityDefinition.IsValid()) ? &AbilityDefinition : nullptr;
+    SpawnTrapVisualAtCell(Cell, DefinitionPtr);
 }
 
 void USkaldAbilityComponent::MulticastTrapRemoved_Implementation(const FIntPoint& Cell)
@@ -837,49 +863,122 @@ void USkaldAbilityComponent::PlayAbilityFeedback(const FSkaldAbilityDefinition& 
     }
 
     const FSkaldAbilityVisuals& Visuals = Definition.Visuals;
-    if (!Visuals.HasAnyVisuals())
+    const bool bHasOwnerVisuals = !Visuals.Montage.IsNull() || !Visuals.NiagaraEffect.IsNull() || !Visuals.Sound.IsNull();
+    const bool bHasTargetCellFX = Visuals.TargetCellFX.HasEffect();
+    if (!bHasOwnerVisuals && !bHasTargetCellFX)
     {
         return;
     }
 
-    if (!Visuals.Montage.IsNull())
+    if (bHasOwnerVisuals)
     {
-        if (UAnimMontage* Montage = Visuals.Montage.LoadSynchronous())
+        if (!Visuals.Montage.IsNull())
         {
-            if (USkeletalMeshComponent* SkeletalMesh = Fighter->FindComponentByClass<USkeletalMeshComponent>())
+            if (UAnimMontage* Montage = Visuals.Montage.LoadSynchronous())
             {
-                if (UAnimInstance* AnimInstance = SkeletalMesh->GetAnimInstance())
+                if (USkeletalMeshComponent* SkeletalMesh = Fighter->FindComponentByClass<USkeletalMeshComponent>())
                 {
-                    AnimInstance->Montage_Play(Montage);
+                    if (UAnimInstance* AnimInstance = SkeletalMesh->GetAnimInstance())
+                    {
+                        AnimInstance->Montage_Play(Montage);
+                    }
                 }
+            }
+        }
+
+        if (!Visuals.NiagaraEffect.IsNull())
+        {
+            UNiagaraSystem* NiagaraTemplate = Visuals.NiagaraEffect.LoadSynchronous();
+            if (NiagaraTemplate)
+            {
+                UNiagaraFunctionLibrary::SpawnSystemAttached(
+                    NiagaraTemplate,
+                    Fighter->GetRootComponent(),
+                    NAME_None,
+                    FVector::ZeroVector,
+                    FRotator::ZeroRotator,
+                    EAttachLocation::KeepRelativeOffset,
+                    true);
+            }
+        }
+
+        if (!Visuals.Sound.IsNull())
+        {
+            if (USoundBase* Cue = Visuals.Sound.LoadSynchronous())
+            {
+                UGameplayStatics::SpawnSoundAttached(
+                    Cue,
+                    Fighter->GetRootComponent());
             }
         }
     }
 
-    if (!Visuals.NiagaraEffect.IsNull())
+    if (bHasTargetCellFX)
     {
-        UNiagaraSystem* NiagaraTemplate = Visuals.NiagaraEffect.LoadSynchronous();
-        if (NiagaraTemplate)
+        SpawnTargetCellVisuals(Definition);
+    }
+}
+
+void USkaldAbilityComponent::SpawnTargetCellVisuals(const FSkaldAbilityDefinition& Definition)
+{
+    const FSkaldAbilityTargetCellFX& TargetFX = Definition.Visuals.TargetCellFX;
+    if (!TargetFX.HasEffect())
+    {
+        return;
+    }
+
+    AFighterPawn* Owner = CachedFighter.Get();
+    if (!Owner)
+    {
+        return;
+    }
+
+    UGridOverlayComponent* Grid = Owner->GetGrid();
+    if (!Grid)
+    {
+        return;
+    }
+
+    TArray<FIntPoint> TargetCells;
+    if (AFighterPawn* TargetFighter = ResolveAbilityTargetFromContext(Definition.AbilityId))
+    {
+        TargetCells = TargetFighter->GetOccupiedCells();
+    }
+    else
+    {
+        FIntPoint TargetCell;
+        if (ResolveAbilityTargetCellFromContext(Definition.AbilityId, TargetCell))
         {
-            UNiagaraFunctionLibrary::SpawnSystemAttached(
-                NiagaraTemplate,
-                Fighter->GetRootComponent(),
-                NAME_None,
-                FVector::ZeroVector,
-                FRotator::ZeroRotator,
-                EAttachLocation::KeepRelativeOffset,
-                true);
+            TargetCells.Add(TargetCell);
         }
     }
 
-    if (!Visuals.Sound.IsNull())
+    if (TargetCells.Num() == 0)
     {
-        if (USoundBase* Cue = Visuals.Sound.LoadSynchronous())
+        return;
+    }
+
+    UNiagaraSystem* NiagaraTemplate = TargetFX.NiagaraEffect.LoadSynchronous();
+    if (!NiagaraTemplate)
+    {
+        return;
+    }
+
+    UWorld* World = GetWorld();
+    if (!World)
+    {
+        return;
+    }
+
+    for (const FIntPoint& Cell : TargetCells)
+    {
+        if (!Grid->IsCellInBounds(Cell))
         {
-            UGameplayStatics::SpawnSoundAttached(
-                Cue,
-                Fighter->GetRootComponent());
+            continue;
         }
+
+        const FVector SpawnLocation = Grid->GridToWorld(Cell) + TargetFX.LocationOffset;
+        UNiagaraFunctionLibrary::SpawnSystemAtLocation(World, NiagaraTemplate, SpawnLocation);
     }
 }
 
@@ -1820,7 +1919,7 @@ void USkaldAbilityComponent::ClearAllTraps()
     ActiveTraps.Empty();
 }
 
-UDecalComponent* USkaldAbilityComponent::SpawnTrapVisualAtCell(const FIntPoint& Cell)
+UDecalComponent* USkaldAbilityComponent::SpawnTrapVisualAtCell(const FIntPoint& Cell, const FSkaldAbilityDefinition* SourceAbility)
 {
     AFighterPawn* OwnerFighter = CachedFighter.Get();
     if (!OwnerFighter)
@@ -1828,12 +1927,48 @@ UDecalComponent* USkaldAbilityComponent::SpawnTrapVisualAtCell(const FIntPoint& 
         return nullptr;
     }
 
-    if (UGridOverlayComponent* Grid = OwnerFighter->GetGrid())
+    UGridOverlayComponent* Grid = OwnerFighter->GetGrid();
+    if (!Grid)
     {
-        return Grid->AddTrapMarker(Cell);
+        return nullptr;
     }
 
-    return nullptr;
+    UDecalComponent* Decal = Grid->AddTrapMarker(Cell);
+    if (SourceAbility && SourceAbility->IsValid())
+    {
+        ApplyTerrainVisualOverrides(*SourceAbility, Cell, Decal, Grid);
+    }
+
+    return Decal;
+}
+
+void USkaldAbilityComponent::ApplyTerrainVisualOverrides(const FSkaldAbilityDefinition& Definition, const FIntPoint& Cell, UDecalComponent* Decal, UGridOverlayComponent* Grid)
+{
+    const FSkaldAbilityTerrainCellVisuals& TerrainVisuals = Definition.Visuals.TerrainCellFX;
+    if (!TerrainVisuals.HasAnyVisuals())
+    {
+        return;
+    }
+
+    if (Decal && !TerrainVisuals.DecalMaterial.IsNull())
+    {
+        if (UMaterialInterface* OverrideMaterial = TerrainVisuals.DecalMaterial.LoadSynchronous())
+        {
+            Decal->SetDecalMaterial(OverrideMaterial);
+        }
+    }
+
+    if (!TerrainVisuals.NiagaraEffect.IsNull() && Grid)
+    {
+        if (UNiagaraSystem* NiagaraTemplate = TerrainVisuals.NiagaraEffect.LoadSynchronous())
+        {
+            if (UWorld* World = GetWorld())
+            {
+                const FVector SpawnLocation = Grid->GridToWorld(Cell) + TerrainVisuals.NiagaraOffset;
+                UNiagaraFunctionLibrary::SpawnSystemAtLocation(World, NiagaraTemplate, SpawnLocation);
+            }
+        }
+    }
 }
 
 void USkaldAbilityComponent::RemoveExpiredModifiers(ESkaldAbilityModifierPhase Phase)
@@ -2502,9 +2637,9 @@ bool USkaldAbilityComponent::DeployTrapAtCell(const FIntPoint& Cell, FName Abili
     FSkaldAbilityTrapState& Trap = ActiveTraps[PendingIndex];
     Trap.Cell = Cell;
     Trap.bPendingPlacement = false;
-    Trap.VisualComponent = MakeWeakObjectPtr(SpawnTrapVisualAtCell(Cell));
+    Trap.VisualComponent = MakeWeakObjectPtr(SpawnTrapVisualAtCell(Cell, &Trap.AbilityDefinition));
 
-    MulticastTrapPlaced(Cell);
+    MulticastTrapPlaced(Cell, Trap.SourceAbilityId);
     return true;
 }
 
@@ -2535,7 +2670,19 @@ bool USkaldAbilityComponent::TryResolveTrapAtCell(const FIntPoint& Cell, AFighte
         RemoveTrapAtIndex(Index);
 
         bSuppressAbilityEffectOnNextTrigger = true;
-        MulticastAbilityTriggered(TrapCopy.AbilityDefinition);
+
+        const bool bTrapHasCell = (TrapCopy.Cell != FIntPoint(INDEX_NONE, INDEX_NONE));
+        if (TrapCopy.AbilityDefinition.IsValid())
+        {
+            FSkaldAbilityContext TrapContext;
+            TrapContext.AbilityId = TrapCopy.AbilityDefinition.AbilityId;
+            TrapContext.TargetFighter = TriggeringFighter;
+            TrapContext.bHasTargetCell = bTrapHasCell;
+            TrapContext.TargetCell = bTrapHasCell ? TrapCopy.Cell : FIntPoint(INDEX_NONE, INDEX_NONE);
+            SetPendingAbilityContext(TrapContext);
+        }
+
+        MulticastAbilityTriggered(TrapCopy.AbilityDefinition, TriggeringFighter, bTrapHasCell, TrapCopy.Cell);
 
         return true;
     }
@@ -3263,8 +3410,6 @@ bool USkaldAbilityComponent::IsAnyCellDifficult(const TArray<FIntPoint>& Cells, 
 
 void USkaldAbilityComponent::SpawnAberrantBloomHazard(const FSkaldAbilityDefinition& Definition)
 {
-    (void)Definition;
-
     ClearAberrantBloomHazards();
 
     AFighterPawn* Owner = CachedFighter.Get();
@@ -3310,7 +3455,7 @@ void USkaldAbilityComponent::SpawnAberrantBloomHazard(const FSkaldAbilityDefinit
 
                 FSkaldAberrantBloomHazardCell& Cell = AberrantBloomHazardCells.Emplace_GetRef();
                 Cell.Cell = Candidate;
-                Cell.VisualComponent = SpawnTrapVisualAtCell(Candidate);
+                Cell.VisualComponent = SpawnTrapVisualAtCell(Candidate, &Definition);
             }
         }
     }
@@ -3408,8 +3553,6 @@ void USkaldAbilityComponent::HandleAberrantBloomOnMovement(AFighterPawn* Fighter
 
 void USkaldAbilityComponent::SpawnRaincallerTemplate(const FSkaldAbilityDefinition& Definition)
 {
-    (void)Definition;
-
     ClearRaincallerTemplate();
 
     AFighterPawn* Owner = CachedFighter.Get();
@@ -3458,7 +3601,7 @@ void USkaldAbilityComponent::SpawnRaincallerTemplate(const FSkaldAbilityDefiniti
 
                 FSkaldRaincallerCell& Cell = RaincallerTemplateCells.Emplace_GetRef();
                 Cell.Cell = Candidate;
-                Cell.VisualComponent = SpawnTrapVisualAtCell(Candidate);
+                Cell.VisualComponent = SpawnTrapVisualAtCell(Candidate, &Definition);
             }
         }
     }
@@ -3934,6 +4077,26 @@ bool USkaldAbilityComponent::ResolveAbilityTargetCellFromContext(const FName& Ab
 
     OutCell = Context->TargetCell;
     return true;
+}
+
+void USkaldAbilityComponent::ApplyAbilityContextFromReplication(const FName& AbilityId, AFighterPawn* TargetFighter, bool bHasTargetCell, const FIntPoint& TargetCell)
+{
+    if (AbilityId.IsNone())
+    {
+        return;
+    }
+
+    if (!TargetFighter && !bHasTargetCell)
+    {
+        return;
+    }
+
+    FSkaldAbilityContext Context;
+    Context.AbilityId = AbilityId;
+    Context.TargetFighter = TargetFighter;
+    Context.bHasTargetCell = bHasTargetCell;
+    Context.TargetCell = bHasTargetCell ? TargetCell : FIntPoint(INDEX_NONE, INDEX_NONE);
+    SetPendingAbilityContext(Context);
 }
 
 bool USkaldAbilityComponent::TryPushFighterOneCellAway(const AFighterPawn* Source, AFighterPawn* Target) const
