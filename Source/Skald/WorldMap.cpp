@@ -504,7 +504,8 @@ void AWorldMap::SelectTerritory(ATerritory *Territory,
 
   const bool bIsGlobalSelection = SelectingPlayerId == INDEX_NONE;
   const bool bAffectsLocalSelection =
-      bIsGlobalSelection || ShouldShowSelectionVisuals(SelectingPlayerId);
+      bIsGlobalSelection || !Territory ||
+      Territory->ShouldShowSelectionVisuals(SelectingPlayerId);
   if (!bAffectsLocalSelection) {
     UE_LOG(LogSkald, VeryVerbose,
            TEXT("WorldMap %s ignoring non-local selection from player %d"),
