@@ -320,6 +320,10 @@ void ASkaldAIController::ProcessCurrentPhase() {
     return;
   }
 
+  if (bAnimatingArmyPlacement) {
+    return;
+  }
+
   if (EnsureStrategySelected(WorldMap, PS)) {
     return;
   }
@@ -334,7 +338,11 @@ void ASkaldAIController::ProcessCurrentPhase() {
 
   if (Phase == ETurnPhase::ArmyPlacement) {
     ClearEnemyTurnStatus();
-    ExecuteStrategicArmyPlacement(WorldMap, PS);
+    ExecuteStrategicArmyPlacement(WorldMap, PS, true);
+    if (bAnimatingArmyPlacement) {
+      return;
+    }
+
     TurnManager->BroadcastDeployableUnits(PS);
 
     if (TurnManager->HasTurnsStarted()) {
@@ -621,7 +629,8 @@ float ASkaldAIController::EvaluateDefensivePriority(
 }
 
 void ASkaldAIController::ExecuteStrategicArmyPlacement(
-    AWorldMap *WorldMap, ASkaldPlayerState *InPlayerState) {
+    AWorldMap *WorldMap, ASkaldPlayerState *InPlayerState,
+    bool bAnimatePlacement) {
   if (!WorldMap || !InPlayerState || InPlayerState->DeployableUnits <= 0) {
     return;
   }
@@ -689,8 +698,40 @@ void ASkaldAIController::ExecuteStrategicArmyPlacement(
     return A.Score > B.Score;
   });
 
+  if (!bAnimatePlacement) {
+    int32 Index = 0;
+    while (InPlayerState->DeployableUnits > 0 && Targets.Num() > 0) {
+      FPlacementTarget &Target = Targets[Index];
+      if (Target.RemainingCapacity <= 0) {
+        Targets.RemoveAt(Index);
+        if (Targets.Num() == 0) {
+          break;
+        }
+        Index %= Targets.Num();
+        continue;
+      }
+
+      ++Target.Territory->ArmyUnits;
+      Target.Territory->RefreshAppearance();
+      --InPlayerState->DeployableUnits;
+      InPlayerState->AddArmyPlacementDeployment(
+          Target.Territory->GetTerritoryId(), 1);
+      --Target.RemainingCapacity;
+
+      if (Targets.Num() > 0) {
+        Index = (Index + 1) % Targets.Num();
+      }
+    }
+    return;
+  }
+
+  int32 UnitsRemaining = InPlayerState->DeployableUnits;
+  TArray<FAnimatedArmyPlacementStep> PlacementSequence;
+  PlacementSequence.Reserve(Targets.Num());
+  TMap<ATerritory *, int32> TerritoryToSequenceIndex;
+
   int32 Index = 0;
-  while (InPlayerState->DeployableUnits > 0 && Targets.Num() > 0) {
+  while (UnitsRemaining > 0 && Targets.Num() > 0) {
     FPlacementTarget &Target = Targets[Index];
     if (Target.RemainingCapacity <= 0) {
       Targets.RemoveAt(Index);
@@ -701,16 +742,135 @@ void ASkaldAIController::ExecuteStrategicArmyPlacement(
       continue;
     }
 
-    ++Target.Territory->ArmyUnits;
-    Target.Territory->RefreshAppearance();
-    --InPlayerState->DeployableUnits;
-    InPlayerState->AddArmyPlacementDeployment(
-        Target.Territory->GetTerritoryId(), 1);
+    int32 SequenceIndex = 0;
+    if (int32 *ExistingIndex =
+            TerritoryToSequenceIndex.Find(Target.Territory)) {
+      SequenceIndex = *ExistingIndex;
+    } else {
+      SequenceIndex = PlacementSequence.Add({Target.Territory, 0});
+      TerritoryToSequenceIndex.Add(Target.Territory, SequenceIndex);
+    }
+
+    FAnimatedArmyPlacementStep &PlacementStep =
+        PlacementSequence[SequenceIndex];
+    ++PlacementStep.Units;
     --Target.RemainingCapacity;
+    --UnitsRemaining;
 
     if (Targets.Num() > 0) {
       Index = (Index + 1) % Targets.Num();
     }
+  }
+
+  if (PlacementSequence.Num() > 0) {
+    StartArmyPlacementAnimation(PlacementSequence, InPlayerState);
+  }
+}
+
+void ASkaldAIController::StartArmyPlacementAnimation(
+    const TArray<FAnimatedArmyPlacementStep> &PlacementOrder,
+    ASkaldPlayerState *PlayerState) {
+  if (PlacementOrder.Num() == 0 || !PlayerState) {
+    return;
+  }
+
+  if (bAnimatingArmyPlacement) {
+    CompleteArmyPlacementAnimation(false);
+  }
+
+  PendingArmyPlacementTargets = PlacementOrder;
+  AnimatedPlacementPlayerState = PlayerState;
+  bAnimatingArmyPlacement = true;
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(ArmyPlacementAnimationHandle);
+  }
+
+  HandleArmyPlacementAnimationStep();
+}
+
+void ASkaldAIController::HandleArmyPlacementAnimationStep() {
+  if (!bAnimatingArmyPlacement) {
+    return;
+  }
+
+  ASkaldPlayerState *PlayerState = AnimatedPlacementPlayerState.Get();
+  if (!PlayerState) {
+    CompleteArmyPlacementAnimation(true);
+    return;
+  }
+
+  if (PendingArmyPlacementTargets.Num() == 0 ||
+      PlayerState->DeployableUnits <= 0) {
+    CompleteArmyPlacementAnimation(true);
+    return;
+  }
+
+  const FAnimatedArmyPlacementStep NextPlacementStep =
+      PendingArmyPlacementTargets[0];
+  PendingArmyPlacementTargets.RemoveAt(0);
+
+  if (ATerritory *Target = NextPlacementStep.Territory.Get()) {
+    const int32 UnitsToDeploy =
+        FMath::Clamp(NextPlacementStep.Units, 0, PlayerState->DeployableUnits);
+    if (UnitsToDeploy > 0) {
+      Target->ArmyUnits += UnitsToDeploy;
+      Target->RefreshAppearance();
+      PlayerState->DeployableUnits -= UnitsToDeploy;
+      PlayerState->AddArmyPlacementDeployment(Target->GetTerritoryId(),
+                                              UnitsToDeploy);
+    }
+  }
+
+  if (TurnManager) {
+    TurnManager->BroadcastDeployableUnits(PlayerState);
+  }
+
+  if (PendingArmyPlacementTargets.Num() == 0 ||
+      PlayerState->DeployableUnits <= 0) {
+    CompleteArmyPlacementAnimation(true);
+    return;
+  }
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().SetTimer(
+        ArmyPlacementAnimationHandle, this,
+        &ASkaldAIController::HandleArmyPlacementAnimationStep,
+        FMath::Max(AnimatedArmyPlacementDelay, 0.f), false);
+  } else {
+    CompleteArmyPlacementAnimation(true);
+  }
+}
+
+void ASkaldAIController::CompleteArmyPlacementAnimation(bool bAdvancePhase) {
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(ArmyPlacementAnimationHandle);
+  }
+
+  const bool bWasAnimating = bAnimatingArmyPlacement;
+  bAnimatingArmyPlacement = false;
+
+  ASkaldPlayerState *PlayerState = AnimatedPlacementPlayerState.Get();
+  AnimatedPlacementPlayerState.Reset();
+  PendingArmyPlacementTargets.Reset();
+
+  if (!bWasAnimating) {
+    return;
+  }
+
+  if (!bAdvancePhase || !TurnManager || !PlayerState) {
+    return;
+  }
+
+  TurnManager->BroadcastDeployableUnits(PlayerState);
+
+  if (TurnManager->HasTurnsStarted()) {
+    const float PlacementDelay =
+        FMath::Max(EnemyTurnStepDelay * StrategyPlanningDelayFraction,
+                   MinimumStrategyPlanningDelay);
+    SchedulePhaseAdvance(PlacementDelay);
+  } else {
+    EndTurn();
   }
 }
 
@@ -1085,6 +1245,7 @@ void ASkaldAIController::ClearDecisionTimers() {
   if (UWorld *World = GetWorld()) {
     World->GetTimerManager().ClearTimer(EnemyTurnStepTimerHandle);
   }
+  CompleteArmyPlacementAnimation(false);
 }
 
 void ASkaldAIController::BroadcastEnemyTurnStatus(const FString &Message) {

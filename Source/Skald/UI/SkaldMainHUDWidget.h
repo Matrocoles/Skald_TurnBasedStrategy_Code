@@ -574,6 +574,7 @@ protected:
   FText CachedSelectionPromptText;
   bool bCachedSelectionPromptVisible = false;
   bool bArmyPlacementWarningActive = false;
+  bool bSelectionPromptSuppressed = false;
   FText CachedStatusMessage;
   float CachedStatusMessageDuration = 0.f;
   bool bStatusMessageVisible = false;
@@ -596,6 +597,8 @@ protected:
   void ClearStrategicInitiativeWaitIfNeeded();
   bool IsStrategicInitiativeOverlayActive() const;
   void ApplyPendingSelectionPrompt();
+  void SetSelectionPromptSuppressed(bool bShouldSuppress);
+  bool IsLocalPlayersTurn() const;
   UTextBlock *GetSelectionPromptTextBlock() const;
   void HandleArmyPlacementWarningExpired();
 
