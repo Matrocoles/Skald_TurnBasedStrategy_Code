@@ -212,7 +212,7 @@ bool FAIArmyPlacementAutoAdvanceTest::RunTest(const FString &Parameters) {
     return false;
   }
 
-  AttachGameModeToWorld(World, GameMode);
+  Skald::Tests::AttachGameModeToWorld(World, GameMode);
   GameMode->InitGameState();
   ASkaldGameState *GameState = GameMode->GetGameState<ASkaldGameState>();
   TestNotNull(TEXT("GameState initialised"), GameState);
@@ -316,7 +316,7 @@ bool FAIArmyPlacementFailsafeRespectsHumanTest::RunTest(
     return false;
   }
 
-  AttachGameModeToWorld(World, GameMode);
+  Skald::Tests::AttachGameModeToWorld(World, GameMode);
   GameMode->InitGameState();
   ASkaldGameState *GameState = GameMode->GetGameState<ASkaldGameState>();
   TestNotNull(TEXT("GameState initialised"), GameState);
@@ -425,7 +425,7 @@ bool FInitializeWorldSingleInitiativeRollTest::RunTest(const FString &Parameters
     return false;
   }
 
-  AttachGameModeToWorld(World, GameMode);
+  Skald::Tests::AttachGameModeToWorld(World, GameMode);
   GameMode->InitGameState();
   ASkaldGameState *GameState = GameMode->GetGameState<ASkaldGameState>();
   TestNotNull(TEXT("GameState initialised"), GameState);
@@ -510,7 +510,7 @@ bool FSkaldGameModeRetryInitTimerTest::RunTest(const FString &Parameters) {
     return false;
   }
 
-  AttachGameModeToWorld(World, GameMode);
+  Skald::Tests::AttachGameModeToWorld(World, GameMode);
   GameMode->InitGameState();
   ASkaldGameState *GameState = GameMode->GetGameState<ASkaldGameState>();
   TestNotNull(TEXT("GameState initialised"), GameState);
