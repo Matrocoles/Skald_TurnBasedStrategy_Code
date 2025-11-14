@@ -741,7 +741,8 @@ private:
   void TickActiveProjectileFX(float DeltaSeconds);
   void SpawnProjectileFX(const FVector &SpawnLocation,
                          const FVector &TargetLocation,
-                         const FRotator &SpawnRotation);
+                         const FRotator &SpawnRotation,
+                         AFighterPawn *Target);
 
   TArray<FActiveProjectileFX> ActiveProjectileFX;
 

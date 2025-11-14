@@ -32,6 +32,7 @@
 #include "Skald_GameInstance.h"
 #include "Skald_PlayerState.h"
 #include "Skald_AIController.h"
+#include "SkaldProjectileFXInterface.h"
 #include "SkaldDiceManager.h"
 #include "Sound/SoundBase.h"
 #include "TimerManager.h"
@@ -1096,14 +1097,12 @@ void AFighterPawn::PlayMeleePreAttackFX(AFighterPawn *Target) {
       ResolveFXOrigin(AttackFX.PreAttackSocket, AttackFX.PreAttackOffset,
                       &SocketRotation);
 
-  FRotator SpawnRotation = SocketRotation;
-  if (AttackFX.PreAttackSocket.IsNone()) {
-    FVector Direction = (TargetLocation - SpawnLocation).GetSafeNormal();
-    if (Direction.IsNearlyZero()) {
-      Direction = SocketRotation.Vector();
-    }
-    SpawnRotation = Direction.Rotation();
+  FVector Direction = (TargetLocation - SpawnLocation).GetSafeNormal();
+  if (Direction.IsNearlyZero()) {
+    Direction = SocketRotation.Vector();
   }
+  FRotator SpawnRotation = Direction.Rotation();
+  SpawnRotation += AttackFX.PreAttackAimOffset;
 
   if (!AttackFX.PreAttackEffect.IsNull()) {
     if (UWorld *World = GetWorld()) {
@@ -1145,7 +1144,7 @@ void AFighterPawn::PlayRangedPreAttackFX(AFighterPawn *Target) {
   }
   const FRotator SpawnRotation = Direction.Rotation();
 
-  SpawnProjectileFX(SpawnLocation, TargetLocation, SpawnRotation);
+  SpawnProjectileFX(SpawnLocation, TargetLocation, SpawnRotation, Target);
 
   if (!AttackFX.ProjectileSound.IsNull()) {
     if (UWorld *World = GetWorld()) {
@@ -1158,7 +1157,27 @@ void AFighterPawn::PlayRangedPreAttackFX(AFighterPawn *Target) {
 
 void AFighterPawn::SpawnProjectileFX(const FVector &SpawnLocation,
                                      const FVector &TargetLocation,
-                                     const FRotator &SpawnRotation) {
+                                     const FRotator &SpawnRotation,
+                                     AFighterPawn *Target) {
+  if (AttackFX.bUseProjectileActor && AttackFX.ProjectileActorClass) {
+    if (UWorld *World = GetWorld()) {
+      const FTransform SpawnTransform(SpawnRotation, SpawnLocation);
+      AActor *ProjectileActor = World->SpawnActorDeferred<AActor>(
+          AttackFX.ProjectileActorClass, SpawnTransform, this, this,
+          ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+      if (ProjectileActor) {
+        ProjectileActor->FinishSpawning(SpawnTransform);
+
+        if (ProjectileActor->GetClass()->ImplementsInterface(
+                USkaldProjectileFXInterface::StaticClass())) {
+          ISkaldProjectileFXInterface::Execute_InitializeProjectileFX(
+              ProjectileActor, this, Target, SpawnLocation, TargetLocation);
+        }
+      }
+    }
+    return;
+  }
+
   if (AttackFX.ProjectileEffect.IsNull()) {
     return;
   }
