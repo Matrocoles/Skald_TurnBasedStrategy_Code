@@ -461,6 +461,12 @@ void USkaldMainHUDWidget::HandleEndPhaseClicked() {
 
 void USkaldMainHUDWidget::UpdateTurnBanner(int32 InCurrentPlayerID,
                                            int32 InTurnNumber) {
+  if (LocalPlayerID <= 0) {
+    const int32 ResolvedLocalId = ResolveLocalPlayerId();
+    if (ResolvedLocalId > 0) {
+      LocalPlayerID = ResolvedLocalId;
+    }
+  }
   CurrentPlayerID = InCurrentPlayerID;
   TurnNumber = InTurnNumber;
 
@@ -469,6 +475,12 @@ void USkaldMainHUDWidget::UpdateTurnBanner(int32 InCurrentPlayerID,
 }
 
 void USkaldMainHUDWidget::UpdatePhaseBanner(ETurnPhase InPhase) {
+  if (LocalPlayerID <= 0) {
+    const int32 ResolvedLocalId = ResolveLocalPlayerId();
+    if (ResolvedLocalId > 0) {
+      LocalPlayerID = ResolvedLocalId;
+    }
+  }
   ClearStrategicInitiativeWaitIfNeeded();
   CurrentPhase = InPhase;
 
@@ -599,6 +611,12 @@ void USkaldMainHUDWidget::RefreshPlayerList(
 void USkaldMainHUDWidget::RefreshFromState(
     int32 InCurrentPlayerID, int32 InTurnNumber, ETurnPhase InPhase,
     const TArray<FS_PlayerData> &Players) {
+  if (LocalPlayerID <= 0) {
+    const int32 ResolvedLocalId = ResolveLocalPlayerId();
+    if (ResolvedLocalId > 0) {
+      LocalPlayerID = ResolvedLocalId;
+    }
+  }
   CurrentPlayerID = InCurrentPlayerID;
   TurnNumber = InTurnNumber;
   CurrentPhase = InPhase;

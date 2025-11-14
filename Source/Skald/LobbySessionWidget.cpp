@@ -42,6 +42,7 @@ void ULobbySessionWidget::NativeConstruct()
 
     CachedController = GetOwningPlayer<ALobbyPlayerController>();
     CachedGameState = GetWorld() ? GetWorld()->GetGameState<ALobbyGameState>() : nullptr;
+    bHasReceivedInitialState = false;
 
     BuildLayout();
 
@@ -456,6 +457,21 @@ void ULobbySessionWidget::RefreshFromState()
 
     if (CachedGameState)
     {
+        int32 ActiveSlots = 0;
+        for (int32 Index = 0; Index < SlotWidgets.Num(); ++Index)
+        {
+            const FLobbyPlayerSlot* SlotData = CachedGameState->GetSlot(Index);
+            if (SlotData && SlotData->bIsActive)
+            {
+                ++ActiveSlots;
+            }
+        }
+
+        if (!bHasReceivedInitialState && ActiveSlots > 0)
+        {
+            bHasReceivedInitialState = true;
+        }
+
         for (int32 Index = 0; Index < SlotWidgets.Num(); ++Index)
         {
             const FLobbyPlayerSlot* SlotData = CachedGameState->GetSlot(Index);
@@ -491,7 +507,9 @@ void ULobbySessionWidget::RefreshSlot(int32 SlotIndex, const FLobbyPlayerSlot& S
 
     if (Widgets.NameEdit)
     {
-        Widgets.NameEdit->SetIsEnabled(SlotData.bIsActive && !bIsAI && bIsLocal && !SlotData.bIsReady);
+    const bool bCanInteract = SlotData.bIsActive && !bIsAI && bIsLocal && !SlotData.bIsReady && bHasReceivedInitialState;
+
+    Widgets.NameEdit->SetIsEnabled(bCanInteract);
         Widgets.NameEdit->SetText(FText::FromString(SlotData.DisplayName));
     }
 
@@ -511,13 +529,14 @@ void ULobbySessionWidget::RefreshSlot(int32 SlotIndex, const FLobbyPlayerSlot& S
             Widgets.FactionCombo->SetSelectedOption(FactionPlaceholder);
         }
 
-        Widgets.FactionCombo->SetIsEnabled(SlotData.bIsActive && !bIsAI && bIsLocal && !SlotData.bIsReady);
+        Widgets.FactionCombo->SetIsEnabled(bCanInteract);
     }
 
     if (Widgets.ReadyButton && Widgets.ReadyLabel)
     {
-        Widgets.ReadyButton->SetVisibility(SlotData.bIsActive && !bIsAI ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
-        Widgets.ReadyButton->SetIsEnabled(bIsLocal && !bIsAI && !SlotData.bIsReady);
+        const bool bShowReadyButton = SlotData.bIsActive && !bIsAI && bHasReceivedInitialState;
+        Widgets.ReadyButton->SetVisibility(bShowReadyButton ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+        Widgets.ReadyButton->SetIsEnabled(bCanInteract);
         Widgets.ReadyLabel->SetText(SlotData.bIsReady ? NSLOCTEXT("Lobby", "LockedLabel", "Locked") : NSLOCTEXT("Lobby", "LockInAction", "Lock In"));
     }
 
@@ -533,10 +552,15 @@ void ULobbySessionWidget::RefreshSlot(int32 SlotIndex, const FLobbyPlayerSlot& S
             Widgets.StatusText->SetText(NSLOCTEXT("Lobby", "AILocked", "AI Locked"));
             Widgets.StatusText->SetColorAndOpacity(FSlateColor(ReadyColor));
         }
-        else
+        else if (bHasReceivedInitialState)
         {
             Widgets.StatusText->SetText(SlotData.bIsReady ? NSLOCTEXT("Lobby", "LockedStatus", "Locked In") : NSLOCTEXT("Lobby", "WaitingStatus", "Awaiting Lock In"));
             Widgets.StatusText->SetColorAndOpacity(FSlateColor(SlotData.bIsReady ? ReadyColor : NotReadyColor));
+        }
+        else
+        {
+            Widgets.StatusText->SetText(NSLOCTEXT("Lobby", "Loading", "Loading..."));
+            Widgets.StatusText->SetColorAndOpacity(FSlateColor(FLinearColor::Gray));
         }
     }
 }
@@ -545,24 +569,31 @@ void ULobbySessionWidget::UpdateHostControls(int32 TotalSlots, int32 AISlots, bo
 {
     const bool bIsHost = CachedController && CachedController->IsLocalPlayerLobbyHost();
     const bool bConfigurationLocked = CachedGameState && CachedGameState->bSlotConfigurationLocked;
+    const bool bHasState = bHasReceivedInitialState;
+    const bool bShowControls = bIsHost && bHasState;
 
     if (PlayerCountSpinBox)
     {
         PlayerCountSpinBox->SetValue(static_cast<float>(TotalSlots));
-        PlayerCountSpinBox->SetIsEnabled(bIsHost && !bConfigurationLocked);
+        PlayerCountSpinBox->SetIsEnabled(bShowControls && !bConfigurationLocked);
     }
 
     if (AICountSpinBox)
     {
         AICountSpinBox->SetMaxValue(static_cast<float>(FMath::Max(0, TotalSlots - 1)));
         AICountSpinBox->SetValue(static_cast<float>(AISlots));
-        AICountSpinBox->SetIsEnabled(bIsHost && !bConfigurationLocked);
+        AICountSpinBox->SetIsEnabled(bShowControls && !bConfigurationLocked);
+    }
+
+    if (HostControls)
+    {
+        HostControls->SetVisibility(bShowControls ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     }
 
     if (LaunchButton)
     {
-        LaunchButton->SetIsEnabled(bIsHost && bAllReady);
-        LaunchButton->SetVisibility(bIsHost ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+        LaunchButton->SetIsEnabled(bShowControls && bAllReady);
+        LaunchButton->SetVisibility(bShowControls ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     }
 }
 

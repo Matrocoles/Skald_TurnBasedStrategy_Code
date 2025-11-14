@@ -1618,6 +1618,7 @@ void ASkaldGameMode::BeginStrategicInitiativePhase() {
   if (USkaldDiceManager *DiceManager = ResolveDiceManager()) {
     DiceManager->SetHoldInitiativeDice(true);
   }
+  BroadcastStrategicInitiativeDiceHold(true);
   if (UWorld *World = GetWorld()) {
     World->GetTimerManager().ClearTimer(StrategicInitiativeAIRollHandle);
   }
@@ -1965,6 +1966,7 @@ void ASkaldGameMode::ResolveStrategicInitiativePhase() {
   if (USkaldDiceManager *DiceManager = ResolveDiceManager()) {
     DiceManager->SetHoldInitiativeDice(false);
   }
+  BroadcastStrategicInitiativeDiceHold(false);
 
   const bool bInitialized = InitializeWorld();
   PendingStrategicInitiativePlayers.Empty();
@@ -1994,10 +1996,10 @@ void ASkaldGameMode::NotifyStrategicInitiativeRoll(
   }
 
   int32 DisplayRound = RoundNumber;
-  if (const ASkaldPlayerState *TargetState =
-          Controller->GetPlayerState<ASkaldPlayerState>()) {
+  ASkaldPlayerState *TargetState = Controller->GetPlayerState<ASkaldPlayerState>();
+  if (const ASkaldPlayerState *StateForRound = TargetState) {
     if (const int32 *StoredRound =
-            StrategicInitiativeRoundByPlayer.Find(TargetState)) {
+            StrategicInitiativeRoundByPlayer.Find(StateForRound)) {
       DisplayRound = *StoredRound;
     }
   }
@@ -2023,6 +2025,47 @@ void ASkaldGameMode::NotifyStrategicInitiativeRoll(
   } else {
     Controller->ClientPromptStrategicInitiative(DisplayRound, RollValue,
                                                bWonInitiative);
+  }
+
+  if (TargetState) {
+    BroadcastStrategicInitiativeRoll(TargetState, Controller, DisplayRound,
+                                     RollValue);
+  }
+}
+
+void ASkaldGameMode::BroadcastStrategicInitiativeRoll(
+    ASkaldPlayerState *Roller, ASkaldPlayerController *RollingController,
+    int32 RoundNumber, int32 RollValue) {
+  if (!Roller) {
+    return;
+  }
+
+  USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+  const FLinearColor RollerTint =
+      GI ? GI->GetFactionColor(Roller->Faction)
+         : USkaldGameInstance::GetDefaultFactionColor(Roller->Faction);
+
+  if (UWorld *World = GetWorld()) {
+    for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator();
+         It; ++It) {
+      if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(*It)) {
+        const bool bIsRollingPlayer = (PC == RollingController);
+        PC->ClientSpectateStrategicInitiativeRoll(
+            Roller->GetPlayerId(), RoundNumber, RollValue, RollerTint,
+            bIsRollingPlayer);
+      }
+    }
+  }
+}
+
+void ASkaldGameMode::BroadcastStrategicInitiativeDiceHold(bool bHold) {
+  if (UWorld *World = GetWorld()) {
+    for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator();
+         It; ++It) {
+      if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(*It)) {
+        PC->ClientSetStrategicInitiativeDiceHold(bHold);
+      }
+    }
   }
 }
 
