@@ -502,6 +502,16 @@ void AWorldMap::SelectTerritory(ATerritory *Territory,
     return;
   }
 
+  const bool bIsGlobalSelection = SelectingPlayerId == INDEX_NONE;
+  const bool bAffectsLocalSelection =
+      bIsGlobalSelection || ShouldShowSelectionVisuals(SelectingPlayerId);
+  if (!bAffectsLocalSelection) {
+    UE_LOG(LogSkald, VeryVerbose,
+           TEXT("WorldMap %s ignoring non-local selection from player %d"),
+           *GetName(), SelectingPlayerId);
+    return;
+  }
+
   if (Territory == SelectedTerritory &&
       SelectingPlayerId == SelectedByPlayerId) {
     return;

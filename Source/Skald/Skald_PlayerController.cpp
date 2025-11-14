@@ -2388,6 +2388,9 @@ void ASkaldPlayerController::Server_CommitArmy_Implementation(
   }
 
   if (ASkald_BattleGameMode *BattleGM = ResolveBattleGameMode()) {
+    if (PS) {
+      BattleGM->RegisterPlayerLockIn(PS->GetPlayerId());
+    }
     BattleGM->TryLaunchBattle();
   }
 }
