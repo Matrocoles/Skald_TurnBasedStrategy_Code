@@ -28,6 +28,7 @@ bool FTerritorySelectionFlowTest::RunTest(const FString &Parameters) {
 
   AWorldMap *Map = World->SpawnActor<AWorldMap>();
   ATerritory *Terr = World->SpawnActor<ATerritory>();
+  ATerritory *OtherTerr = World->SpawnActor<ATerritory>();
   ATerritorySelectionTestPC *PC =
       World->SpawnActor<ATerritorySelectionTestPC>();
   FString Error;
@@ -41,14 +42,17 @@ bool FTerritorySelectionFlowTest::RunTest(const FString &Parameters) {
 
   TestNotNull(TEXT("WorldMap"), Map);
   TestNotNull(TEXT("Territory"), Terr);
+  TestNotNull(TEXT("Second Territory"), OtherTerr);
   TestNotNull(TEXT("PlayerController"), PC);
-  if (!Map || !Terr || !PC) {
+  if (!Map || !Terr || !OtherTerr || !PC) {
     World->GetGameInstance()->RemoveLocalPlayer(LocalPlayer);
     return false;
   }
 
   Terr->TerritoryID = 99;
   Map->RegisterTerritory(Terr);
+  OtherTerr->TerritoryID = 123;
+  Map->RegisterTerritory(OtherTerr);
 
   UPrimitiveComponent *Mesh = Terr->FindComponentByClass<UPrimitiveComponent>();
   TestNotNull(TEXT("Mesh component"), Mesh);
@@ -61,6 +65,17 @@ bool FTerritorySelectionFlowTest::RunTest(const FString &Parameters) {
 
   TestTrue(TEXT("ServerSelectTerritory called"), PC->bServerSelectCalled);
   TestEqual(TEXT("SelectedTerritory updated"), Map->SelectedTerritory, Terr);
+
+  const int32 RemotePlayerId = 4242;
+  Map->SelectTerritory(OtherTerr, false, RemotePlayerId);
+  TestEqual(TEXT("Remote selection cached"),
+            Map->GetSelectionForPlayer(RemotePlayerId), OtherTerr);
+  TestEqual(TEXT("Local selection unaffected by remote player"),
+            Map->SelectedTerritory, Terr);
+
+  Map->SelectTerritory(nullptr, false, RemotePlayerId);
+  TestNull(TEXT("Remote deselection cleared cache"),
+           Map->GetSelectionForPlayer(RemotePlayerId));
 
   World->GetGameInstance()->RemoveLocalPlayer(LocalPlayer);
   return true;

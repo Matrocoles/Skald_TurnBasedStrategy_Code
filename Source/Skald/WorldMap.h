@@ -107,6 +107,10 @@ public:
   UFUNCTION(BlueprintCallable, Category = "WorldMap")
   ATerritory *GetTerritoryById(int32 TerritoryId) const;
 
+  /** Return the most recent selection recorded for a specific player. */
+  UFUNCTION(BlueprintCallable, Category = "WorldMap")
+  ATerritory *GetSelectionForPlayer(int32 PlayerId) const;
+
   /** Sound played when a territory becomes selected on this map. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WorldMap|Audio")
   USoundBase *TerritorySelectedSound = nullptr;
@@ -211,4 +215,7 @@ private:
 
   /** Territory IDs marked as capital candidates in the data table. */
   TSet<int32> CapitalCandidateIDs;
+
+  /** Latest territory selected by each player. */
+  TMap<int32, TWeakObjectPtr<ATerritory>> SelectionByPlayerId;
 };

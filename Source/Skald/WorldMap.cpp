@@ -522,6 +522,18 @@ ATerritory *AWorldMap::GetTerritoryById(int32 TerritoryId) const {
   return Found ? *Found : nullptr;
 }
 
+ATerritory *AWorldMap::GetSelectionForPlayer(int32 PlayerId) const {
+  const TWeakObjectPtr<ATerritory> *Found = SelectionByPlayerId.Find(PlayerId);
+  if (!Found) {
+    return nullptr;
+  }
+
+  if (Found->IsValid()) {
+    return Found->Get();
+  }
+  return nullptr;
+}
+
 void AWorldMap::SelectTerritory(ATerritory *Territory,
                                 bool bPlaySelectionSound,
                                 int32 SelectingPlayerId) {
@@ -539,9 +551,15 @@ void AWorldMap::SelectTerritory(ATerritory *Territory,
                                           : (bIsGlobalSelection ||
                                              IsSelectingPlayerLocal(
                                                  SelectingPlayerId));
-  const bool bHasAuthority = HasAuthority();
+  if (SelectingPlayerId != INDEX_NONE) {
+    if (IsValid(Territory)) {
+      SelectionByPlayerId.FindOrAdd(SelectingPlayerId) = Territory;
+    } else {
+      SelectionByPlayerId.Remove(SelectingPlayerId);
+    }
+  }
 
-  if (!bAffectsLocalSelection && !bHasAuthority) {
+  if (!bAffectsLocalSelection) {
     UE_LOG(LogSkald, VeryVerbose,
            TEXT("WorldMap %s ignoring non-local selection from player %d"),
            *GetName(), SelectingPlayerId);
@@ -558,36 +576,37 @@ void AWorldMap::SelectTerritory(ATerritory *Territory,
          Territory ? *Territory->GetName() : TEXT("None"),
          SelectedTerritory ? *SelectedTerritory->GetName() : TEXT("None"));
 
-  if (IsValid(SelectedTerritory)) {
-    SelectedTerritory->Deselect();
-  }
-
-  SelectedTerritory = IsValid(Territory) ? Territory : nullptr;
-  SelectedByPlayerId = SelectedTerritory ? SelectingPlayerId : INDEX_NONE;
-
-  bool bShouldPlaySound = false;
-  USoundBase *SoundToPlay = nullptr;
-  float VolumeMultiplier = 1.f;
-  if (SelectedTerritory) {
-    SelectedTerritory->Select(SelectingPlayerId);
-
-    SoundToPlay = SelectedTerritory->GetSelectionSound();
-    if (SoundToPlay) {
-      VolumeMultiplier = SelectedTerritory->GetSelectionSoundVolumeMultiplier();
-    } else {
-      SoundToPlay = TerritorySelectedSound;
+  if (bAffectsLocalSelection) {
+    if (IsValid(SelectedTerritory)) {
+      SelectedTerritory->Deselect();
     }
 
-    bShouldPlaySound = bAffectsLocalSelection && bPlaySelectionSound &&
-                      SoundToPlay && GetNetMode() != NM_DedicatedServer &&
-                      SelectedTerritory->IsSelectionVisibleToLocalPlayer();
-  }
+    SelectedTerritory = IsValid(Territory) ? Territory : nullptr;
+    SelectedByPlayerId = SelectedTerritory ? SelectingPlayerId : INDEX_NONE;
 
-  if (bShouldPlaySound) {
-    UGameplayStatics::PlaySound2D(this, SoundToPlay, VolumeMultiplier);
-  }
+    bool bShouldPlaySound = false;
+    USoundBase *SoundToPlay = nullptr;
+    float VolumeMultiplier = 1.f;
+    if (SelectedTerritory) {
+      SelectedTerritory->Select(SelectingPlayerId);
 
-  if (bAffectsLocalSelection) {
+      SoundToPlay = SelectedTerritory->GetSelectionSound();
+      if (SoundToPlay) {
+        VolumeMultiplier =
+            SelectedTerritory->GetSelectionSoundVolumeMultiplier();
+      } else {
+        SoundToPlay = TerritorySelectedSound;
+      }
+
+      bShouldPlaySound = bPlaySelectionSound && SoundToPlay &&
+                        GetNetMode() != NM_DedicatedServer &&
+                        SelectedTerritory->IsSelectionVisibleToLocalPlayer();
+    }
+
+    if (bShouldPlaySound) {
+      UGameplayStatics::PlaySound2D(this, SoundToPlay, VolumeMultiplier);
+    }
+
     OnTerritorySelected.Broadcast(SelectedTerritory);
   }
 }
