@@ -34,6 +34,9 @@ public:
   void HandleHumanLockIn(class ASkaldPlayerController* PC,
                          const TArray<FFighterDefinition>& SelectedFighters);
 
+  /** Record that the supplied player has locked in their army selection. */
+  void RegisterPlayerLockIn(int32 PlayerId);
+
 protected:
   virtual void InitGame(const FString &Map, const FString &Options,
                         FString &Error) override;

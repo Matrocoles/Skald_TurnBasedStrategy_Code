@@ -994,10 +994,10 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
   AutoCommitAIArmy(DefenderPS, DefenderPS->bIsAI ? DefenderBudget : 0);
 
   if (AttackerPS && AttackerPS->bIsAI && AttackerPS->bArmyLockedIn) {
-    LockedInPlayers.Add(AttackerPS->GetPlayerId());
+    RegisterPlayerLockIn(AttackerPS->GetPlayerId());
   }
   if (DefenderPS && DefenderPS->bIsAI && DefenderPS->bArmyLockedIn) {
-    LockedInPlayers.Add(DefenderPS->GetPlayerId());
+    RegisterPlayerLockIn(DefenderPS->GetPlayerId());
   }
 
   bSetupCompleted = true;
@@ -1466,6 +1466,12 @@ void ASkald_BattleGameMode::TryLaunchBattle() {
     return;
   }
 
+  if (!AreBothParticipantsLocked()) {
+    UE_LOG(LogSkaldBattle, Verbose,
+           TEXT("BattleGM TryLaunchBattle: waiting for participants to confirm lock-in"));
+    return;
+  }
+
   TArray<AController *> ControllersToRelocate;
   TMap<AController *, bool> ControllerSides;
   if (AttackerPS) {
@@ -1755,13 +1761,23 @@ void ASkald_BattleGameMode::HandleHumanLockIn(
     return;
   }
 
-  LockedInPlayers.Add(PlayerId);
+  RegisterPlayerLockIn(PlayerId);
   UE_LOG(LogSkaldBattle, Log,
          TEXT("HandleHumanLockIn: PlayerId=%d locked selection"), PlayerId);
   LogParticipantLockState(TEXT("HandleHumanLockIn (post-commit)"));
   PC->Client_OnLockInResult(true, TEXT("Committed"));
 
   TryAdvanceAfterLockIn();
+}
+
+void ASkald_BattleGameMode::RegisterPlayerLockIn(int32 PlayerId)
+{
+  if (PlayerId <= 0)
+  {
+    return;
+  }
+
+  LockedInPlayers.Add(PlayerId);
 }
 
 bool ASkald_BattleGameMode::AreBothParticipantsLocked() const
