@@ -539,14 +539,15 @@ void AWorldMap::SelectTerritory(ATerritory *Territory,
                                           : (bIsGlobalSelection ||
                                              IsSelectingPlayerLocal(
                                                  SelectingPlayerId));
-  if (!bAffectsLocalSelection) {
+  const bool bShouldProcessSelection = bAffectsLocalSelection || HasAuthority();
+  if (!bShouldProcessSelection) {
     UE_LOG(LogSkald, VeryVerbose,
            TEXT("WorldMap %s ignoring non-local selection from player %d"),
            *GetName(), SelectingPlayerId);
     return;
   }
 
-  if (Territory == SelectedTerritory &&
+  if (bAffectsLocalSelection && Territory == SelectedTerritory &&
       SelectingPlayerId == SelectedByPlayerId) {
     return;
   }
@@ -556,9 +557,7 @@ void AWorldMap::SelectTerritory(ATerritory *Territory,
          Territory ? *Territory->GetName() : TEXT("None"),
          SelectedTerritory ? *SelectedTerritory->GetName() : TEXT("None"));
 
-  if (IsValid(SelectedTerritory)) {
-    SelectedTerritory->Deselect();
-  }
+  const TObjectPtr<ATerritory> PreviousSelection = SelectedTerritory;
 
   SelectedTerritory = IsValid(Territory) ? Territory : nullptr;
   SelectedByPlayerId = SelectedTerritory ? SelectingPlayerId : INDEX_NONE;
@@ -566,26 +565,32 @@ void AWorldMap::SelectTerritory(ATerritory *Territory,
   bool bShouldPlaySound = false;
   USoundBase *SoundToPlay = nullptr;
   float VolumeMultiplier = 1.f;
-  if (SelectedTerritory) {
-    SelectedTerritory->Select(SelectingPlayerId);
-
-    SoundToPlay = SelectedTerritory->GetSelectionSound();
-    if (SoundToPlay) {
-      VolumeMultiplier = SelectedTerritory->GetSelectionSoundVolumeMultiplier();
-    } else {
-      SoundToPlay = TerritorySelectedSound;
+  if (bAffectsLocalSelection) {
+    if (IsValid(PreviousSelection) && PreviousSelection != SelectedTerritory) {
+      PreviousSelection->Deselect();
     }
 
-    bShouldPlaySound = bPlaySelectionSound && SoundToPlay &&
-                      GetNetMode() != NM_DedicatedServer &&
-                      SelectedTerritory->IsSelectionVisibleToLocalPlayer();
-  }
+    if (SelectedTerritory) {
+      SelectedTerritory->Select(SelectingPlayerId);
 
-  if (bShouldPlaySound) {
-    UGameplayStatics::PlaySound2D(this, SoundToPlay, VolumeMultiplier);
-  }
+      SoundToPlay = SelectedTerritory->GetSelectionSound();
+      if (SoundToPlay) {
+        VolumeMultiplier = SelectedTerritory->GetSelectionSoundVolumeMultiplier();
+      } else {
+        SoundToPlay = TerritorySelectedSound;
+      }
 
-  OnTerritorySelected.Broadcast(SelectedTerritory);
+      bShouldPlaySound = bPlaySelectionSound && SoundToPlay &&
+                        GetNetMode() != NM_DedicatedServer &&
+                        SelectedTerritory->IsSelectionVisibleToLocalPlayer();
+    }
+
+    if (bShouldPlaySound) {
+      UGameplayStatics::PlaySound2D(this, SoundToPlay, VolumeMultiplier);
+    }
+
+    OnTerritorySelected.Broadcast(SelectedTerritory);
+  }
 }
 
 void AWorldMap::MulticastSelectTerritory_Implementation(int32 TerritoryID,
