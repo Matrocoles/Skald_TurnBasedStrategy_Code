@@ -162,6 +162,15 @@ public:
   bool TryTeleportToCell(FIntPoint TargetCell, int32 MaxDistance,
                          bool bRequireLineOfSight);
 
+  /**
+   * Relocate the fighter without consuming actions or triggering engagement
+   * checks. Optional ignored cells allow swaps with adjacent allies.
+   */
+  bool TryForceMoveToCell(FIntPoint TargetCell,
+                          TArray<FIntPoint> AdditionalIgnoredCells = TArray<FIntPoint>(),
+                          bool bRequireLineOfSight = false,
+                          bool bNotifyAbilityComponent = false);
+
   /** Maximum Chebyshev distance allowed when disengaging. */
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Fighter|Movement")
   int32 GetDisengageRange() const;
@@ -648,7 +657,8 @@ protected:
                             UGridOverlayComponent *Grid,
                             const TArray<FIntPoint> &PreviousCells,
                             const TArray<FIntPoint> &TargetCells,
-                            int32 Distance, bool bSpendAction);
+                            int32 Distance, bool bSpendAction,
+                            bool bNotifyAbilityComponent = true);
 
   /** Apply a new engagement flag and notify listeners. */
   void SetEngaged(bool bNewEngaged);
@@ -677,6 +687,8 @@ private:
   FTimerHandle AutoHealthHoldTimerHandle;
 
   bool TreatsDifficultTerrainAsNormal() const;
+  bool CanIgnoreEngagementRestrictions() const;
+  int32 GetCriticalHitThreshold() const;
 
   bool ShouldOverrideSpawnFacingYaw() const;
   float GetCurrentWorldFacingYaw() const;
@@ -691,6 +703,8 @@ private:
 
   /** Release an automatic hold if no presentation claimed it in time. */
   void HandleAutoHealthHoldExpired();
+  void BroadcastMovementEvent(const TArray<FIntPoint> &PreviousCells,
+                              const TArray<FIntPoint> &TargetCells);
 
   /** Respond when the fighter stats replicate to clients. */
   UFUNCTION()

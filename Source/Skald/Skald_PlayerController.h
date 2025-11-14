@@ -70,6 +70,7 @@ struct FSkaldAbilityTargetingInfo {
   bool bRequireLineOfSight = true;
   bool bAllowSelfTarget = false;
   bool bAllowEmptyCell = false;
+  bool bPerformAttack = true;
 };
 
 struct FPendingAbilityCommand {
@@ -1132,9 +1133,17 @@ private:
   bool HandleAbilityTargetingInput(ESkaldAbilitySlot Slot);
   bool TryExecuteAbilityOnFighter(AFighterPawn *Source,
                                   ESkaldAbilitySlot Slot,
-                                  AFighterPawn *Target, FText &OutError);
-  bool TryExecuteAbilityAtCell(AFighterPawn *Source, ESkaldAbilitySlot Slot,
+                                  AFighterPawn *Target, FText &OutError,
+                                  bool bPerformAttack = true);
+  bool TryExecuteAbilityAtCell(const FPendingAbilityCommand &Command,
                                const FIntPoint &Cell, FText &OutError);
+
+  AFighterPawn *FindCellAbilityAttackTarget(const AFighterPawn *Source,
+                                            const FIntPoint &Cell,
+                                            int32 Radius) const;
+
+  AFighterPawn *ResolveCellAbilityPrimaryTarget(
+      const FPendingAbilityCommand &Command, const FIntPoint &Cell) const;
   void DetermineControlledBattleSide();
   void TryDispatchPendingAttackPresentationNotifications();
   void HandlePendingPresentationTimerTick();

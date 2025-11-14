@@ -2,6 +2,7 @@
 
 #include "Components/ActorComponent.h"
 #include "Abilities/SkaldAbilityTypes.h"
+#include "Templates/Optional.h"
 #include "SkaldAbilityComponent.generated.h"
 
 class AFighterPawn;
@@ -11,6 +12,24 @@ class UNiagaraSystem;
 struct FFighterStats;
 struct FDiceRollResult;
 class UGridBattleManager;
+
+USTRUCT()
+struct FSkaldAbilityContext
+{
+    GENERATED_BODY();
+
+    UPROPERTY()
+    FName AbilityId = NAME_None;
+
+    UPROPERTY()
+    TWeakObjectPtr<AFighterPawn> TargetFighter;
+
+    UPROPERTY()
+    FIntPoint TargetCell = FIntPoint(INDEX_NONE, INDEX_NONE);
+
+    UPROPERTY()
+    bool bHasTargetCell = false;
+};
 
 USTRUCT(BlueprintType)
 struct FSkaldAbilityStatDelta
@@ -192,12 +211,22 @@ public:
 
     /** Record that the owning fighter performed an attack during its activation. */
     void NotifyAttackCommitted();
+    void NotifyOtherFighterMoved(AFighterPawn* Fighter, const TArray<FIntPoint>& PreviousCells, const TArray<FIntPoint>& NewCells);
 
     /** Attempt to trigger a slot. Returns true on success, populates OutFailureReason otherwise. */
     bool TryBeginAbility(ESkaldAbilitySlot Slot, FText& OutFailureReason);
 
     /** Query whether a slot can currently be triggered without mutating state. */
     bool CanActivateAbility(ESkaldAbilitySlot Slot, FText* OutFailureReason = nullptr) const;
+
+    /** Provide the ability context associated with the next activation. */
+    void SetPendingAbilityContext(const FSkaldAbilityContext& Context);
+
+    /** Clear any pending ability context without consuming it. */
+    void ClearPendingAbilityContext();
+
+    /** Fetch the pending ability context if available. */
+    const FSkaldAbilityContext* GetPendingAbilityContext() const;
 
     /** Restore one spent reaction if possible. */
     bool TryRefreshReaction();
@@ -234,6 +263,9 @@ public:
     /** Apply a modifier originating from another fighter (e.g. enemy debuffs). */
     void ReceiveExternalModifier(FSkaldActiveAbilityModifier&& Modifier);
     void NotifyOwnerMoved(int32 DistanceMoved);
+    bool TreatsDifficultTerrainAsNormal() const;
+    bool CanIgnoreEngagementRestrictions() const;
+    int32 GetCriticalHitThreshold() const;
     void ModifyOutgoingAttackStats(AFighterPawn* Target, FFighterStats& InOutStats);
     void ModifyIncomingAttackStats(AFighterPawn* Attacker, FFighterStats& InOutAttackerStats);
     void HandleIncomingAttackStarted();
@@ -267,6 +299,8 @@ protected:
     void RemoveTrapAtIndex(int32 Index);
     void ClearAllTraps();
     UDecalComponent* SpawnTrapVisualAtCell(const FIntPoint& Cell);
+    void HandleModifierApplied(FName AbilityId);
+    void HandleModifierRemoved(FName AbilityId);
     void RemoveExpiredModifiers(ESkaldAbilityModifierPhase Phase);
     void ApplyStatDeltaToOwner(const FSkaldAbilityStatDelta& Delta, bool bApply);
     FSkaldAbilityStatDelta ApplyTargetStatDelta(AFighterPawn* Target, const FSkaldAbilityStatDelta& Delta, bool bApply);
@@ -278,6 +312,12 @@ protected:
     void HandleViralLashResolved(AFighterPawn* Defender, const FDiceRollResult& Result);
     void HandleScrapperFeintResolved(const FDiceRollResult& Result);
     void HandleRallyingShotResolved(const FDiceRollResult& Result);
+    AFighterPawn* ResolveAbilityTargetFromContext(const FName& AbilityId) const;
+    bool ResolveAbilityTargetCellFromContext(const FName& AbilityId, FIntPoint& OutCell) const;
+    bool TryPushFighterOneCellAway(const AFighterPawn* Source, AFighterPawn* Target) const;
+    bool TryPullFighterOneCellTowards(const AFighterPawn* Source, AFighterPawn* Target) const;
+    bool TrySwapAdjacentWithAlly(AFighterPawn* Owner, AFighterPawn* Ally) const;
+    bool TryShiftFighterOneCell(AFighterPawn* Fighter, const AFighterPawn* Reference) const;
     void HandleBrutalChargeResolved(AFighterPawn* Defender, const FDiceRollResult& Result);
     void HandleRuneRiposteTriggered(AFighterPawn* Attacker, const FDiceRollResult& Result);
     void ApplyModifierToTarget(AFighterPawn* Target, FSkaldActiveAbilityModifier&& Modifier);
@@ -361,10 +401,16 @@ protected:
     bool bSuppressingFireActive = false;
     bool bRendAndTearActive = false;
     bool bArtilleryStrikePending = false;
+    FIntPoint DeepDelveMortarTargetCell = FIntPoint(INDEX_NONE, INDEX_NONE);
+    FIntPoint ArtilleryStrikeTargetCell = FIntPoint(INDEX_NONE, INDEX_NONE);
     bool bGoblinFlashBombActive = false;
     bool bGoblinNetActive = false;
     bool bGoblinAmbushActive = false;
     bool bGoblinAmbushPenaltyPending = false;
+    bool bIgnoreDifficultTerrainForNextMove = false;
+    int32 WaaghRoarBuffCount = 0;
+    int32 HowlOfTheAlphaBuffCount = 0;
+    int32 CriticalHitThresholdOverride = 0;
     bool bSuppressAbilityEffectOnNextTrigger = false;
     bool bElfEvasionActive = false;
     bool bLizardPenaltyConsumedThisRound = false;
@@ -379,6 +425,9 @@ protected:
     /** Active traps armed by this ability component. */
     UPROPERTY()
     TArray<FSkaldAbilityTrapState> ActiveTraps;
+
+    /** Optional context describing the command that triggered the next ability. */
+    TOptional<FSkaldAbilityContext> PendingAbilityContext;
 
     /** Default reaction availability refreshed every round. */
     UPROPERTY(EditDefaultsOnly, Category = "Ability")

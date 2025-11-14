@@ -1803,12 +1803,27 @@ int32 AFighterPawn::GetFootprintDistanceToFighter(
 }
 
 bool AFighterPawn::TreatsDifficultTerrainAsNormal() const {
-  if (!AbilityComponent) {
-    return false;
+  if (const USkaldAbilityComponent *Abilities = GetAbilityComponent()) {
+    return Abilities->TreatsDifficultTerrainAsNormal();
   }
 
-  const FSkaldAbilityDefinition Passive = AbilityComponent->GetPassiveAbility();
-  return Passive.AbilityId == TEXT("Ability_Frog_Passive");
+  return false;
+}
+
+bool AFighterPawn::CanIgnoreEngagementRestrictions() const {
+  if (const USkaldAbilityComponent *Abilities = GetAbilityComponent()) {
+    return Abilities->CanIgnoreEngagementRestrictions();
+  }
+
+  return false;
+}
+
+int32 AFighterPawn::GetCriticalHitThreshold() const {
+  if (const USkaldAbilityComponent *Abilities = GetAbilityComponent()) {
+    return Abilities->GetCriticalHitThreshold();
+  }
+
+  return 6;
 }
 
 int32 AFighterPawn::GetMovementStepCost(const FIntPoint &From, const FIntPoint &To,
@@ -2244,7 +2259,8 @@ bool AFighterPawn::ValidateMovementDestination(
 bool AFighterPawn::CommitMovementToCell(
     const FIntPoint &PreviousCell, const FIntPoint &TargetCell,
     UGridOverlayComponent *Grid, const TArray<FIntPoint> &PreviousCells,
-    const TArray<FIntPoint> &TargetCells, int32 Distance, bool bSpendAction) {
+    const TArray<FIntPoint> &TargetCells, int32 Distance, bool bSpendAction,
+    bool bNotifyAbilityComponent) {
   if (Grid) {
     for (const FIntPoint &Cell : PreviousCells) {
       Grid->SetOccupied(Cell, false);
@@ -2288,7 +2304,7 @@ bool AFighterPawn::CommitMovementToCell(
     ConsumeAction();
   }
 
-  if (AbilityComponent) {
+  if (bNotifyAbilityComponent && AbilityComponent) {
     AbilityComponent->NotifyOwnerMoved(Distance);
   }
 
@@ -2299,7 +2315,41 @@ bool AFighterPawn::CommitMovementToCell(
     Grid->ClearHighlights();
   }
 
+  if (PreviousCell != TargetCell) {
+    BroadcastMovementEvent(PreviousCells, TargetCells);
+  }
+
   return true;
+}
+
+void AFighterPawn::BroadcastMovementEvent(
+    const TArray<FIntPoint> &PreviousCells,
+    const TArray<FIntPoint> &TargetCells) {
+  if (!HasAuthority() || PreviousCells.Num() == 0 || TargetCells.Num() == 0) {
+    return;
+  }
+
+  USkaldGameInstance *GI = Cast<USkaldGameInstance>(GetGameInstance());
+  if (!GI) {
+    return;
+  }
+
+  UGridBattleManager *BattleManager = GI->GridBattleManager;
+  if (!BattleManager) {
+    return;
+  }
+
+  const TArray<AFighterPawn *> Fighters =
+      BattleManager->GetInitiativeOrderSnapshot();
+  for (AFighterPawn *Fighter : Fighters) {
+    if (!Fighter || Fighter == this) {
+      continue;
+    }
+
+    if (USkaldAbilityComponent *Ability = Fighter->GetAbilityComponent()) {
+      Ability->NotifyOtherFighterMoved(this, PreviousCells, TargetCells);
+    }
+  }
 }
 
 bool AFighterPawn::HasAdjacentEnemyAtAnchor(
@@ -2355,7 +2405,7 @@ void AFighterPawn::MoveToCell(FIntPoint TargetCell) {
   if (!bIsCurrentlyActive || ActionsRemaining <= 0) {
     return;
   }
-  if (bIsEngaged) {
+  if (bIsEngaged && !CanIgnoreEngagementRestrictions()) {
     return;
   }
 
@@ -2523,6 +2573,66 @@ bool AFighterPawn::TryTeleportToCell(FIntPoint TargetCell, int32 MaxDistance,
   RecalculateBattleEngagement();
 
   return true;
+}
+
+bool AFighterPawn::TryForceMoveToCell(FIntPoint TargetCell,
+                                      TArray<FIntPoint> AdditionalIgnoredCells,
+                                      bool bRequireLineOfSight,
+                                      bool bNotifyAbilityComponent) {
+  UGridOverlayComponent *Grid = GetGrid();
+  if (!Grid) {
+    return false;
+  }
+
+  const FIntPoint PreviousCell = CurrentCell;
+  const TArray<FIntPoint> PreviousCells = GetOccupiedCells(PreviousCell);
+  const TArray<FIntPoint> TargetCells = GetOccupiedCells(TargetCell);
+  if (TargetCells.Num() == 0) {
+    return false;
+  }
+
+  auto IsIgnoredCell = [&PreviousCells, &AdditionalIgnoredCells](
+                            const FIntPoint &Cell) {
+    return PreviousCells.Contains(Cell) ||
+           AdditionalIgnoredCells.Contains(Cell);
+  };
+
+  for (const FIntPoint &Cell : TargetCells) {
+    if (!Grid->IsCellInBounds(Cell) || Grid->IsObscured(Cell)) {
+      return false;
+    }
+
+    if (!IsIgnoredCell(Cell) && Grid->IsOccupied(Cell)) {
+      return false;
+    }
+  }
+
+  if (bRequireLineOfSight) {
+    bool bHasLineOfSight = false;
+    for (const FIntPoint &FromCell : PreviousCells) {
+      for (const FIntPoint &ToCell : TargetCells) {
+        if (Grid->HasLineOfSight(FromCell, ToCell)) {
+          bHasLineOfSight = true;
+          break;
+        }
+      }
+      if (bHasLineOfSight) {
+        break;
+      }
+    }
+
+    if (!bHasLineOfSight) {
+      return false;
+    }
+  }
+
+  const int32 Distance = FMath::Max(
+      FMath::Abs(TargetCell.X - PreviousCell.X),
+      FMath::Abs(TargetCell.Y - PreviousCell.Y));
+
+  return CommitMovementToCell(PreviousCell, TargetCell, Grid, PreviousCells,
+                              TargetCells, Distance, false,
+                              bNotifyAbilityComponent);
 }
 
 void AFighterPawn::RecalculateBattleEngagement() const {
@@ -3358,7 +3468,7 @@ void AFighterPawn::ResolveNextAttackRoll() {
     const int32 BaseDamage = FMath::Max(0, DamageStats.AttackDamage);
     const int32 CriticalBonus =
         FMath::Max(0, DamageStats.CriticalBonusDamage);
-    const bool bCriticalRoll = Outcome.RollValue == 6;
+    const bool bCriticalRoll = Outcome.RollValue >= GetCriticalHitThreshold();
 
     int32 CalculatedDamage = Outcome.bHit ? BaseDamage : 0;
     if (Outcome.bHit && bCriticalRoll) {
@@ -3496,7 +3606,7 @@ void AFighterPawn::ApplyPhysicalRollResults(
     FDiceRollOutcome &Outcome = Result.DiceOutcomes[Index];
     const int32 RollValue = FMath::Clamp(SanitizedValues[Index], 1, 6);
 
-    const bool bCriticalRoll = RollValue == 6;
+    const bool bCriticalRoll = RollValue >= GetCriticalHitThreshold();
     const bool bHit = bCriticalRoll || RollValue >= RequiredRoll;
 
     Outcome.RollValue = RollValue;

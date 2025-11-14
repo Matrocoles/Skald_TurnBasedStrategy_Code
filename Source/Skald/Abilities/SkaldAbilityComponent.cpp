@@ -42,6 +42,23 @@ bool ModifierHasExplicitDuration(const FSkaldActiveAbilityModifier& Modifier)
         || Modifier.bRemoveOnActivationEnd || Modifier.bRemoveWhenRoundsExpire;
 }
 
+bool AreCellSetsAdjacent(const TArray<FIntPoint>& A, const TArray<FIntPoint>& B)
+{
+    for (const FIntPoint& CellA : A)
+    {
+        for (const FIntPoint& CellB : B)
+        {
+            const int32 Distance = FMath::Max(FMath::Abs(CellA.X - CellB.X), FMath::Abs(CellA.Y - CellB.Y));
+            if (Distance <= 1)
+            {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 void ApplyDefaultModifierDuration(FSkaldActiveAbilityModifier& Modifier)
 {
     if (ModifierHasExplicitDuration(Modifier))
@@ -85,6 +102,7 @@ USkaldAbilityComponent::USkaldAbilityComponent()
     bSmashThroughActive = false;
     bForgeguardBraceReady = false;
     bDeepDelveMortarPending = false;
+    DeepDelveMortarTargetCell = FIntPoint(INDEX_NONE, INDEX_NONE);
     bMoonlanceFlurryActive = false;
     MoonlanceFlurryAttacksRemaining = 0;
     bStarfallInvocationPending = false;
@@ -96,10 +114,15 @@ USkaldAbilityComponent::USkaldAbilityComponent()
     bSuppressingFireActive = false;
     bRendAndTearActive = false;
     bArtilleryStrikePending = false;
+    ArtilleryStrikeTargetCell = FIntPoint(INDEX_NONE, INDEX_NONE);
     bGoblinFlashBombActive = false;
     bGoblinNetActive = false;
     bGoblinAmbushActive = false;
     bGoblinAmbushPenaltyPending = false;
+    bIgnoreDifficultTerrainForNextMove = false;
+    WaaghRoarBuffCount = 0;
+    HowlOfTheAlphaBuffCount = 0;
+    CriticalHitThresholdOverride = 0;
 
     bElfEvasionActive = false;
     bLizardPenaltyConsumedThisRound = false;
@@ -303,6 +326,7 @@ void USkaldAbilityComponent::HandleRoundStarted()
     bSmashThroughActive = false;
     bForgeguardBraceReady = false;
     bDeepDelveMortarPending = false;
+    DeepDelveMortarTargetCell = FIntPoint(INDEX_NONE, INDEX_NONE);
     bMoonlanceFlurryActive = false;
     MoonlanceFlurryAttacksRemaining = 0;
     bStarfallInvocationPending = false;
@@ -313,6 +337,7 @@ void USkaldAbilityComponent::HandleRoundStarted()
     bSuppressingFireActive = false;
     bRendAndTearActive = false;
     bArtilleryStrikePending = false;
+    ArtilleryStrikeTargetCell = FIntPoint(INDEX_NONE, INDEX_NONE);
     bGoblinFlashBombActive = false;
     bGoblinNetActive = false;
     bGoblinAmbushActive = false;
@@ -469,6 +494,7 @@ void USkaldAbilityComponent::HandleActivationFinished()
         bSmashThroughActive = false;
         bForgeguardBraceReady = false;
         bDeepDelveMortarPending = false;
+        DeepDelveMortarTargetCell = FIntPoint(INDEX_NONE, INDEX_NONE);
         bMoonlanceFlurryActive = false;
         MoonlanceFlurryAttacksRemaining = 0;
         bStarfallInvocationPending = false;
@@ -479,6 +505,7 @@ void USkaldAbilityComponent::HandleActivationFinished()
         bSuppressingFireActive = false;
         bRendAndTearActive = false;
         bArtilleryStrikePending = false;
+        ArtilleryStrikeTargetCell = FIntPoint(INDEX_NONE, INDEX_NONE);
     }
     BroadcastStateChanged();
 }
@@ -692,6 +719,21 @@ bool USkaldAbilityComponent::CanTriggerAbility(const FSkaldAbilityState& State, 
     return true;
 }
 
+void USkaldAbilityComponent::SetPendingAbilityContext(const FSkaldAbilityContext& Context)
+{
+    PendingAbilityContext = Context;
+}
+
+void USkaldAbilityComponent::ClearPendingAbilityContext()
+{
+    PendingAbilityContext.Reset();
+}
+
+const FSkaldAbilityContext* USkaldAbilityComponent::GetPendingAbilityContext() const
+{
+    return PendingAbilityContext.IsSet() ? &PendingAbilityContext.GetValue() : nullptr;
+}
+
 void USkaldAbilityComponent::HandleAbilityTriggeredLocal(const FSkaldAbilityDefinition& Definition)
 {
     PlayAbilityFeedback(Definition);
@@ -706,6 +748,7 @@ void USkaldAbilityComponent::HandleAbilityTriggeredLocal(const FSkaldAbilityDefi
         bSuppressAbilityEffectOnNextTrigger = false;
     }
     OnAbilityTriggered.Broadcast(this, Definition);
+    ClearPendingAbilityContext();
 }
 
 void USkaldAbilityComponent::MulticastAbilityTriggered_Implementation(const FSkaldAbilityDefinition& Definition)
@@ -893,32 +936,65 @@ void USkaldAbilityComponent::ApplyAbilityEffects(const FSkaldAbilityDefinition& 
             AFighterPawn* OwnerFighter = CachedFighter.Get();
             if (OwnerFighter && CachedBattleManager.IsValid())
             {
-                const TArray<AFighterPawn*> Fighters = CachedBattleManager->GetInitiativeOrderSnapshot();
-                AFighterPawn* BestAlly = nullptr;
-                int32 BestDistance = TNumericLimits<int32>::Max();
-                for (AFighterPawn* Fighter : Fighters)
+                AFighterPawn* SelectedAlly = ResolveAbilityTargetFromContext(Definition.AbilityId);
+                const auto IsValidShieldWallAlly = [OwnerFighter](AFighterPawn* Candidate)
                 {
-                    if (!Fighter || Fighter == OwnerFighter || Fighter->Faction != OwnerFighter->Faction)
+                    if (!Candidate || Candidate == OwnerFighter)
                     {
-                        continue;
+                        return false;
                     }
 
-                    const int32 Distance = OwnerFighter->GetFootprintDistanceToFighter(Fighter);
-                    if (Distance <= 1 && Distance < BestDistance)
+                    if (Candidate->Faction != OwnerFighter->Faction)
                     {
-                        BestAlly = Fighter;
-                        BestDistance = Distance;
+                        return false;
                     }
+
+                    return OwnerFighter->GetFootprintDistanceToFighter(Candidate) <= 1;
+                };
+
+                if (!IsValidShieldWallAlly(SelectedAlly))
+                {
+                    const TArray<AFighterPawn*> Fighters = CachedBattleManager->GetInitiativeOrderSnapshot();
+                    AFighterPawn* BestAlly = nullptr;
+                    int32 BestDistance = TNumericLimits<int32>::Max();
+                    for (AFighterPawn* Fighter : Fighters)
+                    {
+                        if (!IsValidShieldWallAlly(Fighter))
+                        {
+                            continue;
+                        }
+
+                        const int32 Distance = OwnerFighter->GetFootprintDistanceToFighter(Fighter);
+                        if (Distance < BestDistance)
+                        {
+                            BestAlly = Fighter;
+                            BestDistance = Distance;
+                        }
+                    }
+
+                    SelectedAlly = BestAlly;
                 }
 
-                if (BestAlly)
+                if (IsValidShieldWallAlly(SelectedAlly))
                 {
-                    ShieldWallPivotProtectedAlly = BestAlly;
-                    FSkaldActiveAbilityModifier Modifier;
-                    Modifier.SourceAbilityId = Definition.AbilityId;
-                    Modifier.Delta.Defence = 1;
-                    Modifier.bRemoveOnActivationStart = true;
-                    ApplyModifierToTarget(BestAlly, MoveTemp(Modifier));
+                    ShieldWallPivotProtectedAlly = SelectedAlly;
+
+                    FSkaldActiveAbilityModifier OwnerModifier;
+                    OwnerModifier.SourceAbilityId = Definition.AbilityId;
+                    OwnerModifier.Delta.Defence = 1;
+                    OwnerModifier.bRemoveOnActivationStart = true;
+                    AddActiveModifier(MoveTemp(OwnerModifier));
+
+                    FSkaldActiveAbilityModifier AllyModifier;
+                    AllyModifier.SourceAbilityId = Definition.AbilityId;
+                    AllyModifier.Delta.Defence = 1;
+                    AllyModifier.bRemoveOnActivationStart = true;
+                    ApplyModifierToTarget(SelectedAlly, MoveTemp(AllyModifier));
+
+                    if (!TrySwapAdjacentWithAlly(OwnerFighter, SelectedAlly))
+                    {
+                        TryShiftFighterOneCell(SelectedAlly, OwnerFighter);
+                    }
                 }
             }
         }
@@ -996,8 +1072,9 @@ void USkaldAbilityComponent::ApplyAbilityEffects(const FSkaldAbilityDefinition& 
                     FSkaldActiveAbilityModifier Modifier;
                     Modifier.SourceAbilityId = Definition.AbilityId;
                     Modifier.Delta.AttackDice = 1;
-                    Modifier.Delta.Movement = 1;
-                    Modifier.bRemoveOnActivationStart = true;
+                    Modifier.Delta.Movement = 2;
+                    Modifier.RemainingRounds = 1;
+                    Modifier.bRemoveOnRoundStart = true;
                     ApplyModifierToTarget(Fighter, MoveTemp(Modifier));
                 }
             }
@@ -1023,6 +1100,15 @@ void USkaldAbilityComponent::ApplyAbilityEffects(const FSkaldAbilityDefinition& 
         if (GetOwnerRole() == ROLE_Authority)
         {
             bDeepDelveMortarPending = true;
+            FIntPoint TargetCell;
+            if (ResolveAbilityTargetCellFromContext(Definition.AbilityId, TargetCell))
+            {
+                DeepDelveMortarTargetCell = TargetCell;
+            }
+            else if (AFighterPawn* OwnerFighter = CachedFighter.Get())
+            {
+                DeepDelveMortarTargetCell = OwnerFighter->GetCurrentCell();
+            }
 
             FSkaldActiveAbilityModifier Modifier;
             Modifier.SourceAbilityId = Definition.AbilityId;
@@ -1286,6 +1372,15 @@ void USkaldAbilityComponent::ApplyAbilityEffects(const FSkaldAbilityDefinition& 
         if (GetOwnerRole() == ROLE_Authority)
         {
             bArtilleryStrikePending = true;
+            FIntPoint TargetCell;
+            if (ResolveAbilityTargetCellFromContext(Definition.AbilityId, TargetCell))
+            {
+                ArtilleryStrikeTargetCell = TargetCell;
+            }
+            else if (AFighterPawn* OwnerFighter = CachedFighter.Get())
+            {
+                ArtilleryStrikeTargetCell = OwnerFighter->GetCurrentCell();
+            }
 
             FSkaldActiveAbilityModifier Modifier;
             Modifier.SourceAbilityId = Definition.AbilityId;
@@ -1334,31 +1429,49 @@ void USkaldAbilityComponent::ApplyAbilityEffects(const FSkaldAbilityDefinition& 
             AFighterPawn* OwnerFighter = CachedFighter.Get();
             if (OwnerFighter && CachedBattleManager.IsValid())
             {
-                const TArray<AFighterPawn*> Fighters = CachedBattleManager->GetInitiativeOrderSnapshot();
-                AFighterPawn* BestEnemy = nullptr;
-                int32 BestDistance = TNumericLimits<int32>::Max();
-                for (AFighterPawn* Fighter : Fighters)
+                const auto IsValidTongueSnareTarget = [OwnerFighter](AFighterPawn* Candidate)
                 {
-                    if (!Fighter || Fighter->Faction == OwnerFighter->Faction)
+                    if (!Candidate || Candidate->Faction == OwnerFighter->Faction || Candidate->Stats.Health <= 0)
                     {
-                        continue;
+                        return false;
                     }
 
-                    const int32 Distance = OwnerFighter->GetFootprintDistanceToFighter(Fighter);
-                    if (Distance <= 4 && Distance < BestDistance)
+                    return OwnerFighter->GetFootprintDistanceToFighter(Candidate) <= 4;
+                };
+
+                AFighterPawn* Target = ResolveAbilityTargetFromContext(Definition.AbilityId);
+                if (!IsValidTongueSnareTarget(Target))
+                {
+                    const TArray<AFighterPawn*> Fighters = CachedBattleManager->GetInitiativeOrderSnapshot();
+                    AFighterPawn* BestEnemy = nullptr;
+                    int32 BestDistance = TNumericLimits<int32>::Max();
+                    for (AFighterPawn* Fighter : Fighters)
                     {
-                        BestEnemy = Fighter;
-                        BestDistance = Distance;
+                        if (!IsValidTongueSnareTarget(Fighter))
+                        {
+                            continue;
+                        }
+
+                        const int32 Distance = OwnerFighter->GetFootprintDistanceToFighter(Fighter);
+                        if (Distance < BestDistance)
+                        {
+                            BestEnemy = Fighter;
+                            BestDistance = Distance;
+                        }
                     }
+
+                    Target = BestEnemy;
                 }
 
-                if (BestEnemy)
+                if (IsValidTongueSnareTarget(Target))
                 {
                     FSkaldActiveAbilityModifier Modifier;
                     Modifier.SourceAbilityId = Definition.AbilityId;
                     Modifier.Delta.AttackDice = -1;
                     Modifier.bRemoveOnRoundStart = true;
-                    ApplyModifierToTarget(BestEnemy, MoveTemp(Modifier));
+                    ApplyModifierToTarget(Target, MoveTemp(Modifier));
+
+                    TryPullFighterOneCellTowards(OwnerFighter, Target);
                 }
             }
         }
@@ -1500,6 +1613,7 @@ void USkaldAbilityComponent::AddActiveModifier(FSkaldActiveAbilityModifier&& Mod
     const FName SourceAbility = Modifier.SourceAbilityId;
     const FSkaldAbilityStatDelta ModifierDelta = Modifier.Delta;
     ActiveModifiers.Add(MoveTemp(Modifier));
+    HandleModifierApplied(SourceAbility);
 
     if (AFighterPawn* Fighter = CachedFighter.Get())
     {
@@ -1529,6 +1643,7 @@ void USkaldAbilityComponent::RemoveActiveModifier(int32 Index)
     const FSkaldActiveAbilityModifier RemovedModifier = ActiveModifiers[Index];
     ApplyStatDeltaToOwner(RemovedModifier.Delta, false);
     ActiveModifiers.RemoveAtSwap(Index);
+    HandleModifierRemoved(RemovedModifier.SourceAbilityId);
 
     if (AFighterPawn* Fighter = CachedFighter.Get())
     {
@@ -1733,6 +1848,52 @@ void USkaldAbilityComponent::NotifyAttackCommitted()
     }
 }
 
+void USkaldAbilityComponent::NotifyOtherFighterMoved(AFighterPawn* Fighter, const TArray<FIntPoint>& PreviousCells, const TArray<FIntPoint>& NewCells)
+{
+    if (GetOwnerRole() != ROLE_Authority || !Fighter)
+    {
+        return;
+    }
+
+    AFighterPawn* OwnerFighter = CachedFighter.Get();
+    if (!OwnerFighter || !OwnerFighter->IsAlive())
+    {
+        return;
+    }
+
+    if (!bForgeguardBraceReady)
+    {
+        return;
+    }
+
+    if (Fighter == OwnerFighter || Fighter->Faction == OwnerFighter->Faction)
+    {
+        return;
+    }
+
+    const TArray<FIntPoint> OwnerCells = OwnerFighter->GetOccupiedCells();
+    if (OwnerCells.Num() == 0 || PreviousCells.Num() == 0 || NewCells.Num() == 0)
+    {
+        return;
+    }
+
+    const bool bWasAdjacent = AreCellSetsAdjacent(OwnerCells, PreviousCells);
+    const bool bIsAdjacent = AreCellSetsAdjacent(OwnerCells, NewCells);
+    if (!bWasAdjacent && bIsAdjacent)
+    {
+        ApplyDamageToFighter(Fighter, 1);
+
+        FSkaldActiveAbilityModifier Modifier;
+        Modifier.SourceAbilityId = TEXT("Ability_Dwarf_Skirmish");
+        Modifier.Delta.Movement = -1;
+        Modifier.bRemoveOnRoundStart = true;
+        ApplyModifierToTarget(Fighter, MoveTemp(Modifier));
+
+        bForgeguardBraceReady = false;
+        RemoveModifiersByAbilityId(TEXT("Ability_Dwarf_Skirmish"));
+    }
+}
+
 void USkaldAbilityComponent::NotifyOwnerMoved(int32 DistanceMoved)
 {
     if (GetOwnerRole() != ROLE_Authority)
@@ -1750,6 +1911,11 @@ void USkaldAbilityComponent::NotifyOwnerMoved(int32 DistanceMoved)
         BrutalChargeDistanceMoved += DistanceMoved;
     }
 
+    if (bIgnoreDifficultTerrainForNextMove)
+    {
+        bIgnoreDifficultTerrainForNextMove = false;
+    }
+
     if (PassiveAbility.AbilityId == TEXT("Ability_Elf_Passive") && DistanceMoved > 0)
     {
         if (!bElfEvasionActive)
@@ -1761,6 +1927,26 @@ void USkaldAbilityComponent::NotifyOwnerMoved(int32 DistanceMoved)
 
     RefreshPassiveState();
     RefreshAllPassiveStates();
+}
+
+bool USkaldAbilityComponent::TreatsDifficultTerrainAsNormal() const
+{
+    if (PassiveAbility.AbilityId == TEXT("Ability_Frog_Passive"))
+    {
+        return true;
+    }
+
+    return bIgnoreDifficultTerrainForNextMove;
+}
+
+bool USkaldAbilityComponent::CanIgnoreEngagementRestrictions() const
+{
+    return HowlOfTheAlphaBuffCount > 0;
+}
+
+int32 USkaldAbilityComponent::GetCriticalHitThreshold() const
+{
+    return CriticalHitThresholdOverride > 0 ? CriticalHitThresholdOverride : 6;
 }
 
 void USkaldAbilityComponent::ModifyOutgoingAttackStats(
@@ -2147,6 +2333,37 @@ bool USkaldAbilityComponent::HasFactionAttackedOwnerThisRound(ESkaldFaction Fact
     return FactionsThatAttackedOwnerThisRound.Contains(Faction);
 }
 
+void USkaldAbilityComponent::HandleModifierApplied(FName AbilityId)
+{
+    if (AbilityId == TEXT("Ability_Orc_Elite"))
+    {
+        ++WaaghRoarBuffCount;
+        CriticalHitThresholdOverride = 5;
+        bIgnoreDifficultTerrainForNextMove = true;
+    }
+    else if (AbilityId == TEXT("Ability_Gnoll_Line"))
+    {
+        ++HowlOfTheAlphaBuffCount;
+    }
+}
+
+void USkaldAbilityComponent::HandleModifierRemoved(FName AbilityId)
+{
+    if (AbilityId == TEXT("Ability_Orc_Elite"))
+    {
+        WaaghRoarBuffCount = FMath::Max(0, WaaghRoarBuffCount - 1);
+        if (WaaghRoarBuffCount <= 0)
+        {
+            CriticalHitThresholdOverride = 0;
+            bIgnoreDifficultTerrainForNextMove = false;
+        }
+    }
+    else if (AbilityId == TEXT("Ability_Gnoll_Line"))
+    {
+        HowlOfTheAlphaBuffCount = FMath::Max(0, HowlOfTheAlphaBuffCount - 1);
+    }
+}
+
 bool USkaldAbilityComponent::DeployTrapAtCell(const FIntPoint& Cell, FName AbilityId, FText& OutError)
 {
     OutError = FText::GetEmpty();
@@ -2455,6 +2672,7 @@ void USkaldAbilityComponent::HandleBattleAttackResolved(AFighterPawn* Attacker, 
                 Modifier.Delta.Defence = -1;
                 Modifier.bRemoveOnRoundStart = true;
                 ApplyModifierToTarget(Defender, MoveTemp(Modifier));
+                TryPushFighterOneCellAway(OwnerFighter, Defender);
             }
 
             bSmashThroughActive = false;
@@ -2464,7 +2682,10 @@ void USkaldAbilityComponent::HandleBattleAttackResolved(AFighterPawn* Attacker, 
         {
             if (Defender && Result.HitCount > 0)
             {
-                if (CachedBattleManager.IsValid())
+                const FIntPoint OriginCell = (DeepDelveMortarTargetCell.X != INDEX_NONE)
+                    ? DeepDelveMortarTargetCell
+                    : Defender->GetCurrentCell();
+                if (OriginCell.X != INDEX_NONE && CachedBattleManager.IsValid())
                 {
                     const TArray<AFighterPawn*> Fighters = CachedBattleManager->GetInitiativeOrderSnapshot();
                     const int32 SplashDamage = FMath::Max(1, OwnerFighter->Stats.AttackDamage / 2);
@@ -2475,7 +2696,7 @@ void USkaldAbilityComponent::HandleBattleAttackResolved(AFighterPawn* Attacker, 
                             continue;
                         }
 
-                        if (Defender->GetFootprintDistanceToFighter(Fighter) <= 1)
+                        if (Fighter->GetFootprintDistanceToCell(OriginCell) <= 1)
                         {
                             ApplyDamageToFighter(Fighter, SplashDamage);
                         }
@@ -2493,6 +2714,7 @@ void USkaldAbilityComponent::HandleBattleAttackResolved(AFighterPawn* Attacker, 
             }
 
             bDeepDelveMortarPending = false;
+            DeepDelveMortarTargetCell = FIntPoint(INDEX_NONE, INDEX_NONE);
         }
 
         if (bMoonlanceFlurryActive)
@@ -2656,6 +2878,9 @@ void USkaldAbilityComponent::HandleBattleAttackResolved(AFighterPawn* Attacker, 
             {
                 const TArray<AFighterPawn*> Fighters = CachedBattleManager->GetInitiativeOrderSnapshot();
                 const int32 BaseDamage = OwnerFighter->Stats.AttackDamage + 2;
+                const FIntPoint OriginCell = (ArtilleryStrikeTargetCell.X != INDEX_NONE)
+                    ? ArtilleryStrikeTargetCell
+                    : Defender->GetCurrentCell();
                 for (AFighterPawn* Fighter : Fighters)
                 {
                     if (!Fighter || Fighter == Defender)
@@ -2663,7 +2888,7 @@ void USkaldAbilityComponent::HandleBattleAttackResolved(AFighterPawn* Attacker, 
                         continue;
                     }
 
-                    if (Defender->GetFootprintDistanceToFighter(Fighter) <= 2)
+                    if (OriginCell.X != INDEX_NONE && Fighter->GetFootprintDistanceToCell(OriginCell) <= 2)
                     {
                         const bool bAlly = Fighter->Faction == OwnerFighter->Faction;
                         const int32 DamageToApply = bAlly ? FMath::Max(1, BaseDamage / 2) : BaseDamage;
@@ -2673,6 +2898,7 @@ void USkaldAbilityComponent::HandleBattleAttackResolved(AFighterPawn* Attacker, 
             }
 
             bArtilleryStrikePending = false;
+            ArtilleryStrikeTargetCell = FIntPoint(INDEX_NONE, INDEX_NONE);
         }
 
     }
@@ -2787,6 +3013,161 @@ void USkaldAbilityComponent::HandleRallyingShotResolved(const FDiceRollResult& R
     Modifier.RemainingRounds = 1;
     Modifier.bRemoveOnRoundStart = true;
     ApplyModifierToTarget(BestAlly, MoveTemp(Modifier));
+}
+
+AFighterPawn* USkaldAbilityComponent::ResolveAbilityTargetFromContext(const FName& AbilityId) const
+{
+    const FSkaldAbilityContext* Context = GetPendingAbilityContext();
+    if (!Context || Context->AbilityId != AbilityId)
+    {
+        return nullptr;
+    }
+
+    return Context->TargetFighter.Get();
+}
+
+bool USkaldAbilityComponent::ResolveAbilityTargetCellFromContext(const FName& AbilityId, FIntPoint& OutCell) const
+{
+    const FSkaldAbilityContext* Context = GetPendingAbilityContext();
+    if (!Context || Context->AbilityId != AbilityId || !Context->bHasTargetCell)
+    {
+        return false;
+    }
+
+    OutCell = Context->TargetCell;
+    return true;
+}
+
+bool USkaldAbilityComponent::TryPushFighterOneCellAway(const AFighterPawn* Source, AFighterPawn* Target) const
+{
+    if (!Source || !Target || Source == Target)
+    {
+        return false;
+    }
+
+    const FIntPoint SourceCell = Source->GetCurrentCell();
+    const FIntPoint TargetCell = Target->GetCurrentCell();
+    const FIntPoint Step(
+        FMath::Clamp(TargetCell.X - SourceCell.X, -1, 1),
+        FMath::Clamp(TargetCell.Y - SourceCell.Y, -1, 1));
+    if (Step == FIntPoint::ZeroValue)
+    {
+        return false;
+    }
+
+    const FIntPoint Destination = TargetCell + Step;
+    return Target->TryForceMoveToCell(Destination, TArray<FIntPoint>(), false, true);
+}
+
+bool USkaldAbilityComponent::TryPullFighterOneCellTowards(const AFighterPawn* Source, AFighterPawn* Target) const
+{
+    if (!Source || !Target || Source == Target)
+    {
+        return false;
+    }
+
+    const FIntPoint SourceCell = Source->GetCurrentCell();
+    const FIntPoint TargetCell = Target->GetCurrentCell();
+    const FIntPoint Step(
+        FMath::Clamp(SourceCell.X - TargetCell.X, -1, 1),
+        FMath::Clamp(SourceCell.Y - TargetCell.Y, -1, 1));
+    if (Step == FIntPoint::ZeroValue)
+    {
+        return false;
+    }
+
+    const FIntPoint Destination = TargetCell + Step;
+    if (Destination == TargetCell)
+    {
+        return false;
+    }
+
+    return Target->TryForceMoveToCell(Destination, TArray<FIntPoint>(), false, true);
+}
+
+bool USkaldAbilityComponent::TrySwapAdjacentWithAlly(AFighterPawn* Owner, AFighterPawn* Ally) const
+{
+    if (!Owner || !Ally)
+    {
+        return false;
+    }
+
+    if (Owner->GetFootprintDistanceToFighter(Ally) > 1)
+    {
+        return false;
+    }
+
+    const FIntPoint OwnerCell = Owner->GetCurrentCell();
+    const FIntPoint AllyCell = Ally->GetCurrentCell();
+    TArray<FIntPoint> OwnerCells = Owner->GetOccupiedCells(OwnerCell);
+    TArray<FIntPoint> AllyCells = Ally->GetOccupiedCells(AllyCell);
+
+    if (!Ally->TryForceMoveToCell(OwnerCell, OwnerCells, false, false))
+    {
+        return false;
+    }
+
+    if (Owner->TryForceMoveToCell(AllyCell, AllyCells, false, false))
+    {
+        return true;
+    }
+
+    // Owner failed to move, restore the ally.
+    Ally->TryForceMoveToCell(AllyCell, TArray<FIntPoint>(), false, false);
+    return false;
+}
+
+bool USkaldAbilityComponent::TryShiftFighterOneCell(AFighterPawn* Fighter, const AFighterPawn* Reference) const
+{
+    if (!Fighter)
+    {
+        return false;
+    }
+
+    const FIntPoint StartCell = Fighter->GetCurrentCell();
+    TArray<FIntPoint> CandidateAnchors;
+    CandidateAnchors.Reserve(8);
+
+    for (int32 Y = -1; Y <= 1; ++Y)
+    {
+        for (int32 X = -1; X <= 1; ++X)
+        {
+            if (X == 0 && Y == 0)
+            {
+                continue;
+            }
+
+            CandidateAnchors.Add(StartCell + FIntPoint(X, Y));
+        }
+    }
+
+    if (Reference)
+    {
+        const FIntPoint ReferenceCell = Reference->GetCurrentCell();
+        Algo::SortBy(CandidateAnchors, [ReferenceCell](const FIntPoint& Cell)
+            {
+                return FMath::Max(FMath::Abs(Cell.X - ReferenceCell.X),
+                    FMath::Abs(Cell.Y - ReferenceCell.Y));
+            });
+    }
+
+    TSet<FIntPoint> TriedAnchors;
+    for (const FIntPoint& Anchor : CandidateAnchors)
+    {
+        if (TriedAnchors.Contains(Anchor))
+        {
+            continue;
+        }
+
+        TriedAnchors.Add(Anchor);
+
+        if (Fighter->TryForceMoveToCell(Anchor, TArray<FIntPoint>(), false, false))
+        {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 void USkaldAbilityComponent::HandleBrutalChargeResolved(AFighterPawn* Defender, const FDiceRollResult& Result)
