@@ -578,7 +578,7 @@ protected:
 
   UPROPERTY(BlueprintReadOnly, Category = "Game",
             meta = (AllowPrivateAccess = "true"))
-  mutable USkaldGameInstance *CachedGameInstance;
+  USkaldGameInstance *CachedGameInstance;
 
   /** Cached reference to the active grid battle manager. */
   mutable TWeakObjectPtr<UGridBattleManager> CachedBattleManager;
@@ -1122,7 +1122,7 @@ private:
   void ShowInitiativeResults(int32 PlayerResult, int32 EnemyResult);
   void HideInitiativeResults();
   USkaldDiceManager *ResolveDiceManager();
-  FLinearColor ResolveFactionColor(ESkaldFaction Faction) const;
+  FLinearColor ResolveFactionColor(ESkaldFaction Faction);
   FLinearColor ResolveBattleFactionColor(bool bAttackerSide);
   ASkaldPlayerState *FindPlayerStateById(int32 PlayerId) const;
   FLinearColor ResolvePlayerFactionColor(int32 PlayerId) const;
