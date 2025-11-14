@@ -859,9 +859,12 @@ FSkaldAbilityTargetingInfo ASkaldPlayerController::GetAbilityTargetingInfo(
   // range exceeds their standard attack stat.
   static const TMap<FName, FAbilityTargetingPreset> TargetingPresets = {
       {TEXT("Ability_Human_Skirmish"),
-       {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
+       {EBattleCommandMode::AbilityTargetAlly, INDEX_NONE, false, false, false,
+        false}},
       {TEXT("Ability_Human_Line"),
        {EBattleCommandMode::AbilityTargetAlly, 1, false}},
+      {TEXT("Ability_Human_Elite"),
+       {EBattleCommandMode::AbilityTargetAlly, 5, false, false, false, false}},
       {TEXT("Ability_Orc_Skirmish"),
        {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
       {TEXT("Ability_Inflicted_Skirmish"),
@@ -1228,7 +1231,15 @@ bool ASkaldPlayerController::TryExecuteAbilityOnFighter(
   }
 
   if (!bPerformAttack) {
+    if (State->Definition.CostType == ESkaldAbilityCostType::Action &&
+        State->Definition.AbilityId == TEXT("Ability_Human_Skirmish")) {
+      Source->TryRestoreAction();
+    }
     return true;
+  }
+
+  if (State->Definition.AbilityId == TEXT("Ability_Gnoll_Skirmish")) {
+    AbilityComponent->TryPerformHarrierDashAdvance(Target);
   }
 
   if (State->Definition.CostType == ESkaldAbilityCostType::Action) {

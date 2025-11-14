@@ -139,6 +139,34 @@ struct FSkaldAbilityTrapState
     bool bPendingPlacement = false;
 };
 
+struct FSkaldViralLashCarrierState
+{
+    TWeakObjectPtr<AFighterPawn> Carrier;
+    int32 RoundNumber = INDEX_NONE;
+    bool bHasSpread = false;
+};
+
+struct FSkaldAberrantBloomHazardCell
+{
+    FIntPoint Cell = FIntPoint(INDEX_NONE, INDEX_NONE);
+    TWeakObjectPtr<UDecalComponent> VisualComponent;
+};
+
+struct FSkaldRaincallerCell
+{
+    FIntPoint Cell = FIntPoint(INDEX_NONE, INDEX_NONE);
+    TWeakObjectPtr<UDecalComponent> VisualComponent;
+};
+
+struct FSkaldRaincallerOccupantState
+{
+    TWeakObjectPtr<AFighterPawn> Fighter;
+    bool bIsAlly = false;
+    bool bAmphibiousApplied = false;
+    FSkaldAbilityStatDelta AppliedDelta;
+    FName SourceAbilityId = NAME_None;
+};
+
 enum class ESkaldAbilityModifierPhase : uint8
 {
     RoundStart,
@@ -234,6 +262,12 @@ public:
     /** Force the owning fighter to lose all remaining reactions for the round. */
     void ForceSpendAllReactions();
 
+    /** Mark that the owner has an outstanding Tactical Reserves attack bonus. */
+    void MarkTacticalReservesAttackBuffPending();
+
+    /** Clear the pending Tactical Reserves attack bonus, if any. */
+    void ClearTacticalReservesAttackBuff();
+
     /** Place a ground-targeted trap at the supplied grid cell. */
     bool DeployTrapAtCell(const FIntPoint& Cell, FName AbilityId, FText& OutError);
 
@@ -312,12 +346,15 @@ protected:
     void HandleViralLashResolved(AFighterPawn* Defender, const FDiceRollResult& Result);
     void HandleScrapperFeintResolved(const FDiceRollResult& Result);
     void HandleRallyingShotResolved(const FDiceRollResult& Result);
+    bool IsValidRallyingShotAlly(AFighterPawn* Owner, AFighterPawn* Candidate) const;
     AFighterPawn* ResolveAbilityTargetFromContext(const FName& AbilityId) const;
     bool ResolveAbilityTargetCellFromContext(const FName& AbilityId, FIntPoint& OutCell) const;
     bool TryPushFighterOneCellAway(const AFighterPawn* Source, AFighterPawn* Target) const;
     bool TryPullFighterOneCellTowards(const AFighterPawn* Source, AFighterPawn* Target) const;
     bool TrySwapAdjacentWithAlly(AFighterPawn* Owner, AFighterPawn* Ally) const;
     bool TryShiftFighterOneCell(AFighterPawn* Fighter, const AFighterPawn* Reference) const;
+    void TryShiftFighterMultipleCells(AFighterPawn* Fighter, const AFighterPawn* Reference, int32 MaxSteps) const;
+    bool TryPerformHarrierDashAdvance(AFighterPawn* Target);
     void HandleBrutalChargeResolved(AFighterPawn* Defender, const FDiceRollResult& Result);
     void HandleRuneRiposteTriggered(AFighterPawn* Attacker, const FDiceRollResult& Result);
     void ApplyModifierToTarget(AFighterPawn* Target, FSkaldActiveAbilityModifier&& Modifier);
@@ -333,9 +370,33 @@ protected:
     void HandlePassiveEffectApplied(const FSkaldAbilityDefinition& Definition);
     void HandlePassiveEffectRemoved(FName AbilityId);
     bool HasFactionAttackedOwnerThisRound(ESkaldFaction Faction) const;
+    bool CanApplyAmphibiousRushBonus(const FSkaldAbilityDefinition& Definition) const;
+    bool IsAnyCellDifficult(const TArray<FIntPoint>& Cells, UGridOverlayComponent* Grid) const;
+    void SpawnAberrantBloomHazard(const FSkaldAbilityDefinition& Definition);
+    void ClearAberrantBloomHazards();
+    bool DoesAnyCellMatchAberrantBloom(const TArray<FIntPoint>& Cells) const;
+    void HandleAberrantBloomTriggered(AFighterPawn* Victim);
+    void HandleAberrantBloomOnMovement(AFighterPawn* Fighter, const TArray<FIntPoint>& NewCells);
+    void SpawnRaincallerTemplate(const FSkaldAbilityDefinition& Definition);
+    void ClearRaincallerTemplate();
+    void RefreshRaincallerOccupants();
+    void HandleRaincallerOnMovement(AFighterPawn* Fighter);
+    void UpdateRaincallerEffectForFighter(AFighterPawn* Fighter);
+    bool DoesAnyCellMatchRaincaller(const TArray<FIntPoint>& Cells) const;
+    int32 FindRaincallerOccupantIndex(AFighterPawn* Fighter) const;
+    void RemoveRaincallerOccupantAtIndex(int32 Index);
+    void UpdateRaincallerTemplateLifetime();
+    void UpdateViralLashCarriers();
+    bool ApplyViralLashDebuffToFighter(AFighterPawn* Fighter);
+    void HandleViralLashCarrierDamaged(AFighterPawn* Defender, const FDiceRollResult& Result);
+    void AddRaincallerAmphibiousStack();
+    void RemoveRaincallerAmphibiousStack();
 
     UFUNCTION()
     void HandleBattleAttackResolved(AFighterPawn* Attacker, AFighterPawn* Defender, const FDiceRollResult& Result);
+
+    UFUNCTION()
+    void HandleActiveFighterChanged(AFighterPawn* NewFighter);
 
     UFUNCTION()
     void HandleOwnerHealthChanged(int32 NewHealth);
@@ -378,6 +439,7 @@ protected:
     /** True when Scrapper Feint should grant its reposition bonus on the next miss. */
     bool bApplyScrapperFeintOnNextMiss = false;
     bool bApplyRallyingShotOnNextAttack = false;
+    TWeakObjectPtr<AFighterPawn> RallyingShotDesignatedAlly;
     bool bBrutalChargeActive = false;
     int32 BrutalChargeDistanceMoved = 0;
     bool bRuneRiposteReady = false;
@@ -385,7 +447,8 @@ protected:
     bool bDeathlessAdvanceReady = false;
     bool bShieldWallPivotActive = false;
     TWeakObjectPtr<AFighterPawn> ShieldWallPivotProtectedAlly;
-    TSet<TWeakObjectPtr<AFighterPawn>> TacticalReservesRefreshedThisRound;
+    TSet<TWeakObjectPtr<AFighterPawn>> TacticalReservesBuffedThisRound;
+    bool bHasPendingTacticalReservesAttackBuff = false;
     bool bEmpirePassiveDefenceBonusActive = false;
     bool bSmashThroughActive = false;
     bool bForgeguardBraceReady = false;
@@ -408,6 +471,8 @@ protected:
     bool bGoblinAmbushActive = false;
     bool bGoblinAmbushPenaltyPending = false;
     bool bIgnoreDifficultTerrainForNextMove = false;
+    int32 BubbleWardSourceCount = 0;
+    int32 BubbleWardProtectionStacks = 0;
     int32 WaaghRoarBuffCount = 0;
     int32 HowlOfTheAlphaBuffCount = 0;
     int32 CriticalHitThresholdOverride = 0;
@@ -421,6 +486,7 @@ protected:
     int32 LastKnownHealth = 0;
     TMap<FName, int32> PassiveVisualStackCounts;
     TSet<ESkaldFaction> FactionsThatAttackedOwnerThisRound;
+    int32 RaincallerAmphibiousStackCount = 0;
 
     /** Active traps armed by this ability component. */
     UPROPERTY()
@@ -458,5 +524,38 @@ protected:
     /** Tracks whether the owning fighter has made an attack during its current activation. */
     UPROPERTY()
     bool bOwnerAttackedThisActivation = false;
+
+    /** Viral Lash contagion carriers tracked for the current round. */
+    UPROPERTY()
+    TArray<FSkaldViralLashCarrierState> ViralLashCarriers;
+
+    /** Fighters that have already suffered the Viral Lash defence penalty. */
+    UPROPERTY()
+    TSet<TWeakObjectPtr<AFighterPawn>> ViralLashDebuffedFighters;
+
+    /** Persistent Aberrant Bloom hazard cells and visuals. */
+    UPROPERTY()
+    TArray<FSkaldAberrantBloomHazardCell> AberrantBloomHazardCells;
+
+    /** Fighters that have already received the Aberrant Bloom movement penalty. */
+    UPROPERTY()
+    TSet<TWeakObjectPtr<AFighterPawn>> AberrantBloomMovementDebuffed;
+
+    /** Cached damage dealt when Aberrant Bloom triggers. */
+    int32 AberrantBloomDamage = 0;
+
+    /** Persistent Raincaller Deluge template cells and visuals. */
+    UPROPERTY()
+    TArray<FSkaldRaincallerCell> RaincallerTemplateCells;
+
+    /** Fighters currently affected by Raincaller Deluge. */
+    UPROPERTY()
+    TArray<FSkaldRaincallerOccupantState> RaincallerOccupants;
+
+    /** Round when the current Raincaller template should expire. */
+    int32 RaincallerTemplateExpireRound = INDEX_NONE;
+
+    /** Ability identifier used for the active Raincaller template. */
+    FName RaincallerTemplateSourceId = NAME_None;
 };
 
