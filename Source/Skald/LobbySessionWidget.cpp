@@ -461,19 +461,24 @@ void ULobbySessionWidget::RefreshFromState()
         for (int32 Index = 0; Index < SlotWidgets.Num(); ++Index)
         {
             const FLobbyPlayerSlot* SlotData = CachedGameState->GetSlot(Index);
-            if (SlotData)
+            if (SlotData && SlotData->bIsActive)
             {
-                if (SlotData->bIsActive)
-                {
-                    ++ActiveSlots;
-                }
-                RefreshSlot(Index, *SlotData, LocalSlotIndex);
+                ++ActiveSlots;
             }
         }
 
         if (!bHasReceivedInitialState && ActiveSlots > 0)
         {
             bHasReceivedInitialState = true;
+        }
+
+        for (int32 Index = 0; Index < SlotWidgets.Num(); ++Index)
+        {
+            const FLobbyPlayerSlot* SlotData = CachedGameState->GetSlot(Index);
+            if (SlotData)
+            {
+                RefreshSlot(Index, *SlotData, LocalSlotIndex);
+            }
         }
 
         UpdateHostControls(CachedGameState->TotalSlots, CachedGameState->ReservedAISlots, CachedGameState->AreAllSlotsReady());
