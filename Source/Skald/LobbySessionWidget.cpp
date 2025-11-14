@@ -28,6 +28,7 @@ FLinearColor InactiveSlotColor(0.05f, 0.05f, 0.05f, 0.9f);
 FLinearColor ActiveSlotColor(0.08f, 0.08f, 0.1f, 0.95f);
 FLinearColor ReadyColor(0.2f, 0.6f, 0.2f, 1.0f);
 FLinearColor NotReadyColor(0.7f, 0.55f, 0.1f, 1.0f);
+FLinearColor LoadingColor(0.8f, 0.75f, 0.2f, 1.0f);
 } // namespace
 
 ULobbySessionWidget::ULobbySessionWidget(const FObjectInitializer& ObjectInitializer)
@@ -488,10 +489,11 @@ void ULobbySessionWidget::RefreshSlot(int32 SlotIndex, const FLobbyPlayerSlot& S
 
     const bool bIsLocal = SlotIndex == LocalSlotIndex;
     const bool bIsAI = SlotData.bIsAI;
+    const bool bIsLaunching = CachedGameState && CachedGameState->bMatchLaunchInProgress;
 
     if (Widgets.NameEdit)
     {
-        Widgets.NameEdit->SetIsEnabled(SlotData.bIsActive && !bIsAI && bIsLocal && !SlotData.bIsReady);
+        Widgets.NameEdit->SetIsEnabled(SlotData.bIsActive && !bIsAI && bIsLocal && !SlotData.bIsReady && !bIsLaunching);
         Widgets.NameEdit->SetText(FText::FromString(SlotData.DisplayName));
     }
 
@@ -511,13 +513,14 @@ void ULobbySessionWidget::RefreshSlot(int32 SlotIndex, const FLobbyPlayerSlot& S
             Widgets.FactionCombo->SetSelectedOption(FactionPlaceholder);
         }
 
-        Widgets.FactionCombo->SetIsEnabled(SlotData.bIsActive && !bIsAI && bIsLocal && !SlotData.bIsReady);
+        Widgets.FactionCombo->SetIsEnabled(SlotData.bIsActive && !bIsAI && bIsLocal && !SlotData.bIsReady && !bIsLaunching);
     }
 
     if (Widgets.ReadyButton && Widgets.ReadyLabel)
     {
-        Widgets.ReadyButton->SetVisibility(SlotData.bIsActive && !bIsAI ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
-        Widgets.ReadyButton->SetIsEnabled(bIsLocal && !bIsAI && !SlotData.bIsReady);
+        const bool bShowReady = SlotData.bIsActive && !bIsAI && !bIsLaunching;
+        Widgets.ReadyButton->SetVisibility(bShowReady ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+        Widgets.ReadyButton->SetIsEnabled(bIsLocal && !bIsAI && !SlotData.bIsReady && !bIsLaunching);
         Widgets.ReadyLabel->SetText(SlotData.bIsReady ? NSLOCTEXT("Lobby", "LockedLabel", "Locked") : NSLOCTEXT("Lobby", "LockInAction", "Lock In"));
     }
 
@@ -527,6 +530,11 @@ void ULobbySessionWidget::RefreshSlot(int32 SlotIndex, const FLobbyPlayerSlot& S
         {
             Widgets.StatusText->SetText(NSLOCTEXT("Lobby", "Inactive", "Inactive"));
             Widgets.StatusText->SetColorAndOpacity(FSlateColor(FLinearColor::Gray));
+        }
+        else if (bIsLaunching)
+        {
+            Widgets.StatusText->SetText(NSLOCTEXT("Lobby", "Launching", "Loading players..."));
+            Widgets.StatusText->SetColorAndOpacity(FSlateColor(LoadingColor));
         }
         else if (bIsAI)
         {
@@ -545,24 +553,27 @@ void ULobbySessionWidget::UpdateHostControls(int32 TotalSlots, int32 AISlots, bo
 {
     const bool bIsHost = CachedController && CachedController->IsLocalPlayerLobbyHost();
     const bool bConfigurationLocked = CachedGameState && CachedGameState->bSlotConfigurationLocked;
+    const bool bLaunching = CachedGameState && CachedGameState->bMatchLaunchInProgress;
 
     if (PlayerCountSpinBox)
     {
         PlayerCountSpinBox->SetValue(static_cast<float>(TotalSlots));
-        PlayerCountSpinBox->SetIsEnabled(bIsHost && !bConfigurationLocked);
+        PlayerCountSpinBox->SetIsEnabled(bIsHost && !bConfigurationLocked && !bLaunching);
+        PlayerCountSpinBox->SetVisibility(bLaunching ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
     }
 
     if (AICountSpinBox)
     {
         AICountSpinBox->SetMaxValue(static_cast<float>(FMath::Max(0, TotalSlots - 1)));
         AICountSpinBox->SetValue(static_cast<float>(AISlots));
-        AICountSpinBox->SetIsEnabled(bIsHost && !bConfigurationLocked);
+        AICountSpinBox->SetIsEnabled(bIsHost && !bConfigurationLocked && !bLaunching);
+        AICountSpinBox->SetVisibility(bLaunching ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
     }
 
     if (LaunchButton)
     {
-        LaunchButton->SetIsEnabled(bIsHost && bAllReady);
-        LaunchButton->SetVisibility(bIsHost ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+        LaunchButton->SetIsEnabled(bIsHost && bAllReady && !bLaunching);
+        LaunchButton->SetVisibility(bIsHost && !bLaunching ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     }
 }
 

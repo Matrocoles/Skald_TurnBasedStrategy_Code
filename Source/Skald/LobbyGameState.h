@@ -34,6 +34,10 @@ public:
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_SlotConfigurationLocked, Category = "Lobby")
     bool bSlotConfigurationLocked = false;
 
+    /** True while the host has initiated the match launch and players are travelling. */
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_MatchLaunchInProgress, Category = "Lobby")
+    bool bMatchLaunchInProgress = false;
+
     /** Fired whenever the replicated lobby data changes. */
     UPROPERTY(BlueprintAssignable, Category = "Lobby|Events")
     FLobbySlotsUpdated OnLobbySlotsUpdated;
@@ -60,6 +64,9 @@ protected:
 
     UFUNCTION()
     void OnRep_SlotConfigurationLocked();
+
+    UFUNCTION()
+    void OnRep_MatchLaunchInProgress();
 
     void BroadcastSlotsUpdated();
 };
