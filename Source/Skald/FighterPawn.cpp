@@ -3546,16 +3546,21 @@ void AFighterPawn::ApplyPendingPhysicalRollValues() {
          *PendingRollsString, *GetName(),
          *GetNameSafe(PendingAttackTarget.Get()));
 
+  const int32 CriticalHitThreshold = GetCriticalHitThreshold();
   ApplyPhysicalRollResults(PendingAttackDiceResult, PendingPhysicalRollValues,
-                           AttackerStats, DefenderStatsSnapshot);
+                           AttackerStats, DefenderStatsSnapshot,
+                           CriticalHitThreshold);
   bPendingPhysicalRollValuesApplied = true;
 }
 
 void AFighterPawn::ApplyPhysicalRollResults(
     FDiceRollResult &Result, const TArray<int32> &RollValues,
     const FFighterStats &AttackerStats,
-    const FFighterStats &DefenderStats) {
+    const FFighterStats &DefenderStats,
+    int32 CriticalHitThreshold) {
   FString RollValuesString;
+  const int32 EffectiveCriticalThreshold =
+      FMath::Clamp(CriticalHitThreshold > 0 ? CriticalHitThreshold : 6, 1, 6);
   for (int32 Index = 0; Index < RollValues.Num(); ++Index) {
     if (Index > 0) {
       RollValuesString.Append(TEXT(","));
@@ -3606,7 +3611,7 @@ void AFighterPawn::ApplyPhysicalRollResults(
     FDiceRollOutcome &Outcome = Result.DiceOutcomes[Index];
     const int32 RollValue = FMath::Clamp(SanitizedValues[Index], 1, 6);
 
-    const bool bCriticalRoll = RollValue >= GetCriticalHitThreshold();
+    const bool bCriticalRoll = RollValue >= EffectiveCriticalThreshold;
     const bool bHit = bCriticalRoll || RollValue >= RequiredRoll;
 
     Outcome.RollValue = RollValue;
