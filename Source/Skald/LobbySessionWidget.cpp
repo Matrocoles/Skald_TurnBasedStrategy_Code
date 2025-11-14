@@ -504,12 +504,12 @@ void ULobbySessionWidget::RefreshSlot(int32 SlotIndex, const FLobbyPlayerSlot& S
 
     const bool bIsLocal = SlotIndex == LocalSlotIndex;
     const bool bIsAI = SlotData.bIsAI;
+    const bool bCanInteract = SlotData.bIsActive && !bIsAI && bIsLocal &&
+        !SlotData.bIsReady && bHasReceivedInitialState;
 
     if (Widgets.NameEdit)
     {
-    const bool bCanInteract = SlotData.bIsActive && !bIsAI && bIsLocal && !SlotData.bIsReady && bHasReceivedInitialState;
-
-    Widgets.NameEdit->SetIsEnabled(bCanInteract);
+        Widgets.NameEdit->SetIsEnabled(bCanInteract);
         Widgets.NameEdit->SetText(FText::FromString(SlotData.DisplayName));
     }
 
