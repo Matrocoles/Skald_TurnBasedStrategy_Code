@@ -87,7 +87,8 @@ private:
   float EvaluateDefensivePriority(const FStrategicContext &Context,
                                   ATerritory *Territory) const;
   void ExecuteStrategicArmyPlacement(AWorldMap *WorldMap,
-                                     ASkaldPlayerState *PlayerState);
+                                     ASkaldPlayerState *PlayerState,
+                                     bool bAnimatePlacement = false);
   void ExecuteStrategicReinforcements(AWorldMap *WorldMap,
                                       ASkaldPlayerState *PlayerState);
   bool ExecuteStrategicAttack(AWorldMap *WorldMap,
@@ -102,6 +103,11 @@ private:
   void BroadcastEnemyTurnStatus(const FString &Message);
   void ClearEnemyTurnStatus();
   bool ShouldPauseForBattleTransition() const;
+  void StartArmyPlacementAnimation(
+      const TArray<FAnimatedArmyPlacementStep> &PlacementOrder,
+      ASkaldPlayerState *PlayerState);
+  void HandleArmyPlacementAnimationStep();
+  void CompleteArmyPlacementAnimation(bool bAdvancePhase);
 
   void SetupBattleAutomation();
   void TeardownBattleAutomation();
@@ -196,6 +202,9 @@ private:
   /** Tracks whether a phase advance should occur on the next decision step. */
   bool bPendingPhaseAdvance = false;
 
+  /** True while the AI is animating its army placement choices. */
+  bool bAnimatingArmyPlacement = false;
+
   /** Tracks whether the current turn's strategy has been evaluated. */
   bool bStrategyEvaluatedThisTurn = false;
 
@@ -213,6 +222,10 @@ private:
   UPROPERTY(EditAnywhere, Category = "Turn|AI", meta = (ClampMin = "0.0"))
   float ReinforcementPostDeployDelay = 2.0f;
 
+  /** Delay between each animated AI army placement. */
+  UPROPERTY(EditAnywhere, Category = "Turn|AI", meta = (ClampMin = "0.0"))
+  float AnimatedArmyPlacementDelay = 0.4f;
+
   /** Time between polls while waiting for a battle travel transition. */
   UPROPERTY(EditAnywhere, Category = "Turn|AI", meta = (ClampMin = "0.0"))
   float EnemyBattleTransitionPollDelay = 1.0f;
@@ -227,6 +240,7 @@ private:
 
   /** Timer driving world-map decision pacing. */
   FTimerHandle EnemyTurnStepTimerHandle;
+  FTimerHandle ArmyPlacementAnimationHandle;
 
   /** Timer used to retry battle automation binding while the manager spawns. */
   FTimerHandle BattleAutomationPollHandle;
@@ -266,5 +280,16 @@ private:
 
   /** Polling interval used while waiting for movement completion visuals. */
   static constexpr float MovementCompletionPollInterval = 0.1f;
+
+  struct FAnimatedArmyPlacementStep {
+    TWeakObjectPtr<ATerritory> Territory;
+    int32 Units = 0;
+  };
+
+  /** Ordered list of pending animated placement targets. */
+  TArray<FAnimatedArmyPlacementStep> PendingArmyPlacementTargets;
+
+  /** PlayerState associated with the current animated placement sequence. */
+  TWeakObjectPtr<ASkaldPlayerState> AnimatedPlacementPlayerState;
 };
 

@@ -609,6 +609,7 @@ void USkaldMainHUDWidget::RefreshFromState(
   BP_SetPhaseText(CurrentPhase);
   RebuildPlayerList(CachedPlayers);
   SyncPhaseButtons(CurrentPlayerID == LocalPlayerID);
+  SetSelectionPromptSuppressed(CurrentPlayerID != LocalPlayerID);
 }
 
 void USkaldMainHUDWidget::ShowTurnAnnouncement(const FString &PlayerName) {
@@ -706,6 +707,7 @@ void USkaldMainHUDWidget::ShowTurnMessage(bool bIsMyTurn) {
     EndingTurnText->SetVisibility(ESlateVisibility::Visible);
   }
   SyncPhaseButtons(bIsMyTurn);
+  SetSelectionPromptSuppressed(!bIsMyTurn);
   if (UWorld *World = GetWorld()) {
     FTimerManager &TimerManager = World->GetTimerManager();
     TimerManager.ClearTimer(TurnMessageTimerHandle);
@@ -732,6 +734,7 @@ void USkaldMainHUDWidget::ShowEnemyTurnInProgress(const FString &Message) {
     World->GetTimerManager().ClearTimer(TurnMessageTimerHandle);
   }
   SyncPhaseButtons(false);
+  SetSelectionPromptSuppressed(true);
 }
 
 void USkaldMainHUDWidget::HideEnemyTurnInProgress() {
@@ -739,6 +742,7 @@ void USkaldMainHUDWidget::HideEnemyTurnInProgress() {
     World->GetTimerManager().ClearTimer(TurnMessageTimerHandle);
   }
   HideEndingTurn();
+  SetSelectionPromptSuppressed(!IsLocalPlayersTurn());
 }
 
 void USkaldMainHUDWidget::ShowStrategicInitiativePrompt(const FText &PromptText,
@@ -1596,7 +1600,7 @@ void USkaldMainHUDWidget::ShowSelectionPromptMessage(const FText &Message,
     return;
   }
 
-  if (!bShow || bAwaitingStrategicInitiative) {
+  if (!bShow || bAwaitingStrategicInitiative || bSelectionPromptSuppressed) {
     PromptLabel->SetText(FText::GetEmpty());
     PromptLabel->SetVisibility(ESlateVisibility::Collapsed);
     return;
@@ -1654,7 +1658,8 @@ void USkaldMainHUDWidget::ApplyPendingSelectionPrompt() {
     return;
   }
 
-  if (!bPendingSelectionPromptVisible || bAwaitingStrategicInitiative) {
+  if (!bPendingSelectionPromptVisible || bAwaitingStrategicInitiative ||
+      bSelectionPromptSuppressed) {
     PromptLabel->SetText(FText::GetEmpty());
     PromptLabel->SetVisibility(ESlateVisibility::Collapsed);
     return;
@@ -1662,6 +1667,29 @@ void USkaldMainHUDWidget::ApplyPendingSelectionPrompt() {
 
   PromptLabel->SetText(PendingSelectionPromptText);
   PromptLabel->SetVisibility(ESlateVisibility::Visible);
+}
+
+bool USkaldMainHUDWidget::IsLocalPlayersTurn() const {
+  return CurrentPlayerID != -1 && LocalPlayerID != -1 &&
+         CurrentPlayerID == LocalPlayerID;
+}
+
+void USkaldMainHUDWidget::SetSelectionPromptSuppressed(
+    bool bShouldSuppress) {
+  if (bSelectionPromptSuppressed == bShouldSuppress) {
+    return;
+  }
+
+  bSelectionPromptSuppressed = bShouldSuppress;
+
+  if (bSelectionPromptSuppressed) {
+    if (UTextBlock *PromptLabel = GetSelectionPromptTextBlock()) {
+      PromptLabel->SetText(FText::GetEmpty());
+      PromptLabel->SetVisibility(ESlateVisibility::Collapsed);
+    }
+  } else {
+    ApplyPendingSelectionPrompt();
+  }
 }
 
 UTextBlock *USkaldMainHUDWidget::GetSelectionPromptTextBlock() const {
