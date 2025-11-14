@@ -7294,10 +7294,11 @@ void ASkaldPlayerController::ApplyPendingPhysicalAttackResults() {
   }
 
   FDiceRollResult UpdatedResult = PendingAttackSequence.Result;
+  const int32 CriticalHitThreshold = AttackerPawn->GetCriticalHitThreshold();
   AFighterPawn::ApplyPhysicalRollResults(
       UpdatedResult, PendingAttackSequence.PhysicalRollResults,
       PendingAttackSequence.AttackerSnapshot,
-      PendingAttackSequence.DefenderSnapshot);
+      PendingAttackSequence.DefenderSnapshot, CriticalHitThreshold);
 
   UpdatedResult.HighStakesFaction =
       PendingAttackSequence.Result.HighStakesFaction;

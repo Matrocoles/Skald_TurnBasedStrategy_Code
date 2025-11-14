@@ -130,7 +130,8 @@ public:
   static void ApplyPhysicalRollResults(
       FDiceRollResult &Result, const TArray<int32> &RollValues,
       const FFighterStats &AttackerStats,
-      const FFighterStats &DefenderStats);
+      const FFighterStats &DefenderStats,
+      int32 CriticalHitThreshold = 6);
 
   /** Clear round-based activation flags. */
   UFUNCTION(BlueprintCallable, Category = "Fighter")
