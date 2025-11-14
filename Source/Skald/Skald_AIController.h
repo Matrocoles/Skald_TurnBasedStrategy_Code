@@ -58,6 +58,8 @@ protected:
 private:
   enum class EAIStrategy : uint8 { Offensive, Defensive, Hybrid };
 
+  struct FAnimatedArmyPlacementStep;
+
   struct FStrategicContext {
     TArray<ATerritory *> OwnedTerritories;
     TArray<ATerritory *> EnemyTerritories;
