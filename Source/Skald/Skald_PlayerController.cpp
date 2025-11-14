@@ -7358,10 +7358,12 @@ USkaldDiceManager *ASkaldPlayerController::ResolveDiceManager() {
   return GI ? GI->GetSubsystem<USkaldDiceManager>() : nullptr;
 }
 
-FLinearColor ASkaldPlayerController::ResolveFactionColor(ESkaldFaction Faction) {
+FLinearColor ASkaldPlayerController::ResolveFactionColor(
+    ESkaldFaction Faction) const {
   USkaldGameInstance *GI = CachedGameInstance;
   if (!GI) {
-    GI = GetGameInstance<USkaldGameInstance>();
+    GI = const_cast<ASkaldPlayerController *>(this)
+             ->GetGameInstance<USkaldGameInstance>();
     CachedGameInstance = GI;
   }
 
