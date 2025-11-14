@@ -5382,42 +5382,6 @@ void ASkaldPlayerController::ShowPendingStrategicInitiativeResult() {
   bPendingStrategicInitiativeWin = false;
 }
 
-void ASkaldPlayerController::CompleteStrategicInitiativeResultWithoutDice() {
-  PendingStrategicInitiativeRollId.Invalidate();
-
-  if (ASkaldPlayerState *LocalPS = GetPlayerState<ASkaldPlayerState>()) {
-    const int32 LocalPlayerId = LocalPS->GetPlayerId();
-    if (LocalPlayerId > 0) {
-      const int32 EffectiveRound = PendingStrategicInitiativeRound > 0
-                                      ? PendingStrategicInitiativeRound
-                                      : 1;
-      const int64 RollKey =
-          (static_cast<int64>(EffectiveRound) << 32) |
-          (static_cast<int64>(LocalPlayerId) & 0xffffffff);
-      SpectatedStrategicInitiativeRolls.Add(RollKey);
-    }
-  }
-
-  if (MainHUD) {
-    MainHUD->HideStrategicInitiativePrompt();
-    MainHUD->SetAwaitingStrategicInitiative(false);
-
-    const int32 EffectiveRound = PendingStrategicInitiativeRound > 0
-                                     ? PendingStrategicInitiativeRound
-                                     : FMath::Max(MainHUD->TurnNumber, 1);
-    const FText RoundMessage =
-        FText::Format(NSLOCTEXT("Skald", "StrategicRoundStart",
-                                "Round {0} begins"),
-                      FText::AsNumber(EffectiveRound));
-    MainHUD->UpdateInitiativeText(RoundMessage.ToString());
-  }
-
-  PendingStrategicInitiativeRoll = 0;
-  PendingStrategicInitiativeEnemyRoll = 0;
-  PendingStrategicInitiativeRound = 0;
-  bPendingStrategicInitiativeWin = false;
-}
-
 void ASkaldPlayerController::ClientPromptStrategicInitiative_Implementation(
     int32 RoundNumber, int32 RollValue, bool bWonInitiative) {
   // Reset at the start of every new strategic initiative round
@@ -5466,12 +5430,7 @@ void ASkaldPlayerController::ClientDisplayStrategicInitiativeResult_Implementati
   bAwaitingStrategicInitiativeRoll = false;
 
   ShowMainHUD();
-  const bool bShouldAnimateDice = bStrategicInitiativeDiceHoldEnabled;
-  if (bShouldAnimateDice) {
-    ShowPendingStrategicInitiativeResult();
-  } else {
-    CompleteStrategicInitiativeResultWithoutDice();
-  }
+  ShowPendingStrategicInitiativeResult();
 }
 
 void ASkaldPlayerController::ShowStrategicInitiativeSpectatorRoll(
