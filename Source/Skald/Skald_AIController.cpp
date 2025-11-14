@@ -265,6 +265,38 @@ int32 ASkaldAIController::PerformArmyPlacementTurn() {
   return UnitsPlaced;
 }
 
+bool ASkaldAIController::BeginArmyPlacementSetupTurn() {
+  if (!TurnManager) {
+    return false;
+  }
+
+  ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
+  if (!PS || PS->DeployableUnits <= 0) {
+    return false;
+  }
+
+  AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+      GetWorld(), AWorldMap::StaticClass()));
+  if (!WorldMap) {
+    return false;
+  }
+
+  RefreshStrategicContext(WorldMap, PS);
+  if (CachedStrategicContext.OwnedTerritories.Num() == 0) {
+    return false;
+  }
+
+  bArmyPlacementSetupInProgress = true;
+  ExecuteStrategicArmyPlacement(WorldMap, PS, true);
+
+  if (!bAnimatingArmyPlacement) {
+    bArmyPlacementSetupInProgress = false;
+    return false;
+  }
+
+  return true;
+}
+
 void ASkaldAIController::ProcessCurrentPhase() {
   if (!TurnManager) {
     UE_LOG(LogSkald, Warning,
@@ -858,6 +890,12 @@ void ASkaldAIController::CompleteArmyPlacementAnimation(bool bAdvancePhase) {
     return;
   }
 
+  if (bArmyPlacementSetupInProgress && (!TurnManager ||
+                                        !TurnManager->HasTurnsStarted())) {
+    FinalizeArmyPlacementSetupTurn();
+    return;
+  }
+
   if (!bAdvancePhase || !TurnManager || !AnimatedPlayerState) {
     return;
   }
@@ -871,6 +909,43 @@ void ASkaldAIController::CompleteArmyPlacementAnimation(bool bAdvancePhase) {
     SchedulePhaseAdvance(PlacementDelay);
   } else {
     EndTurn();
+  }
+}
+
+void ASkaldAIController::FinalizeArmyPlacementSetupTurn() {
+  if (!bArmyPlacementSetupInProgress) {
+    return;
+  }
+
+  bArmyPlacementSetupInProgress = false;
+
+  ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
+  if (!PS) {
+    if (CachedGameMode) {
+      CachedGameMode->HandleAIArmyPlacementSetupComplete(this);
+    }
+    return;
+  }
+
+  AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
+      GetWorld(), AWorldMap::StaticClass()));
+
+  if (PS->DeployableUnits > 0 && WorldMap) {
+    const int32 FallbackPlaced = WorldMap->AutoPlaceUnitsForAI(PS);
+    if (FallbackPlaced > 0) {
+      UE_LOG(LogSkald, Verbose,
+             TEXT("FinalizeArmyPlacementSetupTurn: fallback auto-placement deployed %d units for %s."),
+             FallbackPlaced,
+             *PS->GetResolvedPlayerName(TEXT("FinalizeArmyPlacementSetupTurn")));
+    }
+  }
+
+  if (TurnManager) {
+    TurnManager->BroadcastDeployableUnits(PS);
+  }
+
+  if (CachedGameMode) {
+    CachedGameMode->HandleAIArmyPlacementSetupComplete(this);
   }
 }
 

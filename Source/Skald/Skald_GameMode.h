@@ -10,6 +10,7 @@
 #include "UObject/WeakObjectPtr.h"
 #include "Skald_GameMode.generated.h"
 class ATurnManager;
+class ASkaldAIController;
 class ASkaldGameState;
 class ASkaldPlayerController;
 class ASkaldPlayerState;
@@ -41,6 +42,7 @@ class SKALD_API ASkaldGameMode : public AGameModeBase {
   friend class FInitializeWorldSingleInitiativeRollTest;
 #endif // WITH_AUTOMATION_TESTS
   friend struct FSkaldGameModeAutomationAccessor;
+  friend class ASkaldAIController;
   friend class USkaldGameInstance;
 
 public:
@@ -153,6 +155,9 @@ protected:
   UFUNCTION(BlueprintCallable, Category = "GameMode")
   void BeginArmyPlacementPhase();
 
+  /** Notified by AI controllers once their animated placement turn finishes. */
+  void HandleAIArmyPlacementSetupComplete(ASkaldAIController *AIController);
+
 public:
   /** Build siege equipment during the engineering phase. */
   UFUNCTION(BlueprintCallable, Category = "Siege")
@@ -224,6 +229,9 @@ private:
   /** Guard to avoid logging the failsafe warning multiple times. */
   bool bArmyPlacementFailsafeTriggered = false;
 
+  /** Tracks which AI controller is currently animating their placement turn. */
+  TWeakObjectPtr<ASkaldAIController> PendingArmyPlacementAIController;
+
   /** Register a newly connected player and update player data. */
   void RegisterPlayer(ASkaldPlayerController *PC);
 
@@ -244,6 +252,12 @@ private:
 
   /** Triggered after a brief delay to advance to the next placement turn. */
   void HandleArmyPlacementAutoAdvance();
+
+  /** Execute the shared cleanup logic after an AI finishes placing units. */
+  void FinalizeAIArmyPlacementTurn(ASkaldPlayerState *PlayerState);
+
+  /** Determines whether the current environment supports animated AI placement. */
+  bool CanAnimateArmyPlacement() const;
 
   /** Ensure a turn manager exists, spawning or reusing one as required. */
   ATurnManager *ResolveTurnManager();
