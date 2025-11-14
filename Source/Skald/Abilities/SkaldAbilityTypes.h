@@ -9,6 +9,7 @@ class UNiagaraSystem;
 class USoundBase;
 class UAnimMontage;
 class UTexture2D;
+class UMaterialInterface;
 
 /** Slots exposed through the existing Ability1/2/3 input bindings. */
 UENUM(BlueprintType)
@@ -37,6 +38,50 @@ enum class ESkaldAbilityTier : uint8
     Elite UMETA(DisplayName = "Elite")
 };
 
+/** Optional Niagara payload spawned directly on target grid cells. */
+USTRUCT(BlueprintType)
+struct FSkaldAbilityTargetCellFX
+{
+    GENERATED_BODY();
+
+    /** Niagara system played at every cell targeted by the ability. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visuals|TargetCell")
+    TSoftObjectPtr<UNiagaraSystem> NiagaraEffect;
+
+    /** Offset applied relative to the centre of the grid cell. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visuals|TargetCell")
+    FVector LocationOffset = FVector::ZeroVector;
+
+    bool HasEffect() const
+    {
+        return !NiagaraEffect.IsNull();
+    }
+};
+
+/** Optional payloads spawned for ability-authored terrain cells. */
+USTRUCT(BlueprintType)
+struct FSkaldAbilityTerrainCellVisuals
+{
+    GENERATED_BODY();
+
+    /** Material override applied to the trap marker decal spawned for the cell. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visuals|Terrain")
+    TSoftObjectPtr<UMaterialInterface> DecalMaterial;
+
+    /** Niagara system played at the centre of the generated terrain cell. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visuals|Terrain")
+    TSoftObjectPtr<UNiagaraSystem> NiagaraEffect;
+
+    /** Offset applied to the Niagara effect relative to the cell centre. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visuals|Terrain")
+    FVector NiagaraOffset = FVector::ZeroVector;
+
+    bool HasAnyVisuals() const
+    {
+        return !DecalMaterial.IsNull() || !NiagaraEffect.IsNull();
+    }
+};
+
 /** Optional audiovisual payloads referenced when executing an ability. */
 USTRUCT(BlueprintType)
 struct FSkaldAbilityVisuals
@@ -55,9 +100,18 @@ struct FSkaldAbilityVisuals
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visuals")
     TSoftObjectPtr<UAnimMontage> Montage;
 
+    /** Optional Niagara payload to fire on the targeted grid cell(s). */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visuals")
+    FSkaldAbilityTargetCellFX TargetCellFX;
+
+    /** Optional decal/Niagara overrides for generated terrain cells. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visuals")
+    FSkaldAbilityTerrainCellVisuals TerrainCellFX;
+
     bool HasAnyVisuals() const
     {
-        return !NiagaraEffect.IsNull() || !Sound.IsNull() || !Montage.IsNull();
+        return !NiagaraEffect.IsNull() || !Sound.IsNull() || !Montage.IsNull()
+            || TargetCellFX.HasEffect() || TerrainCellFX.HasAnyVisuals();
     }
 };
 
