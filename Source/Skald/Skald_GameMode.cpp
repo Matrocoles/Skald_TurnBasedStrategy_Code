@@ -2006,6 +2006,8 @@ void ASkaldGameMode::NotifyStrategicInitiativeRoll(
 
   int32 EnemyRoll = 0;
   if (const ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
+    const ASkaldPlayerState *TargetState =
+        Controller->GetPlayerState<ASkaldPlayerState>();
     for (APlayerState *PSBase : GS->PlayerArray) {
       if (const ASkaldPlayerState *Other =
               Cast<ASkaldPlayerState>(PSBase)) {
