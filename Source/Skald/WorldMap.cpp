@@ -522,6 +522,18 @@ ATerritory *AWorldMap::GetTerritoryById(int32 TerritoryId) const {
   return Found ? *Found : nullptr;
 }
 
+ATerritory *AWorldMap::GetSelectionForPlayer(int32 PlayerId) const {
+  const TWeakObjectPtr<ATerritory> *Found = SelectionByPlayerId.Find(PlayerId);
+  if (!Found) {
+    return nullptr;
+  }
+
+  if (Found->IsValid()) {
+    return Found->Get();
+  }
+  return nullptr;
+}
+
 void AWorldMap::SelectTerritory(ATerritory *Territory,
                                 bool bPlaySelectionSound,
                                 int32 SelectingPlayerId) {
@@ -539,9 +551,15 @@ void AWorldMap::SelectTerritory(ATerritory *Territory,
                                           : (bIsGlobalSelection ||
                                              IsSelectingPlayerLocal(
                                                  SelectingPlayerId));
-  const bool bHasAuthority = HasAuthority();
+  if (SelectingPlayerId != INDEX_NONE) {
+    if (IsValid(Territory)) {
+      SelectionByPlayerId.FindOrAdd(SelectingPlayerId) = Territory;
+    } else {
+      SelectionByPlayerId.Remove(SelectingPlayerId);
+    }
+  }
 
-  if (!bAffectsLocalSelection && !bHasAuthority) {
+  if (!bAffectsLocalSelection) {
     UE_LOG(LogSkald, VeryVerbose,
            TEXT("WorldMap %s ignoring non-local selection from player %d"),
            *GetName(), SelectingPlayerId);
