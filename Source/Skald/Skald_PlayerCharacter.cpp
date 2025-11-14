@@ -184,6 +184,15 @@ bool ASkald_PlayerCharacter::ShouldProcessOverviewMouseInput() const
         return false;
 }
 
+FVector2D ASkald_PlayerCharacter::GetLockedOverviewPitchRange() const
+{
+        const float SanitizedMin = FMath::Min(OverviewLockedMinPitch, OverviewLockedMaxPitch);
+        const float SanitizedMax = FMath::Max(OverviewLockedMinPitch, OverviewLockedMaxPitch);
+        const float ClampedMin = FMath::Clamp(SanitizedMin, OverviewMinPitch, OverviewMaxPitch);
+        const float ClampedMax = FMath::Clamp(SanitizedMax, OverviewMinPitch, OverviewMaxPitch);
+        return FVector2D(ClampedMin, ClampedMax);
+}
+
 void ASkald_PlayerCharacter::InitializeOverviewCamera()
 {
         RefreshOverviewPivot();
@@ -433,7 +442,10 @@ void ASkald_PlayerCharacter::LookUp(float Value)
         }
 
         const float PitchDelta = Value * OverviewMousePitchSpeed;
-        const float NewPitch = FMath::Clamp(DesiredOverviewRotation.Pitch + PitchDelta, OverviewMinPitch, OverviewMaxPitch);
+        const FVector2D PitchBounds = bOverviewCameraLocked
+                ? GetLockedOverviewPitchRange()
+                : FVector2D(OverviewMinPitch, OverviewMaxPitch);
+        const float NewPitch = FMath::Clamp(DesiredOverviewRotation.Pitch + PitchDelta, PitchBounds.X, PitchBounds.Y);
         DesiredOverviewRotation.Pitch = NewPitch;
 
         if (!bOverviewCameraLocked)
@@ -533,7 +545,8 @@ void ASkald_PlayerCharacter::FocusOverviewCameraOnTerritory(ATerritory* Territor
         bOverviewCameraLocked = true;
         OverviewFocusLocation = Territory->GetActorLocation() + (FVector::UpVector * OverviewFocusHeight);
 
-        const float LockedPitch = FMath::Clamp(OverviewLockedPitch, OverviewMinPitch, OverviewMaxPitch);
+        const FVector2D LockedPitchRange = GetLockedOverviewPitchRange();
+        const float LockedPitch = FMath::Clamp(OverviewLockedPitch, LockedPitchRange.X, LockedPitchRange.Y);
         DesiredOverviewRotation.Pitch = LockedPitch;
 
         if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
@@ -706,8 +719,8 @@ void ASkald_PlayerCharacter::UpdateOverviewCamera(float DeltaTime)
                 const FVector NewLocation = FMath::VInterpTo(GetActorLocation(), DesiredLocation, DeltaTime, OverviewPanInterpSpeed);
                 SetActorLocation(NewLocation);
 
-                const float LockedPitch = FMath::Clamp(OverviewLockedPitch, OverviewMinPitch, OverviewMaxPitch);
-                DesiredOverviewRotation.Pitch = LockedPitch;
+                const FVector2D LockedPitchRange = GetLockedOverviewPitchRange();
+                DesiredOverviewRotation.Pitch = FMath::Clamp(DesiredOverviewRotation.Pitch, LockedPitchRange.X, LockedPitchRange.Y);
         }
         else
         {
