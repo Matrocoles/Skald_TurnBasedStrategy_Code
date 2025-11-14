@@ -17,7 +17,6 @@ void ALobbyGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
     DOREPLIFETIME(ALobbyGameState, TotalSlots);
     DOREPLIFETIME(ALobbyGameState, ReservedAISlots);
     DOREPLIFETIME(ALobbyGameState, bSlotConfigurationLocked);
-    DOREPLIFETIME(ALobbyGameState, bMatchLaunchInProgress);
 }
 
 bool ALobbyGameState::AreAllSlotsReady() const
@@ -85,11 +84,6 @@ void ALobbyGameState::OnRep_AISlots()
 }
 
 void ALobbyGameState::OnRep_SlotConfigurationLocked()
-{
-    BroadcastSlotsUpdated();
-}
-
-void ALobbyGameState::OnRep_MatchLaunchInProgress()
 {
     BroadcastSlotsUpdated();
 }
