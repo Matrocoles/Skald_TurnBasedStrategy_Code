@@ -1039,7 +1039,8 @@ bool ASkaldAIController::ExecuteStrategicMovement(AWorldMap *WorldMap,
 
   HandleMoveRequested(BestOption.Source->TerritoryID,
                       BestOption.Target->TerritoryID,
-                      BestOption.UnitsToMove);
+                      BestOption.UnitsToMove,
+                      /*bTransferSiege=*/false);
   return true;
 }
 
