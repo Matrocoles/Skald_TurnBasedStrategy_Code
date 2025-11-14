@@ -533,7 +533,9 @@ void ALobbyGameMode::TryLaunchMatch(APlayerController* RequestingController)
                 }
             }
 
+            const int32 HumanPlayerCount = LobbyPlayers.Num();
             GI->PendingLobbyPlayers = MoveTemp(LobbyPlayers);
+            GI->ExpectedLobbyPlayerCount = HumanPlayerCount;
         }
 
         for (const FLobbyPlayerSlot& Slot : AuthoritySlots)

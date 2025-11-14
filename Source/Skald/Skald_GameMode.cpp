@@ -88,6 +88,13 @@ void ASkaldGameMode::InitGame(const FString &Map, const FString &Options,
                               FString &Error) {
   Super::InitGame(Map, Options, Error);
 
+  USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+  MinPlayerCount = 1;
+  if (GI && GI->bIsMultiplayer) {
+    const int32 ExpectedHumans = FMath::Max(1, GI->ExpectedLobbyPlayerCount);
+    MinPlayerCount = ExpectedHumans;
+  }
+
   // Reset transient state in case the same GameMode instance is reused after
   // travelling back from a battle. Any lingering timers or cached pointers can
   // prevent the overworld from reinitialising correctly which in turn blocks
@@ -125,7 +132,7 @@ void ASkaldGameMode::InitGame(const FString &Map, const FString &Options,
     ArmyPlacementStartupRetryHandle.Invalidate();
   }
 
-  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+  if (GI) {
     GI->SetTravelPending(false);
   }
 }

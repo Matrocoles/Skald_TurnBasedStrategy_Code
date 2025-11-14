@@ -129,6 +129,7 @@ void USkaldGameInstance::Init() {
   }
 
   PendingLobbyPlayers.Reset();
+  ExpectedLobbyPlayerCount = 0;
 
   if (!PostWorldBeginPlayHandle.IsValid()) {
 #if UE_VERSION_OLDER_THAN(5, 5, 0)
@@ -1215,6 +1216,7 @@ void USkaldGameInstance::ResetSessionState() {
   }
   PendingLobbyAIPlayers.Reset();
   PendingLobbyPlayers.Reset();
+  ExpectedLobbyPlayerCount = 0;
   OnFactionsUpdated.Broadcast();
 
   PendingBattle = FS_BattlePayload();
