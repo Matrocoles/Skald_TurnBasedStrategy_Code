@@ -5382,10 +5382,6 @@ void ASkaldPlayerController::ClientPromptStrategicInitiative_Implementation(
 
   ShowMainHUD();
 
-  if (USkaldDiceManager *DiceManager = ResolveDiceManager()) {
-    DiceManager->SetHoldInitiativeDice(true);
-  }
-
   if (MainHUD && MainHUD->RoundStartSound) {
     const int32 EffectiveRound = RoundNumber > 0 ? RoundNumber : 1;
     if (LastStrategicInitiativeSoundRound != EffectiveRound) {
@@ -5422,61 +5418,11 @@ void ASkaldPlayerController::ClientDisplayStrategicInitiativeResult_Implementati
   ShowPendingStrategicInitiativeResult();
 }
 
-void ASkaldPlayerController::ClientDisplayStrategicInitiativeRemoteRoll_Implementation(
-    int32 RollingPlayerId, int32 /*RoundNumber*/, int32 RollValue) {
-  if (!bAutoPresentInitiativeRolls) {
-    return;
-  }
-
-  if (ASkaldPlayerState *LocalPS = GetPlayerState<ASkaldPlayerState>()) {
-    if (LocalPS->GetPlayerId() == RollingPlayerId) {
-      return;
-    }
-  }
-
-  EnsureDiceWidgets();
-
-  USkaldDiceManager *DiceManager = ResolveDiceManager();
-  if (!DiceManager) {
-    return;
-  }
-
-  const int32 ClampedValue = RollValue > 0 ? FMath::Clamp(RollValue, 1, 6) : 1;
-  TArray<int32> PlayerResults;
-  PlayerResults.Add(ClampedValue);
-  const TArray<int32> EnemyResults;
-
-  const FLinearColor PlayerTint = ResolvePlayerFactionColor(RollingPlayerId);
-  const FLinearColor EnemyTint = FLinearColor::Transparent;
-
-  DiceManager->PlayScriptedRoll(PlayerResults, EnemyResults, true, -1.f,
-                                PlayerTint, EnemyTint);
-
-  if (DiceOverlayWidget) {
-    DiceOverlayWidget->SetPlayerTint(PlayerTint);
-    DiceOverlayWidget->SetEnemyTint(EnemyTint);
-    DiceOverlayWidget->SetOverlayMode(ESkaldDiceOverlayMode::Initiative);
-  }
-
-  if (MainHUD) {
-    const FString PlayerName = ResolvePlayerDisplayName(RollingPlayerId);
-    const FText Message = FText::Format(
-        NSLOCTEXT("Skald", "RemoteInitiativeRoll",
-                  "{0} rolled {1} for initiative"),
-        FText::FromString(PlayerName), FText::AsNumber(ClampedValue));
-    MainHUD->UpdateInitiativeText(Message.ToString());
-  }
-}
-
 void ASkaldPlayerController::ClientClearStrategicInitiativeOverlay_Implementation() {
   ShowMainHUD();
 
   if (MainHUD) {
     MainHUD->SetAwaitingStrategicInitiative(false);
-  }
-
-  if (USkaldDiceManager *DiceManager = ResolveDiceManager()) {
-    DiceManager->SetHoldInitiativeDice(false);
   }
 }
 
@@ -7386,52 +7332,6 @@ FLinearColor ASkaldPlayerController::ResolveBattleFactionColor(bool bAttackerSid
   return GI->GetFactionColor(Faction);
 }
 
-ASkaldPlayerState *ASkaldPlayerController::FindPlayerStateById(
-    int32 PlayerId) const {
-  if (PlayerId <= 0) {
-    return nullptr;
-  }
-
-  ASkaldGameState *GS = CachedGameState;
-  if (!GS) {
-    if (const UWorld *World = GetWorld()) {
-      GS = World->GetGameState<ASkaldGameState>();
-    }
-  }
-
-  if (!GS) {
-    return nullptr;
-  }
-
-  for (APlayerState *PSBase : GS->PlayerArray) {
-    if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
-      if (PS->GetPlayerId() == PlayerId) {
-        return PS;
-      }
-    }
-  }
-
-  return nullptr;
-}
-
-FLinearColor ASkaldPlayerController::ResolvePlayerFactionColor(
-    int32 PlayerId) const {
-  if (const ASkaldPlayerState *TargetState = FindPlayerStateById(PlayerId)) {
-    return ResolveFactionColor(TargetState->Faction);
-  }
-
-  return USkaldGameInstance::GetDefaultFactionColor(ESkaldFaction::None);
-}
-
-FString ASkaldPlayerController::ResolvePlayerDisplayName(int32 PlayerId) const {
-  if (const ASkaldPlayerState *TargetState = FindPlayerStateById(PlayerId)) {
-    return TargetState->GetResolvedPlayerName(
-        TEXT("StrategicInitiativeRemoteRoll"));
-  }
-
-  return TEXT("Player");
-}
-
 FGuid ASkaldPlayerController::TriggerAttackDicePresentation(
     AFighterPawn *Attacker, AFighterPawn *Defender,
     const FDiceRollResult &Result) {
@@ -7581,16 +7481,20 @@ FGuid ASkaldPlayerController::TriggerInitiativeDicePresentation(int32 AttackerRo
 
     FGuid RollId;
 
-    if (DiceManager && (PlayerResults.Num() > 0 || EnemyResults.Num() > 0))
+    // Only clients show the dice physically.
+    // The server just updates HUDs with results  no duplicate rolls.
+    if (HasAuthority())
     {
+        // Server: broadcast results (no visual roll)
+        ShowInitiativeResults(PlayerResultValue, EnemyResultValue);
+    }
+    else if (DiceManager && (PlayerResults.Num() > 0 || EnemyResults.Num() > 0))
+    {
+        // Client: show physical dice roll and result
         RollId = DiceManager->PlayScriptedRoll(PlayerResults, EnemyResults, true, -1.f,
             PlayerTint, EnemyTint);
     }
 
-    if (PlayerResultValue != INDEX_NONE || EnemyResultValue != INDEX_NONE)
-    {
-        ShowInitiativeResults(PlayerResultValue, EnemyResultValue);
-    }
     // The overlay can be safely set client-side
     if (DiceOverlayWidget)
     {

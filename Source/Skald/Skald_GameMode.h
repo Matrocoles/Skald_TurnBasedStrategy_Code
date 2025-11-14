@@ -299,9 +299,6 @@ private:
   void HandleStrategicInitiativeDiceCompleted(const FGuid &RollId,
                                               const TArray<int32> &Results);
 
-  void BroadcastStrategicInitiativeRoll(ASkaldPlayerState *PlayerState,
-                                        int32 RoundNumber, int32 RollValue);
-
   int32 ResolveStrategicInitiativeResult(const TArray<int32> &Results);
 
   /** Perform any deferred work that must happen once the overworld is ready. */

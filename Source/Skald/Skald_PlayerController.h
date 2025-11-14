@@ -766,10 +766,6 @@ public:
                                               int32 EnemyRoll, bool bWonInitiative);
 
   UFUNCTION(Client, Reliable)
-  void ClientDisplayStrategicInitiativeRemoteRoll(int32 RollingPlayerId,
-                                                  int32 RoundNumber, int32 RollValue);
-
-  UFUNCTION(Client, Reliable)
   void ClientClearStrategicInitiativeOverlay();
 
   UFUNCTION(Client, Reliable)
@@ -1124,9 +1120,6 @@ private:
   USkaldDiceManager *ResolveDiceManager();
   FLinearColor ResolveFactionColor(ESkaldFaction Faction);
   FLinearColor ResolveBattleFactionColor(bool bAttackerSide);
-  ASkaldPlayerState *FindPlayerStateById(int32 PlayerId) const;
-  FLinearColor ResolvePlayerFactionColor(int32 PlayerId) const;
-  FString ResolvePlayerDisplayName(int32 PlayerId) const;
 
   void StartInitiativeDiceSequence(int32 AttackerRoll, int32 DefenderRoll);
   void HandleInitiativeDiceOverviewReached();

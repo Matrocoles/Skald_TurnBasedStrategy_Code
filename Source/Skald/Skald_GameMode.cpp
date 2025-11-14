@@ -2072,42 +2072,9 @@ void ASkaldGameMode::HandleStrategicInitiativeDiceCompleted(
   const int32 RollValue = ResolveStrategicInitiativeResult(Results);
   if (PlayerState) {
     PlayerState->InitiativeRoll = RollValue;
-    const int32 *RoundPtr = StrategicInitiativeRoundByPlayer.Find(PlayerState);
-    const int32 RoundNumber = (RoundPtr && *RoundPtr > 0) ? *RoundPtr : 1;
-    BroadcastStrategicInitiativeRoll(PlayerState, RoundNumber, RollValue);
     RemovePendingStrategicInitiativePlayer(PlayerState);
   } else {
     HandlePendingStrategicInitiativeUpdate();
-  }
-}
-
-void ASkaldGameMode::BroadcastStrategicInitiativeRoll(
-    ASkaldPlayerState *PlayerState, int32 RoundNumber, int32 RollValue) {
-  if (!PlayerState) {
-    return;
-  }
-
-  if (!GetWorld()) {
-    return;
-  }
-
-  for (FConstPlayerControllerIterator It =
-           GetWorld()->GetPlayerControllerIterator();
-       It; ++It) {
-    if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(*It)) {
-      ASkaldPlayerState *LocalPS = PC->GetPlayerState<ASkaldPlayerState>();
-      const bool bIsAI = LocalPS && LocalPS->bIsAI;
-      if (bIsAI || !LocalPS) {
-        continue;
-      }
-
-      if (LocalPS->GetPlayerId() == PlayerState->GetPlayerId()) {
-        continue;
-      }
-
-      PC->ClientDisplayStrategicInitiativeRemoteRoll(
-          PlayerState->GetPlayerId(), RoundNumber, RollValue);
-    }
   }
 }
 
