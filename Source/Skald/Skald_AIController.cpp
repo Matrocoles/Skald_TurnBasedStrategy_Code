@@ -2052,7 +2052,8 @@ ASkaldAIController::ResolveAIAbilityTargeting(FName AbilityId) const {
 
   static const TMap<FName, FSkaldAbilityTargetingInfo> TargetingPresets = {
       {TEXT("Ability_Human_Skirmish"),
-       {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE, true, false, false}},
+       {EBattleCommandMode::AbilityTargetAlly, INDEX_NONE, false, false, false,
+        false}},
       {TEXT("Ability_Orc_Skirmish"),
        {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE, true, false, false}},
       {TEXT("Ability_Inflicted_Skirmish"),
@@ -2061,6 +2062,8 @@ ASkaldAIController::ResolveAIAbilityTargeting(FName AbilityId) const {
        {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE, true, false, false}},
       {TEXT("Ability_Orc_Line"),
        {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE, true, false, false}},
+      {TEXT("Ability_Human_Elite"),
+       {EBattleCommandMode::AbilityTargetAlly, 5, false, false, false, false}},
       {TEXT("Ability_Dwarf_Elite"),
        {EBattleCommandMode::AbilityTargetEnemy, 6, true, false, false}},
       {TEXT("Ability_Elf_Line"),
