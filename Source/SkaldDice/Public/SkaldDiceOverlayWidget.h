@@ -55,6 +55,9 @@ protected:
     void ResolveConfigReference();
     void BindToManager();
     void UnbindFromManager();
+    void ApplyPlayerTextTint(const FLinearColor& Tint);
+    void ApplyEnemyTextTint(const FLinearColor& Tint);
+    void ApplyTextTintRecursive(UWidget* Widget, const FLinearColor& Tint);
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Dice|Overlay")
     bool bAutoAcquireDiceManager = true;

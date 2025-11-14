@@ -28,4 +28,29 @@ void USkaldDiceResultWidget::ShowResults(int32 PlayerResult, int32 EnemyResult)
         const FText DisplayText = bShowPrefix ? FText::Format(FormatText, EnemyPrefix, Value) : Value;
         EnemyResultText->SetText(DisplayText);
     }
+
+    ApplyResultColors();
+}
+
+void USkaldDiceResultWidget::SetResultColors(const FLinearColor& PlayerColor, const FLinearColor& EnemyColor)
+{
+    bHasPlayerResultColor = true;
+    PlayerResultColor = FSlateColor(PlayerColor);
+    bHasEnemyResultColor = true;
+    EnemyResultColor = FSlateColor(EnemyColor);
+
+    ApplyResultColors();
+}
+
+void USkaldDiceResultWidget::ApplyResultColors()
+{
+    if (PlayerResultText && bHasPlayerResultColor)
+    {
+        PlayerResultText->SetColorAndOpacity(PlayerResultColor);
+    }
+
+    if (EnemyResultText && bHasEnemyResultColor)
+    {
+        EnemyResultText->SetColorAndOpacity(EnemyResultColor);
+    }
 }
