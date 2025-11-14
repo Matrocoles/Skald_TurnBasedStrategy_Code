@@ -607,6 +607,9 @@ public:
   /** Play the configured pre-attack presentation effects against the target. */
   void TriggerAttackPresentationFX(AFighterPawn *Target);
 
+  /** Determine the roll value required for this fighter to score a critical hit. */
+  int32 GetCriticalHitThreshold() const;
+
   /** Maximum health for this fighter. */
   int32 GetMaxHealth() const { return MaxHealth; }
 
@@ -689,7 +692,6 @@ private:
 
   bool TreatsDifficultTerrainAsNormal() const;
   bool CanIgnoreEngagementRestrictions() const;
-  int32 GetCriticalHitThreshold() const;
 
   bool ShouldOverrideSpawnFacingYaw() const;
   float GetCurrentWorldFacingYaw() const;
