@@ -1653,6 +1653,67 @@ void ASkaldPlayerController::HideMainHUD() {
   }
 }
 
+void ASkaldPlayerController::ShowBattleResultWidget(
+    const FBattleResultDisplayData &DisplayData) {
+  if (!IsLocalController() || !DisplayData.bValid) {
+    return;
+  }
+
+  if (!VictoryWidgetClass) {
+    VictoryWidgetClass = UBattleResultWidget::StaticClass();
+  }
+
+  ClearBattleResultWidget();
+
+  if (!VictoryWidgetClass) {
+    return;
+  }
+
+  if (UUserWidget *Widget = CreateWidget<UUserWidget>(this, VictoryWidgetClass)) {
+    if (UBattleResultWidget *ResultWidget = Cast<UBattleResultWidget>(Widget)) {
+      ResultWidget->SetBattleOutcome(
+          DisplayData.bPlayerWon, DisplayData.bPlayerLost,
+          DisplayData.AttackerCasualties, DisplayData.DefenderCasualties,
+          DisplayData.PlayerFactionColor, DisplayData.PlayerNameText,
+          DisplayData.PlayerFactionText, DisplayData.EnemyNameText,
+          DisplayData.EnemyFactionText, DisplayData.bPlayerWasAttacker);
+      ResultWidget->OnBattleResultClosed.RemoveAll(this);
+      ResultWidget->OnBattleResultClosed.AddDynamic(
+          this, &ASkaldPlayerController::HandleBattleResultWidgetClosed);
+    }
+
+    BattleResultWidget = Widget;
+    BattleResultWidget->AddToViewport();
+    HideMainHUD();
+  }
+}
+
+void ASkaldPlayerController::ClearBattleResultWidget() {
+  if (UBattleResultWidget *ResultWidget =
+          Cast<UBattleResultWidget>(BattleResultWidget)) {
+    ResultWidget->OnBattleResultClosed.RemoveAll(this);
+  }
+
+  if (BattleResultWidget) {
+    BattleResultWidget->RemoveFromParent();
+    BattleResultWidget = nullptr;
+  }
+
+  if (bAwaitingBattleResultCloseAck) {
+    bAwaitingBattleResultCloseAck = false;
+    CachedBattleResultDisplayData = FBattleResultDisplayData();
+    ServerAcknowledgeBattleResults();
+  }
+}
+
+void ASkaldPlayerController::HandleBattleResultWidgetClosed() {
+  ClearBattleResultWidget();
+
+  if (!bIsBattleMap) {
+    ShowMainHUD();
+  }
+}
+
 void ASkaldPlayerController::ToggleInGameMenu() {
   if (!IsLocalController()) {
     return;
@@ -3047,6 +3108,19 @@ void ASkaldPlayerController::ServerEndPhase_Implementation() {
   HandleEndPhaseInternal();
 }
 
+void ASkaldPlayerController::ServerAcknowledgeBattleResults_Implementation() {
+  if (!EnsureTurnManager(TEXT("ServerAcknowledgeBattleResults"))) {
+    return;
+  }
+
+  if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+    const int32 PlayerId = PS->GetPlayerId();
+    if (PlayerId > 0) {
+      TurnManager->NotifyBattleResultAcknowledged(PlayerId);
+    }
+  }
+}
+
 void ASkaldPlayerController::HandleEndPhaseInternal() {
   if (!EnsureTurnManager(TEXT("EndPhase"))) {
     return;
@@ -4200,9 +4274,8 @@ void ASkaldPlayerController::HandleBattleMapStateChanged(bool /*bInBattleMap*/) 
 }
 
 void ASkaldPlayerController::HandleWorldStateChanged() {
-  if (BattleResultWidget) {
-    BattleResultWidget->RemoveFromParent();
-    BattleResultWidget = nullptr;
+  if (!bAwaitingBattleResultCloseAck) {
+    ClearBattleResultWidget();
   }
 
   if (!CachedGameInstance) {
@@ -4219,6 +4292,13 @@ void ASkaldPlayerController::HandleWorldStateChanged() {
   }
 
   ShowMainHUD();
+
+  if (!bIsBattleMap && bPendingOverworldBattleResults &&
+      CachedBattleResultDisplayData.bValid) {
+    bPendingOverworldBattleResults = false;
+    bAwaitingBattleResultCloseAck = true;
+    ShowBattleResultWidget(CachedBattleResultDisplayData);
+  }
 
   // Update territory info for the currently selected territory if available.
   if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
@@ -7890,31 +7970,23 @@ void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,
   PlayerFactionText = ResolveFactionText(PlayerFactionValue);
   EnemyFactionText = ResolveFactionText(EnemyFactionValue);
 
-  if (!VictoryWidgetClass) {
-    VictoryWidgetClass = UBattleResultWidget::StaticClass();
-  }
+  FBattleResultDisplayData DisplayData;
+  DisplayData.bValid = true;
+  DisplayData.bPlayerWon = bPlayerWon;
+  DisplayData.bPlayerLost = bPlayerLost;
+  DisplayData.bPlayerWasAttacker = bPlayerWasAttacker;
+  DisplayData.AttackerCasualties = AttackerCasualties;
+  DisplayData.DefenderCasualties = DefenderCasualties;
+  DisplayData.PlayerFactionColor = PlayerFactionColor;
+  DisplayData.PlayerNameText = PlayerNameText;
+  DisplayData.PlayerFactionText = PlayerFactionText;
+  DisplayData.EnemyNameText = EnemyNameText;
+  DisplayData.EnemyFactionText = EnemyFactionText;
 
-  if (BattleResultWidget) {
-    BattleResultWidget->RemoveFromParent();
-    BattleResultWidget = nullptr;
-  }
-
-  if (VictoryWidgetClass) {
-    if (UUserWidget *Widget =
-            CreateWidget<UUserWidget>(this, VictoryWidgetClass)) {
-      if (UBattleResultWidget *ResultWidget = Cast<UBattleResultWidget>(Widget)) {
-        ResultWidget->SetBattleOutcome(bPlayerWon, bPlayerLost, AttackerCasualties,
-                                       DefenderCasualties, PlayerFactionColor,
-                                       PlayerNameText, PlayerFactionText,
-                                       EnemyNameText, EnemyFactionText,
-                                       bPlayerWasAttacker);
-      }
-      BattleResultWidget = Widget;
-      BattleResultWidget->AddToViewport();
-    }
-  }
-
-  HideMainHUD();
+  CachedBattleResultDisplayData = DisplayData;
+  ShowBattleResultWidget(DisplayData);
+  bPendingOverworldBattleResults = true;
+  bAwaitingBattleResultCloseAck = false;
 
   if (!CachedGameInstance)
   {

@@ -189,6 +189,15 @@ public:
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Turn")
   bool HasTurnsStarted() const { return bHasTurnsStarted; }
 
+  /** Returns true when AI controllers must wait for players to close battle results. */
+  bool IsAwaitingBattleResultAcknowledgement() const
+  {
+    return bAwaitingBattleResultAcknowledgements;
+  }
+
+  /** Consume an acknowledgement from the specified player, resuming AI turns when appropriate. */
+  void NotifyBattleResultAcknowledged(int32 PlayerID);
+
   /** Retrieve the payload for a pending battle, if any. */
   const FS_BattlePayload &GetPendingBattlePayload() const { return PendingBattle; }
 
@@ -319,6 +328,15 @@ protected:
   /** Resolve the player ID for the active controller, or INDEX_NONE when unavailable. */
   int32 GetActivePlayerId() const;
 
+  /** Reset any pending acknowledgements for battle results. */
+  void ClearBattleResultAcknowledgements();
+
+  /** Begin waiting for acknowledgements when AI turns must pause. */
+  bool BeginBattleResultAcknowledgementWindow();
+
+  /** Returns true if the currently active controller represents an AI. */
+  bool IsCurrentControllerAI() const;
+
   /** Attempt to continue travelling to the battle map after capturing the world snapshot. */
   void RetryPendingBattleTravel();
 
@@ -368,6 +386,12 @@ protected:
   bool CapturePendingBattleResolution(USkaldGameInstance *GameInstance);
 
   bool bBattleReturnPending = false;
+
+  /** True when an AI-controlled turn must pause for player acknowledgements. */
+  bool bAwaitingBattleResultAcknowledgements = false;
+
+  /** Player IDs that still need to close the battle results widget. */
+  TSet<int32> PendingBattleResultAckPlayerIds;
 
   /** Tracks whether StartTurns (or a resume) has successfully kicked off the turn loop. */
   bool bHasTurnsStarted = false;

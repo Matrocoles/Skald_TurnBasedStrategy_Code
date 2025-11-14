@@ -7,6 +7,8 @@ class UTextBlock;
 class USoundBase;
 class UButton;
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FBattleResultWidgetClosed);
+
 /** Simple widget that displays battle outcome text and casualty totals. */
 UCLASS()
 class SKALD_API UBattleResultWidget : public UUserWidget {
@@ -15,6 +17,10 @@ class SKALD_API UBattleResultWidget : public UUserWidget {
 public:
   virtual void NativeConstruct() override;
   virtual void NativeDestruct() override;
+
+  /** Fired whenever the close button is pressed. */
+  UPROPERTY(BlueprintAssignable, Category = "Skald|Battle")
+  FBattleResultWidgetClosed OnBattleResultClosed;
 
   /** Update the displayed outcome text. */
   UFUNCTION(BlueprintCallable, Category = "Skald|Battle")

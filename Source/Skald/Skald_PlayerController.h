@@ -79,6 +79,20 @@ struct FPendingAbilityCommand {
   FSkaldAbilityTargetingInfo Targeting;
 };
 
+struct FBattleResultDisplayData {
+  bool bValid = false;
+  bool bPlayerWon = false;
+  bool bPlayerLost = false;
+  bool bPlayerWasAttacker = true;
+  int32 AttackerCasualties = 0;
+  int32 DefenderCasualties = 0;
+  FLinearColor PlayerFactionColor = FLinearColor::White;
+  FText PlayerNameText;
+  FText PlayerFactionText;
+  FText EnemyNameText;
+  FText EnemyFactionText;
+};
+
 /** Simple Slate-backed widget used to render custom cursor art. */
 UCLASS()
 class SKALD_API UFactionCursorWidget : public UUserWidget {
@@ -152,6 +166,10 @@ public:
   /** Request the server to end the current phase for this controller. */
   UFUNCTION(Server, Reliable)
   void ServerEndPhase();
+
+  /** Inform the server that this client has closed the battle results widget. */
+  UFUNCTION(Server, Reliable)
+  void ServerAcknowledgeBattleResults();
 
   // === Manual Attack Roll UI Flow ===
 
@@ -492,6 +510,15 @@ protected:
             meta = (AllowPrivateAccess = "true"))
   UUserWidget *BattleResultWidget;
 
+  /** Cached data used to rebuild the battle result widget after returning home. */
+  FBattleResultDisplayData CachedBattleResultDisplayData;
+
+  /** True when the overworld should recreate the battle result widget. */
+  bool bPendingOverworldBattleResults = false;
+
+  /** True when closing the battle result widget should notify the server. */
+  bool bAwaitingBattleResultCloseAck = false;
+
   /** Data-driven cursor configuration used for faction specific visuals. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cursor",
             meta = (AllowPrivateAccess = "true"))
@@ -519,6 +546,12 @@ protected:
 
   /** Tracks whether the cursor was hovering an interactable widget last tick. */
   bool bWasHoveringInteractable = false;
+
+  void ShowBattleResultWidget(const FBattleResultDisplayData &DisplayData);
+  void ClearBattleResultWidget();
+
+  UFUNCTION()
+  void HandleBattleResultWidgetClosed();
 
   /** Fighter selection widget used during battle setup. */
   UPROPERTY(BlueprintReadOnly, Category = "UI",

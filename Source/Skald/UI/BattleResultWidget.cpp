@@ -166,5 +166,6 @@ void UBattleResultWidget::SetBattleOutcome(bool bPlayerWon, bool bPlayerLost,
 }
 
 void UBattleResultWidget::HandleCloseClicked() {
+  OnBattleResultClosed.Broadcast();
   RemoveFromParent();
 }

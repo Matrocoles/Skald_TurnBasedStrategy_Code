@@ -1316,6 +1316,76 @@ TArray<ASkaldPlayerController *> ATurnManager::GetControllers() const {
   return Result;
 }
 
+void ATurnManager::ClearBattleResultAcknowledgements() {
+  PendingBattleResultAckPlayerIds.Reset();
+  bAwaitingBattleResultAcknowledgements = false;
+}
+
+bool ATurnManager::BeginBattleResultAcknowledgementWindow() {
+  ClearBattleResultAcknowledgements();
+
+  for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr : Controllers) {
+    ASkaldPlayerController *Controller = ControllerPtr.Get();
+    if (!Controller) {
+      continue;
+    }
+
+    ASkaldPlayerState *PS = Controller->GetPlayerState<ASkaldPlayerState>();
+    if (!PS || PS->bIsAI) {
+      continue;
+    }
+
+    const int32 PlayerId = PS->GetPlayerId();
+    if (PlayerId > 0) {
+      PendingBattleResultAckPlayerIds.Add(PlayerId);
+    }
+  }
+
+  bAwaitingBattleResultAcknowledgements =
+      PendingBattleResultAckPlayerIds.Num() > 0;
+  return bAwaitingBattleResultAcknowledgements;
+}
+
+bool ATurnManager::IsCurrentControllerAI() const {
+  if (!Controllers.IsValidIndex(CurrentIndex)) {
+    return false;
+  }
+
+  if (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr =
+          Controllers[CurrentIndex];
+      ControllerPtr.IsValid()) {
+    if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
+      if (ASkaldPlayerState *PS = Controller->GetPlayerState<ASkaldPlayerState>()) {
+        return PS->bIsAI;
+      }
+    }
+  }
+
+  return false;
+}
+
+void ATurnManager::NotifyBattleResultAcknowledged(int32 PlayerID) {
+  if (!HasAuthority() || PlayerID <= 0) {
+    return;
+  }
+
+  if (!bAwaitingBattleResultAcknowledgements) {
+    return;
+  }
+
+  PendingBattleResultAckPlayerIds.Remove(PlayerID);
+  if (PendingBattleResultAckPlayerIds.Num() == 0) {
+    bAwaitingBattleResultAcknowledgements = false;
+    PendingBattleResultAckPlayerIds.Reset();
+    UE_LOG(LogSkald, Verbose,
+           TEXT("Battle result acknowledgements complete; resuming AI decisions."));
+  } else {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("Battle result acknowledgement received from PlayerID=%d; Remaining=%d"),
+           PlayerID, PendingBattleResultAckPlayerIds.Num());
+  }
+}
+
 bool ATurnManager::HasPendingBattlePreparation() const {
   const bool bHasPayload = PendingBattlePreparation.FromTerritoryID != 0 ||
                            PendingBattlePreparation.TargetTerritoryID != 0;
@@ -3595,6 +3665,12 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
 
   // Resume the saved turn sequence now that the battle has been resolved.
   TryResumeSavedTurnState(GI);
+
+  if (IsCurrentControllerAI()) {
+    BeginBattleResultAcknowledgementWindow();
+  } else {
+    ClearBattleResultAcknowledgements();
+  }
 
   if (ASkaldGameMode *GM = GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
     GM->CheckVictoryConditions();
