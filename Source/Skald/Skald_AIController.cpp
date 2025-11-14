@@ -349,7 +349,7 @@ void ASkaldAIController::ProcessCurrentPhase() {
   } else if (Phase == ETurnPhase::Reinforcement) {
     ExecuteStrategicReinforcements(WorldMap, PS);
     TurnManager->BroadcastDeployableUnits(PS);
-    TurnManager->BroadcastResources(PS);
+    TurnManager->BroadcastGold(PS);
 
     if (TurnManager->HasTurnsStarted()) {
       const float ReinforcementDelay =
@@ -593,7 +593,7 @@ float ASkaldAIController::EvaluateOffensivePriority(
   Score += bIsBorder ? 25.f : 5.f;
   Score += bApproachesEnemyCapital ? 35.f : 0.f;
   Score += bIsCapital ? 10.f : 0.f;
-  Score += static_cast<float>(Territory->Resources) * 0.5f;
+  Score += static_cast<float>(Territory->GoldYield) * 0.5f;
   Score += static_cast<float>(Territory->ArmyUnits) * 0.3f;
   Score -= static_cast<float>(EnemyPressure) * 0.5f;
   return FMath::Max(Score, 0.f);
@@ -717,7 +717,7 @@ void ASkaldAIController::ExecuteStrategicArmyPlacement(
 void ASkaldAIController::ExecuteStrategicReinforcements(
     AWorldMap *WorldMap, ASkaldPlayerState *InPlayerState) {
   if (!WorldMap || !InPlayerState || InPlayerState->DeployableUnits <= 0 ||
-      InPlayerState->Resources <= 0) {
+      InPlayerState->Gold <= 0) {
     return;
   }
 
@@ -767,7 +767,7 @@ void ASkaldAIController::ExecuteStrategicReinforcements(
                   const FReinforcementTarget &B) { return A.Score > B.Score; });
 
   int32 Index = 0;
-  while (InPlayerState->DeployableUnits > 0 && InPlayerState->Resources > 0 &&
+  while (InPlayerState->DeployableUnits > 0 && InPlayerState->Gold > 0 &&
          Targets.Num() > 0) {
     FReinforcementTarget &Target = Targets[Index];
     if (!Target.Territory) {
@@ -782,7 +782,7 @@ void ASkaldAIController::ExecuteStrategicReinforcements(
     ++Target.Territory->ArmyUnits;
     Target.Territory->RefreshAppearance();
     --InPlayerState->DeployableUnits;
-    --InPlayerState->Resources;
+    --InPlayerState->Gold;
 
     if (Targets.Num() > 0) {
       Index = (Index + 1) % Targets.Num();
@@ -1039,7 +1039,8 @@ bool ASkaldAIController::ExecuteStrategicMovement(AWorldMap *WorldMap,
 
   HandleMoveRequested(BestOption.Source->TerritoryID,
                       BestOption.Target->TerritoryID,
-                      BestOption.UnitsToMove);
+                      BestOption.UnitsToMove,
+                      /*bTransferSiege=*/false);
   return true;
 }
 

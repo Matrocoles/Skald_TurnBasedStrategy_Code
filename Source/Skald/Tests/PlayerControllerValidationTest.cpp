@@ -36,7 +36,7 @@ bool FSkaldPlayerControllerValidationFeedbackTest::RunTest(const FString &)
     TestTrue(TEXT("Attack error shown"), !HUD->LastError.IsEmpty());
 
     HUD->LastError.Empty();
-    PC->HandleMoveRequested(1, 2, 1);
+    PC->HandleMoveRequested(1, 2, 1, /*bTransferSiege=*/false);
     TestTrue(TEXT("Move error shown"), !HUD->LastError.IsEmpty());
 
     HUD->LastError.Empty();

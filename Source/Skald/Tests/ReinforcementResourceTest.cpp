@@ -10,8 +10,8 @@
 #include "WorldMap.h"
 #include "Engine/World.h"
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldReinforcementResourceTest, "Skald.TurnManager.ResourceAccumulation", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
-bool FSkaldReinforcementResourceTest::RunTest(const FString& Parameters) {
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldReinforcementGoldTest, "Skald.TurnManager.GoldAccumulation", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSkaldReinforcementGoldTest::RunTest(const FString& Parameters) {
   Skald::Tests::FScopedAutomationTestWorld TestWorld;
   UWorld* World = TestWorld.Get();
   TestNotNull(TEXT("World created"), World);
@@ -44,17 +44,17 @@ bool FSkaldReinforcementResourceTest::RunTest(const FString& Parameters) {
   }
 
   T1->OwningPlayer = PS;
-  T1->Resources = 3;
+  T1->GoldYield = 3;
   T2->OwningPlayer = PS;
-  T2->Resources = 7;
+  T2->GoldYield = 7;
   Map->Territories = {T1, T2};
 
-  PS->Resources = 0;
+  PS->Gold = 0;
   TM->StartTurns();
-  TestEqual(TEXT("Resources after first reinforcement"), PS->Resources, 10);
+  TestEqual(TEXT("Gold after first reinforcement"), PS->Gold, 10);
 
   TM->AdvanceTurn();
-  TestEqual(TEXT("Resources after second reinforcement"), PS->Resources, 20);
+  TestEqual(TEXT("Gold after second reinforcement"), PS->Gold, 20);
 
   return true;
 }

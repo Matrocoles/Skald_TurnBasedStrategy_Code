@@ -42,7 +42,7 @@ bool FSkaldAIDecisionFlowTest::RunTest(const FString& Parameters)
     PC1->PlayerState = PS1;
     PS1->SetOwner(PC1);
     PS1->DeployableUnits = 4;
-    PS1->Resources = 4;
+    PS1->Gold = 4;
     PC1->SetTurnManager(TM);
 
     // Dummy opponent to prevent infinite turn loop
@@ -78,7 +78,7 @@ bool FSkaldAIDecisionFlowTest::RunTest(const FString& Parameters)
     PC1->StartTurn();
 
     TestEqual(TEXT("Deployable units spent"), PS1->DeployableUnits, 0);
-    TestEqual(TEXT("Resources spent"), PS1->Resources, 0);
+    TestEqual(TEXT("Gold spent"), PS1->Gold, 0);
     TestEqual(TEXT("Attack captured territory"), TB->OwningPlayer, PS1);
     TestTrue(TEXT("Movement reinforced"), TA->ArmyUnits > 1);
     TestEqual(TEXT("Turn ended"), TM->GetCurrentPhase(), ETurnPhase::EndTurn);

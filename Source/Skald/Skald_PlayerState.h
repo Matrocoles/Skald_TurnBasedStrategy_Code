@@ -37,9 +37,10 @@ public:
   UPROPERTY(BlueprintReadWrite, Replicated, Category = "PlayerState")
   int32 InitiativeRoll;
 
-  /** Resource points available to the player. */
-  UPROPERTY(BlueprintReadWrite, Replicated, Category = "PlayerState")
-  int32 Resources;
+  /** Gold available to the player. */
+  UPROPERTY(BlueprintReadWrite, ReplicatedUsing = OnRep_Gold,
+            Category = "PlayerState")
+  int32 Gold;
 
   /** Player chosen display name. */
   UPROPERTY(BlueprintReadWrite, ReplicatedUsing = OnRep_PlayerDisplayName,
@@ -79,6 +80,9 @@ public:
 
   UFUNCTION()
   void OnRep_DeployableUnits();
+
+  UFUNCTION()
+  void OnRep_Gold();
 
   UFUNCTION()
   void OnRep_HasLockedIn();

@@ -30,6 +30,8 @@
 #include "UI/ConfirmAttackWidget.h"
 #include "UI/PrepareForBattleWidget.h"
 #include "UI/DeployWidget.h"
+#include "UI/EngineeringWidget.h"
+#include "UI/SiegeTransferPromptWidget.h"
 #include "UI/CombatFloaterPoolSubsystem.h"
 #include "UI/W_FloatingText.h"
 #include "UI/W_DiceResolutionPanel.h"
@@ -110,6 +112,24 @@ USkaldMainHUDWidget::USkaldMainHUDWidget(
     UE_LOG(LogSkald, Warning,
            TEXT("SkaldMainHUDWidget: failed to find prepare for battle widget"));
     PrepareForBattleWidgetClass = UPrepareForBattleWidget::StaticClass();
+  }
+
+  static ConstructorHelpers::FClassFinder<UEngineeringWidget> EngineeringBP(
+      TEXT("/Game/Blueprints/UI/Skald_EngineeringWidget"));
+  if (EngineeringBP.Succeeded()) {
+    EngineeringWidgetClass = EngineeringBP.Class;
+  } else {
+    UE_LOG(LogSkald, Warning,
+           TEXT("SkaldMainHUDWidget: failed to find engineering widget"));
+  }
+
+  static ConstructorHelpers::FClassFinder<USiegeTransferPromptWidget>
+      SiegePromptBP(TEXT("/Game/Blueprints/UI/Skald_SiegeTransferPrompt"));
+  if (SiegePromptBP.Succeeded()) {
+    SiegeTransferPromptClass = SiegePromptBP.Class;
+  } else {
+    UE_LOG(LogSkald, Warning,
+           TEXT("SkaldMainHUDWidget: failed to find siege transfer prompt"));
   }
 }
 
@@ -483,6 +503,10 @@ void USkaldMainHUDWidget::UpdatePhaseBanner(ETurnPhase InPhase) {
   }
   ClearStrategicInitiativeWaitIfNeeded();
   CurrentPhase = InPhase;
+
+  if (CurrentPhase != ETurnPhase::Engineering && bSelectingForEngineering) {
+    CancelEngineeringSelection();
+  }
 
   BP_SetPhaseText(CurrentPhase);
   if (CurrentPhase != ETurnPhase::Attack) {
@@ -1519,12 +1543,25 @@ void USkaldMainHUDWidget::UpdateDeployableUnits(int32 UnitsRemaining) {
   }
 }
 
-void USkaldMainHUDWidget::UpdateResources(int32 ResourceAmount) {
-  if (ResourcesText) {
-    const FString Text = FString::Printf(TEXT("Resources: %d"), ResourceAmount);
-    ResourcesText->SetText(FText::FromString(Text));
-    ResourcesText->SetVisibility(ESlateVisibility::Visible);
+void USkaldMainHUDWidget::UpdateGold(int32 GoldAmount) {
+  UTextBlock *const TargetText = GoldText ? GoldText : ResourcesText;
+  if (!TargetText) {
+    return;
   }
+
+  const FString Text = FString::Printf(TEXT("Gold: %d"), GoldAmount);
+  TargetText->SetText(FText::FromString(Text));
+  TargetText->SetVisibility(ESlateVisibility::Visible);
+}
+
+int32 USkaldMainHUDWidget::GetSiegeGoldCost(ESiegeWeapon SiegeType) const {
+  if (const UWorld *World = GetWorld()) {
+    if (const USkaldGameInstance *GI = World->GetGameInstance<USkaldGameInstance>()) {
+      return GI->GetSiegeGoldCost(SiegeType);
+    }
+  }
+
+  return SkaldConstants::DefaultSiegeGoldCost;
 }
 
 void USkaldMainHUDWidget::ShowErrorMessage(const FString &Message) {
@@ -1774,8 +1811,12 @@ void USkaldMainHUDWidget::BeginMoveSelection() {
   }
 }
 
-void USkaldMainHUDWidget::SubmitMove(int32 FromID, int32 ToID, int32 Troops) {
-  OnMoveRequested.Broadcast(FromID, ToID, Troops);
+void USkaldMainHUDWidget::SubmitMove(int32 FromID, int32 ToID, int32 Troops,
+                                     bool bTransferSiege) {
+  OnMoveRequested.Broadcast(FromID, ToID, Troops, bTransferSiege);
+  PendingMoveFromID = -1;
+  PendingMoveToID = -1;
+  PendingMoveTroops = 0;
   CancelMoveSelection();
 }
 
@@ -1795,6 +1836,13 @@ void USkaldMainHUDWidget::CancelMoveSelection() {
   bSelectingForMove = false;
   SelectedSourceID = -1;
   SelectedTargetID = -1;
+  PendingMoveFromID = -1;
+  PendingMoveToID = -1;
+  PendingMoveTroops = 0;
+  if (ActiveSiegeTransferPrompt && ActiveSiegeTransferPrompt->IsInViewport()) {
+    ActiveSiegeTransferPrompt->RemoveFromParent();
+  }
+  ActiveSiegeTransferPrompt = nullptr;
   if (CurrentPhase == ETurnPhase::Movement) {
     const FText Prompt = ResolveSelectionPromptText(
         SkaldSelectionPromptKeys::CancelMovePrompt,
@@ -1810,6 +1858,9 @@ void USkaldMainHUDWidget::ResetMoveSelectionAfterInvalidAttempt() {
   ClearTerritoryHighlights();
   SelectedSourceID = -1;
   SelectedTargetID = -1;
+  PendingMoveFromID = -1;
+  PendingMoveToID = -1;
+  PendingMoveTroops = 0;
   if (CurrentPhase == ETurnPhase::Movement) {
     bSelectingForMove = true;
     bSelectingForAttack = false;
@@ -1821,6 +1872,303 @@ void USkaldMainHUDWidget::ResetMoveSelectionAfterInvalidAttempt() {
   } else {
     bSelectingForMove = false;
   }
+}
+
+void USkaldMainHUDWidget::HandleMoveAmountChosen(int32 FromID, int32 ToID,
+                                                int32 Troops) {
+  PendingMoveFromID = FromID;
+  PendingMoveToID = ToID;
+  PendingMoveTroops = Troops;
+
+  if (DoesTerritoryContainSiege(FromID)) {
+    PromptSiegeTransfer();
+    return;
+  }
+
+  SubmitMove(FromID, ToID, Troops, false);
+}
+
+void USkaldMainHUDWidget::BeginEngineeringSelection() {
+  bSelectingForEngineering = true;
+  bSelectingSiegeDestination = false;
+  PendingSiegeDestinationIDs.Empty();
+  PendingSiegeCapitalID = -1;
+  SelectedEngineeringCapitalID = -1;
+  ClearEngineeringWidget();
+  ClearTerritoryHighlights();
+
+  const FText Prompt = NSLOCTEXT(
+      "SkaldHUD", "EngineeringSelectCapital",
+      "Select one of your capitals to manage engineering projects.");
+  ShowSelectionPromptMessage(Prompt);
+
+  ASkaldPlayerState *LocalPS = nullptr;
+  if (APlayerController *PC = GetOwningPlayer()) {
+    LocalPS = PC->GetPlayerState<ASkaldPlayerState>();
+  }
+
+  if (AWorldMap *WorldMap = Cast<AWorldMap>(
+          UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()))) {
+    for (ATerritory *Terr : WorldMap->Territories) {
+      if (Terr && Terr->bIsCapital &&
+          LocalPS && Terr->OwningPlayer == LocalPS) {
+        Terr->Select(LocalPlayerID);
+        HighlightedTerritories.Add(Terr);
+      }
+    }
+  }
+
+  if (HighlightedTerritories.Num() == 0) {
+    const FText Error = NSLOCTEXT(
+        "SkaldHUD", "EngineeringNoCapitals", "You do not control any capitals.");
+    ShowSelectionErrorMessage(Error);
+  }
+}
+
+void USkaldMainHUDWidget::CancelEngineeringSelection() {
+  bSelectingForEngineering = false;
+  bSelectingSiegeDestination = false;
+  PendingSiegeDestinationIDs.Empty();
+  PendingSiegeCapitalID = -1;
+  SelectedEngineeringCapitalID = -1;
+  ClearEngineeringWidget();
+  ClearTerritoryHighlights();
+  if (CurrentPhase != ETurnPhase::Movement &&
+      CurrentPhase != ETurnPhase::Attack) {
+    ShowSelectionPromptMessage(FText::GetEmpty(), false);
+  }
+}
+
+bool USkaldMainHUDWidget::ValidateEngineeringActionRequest(
+    int32 CapitalID, FString &OutError) const {
+  if (!bSelectingForEngineering) {
+    OutError = TEXT("Select one of your capitals before choosing an upgrade.");
+    return false;
+  }
+
+  if (CurrentPhase != ETurnPhase::Engineering) {
+    OutError = TEXT("Engineering projects are only available during the engineering phase.");
+    return false;
+  }
+
+  if (LocalPlayerID == -1 || CurrentPlayerID == -1 ||
+      LocalPlayerID != CurrentPlayerID) {
+    OutError = TEXT("You may only engineer during your turn.");
+    return false;
+  }
+
+  if (CapitalID <= 0 || CapitalID != SelectedEngineeringCapitalID) {
+    OutError = TEXT("Select a valid capital to manage engineering projects.");
+    return false;
+  }
+
+  const UWorld *World = GetWorld();
+  if (!World) {
+    OutError = TEXT("World unavailable for engineering actions.");
+    return false;
+  }
+
+  const AWorldMap *WorldMap = Cast<AWorldMap>(
+      UGameplayStatics::GetActorOfClass(World, AWorldMap::StaticClass()));
+  if (!WorldMap) {
+    OutError = TEXT("World map unavailable.");
+    return false;
+  }
+
+  ATerritory *Capital = WorldMap->GetTerritoryById(CapitalID);
+  if (!Capital || !Capital->bIsCapital) {
+    OutError = TEXT("Only capitals support engineering upgrades.");
+    return false;
+  }
+
+  const ASkaldPlayerController *PC =
+      Cast<ASkaldPlayerController>(GetOwningPlayer());
+  if (!PC) {
+    OutError = TEXT("Player controller unavailable.");
+    return false;
+  }
+
+  ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>();
+  if (!PS) {
+    OutError = TEXT("Unable to resolve player state for engineering.");
+    return false;
+  }
+
+  if (Capital->OwningPlayer != PS) {
+    OutError = TEXT("You may only engineer capitals you control.");
+    return false;
+  }
+
+  if (PS->Gold < SkaldConstants::EngineeringActionGoldCost) {
+    OutError = TEXT("Not enough gold for engineering.");
+    return false;
+  }
+
+  return true;
+}
+
+void USkaldMainHUDWidget::SubmitEngineeringAction(
+    int32 CapitalID, EEngineeringAction Action) {
+  if (Action == EEngineeringAction::BuildSiegeWeapon) {
+    BeginSiegePlacement(CapitalID);
+    return;
+  }
+
+  FString ValidationError;
+  if (!ValidateEngineeringActionRequest(CapitalID, ValidationError)) {
+    if (!ValidationError.IsEmpty()) {
+      ShowErrorMessage(ValidationError);
+    }
+    return;
+  }
+
+  OnEngineeringRequested.Broadcast(CapitalID, Action);
+  ClearEngineeringWidget();
+  SelectedEngineeringCapitalID = -1;
+}
+
+void USkaldMainHUDWidget::BeginSiegePlacement(int32 CapitalID) {
+  bSelectingSiegeDestination = true;
+  PendingSiegeCapitalID = CapitalID;
+  PendingSiegeDestinationIDs.Empty();
+  PendingSiegeType = ESiegeWeapon::BatteringRam;
+  ClearEngineeringWidget();
+  ClearTerritoryHighlights();
+
+  AWorldMap *WorldMap = Cast<AWorldMap>(
+      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
+  if (!WorldMap) {
+    ShowErrorMessage(TEXT("World map unavailable."));
+    CancelEngineeringSelection();
+    return;
+  }
+
+  ATerritory *Capital = WorldMap->GetTerritoryById(CapitalID);
+  if (!Capital) {
+    ShowErrorMessage(TEXT("Invalid capital for siege placement."));
+    CancelEngineeringSelection();
+    return;
+  }
+
+  ASkaldPlayerState *LocalPS = nullptr;
+  if (APlayerController *PC = GetOwningPlayer()) {
+    LocalPS = PC->GetPlayerState<ASkaldPlayerState>();
+  }
+
+  if (!LocalPS || Capital->OwningPlayer != LocalPS) {
+    ShowErrorMessage(TEXT("You may only build siege weapons from your capitals."));
+    CancelEngineeringSelection();
+    return;
+  }
+
+  for (ATerritory *Adj : Capital->AdjacentTerritories) {
+    if (Adj && Adj->OwningPlayer == Capital->OwningPlayer &&
+        Adj->BuiltSiegeID == 0) {
+      Adj->Select(LocalPlayerID);
+      HighlightedTerritories.Add(Adj);
+      PendingSiegeDestinationIDs.Add(Adj->TerritoryID);
+    }
+  }
+
+  if (PendingSiegeDestinationIDs.Num() == 0) {
+    ShowErrorMessage(TEXT("No adjacent territories available for siege weapons."));
+    BeginEngineeringSelection();
+    return;
+  }
+
+  const FText Prompt = NSLOCTEXT(
+      "SkaldHUD", "EngineeringSelectSiegeDestination",
+      "Select a highlighted territory to station the siege weapon.");
+  ShowSelectionPromptMessage(Prompt);
+}
+
+void USkaldMainHUDWidget::HandleSiegePlacementTarget(ATerritory *Territory) {
+  if (!Territory) {
+    return;
+  }
+
+  const bool bIsCandidate = PendingSiegeDestinationIDs.Contains(
+      Territory->TerritoryID);
+  if (!bIsCandidate) {
+    const FText Error = NSLOCTEXT(
+        "SkaldHUD", "EngineeringInvalidSiegeDestination",
+        "Select one of the highlighted territories for the siege weapon.");
+    ShowSelectionErrorMessage(Error);
+    return;
+  }
+
+  BuildSiege(Territory->TerritoryID, PendingSiegeType);
+  bSelectingSiegeDestination = false;
+  PendingSiegeDestinationIDs.Empty();
+  PendingSiegeCapitalID = -1;
+  ClearTerritoryHighlights();
+  const FText Prompt = NSLOCTEXT(
+      "SkaldHUD", "EngineeringSiegePlaced", "Siege weapon queued for construction.");
+  ShowSelectionPromptMessage(Prompt);
+  BeginEngineeringSelection();
+}
+
+void USkaldMainHUDWidget::ClearEngineeringWidget() {
+  if (ActiveEngineeringWidget && ActiveEngineeringWidget->IsInViewport()) {
+    ActiveEngineeringWidget->RemoveFromParent();
+  }
+  ActiveEngineeringWidget = nullptr;
+}
+
+void USkaldMainHUDWidget::PromptSiegeTransfer() {
+  if (PendingMoveFromID == -1 || PendingMoveToID == -1 ||
+      PendingMoveTroops <= 0) {
+    return;
+  }
+
+  if (!SiegeTransferPromptClass) {
+    SubmitMove(PendingMoveFromID, PendingMoveToID, PendingMoveTroops, false);
+    return;
+  }
+
+  if (ActiveSiegeTransferPrompt && ActiveSiegeTransferPrompt->IsInViewport()) {
+    ActiveSiegeTransferPrompt->RemoveFromParent();
+  }
+
+  ActiveSiegeTransferPrompt = CreateWidget<USiegeTransferPromptWidget>(
+      GetWorld(), SiegeTransferPromptClass);
+  if (!ActiveSiegeTransferPrompt) {
+    SubmitMove(PendingMoveFromID, PendingMoveToID, PendingMoveTroops, false);
+    return;
+  }
+
+  ActiveSiegeTransferPrompt->Setup(PendingMoveFromID, PendingMoveToID, this);
+  ActiveSiegeTransferPrompt->AddToViewport();
+}
+
+void USkaldMainHUDWidget::ResolveSiegeTransferChoice(bool bBringSiege) {
+  if (ActiveSiegeTransferPrompt && ActiveSiegeTransferPrompt->IsInViewport()) {
+    ActiveSiegeTransferPrompt->RemoveFromParent();
+  }
+  ActiveSiegeTransferPrompt = nullptr;
+
+  if (PendingMoveFromID == -1 || PendingMoveToID == -1 ||
+      PendingMoveTroops <= 0) {
+    return;
+  }
+
+  SubmitMove(PendingMoveFromID, PendingMoveToID, PendingMoveTroops,
+             bBringSiege);
+}
+
+bool USkaldMainHUDWidget::DoesTerritoryContainSiege(int32 TerritoryID) const {
+  if (TerritoryID <= 0) {
+    return false;
+  }
+
+  if (AWorldMap *WorldMap = Cast<AWorldMap>(
+          UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()))) {
+    if (ATerritory *Territory = WorldMap->GetTerritoryById(TerritoryID)) {
+      return Territory->BuiltSiegeID != 0;
+    }
+  }
+
+  return false;
 }
 
 void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
@@ -1853,6 +2201,49 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
     bAwaitingRetreatConfirmation = true;
     Territory->Select(LocalPlayerID);
     OnRetreatDestinationChosen.Broadcast(Territory->TerritoryID);
+    return;
+  }
+
+  if (bSelectingForEngineering) {
+    if (bSelectingSiegeDestination) {
+      HandleSiegePlacementTarget(Territory);
+      return;
+    }
+
+    if (!bOwnedByLocal || !Territory->bIsCapital) {
+      const FText Error = NSLOCTEXT(
+          "SkaldHUD", "EngineeringOwnCapital",
+          "You may only engineer your own capitals.");
+      ShowSelectionErrorMessage(Error);
+      return;
+    }
+
+    SelectedEngineeringCapitalID = Territory->TerritoryID;
+    Territory->Select(LocalPlayerID);
+
+    if (!EngineeringWidgetClass) {
+      SubmitEngineeringAction(Territory->TerritoryID,
+                              EEngineeringAction::UpgradeMainGate);
+      return;
+    }
+
+    if (ActiveEngineeringWidget && ActiveEngineeringWidget->IsInViewport()) {
+      ActiveEngineeringWidget->RemoveFromParent();
+      ActiveEngineeringWidget = nullptr;
+    }
+
+    ActiveEngineeringWidget =
+        CreateWidget<UEngineeringWidget>(GetWorld(), EngineeringWidgetClass);
+    if (!ActiveEngineeringWidget) {
+      ShowErrorMessage(TEXT("Engineering widget unavailable."));
+      return;
+    }
+
+    ActiveEngineeringWidget->Setup(Territory, this);
+    ActiveEngineeringWidget->AddToViewport();
+    if (APlayerController *FocusPC = GetOwningPlayer()) {
+      FocusWidgetUIOnly(FocusPC, ActiveEngineeringWidget);
+    }
     return;
   }
 
@@ -2190,20 +2581,33 @@ void USkaldMainHUDWidget::HandlePlayersUpdated() {
     NewLocalPlayerId = ResolvedLocalId;
   }
 
-  TArray<FS_PlayerData> Players;
-  for (APlayerState *PSBase : GameState->PlayerArray) {
-    if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
-      FS_PlayerData Data;
-      Data.PlayerID = PS->GetPlayerId();
-      Data.PlayerName =
-          PS->GetResolvedPlayerName(TEXT("SkaldMainHUDWidget::RefreshPlayers"));
-      Data.IsAI = PS->bIsAI;
-      Data.Faction = PS->Faction;
-      Players.Add(Data);
-    }
+  bool bRefreshedFromController = false;
+  if (ASkaldPlayerController *SkaldPC =
+          GetOwningPlayer<ASkaldPlayerController>()) {
+    TArray<FS_PlayerData> Players;
+    SkaldPC->GatherPlayerListData(Players);
+    RefreshPlayerList(Players);
+    bRefreshedFromController = Players.Num() > 0;
   }
 
-  RefreshPlayerList(Players);
+  if (!bRefreshedFromController) {
+    TArray<FS_PlayerData> Players;
+    for (APlayerState *PSBase : GameState->PlayerArray) {
+      if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
+        FS_PlayerData Data;
+        Data.PlayerID = PS->GetPlayerId();
+        Data.PlayerName = PS->GetResolvedPlayerName(
+            TEXT("SkaldMainHUDWidget::RefreshPlayers"));
+        Data.IsAI = PS->bIsAI;
+        Data.Faction = PS->Faction;
+        Data.Gold = PS->Gold;
+        Data.IsEliminated = PS->IsEliminated;
+        Players.Add(Data);
+      }
+    }
+
+    RefreshPlayerList(Players);
+  }
 
   const bool bLocalIdChanged = (NewLocalPlayerId != LocalPlayerID);
   LocalPlayerID = NewLocalPlayerId;

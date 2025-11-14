@@ -101,6 +101,21 @@ USkaldGameInstance::USkaldGameInstance() {
                     GetDefaultFactionColor(ESkaldFaction::FrogFolk));
   FactionColors.Add(ESkaldFaction::Ravpack,
                     GetDefaultFactionColor(ESkaldFaction::Ravpack));
+
+  if (SiegeGoldCosts.Num() == 0) {
+    SiegeGoldCosts.Add(ESiegeWeapon::BatteringRam, 200);
+    SiegeGoldCosts.Add(ESiegeWeapon::Trebuchet, 350);
+    SiegeGoldCosts.Add(ESiegeWeapon::SiegeTower, 300);
+    SiegeGoldCosts.Add(ESiegeWeapon::Catapult, 250);
+  }
+}
+
+int32 USkaldGameInstance::GetSiegeGoldCost(ESiegeWeapon SiegeType) const {
+  if (const int32 *Override = SiegeGoldCosts.Find(SiegeType)) {
+    return FMath::Max(0, *Override);
+  }
+
+  return FMath::Max(0, DefaultSiegeGoldCost);
 }
 
 FLinearColor USkaldGameInstance::GetFactionColor(ESkaldFaction InFaction) const {

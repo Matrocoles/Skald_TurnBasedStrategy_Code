@@ -15,8 +15,10 @@ class ASkaldPlayerController;
 class ASkaldPlayerState;
 class USkaldDiceManager;
 class AWorldMap;
+class ATerritory;
 class APlayerController;
 class USkaldSaveGame;
+class UTexture2D;
 
 #if defined(WITH_AUTOMATION_TESTS) && WITH_AUTOMATION_TESTS
 class FArmyPlacementInitiativeOrderTest;
@@ -162,8 +164,33 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Siege")
   int32 ConsumeSiege(int32 TerritoryID);
 
-  /** Update cached player resource values. */
-  void UpdatePlayerResources(ASkaldPlayerState *Player);
+  /** Copy data for a siege weapon by ID without exposing the internal pool. */
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Siege")
+  bool TryCopySiegeById(int32 SiegeID, FS_Siege &OutSiege) const;
+
+  /** Assign a portrait that should represent the specified siege weapon in battle. */
+  UFUNCTION(BlueprintCallable, Category = "Siege")
+  bool SetSiegePortrait(int32 SiegeID, UTexture2D *PortraitTexture);
+
+  /** Transfer an existing siege weapon between friendly territories. */
+  UFUNCTION(BlueprintCallable, Category = "Siege")
+  bool TransferSiegeBetweenTerritories(int32 FromTerritoryID,
+                                       int32 ToTerritoryID);
+
+  /** Assign an existing siege (previously consumed) to a territory. */
+  bool AssignExistingSiegeToTerritory(int32 SiegeID, ATerritory *Territory);
+
+  /** Remove a siege weapon from the world entirely. */
+  void RemoveSiege(int32 SiegeID);
+
+  bool UpgradeCapitalGate(ATerritory *Capital, int32 HealthBonus);
+  bool EnableCapitalMoat(ATerritory *Capital);
+
+  /** Update cached player gold values. */
+  void UpdatePlayerGold(ASkaldPlayerState *Player);
+
+  /** Resolve the gold cost required to construct a siege weapon of the specified type. */
+  int32 GetSiegeGoldCost(ESiegeWeapon Type) const;
 
   /** Attempt to initialise the world and start the game flow. */
   virtual void TryInitializeWorldAndStart();
@@ -182,6 +209,9 @@ protected:
   bool bWorldInitialized;
 
 private:
+  FS_Siege *FindSiegeById(int32 SiegeID);
+  const FS_Siege *FindSiegeById(int32 SiegeID) const;
+
   /** Attempt to resolve the world map actor, retrying until it becomes available. */
   void RequestWorldMapRetry();
 

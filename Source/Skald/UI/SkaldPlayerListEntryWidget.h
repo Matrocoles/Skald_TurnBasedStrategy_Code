@@ -70,7 +70,12 @@ protected:
             meta = (BindWidgetOptional))
   UTextBlock *TroopCountText = nullptr;
 
-  /** Optional text block automatically populated with the player's resource total. */
+  /** Optional text block automatically populated with the player's gold total. */
+  UPROPERTY(BlueprintReadOnly, Category = "Skald|PlayerList|Bindings",
+            meta = (BindWidgetOptional))
+  UTextBlock *GoldCountText = nullptr;
+
+  /** Legacy binding retained for widgets that still expose a ResourceCountText field. */
   UPROPERTY(BlueprintReadOnly, Category = "Skald|PlayerList|Bindings",
             meta = (BindWidgetOptional))
   UTextBlock *ResourceCountText = nullptr;

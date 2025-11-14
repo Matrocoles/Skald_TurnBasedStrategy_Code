@@ -186,6 +186,9 @@ public:
   UFUNCTION(Server, Reliable)
   void ServerNotifyAIAttackOverviewComplete(class AFighterPawn* Attacker);
 
+  UFUNCTION(Client, Reliable)
+  void ClientNotifyGoldReward(FVector WorldLocation, int32 GoldAmount);
+
   bool IsFriendlyFighter(const AFighterPawn *Fighter) const;
 
   /** Set the turn manager responsible for sequencing play. */
@@ -478,6 +481,10 @@ protected:
   UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
   USoundBase *MissImpactSound = nullptr;
 
+  /** Tint applied to floating text when gold rewards are granted. */
+  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle|Feedback")
+  FLinearColor GoldRewardFloaterColor = FLinearColor(1.f, 0.85f, 0.f);
+
   /** Reference to the HUD widget instance. */
   UPROPERTY(BlueprintReadOnly, Category = "UI",
             meta = (AllowPrivateAccess = "true"))
@@ -665,7 +672,8 @@ public:
    *  Called when a move action is confirmed from a widget.
    */
   UFUNCTION(BlueprintCallable, Category = "UI")
-  void HandleMoveRequested(int32 FromID, int32 ToID, int32 Troops);
+  void HandleMoveRequested(int32 FromID, int32 ToID, int32 Troops,
+                           bool bTransferSiege);
 
   /** Handle HUD end-attack confirmations.
    *  Bound to USkaldMainHUDWidget::OnEndAttackRequested.
@@ -683,7 +691,8 @@ public:
 
   /** Handle HUD engineering action requests. */
   UFUNCTION(BlueprintCallable, Category = "UI")
-  void HandleEngineeringRequested(int32 CapitalID, uint8 UpgradeType);
+  void HandleEngineeringRequested(int32 CapitalID,
+                                  EEngineeringAction UpgradeType);
 
   /** Handle HUD treasure digging requests. */
   UFUNCTION(BlueprintCallable, Category = "UI")
@@ -826,6 +835,11 @@ public:
   UFUNCTION(BlueprintCallable, Category = "UI")
   void HandleBuildSiegeRequested(int32 TerritoryID, ESiegeWeapon SiegeType);
 
+  /** Server-side processing of an engineering upgrade request. */
+  UFUNCTION(Server, Reliable)
+  void ServerHandleEngineeringAction(int32 CapitalID,
+                                     EEngineeringAction UpgradeType);
+
   /** Server-side processing of a siege build request. */
   UFUNCTION(Server, Reliable)
   void ServerBuildSiege(int32 TerritoryID, ESiegeWeapon SiegeType);
@@ -836,7 +850,8 @@ public:
 
   /** Server-side processing of a move request. */
   UFUNCTION(Server, Reliable)
-  void ServerHandleMove(int32 FromID, int32 ToID, int32 Troops);
+  void ServerHandleMove(int32 FromID, int32 ToID, int32 Troops,
+                        bool bTransferSiege);
 
   /** Notify the client of the result of a move request. */
   UFUNCTION(Client, Reliable)
@@ -908,6 +923,11 @@ public:
   void CompleteRetreatSelectionLocal();
   virtual void NotifyRetreatFailed(const FText &Message);
   void NotifyEnemyRetreated();
+  /**
+   * Build a snapshot of the current players for UI consumption.  The HUD uses
+   * this to stay synchronized with the same richer dataset as the controller.
+   */
+  void GatherPlayerListData(TArray<FS_PlayerData> &OutPlayers) const;
 private:
   /** Display the stored strategic initiative roll if one is pending. */
   void ShowPendingStrategicInitiativeResult();
