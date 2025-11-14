@@ -277,14 +277,6 @@ private:
                                      int32 RoundNumber, int32 RollValue,
                                      bool bWonInitiative);
 
-  /** Mirror initiative rolls to all clients so everyone sees the dice. */
-  void BroadcastStrategicInitiativeRoll(ASkaldPlayerState *Roller,
-                                        ASkaldPlayerController *RollingController,
-                                        int32 RoundNumber, int32 RollValue);
-
-  /** Request that clients hold or release initiative dice arenas. */
-  void BroadcastStrategicInitiativeDiceHold(bool bHold);
-
   /** Begin a dice roll for the supplied player if possible. */
   bool StartStrategicInitiativeRoll(ASkaldPlayerState *PlayerState,
                                     bool bUsePlayerTint);

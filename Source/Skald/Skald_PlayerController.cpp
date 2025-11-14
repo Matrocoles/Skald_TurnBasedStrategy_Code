@@ -5326,19 +5326,6 @@ void ASkaldPlayerController::ShowPendingStrategicInitiativeResult() {
     return;
   }
 
-  if (ASkaldPlayerState *LocalPS = GetPlayerState<ASkaldPlayerState>()) {
-    const int32 LocalPlayerId = LocalPS->GetPlayerId();
-    if (LocalPlayerId > 0) {
-      const int32 EffectiveRound = PendingStrategicInitiativeRound > 0
-                                      ? PendingStrategicInitiativeRound
-                                      : 1;
-      const int64 RollKey =
-          (static_cast<int64>(EffectiveRound) << 32) |
-          (static_cast<int64>(LocalPlayerId) & 0xffffffff);
-      SpectatedStrategicInitiativeRolls.Add(RollKey);
-    }
-  }
-
   MainHUD->HideStrategicInitiativePrompt();
   MainHUD->ShowStrategicInitiativeRoll(PendingStrategicInitiativeRoll, 2.f);
   MainHUD->SetAwaitingStrategicInitiative(false);
@@ -5386,14 +5373,12 @@ void ASkaldPlayerController::ClientPromptStrategicInitiative_Implementation(
     int32 RoundNumber, int32 RollValue, bool bWonInitiative) {
   // Reset at the start of every new strategic initiative round
   bInitiativeRollPresentationShown = false;
-  SpectatedStrategicInitiativeRolls.Reset();
 
   PendingStrategicInitiativeRound = RoundNumber;
   PendingStrategicInitiativeRoll = RollValue;
   PendingStrategicInitiativeEnemyRoll = 0;
   bPendingStrategicInitiativeWin = bWonInitiative;
   bAwaitingStrategicInitiativeRoll = true;
-  EnableStrategicInitiativeDiceHold(true);
 
   ShowMainHUD();
 
@@ -5433,95 +5418,12 @@ void ASkaldPlayerController::ClientDisplayStrategicInitiativeResult_Implementati
   ShowPendingStrategicInitiativeResult();
 }
 
-void ASkaldPlayerController::ShowStrategicInitiativeSpectatorRoll(
-    int32 RollerPlayerId, int32 RoundNumber, int32 RollValue,
-    const FLinearColor &RollerTint) {
-  if (!IsLocalController() || !bAutoPresentInitiativeRolls) {
-    return;
-  }
-
-  if (RollValue <= 0) {
-    return;
-  }
-
-  const int64 RollKey =
-      (static_cast<int64>(RoundNumber) << 32) |
-      (static_cast<int64>(RollerPlayerId) & 0xffffffff);
-  if (SpectatedStrategicInitiativeRolls.Contains(RollKey)) {
-    return;
-  }
-  SpectatedStrategicInitiativeRolls.Add(RollKey);
-
-  EnsureDiceWidgets();
-  EnsureDiceManagerBindings();
-
-  USkaldDiceManager *DiceManager = ResolveDiceManager();
-  if (!DiceManager) {
-    return;
-  }
-
-  TArray<int32> PlayerResults;
-  PlayerResults.Add(FMath::Clamp(RollValue, 1, 6));
-
-  if (DiceOverlayWidget) {
-    DiceOverlayWidget->SetPlayerTint(RollerTint);
-    DiceOverlayWidget->SetEnemyTint(FLinearColor::Transparent);
-    DiceOverlayWidget->SetOverlayMode(ESkaldDiceOverlayMode::Initiative);
-  }
-
-  DiceManager->PlayScriptedRoll(PlayerResults, TArray<int32>(), true, -1.f,
-                                RollerTint, FLinearColor::Transparent);
-}
-
-void ASkaldPlayerController::EnableStrategicInitiativeDiceHold(bool bHold) {
-  if (bStrategicInitiativeDiceHoldEnabled == bHold) {
-    return;
-  }
-
-  bStrategicInitiativeDiceHoldEnabled = bHold;
-
-  if (USkaldDiceManager *DiceManager = ResolveDiceManager()) {
-    DiceManager->SetHoldInitiativeDice(bHold);
-  }
-
-  if (!bHold) {
-    SpectatedStrategicInitiativeRolls.Reset();
-  }
-}
-
 void ASkaldPlayerController::ClientClearStrategicInitiativeOverlay_Implementation() {
   ShowMainHUD();
 
   if (MainHUD) {
     MainHUD->SetAwaitingStrategicInitiative(false);
   }
-
-  EnableStrategicInitiativeDiceHold(false);
-}
-
-void ASkaldPlayerController::ClientSpectateStrategicInitiativeRoll_Implementation(
-    int32 RollerPlayerId, int32 RoundNumber, int32 RollValue,
-    FLinearColor RollerTint, bool bIsRollingPlayer) {
-  if (!IsLocalController()) {
-    return;
-  }
-
-  const int64 RollKey =
-      (static_cast<int64>(RoundNumber) << 32) |
-      (static_cast<int64>(RollerPlayerId) & 0xffffffff);
-
-  if (bIsRollingPlayer) {
-    SpectatedStrategicInitiativeRolls.Add(RollKey);
-    return;
-  }
-
-  ShowStrategicInitiativeSpectatorRoll(RollerPlayerId, RoundNumber, RollValue,
-                                       RollerTint);
-}
-
-void ASkaldPlayerController::ClientSetStrategicInitiativeDiceHold_Implementation(
-    bool bHold) {
-  EnableStrategicInitiativeDiceHold(bHold);
 }
 
 void ASkaldPlayerController::RegisterPendingReadyPromptRetry() {
