@@ -15,6 +15,9 @@
 #include "SkaldLogging.h"
 #include "SkaldSaveGame.h"
 #include "Misc/Char.h"
+#if defined(WITH_AUTOMATION_TESTS) && WITH_AUTOMATION_TESTS
+#include "Misc/AutomationTest.h"
+#endif
 #include "Skald_AIController.h"
 #include "Skald_BattleGameMode.h"
 #include "Skald_GameInstance.h"
@@ -2826,6 +2829,7 @@ void ASkaldGameMode::BeginArmyPlacementPhase() {
   }
 
   ArmyPlacementLeader.Reset();
+  PendingArmyPlacementAIController.Reset();
   PlacementIndex = -1;
   AdvanceArmyPlacement();
 }
@@ -3000,66 +3004,22 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
     }
 
     if (PS->bIsAI) {
-      int32 UnitsPlaced = 0;
       if (ASkaldAIController *AIController = Cast<ASkaldAIController>(PC)) {
-        UnitsPlaced = AIController->PerformArmyPlacementTurn();
+        if (CanAnimateArmyPlacement() &&
+            AIController->BeginArmyPlacementSetupTurn()) {
+          PendingArmyPlacementAIController = AIController;
+          return;
+        }
+
+        AIController->PerformArmyPlacementTurn();
       } else {
-        UnitsPlaced = WorldMap->AutoPlaceUnitsForAI(PS);
-        if (UnitsPlaced > 0) {
+        const int32 AutoPlaced = WorldMap->AutoPlaceUnitsForAI(PS);
+        if (AutoPlaced > 0) {
           TurnManager->BroadcastDeployableUnits(PS);
         }
       }
 
-      bArmyPlacementFailsafeTriggered = false;
-
-      const bool bHasRemainingUnits = PS->DeployableUnits > 0;
-      bool bCanPlaceMore = false;
-      if (bHasRemainingUnits) {
-        for (ATerritory *Terr : WorldMap->Territories) {
-          if (!Terr || Terr->OwningPlayer != PS) {
-            continue;
-          }
-
-          const int32 TerritoryId = Terr->GetTerritoryId();
-          const int32 AlreadyPlaced =
-              PS->GetArmyPlacementDeploymentForTerritory(TerritoryId);
-          if (AlreadyPlaced < Skald::ArmyPlacement::DeployPerTerritoryLimit) {
-            bCanPlaceMore = true;
-            break;
-          }
-        }
-      }
-
-      if (bHasRemainingUnits && bCanPlaceMore) {
-        UE_LOG(LogSkald, Verbose,
-               TEXT("AdvanceArmyPlacement: %s retains %d units after placement; retrying."),
-               *PS->GetResolvedPlayerName(TEXT("AdvanceArmyPlacement_AIRetry")),
-               PS->DeployableUnits);
-        GetWorldTimerManager().SetTimer(ArmyPlacementAutoAdvanceHandle, this,
-                                        &ASkaldGameMode::AdvanceArmyPlacement,
-                                        RetryInitDelay, false);
-        return;
-      }
-
-      bool bScheduledAutoAdvance = false;
-      if (ArmyPlacementAutoAdvanceDelay > KINDA_SMALL_NUMBER) {
-        if (UWorld *World = GetWorld()) {
-          // Allow a short pause so replicated HUDs can reveal their phase buttons
-          // before the turn advances to the next player.
-          World->GetTimerManager().SetTimer(
-              ArmyPlacementAutoAdvanceHandle, this,
-              &ASkaldGameMode::HandleArmyPlacementAutoAdvance,
-              ArmyPlacementAutoAdvanceDelay, false);
-          bScheduledAutoAdvance = true;
-        }
-      }
-
-      if (!bScheduledAutoAdvance && TurnManager) {
-        TurnManager->EndCurrentPhase();
-      }
-      GetWorldTimerManager().SetTimer(ArmyPlacementFailsafeHandle, this,
-                                      &ASkaldGameMode::HandleArmyPlacementFailsafe,
-                                      2.0f, false);
+      FinalizeAIArmyPlacementTurn(PS);
       return;
     }
 
@@ -3188,6 +3148,94 @@ void ASkaldGameMode::HandleArmyPlacementFailsafe() {
   }
 
   TurnManager->EndCurrentPhase();
+}
+
+void ASkaldGameMode::FinalizeAIArmyPlacementTurn(
+    ASkaldPlayerState *PlayerState) {
+  if (!PlayerState) {
+    return;
+  }
+
+  bArmyPlacementFailsafeTriggered = false;
+
+  bool bHasRemainingUnits = PlayerState->DeployableUnits > 0;
+  bool bCanPlaceMore = false;
+  if (bHasRemainingUnits && WorldMap) {
+    for (ATerritory *Terr : WorldMap->Territories) {
+      if (!Terr || Terr->OwningPlayer != PlayerState) {
+        continue;
+      }
+
+      const int32 TerritoryId = Terr->GetTerritoryId();
+      const int32 AlreadyPlaced =
+          PlayerState->GetArmyPlacementDeploymentForTerritory(TerritoryId);
+      if (AlreadyPlaced < Skald::ArmyPlacement::DeployPerTerritoryLimit) {
+        bCanPlaceMore = true;
+        break;
+      }
+    }
+  }
+
+  if (bHasRemainingUnits && bCanPlaceMore) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("AdvanceArmyPlacement: %s retains %d units after placement; retrying."),
+           *PlayerState->GetResolvedPlayerName(TEXT("AdvanceArmyPlacement_AIRetry")),
+           PlayerState->DeployableUnits);
+    GetWorldTimerManager().SetTimer(ArmyPlacementAutoAdvanceHandle, this,
+                                    &ASkaldGameMode::AdvanceArmyPlacement,
+                                    RetryInitDelay, false);
+    return;
+  }
+
+  bool bScheduledAutoAdvance = false;
+  if (ArmyPlacementAutoAdvanceDelay > KINDA_SMALL_NUMBER) {
+    if (UWorld *World = GetWorld()) {
+      World->GetTimerManager().SetTimer(
+          ArmyPlacementAutoAdvanceHandle, this,
+          &ASkaldGameMode::HandleArmyPlacementAutoAdvance,
+          ArmyPlacementAutoAdvanceDelay, false);
+      bScheduledAutoAdvance = true;
+    }
+  }
+
+  if (!bScheduledAutoAdvance && TurnManager) {
+    TurnManager->EndCurrentPhase();
+  }
+
+  GetWorldTimerManager().SetTimer(ArmyPlacementFailsafeHandle, this,
+                                  &ASkaldGameMode::HandleArmyPlacementFailsafe,
+                                  2.0f, false);
+}
+
+void ASkaldGameMode::HandleAIArmyPlacementSetupComplete(
+    ASkaldAIController *AIController) {
+  if (!AIController) {
+    return;
+  }
+
+  if (!PendingArmyPlacementAIController.IsValid() ||
+      PendingArmyPlacementAIController.Get() != AIController) {
+    return;
+  }
+
+  PendingArmyPlacementAIController.Reset();
+
+  ASkaldPlayerState *PS = AIController->GetPlayerState<ASkaldPlayerState>();
+  if (!PS) {
+    AdvanceArmyPlacement();
+    return;
+  }
+
+  FinalizeAIArmyPlacementTurn(PS);
+}
+
+bool ASkaldGameMode::CanAnimateArmyPlacement() const {
+#if defined(WITH_AUTOMATION_TESTS) && WITH_AUTOMATION_TESTS
+  if (GIsAutomationTesting) {
+    return false;
+  }
+#endif
+  return true;
 }
 
 bool ASkaldGameMode::InitializeWorld() {

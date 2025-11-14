@@ -47,6 +47,9 @@ public:
    */
   int32 PerformArmyPlacementTurn();
 
+  /** Starts an animated army placement turn during the setup phase. */
+  bool BeginArmyPlacementSetupTurn();
+
 protected:
   virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
@@ -110,6 +113,7 @@ private:
       ASkaldPlayerState *InPlayerState);
   void HandleArmyPlacementAnimationStep();
   void CompleteArmyPlacementAnimation(bool bAdvancePhase);
+  void FinalizeArmyPlacementSetupTurn();
 
   void SetupBattleAutomation();
   void TeardownBattleAutomation();
@@ -206,6 +210,9 @@ private:
 
   /** True while the AI is animating its army placement choices. */
   bool bAnimatingArmyPlacement = false;
+
+  /** Tracks whether the AI is animating during the pre-turn placement phase. */
+  bool bArmyPlacementSetupInProgress = false;
 
   /** Tracks whether the current turn's strategy has been evaluated. */
   bool bStrategyEvaluatedThisTurn = false;
