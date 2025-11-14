@@ -184,6 +184,9 @@ protected:
     /** Whether the widget is currently applying replicated state. */
     bool bIsUpdatingFromState = false;
 
+    /** True once the widget has received an initial replicated snapshot. */
+    bool bHasReceivedInitialState = false;
+
     void BuildLayout();
     void RebuildFactionOptions(UComboBoxString* Combo) const;
     void RefreshFromState();
