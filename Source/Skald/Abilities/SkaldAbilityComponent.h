@@ -139,31 +139,63 @@ struct FSkaldAbilityTrapState
     bool bPendingPlacement = false;
 };
 
+USTRUCT()
 struct FSkaldViralLashCarrierState
 {
+    GENERATED_BODY();
+
+    UPROPERTY()
     TWeakObjectPtr<AFighterPawn> Carrier;
+
+    UPROPERTY()
     int32 RoundNumber = INDEX_NONE;
+
+    UPROPERTY()
     bool bHasSpread = false;
 };
 
+USTRUCT()
 struct FSkaldAberrantBloomHazardCell
 {
+    GENERATED_BODY();
+
+    UPROPERTY()
     FIntPoint Cell = FIntPoint(INDEX_NONE, INDEX_NONE);
+
+    UPROPERTY()
     TWeakObjectPtr<UDecalComponent> VisualComponent;
 };
 
+USTRUCT()
 struct FSkaldRaincallerCell
 {
+    GENERATED_BODY();
+
+    UPROPERTY()
     FIntPoint Cell = FIntPoint(INDEX_NONE, INDEX_NONE);
+
+    UPROPERTY()
     TWeakObjectPtr<UDecalComponent> VisualComponent;
 };
 
+USTRUCT()
 struct FSkaldRaincallerOccupantState
 {
+    GENERATED_BODY();
+
+    UPROPERTY()
     TWeakObjectPtr<AFighterPawn> Fighter;
+
+    UPROPERTY()
     bool bIsAlly = false;
+
+    UPROPERTY()
     bool bAmphibiousApplied = false;
+
+    UPROPERTY()
     FSkaldAbilityStatDelta AppliedDelta;
+
+    UPROPERTY()
     FName SourceAbilityId = NAME_None;
 };
 
