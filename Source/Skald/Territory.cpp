@@ -81,8 +81,25 @@ ATerritory::ATerritory() {
     SelectionDecal->SetCanEverAffectNavigation(false);
   }
 
+  SiegeMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("SiegeMesh"));
+  if (SiegeMesh) {
+    SiegeMesh->SetupAttachment(RootComponent);
+    SiegeMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    SiegeMesh->SetGenerateOverlapEvents(false);
+    SiegeMesh->SetCastShadow(false);
+    SiegeMesh->SetRelativeLocation(FVector(0.f, 0.f, 120.f));
+    SiegeMesh->SetRelativeScale3D(FVector(0.35f));
+    static UStaticMesh *DefaultSiegeMesh = LoadObject<UStaticMesh>(
+        nullptr, TEXT("/Engine/BasicShapes/Cone.Cone"));
+    if (DefaultSiegeMesh) {
+      SiegeMesh->SetStaticMesh(DefaultSiegeMesh);
+    }
+    SiegeMesh->SetVisibility(false);
+    SiegeMesh->SetHiddenInGame(true);
+  }
+
   OwningPlayer = nullptr;
-  Resources = 0;
+  GoldYield = 0;
   TerritoryID = 0;
   TerritoryName = TEXT("");
   bIsCapital = false;
@@ -145,6 +162,8 @@ void ATerritory::BeginPlay() {
     CapitalMesh->SetHiddenInGame(!bIsCapital);
   }
 
+  UpdateSiegeAppearance();
+
   // Ensure this territory is registered with the world map. When territories
   // are placed manually in a level they may not have been added during map
   // initialization, so register here if needed.
@@ -161,7 +180,7 @@ void ATerritory::GetLifetimeReplicatedProps(
   Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
   DOREPLIFETIME(ATerritory, OwningPlayer);
-  DOREPLIFETIME(ATerritory, Resources);
+  DOREPLIFETIME(ATerritory, GoldYield);
   DOREPLIFETIME(ATerritory, TerritoryID);
   DOREPLIFETIME(ATerritory, TerritoryName);
   DOREPLIFETIME(ATerritory, bIsCapital);
@@ -171,6 +190,8 @@ void ATerritory::GetLifetimeReplicatedProps(
   DOREPLIFETIME(ATerritory, BuiltSiegeID);
   DOREPLIFETIME(ATerritory, bHasTreasure);
 }
+
+void ATerritory::OnRep_BuiltSiegeID() { UpdateSiegeAppearance(); }
 
 void ATerritory::Select(int32 SelectingPlayerId) {
   const bool bShouldShow = ShouldShowSelectionVisuals(SelectingPlayerId);
@@ -207,6 +228,16 @@ void ATerritory::EndPlay(const EEndPlayReason::Type Reason) {
 
 bool ATerritory::IsAdjacentTo(const ATerritory *Other) const {
   return AdjacentTerritories.Contains(Other);
+}
+
+void ATerritory::UpdateSiegeAppearance() {
+  if (!SiegeMesh) {
+    return;
+  }
+
+  const bool bHasSiege = BuiltSiegeID != 0;
+  SiegeMesh->SetVisibility(bHasSiege);
+  SiegeMesh->SetHiddenInGame(!bHasSiege);
 }
 
 bool ATerritory::MoveTo(ATerritory *TargetTerritory, int32 Troops) {

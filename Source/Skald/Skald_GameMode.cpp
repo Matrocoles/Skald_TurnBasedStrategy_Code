@@ -8,6 +8,7 @@
 #include "Engine/Engine.h"
 #include "Engine/Level.h"
 #include "Engine/World.h"
+#include "Engine/Texture2D.h"
 #include "GridBattleManager.h"
 #include "Kismet/GameplayStatics.h"
 #include "Skald.h"
@@ -40,7 +41,7 @@
 
 namespace {
 constexpr float StartGameTimeout = 10.f;
-constexpr int32 StartingResources = 100;
+constexpr int32 StartingGold = 100;
 constexpr float RetryInitDelay = 0.01f;
 constexpr float ArmyPlacementAutoAdvanceDelay = 0.15f;
 const TArray<FString> FantasyAINames = {
@@ -386,7 +387,7 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
     PlayerDataArray[Index].DisplayName = PS->PlayerDisplayName;
     PlayerDataArray[Index].IsAI = PS->bIsAI;
     PlayerDataArray[Index].Faction = PS->Faction;
-    PlayerDataArray[Index].Resources = PS->Resources;
+    PlayerDataArray[Index].Gold = PS->Gold;
   }
 
   // Notify listeners that player data has changed and refresh HUDs on the
@@ -721,7 +722,7 @@ void ASkaldGameMode::PopulateAIPlayers() {
     if (Snapshot->PlayerID > 0 && State->GetPlayerId() != Snapshot->PlayerID) {
       State->SetPlayerId(Snapshot->PlayerID);
     }
-    State->Resources = Snapshot->Resources;
+    State->Gold = Snapshot->Gold;
     State->IsEliminated = Snapshot->IsEliminated;
   };
 
@@ -1078,7 +1079,7 @@ void ASkaldGameMode::RefreshHUDs() {
           SPS->GetResolvedPlayerName(TEXT("RefreshHUDs_Player"));
       Data.IsAI = SPS->bIsAI;
       Data.Faction = SPS->Faction;
-      Data.Resources = SPS->Resources;
+      Data.Gold = SPS->Gold;
       AllPlayers.Add(Data);
     }
   }
@@ -1094,7 +1095,7 @@ void ASkaldGameMode::RefreshHUDs() {
   }
 }
 
-void ASkaldGameMode::UpdatePlayerResources(ASkaldPlayerState *Player) {
+void ASkaldGameMode::UpdatePlayerGold(ASkaldPlayerState *Player) {
   if (!Player) {
     return;
   }
@@ -1104,7 +1105,11 @@ void ASkaldGameMode::UpdatePlayerResources(ASkaldPlayerState *Player) {
         return Data.PlayerID == Player->GetPlayerId();
       });
   if (PlayerData) {
-    PlayerData->Resources = Player->Resources;
+    PlayerData->Gold = Player->Gold;
+  }
+
+  if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
+    GS->OnPlayersUpdated.Broadcast();
   }
 }
 
@@ -2261,7 +2266,7 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
     Data.PlayerName = PlayerSave.PlayerName;
     Data.DisplayName = PlayerSave.PlayerName;
     Data.Faction = PlayerSave.Faction;
-    Data.Resources = PlayerSave.Resources;
+    Data.Gold = PlayerSave.Gold;
     Data.IsEliminated = PlayerSave.IsEliminated;
     Data.IsHuman = !bIsAIPlayer;
     Data.IsAI = bIsAIPlayer;
@@ -2288,7 +2293,7 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
     PlayerState->PlayerDisplayName = PlayerSave.PlayerName;
     PlayerState->SetPlayerName(PlayerSave.PlayerName);
     PlayerState->Faction = PlayerSave.Faction;
-    PlayerState->Resources = PlayerSave.Resources;
+    PlayerState->Gold = PlayerSave.Gold;
     PlayerState->IsEliminated = PlayerSave.IsEliminated;
     PlayerState->bIsAI = bIsAIPlayer;
 
@@ -2306,7 +2311,7 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
     }
 
     if (TurnManager) {
-      TurnManager->BroadcastResources(PlayerState);
+      TurnManager->BroadcastGold(PlayerState);
     }
 
     PlayerDataArray.Add(Data);
@@ -2352,11 +2357,11 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
       AIState->PlayerDisplayName = PlayerSave.PlayerName;
       AIState->SetPlayerName(PlayerSave.PlayerName);
       AIState->Faction = PlayerSave.Faction;
-      AIState->Resources = PlayerSave.Resources;
+      AIState->Gold = PlayerSave.Gold;
       AIState->IsEliminated = PlayerSave.IsEliminated;
 
       if (TurnManager) {
-        TurnManager->BroadcastResources(AIState);
+        TurnManager->BroadcastGold(AIState);
       }
 
       if (PlayerDataArray.IsValidIndex(AIDataIndices[Index])) {
@@ -2365,7 +2370,7 @@ void ASkaldGameMode::ApplyLoadedGame(USkaldSaveGame *LoadedGame) {
         PlayerData.PlayerName = PlayerSave.PlayerName;
         PlayerData.DisplayName = PlayerSave.PlayerName;
         PlayerData.Faction = PlayerSave.Faction;
-        PlayerData.Resources = PlayerSave.Resources;
+        PlayerData.Gold = PlayerSave.Gold;
         PlayerData.IsEliminated = PlayerSave.IsEliminated;
         PlayerData.IsAI = true;
         PlayerData.IsHuman = false;
@@ -2834,6 +2839,14 @@ void ASkaldGameMode::BeginArmyPlacementPhase() {
   AdvanceArmyPlacement();
 }
 
+int32 ASkaldGameMode::GetSiegeGoldCost(ESiegeWeapon Type) const {
+  if (const USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+    return GI->GetSiegeGoldCost(Type);
+  }
+
+  return SkaldConstants::DefaultSiegeGoldCost;
+}
+
 int32 ASkaldGameMode::BuildSiegeAtTerritory(int32 TerritoryID,
                                             ESiegeWeapon Type) {
   if (!WorldMap) {
@@ -2847,6 +2860,8 @@ int32 ASkaldGameMode::BuildSiegeAtTerritory(int32 TerritoryID,
   NewSiege.SiegeID = NextSiegeID++;
   NewSiege.Type = Type;
   NewSiege.BuiltAtTerritoryID = TerritoryID;
+  NewSiege.AssignedToUnitID = 0;
+  NewSiege.GoldCost = GetSiegeGoldCost(Type);
   SiegePool.Add(NewSiege);
   Terr->BuiltSiegeID = NewSiege.SiegeID;
   return NewSiege.SiegeID;
@@ -2862,11 +2877,141 @@ int32 ASkaldGameMode::ConsumeSiege(int32 TerritoryID) {
   }
   const int32 SiegeID = Terr->BuiltSiegeID;
   Terr->BuiltSiegeID = 0;
-  if (FS_Siege *Siege = SiegePool.FindByPredicate(
-          [SiegeID](const FS_Siege &S) { return S.SiegeID == SiegeID; })) {
+  if (FS_Siege *Siege = FindSiegeById(SiegeID)) {
     Siege->AssignedToUnitID = TerritoryID;
+    Siege->BuiltAtTerritoryID = 0;
   }
   return SiegeID;
+}
+
+bool ASkaldGameMode::TryCopySiegeById(int32 SiegeID, FS_Siege &OutSiege) const {
+  if (SiegeID <= 0) {
+    return false;
+  }
+
+  if (const FS_Siege *Siege = FindSiegeById(SiegeID)) {
+    OutSiege = *Siege;
+    return true;
+  }
+
+  return false;
+}
+
+bool ASkaldGameMode::SetSiegePortrait(int32 SiegeID, UTexture2D *PortraitTexture) {
+  if (SiegeID <= 0) {
+    return false;
+  }
+
+  if (FS_Siege *Siege = FindSiegeById(SiegeID)) {
+    Siege->Portrait = PortraitTexture;
+    return true;
+  }
+
+  return false;
+}
+
+bool ASkaldGameMode::TransferSiegeBetweenTerritories(int32 FromTerritoryID,
+                                                     int32 ToTerritoryID) {
+  if (!WorldMap) {
+    return false;
+  }
+
+  ATerritory *From = WorldMap->GetTerritoryById(FromTerritoryID);
+  ATerritory *To = WorldMap->GetTerritoryById(ToTerritoryID);
+  if (!From || !To || From->BuiltSiegeID == 0 || To->BuiltSiegeID != 0) {
+    return false;
+  }
+
+  const int32 SiegeID = From->BuiltSiegeID;
+  From->BuiltSiegeID = 0;
+  To->BuiltSiegeID = SiegeID;
+  if (FS_Siege *Siege = FindSiegeById(SiegeID)) {
+    Siege->BuiltAtTerritoryID = ToTerritoryID;
+    Siege->AssignedToUnitID = 0;
+  }
+  From->RefreshAppearance();
+  To->RefreshAppearance();
+  return true;
+}
+
+bool ASkaldGameMode::AssignExistingSiegeToTerritory(int32 SiegeID,
+                                                    ATerritory *Territory) {
+  if (SiegeID <= 0 || !Territory || Territory->BuiltSiegeID != 0) {
+    return false;
+  }
+
+  FS_Siege *Siege = FindSiegeById(SiegeID);
+  if (!Siege) {
+    return false;
+  }
+
+  Territory->BuiltSiegeID = SiegeID;
+  Siege->BuiltAtTerritoryID = Territory->TerritoryID;
+  Siege->AssignedToUnitID = 0;
+  Territory->RefreshAppearance();
+  return true;
+}
+
+void ASkaldGameMode::RemoveSiege(int32 SiegeID) {
+  if (SiegeID <= 0) {
+    return;
+  }
+
+  const int32 SiegeIndex = SiegePool.IndexOfByPredicate(
+      [SiegeID](const FS_Siege &Entry) { return Entry.SiegeID == SiegeID; });
+  if (SiegeIndex == INDEX_NONE) {
+    return;
+  }
+
+  const FS_Siege RemovedSiege = SiegePool[SiegeIndex];
+  SiegePool.RemoveAt(SiegeIndex);
+
+  if (WorldMap && RemovedSiege.BuiltAtTerritoryID > 0) {
+    if (ATerritory *Territory =
+            WorldMap->GetTerritoryById(RemovedSiege.BuiltAtTerritoryID)) {
+      if (Territory->BuiltSiegeID == SiegeID) {
+        Territory->BuiltSiegeID = 0;
+        Territory->RefreshAppearance();
+      }
+    }
+  }
+}
+
+bool ASkaldGameMode::UpgradeCapitalGate(ATerritory *Capital,
+                                        int32 HealthBonus) {
+  if (!Capital || HealthBonus <= 0) {
+    return false;
+  }
+
+  const int32 CurrentValue =
+      ReadIntProperty(Capital, TEXT("FortificationLevel"));
+  WriteIntProperty(Capital, TEXT("FortificationLevel"),
+                   CurrentValue + HealthBonus);
+  return true;
+}
+
+bool ASkaldGameMode::EnableCapitalMoat(ATerritory *Capital) {
+  if (!Capital) {
+    return false;
+  }
+
+  if (ReadBoolProperty(Capital, TEXT("Moat"))) {
+    return false;
+  }
+
+  WriteBoolProperty(Capital, TEXT("Moat"), true);
+  Capital->RefreshAppearance();
+  return true;
+}
+
+FS_Siege *ASkaldGameMode::FindSiegeById(int32 SiegeID) {
+  return SiegePool.FindByPredicate(
+      [SiegeID](const FS_Siege &Entry) { return Entry.SiegeID == SiegeID; });
+}
+
+const FS_Siege *ASkaldGameMode::FindSiegeById(int32 SiegeID) const {
+  return SiegePool.FindByPredicate(
+      [SiegeID](const FS_Siege &Entry) { return Entry.SiegeID == SiegeID; });
 }
 
 void ASkaldGameMode::AdvanceArmyPlacement() {
@@ -3387,19 +3532,19 @@ bool ASkaldGameMode::InitializeWorld() {
     return RollA > RollB;
   });
 
-  // Assign starting resources to each player
+  // Assign starting gold to each player
   for (APlayerState *PSBase : GS->PlayerArray) {
     if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
-      PS->Resources = StartingResources;
+      PS->Gold = StartingGold;
       FS_PlayerData *PlayerData =
           PlayerDataArray.FindByPredicate([PS](const FS_PlayerData &Data) {
             return Data.PlayerID == PS->GetPlayerId();
           });
       if (PlayerData) {
-        PlayerData->Resources = StartingResources;
+        PlayerData->Gold = StartingGold;
       }
       if (TurnManager) {
-        TurnManager->BroadcastResources(PS);
+        TurnManager->BroadcastGold(PS);
       }
     }
   }
@@ -3711,7 +3856,7 @@ void ASkaldGameMode::FillSaveGame(USkaldSaveGame *SaveGameObject) const {
     PlayerSave.PlayerID = Data.PlayerID;
     PlayerSave.PlayerName = Data.PlayerName;
     PlayerSave.Faction = Data.Faction;
-    PlayerSave.Resources = Data.Resources;
+    PlayerSave.Gold = Data.Gold;
     PlayerSave.CapitalTerritoryIDs = Data.CapitalTerritoryIDs;
     PlayerSave.IsEliminated = Data.IsEliminated;
     SaveGameObject->Players.Add(PlayerSave);

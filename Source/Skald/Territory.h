@@ -40,9 +40,9 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory", meta = (DisplayName = "Owner"), ReplicatedUsing = OnRep_OwningPlayer)
     ASkaldPlayerState* OwningPlayer = nullptr;
 
-    /** Amount of resources produced by this territory. */
+    /** Amount of gold produced by this territory each reinforcement phase. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory", Replicated)
-    int32 Resources = 0;
+    int32 GoldYield = 0;
 
     /** Unique identifier for this territory. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory", Replicated)
@@ -73,7 +73,8 @@ public:
     int32 ArmyUnits = 0;
 
     /** ID of siege equipment built in this territory, 0 if none. */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory", Replicated)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory",
+              ReplicatedUsing = OnRep_BuiltSiegeID)
     int32 BuiltSiegeID = 0;
     /** Whether this territory contains treasure. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory", Replicated)
@@ -147,6 +148,9 @@ public:
     UFUNCTION()
     void OnRep_IsCapital();
 
+    UFUNCTION()
+    void OnRep_BuiltSiegeID();
+
 protected:
     /** Visual representation of the territory. */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Territory")
@@ -163,6 +167,10 @@ protected:
     /** Decal used to visualize local selections. */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Territory|Selection")
     UDecalComponent* SelectionDecal = nullptr;
+
+    /** Optional mesh representing siege equipment stationed on the territory. */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Territory|Siege")
+    UStaticMeshComponent* SiegeMesh = nullptr;
 
     /** Material applied to the territory selection decal. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory|Selection")
@@ -208,4 +216,5 @@ protected:
     void SetSelectionDecalVisible(bool bVisible);
     void UpdateSelectionVisuals(bool bVisible);
     bool ShouldShowSelectionVisuals(int32 SelectingPlayerId) const;
+    void UpdateSiegeAppearance();
 };

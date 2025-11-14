@@ -1232,6 +1232,21 @@ void AFighterPawn::BeginActivation() {
   if (UGridOverlayComponent *Grid = GetGrid()) {
     Grid->HighlightSelection(this);
   }
+
+  if (bAutoSkipActivation) {
+    if (UWorld *World = GetWorld()) {
+      if (USkaldGameInstance *GI =
+              Cast<USkaldGameInstance>(World->GetGameInstance())) {
+        if (GI->GridBattleManager) {
+          GI->GridBattleManager->FinishActivation(
+              this, EGridActivationFinishReason::Manual);
+          return;
+        }
+      }
+    }
+
+    FinishActivation();
+  }
 }
 
 void AFighterPawn::ResetActivationState() {

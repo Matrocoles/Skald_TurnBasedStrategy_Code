@@ -67,9 +67,10 @@ void USkaldPlayerListEntryWidget::NativeOnPlayerDataUpdated()
     TroopCountText->SetText(FText::AsNumber(FMath::Max(0, PlayerData.TroopsCount)));
   }
 
-  if (ResourceCountText)
+  UTextBlock *const EffectiveGoldText = GoldCountText ? GoldCountText : ResourceCountText;
+  if (EffectiveGoldText)
   {
-    ResourceCountText->SetText(FText::AsNumber(FMath::Max(0, PlayerData.Resources)));
+    EffectiveGoldText->SetText(FText::AsNumber(FMath::Max(0, PlayerData.Gold)));
   }
 
   if (AIIndicatorWidget)

@@ -17,6 +17,9 @@
 #include "GridObstacleActor.h"
 #include "GridObstacleComponent.h"
 #include "GridOverlayComponent.h"
+#include "MainGateFighterPawn.h"
+#include "MoatGridObstacleActor.h"
+#include "SiegeBattleLibrary.h"
 #include "Skald.h"
 #include "Skald_GameInstance.h"
 #include "Skald_GameState.h"
@@ -379,6 +382,8 @@ void ASkald_BattleGameMode::BeginPlay() {
     BattleManager->SetRandomSeed(Seed);
     BattleManager->OnBattleEnded.AddDynamic(this,
                                            &ASkald_BattleGameMode::HandleBattleEnded);
+    BattleManager->OnAttackResolved.AddDynamic(
+        this, &ASkald_BattleGameMode::HandleBattleAttackResolved);
   }
 
   if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
@@ -423,6 +428,11 @@ void ASkald_BattleGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason) {
   }
 
   WaitForPlayersHandle.Invalidate();
+
+  if (BattleManager) {
+    BattleManager->OnAttackResolved.RemoveDynamic(
+        this, &ASkald_BattleGameMode::HandleBattleAttackResolved);
+  }
 
   Super::EndPlay(EndPlayReason);
 }
@@ -947,6 +957,9 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
       GS, World, Battle.DefenderPlayerID, Battle.DefenderDisplayName,
       Battle.DefenderFaction, Battle.bDefenderIsAI);
 
+  CachedAttackerState = AttackerPS;
+  CachedDefenderState = DefenderPS;
+
   const auto ResolveParticipantAIFlag =
       [this](ASkaldPlayerState *PlayerState, AController *Controller,
              bool &bInOutPayloadFlag) {
@@ -1419,6 +1432,105 @@ void ASkald_BattleGameMode::SpawnFighterSide(const TArray<FFighterDefinition> &R
   }
 }
 
+void ASkald_BattleGameMode::DisableUnusedMainGates() const {
+  if (!HasAuthority()) {
+    return;
+  }
+
+  if (UWorld *World = GetWorld()) {
+    for (TActorIterator<AMainGateFighterPawn> It(World); It; ++It) {
+      if (AMainGateFighterPawn *Gate = *It) {
+        Gate->SetGateEnabled(false);
+      }
+    }
+  }
+}
+
+void ASkald_BattleGameMode::DisableAllCapitalMoats() const {
+  if (!HasAuthority()) {
+    return;
+  }
+
+  if (UWorld *World = GetWorld()) {
+    for (TActorIterator<AMoatGridObstacleActor> It(World); It; ++It) {
+      if (AMoatGridObstacleActor *Moat = *It) {
+        Moat->SetMoatEnabled(false);
+      }
+    }
+  }
+}
+
+void ASkald_BattleGameMode::EnableMoatsForTerritory(int32 TerritoryID) const {
+  if (!HasAuthority() || TerritoryID <= 0) {
+    return;
+  }
+
+  if (UWorld *World = GetWorld()) {
+    for (TActorIterator<AMoatGridObstacleActor> It(World); It; ++It) {
+      AMoatGridObstacleActor *Moat = *It;
+      if (!Moat) {
+        continue;
+      }
+
+      if (Moat->SupportsTerritory(TerritoryID)) {
+        Moat->SetMoatEnabled(true);
+      }
+    }
+  }
+}
+
+void ASkald_BattleGameMode::AppendCapitalGateFighters(
+    int32 TargetTerritoryID, int32 FortificationBonus,
+    ESkaldFaction DefenderFaction, TArray<FFighter> &DefenderFighters,
+    TArray<FPendingGateRegistration> &OutRegistrations) {
+  if (!HasAuthority()) {
+    return;
+  }
+
+  if (UWorld *World = GetWorld()) {
+    for (TActorIterator<AMainGateFighterPawn> It(World); It; ++It) {
+      AMainGateFighterPawn *Gate = *It;
+      if (!Gate || !Gate->SupportsTerritory(TargetTerritoryID)) {
+        continue;
+      }
+
+      const FFighterStats BattleStats =
+          Gate->BuildBattleStats(FortificationBonus);
+
+      FFighter Fighter;
+      Fighter.Stats = BattleStats;
+      Fighter.Faction = DefenderFaction;
+      Fighter.AttackType = Gate->AttackType;
+      DefenderFighters.Add(Fighter);
+
+      FPendingGateRegistration Registration;
+      Registration.Gate = Gate;
+      Registration.Stats = BattleStats;
+      OutRegistrations.Add(Registration);
+    }
+  }
+}
+
+void ASkald_BattleGameMode::ApplyGateRegistrations(
+    const TArray<FPendingGateRegistration> &GateRegistrations,
+    ESkaldFaction DefenderFaction) {
+  if (!HasAuthority() || GateRegistrations.Num() == 0) {
+    return;
+  }
+
+  for (const FPendingGateRegistration &Entry : GateRegistrations) {
+    AMainGateFighterPawn *Gate = Entry.Gate.Get();
+    if (!Gate) {
+      continue;
+    }
+
+    Gate->Faction = DefenderFaction;
+    Gate->bIsAttacker = false;
+    Gate->ApplyBattleStats(Entry.Stats);
+    Gate->SetGateEnabled(true);
+  }
+}
+
 void ASkald_BattleGameMode::TryLaunchBattle() {
   if (bBattleLaunched || !HasAuthority()) {
     return;
@@ -1466,6 +1578,13 @@ void ASkald_BattleGameMode::TryLaunchBattle() {
     return;
   }
 
+  DisableUnusedMainGates();
+  DisableAllCapitalMoats();
+
+  if (Battle.IsCapitalAttack && Battle.bDefenderHasMoat) {
+    EnableMoatsForTerritory(Battle.TargetTerritoryID);
+  }
+
   TArray<AController *> ControllersToRelocate;
   TMap<AController *, bool> ControllerSides;
   if (AttackerPS) {
@@ -1494,12 +1613,33 @@ void ASkald_BattleGameMode::TryLaunchBattle() {
   TArray<FFighterDefinition> DefenderDefs =
       DefenderPS ? DefenderPS->PendingArmy : TArray<FFighterDefinition>();
 
+  if (Battle.AttackerSieges.Num() > 0) {
+    USiegeBattleLibrary::AppendSiegeFighters(
+        Battle.AttackerSieges,
+        AttackerPS ? AttackerPS->Faction : Battle.AttackerFaction,
+        AttackerDefs);
+  }
+
+  if (Battle.DefenderSieges.Num() > 0) {
+    USiegeBattleLibrary::AppendSiegeFighters(
+        Battle.DefenderSieges,
+        DefenderPS ? DefenderPS->Faction : Battle.DefenderFaction,
+        DefenderDefs);
+  }
+
+  const ESkaldFaction AttackerFaction =
+      AttackerPS ? AttackerPS->Faction : Battle.AttackerFaction;
+  const ESkaldFaction DefenderFaction =
+      DefenderPS ? DefenderPS->Faction : Battle.DefenderFaction;
+  const FS_Territory *TargetSnapshot =
+      CachedTerritoryMap.Find(Battle.TargetTerritoryID);
+
   TArray<FFighter> Attackers;
   Attackers.Reserve(AttackerDefs.Num());
   for (const FFighterDefinition &Def : AttackerDefs) {
     FFighter Fighter;
     Fighter.Stats = Def.Stats;
-    Fighter.Faction = AttackerPS ? AttackerPS->Faction : Def.Faction;
+    Fighter.Faction = AttackerFaction;
     Fighter.AttackType = Def.AttackType;
     Attackers.Add(Fighter);
   }
@@ -1509,9 +1649,17 @@ void ASkald_BattleGameMode::TryLaunchBattle() {
   for (const FFighterDefinition &Def : DefenderDefs) {
     FFighter Fighter;
     Fighter.Stats = Def.Stats;
-    Fighter.Faction = DefenderPS ? DefenderPS->Faction : Def.Faction;
+    Fighter.Faction = DefenderFaction;
     Fighter.AttackType = Def.AttackType;
     Defenders.Add(Fighter);
+  }
+
+  TArray<FPendingGateRegistration> GateRegistrations;
+  if (Battle.IsCapitalAttack) {
+    const int32 FortificationBonus =
+        TargetSnapshot ? TargetSnapshot->FortificationLevel : 0;
+    AppendCapitalGateFighters(Battle.TargetTerritoryID, FortificationBonus,
+                              DefenderFaction, Defenders, GateRegistrations);
   }
 
   UE_LOG(LogSkald, Log,
@@ -1522,6 +1670,10 @@ void ASkald_BattleGameMode::TryLaunchBattle() {
 
   SpawnFighterSide(AttackerDefs, /*bAsAttacker=*/true);
   SpawnFighterSide(DefenderDefs, /*bAsAttacker=*/false);
+
+  if (GateRegistrations.Num() > 0) {
+    ApplyGateRegistrations(GateRegistrations, DefenderFaction);
+  }
 
   GI->GridBattleManager->StartRound();
 
@@ -1933,5 +2085,70 @@ void ASkald_BattleGameMode::LogParticipantLockState(const TCHAR *Context)
          *DescribeParticipant(Battle.AttackerPlayerID),
          *DescribeParticipant(Battle.DefenderPlayerID), *LockedIds,
          *UEnum::GetValueAsString(GS->BattlePhase));
+}
+
+ASkaldPlayerState *
+ASkald_BattleGameMode::ResolveParticipantForFighter(const AFighterPawn *Fighter) const
+{
+  if (!Fighter)
+  {
+    return nullptr;
+  }
+
+  return Fighter->bIsAttacker ? CachedAttackerState.Get()
+                              : CachedDefenderState.Get();
+}
+
+void ASkald_BattleGameMode::AwardKillGold(ASkaldPlayerState *Recipient,
+                                          AFighterPawn *Defender,
+                                          int32 GoldAmount)
+{
+  if (!Recipient || GoldAmount <= 0)
+  {
+    return;
+  }
+
+  Recipient->Gold = FMath::Max(0, Recipient->Gold + GoldAmount);
+  UpdatePlayerGold(Recipient);
+  Recipient->ForceNetUpdate();
+
+  if (ASkaldPlayerController *PC =
+          Cast<ASkaldPlayerController>(Recipient->GetOwner()))
+  {
+    const FVector Anchor = Defender
+                               ? Defender->GetActorLocation() + FVector(0.f, 0.f, 160.f)
+                               : FVector::ZeroVector;
+    PC->ClientNotifyGoldReward(Anchor, GoldAmount);
+  }
+}
+
+void ASkald_BattleGameMode::HandleBattleAttackResolved(
+    AFighterPawn *Attacker, AFighterPawn *Defender,
+    const FDiceRollResult &Result)
+{
+  if (!Attacker || !Defender)
+  {
+    return;
+  }
+
+  if (Result.StartingHealth <= 0 || Result.EndingHealth > 0)
+  {
+    return;
+  }
+
+  const int32 ArmyCost = FMath::Max(Defender->Stats.ArmyCost, 0);
+  if (ArmyCost <= 0)
+  {
+    return;
+  }
+
+  ASkaldPlayerState *Recipient = ResolveParticipantForFighter(Attacker);
+  if (!Recipient)
+  {
+    return;
+  }
+
+  const int32 GoldReward = ArmyCost * SkaldConstants::FighterGoldMultiplier;
+  AwardKillGold(Recipient, Defender, GoldReward);
 }
 
