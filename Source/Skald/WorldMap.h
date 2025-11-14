@@ -198,6 +198,9 @@ protected:
   UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "WorldMap")
   bool bIsWorldActive = true;
 
+  /** Returns true if the supplied player ID belongs to a local controller. */
+  bool IsSelectingPlayerLocal(int32 SelectingPlayerId) const;
+
 private:
   /** Cached collision state so we can restore original settings after battles. */
   TMap<TWeakObjectPtr<UPrimitiveComponent>, TEnumAsByte<ECollisionEnabled::Type>>

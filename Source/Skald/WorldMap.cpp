@@ -484,6 +484,36 @@ void AWorldMap::RegisterTerritory(ATerritory *Territory) {
   }
 }
 
+bool AWorldMap::IsSelectingPlayerLocal(int32 SelectingPlayerId) const {
+  if (SelectingPlayerId == INDEX_NONE) {
+    return true;
+  }
+
+  const UWorld *World = GetWorld();
+  if (!World) {
+    return false;
+  }
+
+  for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It;
+       ++It) {
+    const APlayerController *PC = It->Get();
+    if (!PC || !PC->IsLocalController()) {
+      continue;
+    }
+
+    const ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PC->PlayerState);
+    if (!PS) {
+      continue;
+    }
+
+    if (PS->GetPlayerId() == SelectingPlayerId) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 ATerritory *AWorldMap::GetTerritoryById(int32 TerritoryId) const {
   const TObjectPtr<ATerritory> *Found = Territories.FindByPredicate(
       [TerritoryId](const TObjectPtr<ATerritory> &Territory) {
@@ -503,9 +533,12 @@ void AWorldMap::SelectTerritory(ATerritory *Territory,
   }
 
   const bool bIsGlobalSelection = SelectingPlayerId == INDEX_NONE;
-  const bool bAffectsLocalSelection =
-      bIsGlobalSelection || !Territory ||
-      Territory->ShouldAffectLocalSelection(SelectingPlayerId);
+  const bool bAffectsLocalSelection = Territory
+                                          ? Territory->ShouldAffectLocalSelection(
+                                                SelectingPlayerId)
+                                          : (bIsGlobalSelection ||
+                                             IsSelectingPlayerLocal(
+                                                 SelectingPlayerId));
   if (!bAffectsLocalSelection) {
     UE_LOG(LogSkald, VeryVerbose,
            TEXT("WorldMap %s ignoring non-local selection from player %d"),
