@@ -3020,25 +3020,28 @@ void USkaldAbilityComponent::HandleBattleAttackResolved(AFighterPawn* Attacker, 
 
         if (BubbleWardProtectionStacks > 0 && Attacker && Attacker->GetAttackType() == EFighterAttackType::Ranged)
         {
-            int32 HighestDamage = 0;
-            for (const FDiceRollOutcome& Outcome : Result.DiceOutcomes)
+            if (Result.HitCount > 0)
             {
-                if (!Outcome.bHit)
+                int32 HighestDamage = 0;
+                for (const FDiceRollOutcome& Outcome : Result.DiceOutcomes)
                 {
-                    continue;
+                    if (!Outcome.bHit)
+                    {
+                        continue;
+                    }
+
+                    HighestDamage = FMath::Max(HighestDamage, Outcome.Damage);
                 }
 
-                HighestDamage = FMath::Max(HighestDamage, Outcome.Damage);
-            }
+                const int32 DamageTaken = FMath::Max(0, Result.StartingHealth - Result.EndingHealth);
+                const int32 HealAmount = FMath::Min(DamageTaken, HighestDamage);
+                if (HealAmount > 0)
+                {
+                    HealFighter(OwnerFighter, HealAmount);
+                }
 
-            const int32 DamageTaken = FMath::Max(0, Result.StartingHealth - Result.EndingHealth);
-            const int32 HealAmount = FMath::Min(DamageTaken, HighestDamage);
-            if (HealAmount > 0)
-            {
-                HealFighter(OwnerFighter, HealAmount);
+                BubbleWardProtectionStacks = FMath::Max(0, BubbleWardProtectionStacks - 1);
             }
-
-            BubbleWardProtectionStacks = FMath::Max(0, BubbleWardProtectionStacks - 1);
         }
 
         if (PassiveAbility.AbilityId == TEXT("Ability_Elf_Passive") && bElfEvasionActive && Result.HitCount > 0)
