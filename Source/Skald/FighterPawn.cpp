@@ -206,6 +206,18 @@ AFighterPawn::AFighterPawn() : MaxHealth(0) {
   PassiveBuffDecal->SetVisibility(false);
   PassiveBuffDecal->SetCanEverAffectNavigation(false);
 
+  DebuffDecal = CreateDefaultSubobject<UDecalComponent>(TEXT("DebuffDecal"));
+  DebuffDecal->SetupAttachment(CollisionComponent);
+  DebuffDecal->SetRelativeRotation(FRotator(-90.f, 0.f, 0.f));
+  DebuffDecal->SetRelativeLocation(
+      FVector(0.f, 0.f,
+              -CollisionComponent->GetUnscaledCapsuleHalfHeight() +
+                  DebuffDecalFloorOffset));
+  DebuffDecal->DecalSize = DebuffDecalSizeSingleCell;
+  DebuffDecal->SetHiddenInGame(true);
+  DebuffDecal->SetVisibility(false);
+  DebuffDecal->SetCanEverAffectNavigation(false);
+
   TargetedDecal =
       CreateDefaultSubobject<UDecalComponent>(TEXT("TargetedDecal"));
   TargetedDecal->SetupAttachment(CollisionComponent);
@@ -287,7 +299,11 @@ void AFighterPawn::OnConstruction(const FTransform &Transform) {
   UpdatePassiveBuffDecalSize();
   UpdatePassiveBuffDecalTransform();
   RefreshPassiveBuffDecalMaterial();
+  UpdateDebuffDecalSize();
+  UpdateDebuffDecalTransform();
+  RefreshDebuffDecalMaterial();
   SetPassiveBuffVisible(false);
+  SetDebuffDecalVisible(false);
   SetTargetedIndicatorVisible(false);
   if (BuffStatusWidget) {
     BuffStatusWidget->SetRelativeLocation(
@@ -397,6 +413,7 @@ void AFighterPawn::BeginPlay() {
   UpdateTargetedIndicatorTransform();
   RefreshTargetedIndicatorMaterial();
   SetSelectionIndicatorVisible(false);
+  SetDebuffDecalVisible(false);
   SetTargetedIndicatorVisible(false);
 
   RefreshMovementAudioComponent();
@@ -484,7 +501,10 @@ void AFighterPawn::OnRep_AttackType() {}
 
 void AFighterPawn::OnRep_ActiveBuffs() { UpdateFloatingStatusText(); }
 
-void AFighterPawn::OnRep_ActiveDebuffs() { UpdateFloatingStatusText(); }
+void AFighterPawn::OnRep_ActiveDebuffs() {
+  UpdateFloatingStatusText();
+  SetDebuffDecalVisible(ActiveDebuffs.Num() > 0);
+}
 
 void AFighterPawn::Tick(float DeltaSeconds) {
   Super::Tick(DeltaSeconds);
@@ -1379,6 +1399,7 @@ void AFighterPawn::ClearFloatingStatusEffects() {
     OnRep_ActiveDebuffs();
   } else {
     UpdateFloatingStatusText();
+    SetDebuffDecalVisible(false);
   }
 }
 
@@ -1853,6 +1874,7 @@ void AFighterPawn::ApplyFootprintScale() {
   UpdateSelectionIndicatorSize();
   UpdateTargetedIndicatorSize();
   UpdatePassiveBuffDecalSize();
+  UpdateDebuffDecalSize();
 }
 
 void AFighterPawn::UpdateSelectionIndicatorSize() {
@@ -1953,6 +1975,46 @@ void AFighterPawn::RefreshPassiveBuffDecalMaterial() {
   }
 
   PassiveBuffDecal->SetDecalMaterial(PassiveBuffDecalMaterial);
+}
+
+void AFighterPawn::SetDebuffDecalVisible(bool bVisible) {
+  if (!DebuffDecal) {
+    return;
+  }
+
+  DebuffDecal->SetVisibility(bVisible);
+  DebuffDecal->SetHiddenInGame(!bVisible);
+}
+
+void AFighterPawn::UpdateDebuffDecalSize() {
+  if (!DebuffDecal) {
+    return;
+  }
+
+  const FVector DesiredSize =
+      GridFootprint == EFighterPawnFootprint::FourCells
+          ? DebuffDecalSizeFourCells
+          : DebuffDecalSizeSingleCell;
+  DebuffDecal->DecalSize = DesiredSize;
+}
+
+void AFighterPawn::UpdateDebuffDecalTransform() {
+  if (!DebuffDecal || !CollisionComponent) {
+    return;
+  }
+
+  const float CapsuleHalfHeight =
+      CollisionComponent->GetScaledCapsuleHalfHeight();
+  const float VerticalOffset = -CapsuleHalfHeight + DebuffDecalFloorOffset;
+  DebuffDecal->SetRelativeLocation(FVector(0.f, 0.f, VerticalOffset));
+}
+
+void AFighterPawn::RefreshDebuffDecalMaterial() {
+  if (!DebuffDecal) {
+    return;
+  }
+
+  DebuffDecal->SetDecalMaterial(DebuffDecalMaterial);
 }
 
 void AFighterPawn::RefreshDisplayMeshYawOffset() {
