@@ -10,51 +10,12 @@
 #include "Skald_TurnManager.h"
 #include "Territory.h"
 #include "Tests/SkaldAutomationTestHelpers.h"
+#include "Tests/SkaldGameModeAutomationAccessor.h"
 #include "UObject/UnrealType.h"
 #include "WorldMap.h"
 #include "Math/UnrealMathUtility.h"
 
 #include "Engine/World.h"
-
-struct FSkaldGameModeAutomationAccessor {
-  static void BeginArmyPlacementPhase(ASkaldGameMode *GameMode) {
-    if (GameMode) {
-      GameMode->BeginArmyPlacementPhase();
-    }
-  }
-
-  static void HandleArmyPlacementFailsafe(ASkaldGameMode *GameMode) {
-    if (GameMode) {
-      GameMode->HandleArmyPlacementFailsafe();
-    }
-  }
-
-  static bool IsRetryInitTimerActive(ASkaldGameMode *GameMode) {
-    if (!GameMode) {
-      return false;
-    }
-
-    if (UWorld *World = GameMode->GetWorld()) {
-      return World->GetTimerManager().IsTimerActive(
-          GameMode->RetryInitTimerHandle);
-    }
-
-    return false;
-  }
-
-  static float GetRetryInitTimerRate(ASkaldGameMode *GameMode) {
-    if (!GameMode) {
-      return -1.f;
-    }
-
-    if (UWorld *World = GameMode->GetWorld()) {
-      return World->GetTimerManager().GetTimerRate(
-          GameMode->RetryInitTimerHandle);
-    }
-
-    return -1.f;
-  }
-};
 
 namespace {
 void SetObjectProperty(UObject *Target, const TCHAR *PropertyName, UObject *Value) {
