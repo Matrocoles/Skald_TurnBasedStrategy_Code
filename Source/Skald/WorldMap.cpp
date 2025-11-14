@@ -558,36 +558,37 @@ void AWorldMap::SelectTerritory(ATerritory *Territory,
          Territory ? *Territory->GetName() : TEXT("None"),
          SelectedTerritory ? *SelectedTerritory->GetName() : TEXT("None"));
 
-  if (IsValid(SelectedTerritory)) {
-    SelectedTerritory->Deselect();
-  }
-
-  SelectedTerritory = IsValid(Territory) ? Territory : nullptr;
-  SelectedByPlayerId = SelectedTerritory ? SelectingPlayerId : INDEX_NONE;
-
-  bool bShouldPlaySound = false;
-  USoundBase *SoundToPlay = nullptr;
-  float VolumeMultiplier = 1.f;
-  if (SelectedTerritory) {
-    SelectedTerritory->Select(SelectingPlayerId);
-
-    SoundToPlay = SelectedTerritory->GetSelectionSound();
-    if (SoundToPlay) {
-      VolumeMultiplier = SelectedTerritory->GetSelectionSoundVolumeMultiplier();
-    } else {
-      SoundToPlay = TerritorySelectedSound;
+  if (bAffectsLocalSelection) {
+    if (IsValid(SelectedTerritory)) {
+      SelectedTerritory->Deselect();
     }
 
-    bShouldPlaySound = bAffectsLocalSelection && bPlaySelectionSound &&
-                      SoundToPlay && GetNetMode() != NM_DedicatedServer &&
-                      SelectedTerritory->IsSelectionVisibleToLocalPlayer();
-  }
+    SelectedTerritory = IsValid(Territory) ? Territory : nullptr;
+    SelectedByPlayerId = SelectedTerritory ? SelectingPlayerId : INDEX_NONE;
 
-  if (bShouldPlaySound) {
-    UGameplayStatics::PlaySound2D(this, SoundToPlay, VolumeMultiplier);
-  }
+    bool bShouldPlaySound = false;
+    USoundBase *SoundToPlay = nullptr;
+    float VolumeMultiplier = 1.f;
+    if (SelectedTerritory) {
+      SelectedTerritory->Select(SelectingPlayerId);
 
-  if (bAffectsLocalSelection) {
+      SoundToPlay = SelectedTerritory->GetSelectionSound();
+      if (SoundToPlay) {
+        VolumeMultiplier =
+            SelectedTerritory->GetSelectionSoundVolumeMultiplier();
+      } else {
+        SoundToPlay = TerritorySelectedSound;
+      }
+
+      bShouldPlaySound = bPlaySelectionSound && SoundToPlay &&
+                        GetNetMode() != NM_DedicatedServer &&
+                        SelectedTerritory->IsSelectionVisibleToLocalPlayer();
+    }
+
+    if (bShouldPlaySound) {
+      UGameplayStatics::PlaySound2D(this, SoundToPlay, VolumeMultiplier);
+    }
+
     OnTerritorySelected.Broadcast(SelectedTerritory);
   }
 }
