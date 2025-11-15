@@ -109,6 +109,9 @@ public:
   /** Returns true if any deployments were recorded during the current phase. */
   bool HasArmyPlacementDeployments() const;
 
+  /** Unique identifier that remains stable even before PlayerId replication. */
+  int32 GetAuthoritativePlayerId() const;
+
 private:
   /** Tracks deployments per territory during the army placement phase. */
   UPROPERTY()

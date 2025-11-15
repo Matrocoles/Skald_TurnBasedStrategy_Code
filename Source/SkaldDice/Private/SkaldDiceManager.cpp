@@ -39,7 +39,8 @@ void USkaldDiceManager::Deinitialize()
 }
 
 FGuid USkaldDiceManager::RollDice_D6(int32 NumPlayerDice, int32 NumEnemyDice,
-    bool bForInitiative, FLinearColor PlayerColor, FLinearColor EnemyColor)
+    bool bForInitiative, FLinearColor PlayerColor, FLinearColor EnemyColor,
+    FGuid OverrideRollId)
 {
     const int32 TotalDice = FMath::Max(NumPlayerDice, 0) + FMath::Max(NumEnemyDice, 0);
     if (TotalDice <= 0)
@@ -59,7 +60,7 @@ FGuid USkaldDiceManager::RollDice_D6(int32 NumPlayerDice, int32 NumEnemyDice,
     const float MaxDuration = Config ? Config->RollDurationMax : 1.5f;
     const float Duration = FMath::Clamp(FMath::FRandRange(MinDuration, MaxDuration), MinDuration, MaxDuration);
 
-    const FGuid RollId = FGuid::NewGuid();
+    const FGuid RollId = OverrideRollId.IsValid() ? OverrideRollId : FGuid::NewGuid();
     FActiveRoll& Roll = AddRoll(NumPlayerDice, NumEnemyDice, Duration, RollId,
         bForInitiative, PlayerColor, EnemyColor);
     Roll.RollId = RollId;

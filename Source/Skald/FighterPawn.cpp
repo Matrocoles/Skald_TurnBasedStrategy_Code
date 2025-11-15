@@ -2899,6 +2899,12 @@ void AFighterPawn::ExecuteManualAttackRoll() {
     return;
   }
 
+  if (UWorld *World = GetWorld()) {
+    ASkaldPlayerController::BroadcastPhysicalDiceRoll(
+        World, RollId, DiceToRoll, 0, false, FactionColor,
+        FLinearColor::Transparent);
+  }
+
   PendingAttackRollId = RollId;
   UE_LOG(LogTemp, Log,
          TEXT("TriggerManualAttackRoll: Awaiting dice arena completion (RollId=%s, Attacker=%s, Target=%s)"),
@@ -3160,7 +3166,10 @@ void AFighterPawn::ShowAttackRollButtonForPlayer()
 void AFighterPawn::HandleDiceRollCompleted(const FGuid &RollId,
                                            const TArray<int32> &Results) {
   if (!HasAuthority()) {
-    ServerSubmitPhysicalDiceRoll(RollId, Results);
+    if (bAwaitingPhysicalAttackRoll && PendingAttackRollId.IsValid() &&
+        PendingAttackRollId == RollId) {
+      ServerSubmitPhysicalDiceRoll(RollId, Results);
+    }
     return;
   }
 

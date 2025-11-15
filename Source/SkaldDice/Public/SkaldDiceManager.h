@@ -34,7 +34,8 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Dice")
     FGuid RollDice_D6(int32 NumPlayerDice, int32 NumEnemyDice, bool bForInitiative,
         FLinearColor PlayerColor = FLinearColor::Transparent,
-        FLinearColor EnemyColor = FLinearColor::Transparent);
+        FLinearColor EnemyColor = FLinearColor::Transparent,
+        FGuid OverrideRollId = FGuid());
 
     UFUNCTION(BlueprintCallable, Category = "Dice")
     void SetConfig(UDiceRollConfig* InConfig);

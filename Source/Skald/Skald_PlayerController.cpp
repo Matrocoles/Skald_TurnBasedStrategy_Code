@@ -183,6 +183,22 @@ bool IsCursorOverInteractableSlateWidget() {
 }
 }
 
+void ASkaldPlayerController::BroadcastPhysicalDiceRoll(
+    UWorld *World, const FGuid &RollId, int32 PlayerDice, int32 EnemyDice,
+    bool bForInitiative, FLinearColor PlayerColor, FLinearColor EnemyColor) {
+  if (!World || World->GetNetMode() == NM_Client || !RollId.IsValid()) {
+    return;
+  }
+
+  for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It;
+       ++It) {
+    if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(*It)) {
+      PC->ClientStartPhysicalDiceRoll(RollId, PlayerDice, EnemyDice,
+                                      bForInitiative, PlayerColor, EnemyColor);
+    }
+  }
+}
+
 
 ASkald_BattleGameMode *ASkaldPlayerController::ResolveBattleGameMode() {
   if (UWorld *World = GetWorld()) {
@@ -4138,7 +4154,7 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
 
   int32 SelectingPlayerId = INDEX_NONE;
   if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
-    SelectingPlayerId = PS->GetPlayerId();
+    SelectingPlayerId = PS->GetAuthoritativePlayerId();
   }
 
   if (!WorldMap->IsWorldActive() && TerritoryID >= 0) {
@@ -4176,10 +4192,24 @@ void ASkaldPlayerController::ClientSelectTerritory_Implementation(
       TerritoryID >= 0 ? WorldMap->GetTerritoryById(TerritoryID) : nullptr;
   int32 SelectingPlayerId = INDEX_NONE;
   if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
-    SelectingPlayerId = PS->GetPlayerId();
+    SelectingPlayerId = PS->GetAuthoritativePlayerId();
   }
   WorldMap->SelectTerritory(Terr, true, SelectingPlayerId);
   UE_LOG(LogSkald, Log, TEXT("ClientSelectTerritory <- %d"), TerritoryID);
+}
+
+void ASkaldPlayerController::ClientStartPhysicalDiceRoll_Implementation(
+    const FGuid &RollId, int32 PlayerDice, int32 EnemyDice, bool bForInitiative,
+    FLinearColor PlayerColor, FLinearColor EnemyColor) {
+  if (HasAuthority() || !RollId.IsValid()) {
+    return;
+  }
+
+  if (USkaldDiceManager *DiceManager = ResolveDiceManager()) {
+    const FGuid LocalRollId = DiceManager->RollDice_D6(
+        PlayerDice, EnemyDice, bForInitiative, PlayerColor, EnemyColor, RollId);
+    ensure(!LocalRollId.IsValid() || LocalRollId == RollId);
+  }
 }
 
 void ASkaldPlayerController::HandleEndAttackRequested(bool bConfirmed) {
