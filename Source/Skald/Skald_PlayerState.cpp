@@ -163,7 +163,14 @@ int32 ASkaldPlayerState::GetAuthoritativePlayerId() const {
 
   const FUniqueNetIdRepl &NetId = GetUniqueId();
   if (NetId.IsValid()) {
-    const uint32 NetIdHash = FCrc::StrCrc32(*NetId.ToString());
+    FString NetIdString;
+    if (TSharedPtr<const FUniqueNetId> UniqueId = NetId.GetUniqueNetId()) {
+      NetIdString = UniqueId->ToString();
+    } else {
+      NetIdString = NetId.ToDebugString();
+    }
+
+    const uint32 NetIdHash = FCrc::StrCrc32(*NetIdString);
     // Clamp to the positive int32 range so we can continue using a single
     // integer identifier throughout the UI/world map selection code paths.
     return static_cast<int32>(NetIdHash & 0x7fffffff);
