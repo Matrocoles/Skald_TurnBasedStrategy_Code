@@ -1,7 +1,9 @@
 #include "Skald_PlayerState.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "Misc/Crc.h"
 #include "Net/UnrealNetwork.h"
+#include "OnlineSubsystemTypes.h"
 #include "Skald.h"
 #include "SkaldLogging.h"
 #include "Skald_GameState.h"
@@ -157,6 +159,14 @@ int32 ASkaldPlayerState::GetAuthoritativePlayerId() const {
   const int32 ResolvedPlayerId = GetPlayerId();
   if (ResolvedPlayerId != INDEX_NONE && ResolvedPlayerId >= 0) {
     return ResolvedPlayerId;
+  }
+
+  const FUniqueNetIdRepl &NetId = GetUniqueId();
+  if (NetId.IsValid()) {
+    const uint32 NetIdHash = FCrc::StrCrc32(*NetId.ToString());
+    // Clamp to the positive int32 range so we can continue using a single
+    // integer identifier throughout the UI/world map selection code paths.
+    return static_cast<int32>(NetIdHash & 0x7fffffff);
   }
 
   return static_cast<int32>(GetUniqueID());
