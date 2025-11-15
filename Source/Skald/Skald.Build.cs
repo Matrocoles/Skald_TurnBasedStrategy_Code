@@ -33,6 +33,7 @@ public class Skald : ModuleRules
                         "SlateCore",
                         "UMG",
                         "OnlineSubsystem",
+                        "OnlineSubsystemUtils",
                         "Landscape",
                         "AssetRegistry",
                         "Niagara",
