@@ -227,6 +227,7 @@ ASkaldPlayerController::ASkaldPlayerController() {
   InGameMenuWidgetClass = UInGameMenuWidget::StaticClass();
   bBattleHUDVisible = false;
   bBattleHUDReadyToShow = false;
+  bPendingLocalSelectionRefresh = false;
 
   static ConstructorHelpers::FClassFinder<UChoosePlayerWidget> ChooseBP(
       TEXT("/Game/Blueprints/UI/Skald_ChoosePlayerWidget"));
@@ -248,32 +249,82 @@ void ASkaldPlayerController::GetLifetimeReplicatedProps(
 }
 
 void ASkaldPlayerController::CacheGameReferences() {
-  CachedGameState = GetWorld()->GetGameState<ASkaldGameState>();
-  if (!CachedGameState) {
-    UE_LOG(LogSkald, Error,
-           TEXT("ASkaldPlayerController could not find ASkaldGameState."));
-  } else {
-    CachedGameState->OnPlayersUpdated.AddDynamic(
-        this, &ASkaldPlayerController::HandlePlayersUpdated);
+  UWorld *World = GetWorld();
+  if (!World) {
+    return;
   }
 
-  CachedGameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
-  if (!CachedGameMode) {
-    UE_LOG(LogSkald, Error,
-           TEXT("ASkaldPlayerController could not find ASkaldGameMode."));
+  bool bNeedsRetry = false;
+
+  ASkaldGameState *WorldGameState = World->GetGameState<ASkaldGameState>();
+  if (CachedGameState != WorldGameState) {
+    if (CachedGameState) {
+      CachedGameState->OnPlayersUpdated.RemoveDynamic(
+          this, &ASkaldPlayerController::HandlePlayersUpdated);
+    }
+    CachedGameState = WorldGameState;
   }
 
-  CachedGameInstance = GetGameInstance<USkaldGameInstance>();
-  if (!CachedGameInstance) {
-    UE_LOG(LogSkald, Error,
-           TEXT("ASkaldPlayerController could not find USkaldGameInstance."));
+  if (CachedGameState) {
+    if (!CachedGameState->OnPlayersUpdated.IsAlreadyBound(
+            this, &ASkaldPlayerController::HandlePlayersUpdated)) {
+      CachedGameState->OnPlayersUpdated.AddDynamic(
+          this, &ASkaldPlayerController::HandlePlayersUpdated);
+    }
   } else {
-    CachedGameInstance->OnFactionsUpdated.AddDynamic(
+    bNeedsRetry = true;
+    UE_LOG(LogSkald, Verbose,
+           TEXT("ASkaldPlayerController deferring GameState caching; not yet replicated."));
+  }
+
+  if (!IsValid(CachedGameMode)) {
+    CachedGameMode = nullptr;
+  }
+
+  if (!CachedGameMode && World->GetNetMode() != NM_Client) {
+    CachedGameMode = World->GetAuthGameMode<ASkaldGameMode>();
+    if (!CachedGameMode) {
+      bNeedsRetry = true;
+      UE_LOG(LogSkald, Verbose,
+             TEXT("ASkaldPlayerController waiting for GameMode replication."));
+    }
+  }
+
+  USkaldGameInstance *ResolvedGameInstance = GetGameInstance<USkaldGameInstance>();
+  if (CachedGameInstance && CachedGameInstance != ResolvedGameInstance) {
+    CachedGameInstance->OnFactionsUpdated.RemoveDynamic(
         this, &ASkaldPlayerController::HandleFactionsUpdated);
+    CachedGameInstance->OnBattleMapStateChanged.RemoveDynamic(
+        this, &ASkaldPlayerController::HandleBattleMapStateChanged);
+  }
+  CachedGameInstance = ResolvedGameInstance;
+
+  if (CachedGameInstance) {
+    if (!CachedGameInstance->OnFactionsUpdated.IsAlreadyBound(
+            this, &ASkaldPlayerController::HandleFactionsUpdated)) {
+      CachedGameInstance->OnFactionsUpdated.AddDynamic(
+          this, &ASkaldPlayerController::HandleFactionsUpdated);
+    }
     CachedGameInstance->OnBattleMapStateChanged.RemoveDynamic(
         this, &ASkaldPlayerController::HandleBattleMapStateChanged);
     CachedGameInstance->OnBattleMapStateChanged.AddDynamic(
         this, &ASkaldPlayerController::HandleBattleMapStateChanged);
+  } else {
+    bNeedsRetry = true;
+    UE_LOG(LogSkald, Verbose,
+           TEXT("ASkaldPlayerController waiting for GameInstance initialisation."));
+  }
+
+  FTimerManager &TimerManager = World->GetTimerManager();
+  if (bNeedsRetry) {
+    if (!TimerManager.IsTimerActive(GameReferenceRetryHandle)) {
+      constexpr float RetryDelaySeconds = 0.1f;
+      TimerManager.SetTimer(GameReferenceRetryHandle, this,
+                            &ASkaldPlayerController::CacheGameReferences,
+                            RetryDelaySeconds, false);
+    }
+  } else {
+    TimerManager.ClearTimer(GameReferenceRetryHandle);
   }
 }
 
@@ -1670,8 +1721,15 @@ void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
   ClearFactionCursor();
 
   if (CachedGameInstance) {
+    CachedGameInstance->OnFactionsUpdated.RemoveDynamic(
+        this, &ASkaldPlayerController::HandleFactionsUpdated);
     CachedGameInstance->OnBattleMapStateChanged.RemoveDynamic(
         this, &ASkaldPlayerController::HandleBattleMapStateChanged);
+  }
+
+  if (CachedGameState) {
+    CachedGameState->OnPlayersUpdated.RemoveDynamic(
+        this, &ASkaldPlayerController::HandlePlayersUpdated);
   }
 
   ResetPendingReadyPromptState();
@@ -1725,6 +1783,7 @@ void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
       FighterSpawnedHandle.Reset();
     }
     World->GetTimerManager().ClearTimer(LobbyAutoInitHandle);
+    World->GetTimerManager().ClearTimer(GameReferenceRetryHandle);
   }
 
   if (BattleResultWidget) {
@@ -1935,12 +1994,45 @@ void ASkaldPlayerController::TryBindWorldMap() {
                      this, &ASkaldPlayerController::HandleTerritorySelected),
                  TEXT("Failed to bind HandleTerritorySelected to WorldMap."));
     }
+    if (IsLocalController()) {
+      if (RefreshLocalTerritorySelection()) {
+        bPendingLocalSelectionRefresh = false;
+      }
+    }
     World->GetTimerManager().ClearTimer(WorldMapSearchHandle);
   } else {
     World->GetTimerManager().SetTimer(WorldMapSearchHandle, this,
                                       &ASkaldPlayerController::TryBindWorldMap,
                                       0.5f, false);
   }
+}
+
+bool ASkaldPlayerController::RefreshLocalTerritorySelection() {
+  if (!IsLocalController()) {
+    return false;
+  }
+
+  ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
+  if (!PS) {
+    return false;
+  }
+
+  const int32 LocalPlayerId = PS->GetPlayerId();
+  if (LocalPlayerId == INDEX_NONE) {
+    return false;
+  }
+
+  AWorldMap *WorldMap = CachedWorldMap.Get();
+  if (!WorldMap) {
+    return false;
+  }
+
+  if (ATerritory *CachedSelection =
+          WorldMap->GetSelectionForPlayer(LocalPlayerId)) {
+    WorldMap->SelectTerritory(CachedSelection, false, LocalPlayerId);
+  }
+
+  return true;
 }
 
 const FFactionCursorDefinition *ASkaldPlayerController::ResolveCursorDefinition() const {
@@ -8174,6 +8266,18 @@ void ASkaldPlayerController::HandlePlayerIdUpdated() {
   DetermineControlledBattleSide();
   UpdateBattleHUDButtons();
   RefreshLockedInFighterList();
+
+  if (IsLocalController()) {
+    const bool bRefreshedSelection = RefreshLocalTerritorySelection();
+    if (!bRefreshedSelection) {
+      if (!CachedWorldMap.IsValid()) {
+        bPendingLocalSelectionRefresh = true;
+        TryBindWorldMap();
+      }
+    } else {
+      bPendingLocalSelectionRefresh = false;
+    }
+  }
 }
 
 void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,

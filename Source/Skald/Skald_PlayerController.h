@@ -581,6 +581,9 @@ protected:
             meta = (AllowPrivateAccess = "true"))
   USkaldGameInstance *CachedGameInstance;
 
+  /** Retry handle used when core replicated references are not yet available. */
+  FTimerHandle GameReferenceRetryHandle;
+
   /** Cached reference to the active grid battle manager. */
   mutable TWeakObjectPtr<UGridBattleManager> CachedBattleManager;
 
@@ -949,6 +952,9 @@ private:
   /** Attempt to locate the world map and bind to its selection event. */
   void TryBindWorldMap();
 
+  /** Reapply the most recent local territory selection once IDs/world map resolve. */
+  bool RefreshLocalTerritorySelection();
+
   /** Handle playing the click sound when interacting with UI. */
   void HandleCursorClickSound();
 
@@ -966,6 +972,9 @@ private:
 
   /** Cached pointer to the active world map to manage delegate bindings safely. */
   TWeakObjectPtr<AWorldMap> CachedWorldMap;
+
+  /** Whether we need to retry restoring the local player's territory selection. */
+  bool bPendingLocalSelectionRefresh = false;
 
   /** Timer used to poll for the world map actor until it exists. */
   FTimerHandle WorldMapSearchHandle;

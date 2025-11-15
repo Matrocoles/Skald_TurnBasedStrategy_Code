@@ -2245,6 +2245,14 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
       bShouldStreamSelectedMap = true;
     }
 
+    const ENetMode NetMode = World->GetNetMode();
+    if (NetMode != NM_Standalone && bShouldStreamSelectedMap) {
+      UE_LOG(LogSkald, Log,
+             TEXT("TriggerGridBattle: forcing travel for net mode %d (streaming only supported in standalone)."),
+             static_cast<int32>(NetMode));
+      bShouldStreamSelectedMap = false;
+    }
+
     FString MapToLoad =
         SelectedBattleMap.ToSoftObjectPath().GetLongPackageName();
     if (MapToLoad.IsEmpty()) {
