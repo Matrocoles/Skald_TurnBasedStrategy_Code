@@ -238,6 +238,9 @@ private:
   /** Populate remaining slots with AI players in singleplayer. */
   void PopulateAIPlayers();
 
+  /** Relax minimum player requirements if the lobby never fills. */
+  void HandleStartGameTimeout();
+
   /** Notify HUDs of the current player roster. */
   void RefreshHUDs();
 
