@@ -112,7 +112,7 @@ private:
                                    ASkaldPlayerState *PlayerState,
                                    FAIStrategicAttackOption &OutOption) const;
   bool HandlePostBattleReevaluation(AWorldMap *WorldMap,
-                                    ASkaldPlayerState *PlayerState);
+                                    ASkaldPlayerState *InPlayerState);
   bool ShouldContinueAttackingAfterBattle(
       const FAIStrategicAttackOption &Option) const;
   bool IsActiveTurnController() const;

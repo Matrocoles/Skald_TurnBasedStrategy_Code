@@ -1349,8 +1349,8 @@ bool ASkaldAIController::ExecuteStrategicMovement(AWorldMap *WorldMap,
 }
 
 bool ASkaldAIController::HandlePostBattleReevaluation(
-    AWorldMap *WorldMap, ASkaldPlayerState *PlayerState) {
-  if (!bPostBattleEvaluationPending || !WorldMap || !PlayerState) {
+    AWorldMap *WorldMap, ASkaldPlayerState *InPlayerState) {
+  if (!bPostBattleEvaluationPending || !WorldMap || !InPlayerState) {
     return false;
   }
 
@@ -1364,10 +1364,10 @@ bool ASkaldAIController::HandlePostBattleReevaluation(
   bPostBattlePauseActive = false;
   bPostBattleEvaluationPending = false;
 
-  RefreshStrategicContext(WorldMap, PlayerState);
+  RefreshStrategicContext(WorldMap, InPlayerState);
 
   FAIStrategicAttackOption BestOption;
-  if (!EvaluateBestStrategicAttack(WorldMap, PlayerState, BestOption) ||
+  if (!EvaluateBestStrategicAttack(WorldMap, InPlayerState, BestOption) ||
       !ShouldContinueAttackingAfterBattle(BestOption)) {
     BroadcastEnemyTurnStatus(FString(EnemyPostBattleStandDownMessage));
     SchedulePhaseAdvance(EnemyTurnStepDelay);
