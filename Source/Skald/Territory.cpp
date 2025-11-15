@@ -420,7 +420,7 @@ bool ATerritory::ShouldShowSelectionVisuals(int32 SelectingPlayerId) const {
       continue;
     }
 
-    if (PS->GetPlayerId() == SelectingPlayerId) {
+    if (PS->GetAuthoritativePlayerId() == SelectingPlayerId) {
       return true;
     }
   }

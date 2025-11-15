@@ -1799,6 +1799,10 @@ bool ASkaldGameMode::StartStrategicInitiativeRoll(
     const FGuid RollId = DiceManager->RollDice_D6(PlayerDice, EnemyDice, true,
                                                  PlayerTint, EnemyTint);
     if (RollId.IsValid()) {
+      if (UWorld *World = GetWorld()) {
+        ASkaldPlayerController::BroadcastPhysicalDiceRoll(
+            World, RollId, PlayerDice, EnemyDice, true, PlayerTint, EnemyTint);
+      }
       PendingStrategicInitiativeRolls.Add(RollId, PlayerState);
       return true;
     }

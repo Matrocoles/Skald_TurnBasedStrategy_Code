@@ -152,3 +152,12 @@ bool ASkaldPlayerState::HasArmyPlacementDeployments() const {
 
   return false;
 }
+
+int32 ASkaldPlayerState::GetAuthoritativePlayerId() const {
+  const int32 PlayerId = GetPlayerId();
+  if (PlayerId != INDEX_NONE && PlayerId >= 0) {
+    return PlayerId;
+  }
+
+  return static_cast<int32>(GetUniqueID());
+}

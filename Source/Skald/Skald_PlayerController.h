@@ -876,6 +876,18 @@ public:
   UFUNCTION(Client, Reliable)
   void ClientSelectTerritory(int32 TerritoryID);
 
+  UFUNCTION(Client, Reliable)
+  void ClientStartPhysicalDiceRoll(const FGuid &RollId, int32 PlayerDice,
+                                   int32 EnemyDice, bool bForInitiative,
+                                   FLinearColor PlayerColor,
+                                   FLinearColor EnemyColor);
+
+  static void BroadcastPhysicalDiceRoll(UWorld *World, const FGuid &RollId,
+                                        int32 PlayerDice, int32 EnemyDice,
+                                        bool bForInitiative,
+                                        FLinearColor PlayerColor,
+                                        FLinearColor EnemyColor);
+
   /** Phase change handlers. */
   UFUNCTION(BlueprintCallable, Category = "Turn")
   void HandleAttackPhase();

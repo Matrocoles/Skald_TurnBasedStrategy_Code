@@ -493,10 +493,18 @@ bool UGridBattleManager::RollInitiative()
                     }
                 }
 
-                const FGuid RollId = Manager->RollDice_D6(PendingInitiativePlayerDice, PendingInitiativeEnemyDice, true,
+                const int32 PlayerDiceCount = PendingInitiativePlayerDice;
+                const int32 EnemyDiceCount = PendingInitiativeEnemyDice;
+                const FGuid RollId = Manager->RollDice_D6(PlayerDiceCount, EnemyDiceCount, true,
                     PlayerColor, EnemyColor);
                 if (RollId.IsValid())
                 {
+                    if (UWorld* World = GetWorld())
+                    {
+                        ASkaldPlayerController::BroadcastPhysicalDiceRoll(
+                            World, RollId, PlayerDiceCount, EnemyDiceCount, true,
+                            PlayerColor, EnemyColor);
+                    }
                     ActiveInitiativeRollId = RollId;
                     bInitiativeRollAwaitingResults = true;
                     bInitiativeRollUsingPhysicalDice = true;
