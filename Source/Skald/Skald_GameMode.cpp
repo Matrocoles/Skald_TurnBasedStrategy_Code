@@ -445,7 +445,7 @@ void ASkaldGameMode::CleanupStalePlayerStates() {
 void ASkaldGameMode::PopulateAIPlayers() {
   ASkaldGameState *GS = GetGameState<ASkaldGameState>();
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
-  if (!GS || !GI || GI->bIsMultiplayer || !AIControllerClass) {
+  if (!GS || !GI || !AIControllerClass) {
     return;
   }
 
