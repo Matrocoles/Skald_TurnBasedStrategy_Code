@@ -1388,6 +1388,7 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
       TurnManager ? TurnManager->GetControllers()
                   : TArray<ASkaldPlayerController *>();
   TSet<ASkaldPlayerController *> UniqueControllers;
+  TSet<ASkaldPlayerController *> UniqueHumanControllers;
   bool bNeedsRetry = false;
   for (int32 Index = GS->PlayerArray.Num() - 1; Index >= 0; --Index) {
     ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(GS->PlayerArray[Index]);
@@ -1419,6 +1420,9 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
       continue;
     }
     UniqueControllers.Add(OwningController);
+    if (PS && !PS->bIsAI) {
+      UniqueHumanControllers.Add(OwningController);
+    }
     if (!RegisteredControllers.Contains(OwningController)) {
       UE_LOG(LogSkald, Warning,
              TEXT("TryInitializeWorldAndStart: Requeuing controller %s"),
@@ -1522,30 +1526,32 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     }
   }
 
-  const int32 CurrentPlayerCount = UniqueControllers.Num();
+  const int32 CurrentControllerCount = UniqueControllers.Num();
+  const int32 CurrentHumanCount = UniqueHumanControllers.Num();
   const bool bReadyToStart =
       bAllLockedIn && bAllHaveControllers && bAllHumansHaveFactions &&
       bAllHumansHaveNames &&
-      CurrentPlayerCount >= MinPlayerCount && TurnManager &&
-      TurnManager->GetControllerCount() >= CurrentPlayerCount;
+      CurrentHumanCount >= MinPlayerCount && TurnManager &&
+      TurnManager->GetControllerCount() >= CurrentControllerCount;
 
   UE_LOG(
       LogSkald, Log,
       TEXT("TryInitializeWorldAndStart: bAllLockedIn=%s bAllHaveControllers=%s "
-           "bAllHumansHaveFactions=%s bAllHumansHaveNames=%s CurrentPlayerCount=%d "
+           "bAllHumansHaveFactions=%s bAllHumansHaveNames=%s CurrentHumanCount=%d CurrentControllerCount=%d "
            "ControllerCount=%d bReadyToStart=%s"),
       bAllLockedIn ? TEXT("true") : TEXT("false"),
       bAllHaveControllers ? TEXT("true") : TEXT("false"),
       bAllHumansHaveFactions ? TEXT("true") : TEXT("false"),
-      bAllHumansHaveNames ? TEXT("true") : TEXT("false"), CurrentPlayerCount,
+      bAllHumansHaveNames ? TEXT("true") : TEXT("false"), CurrentHumanCount,
+      CurrentControllerCount,
       TurnManager ? TurnManager->GetControllerCount() : 0,
       bReadyToStart ? TEXT("true") : TEXT("false"));
 
-  if (GEngine && CurrentPlayerCount < MinPlayerCount) {
+  if (GEngine && CurrentHumanCount < MinPlayerCount) {
     GEngine->AddOnScreenDebugMessage(
         -1, 4.f, FColor::Yellow,
         FString::Printf(TEXT("Waiting for players: %d/%d ready"),
-                        CurrentPlayerCount, MinPlayerCount));
+                        CurrentHumanCount, MinPlayerCount));
   }
 
   if (GEngine && (!bAllHumansHaveFactions || !bAllHumansHaveNames)) {
@@ -3277,18 +3283,27 @@ bool ASkaldGameMode::InitializeWorld() {
     return false;
   }
 
+  int32 HumanPlayerCount = 0;
+  for (APlayerState *PlayerStateBase : GS->PlayerArray) {
+    if (ASkaldPlayerState *PlayerState =
+            Cast<ASkaldPlayerState>(PlayerStateBase)) {
+      if (!PlayerState->bIsAI) {
+        ++HumanPlayerCount;
+      }
+    }
+  }
+
   const int32 TotalPlayerCount = GS->PlayerArray.Num();
-  if (TotalPlayerCount < MinPlayerCount) {
+  if (HumanPlayerCount < MinPlayerCount) {
     UE_LOG(
         LogSkald, Warning,
-        TEXT("InitializeWorld aborted: need at least %d players but found %d"),
-        MinPlayerCount, TotalPlayerCount);
+        TEXT("InitializeWorld aborted: need at least %d human players but found %d (total players=%d)"),
+        MinPlayerCount, HumanPlayerCount, TotalPlayerCount);
     if (GEngine) {
       GEngine->AddOnScreenDebugMessage(
           -1, 5.f, FColor::Yellow,
-          FString::Printf(
-              TEXT("InitializeWorld: need at least %d players but found %d"),
-              MinPlayerCount, TotalPlayerCount));
+          FString::Printf(TEXT("InitializeWorld: need %d human players but found %d (total=%d)"),
+                          MinPlayerCount, HumanPlayerCount, TotalPlayerCount));
     }
     return false;
   }
