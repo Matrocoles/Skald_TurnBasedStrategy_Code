@@ -36,8 +36,19 @@ constexpr TCHAR EnemyAwaitingResultsMessage[] =
     TEXT("Enemy is reviewing battle results...");
 constexpr TCHAR EnemyStrategyPlanningMessage[] =
     TEXT("Enemy is evaluating the battlefield...");
+constexpr TCHAR EnemyPostBattleReevaluationMessage[] =
+    TEXT("Enemy is reassessing their offensive...");
+constexpr TCHAR EnemyPostBattleResumeMessage[] =
+    TEXT("Enemy resumes their assault.");
+constexpr TCHAR EnemyPostBattleStandDownMessage[] =
+    TEXT("Enemy stands down from their assault.");
 constexpr float StrategyPlanningDelayFraction = 0.5f;
 constexpr float MinimumStrategyPlanningDelay = 0.75f;
+constexpr float PostBattleEvaluationPauseSeconds = 8.0f;
+constexpr float PostBattleAttackScoreThreshold = 75.0f;
+constexpr int32 MovementMaxDetourDistance = 2;
+constexpr float MovementHuntDistanceWeight = 10.0f;
+constexpr float MovementHuntStepWeight = 1.0f;
 
 enum class EAIFactionAbilityCategory : uint8 {
   None,
@@ -199,6 +210,9 @@ void ASkaldAIController::StartTurn() {
   bStrategyEvaluatedThisTurn = false;
   CachedStrategicContext = FStrategicContext();
   CurrentStrategy = EAIStrategy::Hybrid;
+  AttacksInitiatedThisPhase = 0;
+  bPostBattleEvaluationPending = false;
+  bPostBattlePauseActive = false;
   ClearDecisionTimers();
   MakeAIDecision();
 }
@@ -207,6 +221,9 @@ void ASkaldAIController::EndTurn() {
   ClearDecisionTimers();
   bAwaitingBattleTransition = false;
   bPendingPhaseAdvance = false;
+  bPostBattleEvaluationPending = false;
+  bPostBattlePauseActive = false;
+  AttacksInitiatedThisPhase = 0;
   ClearEnemyTurnStatus();
   Super::EndTurn();
 }
@@ -361,6 +378,11 @@ void ASkaldAIController::ProcessCurrentPhase() {
   }
 
   const ETurnPhase Phase = TurnManager->GetCurrentPhase();
+  if (Phase != ETurnPhase::Attack) {
+    bPostBattleEvaluationPending = false;
+    bPostBattlePauseActive = false;
+    AttacksInitiatedThisPhase = 0;
+  }
   if (Phase == ETurnPhase::Revolt) {
     UE_LOG(LogSkald, Log, TEXT("AI decision completed in %d steps"),
            DecisionIterationCount);
@@ -404,6 +426,10 @@ void ASkaldAIController::ProcessCurrentPhase() {
       bAwaitingBattleTransition = true;
       BroadcastEnemyTurnStatus(FString(EnemyBattleTransitionMessage));
       ScheduleNextDecisionStep(EnemyBattleTransitionPollDelay);
+      return;
+    }
+
+    if (HandlePostBattleReevaluation(WorldMap, PS)) {
       return;
     }
 
@@ -1025,20 +1051,14 @@ void ASkaldAIController::ExecuteStrategicReinforcements(
   }
 }
 
-bool ASkaldAIController::ExecuteStrategicAttack(AWorldMap *WorldMap,
-                                                ASkaldPlayerState *InPlayerState) {
+bool ASkaldAIController::EvaluateBestStrategicAttack(
+    AWorldMap *WorldMap, ASkaldPlayerState *InPlayerState,
+    FAIStrategicAttackOption &OutOption) const {
   if (!WorldMap || !InPlayerState) {
     return false;
   }
 
-  struct FAttackOption {
-    ATerritory *Source = nullptr;
-    ATerritory *Target = nullptr;
-    float Score = 0.f;
-    int32 UnitsToSend = 0;
-  };
-
-  FAttackOption BestOption;
+  FAIStrategicAttackOption BestOption;
   BestOption.Score = std::numeric_limits<float>::lowest();
   bool bFoundOption = false;
 
@@ -1113,13 +1133,11 @@ bool ASkaldAIController::ExecuteStrategicAttack(AWorldMap *WorldMap,
       if (bTargetIsCapital) {
         const int32 MaxMovable = SourceUnits - 1;
         if (MaxMovable < SkaldConstants::CapitalAttackArmyRequirement) {
-          // Not enough available forces to meet the capital attack requirement.
           continue;
         }
 
         UnitsToSend = FMath::Min(UnitsToSend, MaxMovable);
         if (UnitsToSend < SkaldConstants::CapitalAttackArmyRequirement) {
-          // The AI cannot commit the required force during the attack phase.
           continue;
         }
 
@@ -1147,9 +1165,61 @@ bool ASkaldAIController::ExecuteStrategicAttack(AWorldMap *WorldMap,
     return false;
   }
 
+  OutOption = BestOption;
+  return true;
+}
+
+bool ASkaldAIController::ExecuteStrategicAttack(AWorldMap *WorldMap,
+                                                ASkaldPlayerState *InPlayerState) {
+  if (!WorldMap || !InPlayerState) {
+    return false;
+  }
+
+  if (AttacksInitiatedThisPhase >= MaxStrategicAttacksPerPhase) {
+    return false;
+  }
+
+  FAIStrategicAttackOption BestOption;
+  if (!EvaluateBestStrategicAttack(WorldMap, InPlayerState, BestOption)) {
+    return false;
+  }
+
   HandleAttackRequested(BestOption.Source->TerritoryID,
                         BestOption.Target->TerritoryID,
                         BestOption.UnitsToSend, false);
+  ++AttacksInitiatedThisPhase;
+  return true;
+}
+
+bool ASkaldAIController::ShouldContinueAttackingAfterBattle(
+    const FAIStrategicAttackOption &Option) const {
+  if (!Option.Source || !Option.Target) {
+    return false;
+  }
+
+  if (AttacksInitiatedThisPhase >= MaxStrategicAttacksPerPhase) {
+    return false;
+  }
+
+  if (Option.Score < PostBattleAttackScoreThreshold) {
+    return false;
+  }
+
+  const int32 FriendlyUnits = CachedStrategicContext.TotalFriendlyUnits;
+  const int32 EnemyUnits = FMath::Max(1, CachedStrategicContext.TotalEnemyUnits);
+  const float ForceRatio = FriendlyUnits > 0
+                               ? static_cast<float>(FriendlyUnits) / EnemyUnits
+                               : 0.f;
+
+  if (ForceRatio < 0.5f && AttacksInitiatedThisPhase > 0) {
+    return false;
+  }
+
+  const int32 StrengthDelta = Option.Source->ArmyUnits - Option.Target->ArmyUnits;
+  if (StrengthDelta <= 1 && Option.UnitsToSend <= 2) {
+    return false;
+  }
+
   return true;
 }
 
@@ -1276,6 +1346,36 @@ bool ASkaldAIController::ExecuteStrategicMovement(AWorldMap *WorldMap,
                       BestOption.Target->TerritoryID,
                       BestOption.UnitsToMove);
   return true;
+}
+
+bool ASkaldAIController::HandlePostBattleReevaluation(
+    AWorldMap *WorldMap, ASkaldPlayerState *PlayerState) {
+  if (!bPostBattleEvaluationPending || !WorldMap || !PlayerState) {
+    return false;
+  }
+
+  if (!bPostBattlePauseActive) {
+    bPostBattlePauseActive = true;
+    BroadcastEnemyTurnStatus(FString(EnemyPostBattleReevaluationMessage));
+    ScheduleNextDecisionStep(PostBattleEvaluationPauseSeconds);
+    return true;
+  }
+
+  bPostBattlePauseActive = false;
+  bPostBattleEvaluationPending = false;
+
+  RefreshStrategicContext(WorldMap, PlayerState);
+
+  FAIStrategicAttackOption BestOption;
+  if (!EvaluateBestStrategicAttack(WorldMap, PlayerState, BestOption) ||
+      !ShouldContinueAttackingAfterBattle(BestOption)) {
+    BroadcastEnemyTurnStatus(FString(EnemyPostBattleStandDownMessage));
+    SchedulePhaseAdvance(EnemyTurnStepDelay);
+    return true;
+  }
+
+  BroadcastEnemyTurnStatus(FString(EnemyPostBattleResumeMessage));
+  return false;
 }
 
 int32 ASkaldAIController::DetermineArmyToSend(EAIStrategy Strategy,
@@ -1567,6 +1667,22 @@ bool ASkaldAIController::ControlsFighter(const AFighterPawn *Fighter) const {
   }
   return Fighter->bIsAttacker ? bAIControlsAttackerSide
                               : bAIControlsDefenderSide;
+}
+
+bool ASkaldAIController::IsActiveTurnController() const {
+  if (!TurnManager) {
+    return false;
+  }
+
+  const int32 CurrentIndex = TurnManager->GetCurrentControllerIndex();
+  const TArray<ASkaldPlayerController *> Controllers =
+      TurnManager->GetControllers();
+
+  if (!Controllers.IsValidIndex(CurrentIndex)) {
+    return false;
+  }
+
+  return Controllers[CurrentIndex] == this;
 }
 
 bool ASkaldAIController::IsMyTurn() const {
@@ -2447,8 +2563,11 @@ bool ASkaldAIController::TryMoveTowardsNearestEnemy(AFighterPawn *Fighter) {
   BestPathCosts.Add(StartCell, 0);
 
   FIntPoint BestAnchor = StartCell;
-  int32 BestDistance = CurrentDistance;
-  int32 BestPathCost = TNumericLimits<int32>::Max();
+  float BestImprovementScore = TNumericLimits<float>::Max();
+  bool bFoundCloserDestination = false;
+  FIntPoint BestFallbackAnchor = StartCell;
+  float BestFallbackScore = TNumericLimits<float>::Max();
+  bool bHasFallbackDestination = false;
   FIntPoint BestAttackAnchor = StartCell;
   int32 BestAttackDistance = CurrentDistance;
   int32 BestAttackCost = TNumericLimits<int32>::Max();
@@ -2507,20 +2626,36 @@ bool ASkaldAIController::TryMoveTowardsNearestEnemy(AFighterPawn *Fighter) {
         bFoundAttackAnchor = true;
       }
 
-      if (CandidateDistance > BestDistance) {
-        continue;
-      }
+      const float CandidateScore =
+          CandidateDistance * MovementHuntDistanceWeight +
+          static_cast<float>(StepCost) * MovementHuntStepWeight;
 
-      if (CandidateDistance < BestDistance || StepCost < BestPathCost) {
-        BestDistance = CandidateDistance;
-        BestPathCost = StepCost;
-        BestAnchor = Next;
+      if (CandidateDistance < CurrentDistance) {
+        if (!bFoundCloserDestination || CandidateScore < BestImprovementScore) {
+          bFoundCloserDestination = true;
+          BestImprovementScore = CandidateScore;
+          BestAnchor = Next;
+        }
+      } else if (CandidateDistance <=
+                 CurrentDistance + MovementMaxDetourDistance) {
+        if (!bHasFallbackDestination || CandidateScore < BestFallbackScore) {
+          bHasFallbackDestination = true;
+          BestFallbackScore = CandidateScore;
+          BestFallbackAnchor = Next;
+        }
       }
     }
   }
 
+  FIntPoint PreferredAnchor = StartCell;
+  if (bFoundCloserDestination) {
+    PreferredAnchor = BestAnchor;
+  } else if (bHasFallbackDestination) {
+    PreferredAnchor = BestFallbackAnchor;
+  }
+
   const FIntPoint Destination =
-      bFoundAttackAnchor ? BestAttackAnchor : BestAnchor;
+      bFoundAttackAnchor ? BestAttackAnchor : PreferredAnchor;
 
   if (Destination == StartCell) {
     return false;
@@ -2724,8 +2859,11 @@ bool ASkaldAIController::TryMoveTowardsSupportAlly(AFighterPawn *Fighter) {
   BestPathCosts.Add(StartCell, 0);
 
   FIntPoint BestAnchor = StartCell;
-  int32 BestDistance = CurrentDistance;
-  int32 BestPathCost = TNumericLimits<int32>::Max();
+  float BestImprovementScore = TNumericLimits<float>::Max();
+  bool bFoundCloserDestination = false;
+  FIntPoint BestFallbackAnchor = StartCell;
+  float BestFallbackScore = TNumericLimits<float>::Max();
+  bool bHasFallbackDestination = false;
 
   while (Frontier.Num() > 0) {
     Frontier.Sort(FrontierComparator);
@@ -2768,19 +2906,33 @@ bool ASkaldAIController::TryMoveTowardsSupportAlly(AFighterPawn *Fighter) {
       Frontier.Add({Next, StepCost});
 
       const int32 CandidateDistance = ComputeDistanceFromAnchor(Next);
-      if (CandidateDistance > BestDistance) {
-        continue;
-      }
+      const float CandidateScore =
+          CandidateDistance * MovementHuntDistanceWeight +
+          static_cast<float>(StepCost) * MovementHuntStepWeight;
 
-      if (CandidateDistance < BestDistance || StepCost < BestPathCost) {
-        BestDistance = CandidateDistance;
-        BestPathCost = StepCost;
-        BestAnchor = Next;
+      if (CandidateDistance < CurrentDistance) {
+        if (!bFoundCloserDestination || CandidateScore < BestImprovementScore) {
+          bFoundCloserDestination = true;
+          BestImprovementScore = CandidateScore;
+          BestAnchor = Next;
+        }
+      } else if (CandidateDistance <=
+                 CurrentDistance + MovementMaxDetourDistance) {
+        if (!bHasFallbackDestination || CandidateScore < BestFallbackScore) {
+          bHasFallbackDestination = true;
+          BestFallbackScore = CandidateScore;
+          BestFallbackAnchor = Next;
+        }
       }
     }
   }
 
-  const FIntPoint Destination = BestAnchor;
+  FIntPoint Destination = StartCell;
+  if (bFoundCloserDestination) {
+    Destination = BestAnchor;
+  } else if (bHasFallbackDestination) {
+    Destination = BestFallbackAnchor;
+  }
 
   if (Destination == StartCell) {
     return false;
@@ -2974,11 +3126,35 @@ void ASkaldAIController::CompleteFighterActivation() {
 }
 
 void ASkaldAIController::HandleBattleMapStateChanged(bool bInBattleMap) {
+  const bool bPreviouslyInBattleMap = bWasInBattleMap;
+  bWasInBattleMap = bInBattleMap;
+
   if (bInBattleMap) {
     SetupBattleAutomation();
   } else {
     TeardownBattleAutomation();
+    if (bPreviouslyInBattleMap) {
+      HandleBattleMapExit();
+    }
   }
+}
+
+void ASkaldAIController::HandleBattleMapExit() {
+  bPostBattlePauseActive = false;
+
+  if (!TurnManager) {
+    return;
+  }
+
+  if (TurnManager->GetCurrentPhase() != ETurnPhase::Attack) {
+    return;
+  }
+
+  if (!IsActiveTurnController()) {
+    return;
+  }
+
+  bPostBattleEvaluationPending = true;
 }
 
 void ASkaldAIController::ScheduleTryActivateNextFighter() {

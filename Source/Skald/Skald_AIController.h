@@ -9,6 +9,7 @@
 #include "Skald_AIController.generated.h"
 
 class AFighterPawn;
+class ATerritory;
 class AWorldMap;
 class UGridBattleManager;
 class UGridOverlayComponent;
@@ -63,6 +64,13 @@ private:
 
   struct FAnimatedArmyPlacementStep;
 
+  struct FAIStrategicAttackOption {
+    ATerritory *Source = nullptr;
+    ATerritory *Target = nullptr;
+    float Score = 0.f;
+    int32 UnitsToSend = 0;
+  };
+
   struct FStrategicContext {
     TArray<ATerritory *> OwnedTerritories;
     TArray<ATerritory *> EnemyTerritories;
@@ -100,6 +108,14 @@ private:
                               ASkaldPlayerState *PlayerState);
   bool ExecuteStrategicMovement(AWorldMap *WorldMap,
                                 ASkaldPlayerState *PlayerState);
+  bool EvaluateBestStrategicAttack(AWorldMap *WorldMap,
+                                   ASkaldPlayerState *PlayerState,
+                                   FAIStrategicAttackOption &OutOption) const;
+  bool HandlePostBattleReevaluation(AWorldMap *WorldMap,
+                                    ASkaldPlayerState *PlayerState);
+  bool ShouldContinueAttackingAfterBattle(
+      const FAIStrategicAttackOption &Option) const;
+  bool IsActiveTurnController() const;
   int32 DetermineArmyToSend(EAIStrategy Strategy, int32 SourceUnits,
                             int32 TargetUnits) const;
   void ScheduleNextDecisionStep(float DelaySeconds);
@@ -172,6 +188,7 @@ private:
   float EvaluateFighterActivationPriority(AFighterPawn *Fighter) const;
   void CompleteFighterActivation();
   virtual void HandleBattleMapStateChanged(bool bInBattleMap) override;
+  void HandleBattleMapExit();
 
   void ProcessPrepareForBattlePrompt(
       const FPrepareForBattlePromptData &PromptData);
@@ -202,6 +219,12 @@ private:
   /** Tracks whether the AI is waiting for a battle travel transition. */
   bool bAwaitingBattleTransition = false;
 
+  /** True when a battle just concluded and the AI should pause before attacking. */
+  bool bPostBattleEvaluationPending = false;
+
+  /** Tracks whether the post-battle pause timer is active. */
+  bool bPostBattlePauseActive = false;
+
   /** Tracks the number of decision steps processed this turn. */
   int32 DecisionIterationCount = 0;
 
@@ -216,6 +239,15 @@ private:
 
   /** Tracks whether the current turn's strategy has been evaluated. */
   bool bStrategyEvaluatedThisTurn = false;
+
+  /** Tracks the number of attacks launched during the current attack phase. */
+  int32 AttacksInitiatedThisPhase = 0;
+
+  /** Cached state of whether the battle map was previously active. */
+  bool bWasInBattleMap = false;
+
+  /** Maximum strategic attacks permitted in a single attack phase. */
+  static constexpr int32 MaxStrategicAttacksPerPhase = 4;
 
   /** Cached strategic context reused throughout the turn. */
   FStrategicContext CachedStrategicContext;
