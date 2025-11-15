@@ -164,8 +164,8 @@ int32 ASkaldPlayerState::GetAuthoritativePlayerId() const {
   const FUniqueNetIdRepl &NetId = GetUniqueId();
   if (NetId.IsValid()) {
     FString NetIdString;
-    if (TSharedPtr<const FUniqueNetId> UniqueId = NetId.GetUniqueNetId()) {
-      NetIdString = UniqueId->ToString();
+    if (TSharedPtr<const FUniqueNetId> UniqueIdHandle = NetId.GetUniqueNetId()) {
+      NetIdString = UniqueIdHandle->ToString();
     } else {
       NetIdString = NetId.ToDebugString();
     }
