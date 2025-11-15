@@ -163,17 +163,20 @@ int32 ASkaldPlayerState::GetAuthoritativePlayerId() const {
 
   const FUniqueNetIdRepl &NetId = GetUniqueId();
   if (NetId.IsValid()) {
-    FString NetIdString;
     if (TSharedPtr<const FUniqueNetId> UniqueIdHandle = NetId.GetUniqueNetId()) {
-      NetIdString = UniqueIdHandle->ToString();
-    } else {
-      NetIdString = NetId.ToDebugString();
+      const uint32 NetIdHash = FCrc::StrCrc32(*UniqueIdHandle->ToString());
+      // Clamp to the positive int32 range so we can continue using a single
+      // integer identifier throughout the UI/world map selection code paths.
+      return static_cast<int32>(NetIdHash & 0x7fffffff);
     }
 
-    const uint32 NetIdHash = FCrc::StrCrc32(*NetIdString);
-    // Clamp to the positive int32 range so we can continue using a single
-    // integer identifier throughout the UI/world map selection code paths.
-    return static_cast<int32>(NetIdHash & 0x7fffffff);
+    // In some editor scenarios the replicated ID can be flagged as valid but
+    // the underlying pointer has not been resolved yet. Fall back to the
+    // UObject unique ID in that rare case so we always return a stable value
+    // without requiring OnlineSubsystem symbols at link-time.
+    UE_LOG(LogSkald, Verbose,
+           TEXT("GetAuthoritativePlayerId could not resolve NetId handle for %s"),
+           *GetResolvedPlayerName(TEXT("SkaldPlayerState::GetAuthoritativePlayerId")));
   }
 
   return static_cast<int32>(GetUniqueID());
