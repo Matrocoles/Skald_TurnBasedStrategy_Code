@@ -2033,7 +2033,7 @@ bool ASkaldPlayerController::RefreshLocalTerritorySelection() {
     return false;
   }
 
-  const int32 LocalPlayerId = PS->GetPlayerId();
+  const int32 LocalPlayerId = ResolveStablePlayerId(PS);
   if (LocalPlayerId == INDEX_NONE) {
     return false;
   }
@@ -2251,7 +2251,7 @@ void ASkaldPlayerController::OnRep_PlayerState() {
   }
 
   if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
-    MainHUD->LocalPlayerID = PS->GetPlayerId();
+    MainHUD->LocalPlayerID = ResolveStablePlayerId(PS);
     MainHUD->UpdateResources(PS->Resources);
     MainHUD->SyncPhaseButtons(MainHUD->CurrentPlayerID ==
                                     MainHUD->LocalPlayerID);
@@ -2376,6 +2376,21 @@ void ASkaldPlayerController::ApplyTurnManager(ATurnManager *Manager) {
   }
 }
 
+ATurnManager *ASkaldPlayerController::FindTurnManagerActor() const {
+  UWorld *World = GetWorld();
+  if (!World) {
+    return nullptr;
+  }
+
+  for (TActorIterator<ATurnManager> It(World); It; ++It) {
+    if (ATurnManager *Manager = *It) {
+      return Manager;
+    }
+  }
+
+  return nullptr;
+}
+
 void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
   if (!IsLocalController()) {
     return;
@@ -2394,6 +2409,8 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
     }
     return;
   }
+
+  RequestBattleStateIfNeeded();
 
   // If we've already locked in and are waiting for the battle HUD to take over,
   // keep the fighter selection screen hidden so we don't immediately flip the
@@ -2416,7 +2433,7 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
   }
 
   const FS_BattlePayload &Battle = CachedGameInstance->PendingBattle;
-  const int32 PlayerID = PS->GetPlayerId();
+  const int32 PlayerID = ResolveStablePlayerId(PS);
   const bool bIsParticipant =
       Battle.AttackerPlayerID == PlayerID || Battle.DefenderPlayerID == PlayerID;
 
@@ -2427,6 +2444,41 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
   if (!FighterSelectionWidget || !FighterSelectionWidget->IsInViewport()) {
     ShowFighterSelectionUI(PS->PendingArmyBudget, PS->Faction);
   }
+}
+
+void ASkaldPlayerController::RequestBattleStateIfNeeded() {
+  if (!IsLocalController()) {
+    return;
+  }
+
+  if (!CachedGameInstance) {
+    CachedGameInstance = GetGameInstance<USkaldGameInstance>();
+  }
+
+  if (!CachedGameInstance) {
+    return;
+  }
+
+  const bool bInBattle = bIsBattleMap || CachedGameInstance->bIsInBattleMap;
+  if (!bInBattle) {
+    bPendingBattleStateRequest = false;
+    return;
+  }
+
+  const bool bHasBattlePayload =
+      CachedGameInstance->PendingBattle.FromTerritoryID > 0 &&
+      CachedGameInstance->PendingBattle.TargetTerritoryID > 0;
+  if (bHasBattlePayload) {
+    bPendingBattleStateRequest = false;
+    return;
+  }
+
+  if (bPendingBattleStateRequest) {
+    return;
+  }
+
+  bPendingBattleStateRequest = true;
+  ServerRequestPendingBattleState();
 }
 
 void ASkaldPlayerController::ShowFighterSelectionUI(int32 MaxBudget,
@@ -2607,7 +2659,7 @@ void ASkaldPlayerController::Server_CommitArmy_Implementation(
   const FS_BattlePayload Battle = GI->PendingBattle;
 
   if (PS) {
-    const int32 PlayerID = PS->GetPlayerId();
+    const int32 PlayerID = ResolveStablePlayerId(PS);
     if (PlayerID != Battle.AttackerPlayerID &&
         PlayerID != Battle.DefenderPlayerID) {
       return;
@@ -2633,7 +2685,7 @@ void ASkaldPlayerController::Server_CommitArmy_Implementation(
 
   if (ASkald_BattleGameMode *BattleGM = ResolveBattleGameMode()) {
     if (PS) {
-      BattleGM->RegisterPlayerLockIn(PS->GetPlayerId());
+      BattleGM->RegisterPlayerLockIn(ResolveStablePlayerId(PS));
     }
     BattleGM->TryLaunchBattle();
   }
@@ -3208,6 +3260,9 @@ void ASkaldPlayerController::DetectBattleMap() {
       if (CachedGameMode) {
         TM = CachedGameMode->GetTurnManager();
       }
+      if (!TM) {
+        TM = FindTurnManagerActor();
+      }
     }
 
     if (TM) {
@@ -3429,7 +3484,7 @@ void ASkaldPlayerController::ServerAcknowledgeBattleResults_Implementation() {
   }
 
   if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
-    const int32 PlayerId = PS->GetPlayerId();
+    const int32 PlayerId = ResolveStablePlayerId(PS);
     if (PlayerId > 0) {
       TurnManager->NotifyBattleResultAcknowledged(PlayerId);
     }
@@ -3695,9 +3750,22 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
     // === TurnManager-driven battle (grid / advanced flow) ===
     if (TurnManager)
     {
-        FS_BattlePayload Battle;
-        Battle.AttackerPlayerID = AttackerPS ? AttackerPS->GetPlayerId() : -1;
-        Battle.DefenderPlayerID = DefenderPS ? DefenderPS->GetPlayerId() : -1;
+    auto ResolveStablePlayerId = [](const ASkaldPlayerState *PlayerState) {
+      if (!PlayerState) {
+        return INDEX_NONE;
+      }
+
+      const int32 ReplicatedId = PlayerState->GetPlayerId();
+      if (ReplicatedId > 0) {
+        return ReplicatedId;
+      }
+
+      return PlayerState->GetAuthoritativePlayerId();
+    };
+
+    FS_BattlePayload Battle;
+    Battle.AttackerPlayerID = ResolveStablePlayerId(AttackerPS);
+    Battle.DefenderPlayerID = ResolveStablePlayerId(DefenderPS);
         Battle.FromTerritoryID = FromID;
         Battle.TargetTerritoryID = ToID;
         Battle.AttackerTerritoryName = Source->TerritoryName;
@@ -3863,7 +3931,7 @@ void ASkaldPlayerController::ServerSetReadyForBattle_Implementation(bool bReady)
     }
 
     ASkaldPlayerState* PS = GetPlayerState<ASkaldPlayerState>();
-    const int32 PlayerID = PS ? PS->GetPlayerId() : -1;
+    const int32 PlayerID = ResolveStablePlayerId(PS);
     if (PlayerID < 0) {
         UE_LOG(LogSkald, Warning,
             TEXT("ServerSetReadyForBattle called with invalid PlayerID"));
@@ -3943,7 +4011,7 @@ void ASkaldPlayerController::ServerHandleMove_Implementation(int32 FromID,
   }
 
   ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
-  const int32 PlayerID = PS ? PS->GetPlayerId() : -1;
+  const int32 PlayerID = ResolveStablePlayerId(PS);
   if (PlayerID <= 0) {
     Error = TEXT("Unable to resolve player for movement");
     ClientHandleMoveOutcome(false, FromID, ToID, Error);
@@ -4162,8 +4230,8 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
   }
 
   if (TerritoryID < 0) {
-    WorldMap->SelectTerritory(nullptr, false, SelectingPlayerId); // server
-    WorldMap->MulticastSelectTerritory(-1, SelectingPlayerId); // replicate
+    WorldMap->SelectTerritory(nullptr, false, SelectingPlayerId);
+    ClientSelectTerritory(-1, SelectingPlayerId);
     return;
   }
 
@@ -4172,12 +4240,12 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
     return;
   }
 
-  WorldMap->SelectTerritory(Terr, false, SelectingPlayerId); // server authority
-  WorldMap->MulticastSelectTerritory(TerritoryID, SelectingPlayerId);
+  WorldMap->SelectTerritory(Terr, false, SelectingPlayerId);
+  ClientSelectTerritory(TerritoryID, SelectingPlayerId);
 }
 
 void ASkaldPlayerController::ClientSelectTerritory_Implementation(
-    int32 TerritoryID) {
+    int32 TerritoryID, int32 SelectingPlayerId) {
   AWorldMap *WorldMap = Cast<AWorldMap>(
       UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
   if (!WorldMap) {
@@ -4190,18 +4258,58 @@ void ASkaldPlayerController::ClientSelectTerritory_Implementation(
 
   ATerritory *Terr =
       TerritoryID >= 0 ? WorldMap->GetTerritoryById(TerritoryID) : nullptr;
-  int32 SelectingPlayerId = INDEX_NONE;
-  if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
-    SelectingPlayerId = PS->GetAuthoritativePlayerId();
-  }
   WorldMap->SelectTerritory(Terr, true, SelectingPlayerId);
   UE_LOG(LogSkald, Log, TEXT("ClientSelectTerritory <- %d"), TerritoryID);
+}
+
+void ASkaldPlayerController::ServerRequestPendingBattleState_Implementation() {
+  USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+  if (!GI) {
+    return;
+  }
+
+  const FS_BattlePayload BattlePayload = GI->PendingBattle;
+  const FSkaldTravelState TravelState = GI->GetTravelState();
+  const bool bBattleMapActive = GI->bIsInBattleMap;
+
+  ClientApplyPendingBattleState(BattlePayload, TravelState, bBattleMapActive);
+}
+
+void ASkaldPlayerController::ClientApplyPendingBattleState_Implementation(
+    const FS_BattlePayload &Battle, const FSkaldTravelState &TravelState,
+    bool bBattleMapActive) {
+  if (!CachedGameInstance) {
+    CachedGameInstance = GetGameInstance<USkaldGameInstance>();
+  }
+
+  if (CachedGameInstance) {
+    CachedGameInstance->SetTravelState(TravelState);
+    CachedGameInstance->PendingBattle = Battle;
+    CachedGameInstance->SetBattleMapActive(bBattleMapActive);
+  }
+
+  bPendingBattleStateRequest = false;
+  DetectBattleMap();
+  InitializeFighterSelectionIfNeeded();
 }
 
 void ASkaldPlayerController::ClientStartPhysicalDiceRoll_Implementation(
     const FGuid &RollId, int32 PlayerDice, int32 EnemyDice, bool bForInitiative,
     FLinearColor PlayerColor, FLinearColor EnemyColor) {
   if (HasAuthority() || !RollId.IsValid()) {
+    return;
+  }
+
+  // Initiative rolls already receive a deterministic, scripted presentation via
+  // TriggerInitiativeDicePresentation once the server resolves the outcome.
+  // Replaying a local physical roll beforehand caused clients to see two
+  // completely separate rolls (one random, one authoritative). Skip spawning
+  // the redundant roll so the first visuals the player sees always match the
+  // actual networked result.
+  if (bForInitiative) {
+    UE_LOG(LogSkaldDice, Verbose,
+           TEXT("ClientStartPhysicalDiceRoll: skipping local initiative roll %s"),
+           *RollId.ToString());
     return;
   }
 
@@ -4558,6 +4666,12 @@ bool ASkaldPlayerController::EnsureTurnManager(const TCHAR *Caller) {
   }
 
   if (!TurnManager) {
+    if (ATurnManager *WorldManager = FindTurnManagerActor()) {
+      SetTurnManager(WorldManager);
+    }
+  }
+
+  if (!TurnManager) {
     UE_LOG(LogSkald, Warning, TEXT("TurnManager still missing; aborting %s."),
            Caller);
     return false;
@@ -4574,17 +4688,21 @@ void ASkaldPlayerController::BuildPlayerDataArray(
   }
 
   TMap<int32, int32> TerritoryCounts;
-  auto AccumulateOwner = [&TerritoryCounts](int32 OwnerPlayerId) {
+  auto AccumulateOwnerId = [&TerritoryCounts](int32 OwnerPlayerId) {
     if (OwnerPlayerId > 0) {
       TerritoryCounts.FindOrAdd(OwnerPlayerId) += 1;
     }
   };
+  auto AccumulateOwner =
+      [this, &AccumulateOwnerId](const ASkaldPlayerState *OwnerPlayer) {
+        AccumulateOwnerId(ResolveStablePlayerId(OwnerPlayer));
+      };
 
   bool bResolvedTerritories = false;
   if (AWorldMap *WorldMap = CachedWorldMap.Get()) {
     for (ATerritory *Territory : WorldMap->Territories) {
       if (Territory && Territory->OwningPlayer) {
-        AccumulateOwner(Territory->OwningPlayer->GetPlayerId());
+        AccumulateOwner(Territory->OwningPlayer);
         bResolvedTerritories = true;
       }
     }
@@ -4597,7 +4715,7 @@ void ASkaldPlayerController::BuildPlayerDataArray(
                   World, AWorldMap::StaticClass()))) {
         for (ATerritory *Territory : WorldMap->Territories) {
           if (Territory && Territory->OwningPlayer) {
-            AccumulateOwner(Territory->OwningPlayer->GetPlayerId());
+            AccumulateOwner(Territory->OwningPlayer);
             bResolvedTerritories = true;
           }
         }
@@ -4613,12 +4731,12 @@ void ASkaldPlayerController::BuildPlayerDataArray(
 
     if (GameInstance) {
       auto AccumulateFromSnapshots =
-          [&AccumulateOwner, &bResolvedTerritories](
+          [&AccumulateOwnerId, &bResolvedTerritories](
               const TArray<FS_Territory> &Snapshots) {
             bool bFoundData = false;
             for (const FS_Territory &Snapshot : Snapshots) {
               if (Snapshot.OwnerPlayerID > 0) {
-                AccumulateOwner(Snapshot.OwnerPlayerID);
+                AccumulateOwnerId(Snapshot.OwnerPlayerID);
                 bFoundData = true;
               }
             }
@@ -4640,7 +4758,7 @@ void ASkaldPlayerController::BuildPlayerDataArray(
   for (APlayerState *PSBase : CachedGameState->PlayerArray) {
     if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
       FS_PlayerData Data;
-      Data.PlayerID = PS->GetPlayerId();
+      Data.PlayerID = ResolveStablePlayerId(PS);
       Data.PlayerName = PS->GetResolvedPlayerName(TEXT("BuildPlayerDataArray"));
       Data.IsAI = PS->bIsAI;
       Data.Faction = PS->Faction;
@@ -4684,6 +4802,7 @@ void ASkaldPlayerController::HandleBattleMapStateChanged(bool /*bInBattleMap*/) 
   DetectBattleMap();
   InitializeFighterSelectionIfNeeded();
   RefreshFactionCursorFromState();
+  RequestBattleStateIfNeeded();
 }
 
 void ASkaldPlayerController::HandleWorldStateChanged() {
@@ -4768,7 +4887,7 @@ void ASkaldPlayerController::HandleFactionLockedIn() {
       MainHUD->RefreshPlayerList(Players);
     }
     if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
-      MainHUD->LocalPlayerID = PS->GetPlayerId();
+      MainHUD->LocalPlayerID = ResolveStablePlayerId(PS);
       MainHUD->UpdateDeployableUnits(PS->DeployableUnits);
       MainHUD->UpdateResources(PS->Resources);
       MainHUD->SyncPhaseButtons(MainHUD->CurrentPlayerID ==
@@ -6004,7 +6123,7 @@ bool ASkaldPlayerController::ShouldDisplayPrepareForBattlePrompt(
     return true;
   }
 
-  const int32 LocalPlayerID = LocalPS->GetPlayerId();
+  const int32 LocalPlayerID = ResolveStablePlayerId(LocalPS);
   if (LocalPlayerID <= 0) {
     UE_LOG(
         LogSkaldReady, Verbose,
@@ -8261,6 +8380,20 @@ void ASkaldPlayerController::HideInitiativeResults() {
   }
 }
 
+int32 ASkaldPlayerController::ResolveStablePlayerId(
+    const ASkaldPlayerState *PlayerState) const {
+  if (!PlayerState) {
+    return INDEX_NONE;
+  }
+
+  const int32 ReplicatedId = PlayerState->GetPlayerId();
+  if (ReplicatedId > 0) {
+    return ReplicatedId;
+  }
+
+  return PlayerState->GetAuthoritativePlayerId();
+}
+
 bool ASkaldPlayerController::IsFriendlyFighter(const AFighterPawn *Fighter) const {
   if (!Fighter)
     return false;
@@ -8283,7 +8416,7 @@ void ASkaldPlayerController::DetermineControlledBattleSide() {
     return;
 
   const FS_BattlePayload &Battle = CachedGameInstance->PendingBattle;
-  const int32 PlayerID = PS->GetPlayerId();
+  const int32 PlayerID = ResolveStablePlayerId(PS);
   if (PlayerID == Battle.AttackerPlayerID) {
     bControlsAttackerSide = true;
   }
@@ -8378,7 +8511,7 @@ void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,
     PlayerFactionColor = ResolveFactionColor(PS->Faction);
   }
 
-  const int32 PlayerId = PS ? PS->GetPlayerId() : INDEX_NONE;
+  const int32 PlayerId = ResolveStablePlayerId(PS);
   bool bWasAttacker = PlayerId != INDEX_NONE &&
                       PlayerId == BattleSnapshot.AttackerPlayerID;
   const bool bWasDefender = PlayerId != INDEX_NONE &&

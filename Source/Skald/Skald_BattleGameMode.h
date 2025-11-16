@@ -83,6 +83,8 @@ private:
   void PollBattleBootstrap();
   void EnsureBattleControllers();
   void ProcessDeferredControllers();
+  void QueueDeferredController(AController *Controller);
+  bool ControllerHasStablePlayerId(AController *Controller) const;
   void ProcessStreamingActivation();
 
   /** Controllers waiting for bootstrap while we rebuild the roster. */

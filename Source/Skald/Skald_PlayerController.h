@@ -52,6 +52,7 @@ class ICursor;
 class UImage;
 class UCanvasPanel;
 class UFactionCursorWidget;
+struct FSkaldTravelState;
 
 /** Command issued by the player during a battle. */
 UENUM()
@@ -876,7 +877,17 @@ public:
 
   /** Client-side update for a territory selection. Pass -1 to clear. */
   UFUNCTION(Client, Reliable)
-  void ClientSelectTerritory(int32 TerritoryID);
+  void ClientSelectTerritory(int32 TerritoryID, int32 SelectingPlayerId);
+
+  /** Request the pending battle payload from the host if it failed to replicate. */
+  UFUNCTION(Server, Reliable)
+  void ServerRequestPendingBattleState();
+
+  /** Apply the pending battle payload sent from the host. */
+  UFUNCTION(Client, Reliable)
+  void ClientApplyPendingBattleState(const FS_BattlePayload &Battle,
+                                     const FSkaldTravelState &TravelState,
+                                     bool bBattleMapActive);
 
   UFUNCTION(Client, Reliable)
   void ClientStartPhysicalDiceRoll(const FGuid &RollId, int32 PlayerDice,
@@ -921,6 +932,7 @@ protected:
 
   /** Helper to update cached state whenever the replicated turn manager changes. */
   void ApplyTurnManager(ATurnManager *Manager);
+  ATurnManager *FindTurnManagerActor() const;
 
   void RegisterPendingReadyPromptRetry();
   void HandlePendingReadyPromptRetry();
@@ -969,6 +981,9 @@ private:
   /** Reapply the most recent local territory selection once IDs/world map resolve. */
   bool RefreshLocalTerritorySelection();
 
+  /** Resolve a player's stable ID, falling back to hashed net IDs before replication. */
+  int32 ResolveStablePlayerId(const class ASkaldPlayerState *PlayerState) const;
+
   /** Handle playing the click sound when interacting with UI. */
   void HandleCursorClickSound();
 
@@ -1007,8 +1022,13 @@ private:
             meta = (AllowPrivateAccess = "true"))
   bool bIsBattleMap = false;
 
+  /** Prevents redundant pending battle state requests while waiting for a reply. */
+  bool bPendingBattleStateRequest = false;
+
   /** Detect if the current level is a battle map and update bIsBattleMap. */
   void DetectBattleMap();
+
+  void RequestBattleStateIfNeeded();
 
   void BuildPlayerDataArray(TArray<FS_PlayerData> &OutPlayers) const;
 

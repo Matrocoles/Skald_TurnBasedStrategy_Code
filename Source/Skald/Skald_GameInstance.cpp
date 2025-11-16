@@ -40,6 +40,20 @@ using Skald::PropertyAccess::ReadIntProperty;
 using Skald::PropertyAccess::WriteBoolProperty;
 
 namespace {
+
+int32 ResolveSnapshotPlayerId(const ASkaldPlayerState *PlayerState) {
+  if (!PlayerState) {
+    return 0;
+  }
+
+  const int32 ReplicatedId = PlayerState->GetPlayerId();
+  if (ReplicatedId > 0) {
+    return ReplicatedId;
+  }
+
+  return PlayerState->GetAuthoritativePlayerId();
+}
+
 FLinearColor ResolveDefaultFactionColor(ESkaldFaction InFaction) {
   switch (InFaction) {
   case ESkaldFaction::Human:
@@ -433,8 +447,9 @@ bool USkaldGameInstance::CacheWorldMapSnapshot(UWorld *InWorldContext) {
     FS_Territory TerrData;
     TerrData.TerritoryID = Territory->TerritoryID;
     TerrData.TerritoryName = Territory->TerritoryName;
-    TerrData.OwnerPlayerID =
-        Territory->OwningPlayer ? Territory->OwningPlayer->GetPlayerId() : 0;
+    TerrData.OwnerPlayerID = Territory->OwningPlayer
+                                ? ResolveSnapshotPlayerId(Territory->OwningPlayer)
+                                : 0;
     TerrData.IsCapital = Territory->bIsCapital;
     TerrData.CapitalOwner = TerrData.OwnerPlayerID;
     TerrData.ArmyUnits = Territory->ArmyUnits;
@@ -590,7 +605,10 @@ bool USkaldGameInstance::RestoreWorldFromSnapshot(UWorld *InWorldContext) {
 
   for (APlayerState *PSBase : GameState->PlayerArray) {
     if (ASkaldPlayerState *SkaldPS = Cast<ASkaldPlayerState>(PSBase)) {
-      PlayerStateById.Add(SkaldPS->GetPlayerId(), SkaldPS);
+      const int32 PlayerId = ResolveSnapshotPlayerId(SkaldPS);
+      if (PlayerId > 0) {
+        PlayerStateById.Add(PlayerId, SkaldPS);
+      }
     }
   }
 
@@ -727,8 +745,9 @@ bool USkaldGameInstance::RestoreWorldFromSnapshot(UWorld *InWorldContext) {
            SampleSnapshot.WallHealth, SampleSnapshot.ConqueredTurn,
            SampleSnapshot.IsNeutralSpawn ? 1 : 0);
 
-    const int32 PostOwnerId =
-        SampleActor->OwningPlayer ? SampleActor->OwningPlayer->GetPlayerId() : 0;
+    const int32 PostOwnerId = SampleActor->OwningPlayer
+                                  ? ResolveSnapshotPlayerId(SampleActor->OwningPlayer)
+                                  : 0;
     UE_LOG(LogSkald, Verbose,
            TEXT("GameInstance RestoreWorldFromSnapshot sample (after): Id=%d Owner=%d Army=%d "
                 "TreasureCarrier=%d Fort=%d Moat=%d Wall=%d Conquered=%d Neutral=%d"),
