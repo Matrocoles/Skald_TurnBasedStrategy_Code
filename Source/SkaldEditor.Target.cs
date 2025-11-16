@@ -11,6 +11,6 @@ public class SkaldEditorTarget : TargetRules
                 DefaultBuildSettings = BuildSettingsVersion.V5;
                 IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_5;
 
-                ExtraModuleNames.AddRange( new string[] { "Skald" } );
+                ExtraModuleNames.AddRange( new string[] { "Skald", "SkaldDice" } );
         }
 }
