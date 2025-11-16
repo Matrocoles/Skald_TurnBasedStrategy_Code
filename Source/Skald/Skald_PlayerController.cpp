@@ -36,6 +36,7 @@
 #include "Territory.h"
 #include "TimerManager.h"
 #include "SkaldDiceManager.h"
+#include "SkaldDiceModule.h"
 #include "SkaldDiceOverlayWidget.h"
 #include "SkaldDiceResultWidget.h"
 #include "UI/BattleHUDWidget.h"
@@ -3750,19 +3751,6 @@ void ASkaldPlayerController::ServerHandleAttack_Implementation(int32 FromID,
     // === TurnManager-driven battle (grid / advanced flow) ===
     if (TurnManager)
     {
-    auto ResolveStablePlayerId = [](const ASkaldPlayerState *PlayerState) {
-      if (!PlayerState) {
-        return INDEX_NONE;
-      }
-
-      const int32 ReplicatedId = PlayerState->GetPlayerId();
-      if (ReplicatedId > 0) {
-        return ReplicatedId;
-      }
-
-      return PlayerState->GetAuthoritativePlayerId();
-    };
-
     FS_BattlePayload Battle;
     Battle.AttackerPlayerID = ResolveStablePlayerId(AttackerPS);
     Battle.DefenderPlayerID = ResolveStablePlayerId(DefenderPS);
@@ -8381,17 +8369,17 @@ void ASkaldPlayerController::HideInitiativeResults() {
 }
 
 int32 ASkaldPlayerController::ResolveStablePlayerId(
-    const ASkaldPlayerState *PlayerState) const {
-  if (!PlayerState) {
-    return INDEX_NONE;
+    const ASkaldPlayerState *InPlayerState) const {
+  if (!InPlayerState) {
+    return static_cast<int32>(INDEX_NONE);
   }
 
-  const int32 ReplicatedId = PlayerState->GetPlayerId();
+  const int32 ReplicatedId = InPlayerState->GetPlayerId();
   if (ReplicatedId > 0) {
     return ReplicatedId;
   }
 
-  return PlayerState->GetAuthoritativePlayerId();
+  return InPlayerState->GetAuthoritativePlayerId();
 }
 
 bool ASkaldPlayerController::IsFriendlyFighter(const AFighterPawn *Fighter) const {
