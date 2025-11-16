@@ -238,6 +238,9 @@ bool ATerritory::MoveTo(ATerritory *TargetTerritory, int32 Troops) {
 void ATerritory::HandleMouseEnter(UPrimitiveComponent *TouchedComponent) {
   if (AWorldMap *Map = Cast<AWorldMap>(GetOwner())) {
     if (!Map->IsWorldActive()) {
+      UE_LOG(LogSkald, VeryVerbose,
+             TEXT("Territory %d mouse enter ignored because world map is inactive."),
+             TerritoryID);
       return;
     }
   }
@@ -250,6 +253,9 @@ void ATerritory::HandleMouseEnter(UPrimitiveComponent *TouchedComponent) {
 void ATerritory::HandleMouseLeave(UPrimitiveComponent *TouchedComponent) {
   if (AWorldMap *Map = Cast<AWorldMap>(GetOwner())) {
     if (!Map->IsWorldActive()) {
+      UE_LOG(LogSkald, VeryVerbose,
+             TEXT("Territory %d mouse leave ignored because world map is inactive."),
+             TerritoryID);
       return;
     }
   }
@@ -263,6 +269,9 @@ void ATerritory::HandleClicked(UPrimitiveComponent *TouchedComponent,
                                FKey ButtonPressed) {
   if (AWorldMap *Map = Cast<AWorldMap>(GetOwner())) {
     if (!Map->IsWorldActive()) {
+      UE_LOG(LogSkald, Verbose,
+             TEXT("Territory %d click ignored because world map is inactive."),
+             TerritoryID);
       return;
     }
   }
@@ -297,7 +306,7 @@ void ATerritory::HandleClicked(UPrimitiveComponent *TouchedComponent,
   const int32 LocalPlayerId = LocalController->GetResolvedLocalPlayerId();
   if (LocalPlayerId == INDEX_NONE) {
     UE_LOG(LogSkald, Verbose,
-           TEXT("Territory %d clicked before controller %s finished registration; ignoring."),
+           TEXT("Territory %d click ignored because %s does not have a resolved player id yet."),
            TerritoryID, *LocalController->GetName());
     return;
   }

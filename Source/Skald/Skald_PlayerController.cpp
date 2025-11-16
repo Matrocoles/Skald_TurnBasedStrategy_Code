@@ -4205,6 +4205,9 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
   AWorldMap *WorldMap = Cast<AWorldMap>(
       UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
   if (!WorldMap) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("ServerSelectTerritory: no world map available for %s"),
+           *GetName());
     return;
   }
 
@@ -4221,6 +4224,9 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
   }
 
   if (!WorldMap->IsWorldActive() && TerritoryID >= 0) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("ServerSelectTerritory ignoring selection %d while world map is inactive for player %s."),
+           TerritoryID, *GetName());
     return;
   }
 
@@ -4232,6 +4238,9 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
 
   ATerritory *Terr = WorldMap->GetTerritoryById(TerritoryID);
   if (!Terr) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("ServerSelectTerritory: territory %d not found for player %s"),
+           TerritoryID, *GetName());
     return;
   }
 
