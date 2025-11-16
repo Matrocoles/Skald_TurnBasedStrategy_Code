@@ -4303,7 +4303,15 @@ void ASkaldPlayerController::ClientApplyPendingBattleState_Implementation(
 void ASkaldPlayerController::ClientStartPhysicalDiceRoll_Implementation(
     const FGuid &RollId, int32 PlayerDice, int32 EnemyDice, bool bForInitiative,
     FLinearColor PlayerColor, FLinearColor EnemyColor) {
-  if (HasAuthority() || !RollId.IsValid()) {
+  if (!RollId.IsValid()) {
+    return;
+  }
+
+  if (bForInitiative && !bIsBattleMap) {
+    CacheStrategicInitiativeRollId(RollId);
+  }
+
+  if (HasAuthority()) {
     return;
   }
 
@@ -5081,6 +5089,12 @@ void ASkaldPlayerController::HandleGridClick() {
   // Non-battle map handling
   FHitResult Hit;
   if (!bIsBattleMap) {
+    if (!HasResolvedLocalPlayerId()) {
+      UE_LOG(LogSkald, Verbose,
+             TEXT("HandleGridClick ignoring world map click until the controller finishes registration."));
+      return;
+    }
+
     GetHitResultUnderCursor(ECC_Visibility, /*bTraceComplex*/ true, Hit);
     if (ATerritory *Terr = Cast<ATerritory>(Hit.GetActor())) {
       ServerSelectTerritory(Terr->TerritoryID);
@@ -5644,6 +5658,12 @@ void ASkaldPlayerController::HandleClearSelectionPressed() {
   }
 
   if (!bIsBattleMap) {
+    if (!HasResolvedLocalPlayerId()) {
+      UE_LOG(LogSkald, Verbose,
+             TEXT("HandleClearSelectionPressed ignoring deselect until the controller finishes registration."));
+      return;
+    }
+
     ServerSelectTerritory(-1);
     return;
   }
@@ -5885,7 +5905,6 @@ void ASkaldPlayerController::ShowPendingStrategicInitiativeResult() {
   const int32 EnemyResult =
       PendingStrategicInitiativeEnemyRoll > 0 ? PendingStrategicInitiativeEnemyRoll
                                               : INDEX_NONE;
-  PendingStrategicInitiativeRollId.Invalidate();
 
   ASkald_PlayerCharacter *CameraPawn = Cast<ASkald_PlayerCharacter>(GetPawn());
   if (CameraPawn && !CameraPawn->IsBattleCameraActive() && CameraPawn->BeginStrategicInitiativeCameraView()) {
@@ -5893,14 +5912,17 @@ void ASkaldPlayerController::ShowPendingStrategicInitiativeResult() {
     EnsureDiceManagerBindings();
   }
 
-  const FGuid RollId = TriggerInitiativeDicePresentation(PendingStrategicInitiativeRoll, EnemyResult);
-
-  if (bStrategicInitiativeCameraActive) {
+  FGuid RollId = PendingStrategicInitiativeRollId;
+  if (!RollId.IsValid()) {
+    RollId = TriggerInitiativeDicePresentation(PendingStrategicInitiativeRoll,
+                                               EnemyResult);
     if (RollId.IsValid()) {
       PendingStrategicInitiativeRollId = RollId;
-    } else {
-      RestoreStrategicInitiativeCamera();
     }
+  }
+
+  if (bStrategicInitiativeCameraActive && !RollId.IsValid()) {
+    RestoreStrategicInitiativeCamera();
   }
 
   if (bPendingStrategicInitiativeWin && InitiativeWinSound && IsLocalController()) {
@@ -6053,6 +6075,12 @@ bool ASkaldPlayerController::TryShowPendingReadyPrompt() {
 
 void ASkaldPlayerController::BeginRetreatSelectionLocal(
     int32 DefendingTerritoryID, const TArray<int32> &CandidateTerritoryIDs) {
+  if (!HasResolvedLocalPlayerId()) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("BeginRetreatSelectionLocal cannot clear selection because the controller has not finished registration."));
+    return;
+  }
+
   ServerSelectTerritory(-1);
 
   if (!MainHUD) {
@@ -7624,6 +7652,15 @@ void ASkaldPlayerController::RestoreStrategicInitiativeCamera() {
   }
 }
 
+void ASkaldPlayerController::CacheStrategicInitiativeRollId(const FGuid &RollId) {
+  if (!RollId.IsValid() || bIsBattleMap) {
+    return;
+  }
+
+  PendingStrategicInitiativeRollId = RollId;
+  EnsureDiceManagerBindings();
+}
+
 void ASkaldPlayerController::HandleDiceResolutionComplete(
     AFighterPawn *Attacker, AFighterPawn *Defender,
     const FDiceRollResult &Result) {
@@ -8394,6 +8431,19 @@ int32 ASkaldPlayerController::ResolveStablePlayerId(
   }
 
   return InPlayerState->GetAuthoritativePlayerId();
+}
+
+int32 ASkaldPlayerController::GetResolvedLocalPlayerId() const {
+  if (const ASkaldPlayerState *LocalPlayerState =
+          GetPlayerState<ASkaldPlayerState>()) {
+    return ResolveStablePlayerId(LocalPlayerState);
+  }
+
+  return static_cast<int32>(INDEX_NONE);
+}
+
+bool ASkaldPlayerController::HasResolvedLocalPlayerId() const {
+  return GetResolvedLocalPlayerId() != static_cast<int32>(INDEX_NONE);
 }
 
 bool ASkaldPlayerController::IsFriendlyFighter(const AFighterPawn *Fighter) const {

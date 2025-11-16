@@ -294,21 +294,20 @@ void ATerritory::HandleClicked(UPrimitiveComponent *TouchedComponent,
     return;
   }
 
-  int32 LocalPlayerId = INDEX_NONE;
-  if (const ASkaldPlayerState *LocalPlayerState =
-          LocalController->GetPlayerState<ASkaldPlayerState>()) {
-    LocalPlayerId = LocalPlayerState->GetAuthoritativePlayerId();
+  const int32 LocalPlayerId = LocalController->GetResolvedLocalPlayerId();
+  if (LocalPlayerId == INDEX_NONE) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("Territory %d clicked before controller %s finished registration; ignoring."),
+           TerritoryID, *LocalController->GetName());
+    return;
   }
 
   bool bDeselected = bIsSelected;
   if (AWorldMap *Map = Cast<AWorldMap>(GetOwner())) {
-    if (LocalPlayerId != INDEX_NONE) {
-      if (ATerritory *CurrentSelection =
-              Map->GetSelectionForPlayer(LocalPlayerId)) {
-        bDeselected = CurrentSelection == this;
-      } else {
-        bDeselected = false;
-      }
+    if (ATerritory *CurrentSelection = Map->GetSelectionForPlayer(LocalPlayerId)) {
+      bDeselected = CurrentSelection == this;
+    } else {
+      bDeselected = false;
     }
   }
 
