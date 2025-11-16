@@ -191,6 +191,10 @@ void ASkaldPlayerController::BroadcastPhysicalDiceRoll(
     return;
   }
 
+  if (bForInitiative && World->GetNetMode() != NM_Standalone) {
+    return;
+  }
+
   for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It;
        ++It) {
     if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(*It)) {

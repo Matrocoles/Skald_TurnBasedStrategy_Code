@@ -519,15 +519,19 @@ bool UGridBattleManager::RollInitiative()
                         PlayerColor, EnemyColor);
                     if (RollId.IsValid())
                     {
-                        if (UWorld* World = GetWorld())
+                        const bool bUsedPhysicalDice = Manager->DidRollUsePhysicalDice(RollId);
+                        if (bUsedPhysicalDice)
                         {
-                            ASkaldPlayerController::BroadcastPhysicalDiceRoll(
-                                World, RollId, PlayerDiceCount, EnemyDiceCount, true,
-                                PlayerColor, EnemyColor);
+                            if (UWorld* World = GetWorld())
+                            {
+                                ASkaldPlayerController::BroadcastPhysicalDiceRoll(
+                                    World, RollId, PlayerDiceCount, EnemyDiceCount, true,
+                                    PlayerColor, EnemyColor);
+                            }
                         }
                         ActiveInitiativeRollId = RollId;
                         bInitiativeRollAwaitingResults = true;
-                        bInitiativeRollUsingPhysicalDice = true;
+                        bInitiativeRollUsingPhysicalDice = bUsedPhysicalDice;
                         return false;
                     }
 
