@@ -38,6 +38,25 @@ void USkaldDiceManager::Deinitialize()
     Super::Deinitialize();
 }
 
+namespace
+{
+bool ShouldSpawnPhysicalDice(const UWorld* World, bool bForInitiative)
+{
+    if (!World)
+    {
+        return false;
+    }
+
+    if (!bForInitiative)
+    {
+        return true;
+    }
+
+    const ENetMode NetMode = World->GetNetMode();
+    return NetMode == NM_Standalone;
+}
+}
+
 FGuid USkaldDiceManager::RollDice_D6(int32 NumPlayerDice, int32 NumEnemyDice,
     bool bForInitiative, FLinearColor PlayerColor, FLinearColor EnemyColor,
     FGuid OverrideRollId)
@@ -69,7 +88,7 @@ FGuid USkaldDiceManager::RollDice_D6(int32 NumPlayerDice, int32 NumEnemyDice,
     Roll.bUseScriptedResults = false;
     Roll.ScriptedResults.Reset();
 
-    const bool bSpawnedPhysical = SpawnPhysicalRoll(Roll);
+    const bool bSpawnedPhysical = ShouldSpawnPhysicalDice(World, bForInitiative) ? SpawnPhysicalRoll(Roll) : false;
 
     OnDiceRollStarted.Broadcast(RollId);
 
