@@ -322,8 +322,10 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
 
   if (GI && (PS->Faction == ESkaldFaction::None || PS->PlayerDisplayName.IsEmpty())) {
     FS_PlayerData LobbyData;
-    const FString ExistingDisplayName = PS->PlayerDisplayName;
-    if (GI->ConsumePendingLobbyPlayerData(PS->GetPlayerId(), ExistingDisplayName,
+    const FString ExistingIdentity = !PS->PlayerDisplayName.IsEmpty()
+                                         ? PS->PlayerDisplayName
+                                         : PS->GetPlayerName();
+    if (GI->ConsumePendingLobbyPlayerData(PS->GetPlayerId(), ExistingIdentity,
                                           LobbyData)) {
       if (PS->Faction == ESkaldFaction::None &&
           LobbyData.Faction != ESkaldFaction::None) {
@@ -1387,6 +1389,38 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
   TArray<ASkaldPlayerController *> RegisteredControllers =
       TurnManager ? TurnManager->GetControllers()
                   : TArray<ASkaldPlayerController *>();
+
+  const int32 ExpectedControllerCount =
+      FMath::Max(ResolveExpectedControllerCount(), MinPlayerCount);
+  const int32 RegisteredControllerCount =
+      TurnManager ? TurnManager->GetControllerCount() : 0;
+  const bool bWaitingOnControllers =
+      PendingControllers.Num() > 0 ||
+      (ExpectedControllerCount > 0 &&
+       RegisteredControllerCount < ExpectedControllerCount);
+
+  if (bWaitingOnControllers) {
+    UE_LOG(LogSkald, Log,
+           TEXT("TryInitializeWorldAndStart: waiting for controllers Registered=%d Expected=%d Pending=%d"),
+           RegisteredControllerCount, ExpectedControllerCount,
+           PendingControllers.Num());
+
+    if (GEngine && ExpectedControllerCount > 0) {
+      GEngine->AddOnScreenDebugMessage(
+          -1, 4.f, FColor::Yellow,
+          FString::Printf(TEXT("Waiting for controllers: %d/%d ready"),
+                          RegisteredControllerCount,
+                          ExpectedControllerCount));
+    }
+
+    FTimerDelegate RetryInit = FTimerDelegate::CreateUObject(
+        this, &ASkaldGameMode::TryInitializeWorldAndStart);
+    GetWorldTimerManager().ClearTimer(RetryInitTimerHandle);
+    GetWorldTimerManager().SetTimer(RetryInitTimerHandle, RetryInit,
+                                    RetryInitDelay, false);
+    GetWorldTimerManager().SetTimerForNextTick(RetryInit);
+    return;
+  }
   TSet<ASkaldPlayerController *> UniqueControllers;
   TSet<ASkaldPlayerController *> UniqueHumanControllers;
   bool bNeedsRetry = false;
@@ -3062,6 +3096,19 @@ int32 ASkaldGameMode::ResolveExpectedControllerCount() const {
       }
     }
     ExpectedCount = UniqueControllers.Num();
+  }
+
+  const USkaldGameInstance *GI =
+      const_cast<ASkaldGameMode *>(this)->GetGameInstance<USkaldGameInstance>();
+  if (GI) {
+    if (GI->ExpectedLobbyPlayerCount > 0) {
+      ExpectedCount = FMath::Max(ExpectedCount, GI->ExpectedLobbyPlayerCount);
+    }
+
+    const FSkaldTravelState &TravelState = GI->GetTravelState();
+    if (TravelState.bValid && TravelState.ExpectedControllers > 0) {
+      ExpectedCount = FMath::Max(ExpectedCount, TravelState.ExpectedControllers);
+    }
   }
 
   if (ExpectedCount <= 0 && TurnManager) {

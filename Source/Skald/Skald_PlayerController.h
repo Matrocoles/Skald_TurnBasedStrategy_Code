@@ -216,6 +216,12 @@ public:
   UFUNCTION(BlueprintCallable, Category = "UI")
   void HandleTerritorySelected(ATerritory *Terr);
 
+  /** Resolve the local player's stable identifier once their PlayerState finishes registering. */
+  int32 GetResolvedLocalPlayerId() const;
+
+  /** Returns true when the local controller has a registered PlayerState. */
+  bool HasResolvedLocalPlayerId() const;
+
   /** Accessor for the main HUD widget instance. */
   UFUNCTION(BlueprintCallable, Category = "UI")
   USkaldMainHUDWidget *GetHUDWidget() const { return MainHUD; }
@@ -1225,6 +1231,7 @@ private:
                                            float &OutZoom) const;
   void EnsureDiceManagerBindings();
   void RestoreStrategicInitiativeCamera();
+  void CacheStrategicInitiativeRollId(const FGuid &RollId);
 
   UFUNCTION()
   void HandlePhysicalDiceRollCompleted(const FGuid &RollId,
