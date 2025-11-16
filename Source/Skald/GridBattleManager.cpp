@@ -24,14 +24,12 @@ bool ShouldSpawnPhysicalInitiativeDice(UWorld* World)
         return false;
     }
 
-    // In multiplayer sessions physical initiative dice cause two distinct
-    // presentations: the random physical roll that happens locally on the
-    // listen server and the scripted roll that replicates after the host
-    // resolves the outcome. Only allow the physical dice when running in
-    // standalone mode so multiplayer clients and hosts share a single
-    // authoritative presentation.
-    ENetMode NetMode = World->GetNetMode();
-    return NetMode == NM_Standalone;
+    // Allow the server (listen or dedicated) to drive the physical dice so the
+    // authoritative results always originate from a single source. Pure
+    // clients follow the replicated outcome and do not request their own dice
+    // rolls from the battle manager.
+    const ENetMode NetMode = World->GetNetMode();
+    return NetMode != NM_Client;
 }
 
 constexpr float BattleConclusionBroadcastDelaySeconds = 1.5f;

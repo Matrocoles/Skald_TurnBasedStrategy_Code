@@ -191,10 +191,6 @@ void ASkaldPlayerController::BroadcastPhysicalDiceRoll(
     return;
   }
 
-  if (bForInitiative && World->GetNetMode() != NM_Standalone) {
-    return;
-  }
-
   for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It;
        ++It) {
     if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(*It)) {
@@ -4214,7 +4210,14 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
 
   int32 SelectingPlayerId = INDEX_NONE;
   if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
-    SelectingPlayerId = PS->GetAuthoritativePlayerId();
+    SelectingPlayerId = ResolveStablePlayerId(PS);
+  }
+
+  if (SelectingPlayerId == INDEX_NONE) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("ServerSelectTerritory could not resolve a stable player id for %s; ignoring selection."),
+           *GetName());
+    return;
   }
 
   if (!WorldMap->IsWorldActive() && TerritoryID >= 0) {
@@ -4246,6 +4249,18 @@ void ASkaldPlayerController::ClientSelectTerritory_Implementation(
 
   if (!WorldMap->IsWorldActive() && TerritoryID >= 0) {
     return;
+  }
+
+  if (SelectingPlayerId != INDEX_NONE) {
+    if (ASkaldPlayerState *LocalPS = GetPlayerState<ASkaldPlayerState>()) {
+      const int32 LocalPlayerId = ResolveStablePlayerId(LocalPS);
+      if (LocalPlayerId != INDEX_NONE && LocalPlayerId != SelectingPlayerId) {
+        UE_LOG(LogSkald, VeryVerbose,
+               TEXT("ClientSelectTerritory ignoring selection %d for remote player %d (local id %d)."),
+               TerritoryID, SelectingPlayerId, LocalPlayerId);
+        return;
+      }
+    }
   }
 
   ATerritory *Terr =
@@ -4289,19 +4304,6 @@ void ASkaldPlayerController::ClientStartPhysicalDiceRoll_Implementation(
     const FGuid &RollId, int32 PlayerDice, int32 EnemyDice, bool bForInitiative,
     FLinearColor PlayerColor, FLinearColor EnemyColor) {
   if (HasAuthority() || !RollId.IsValid()) {
-    return;
-  }
-
-  // Initiative rolls already receive a deterministic, scripted presentation via
-  // TriggerInitiativeDicePresentation once the server resolves the outcome.
-  // Replaying a local physical roll beforehand caused clients to see two
-  // completely separate rolls (one random, one authoritative). Skip spawning
-  // the redundant roll so the first visuals the player sees always match the
-  // actual networked result.
-  if (bForInitiative) {
-    UE_LOG(LogSkaldDice, Verbose,
-           TEXT("ClientStartPhysicalDiceRoll: skipping local initiative roll %s"),
-           *RollId.ToString());
     return;
   }
 
@@ -5930,6 +5932,10 @@ void ASkaldPlayerController::ClientPromptStrategicInitiative_Implementation(
   bPendingStrategicInitiativeWin = bWonInitiative;
   bAwaitingStrategicInitiativeRoll = true;
 
+  if (USkaldDiceManager *DiceManager = ResolveDiceManager()) {
+    DiceManager->SetHoldInitiativeDice(true);
+  }
+
   ShowMainHUD();
 
   if (MainHUD && MainHUD->RoundStartSound) {
@@ -5973,6 +5979,10 @@ void ASkaldPlayerController::ClientClearStrategicInitiativeOverlay_Implementatio
 
   if (MainHUD) {
     MainHUD->SetAwaitingStrategicInitiative(false);
+  }
+
+  if (USkaldDiceManager *DiceManager = ResolveDiceManager()) {
+    DiceManager->SetHoldInitiativeDice(false);
   }
 }
 
