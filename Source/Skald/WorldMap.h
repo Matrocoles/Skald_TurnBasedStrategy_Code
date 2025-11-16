@@ -205,6 +205,9 @@ protected:
   /** Returns true if the supplied player ID belongs to a local controller. */
   bool IsSelectingPlayerLocal(int32 SelectingPlayerId) const;
 
+  /** Number of registered territories currently owned by this world map. */
+  int32 GetTerritoryCount() const { return Territories.Num(); }
+
 private:
   /** Cached collision state so we can restore original settings after battles. */
   TMap<TWeakObjectPtr<UPrimitiveComponent>, TEnumAsByte<ECollisionEnabled::Type>>

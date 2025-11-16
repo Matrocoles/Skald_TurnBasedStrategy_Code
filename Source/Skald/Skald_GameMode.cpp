@@ -87,6 +87,40 @@ ASkaldGameMode::ASkaldGameMode() {
   bStrategicInitiativePromptIssued = false;
 }
 
+FString ASkaldGameMode::InitNewPlayer(APlayerController *NewPlayer,
+                                      const FUniqueNetIdRepl &UniqueId,
+                                      const FString &Options,
+                                      const FString &Portal) {
+  const FString Error =
+      Super::InitNewPlayer(NewPlayer, UniqueId, Options, Portal);
+  if (!Error.IsEmpty()) {
+    return Error;
+  }
+
+  ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(NewPlayer);
+  ASkaldPlayerState *PS = PC ? PC->GetPlayerState<ASkaldPlayerState>() : nullptr;
+  if (!PS) {
+    return Error;
+  }
+
+  FString RequestedName = UGameplayStatics::ParseOption(Options, TEXT("Name"));
+  if (RequestedName.IsEmpty()) {
+    RequestedName = UGameplayStatics::ParseOption(Options, TEXT("PlayerName"));
+  }
+  RequestedName.TrimStartAndEndInline();
+
+  if (!RequestedName.IsEmpty()) {
+    PS->PlayerDisplayName = RequestedName;
+    if (PS->GetPlayerName().IsEmpty() || PS->GetPlayerName() != RequestedName) {
+      PS->SetPlayerName(RequestedName);
+    }
+  } else {
+    PS->EnsureDefaultPlayerName();
+  }
+
+  return Error;
+}
+
 void ASkaldGameMode::InitGame(const FString &Map, const FString &Options,
                               FString &Error) {
   Super::InitGame(Map, Options, Error);

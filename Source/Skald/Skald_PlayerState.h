@@ -24,9 +24,14 @@ class SKALD_API ASkaldPlayerState : public APlayerState {
 public:
   ASkaldPlayerState();
 
+  virtual void BeginPlay() override;
+
   /** Retrieve the player name, logging if none has been assigned. */
   FString GetResolvedPlayerName(const TCHAR *Context = TEXT("SkaldPlayerState"))
       const;
+
+  /** Ensure player-facing name fields are populated with a deterministic default. */
+  void EnsureDefaultPlayerName();
 
   /** Deployable units available for placement. */
   UPROPERTY(BlueprintReadWrite, ReplicatedUsing = OnRep_DeployableUnits,
