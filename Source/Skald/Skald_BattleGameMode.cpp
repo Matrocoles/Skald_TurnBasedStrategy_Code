@@ -45,6 +45,24 @@ static bool IsAIController(const AController *C) {
   return C && C->IsA(ASkaldAIController::StaticClass());
 }
 
+static int32 ResolveBattlePlayerId(const ASkaldPlayerState *PlayerState) {
+  if (!PlayerState) {
+    return INDEX_NONE;
+  }
+
+  const int32 ReplicatedId = PlayerState->GetPlayerId();
+  if (ReplicatedId > 0) {
+    return ReplicatedId;
+  }
+
+  const int32 AuthoritativeId = PlayerState->GetAuthoritativePlayerId();
+  if (AuthoritativeId > 0) {
+    return AuthoritativeId;
+  }
+
+  return INDEX_NONE;
+}
+
 static int32 GetPlayerIdFrom(AController *C) {
   if (!C) {
     return INDEX_NONE;
@@ -53,7 +71,10 @@ static int32 GetPlayerIdFrom(AController *C) {
     C->InitPlayerState();
   }
   if (const ASkaldPlayerState *SPS = C->GetPlayerState<ASkaldPlayerState>()) {
-    return SPS->GetPlayerId();
+    const int32 ResolvedId = ResolveBattlePlayerId(SPS);
+    if (ResolvedId > 0) {
+      return ResolvedId;
+    }
   }
   return INDEX_NONE;
 }
@@ -682,6 +703,38 @@ void ASkald_BattleGameMode::ProcessDeferredControllers() {
       OnControllerReady(Controller);
     }
   }
+}
+
+void ASkald_BattleGameMode::QueueDeferredController(AController *Controller) {
+  if (!Controller) {
+    return;
+  }
+
+  DeferredReadyControllers.AddUnique(Controller);
+
+  if (UWorld *World = GetWorld()) {
+    FTimerDelegate RetryDelegate = FTimerDelegate::CreateUObject(
+        this, &ASkald_BattleGameMode::ProcessDeferredControllers);
+    World->GetTimerManager().SetTimerForNextTick(RetryDelegate);
+  }
+}
+
+bool ASkald_BattleGameMode::ControllerHasStablePlayerId(
+    AController *Controller) const {
+  if (!Controller) {
+    return false;
+  }
+
+  if (!Controller->PlayerState) {
+    return false;
+  }
+
+  if (const ASkaldPlayerState *PlayerState =
+          Controller->GetPlayerState<ASkaldPlayerState>()) {
+    return ResolveBattlePlayerId(PlayerState) > 0;
+  }
+
+  return false;
 }
 
 void ASkald_BattleGameMode::BeginPreBattleSelection(ASkaldPlayerState *AttackerPS,
@@ -1645,6 +1698,11 @@ void ASkald_BattleGameMode::OnControllerReady(AController *Controller) {
 
   if (Controller && !Controller->PlayerState) {
     Controller->InitPlayerState();
+  }
+
+  if (!ControllerHasStablePlayerId(Controller)) {
+    QueueDeferredController(Controller);
+    return;
   }
 
   AssignControllerSlot(Controller);

@@ -17,6 +17,23 @@
 
 namespace
 {
+bool ShouldSpawnPhysicalInitiativeDice(UWorld* World)
+{
+    if (!World)
+    {
+        return false;
+    }
+
+    // In multiplayer sessions physical initiative dice cause two distinct
+    // presentations: the random physical roll that happens locally on the
+    // listen server and the scripted roll that replicates after the host
+    // resolves the outcome. Only allow the physical dice when running in
+    // standalone mode so multiplayer clients and hosts share a single
+    // authoritative presentation.
+    ENetMode NetMode = World->GetNetMode();
+    return NetMode == NM_Standalone;
+}
+
 constexpr float BattleConclusionBroadcastDelaySeconds = 1.5f;
 // Delay used when automatically triggering a manual attack roll for AI controlled
 // fighters so their flow aligns with the player camera presentation cadence.
@@ -469,50 +486,54 @@ bool UGridBattleManager::RollInitiative()
             return false;
         }
 
-        if (USkaldDiceManager* Manager = ResolveDiceManager())
+        const bool bShouldUsePhysicalDice = ShouldSpawnPhysicalInitiativeDice(GetWorld());
+        if (bShouldUsePhysicalDice)
         {
-            PendingInitiativePlayerDice = bNeedsAttackerRoll ? 1 : 0;
-            PendingInitiativeEnemyDice = bNeedsDefenderRoll ? 1 : 0;
-
-            if (PendingInitiativePlayerDice > 0 || PendingInitiativeEnemyDice > 0)
+            if (USkaldDiceManager* Manager = ResolveDiceManager())
             {
-                FLinearColor PlayerColor = FLinearColor::Transparent;
-                FLinearColor EnemyColor = FLinearColor::Transparent;
-                if (UWorld* World = GetWorld())
-                {
-                    if (USkaldGameInstance* GameInstance = Cast<USkaldGameInstance>(World->GetGameInstance()))
-                    {
-                        if (AttackerTeam.Num() > 0)
-                        {
-                            PlayerColor = GameInstance->GetFactionColor(AttackerTeam[0].Faction);
-                        }
-                        if (DefenderTeam.Num() > 0)
-                        {
-                            EnemyColor = GameInstance->GetFactionColor(DefenderTeam[0].Faction);
-                        }
-                    }
-                }
+                PendingInitiativePlayerDice = bNeedsAttackerRoll ? 1 : 0;
+                PendingInitiativeEnemyDice = bNeedsDefenderRoll ? 1 : 0;
 
-                const int32 PlayerDiceCount = PendingInitiativePlayerDice;
-                const int32 EnemyDiceCount = PendingInitiativeEnemyDice;
-                const FGuid RollId = Manager->RollDice_D6(PlayerDiceCount, EnemyDiceCount, true,
-                    PlayerColor, EnemyColor);
-                if (RollId.IsValid())
+                if (PendingInitiativePlayerDice > 0 || PendingInitiativeEnemyDice > 0)
                 {
+                    FLinearColor PlayerColor = FLinearColor::Transparent;
+                    FLinearColor EnemyColor = FLinearColor::Transparent;
                     if (UWorld* World = GetWorld())
                     {
-                        ASkaldPlayerController::BroadcastPhysicalDiceRoll(
-                            World, RollId, PlayerDiceCount, EnemyDiceCount, true,
-                            PlayerColor, EnemyColor);
+                        if (USkaldGameInstance* GameInstance = Cast<USkaldGameInstance>(World->GetGameInstance()))
+                        {
+                            if (AttackerTeam.Num() > 0)
+                            {
+                                PlayerColor = GameInstance->GetFactionColor(AttackerTeam[0].Faction);
+                            }
+                            if (DefenderTeam.Num() > 0)
+                            {
+                                EnemyColor = GameInstance->GetFactionColor(DefenderTeam[0].Faction);
+                            }
+                        }
                     }
-                    ActiveInitiativeRollId = RollId;
-                    bInitiativeRollAwaitingResults = true;
-                    bInitiativeRollUsingPhysicalDice = true;
-                    return false;
-                }
 
-                PendingInitiativePlayerDice = 0;
-                PendingInitiativeEnemyDice = 0;
+                    const int32 PlayerDiceCount = PendingInitiativePlayerDice;
+                    const int32 EnemyDiceCount = PendingInitiativeEnemyDice;
+                    const FGuid RollId = Manager->RollDice_D6(PlayerDiceCount, EnemyDiceCount, true,
+                        PlayerColor, EnemyColor);
+                    if (RollId.IsValid())
+                    {
+                        if (UWorld* World = GetWorld())
+                        {
+                            ASkaldPlayerController::BroadcastPhysicalDiceRoll(
+                                World, RollId, PlayerDiceCount, EnemyDiceCount, true,
+                                PlayerColor, EnemyColor);
+                        }
+                        ActiveInitiativeRollId = RollId;
+                        bInitiativeRollAwaitingResults = true;
+                        bInitiativeRollUsingPhysicalDice = true;
+                        return false;
+                    }
+
+                    PendingInitiativePlayerDice = 0;
+                    PendingInitiativeEnemyDice = 0;
+                }
             }
         }
 
