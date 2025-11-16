@@ -2140,8 +2140,18 @@ int32 ASkaldGameMode::ResolveStrategicInitiativeResult(
 
 void ASkaldGameMode::HandleWorldInitializationComplete() {
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
-  if (!GI || GI->bIsInBattleMap) {
+  if (!GI) {
     return;
+  }
+
+  if (GI->bIsInBattleMap) {
+    GI->SetBattleMapActive(false);
+
+    // Ensure all clients clear any stale battle-map state that would block
+    // overworld interaction such as territory selection.
+    if (TurnManager && HasAuthority()) {
+      TurnManager->MulticastSetBattleMapActive(false);
+    }
   }
 
   if (bPendingInitialSnapshot || GI->CachedWorldMapTerritories.Num() == 0) {
