@@ -566,8 +566,20 @@ bool USkaldGameInstance::RestoreWorldFromSnapshot(UWorld *InWorldContext) {
     return false;
   }
 
+  TMap<int32, ASkaldPlayerState *> PlayerStateById;
+  PlayerStateById.Reserve(GameState->PlayerArray.Num());
+  for (APlayerState *PSBase : GameState->PlayerArray) {
+    if (ASkaldPlayerState *SkaldPS = Cast<ASkaldPlayerState>(PSBase)) {
+      const int32 PlayerId = ResolveSnapshotPlayerId(SkaldPS);
+      if (PlayerId > 0) {
+        PlayerStateById.Add(PlayerId, SkaldPS);
+      }
+    }
+  }
+
   TArray<int32> MissingPlayerIds;
-  if (!ValidateSnapshotPlayers(*SnapshotSource, GameState, MissingPlayerIds)) {
+  if (!ValidateSnapshotPlayers(*SnapshotSource, PlayerStateById,
+                               MissingPlayerIds)) {
     FString MissingList;
     for (int32 Index = 0; Index < MissingPlayerIds.Num(); ++Index) {
       if (Index > 0) {
@@ -601,16 +613,6 @@ bool USkaldGameInstance::RestoreWorldFromSnapshot(UWorld *InWorldContext) {
   }
 
   TMap<int32, FS_PlayerData *> PlayerDataById;
-  TMap<int32, ASkaldPlayerState *> PlayerStateById;
-
-  for (APlayerState *PSBase : GameState->PlayerArray) {
-    if (ASkaldPlayerState *SkaldPS = Cast<ASkaldPlayerState>(PSBase)) {
-      const int32 PlayerId = ResolveSnapshotPlayerId(SkaldPS);
-      if (PlayerId > 0) {
-        PlayerStateById.Add(PlayerId, SkaldPS);
-      }
-    }
-  }
 
   for (FS_PlayerData &PlayerData : GameMode->PlayerDataArray) {
     PlayerDataById.Add(PlayerData.PlayerID, &PlayerData);
@@ -651,7 +653,7 @@ bool USkaldGameInstance::RestoreWorldFromSnapshot(UWorld *InWorldContext) {
     Territory->SetActorLocation(Snapshot.Location);
     Territory->OwningPlayer =
         (Snapshot.OwnerPlayerID > 0)
-            ? GameState->GetPlayerById(Snapshot.OwnerPlayerID)
+            ? PlayerStateById.FindRef(Snapshot.OwnerPlayerID)
             : nullptr;
 
     Territory->AdjacentTerritories.Reset();
@@ -767,12 +769,10 @@ bool USkaldGameInstance::RestoreWorldFromSnapshot(UWorld *InWorldContext) {
 }
 
 bool USkaldGameInstance::ValidateSnapshotPlayers(
-    const TArray<FS_Territory> &Snapshot, ASkaldGameState *GameState,
+    const TArray<FS_Territory> &Snapshot,
+    const TMap<int32, ASkaldPlayerState *> &PlayerStateById,
     TArray<int32> &OutMissingPlayerIds) const {
   OutMissingPlayerIds.Reset();
-  if (!GameState) {
-    return false;
-  }
 
   TSet<int32> RequiredPlayerIds;
   for (const FS_Territory &Entry : Snapshot) {
@@ -782,7 +782,7 @@ bool USkaldGameInstance::ValidateSnapshotPlayers(
   }
 
   for (int32 PlayerId : RequiredPlayerIds) {
-    if (!GameState->GetPlayerById(PlayerId)) {
+    if (!PlayerStateById.Contains(PlayerId)) {
       OutMissingPlayerIds.Add(PlayerId);
     }
   }

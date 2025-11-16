@@ -380,9 +380,10 @@ private:
   /** Handle invoked when the owning world begins play after travel. */
   FDelegateHandle PostWorldBeginPlayHandle;
 
-  bool ValidateSnapshotPlayers(const TArray<FS_Territory> &Snapshot,
-                               ASkaldGameState *GameState,
-                               TArray<int32> &OutMissingPlayerIds) const;
+  bool ValidateSnapshotPlayers(
+      const TArray<FS_Territory> &Snapshot,
+      const TMap<int32, ASkaldPlayerState *> &PlayerStateById,
+      TArray<int32> &OutMissingPlayerIds) const;
   void ScheduleSnapshotRetry(UWorld *World);
   void HandleCacheWorldMapSnapshotRetry();
 
