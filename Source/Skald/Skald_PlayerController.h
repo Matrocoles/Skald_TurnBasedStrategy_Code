@@ -982,7 +982,7 @@ private:
   bool RefreshLocalTerritorySelection();
 
   /** Resolve a player's stable ID, falling back to hashed net IDs before replication. */
-  int32 ResolveStablePlayerId(const class ASkaldPlayerState *PlayerState) const;
+  int32 ResolveStablePlayerId(const class ASkaldPlayerState *InPlayerState) const;
 
   /** Handle playing the click sound when interacting with UI. */
   void HandleCursorClickSound();
