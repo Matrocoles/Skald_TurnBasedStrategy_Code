@@ -37,6 +37,9 @@ public:
         FLinearColor EnemyColor = FLinearColor::Transparent,
         FGuid OverrideRollId = FGuid());
 
+    /** Returns whether a given roll spawned physical dice actors. */
+    bool DidRollUsePhysicalDice(const FGuid& RollId) const;
+
     UFUNCTION(BlueprintCallable, Category = "Dice")
     void SetConfig(UDiceRollConfig* InConfig);
 
@@ -87,6 +90,7 @@ private:
         FTimerHandle UpdateTimerHandle;
         bool bUseScriptedResults = false;
         bool bIsInitiative = false;
+        bool bSpawnedPhysicalDice = false;
         TArray<int32> ScriptedResults;
         TWeakObjectPtr<ADiceRollArena> Arena;
         FLinearColor PlayerColor = FLinearColor::Transparent;

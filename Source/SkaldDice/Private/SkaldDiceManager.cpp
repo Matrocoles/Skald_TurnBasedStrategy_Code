@@ -89,6 +89,7 @@ FGuid USkaldDiceManager::RollDice_D6(int32 NumPlayerDice, int32 NumEnemyDice,
     Roll.ScriptedResults.Reset();
 
     const bool bSpawnedPhysical = ShouldSpawnPhysicalDice(World, bForInitiative) ? SpawnPhysicalRoll(Roll) : false;
+    Roll.bSpawnedPhysicalDice = bSpawnedPhysical;
 
     OnDiceRollStarted.Broadcast(RollId);
 
@@ -144,6 +145,16 @@ TArray<int32> USkaldDiceManager::RollDiceBlocking_D6(int32 NumDice)
     return GenerateResults(FMath::Max(0, NumDice));
 }
 
+bool USkaldDiceManager::DidRollUsePhysicalDice(const FGuid& RollId) const
+{
+    if (const FActiveRoll* Roll = ActiveRolls.Find(RollId))
+    {
+        return Roll->bSpawnedPhysicalDice;
+    }
+
+    return false;
+}
+
 FGuid USkaldDiceManager::PlayScriptedRoll(const TArray<int32>& PlayerResults,
     const TArray<int32>& EnemyResults, bool bForInitiative, float DurationOverride,
     FLinearColor PlayerColor, FLinearColor EnemyColor)
@@ -180,6 +191,7 @@ FGuid USkaldDiceManager::PlayScriptedRoll(const TArray<int32>& PlayerResults,
     Roll.ScriptedResults.Append(EnemyResults);
 
     const bool bSpawnedPhysical = SpawnPhysicalRoll(Roll, &PlayerResults, &EnemyResults);
+    Roll.bSpawnedPhysicalDice = bSpawnedPhysical;
 
     OnDiceRollStarted.Broadcast(RollId);
 
