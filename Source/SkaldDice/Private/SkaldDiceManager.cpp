@@ -52,8 +52,11 @@ bool ShouldSpawnPhysicalDice(const UWorld* World, bool bForInitiative)
         return true;
     }
 
-    const ENetMode NetMode = World->GetNetMode();
-    return NetMode == NM_Standalone;
+    // Strategic initiative rolls now share a single, networked presentation, so
+    // always spawn the arena regardless of net mode. Dedicated servers still
+    // need the physical dice for authoritative results while clients render
+    // their own presentation via the replicated RollId.
+    return true;
 }
 }
 
