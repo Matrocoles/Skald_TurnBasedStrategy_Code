@@ -4307,11 +4307,12 @@ void ASkaldPlayerController::ClientStartPhysicalDiceRoll_Implementation(
     return;
   }
 
-  if (bForInitiative && !bIsBattleMap) {
+  const bool bIsAuthority = HasAuthority();
+  if (bForInitiative && !bIsBattleMap && !bIsAuthority) {
     CacheStrategicInitiativeRollId(RollId);
   }
 
-  if (HasAuthority()) {
+  if (bIsAuthority) {
     return;
   }
 
