@@ -2,4 +2,4 @@
 
 #include "CoreMinimal.h"
 
-DECLARE_LOG_CATEGORY_EXTERN(LogSkaldDice, Log, All);
+SKALDDICE_API DECLARE_LOG_CATEGORY_EXTERN(LogSkaldDice, Log, All);
