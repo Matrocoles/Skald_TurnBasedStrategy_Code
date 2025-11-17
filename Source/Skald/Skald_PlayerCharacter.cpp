@@ -138,7 +138,7 @@ void ASkald_PlayerCharacter::TryCacheWorldMap()
                         InitializeOverviewCamera();
                         WorldMap->OnTerritorySelected.AddUniqueDynamic(this, &ASkald_PlayerCharacter::HandleTerritorySelected);
                         GetWorldTimerManager().ClearTimer(WorldMapSearchHandle);
-                        HandleTerritorySelected(WorldMap->SelectedTerritory);
+                        HandleTerritorySelected(WorldMap->GetLocalSelection());
                 }
                 else
                 {

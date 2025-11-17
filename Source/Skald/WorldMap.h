@@ -111,6 +111,9 @@ public:
   UFUNCTION(BlueprintCallable, Category = "WorldMap")
   ATerritory *GetSelectionForPlayer(int32 PlayerId) const;
 
+  /** Return the latest territory selected by the local player, if any. */
+  ATerritory *GetLocalSelection() const;
+
   /** Sound played when a territory becomes selected on this map. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WorldMap|Audio")
   USoundBase *TerritorySelectedSound = nullptr;
