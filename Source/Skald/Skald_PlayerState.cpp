@@ -16,6 +16,12 @@ ASkaldPlayerState::ASkaldPlayerState()
       PlayerDisplayName(TEXT("")), Faction(ESkaldFaction::None), bIsAI(false),
       bHasLockedIn(false), IsEliminated(false) {}
 
+void ASkaldPlayerState::BeginPlay() {
+  Super::BeginPlay();
+
+  EnsureDefaultPlayerName();
+}
+
 FString ASkaldPlayerState::GetResolvedPlayerName(const TCHAR *Context) const {
   FString Name = GetPlayerName();
   if (Name.IsEmpty()) {
@@ -23,13 +29,43 @@ FString ASkaldPlayerState::GetResolvedPlayerName(const TCHAR *Context) const {
   }
 
   if (Name.IsEmpty()) {
-    UE_LOG(LogSkald, Warning,
-           TEXT("%s: PlayerState %s missing assigned name"), Context,
-           *GetName());
-    Name = TEXT("Unknown");
+    UE_LOG(LogSkald, Verbose,
+           TEXT("%s: PlayerState %s missing assigned name; applying fallback."),
+           Context, *GetName());
+    const_cast<ASkaldPlayerState *>(this)->EnsureDefaultPlayerName();
+
+    Name = GetPlayerName();
+    if (Name.IsEmpty()) {
+      Name = PlayerDisplayName;
+    }
+  }
+
+  if (Name.IsEmpty()) {
+    Name = TEXT("Player");
   }
 
   return Name;
+}
+
+void ASkaldPlayerState::EnsureDefaultPlayerName() {
+  FString DesiredName = PlayerDisplayName;
+  if (DesiredName.IsEmpty()) {
+    const int32 StableId = GetAuthoritativePlayerId();
+    if (StableId > 0) {
+      DesiredName = FString::Printf(TEXT("Player %d"), StableId);
+    } else {
+      DesiredName = TEXT("Player");
+    }
+  }
+
+  if (PlayerDisplayName.IsEmpty()) {
+    PlayerDisplayName = DesiredName;
+  }
+
+  const FString CurrentPlayerName = GetPlayerName();
+  if (CurrentPlayerName.IsEmpty() || CurrentPlayerName != PlayerDisplayName) {
+    SetPlayerName(PlayerDisplayName);
+  }
 }
 
 void ASkaldPlayerState::GetLifetimeReplicatedProps(
@@ -100,6 +136,8 @@ void ASkaldPlayerState::OnRep_IsAI() {
 
 void ASkaldPlayerState::OnRep_PlayerId() {
   Super::OnRep_PlayerId();
+
+  EnsureDefaultPlayerName();
 
   if (APlayerController *PC = GetOwner<APlayerController>()) {
     if (ASkaldPlayerController *SkaldPC = Cast<ASkaldPlayerController>(PC)) {

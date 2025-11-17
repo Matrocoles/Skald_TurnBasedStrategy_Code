@@ -4236,6 +4236,28 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
     return;
   }
 
+  const bool bWorldHasTerritories = WorldMap->GetTerritoryCount() > 0;
+  if (TerritoryID >= 0 && !bWorldHasTerritories) {
+    // Clients can click immediately after loading while the server is still
+    // spawning/replicating the world map. Cache the request and replay it once
+    // territories are available.
+    UE_LOG(LogSkald, Verbose,
+           TEXT("ServerSelectTerritory received selection %d before the world map finished registering territories; queuing retry."),
+           TerritoryID);
+    PendingTerritorySelectionId = TerritoryID;
+    if (UWorld *World = GetWorld()) {
+      World->GetTimerManager().SetTimer(
+          PendingTerritorySelectionHandle, this,
+          &ASkaldPlayerController::RetryPendingTerritorySelection, 0.05f, true);
+    }
+    return;
+  }
+
+  PendingTerritorySelectionId = INDEX_NONE;
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(PendingTerritorySelectionHandle);
+  }
+
   ATerritory *Terr = WorldMap->GetTerritoryById(TerritoryID);
   if (!Terr) {
     UE_LOG(LogSkald, Warning,
@@ -4246,6 +4268,36 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
 
   WorldMap->SelectTerritory(Terr, false, SelectingPlayerId);
   ClientSelectTerritory(TerritoryID, SelectingPlayerId);
+}
+
+void ASkaldPlayerController::RetryPendingTerritorySelection() {
+  if (PendingTerritorySelectionId == INDEX_NONE) {
+    if (UWorld *World = GetWorld()) {
+      World->GetTimerManager().ClearTimer(PendingTerritorySelectionHandle);
+    }
+    return;
+  }
+
+  AWorldMap *WorldMap = Cast<AWorldMap>(
+      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
+  if (!WorldMap) {
+    return;
+  }
+
+  if (WorldMap->GetTerritoryCount() == 0) {
+    return;
+  }
+
+  const int32 QueuedSelection = PendingTerritorySelectionId;
+  PendingTerritorySelectionId = INDEX_NONE;
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(PendingTerritorySelectionHandle);
+  }
+
+  UE_LOG(LogSkald, Verbose,
+         TEXT("Retrying queued territory selection %d now that the world map is ready."),
+         QueuedSelection);
+  ServerSelectTerritory(QueuedSelection);
 }
 
 void ASkaldPlayerController::ClientSelectTerritory_Implementation(

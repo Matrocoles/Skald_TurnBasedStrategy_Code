@@ -190,6 +190,10 @@ public:
   bool IsOwnedBy(const ATerritory *Territory,
                  const ASkaldPlayerState *Player) const;
 
+  /** Number of registered territories currently owned by this world map. */
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "WorldMap")
+  int32 GetTerritoryCount() const { return Territories.Num(); }
+
   /** Automatically distribute remaining deployable units across owned territories. */
   UFUNCTION(BlueprintCallable, Category = "WorldMap")
   int32 AutoPlaceUnitsForAI(ASkaldPlayerState *PlayerState);

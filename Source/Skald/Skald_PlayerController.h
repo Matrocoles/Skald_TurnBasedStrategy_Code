@@ -1008,6 +1008,15 @@ private:
   /** Cached pointer to the active world map to manage delegate bindings safely. */
   TWeakObjectPtr<AWorldMap> CachedWorldMap;
 
+  /** Replays territory selections made while the world map was still registering territories. */
+  void RetryPendingTerritorySelection();
+
+  /** Queued territory selection to replay once the world map finishes spawning. */
+  int32 PendingTerritorySelectionId = INDEX_NONE;
+
+  /** Timer used to poll for world map readiness after an early selection arrives. */
+  FTimerHandle PendingTerritorySelectionHandle;
+
   /** Whether we need to retry restoring the local player's territory selection. */
   bool bPendingLocalSelectionRefresh = false;
 
