@@ -1155,6 +1155,8 @@ void USkaldGameInstance::HandleNetworkFailure(
   }
 }
 
+void USkaldGameInstance::ResetSessionData() { ResetSessionState(); }
+
 void USkaldGameInstance::ReturnToMainMenu() {
   ResetSessionState();
 

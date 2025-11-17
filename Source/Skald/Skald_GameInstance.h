@@ -366,6 +366,10 @@ public:
   UFUNCTION(BlueprintCallable, Category = "Skald|Menu")
   void ReturnToMainMenu();
 
+  /** Reset lobby and travel state so a fresh session can be configured. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Menu")
+  void ResetSessionData();
+
   /** Save game loaded when transitioning from the main menu. */
   UPROPERTY(BlueprintReadWrite, Category = "SaveGame")
   USkaldSaveGame *LoadedSaveGame = nullptr;
