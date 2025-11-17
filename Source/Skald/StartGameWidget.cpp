@@ -199,6 +199,8 @@ UWidget *UStartGameWidget::GenerateFactionOptionWidget(const FString &Option) {
 void UStartGameWidget::StartGame(bool bMultiplayer, bool bHost) {
   if (UWorld *World = GetWorld()) {
     if (USkaldGameInstance *GI = World->GetGameInstance<USkaldGameInstance>()) {
+      GI->ResetSessionState();
+
       GI->bIsMultiplayer = bMultiplayer;
       GI->bIsHost = bHost;
       if (!bMultiplayer) {
