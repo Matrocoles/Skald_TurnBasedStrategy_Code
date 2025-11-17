@@ -4973,7 +4973,7 @@ void ASkaldPlayerController::HandleWorldStateChanged() {
   // Update territory info for the currently selected territory if available.
   if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
           GetWorld(), AWorldMap::StaticClass()))) {
-    if (ATerritory *Terr = WorldMap->SelectedTerritory) {
+    if (ATerritory *Terr = WorldMap->GetLocalSelection()) {
       const FString OwnerName = ResolvePlayerName(
           Terr->OwningPlayer, TEXT("HandleWorldStateChanged"));
       MainHUD->UpdateTerritoryInfo(Terr->TerritoryName, OwnerName,

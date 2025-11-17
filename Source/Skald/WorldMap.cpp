@@ -16,6 +16,7 @@
 #include "SkaldLogging.h"
 #include "Skald_GameMode.h"
 #include "Skald_PlayerState.h"
+#include "GameFramework/PlayerController.h"
 #include "Math/NumericLimits.h"
 #include "Math/UnrealMathUtility.h"
 #include "Templates/Function.h"
@@ -532,6 +533,41 @@ ATerritory *AWorldMap::GetSelectionForPlayer(int32 PlayerId) const {
     return Found->Get();
   }
   return nullptr;
+}
+
+ATerritory *AWorldMap::GetLocalSelection() const {
+  const UWorld *World = GetWorld();
+  if (!World) {
+    return SelectedTerritory;
+  }
+
+  for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator();
+       It; ++It) {
+    const APlayerController *PC = It->Get();
+    if (!PC || !PC->IsLocalController()) {
+      continue;
+    }
+
+    const ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PC->PlayerState);
+    if (!PS) {
+      continue;
+    }
+
+    const int32 StableId = PS->GetStablePlayerId();
+    if (StableId == INDEX_NONE) {
+      continue;
+    }
+
+    const TWeakObjectPtr<ATerritory> *Selection =
+        SelectionByPlayerId.Find(StableId);
+    if (Selection && Selection->IsValid()) {
+      return Selection->Get();
+    }
+
+    break;
+  }
+
+  return SelectedTerritory;
 }
 
 void AWorldMap::SelectTerritory(ATerritory *Territory,
