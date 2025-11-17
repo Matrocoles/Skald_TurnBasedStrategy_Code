@@ -14,12 +14,16 @@
 ASkaldPlayerState::ASkaldPlayerState()
     : DeployableUnits(0), InitiativeRoll(0), Resources(0),
       PlayerDisplayName(TEXT("")), Faction(ESkaldFaction::None), bIsAI(false),
-      bHasLockedIn(false), IsEliminated(false) {}
+      bHasLockedIn(false), IsEliminated(false), StablePlayerId(INDEX_NONE) {}
 
 void ASkaldPlayerState::BeginPlay() {
   Super::BeginPlay();
 
   EnsureDefaultPlayerName();
+
+  if (HasAuthority()) {
+    RefreshStablePlayerId();
+  }
 }
 
 FString ASkaldPlayerState::GetResolvedPlayerName(const TCHAR *Context) const {
@@ -83,6 +87,7 @@ void ASkaldPlayerState::GetLifetimeReplicatedProps(
   DOREPLIFETIME(ASkaldPlayerState, Resources);
   DOREPLIFETIME(ASkaldPlayerState, bHasLockedIn);
   DOREPLIFETIME(ASkaldPlayerState, IsEliminated);
+  DOREPLIFETIME(ASkaldPlayerState, StablePlayerId);
 }
 
 void ASkaldPlayerState::OnRep_DeployableUnits() {
@@ -124,6 +129,14 @@ void ASkaldPlayerState::OnRep_PlayerDisplayName() {
       GS->OnPlayersUpdated.Broadcast();
     }
   }
+
+  // Keep the replicated engine player name aligned with the display name so
+  // listen-server hosts and clients see the same identity everywhere (chat,
+  // scoreboards, territory labels).
+  const FString CurrentName = GetPlayerName();
+  if (!PlayerDisplayName.IsEmpty() && CurrentName != PlayerDisplayName) {
+    SetPlayerName(PlayerDisplayName);
+  }
 }
 
 void ASkaldPlayerState::OnRep_IsAI() {
@@ -138,6 +151,8 @@ void ASkaldPlayerState::OnRep_PlayerId() {
   Super::OnRep_PlayerId();
 
   EnsureDefaultPlayerName();
+
+  RefreshStablePlayerId();
 
   if (APlayerController *PC = GetOwner<APlayerController>()) {
     if (ASkaldPlayerController *SkaldPC = Cast<ASkaldPlayerController>(PC)) {
@@ -218,4 +233,42 @@ int32 ASkaldPlayerState::GetAuthoritativePlayerId() const {
   }
 
   return static_cast<int32>(GetUniqueID());
+}
+
+int32 ASkaldPlayerState::GetStablePlayerId() const {
+  if (StablePlayerId != INDEX_NONE) {
+    return StablePlayerId;
+  }
+
+  return GetAuthoritativePlayerId();
+}
+
+void ASkaldPlayerState::RefreshStablePlayerId() {
+  if (!HasAuthority()) {
+    return;
+  }
+
+  const int32 NewStableId = GetAuthoritativePlayerId();
+  if (StablePlayerId == NewStableId) {
+    return;
+  }
+
+  StablePlayerId = NewStableId;
+  OnRep_StablePlayerId();
+  ForceNetUpdate();
+}
+
+void ASkaldPlayerState::OnRep_StablePlayerId() {
+  if (APlayerController *PC = GetOwner<APlayerController>()) {
+    if (ASkaldPlayerController *SkaldPC = Cast<ASkaldPlayerController>(PC)) {
+      if (USkaldMainHUDWidget *HUD = SkaldPC->GetHUDWidget()) {
+        const bool bLocalIdChanged = (HUD->LocalPlayerID != StablePlayerId);
+        HUD->LocalPlayerID = StablePlayerId;
+        if (bLocalIdChanged) {
+          HUD->SyncPhaseButtons(HUD->CurrentPlayerID == HUD->LocalPlayerID);
+        }
+      }
+      SkaldPC->HandlePlayerIdUpdated();
+    }
+  }
 }
