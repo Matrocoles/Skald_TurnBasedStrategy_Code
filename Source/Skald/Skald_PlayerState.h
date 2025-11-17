@@ -82,6 +82,11 @@ public:
             Category = "PlayerState")
   bool IsEliminated;
 
+  /** Stable identifier replicated to all clients for consistent selection routing. */
+  UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_StablePlayerId,
+            Category = "PlayerState")
+  int32 StablePlayerId;
+
   UFUNCTION()
   void OnRep_DeployableUnits();
 
@@ -98,6 +103,9 @@ public:
   void OnRep_IsAI();
 
   virtual void OnRep_PlayerId() override;
+
+  UFUNCTION()
+  void OnRep_StablePlayerId();
 
   virtual void GetLifetimeReplicatedProps(
       TArray<FLifetimeProperty> &OutLifetimeProps) const override;
@@ -116,6 +124,12 @@ public:
 
   /** Unique identifier that remains stable even before PlayerId replication. */
   int32 GetAuthoritativePlayerId() const;
+
+  /** Stable identifier safe to use for routing selection events client-side. */
+  int32 GetStablePlayerId() const;
+
+  /** Refreshes and replicates the stable identifier on the server. */
+  void RefreshStablePlayerId();
 
 private:
   /** Tracks deployments per territory during the army placement phase. */

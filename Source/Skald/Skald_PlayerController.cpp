@@ -8487,12 +8487,7 @@ int32 ASkaldPlayerController::ResolveStablePlayerId(
     return static_cast<int32>(INDEX_NONE);
   }
 
-  const int32 ReplicatedId = InPlayerState->GetPlayerId();
-  if (ReplicatedId > 0) {
-    return ReplicatedId;
-  }
-
-  return InPlayerState->GetAuthoritativePlayerId();
+  return InPlayerState->GetStablePlayerId();
 }
 
 int32 ASkaldPlayerController::GetResolvedLocalPlayerId() const {
