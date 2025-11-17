@@ -4312,15 +4312,27 @@ void ASkaldPlayerController::ClientSelectTerritory_Implementation(
     return;
   }
 
+  int32 LocalPlayerId = INDEX_NONE;
+  if (ASkaldPlayerState *LocalPS = GetPlayerState<ASkaldPlayerState>()) {
+    LocalPlayerId = ResolveStablePlayerId(LocalPS);
+    if (LocalPlayerId == INDEX_NONE) {
+      LocalPlayerId = LocalPS->GetPlayerId();
+    }
+  }
+
   if (SelectingPlayerId != INDEX_NONE) {
-    if (ASkaldPlayerState *LocalPS = GetPlayerState<ASkaldPlayerState>()) {
-      const int32 LocalPlayerId = ResolveStablePlayerId(LocalPS);
-      if (LocalPlayerId != INDEX_NONE && LocalPlayerId != SelectingPlayerId) {
-        UE_LOG(LogSkald, VeryVerbose,
-               TEXT("ClientSelectTerritory ignoring selection %d for remote player %d (local id %d)."),
-               TerritoryID, SelectingPlayerId, LocalPlayerId);
-        return;
-      }
+    if (LocalPlayerId == INDEX_NONE) {
+      UE_LOG(LogSkald, Verbose,
+             TEXT("ClientSelectTerritory ignoring selection %d for player %d because the local player id is not resolved yet."),
+             TerritoryID, SelectingPlayerId);
+      return;
+    }
+
+    if (LocalPlayerId != SelectingPlayerId) {
+      UE_LOG(LogSkald, VeryVerbose,
+             TEXT("ClientSelectTerritory ignoring selection %d for remote player %d (local id %d)."),
+             TerritoryID, SelectingPlayerId, LocalPlayerId);
+      return;
     }
   }
 

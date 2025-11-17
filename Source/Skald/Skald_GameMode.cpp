@@ -321,6 +321,12 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
 
   PS->bIsAI = PC->IsA<ASkaldAIController>();
 
+  // Ensure the controller has a stable player identifier before continuing.
+  // Multiplayer clients can begin interacting with the world map before the
+  // initial PlayerState replication completes, which leaves the StablePlayerId
+  // unset and prevents UI/selection logic from routing to the correct owner.
+  PS->RefreshStablePlayerId();
+
   if (!GS->PlayerArray.Contains(PS)) {
     GS->AddPlayerState(PS);
   }
