@@ -987,6 +987,12 @@ private:
   /** Reapply the most recent local territory selection once IDs/world map resolve. */
   bool RefreshLocalTerritorySelection();
 
+  /** Queue a replicated territory selection until the world map is ready. */
+  void QueueRemoteTerritorySelection(int32 TerritoryId, int32 SelectingPlayerId);
+
+  /** Replay any buffered remote territory selections once territories exist. */
+  void RetryPendingRemoteTerritorySelections();
+
   /** Resolve a player's stable ID, falling back to hashed net IDs before replication. */
   int32 ResolveStablePlayerId(const class ASkaldPlayerState *InPlayerState) const;
 
@@ -1016,6 +1022,12 @@ private:
 
   /** Timer used to poll for world map readiness after an early selection arrives. */
   FTimerHandle PendingTerritorySelectionHandle;
+
+  /** Remote territory selections awaiting replication of the world map. */
+  TMap<int32, int32> PendingRemoteTerritorySelections;
+
+  /** Timer used to retry pending remote selections until the world map is active. */
+  FTimerHandle PendingRemoteSelectionRetryHandle;
 
   /** Whether we need to retry restoring the local player's territory selection. */
   bool bPendingLocalSelectionRefresh = false;

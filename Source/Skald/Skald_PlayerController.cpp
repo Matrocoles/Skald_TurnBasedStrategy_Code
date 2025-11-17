@@ -4267,7 +4267,17 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
   }
 
   WorldMap->SelectTerritory(Terr, false, SelectingPlayerId);
-  ClientSelectTerritory(TerritoryID, SelectingPlayerId);
+
+  if (UWorld *World = GetWorld()) {
+    for (FConstPlayerControllerIterator It =
+             World->GetPlayerControllerIterator();
+         It; ++It) {
+      if (ASkaldPlayerController *OtherPC =
+              Cast<ASkaldPlayerController>(*It)) {
+        OtherPC->ClientSelectTerritory(TerritoryID, SelectingPlayerId);
+      }
+    }
+  }
 }
 
 void ASkaldPlayerController::RetryPendingTerritorySelection() {
@@ -4305,41 +4315,70 @@ void ASkaldPlayerController::ClientSelectTerritory_Implementation(
   AWorldMap *WorldMap = Cast<AWorldMap>(
       UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
   if (!WorldMap) {
+    if (TerritoryID >= 0) {
+      QueueRemoteTerritorySelection(TerritoryID, SelectingPlayerId);
+    }
     return;
   }
 
-  if (!WorldMap->IsWorldActive() && TerritoryID >= 0) {
+  const bool bWorldReady = WorldMap->IsWorldActive() &&
+                           (TerritoryID < 0 || WorldMap->GetTerritoryCount() > 0);
+  if (!bWorldReady && TerritoryID >= 0) {
+    QueueRemoteTerritorySelection(TerritoryID, SelectingPlayerId);
     return;
-  }
-
-  int32 LocalPlayerId = INDEX_NONE;
-  if (ASkaldPlayerState *LocalPS = GetPlayerState<ASkaldPlayerState>()) {
-    LocalPlayerId = ResolveStablePlayerId(LocalPS);
-    if (LocalPlayerId == INDEX_NONE) {
-      LocalPlayerId = LocalPS->GetPlayerId();
-    }
-  }
-
-  if (SelectingPlayerId != INDEX_NONE) {
-    if (LocalPlayerId == INDEX_NONE) {
-      UE_LOG(LogSkald, Verbose,
-             TEXT("ClientSelectTerritory ignoring selection %d for player %d because the local player id is not resolved yet."),
-             TerritoryID, SelectingPlayerId);
-      return;
-    }
-
-    if (LocalPlayerId != SelectingPlayerId) {
-      UE_LOG(LogSkald, VeryVerbose,
-             TEXT("ClientSelectTerritory ignoring selection %d for remote player %d (local id %d)."),
-             TerritoryID, SelectingPlayerId, LocalPlayerId);
-      return;
-    }
   }
 
   ATerritory *Terr =
       TerritoryID >= 0 ? WorldMap->GetTerritoryById(TerritoryID) : nullptr;
   WorldMap->SelectTerritory(Terr, true, SelectingPlayerId);
   UE_LOG(LogSkald, Log, TEXT("ClientSelectTerritory <- %d"), TerritoryID);
+}
+
+void ASkaldPlayerController::QueueRemoteTerritorySelection(
+    int32 TerritoryId, int32 SelectingPlayerId) {
+  PendingRemoteTerritorySelections.Add(SelectingPlayerId, TerritoryId);
+
+  if (UWorld *World = GetWorld()) {
+    if (!World->GetTimerManager().IsTimerActive(
+            PendingRemoteSelectionRetryHandle)) {
+      World->GetTimerManager().SetTimer(
+          PendingRemoteSelectionRetryHandle, this,
+          &ASkaldPlayerController::RetryPendingRemoteTerritorySelections, 0.05f,
+          true);
+    }
+  }
+}
+
+void ASkaldPlayerController::RetryPendingRemoteTerritorySelections() {
+  if (PendingRemoteTerritorySelections.Num() == 0) {
+    if (UWorld *World = GetWorld()) {
+      World->GetTimerManager().ClearTimer(PendingRemoteSelectionRetryHandle);
+    }
+    return;
+  }
+
+  AWorldMap *WorldMap = Cast<AWorldMap>(
+      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
+  if (!WorldMap || !WorldMap->IsWorldActive() ||
+      WorldMap->GetTerritoryCount() == 0) {
+    return;
+  }
+
+  for (const TPair<int32, int32> &Selection : PendingRemoteTerritorySelections) {
+    ATerritory *Terr =
+        Selection.Value >= 0 ? WorldMap->GetTerritoryById(Selection.Value)
+                             : nullptr;
+    WorldMap->SelectTerritory(Terr, true, Selection.Key);
+    UE_LOG(LogSkald, Verbose,
+           TEXT("Replaying pending remote selection %d for player %d."),
+           Selection.Value, Selection.Key);
+  }
+
+  PendingRemoteTerritorySelections.Empty();
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(PendingRemoteSelectionRetryHandle);
+  }
 }
 
 void ASkaldPlayerController::ServerRequestPendingBattleState_Implementation() {
@@ -4854,6 +4893,29 @@ void ASkaldPlayerController::HandlePlayersUpdated() {
 
     if (ASkaldPlayerState *LocalPS = GetPlayerState<ASkaldPlayerState>()) {
       MainHUD->UpdateResources(LocalPS->Resources);
+    }
+  }
+
+  if (CachedGameInstance && CachedGameState) {
+    TArray<ESkaldFaction> ReplicatedFactions;
+    ReplicatedFactions.Reserve(CachedGameState->PlayerArray.Num());
+
+    for (APlayerState *PSBase : CachedGameState->PlayerArray) {
+      if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
+        if (PS->Faction != ESkaldFaction::None) {
+          ReplicatedFactions.AddUnique(PS->Faction);
+        }
+      }
+    }
+
+    ReplicatedFactions.Sort();
+
+    TArray<ESkaldFaction> LocalFactions = CachedGameInstance->TakenFactions;
+    LocalFactions.Sort();
+
+    if (ReplicatedFactions != LocalFactions) {
+      CachedGameInstance->TakenFactions = MoveTemp(ReplicatedFactions);
+      CachedGameInstance->OnFactionsUpdated.Broadcast();
     }
   }
 

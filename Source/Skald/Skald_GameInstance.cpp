@@ -138,9 +138,6 @@ void USkaldGameInstance::Init() {
   Super::Init();
   SeedCombatRandomStream(FMath::Rand());
   TakenFactions.Empty();
-  if (Faction != ESkaldFaction::None) {
-    TakenFactions.Add(Faction);
-  }
 
   PendingLobbyPlayers.Reset();
   ExpectedLobbyPlayerCount = 0;
@@ -1231,10 +1228,8 @@ void USkaldGameInstance::ResetSessionState() {
   AIPlayersToSpawn = 1;
   bIsMultiplayer = false;
   bIsHost = false;
+  Faction = ESkaldFaction::Human;
   TakenFactions.Empty();
-  if (Faction != ESkaldFaction::None) {
-    TakenFactions.Add(Faction);
-  }
   PendingLobbyAIPlayers.Reset();
   PendingLobbyPlayers.Reset();
   ExpectedLobbyPlayerCount = 0;
@@ -1254,7 +1249,7 @@ void USkaldGameInstance::ResetSessionState() {
   }
   SetActiveBattleGameMode(nullptr);
   SetBattleMapActive(false);
-  bTravelPending = false;
+  SetTravelPending(false);
   PendingReturnMap.Reset();
   CachedWorldMapTerritories.Empty();
   PendingTravelTerritories.Empty();
