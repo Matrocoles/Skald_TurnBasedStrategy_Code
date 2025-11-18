@@ -281,6 +281,15 @@ void ASkaldPlayerState::OnRep_StablePlayerId() {
 }
 
 void ASkaldPlayerState::OnRep_SelectedTerritory() {
+  const FString TerritoryDesc = SelectedTerritory
+                                    ? FString::Printf(TEXT("%s (%d)"),
+                                                      *SelectedTerritory->GetName(),
+                                                      SelectedTerritory->TerritoryID)
+                                    : FString(TEXT("None"));
+  UE_LOG(LogSkald, Log,
+         TEXT("OnRep_SelectedTerritory for %s (StableId=%d) now %s"),
+         *GetResolvedPlayerName(TEXT("OnRep_SelectedTerritory")),
+         GetStablePlayerId(), *TerritoryDesc);
   ApplySelectedTerritoryToWorldMap(true);
 }
 

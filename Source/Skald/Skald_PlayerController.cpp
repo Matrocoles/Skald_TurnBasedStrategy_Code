@@ -4191,16 +4191,50 @@ void ASkaldPlayerController::ServerDeployUnits_Implementation(int32 TerritoryID,
   }
 }
 
+void ASkaldPlayerController::RequestSelectTerritory(ATerritory *Territory) {
+  if (!IsLocalController()) {
+    return;
+  }
+
+  if (!HasResolvedLocalPlayerId()) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("RequestSelectTerritory ignored for %s because the player has not finished registration."),
+           *GetName());
+    return;
+  }
+
+  const FString TerrDesc = IsValid(Territory)
+                               ? FString::Printf(TEXT("%s (%d)"),
+                                                 *Territory->GetName(),
+                                                 Territory->TerritoryID)
+                               : FString(TEXT("None"));
+  UE_LOG(LogSkald, Log,
+         TEXT("RequestSelectTerritory forwarding %s from client controller %s"),
+         *TerrDesc, *GetName());
+
+  ServerSelectTerritory(Territory);
+}
+
 void ASkaldPlayerController::ServerSelectTerritory_Implementation(
-    int32 TerritoryID) {
+    ATerritory *Territory) {
+  const FString TerrDesc = IsValid(Territory)
+                               ? FString::Printf(TEXT("%s (%d)"),
+                                                 *Territory->GetName(),
+                                                 Territory->TerritoryID)
+                               : FString(TEXT("None"));
+
   if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
-    if (GI->bIsInBattleMap && TerritoryID >= 0) {
+    if (GI->bIsInBattleMap && Territory) {
+      UE_LOG(LogSkald, Verbose,
+             TEXT("ServerSelectTerritory ignoring %s during battle map for %s"),
+             *TerrDesc, *GetName());
       return;
     }
   }
 
-  UE_LOG(LogSkald, Log, TEXT("ServerSelectTerritory called with %d"),
-         TerritoryID);
+  UE_LOG(LogSkald, Log,
+         TEXT("ServerSelectTerritory called with %s from controller %s"),
+         *TerrDesc, *GetName());
   AWorldMap *WorldMap = Cast<AWorldMap>(
       UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
   if (!WorldMap) {
@@ -4210,11 +4244,15 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
     return;
   }
 
-  int32 SelectingPlayerId = INDEX_NONE;
-  if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
-    SelectingPlayerId = ResolveStablePlayerId(PS);
+  ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
+  if (!PS) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("ServerSelectTerritory failed because PlayerState was missing for %s"),
+           *GetName());
+    return;
   }
 
+  const int32 SelectingPlayerId = ResolveStablePlayerId(PS);
   if (SelectingPlayerId == INDEX_NONE) {
     UE_LOG(LogSkald, Warning,
            TEXT("ServerSelectTerritory could not resolve a stable player id for %s; ignoring selection."),
@@ -4222,29 +4260,12 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
     return;
   }
 
-  if (!WorldMap->IsWorldActive() && TerritoryID >= 0) {
+  const bool bHasWorldEntries = WorldMap->GetTerritoryCount() > 0;
+  if (Territory && !bHasWorldEntries) {
     UE_LOG(LogSkald, Verbose,
-           TEXT("ServerSelectTerritory ignoring selection %d while world map is inactive for player %s."),
-           TerritoryID, *GetName());
-    return;
-  }
-
-  if (TerritoryID < 0) {
-    if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
-      PS->SetSelectedTerritory(nullptr);
-    }
-    return;
-  }
-
-  const bool bWorldHasTerritories = WorldMap->GetTerritoryCount() > 0;
-  if (TerritoryID >= 0 && !bWorldHasTerritories) {
-    // Clients can click immediately after loading while the server is still
-    // spawning/replicating the world map. Cache the request and replay it once
-    // territories are available.
-    UE_LOG(LogSkald, Verbose,
-           TEXT("ServerSelectTerritory received selection %d before the world map finished registering territories; queuing retry."),
-           TerritoryID);
-    PendingTerritorySelectionId = TerritoryID;
+           TEXT("ServerSelectTerritory received %s before the world map finished registering territories; queuing retry."),
+           *TerrDesc);
+    PendingTerritorySelectionId = Territory->TerritoryID;
     if (UWorld *World = GetWorld()) {
       World->GetTimerManager().SetTimer(
           PendingTerritorySelectionHandle, this,
@@ -4258,17 +4279,50 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
     World->GetTimerManager().ClearTimer(PendingTerritorySelectionHandle);
   }
 
-  ATerritory *Terr = WorldMap->GetTerritoryById(TerritoryID);
-  if (!Terr) {
-    UE_LOG(LogSkald, Warning,
-           TEXT("ServerSelectTerritory: territory %d not found for player %s"),
-           TerritoryID, *GetName());
+  if (!WorldMap->IsWorldActive() && Territory) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("ServerSelectTerritory ignoring %s while world map is inactive for player %s."),
+           *TerrDesc, *GetName());
     return;
   }
 
-  if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
-    PS->SetSelectedTerritory(Terr);
+  if (Territory && !WorldMap->Territories.Contains(Territory)) {
+    if (ATerritory *WorldOwned =
+            WorldMap->GetTerritoryById(Territory->TerritoryID)) {
+      Territory = WorldOwned;
+    } else {
+      UE_LOG(LogSkald, Warning,
+             TEXT("ServerSelectTerritory rejected %s because it is not registered with the active world map for %s"),
+             *TerrDesc, *GetName());
+      return;
+    }
   }
+
+  const ETurnPhase Phase = TurnManager ? TurnManager->GetCurrentPhase()
+                                       : ETurnPhase::None;
+  const bool bOwnershipRequired =
+      Phase == ETurnPhase::Reinforcement || Phase == ETurnPhase::ArmyPlacement;
+  if (Territory && bOwnershipRequired && Territory->OwningPlayer != PS) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("ServerSelectTerritory rejected selection of %s for %s during %s because the player does not own the territory."),
+           *TerrDesc, *GetName(),
+           *UEnum::GetValueAsString(TEXT("ETurnPhase"), static_cast<int32>(Phase)));
+    NotifyActionError(TEXT("You can only select your own territory during this phase."));
+    return;
+  }
+
+  if (!Territory) {
+    UE_LOG(LogSkald, Log,
+           TEXT("ServerSelectTerritory clearing selection for player %s (id %d)"),
+           *GetName(), SelectingPlayerId);
+    PS->SetSelectedTerritory(nullptr);
+    return;
+  }
+
+  PS->SetSelectedTerritory(Territory);
+  UE_LOG(LogSkald, Log,
+         TEXT("ServerSelectTerritory applied selection of %s for player %s (StableId=%d)"),
+         *TerrDesc, *GetName(), SelectingPlayerId);
 }
 
 void ASkaldPlayerController::RetryPendingTerritorySelection() {
@@ -4298,7 +4352,7 @@ void ASkaldPlayerController::RetryPendingTerritorySelection() {
   UE_LOG(LogSkald, Verbose,
          TEXT("Retrying queued territory selection %d now that the world map is ready."),
          QueuedSelection);
-  ServerSelectTerritory(QueuedSelection);
+  ServerSelectTerritory(WorldMap->GetTerritoryById(QueuedSelection));
 }
 
 void ASkaldPlayerController::ServerRequestPendingBattleState_Implementation() {
@@ -4891,9 +4945,8 @@ void ASkaldPlayerController::HandleWorldStateChanged() {
   }
 
   // Update territory info for the currently selected territory if available.
-  if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
-          GetWorld(), AWorldMap::StaticClass()))) {
-    if (ATerritory *Terr = WorldMap->GetLocalSelection()) {
+  if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+    if (ATerritory *Terr = PS->SelectedTerritory.Get()) {
       const FString OwnerName = ResolvePlayerName(
           Terr->OwningPlayer, TEXT("HandleWorldStateChanged"));
       MainHUD->UpdateTerritoryInfo(Terr->TerritoryName, OwnerName,
@@ -5153,7 +5206,7 @@ void ASkaldPlayerController::HandleGridClick() {
 
     GetHitResultUnderCursor(ECC_Visibility, /*bTraceComplex*/ true, Hit);
     if (ATerritory *Terr = Cast<ATerritory>(Hit.GetActor())) {
-      ServerSelectTerritory(Terr->TerritoryID);
+      RequestSelectTerritory(Terr);
     }
     return;
   }
@@ -5720,7 +5773,7 @@ void ASkaldPlayerController::HandleClearSelectionPressed() {
       return;
     }
 
-    ServerSelectTerritory(-1);
+    RequestSelectTerritory(nullptr);
     return;
   }
 
@@ -6137,7 +6190,7 @@ void ASkaldPlayerController::BeginRetreatSelectionLocal(
     return;
   }
 
-  ServerSelectTerritory(-1);
+  RequestSelectTerritory(nullptr);
 
   if (!MainHUD) {
     InitializeHUDWidget();

@@ -550,15 +550,12 @@ void USkaldMainHUDWidget::UpdateTerritoryInfo(const FString &TerritoryName,
     bool bIsCapital = false;
     if (APlayerController *PC = GetOwningPlayer()) {
       if (ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>()) {
-        if (AWorldMap *Map = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
-                GetWorld(), AWorldMap::StaticClass()))) {
-          if (ATerritory *Sel = Map->SelectedTerritory) {
-            bOwnedByLocal =
-                (Sel->OwningPlayer &&
-                 Sel->OwningPlayer->GetPlayerId() == PS->GetPlayerId());
-            if (bOwnedByLocal) {
-              bIsCapital = Sel->bIsCapital;
-            }
+        if (ATerritory *Sel = PS->SelectedTerritory.Get()) {
+          bOwnedByLocal =
+              (Sel->OwningPlayer &&
+               Sel->OwningPlayer->GetPlayerId() == PS->GetPlayerId());
+          if (bOwnedByLocal) {
+            bIsCapital = Sel->bIsCapital;
           }
         }
       }

@@ -4139,6 +4139,25 @@ bool ATurnManager::BroadcastCurrentPhase() {
         FString::Printf(TEXT("Current Phase: %s"), *PhaseString));
   }
 
+  if (ASkaldGameState *GS = GetWorld()->GetGameState<ASkaldGameState>()) {
+    for (APlayerState *RawPlayerState : GS->PlayerArray) {
+      if (ASkaldPlayerState *SkaldPS = Cast<ASkaldPlayerState>(RawPlayerState)) {
+        const int32 StableId = SkaldPS->GetStablePlayerId();
+        ATerritory *Selection = SkaldPS->SelectedTerritory.Get();
+        const FString SelectionDesc = Selection
+                                          ? FString::Printf(TEXT("%s (%d)"),
+                                                            *Selection->GetName(),
+                                                            Selection->TerritoryID)
+                                          : FString(TEXT("None"));
+        UE_LOG(LogSkald, Log,
+               TEXT("Phase %s selection snapshot for %s (StableId=%d): %s"),
+               *PhaseString,
+               *SkaldPS->GetResolvedPlayerName(TEXT("BroadcastCurrentPhase")),
+               StableId, *SelectionDesc);
+      }
+    }
+  }
+
   for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr :
        Controllers) {
     if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
