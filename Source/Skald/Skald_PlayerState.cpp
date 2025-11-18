@@ -10,6 +10,8 @@
 #include "Skald_PlayerController.h"
 #include "Territory.h"
 #include "UI/SkaldMainHUDWidget.h"
+#include "WorldMap.h"
+#include "Kismet/GameplayStatics.h"
 
 ASkaldPlayerState::ASkaldPlayerState()
     : DeployableUnits(0), InitiativeRoll(0), Resources(0),
@@ -88,6 +90,7 @@ void ASkaldPlayerState::GetLifetimeReplicatedProps(
   DOREPLIFETIME(ASkaldPlayerState, bHasLockedIn);
   DOREPLIFETIME(ASkaldPlayerState, IsEliminated);
   DOREPLIFETIME(ASkaldPlayerState, StablePlayerId);
+  DOREPLIFETIME(ASkaldPlayerState, SelectedTerritory);
 }
 
 void ASkaldPlayerState::OnRep_DeployableUnits() {
@@ -271,4 +274,33 @@ void ASkaldPlayerState::OnRep_StablePlayerId() {
       SkaldPC->HandlePlayerIdUpdated();
     }
   }
+
+  if (SelectedTerritory.IsValid()) {
+    OnRep_SelectedTerritory();
+  }
+}
+
+void ASkaldPlayerState::OnRep_SelectedTerritory() {
+  if (UWorld *World = GetWorld()) {
+    if (AWorldMap *WorldMap = Cast<AWorldMap>(
+            UGameplayStatics::GetActorOfClass(World, AWorldMap::StaticClass()))) {
+      const int32 StableId = GetStablePlayerId();
+      if (StableId != INDEX_NONE) {
+        WorldMap->SelectTerritory(SelectedTerritory.Get(), true, StableId);
+      }
+    }
+  }
+}
+
+void ASkaldPlayerState::SetSelectedTerritory(ATerritory *Territory) {
+  if (!HasAuthority()) {
+    return;
+  }
+
+  SelectedTerritory = Territory;
+
+  // Immediately apply the change on the server so listen-server hosts and
+  // dedicated servers maintain consistent local selection caches.
+  OnRep_SelectedTerritory();
+  ForceNetUpdate();
 }

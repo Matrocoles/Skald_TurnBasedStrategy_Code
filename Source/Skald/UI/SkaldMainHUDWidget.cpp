@@ -1700,9 +1700,20 @@ UTextBlock *USkaldMainHUDWidget::GetSelectionPromptTextBlock() const {
 }
 
 ATerritory *USkaldMainHUDWidget::GetCurrentlySelectedTerritory() const {
-  if (AWorldMap *WorldMap = Cast<AWorldMap>(UGameplayStatics::GetActorOfClass(
-          GetWorld(), AWorldMap::StaticClass()))) {
-    return WorldMap->SelectedTerritory;
+  if (const UWorld *World = GetWorld()) {
+    for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator();
+         It; ++It) {
+      if (const ASkaldPlayerController *PC =
+              Cast<ASkaldPlayerController>(*It)) {
+        if (!PC->IsLocalController()) {
+          continue;
+        }
+
+        if (const ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>()) {
+          return PS->SelectedTerritory.Get();
+        }
+      }
+    }
   }
 
   return nullptr;

@@ -82,6 +82,11 @@ public:
             Category = "PlayerState")
   bool IsEliminated;
 
+  /** Territory currently selected by this player. */
+  UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_SelectedTerritory,
+            Category = "Skald|Selection")
+  TObjectPtr<class ATerritory> SelectedTerritory = nullptr;
+
   /** Stable identifier replicated to all clients for consistent selection routing. */
   UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_StablePlayerId,
             Category = "PlayerState")
@@ -107,6 +112,9 @@ public:
   UFUNCTION()
   void OnRep_StablePlayerId();
 
+  UFUNCTION()
+  void OnRep_SelectedTerritory();
+
   virtual void GetLifetimeReplicatedProps(
       TArray<FLifetimeProperty> &OutLifetimeProps) const override;
 
@@ -127,6 +135,9 @@ public:
 
   /** Stable identifier safe to use for routing selection events client-side. */
   int32 GetStablePlayerId() const;
+
+  /** Server-side setter used to validate and update the player's selection. */
+  void SetSelectedTerritory(class ATerritory *Territory);
 
   /** Refreshes and replicates the stable identifier on the server. */
   void RefreshStablePlayerId();
