@@ -4,6 +4,8 @@
 #include "Skald_PlayerController.h"
 #include "TerritorySelectionTest.generated.h"
 
+class ATerritory;
+
 /** Player controller capturing server selection calls for tests. */
 UCLASS()
 class SKALD_API ATerritorySelectionTestPC : public ASkaldPlayerController {
@@ -12,9 +14,9 @@ class SKALD_API ATerritorySelectionTestPC : public ASkaldPlayerController {
 public:
     bool bServerSelectCalled = false;
 
-    virtual void ServerSelectTerritory_Implementation(int32 TerritoryID) override {
+    virtual void ServerSelectTerritory_Implementation(ATerritory *Territory) override {
         bServerSelectCalled = true;
-        Super::ServerSelectTerritory_Implementation(TerritoryID);
+        Super::ServerSelectTerritory_Implementation(Territory);
     }
 };
 
