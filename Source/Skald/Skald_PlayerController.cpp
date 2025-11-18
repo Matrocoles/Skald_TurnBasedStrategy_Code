@@ -4306,7 +4306,7 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
     UE_LOG(LogSkald, Warning,
            TEXT("ServerSelectTerritory rejected selection of %s for %s during %s because the player does not own the territory."),
            *TerrDesc, *GetName(),
-           *UEnum::GetValueAsString(TEXT("ETurnPhase"), static_cast<int32>(Phase)));
+          *UEnum::GetValueAsString(TEXT("ETurnPhase"), Phase));
     NotifyActionError(TEXT("You can only select your own territory during this phase."));
     return;
   }
