@@ -4303,10 +4303,16 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
   const bool bOwnershipRequired = TurnManager &&
       (Phase == ETurnPhase::Reinforcement || Phase == ETurnPhase::ArmyPlacement);
   if (Territory && bOwnershipRequired && Territory->OwningPlayer != PS) {
+    const UEnum *TurnPhaseEnum = StaticEnum<ETurnPhase>();
+    const FString PhaseName = TurnPhaseEnum
+                                  ? TurnPhaseEnum->GetNameStringByValue(
+                                        static_cast<int64>(Phase))
+                                  : TEXT("UnknownPhase");
+
     UE_LOG(LogSkald, Warning,
            TEXT("ServerSelectTerritory rejected selection of %s for %s during %s because the player does not own the territory."),
            *TerrDesc, *GetName(),
-          *UEnum::GetValueAsString(TEXT("ETurnPhase"), Phase));
+           *PhaseName);
     NotifyActionError(TEXT("You can only select your own territory during this phase."));
     return;
   }
