@@ -877,9 +877,13 @@ public:
   UFUNCTION(Server, Reliable)
   void ServerDeployUnits(int32 TerritoryID, int32 Amount);
 
-  /** Server-side processing of a territory selection. Pass -1 to deselect. */
+  /** Request the local player's selection be sent to the server for validation. */
+  UFUNCTION(BlueprintCallable, Category = "Skald|Selection")
+  void RequestSelectTerritory(class ATerritory *Territory);
+
+  /** Server-side processing of a territory selection. Pass nullptr to deselect. */
   UFUNCTION(Server, Reliable)
-  void ServerSelectTerritory(int32 TerritoryID);
+  void ServerSelectTerritory(class ATerritory *Territory);
 
   /** Request the pending battle payload from the host if it failed to replicate. */
   UFUNCTION(Server, Reliable)

@@ -311,6 +311,10 @@ void ATerritory::HandleClicked(UPrimitiveComponent *TouchedComponent,
     return;
   }
 
+  UE_LOG(LogSkald, Log,
+         TEXT("Territory %d received click from player controller %s (StableId=%d)"),
+         TerritoryID, *LocalController->GetName(), LocalPlayerId);
+
   bool bDeselected = bIsSelected;
   if (AWorldMap *Map = Cast<AWorldMap>(GetOwner())) {
     if (ATerritory *CurrentSelection = Map->GetSelectionForPlayer(LocalPlayerId)) {
@@ -320,7 +324,7 @@ void ATerritory::HandleClicked(UPrimitiveComponent *TouchedComponent,
     }
   }
 
-  LocalController->ServerSelectTerritory(bDeselected ? -1 : TerritoryID);
+  LocalController->RequestSelectTerritory(bDeselected ? nullptr : this);
 }
 
 void ATerritory::SetSelectionDecalAdditionalHeightOffset(float AdditionalOffset) {
