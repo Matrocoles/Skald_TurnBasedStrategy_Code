@@ -68,6 +68,7 @@
 #include "Widgets/SWindow.h"
 
 #include "Net/UnrealNetwork.h"
+#include "UObject/EnumProperty.h"
 
 void UFactionCursorWidget::InitializeCursor(UTexture2D *InTexture,
                                             const FVector2D &InHotspot,
@@ -2260,6 +2261,11 @@ void ASkaldPlayerController::OnRep_PlayerState() {
 
 void ASkaldPlayerController::OnPossess(APawn *InPawn) {
   Super::OnPossess(InPawn);
+
+  UE_LOG(LogSkald, Log,
+         TEXT("OnPossess: Controller=%s Pawn=%s Role=%s RemoteRole=%s"),
+         *GetName(), *GetNameSafe(InPawn), *UEnum::GetValueAsString(GetLocalRole()),
+         *UEnum::GetValueAsString(GetRemoteRole()));
 
   if (!IsLocalController()) {
     return;

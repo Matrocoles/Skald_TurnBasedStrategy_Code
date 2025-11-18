@@ -1696,6 +1696,38 @@ void ASkald_BattleGameMode::OnControllerReady(AController *Controller) {
     return;
   }
 
+  // Ensure controllers that survived seamless travel have a valid pawn they
+  // actually own. If a controller is missing its pawn (or is holding onto a
+  // pawn possessed by someone else) the resulting camera replication appears
+  // to jump between players. Restarting the player guarantees a fresh pawn
+  // that is owned and driven locally on each connection.
+  APawn *ExistingPawn = Controller->GetPawn();
+  const bool bPawnOwnedByController =
+      ExistingPawn && ExistingPawn->GetController() == Controller;
+
+  if (!ExistingPawn || !bPawnOwnedByController) {
+    UE_LOG(LogSkaldBattle, Log,
+           TEXT("OnControllerReady: Respawning pawn for %s (Pawn=%s OwnedBySelf=%d)"),
+           *GetNameSafe(Controller), *GetNameSafe(ExistingPawn),
+           bPawnOwnedByController ? 1 : 0);
+    RestartPlayer(Controller);
+    ExistingPawn = Controller->GetPawn();
+  }
+
+  if (APlayerController *PC = Cast<APlayerController>(Controller)) {
+    FString CameraSummary(TEXT("<none>"));
+    if (ExistingPawn) {
+      if (const AActor *CamOwner = PC->GetViewTarget()) {
+        CameraSummary = CamOwner->GetName();
+      } else {
+        CameraSummary = ExistingPawn->GetName();
+      }
+    }
+    UE_LOG(LogSkaldBattle, Log,
+           TEXT("OnControllerReady: %s owns pawn %s view=%s"),
+           *GetNameSafe(PC), *GetNameSafe(ExistingPawn), *CameraSummary);
+  }
+
   if (Controller && !Controller->PlayerState) {
     Controller->InitPlayerState();
   }
@@ -1711,6 +1743,20 @@ void ASkald_BattleGameMode::OnControllerReady(AController *Controller) {
     TArray<AController *> SingleController;
     SingleController.Add(Controller);
     RelocateControllersNearBattleGrid(SingleController);
+  }
+
+  // Push the pending battle state to newly-arrived clients so their UI binds
+  // to the correct PlayerState and payload before any selection widgets
+  // initialise.
+  if (ASkaldPlayerController *SkaldPC = Cast<ASkaldPlayerController>(Controller)) {
+    if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+      SkaldPC->ClientApplyPendingBattleState(GI->PendingBattle,
+                                             GI->GetTravelState(), GI->bIsInBattleMap);
+      UE_LOG(LogSkaldBattle, Log,
+             TEXT("OnControllerReady: Sent pending battle payload to %s (BattleValid=%d TravelValid=%d)"),
+             *GetNameSafe(SkaldPC), GI->PendingBattle.FromTerritoryID > 0 ? 1 : 0,
+             GI->GetTravelState().bValid ? 1 : 0);
+    }
   }
 
   TrySetupBattleWhenReady();
