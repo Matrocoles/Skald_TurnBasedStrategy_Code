@@ -275,7 +275,7 @@ void ASkaldPlayerState::OnRep_StablePlayerId() {
     }
   }
 
-  if (SelectedTerritory.IsValid()) {
+  if (SelectedTerritory) {
     OnRep_SelectedTerritory();
   }
 }
@@ -298,7 +298,7 @@ void ASkaldPlayerState::SetSelectedTerritory(ATerritory *Territory) {
 }
 
 void ASkaldPlayerState::ApplySelectedTerritoryToWorldMap(bool bAllowRetry) {
-  if (!SelectedTerritory.IsValid()) {
+  if (!SelectedTerritory) {
     ClearSelectionReplayTimer();
     return;
   }
@@ -333,7 +333,7 @@ void ASkaldPlayerState::ClearSelectionReplayTimer() {
 
 void ASkaldPlayerState::RetryApplySelectedTerritory() {
   ApplySelectedTerritoryToWorldMap(true);
-  if (!SelectedTerritory.IsValid()) {
+  if (!SelectedTerritory) {
     ClearSelectionReplayTimer();
   }
 }
