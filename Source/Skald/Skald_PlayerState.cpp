@@ -281,15 +281,7 @@ void ASkaldPlayerState::OnRep_StablePlayerId() {
 }
 
 void ASkaldPlayerState::OnRep_SelectedTerritory() {
-  if (UWorld *World = GetWorld()) {
-    if (AWorldMap *WorldMap = Cast<AWorldMap>(
-            UGameplayStatics::GetActorOfClass(World, AWorldMap::StaticClass()))) {
-      const int32 StableId = GetStablePlayerId();
-      if (StableId != INDEX_NONE) {
-        WorldMap->SelectTerritory(SelectedTerritory.Get(), true, StableId);
-      }
-    }
-  }
+  ApplySelectedTerritoryToWorldMap(true);
 }
 
 void ASkaldPlayerState::SetSelectedTerritory(ATerritory *Territory) {
@@ -303,4 +295,45 @@ void ASkaldPlayerState::SetSelectedTerritory(ATerritory *Territory) {
   // dedicated servers maintain consistent local selection caches.
   OnRep_SelectedTerritory();
   ForceNetUpdate();
+}
+
+void ASkaldPlayerState::ApplySelectedTerritoryToWorldMap(bool bAllowRetry) {
+  if (!SelectedTerritory.IsValid()) {
+    ClearSelectionReplayTimer();
+    return;
+  }
+
+  const int32 StableId = GetStablePlayerId();
+  if (StableId == INDEX_NONE) {
+    return;
+  }
+
+  UWorld *World = GetWorld();
+  if (!World) {
+    return;
+  }
+
+  if (AWorldMap *WorldMap = Cast<AWorldMap>(
+          UGameplayStatics::GetActorOfClass(World, AWorldMap::StaticClass()))) {
+    WorldMap->SelectTerritory(SelectedTerritory.Get(), true, StableId);
+    ClearSelectionReplayTimer();
+  } else if (bAllowRetry && !World->GetTimerManager().IsTimerActive(
+                                 SelectionReplayTimerHandle)) {
+    World->GetTimerManager().SetTimer(
+        SelectionReplayTimerHandle, this,
+        &ASkaldPlayerState::RetryApplySelectedTerritory, 0.25f, true);
+  }
+}
+
+void ASkaldPlayerState::ClearSelectionReplayTimer() {
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(SelectionReplayTimerHandle);
+  }
+}
+
+void ASkaldPlayerState::RetryApplySelectedTerritory() {
+  ApplySelectedTerritoryToWorldMap(true);
+  if (!SelectedTerritory.IsValid()) {
+    ClearSelectionReplayTimer();
+  }
 }

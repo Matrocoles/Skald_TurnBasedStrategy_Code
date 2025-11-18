@@ -4,6 +4,7 @@
 #include "GameFramework/PlayerState.h"
 #include "GridBattleManager.h"
 #include "SkaldTypes.h"
+#include "TimerManager.h"
 #include "Skald_PlayerState.generated.h"
 
 namespace Skald {
@@ -146,4 +147,16 @@ private:
   /** Tracks deployments per territory during the army placement phase. */
   UPROPERTY()
   TMap<int32, int32> ArmyPlacementDeployments;
+
+  /** Timer used to retry selection application until the world map is ready. */
+  FTimerHandle SelectionReplayTimerHandle;
+
+  /** Attempts to push the replicated selection into the WorldMap when present. */
+  void ApplySelectedTerritoryToWorldMap(bool bAllowRetry);
+
+  /** Clears the pending retry timer if one is active. */
+  void ClearSelectionReplayTimer();
+
+  /** Timer callback used to retry selection application after map spawn. */
+  void RetryApplySelectedTerritory();
 };
