@@ -10,6 +10,8 @@
 #include "Skald_PlayerController.h"
 #include "Territory.h"
 #include "UI/SkaldMainHUDWidget.h"
+#include "WorldMap.h"
+#include "Kismet/GameplayStatics.h"
 
 ASkaldPlayerState::ASkaldPlayerState()
     : DeployableUnits(0), InitiativeRoll(0), Resources(0),
@@ -88,6 +90,7 @@ void ASkaldPlayerState::GetLifetimeReplicatedProps(
   DOREPLIFETIME(ASkaldPlayerState, bHasLockedIn);
   DOREPLIFETIME(ASkaldPlayerState, IsEliminated);
   DOREPLIFETIME(ASkaldPlayerState, StablePlayerId);
+  DOREPLIFETIME(ASkaldPlayerState, SelectedTerritory);
 }
 
 void ASkaldPlayerState::OnRep_DeployableUnits() {
@@ -270,5 +273,67 @@ void ASkaldPlayerState::OnRep_StablePlayerId() {
       }
       SkaldPC->HandlePlayerIdUpdated();
     }
+  }
+
+  if (SelectedTerritory.IsValid()) {
+    OnRep_SelectedTerritory();
+  }
+}
+
+void ASkaldPlayerState::OnRep_SelectedTerritory() {
+  ApplySelectedTerritoryToWorldMap(true);
+}
+
+void ASkaldPlayerState::SetSelectedTerritory(ATerritory *Territory) {
+  if (!HasAuthority()) {
+    return;
+  }
+
+  SelectedTerritory = Territory;
+
+  // Immediately apply the change on the server so listen-server hosts and
+  // dedicated servers maintain consistent local selection caches.
+  OnRep_SelectedTerritory();
+  ForceNetUpdate();
+}
+
+void ASkaldPlayerState::ApplySelectedTerritoryToWorldMap(bool bAllowRetry) {
+  if (!SelectedTerritory.IsValid()) {
+    ClearSelectionReplayTimer();
+    return;
+  }
+
+  const int32 StableId = GetStablePlayerId();
+  if (StableId == INDEX_NONE) {
+    return;
+  }
+
+  UWorld *World = GetWorld();
+  if (!World) {
+    return;
+  }
+
+  if (AWorldMap *WorldMap = Cast<AWorldMap>(
+          UGameplayStatics::GetActorOfClass(World, AWorldMap::StaticClass()))) {
+    WorldMap->SelectTerritory(SelectedTerritory.Get(), true, StableId);
+    ClearSelectionReplayTimer();
+  } else if (bAllowRetry && !World->GetTimerManager().IsTimerActive(
+                                 SelectionReplayTimerHandle)) {
+    World->GetTimerManager().SetTimer(
+        SelectionReplayTimerHandle, this,
+        &ASkaldPlayerState::RetryApplySelectedTerritory, 0.25f, true);
+  }
+}
+
+void ASkaldPlayerState::ClearSelectionReplayTimer() {
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(SelectionReplayTimerHandle);
+  }
+}
+
+void ASkaldPlayerState::RetryApplySelectedTerritory() {
+  ApplySelectedTerritoryToWorldMap(true);
+  if (!SelectedTerritory.IsValid()) {
+    ClearSelectionReplayTimer();
   }
 }

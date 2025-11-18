@@ -2044,8 +2044,7 @@ bool ASkaldPlayerController::RefreshLocalTerritorySelection() {
     return false;
   }
 
-  if (ATerritory *CachedSelection =
-          WorldMap->GetSelectionForPlayer(LocalPlayerId)) {
+  if (ATerritory *CachedSelection = PS->SelectedTerritory.Get()) {
     WorldMap->SelectTerritory(CachedSelection, false, LocalPlayerId);
   }
 
@@ -4231,8 +4230,9 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
   }
 
   if (TerritoryID < 0) {
-    WorldMap->SelectTerritory(nullptr, false, SelectingPlayerId);
-    ClientSelectTerritory(-1, SelectingPlayerId);
+    if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+      PS->SetSelectedTerritory(nullptr);
+    }
     return;
   }
 
@@ -4266,17 +4266,8 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
     return;
   }
 
-  WorldMap->SelectTerritory(Terr, false, SelectingPlayerId);
-
-  if (UWorld *World = GetWorld()) {
-    for (FConstPlayerControllerIterator It =
-             World->GetPlayerControllerIterator();
-         It; ++It) {
-      if (ASkaldPlayerController *OtherPC =
-              Cast<ASkaldPlayerController>(*It)) {
-        OtherPC->ClientSelectTerritory(TerritoryID, SelectingPlayerId);
-      }
-    }
+  if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+    PS->SetSelectedTerritory(Terr);
   }
 }
 
@@ -4308,77 +4299,6 @@ void ASkaldPlayerController::RetryPendingTerritorySelection() {
          TEXT("Retrying queued territory selection %d now that the world map is ready."),
          QueuedSelection);
   ServerSelectTerritory(QueuedSelection);
-}
-
-void ASkaldPlayerController::ClientSelectTerritory_Implementation(
-    int32 TerritoryID, int32 SelectingPlayerId) {
-  AWorldMap *WorldMap = Cast<AWorldMap>(
-      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
-  if (!WorldMap) {
-    if (TerritoryID >= 0) {
-      QueueRemoteTerritorySelection(TerritoryID, SelectingPlayerId);
-    }
-    return;
-  }
-
-  const bool bWorldReady = WorldMap->IsWorldActive() &&
-                           (TerritoryID < 0 || WorldMap->GetTerritoryCount() > 0);
-  if (!bWorldReady && TerritoryID >= 0) {
-    QueueRemoteTerritorySelection(TerritoryID, SelectingPlayerId);
-    return;
-  }
-
-  ATerritory *Terr =
-      TerritoryID >= 0 ? WorldMap->GetTerritoryById(TerritoryID) : nullptr;
-  WorldMap->SelectTerritory(Terr, true, SelectingPlayerId);
-  UE_LOG(LogSkald, Log, TEXT("ClientSelectTerritory <- %d"), TerritoryID);
-}
-
-void ASkaldPlayerController::QueueRemoteTerritorySelection(
-    int32 TerritoryId, int32 SelectingPlayerId) {
-  PendingRemoteTerritorySelections.Add(SelectingPlayerId, TerritoryId);
-
-  if (UWorld *World = GetWorld()) {
-    if (!World->GetTimerManager().IsTimerActive(
-            PendingRemoteSelectionRetryHandle)) {
-      World->GetTimerManager().SetTimer(
-          PendingRemoteSelectionRetryHandle, this,
-          &ASkaldPlayerController::RetryPendingRemoteTerritorySelections, 0.05f,
-          true);
-    }
-  }
-}
-
-void ASkaldPlayerController::RetryPendingRemoteTerritorySelections() {
-  if (PendingRemoteTerritorySelections.Num() == 0) {
-    if (UWorld *World = GetWorld()) {
-      World->GetTimerManager().ClearTimer(PendingRemoteSelectionRetryHandle);
-    }
-    return;
-  }
-
-  AWorldMap *WorldMap = Cast<AWorldMap>(
-      UGameplayStatics::GetActorOfClass(GetWorld(), AWorldMap::StaticClass()));
-  if (!WorldMap || !WorldMap->IsWorldActive() ||
-      WorldMap->GetTerritoryCount() == 0) {
-    return;
-  }
-
-  for (const TPair<int32, int32> &Selection : PendingRemoteTerritorySelections) {
-    ATerritory *Terr =
-        Selection.Value >= 0 ? WorldMap->GetTerritoryById(Selection.Value)
-                             : nullptr;
-    WorldMap->SelectTerritory(Terr, true, Selection.Key);
-    UE_LOG(LogSkald, Verbose,
-           TEXT("Replaying pending remote selection %d for player %d."),
-           Selection.Value, Selection.Key);
-  }
-
-  PendingRemoteTerritorySelections.Empty();
-
-  if (UWorld *World = GetWorld()) {
-    World->GetTimerManager().ClearTimer(PendingRemoteSelectionRetryHandle);
-  }
 }
 
 void ASkaldPlayerController::ServerRequestPendingBattleState_Implementation() {
