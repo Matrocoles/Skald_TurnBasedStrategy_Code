@@ -2881,11 +2881,6 @@ void AFighterPawn::ExecuteManualAttackRoll() {
   CancelAIDiceRollDelay();
 
   EnsureDiceManagerBinding();
-  USkaldDiceManager *DiceManager = CachedDiceManager.Get();
-  if (!DiceManager) {
-    return;
-  }
-
   const int32 DiceToRoll = FMath::Max(Stats.AttackDice, 0);
   FLinearColor FactionColor = FLinearColor::Transparent;
   if (USkaldGameInstance *GI = Cast<USkaldGameInstance>(GetGameInstance())) {
@@ -2893,11 +2888,7 @@ void AFighterPawn::ExecuteManualAttackRoll() {
   } else {
     FactionColor = USkaldGameInstance::GetDefaultFactionColor(Faction);
   }
-  const FGuid RollId = DiceManager->RollDice_D6(DiceToRoll, 0, false,
-                                                FactionColor, FLinearColor::Transparent);
-  if (!RollId.IsValid()) {
-    return;
-  }
+  const FGuid RollId = FGuid::NewGuid();
 
   if (UWorld *World = GetWorld()) {
     ASkaldPlayerController::BroadcastPhysicalDiceRoll(

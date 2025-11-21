@@ -24,6 +24,10 @@ ASkald_PlayerCharacter::ASkald_PlayerCharacter()
 {
         PrimaryActorTick.bCanEverTick = true;
 
+        bReplicates = false;
+        bReplicateMovement = false;
+        SetReplicateMovement(false);
+
         bUseControllerRotationYaw = true;
         bUseControllerRotationPitch = true;
 
@@ -122,6 +126,10 @@ void ASkald_PlayerCharacter::PossessedBy(AController* NewController)
 void ASkald_PlayerCharacter::OnRep_Controller()
 {
         Super::OnRep_Controller();
+
+        UE_LOG(LogSkald, Log, TEXT("[Camera] %s received controller %s (role=%s)"),
+               *GetName(), *GetNameSafe(Controller),
+               *UEnum::GetValueAsString(GetLocalRole()));
 
         InitializeOverviewCamera();
 }

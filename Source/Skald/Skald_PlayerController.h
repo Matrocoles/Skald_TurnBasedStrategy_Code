@@ -896,9 +896,10 @@ public:
                                      bool bBattleMapActive);
 
   UFUNCTION(Client, Reliable)
-  void ClientStartPhysicalDiceRoll(const FGuid &RollId, int32 PlayerDice,
-                                   int32 EnemyDice, bool bForInitiative,
-                                   FLinearColor PlayerColor,
+  void ClientStartPhysicalDiceRoll(const FGuid &RollId,
+                                   const TArray<int32> &PlayerResults,
+                                   const TArray<int32> &EnemyResults,
+                                   bool bForInitiative, FLinearColor PlayerColor,
                                    FLinearColor EnemyColor);
 
   static void BroadcastPhysicalDiceRoll(UWorld *World, const FGuid &RollId,
@@ -935,6 +936,11 @@ protected:
   UPROPERTY(EditInstanceOnly, BlueprintReadOnly, ReplicatedUsing = OnRep_TurnManager,
             Category = "Turn", meta = (ExposeOnSpawn = true))
   TObjectPtr<ATurnManager> TurnManager;
+
+  /** Keep HUD turn/phase widgets aligned with replicated game state. */
+  void RefreshTurnDataFromState();
+  UFUNCTION()
+  void HandleTurnIndexChanged(int32 NewIndex);
 
   /** Helper to update cached state whenever the replicated turn manager changes. */
   void ApplyTurnManager(ATurnManager *Manager);
