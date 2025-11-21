@@ -192,10 +192,36 @@ void ASkaldPlayerController::BroadcastPhysicalDiceRoll(
     return;
   }
 
+  USkaldDiceManager *DiceManager = nullptr;
+  if (UGameInstance *GI = World->GetGameInstance()) {
+    DiceManager = GI->GetSubsystem<USkaldDiceManager>();
+  }
+
+  auto GenerateResults = [](int32 Count, USkaldDiceManager *Mgr) {
+    TArray<int32> Out;
+    if (Count > 0) {
+      if (Mgr) {
+        Out = Mgr->RollDiceBlocking_D6(Count);
+      } else {
+        for (int32 Index = 0; Index < Count; ++Index) {
+          Out.Add(FMath::RandRange(1, 6));
+        }
+      }
+    }
+    return Out;
+  };
+
+  const TArray<int32> PlayerResults = GenerateResults(PlayerDice, DiceManager);
+  const TArray<int32> EnemyResults = GenerateResults(EnemyDice, DiceManager);
+
+  UE_LOG(LogSkald, Log,
+         TEXT("[DiceArena] Broadcasting roll %s (PlayerDice=%d EnemyDice=%d)"),
+         *RollId.ToString(), PlayerDice, EnemyDice);
+
   for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It;
        ++It) {
     if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(*It)) {
-      PC->ClientStartPhysicalDiceRoll(RollId, PlayerDice, EnemyDice,
+      PC->ClientStartPhysicalDiceRoll(RollId, PlayerResults, EnemyResults,
                                       bForInitiative, PlayerColor, EnemyColor);
     }
   }
@@ -279,6 +305,8 @@ void ASkaldPlayerController::CacheGameReferences() {
     if (CachedGameState) {
       CachedGameState->OnPlayersUpdated.RemoveDynamic(
           this, &ASkaldPlayerController::HandlePlayersUpdated);
+      CachedGameState->OnTurnIndexChanged.RemoveDynamic(
+          this, &ASkaldPlayerController::HandleTurnIndexChanged);
     }
     CachedGameState = WorldGameState;
   }
@@ -288,6 +316,11 @@ void ASkaldPlayerController::CacheGameReferences() {
             this, &ASkaldPlayerController::HandlePlayersUpdated)) {
       CachedGameState->OnPlayersUpdated.AddDynamic(
           this, &ASkaldPlayerController::HandlePlayersUpdated);
+    }
+    if (!CachedGameState->OnTurnIndexChanged.IsAlreadyBound(
+            this, &ASkaldPlayerController::HandleTurnIndexChanged)) {
+      CachedGameState->OnTurnIndexChanged.AddDynamic(
+          this, &ASkaldPlayerController::HandleTurnIndexChanged);
     }
   } else {
     bNeedsRetry = true;
@@ -4399,7 +4432,8 @@ void ASkaldPlayerController::ClientApplyPendingBattleState_Implementation(
 }
 
 void ASkaldPlayerController::ClientStartPhysicalDiceRoll_Implementation(
-    const FGuid &RollId, int32 PlayerDice, int32 EnemyDice, bool bForInitiative,
+    const FGuid &RollId, const TArray<int32> &PlayerResults,
+    const TArray<int32> &EnemyResults, bool bForInitiative,
     FLinearColor PlayerColor, FLinearColor EnemyColor) {
   if (!RollId.IsValid()) {
     return;
@@ -4415,8 +4449,9 @@ void ASkaldPlayerController::ClientStartPhysicalDiceRoll_Implementation(
   }
 
   if (USkaldDiceManager *DiceManager = ResolveDiceManager()) {
-    const FGuid LocalRollId = DiceManager->RollDice_D6(
-        PlayerDice, EnemyDice, bForInitiative, PlayerColor, EnemyColor, RollId);
+    const FGuid LocalRollId = DiceManager->PlayScriptedRoll(
+        PlayerResults, EnemyResults, bForInitiative, -1.f, PlayerColor,
+        EnemyColor);
     ensure(!LocalRollId.IsValid() || LocalRollId == RollId);
   }
 }
@@ -4908,6 +4943,31 @@ void ASkaldPlayerController::HandlePlayersUpdated() {
   InitializeFighterSelectionIfNeeded();
 }
 
+void ASkaldPlayerController::HandleTurnIndexChanged(int32 NewIndex) {
+  UE_LOG(LogSkald, Log, TEXT("[TurnState] Controller %s observed turn index %d"),
+         *GetName(), NewIndex);
+  RefreshTurnDataFromState();
+}
+
+void ASkaldPlayerController::RefreshTurnDataFromState() {
+  if (!MainHUD || !CachedGameState) {
+    return;
+  }
+
+  int32 CurrentStableId = -1;
+  if (ASkaldPlayerState *CurrentPS = CachedGameState->GetCurrentPlayer()) {
+    CurrentStableId = CurrentPS->GetStablePlayerId();
+  }
+
+  const int32 TurnNumber = CachedGameState->CurrentTurnIndex + 1;
+  MainHUD->UpdateTurnBanner(CurrentStableId, TurnNumber);
+  MainHUD->SyncPhaseButtons(CurrentStableId == MainHUD->LocalPlayerID);
+
+  if (TurnManager) {
+    MainHUD->UpdatePhaseBanner(TurnManager->GetCurrentPhase());
+  }
+}
+
 void ASkaldPlayerController::HandleFactionsUpdated() {
   if (!MainHUD || !CachedGameState) {
     return;
@@ -4981,6 +5041,8 @@ void ASkaldPlayerController::HandleWorldStateChanged() {
   if (TurnManager) {
     MainHUD->UpdatePhaseBanner(TurnManager->GetCurrentPhase());
   }
+
+  RefreshTurnDataFromState();
 }
 
 void ASkaldPlayerController::HandlePlayerLockedIn() { HandleFactionLockedIn(); }
