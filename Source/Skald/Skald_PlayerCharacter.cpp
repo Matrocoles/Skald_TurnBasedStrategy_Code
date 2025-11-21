@@ -25,7 +25,6 @@ ASkald_PlayerCharacter::ASkald_PlayerCharacter()
         PrimaryActorTick.bCanEverTick = true;
 
         bReplicates = false;
-        bReplicateMovement = false;
         SetReplicateMovement(false);
 
         bUseControllerRotationYaw = true;
