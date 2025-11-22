@@ -94,7 +94,7 @@ private:
   void OnRep_PendingArmyBudget();
 
   /** Stable identifier replicated to all clients for consistent selection routing. */
-  UPROPERTY(ReplicatedUsing = OnRep_StablePlayerId, Category = "PlayerState")
+  UPROPERTY(ReplicatedUsing = OnRep_StablePlayerId)
   int32 StablePlayerId;
 
   UFUNCTION()
