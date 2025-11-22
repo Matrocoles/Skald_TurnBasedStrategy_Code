@@ -121,9 +121,11 @@ private:
   UFUNCTION()
   void OnRep_SelectedTerritory();
 
+protected:
   virtual void GetLifetimeReplicatedProps(
       TArray<FLifetimeProperty> &OutLifetimeProps) const override;
 
+public:
   /** Clears per-territory deployment tracking for the army placement phase. */
   void ResetArmyPlacementDeployments();
 
