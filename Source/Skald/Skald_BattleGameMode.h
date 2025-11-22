@@ -42,7 +42,8 @@ protected:
                         FString &Error) override;
   virtual void BeginPlay() override;
   virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-  virtual void HandleStartingNewPlayer(APlayerController *NewPlayer) override;
+  virtual void HandleStartingNewPlayer_Implementation(
+      APlayerController *NewPlayer) override;
   virtual void PostLogin(APlayerController *NewPlayer) override;
   virtual void HandleSeamlessTravelPlayer(AController *&C) override;
   virtual void TryInitializeWorldAndStart() override;

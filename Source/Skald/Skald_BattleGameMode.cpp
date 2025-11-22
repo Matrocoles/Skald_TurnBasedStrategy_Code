@@ -1650,12 +1650,13 @@ void ASkald_BattleGameMode::StartBootstrapTimer()
   }
 }
 
-void ASkald_BattleGameMode::HandleStartingNewPlayer(APlayerController *NewPlayer) {
+void ASkald_BattleGameMode::HandleStartingNewPlayer_Implementation(
+    APlayerController *NewPlayer) {
   UE_LOG(LogSkaldBattle, Log,
          TEXT("HandleStartingNewPlayer: %s (HasAuthority=%d)"),
          *GetNameSafe(NewPlayer), HasAuthority() ? 1 : 0);
 
-  Super::HandleStartingNewPlayer(NewPlayer);
+  Super::HandleStartingNewPlayer_Implementation(NewPlayer);
 
   if (!HasAuthority()) {
     return;
