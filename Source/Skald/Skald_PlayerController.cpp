@@ -307,6 +307,8 @@ void ASkaldPlayerController::CacheGameReferences() {
           this, &ASkaldPlayerController::HandlePlayersUpdated);
       CachedGameState->OnTurnIndexChanged.RemoveDynamic(
           this, &ASkaldPlayerController::HandleTurnIndexChanged);
+      CachedGameState->OnBattleEntriesUpdated.RemoveDynamic(
+          this, &ASkaldPlayerController::HandleBattleEntriesUpdated);
     }
     CachedGameState = WorldGameState;
   }
@@ -321,6 +323,11 @@ void ASkaldPlayerController::CacheGameReferences() {
             this, &ASkaldPlayerController::HandleTurnIndexChanged)) {
       CachedGameState->OnTurnIndexChanged.AddDynamic(
           this, &ASkaldPlayerController::HandleTurnIndexChanged);
+    }
+    if (!CachedGameState->OnBattleEntriesUpdated.IsAlreadyBound(
+            this, &ASkaldPlayerController::HandleBattleEntriesUpdated)) {
+      CachedGameState->OnBattleEntriesUpdated.AddDynamic(
+          this, &ASkaldPlayerController::HandleBattleEntriesUpdated);
     }
   } else {
     bNeedsRetry = true;
@@ -2471,17 +2478,36 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
     return;
   }
 
-  const FS_BattlePayload &Battle = CachedGameInstance->PendingBattle;
   const int32 PlayerID = ResolveStablePlayerId(PS);
-  const bool bIsParticipant =
-      Battle.AttackerPlayerID == PlayerID || Battle.DefenderPlayerID == PlayerID;
+  int32 PendingBudget = PS->PendingArmyBudget;
+  bool bIsParticipant = false;
 
-  if (!bIsParticipant || PS->PendingArmyBudget <= 0) {
+  if (CachedGameState) {
+    FBattlePlayerEntry Entry;
+    if (CachedGameState->GetBattleEntryForPlayer(PlayerID, Entry)) {
+      bIsParticipant = true;
+      PendingBudget = PendingBudget > 0 ? PendingBudget : Entry.PendingArmyBudget;
+      if (PS->Faction == ESkaldFaction::None && Entry.Faction != ESkaldFaction::None) {
+        PS->Faction = Entry.Faction;
+      }
+    }
+  }
+
+  const FS_BattlePayload Battle = CachedGameState
+                                      ? CachedGameState->GetActiveBattlePayload()
+                                      : CachedGameInstance->PendingBattle;
+
+  if (!bIsParticipant &&
+      (Battle.AttackerPlayerID == PlayerID || Battle.DefenderPlayerID == PlayerID)) {
+    bIsParticipant = true;
+  }
+
+  if (!bIsParticipant || PendingBudget <= 0) {
     return;
   }
 
   if (!FighterSelectionWidget || !FighterSelectionWidget->IsInViewport()) {
-    ShowFighterSelectionUI(PS->PendingArmyBudget, PS->Faction);
+    ShowFighterSelectionUI(PendingBudget, PS->Faction);
   }
 }
 
@@ -4940,6 +4966,11 @@ void ASkaldPlayerController::HandlePlayersUpdated() {
     }
   }
 
+  InitializeFighterSelectionIfNeeded();
+}
+
+void ASkaldPlayerController::HandleBattleEntriesUpdated() {
+  DetermineControlledBattleSide();
   InitializeFighterSelectionIfNeeded();
 }
 
@@ -8645,7 +8676,11 @@ void ASkaldPlayerController::DetermineControlledBattleSide() {
   if (!CachedGameInstance)
     return;
 
-  const FS_BattlePayload &Battle = CachedGameInstance->PendingBattle;
+  FS_BattlePayload Battle = CachedGameInstance->PendingBattle;
+  if (CachedGameState)
+  {
+    Battle = CachedGameState->GetActiveBattlePayload();
+  }
   const int32 PlayerID = ResolveStablePlayerId(PS);
   if (PlayerID == Battle.AttackerPlayerID) {
     bControlsAttackerSide = true;

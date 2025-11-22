@@ -6,6 +6,7 @@
 #include "Engine/World.h"
 #include "GameFramework/WorldSettings.h"
 #include "SkaldLogging.h"
+#include "Skald_GameInstance.h"
 
 ASkaldGameState::ASkaldGameState()
     : CurrentTurnIndex(0)
@@ -25,6 +26,8 @@ void ASkaldGameState::GetLifetimeReplicatedProps(
     DOREPLIFETIME(ASkaldGameState, LastDefenderCasualties);
     DOREPLIFETIME(ASkaldGameState, BattlePhase);
     DOREPLIFETIME(ASkaldGameState, PendingBattleReadyState);
+    DOREPLIFETIME(ASkaldGameState, ActiveBattlePayload);
+    DOREPLIFETIME(ASkaldGameState, BattleEntries);
     DOREPLIFETIME(ASkaldGameState, CurrentBattleRound);
     DOREPLIFETIME(ASkaldGameState, BattleInitiativeWinner);
     DOREPLIFETIME(ASkaldGameState, RemainingAttackerActivations);
@@ -204,6 +207,19 @@ void ASkaldGameState::OnRep_BattleSummary()
     OnBattleSummaryUpdated.Broadcast();
 }
 
+void ASkaldGameState::OnRep_BattlePayload()
+{
+    if (USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>())
+    {
+        GI->PendingBattle = ActiveBattlePayload;
+    }
+}
+
+void ASkaldGameState::OnRep_BattleEntries()
+{
+    OnBattleEntriesUpdated.Broadcast();
+}
+
 void ASkaldGameState::OnRep_PendingBattleReady()
 {
     UE_LOG(LogSkaldBattle, Verbose,
@@ -286,6 +302,66 @@ void ASkaldGameState::ServerSetFighterRoster_Implementation(const TArray<FFighte
     FighterRoster = InRoster;
     // Fire local notify so server-side UI (if any) also refreshes immediately
     OnRep_FighterRoster();
+}
+
+void ASkaldGameState::SetActiveBattlePayload(const FS_BattlePayload& Payload)
+{
+  if (!HasAuthority())
+  {
+    return;
+  }
+
+  ActiveBattlePayload = Payload;
+  OnRep_BattlePayload();
+  ForceNetUpdate();
+}
+
+void ASkaldGameState::UpsertBattleEntry(const FBattlePlayerEntry& Entry)
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    if (Entry.PlayerId <= 0)
+    {
+        return;
+    }
+
+    bool bUpdated = false;
+    for (FBattlePlayerEntry& Existing : BattleEntries)
+    {
+        if (Existing.PlayerId == Entry.PlayerId)
+        {
+            Existing = Entry;
+            bUpdated = true;
+            break;
+        }
+    }
+
+  if (!bUpdated)
+  {
+    BattleEntries.Add(Entry);
+  }
+
+  OnRep_BattleEntries();
+  ForceNetUpdate();
+}
+
+bool ASkaldGameState::GetBattleEntryForPlayer(int32 PlayerId, FBattlePlayerEntry& OutEntry) const
+{
+    const FBattlePlayerEntry* Found = BattleEntries.FindByPredicate([PlayerId](const FBattlePlayerEntry& Candidate)
+    {
+        return Candidate.PlayerId == PlayerId;
+    });
+
+    if (Found)
+    {
+        OutEntry = *Found;
+        return true;
+    }
+
+    return false;
 }
 
 void ASkaldGameState::SetBattlePhase(EBattlePhase NewPhase)

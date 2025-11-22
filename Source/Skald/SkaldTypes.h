@@ -184,6 +184,32 @@ struct SKALD_API FS_BattlePayload
     FString ReturnMap;
 };
 
+USTRUCT(BlueprintType)
+struct SKALD_API FBattlePlayerEntry
+{
+    GENERATED_BODY()
+
+    /** Stable PlayerId for this participant. */
+    UPROPERTY(BlueprintReadOnly, EditAnywhere)
+    int32 PlayerId = 0;
+
+    /** Display name resolved on the server. */
+    UPROPERTY(BlueprintReadOnly, EditAnywhere)
+    FString DisplayName;
+
+    /** Faction selected for the pending battle. */
+    UPROPERTY(BlueprintReadOnly, EditAnywhere)
+    ESkaldFaction Faction = ESkaldFaction::None;
+
+    /** True if the participant is controlled by AI. */
+    UPROPERTY(BlueprintReadOnly, EditAnywhere)
+    bool bIsAI = false;
+
+    /** Budget assigned for fighter selection. */
+    UPROPERTY(BlueprintReadOnly, EditAnywhere)
+    int32 PendingArmyBudget = 0;
+};
+
 /** Data broadcast to clients when prompting them to prepare for battle. */
 USTRUCT(BlueprintType)
 struct SKALD_API FPrepareForBattlePromptData {
