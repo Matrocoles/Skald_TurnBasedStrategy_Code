@@ -826,9 +826,11 @@ void USkaldGameInstance::HandleWorldBeginPlay(UWorld *LoadedWorld) {
   // Keep the battle-map state in sync with the actual level in case the travel
   // RPC was missed (e.g. late-joining clients or failed multicast). This ensures
   // PlayerControllers on the new map can immediately initialise their battle
-  // UI such as fighter selection.
-  if (bIsInBattleMap != bDetectedBattleMap) {
-    SetBattleMapActive(bDetectedBattleMap);
+  // UI such as fighter selection. Only auto-promote into battle state when the
+  // default BattleMap is detected to avoid clearing an existing battle flag when
+  // travelling to named battle maps selected from the configured map lists.
+  if (bDetectedBattleMap && !bIsInBattleMap) {
+    SetBattleMapActive(true);
   }
 
   SetTravelPending(false);
