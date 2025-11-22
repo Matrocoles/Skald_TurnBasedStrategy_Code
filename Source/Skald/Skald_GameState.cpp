@@ -220,6 +220,20 @@ void ASkaldGameState::OnRep_BattleEntries()
     UE_LOG(LogSkaldBattle, Log,
            TEXT("GameState BattleEntries replicated (%d participants)"),
            BattleEntries.Num());
+
+    if (BattlePhase == EBattlePhase::FighterSelection)
+    {
+        if (UWorld* World = GetWorld())
+        {
+            for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+            {
+                if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
+                {
+                    PC->InitializeFighterSelectionIfNeeded();
+                }
+            }
+        }
+    }
     OnBattleEntriesUpdated.Broadcast();
 }
 
@@ -378,7 +392,10 @@ void ASkaldGameState::SetBattlePhase(EBattlePhase NewPhase)
 
 void ASkaldGameState::OnRep_BattlePhase()
 {
-    UE_LOG(LogSkaldBattle, Log, TEXT("GameState BattlePhase -> %d"), static_cast<int32>(BattlePhase));
+    const ENetMode NetMode = GetNetMode();
+    UE_LOG(LogSkaldBattle, Log,
+           TEXT("GameState BattlePhase -> %d (NetMode=%d)"),
+           static_cast<int32>(BattlePhase), static_cast<int32>(NetMode));
 
     if (BattlePhase == EBattlePhase::FighterSelection)
     {

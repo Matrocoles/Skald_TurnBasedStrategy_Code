@@ -443,6 +443,7 @@ void ASkald_BattleGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason) {
 }
 
 void ASkald_BattleGameMode::NotifyBattleLevelActivated() {
+  UE_LOG(LogSkaldBattle, Log, TEXT("BattleGM: Battle level activated; deferring bootstrap until BeginPlay."));
   bPendingStreamingActivation = true;
   ProcessStreamingActivation();
 }
@@ -825,6 +826,11 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
     return;
   }
 
+  UE_LOG(LogSkaldBattle, Log,
+         TEXT("BattleGM SetupPendingBattle: building battle payload (TravelValid=%d BattleValid=%d)"),
+         GI->GetTravelState().bValid ? 1 : 0,
+         GI->PendingBattle.FromTerritoryID > 0 ? 1 : 0);
+
   ASkaldGameState *GS = GetGameState<ASkaldGameState>();
   if (!GS) {
     UE_LOG(LogSkaldBattle, Warning,
@@ -1068,6 +1074,10 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
          TEXT("BattleGM: BeginPreBattleSelection started (AttackerID=%d DefenderID=%d Budgets=%d/%d)"),
          Battle.AttackerPlayerID, Battle.DefenderPlayerID, AttackerBudget,
          DefenderBudget);
+
+  UE_LOG(LogSkaldBattle, Log,
+         TEXT("BattleGM: Battle phase advancing to FighterSelection (NetMode=%d)"),
+         static_cast<int32>(GetNetMode()));
 
   if (ASkaldGameState *SyncGS = GetGameState<ASkaldGameState>()) {
     SyncGS->SetActiveBattlePayload(Battle);

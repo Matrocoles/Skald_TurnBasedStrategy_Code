@@ -61,7 +61,8 @@ public:
   TArray<FFighterDefinition> PendingArmy;
 
   /** Maximum budget allowed for the pending army selection. */
-  UPROPERTY(Replicated, BlueprintReadOnly, Category = "Skald|Player")
+  UPROPERTY(ReplicatedUsing = OnRep_PendingArmyBudget, BlueprintReadOnly,
+            Category = "Skald|Player")
   int32 PendingArmyBudget = 0;
 
   /** Whether the player has finalised their army selection. */
@@ -87,6 +88,10 @@ public:
   UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_SelectedTerritory,
             Category = "Skald|Selection")
   TObjectPtr<class ATerritory> SelectedTerritory = nullptr;
+
+private:
+  UFUNCTION()
+  void OnRep_PendingArmyBudget();
 
   /** Stable identifier replicated to all clients for consistent selection routing. */
   UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_StablePlayerId,
@@ -116,9 +121,11 @@ public:
   UFUNCTION()
   void OnRep_SelectedTerritory();
 
+protected:
   virtual void GetLifetimeReplicatedProps(
       TArray<FLifetimeProperty> &OutLifetimeProps) const override;
 
+public:
   /** Clears per-territory deployment tracking for the army placement phase. */
   void ResetArmyPlacementDeployments();
 

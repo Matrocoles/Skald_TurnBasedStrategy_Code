@@ -2611,6 +2611,9 @@ void ASkaldPlayerController::ShowFighterSelectionUI(int32 MaxBudget,
 
 void ASkaldPlayerController::Client_ShowFighterSelection_Implementation(
     int32 MaxBudget, ESkaldFaction Faction) {
+  UE_LOG(LogSkaldBattle, Log,
+         TEXT("Client_ShowFighterSelection: Controller=%s Budget=%d Faction=%d"),
+         *GetName(), MaxBudget, static_cast<int32>(Faction));
   ShowFighterSelectionUI(MaxBudget, Faction);
 }
 
