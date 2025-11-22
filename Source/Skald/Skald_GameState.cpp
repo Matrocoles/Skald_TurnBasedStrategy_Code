@@ -217,6 +217,9 @@ void ASkaldGameState::OnRep_BattlePayload()
 
 void ASkaldGameState::OnRep_BattleEntries()
 {
+    UE_LOG(LogSkaldBattle, Log,
+           TEXT("GameState BattleEntries replicated (%d participants)"),
+           BattleEntries.Num());
     OnBattleEntriesUpdated.Broadcast();
 }
 
@@ -376,6 +379,11 @@ void ASkaldGameState::SetBattlePhase(EBattlePhase NewPhase)
 void ASkaldGameState::OnRep_BattlePhase()
 {
     UE_LOG(LogSkaldBattle, Log, TEXT("GameState BattlePhase -> %d"), static_cast<int32>(BattlePhase));
+
+    if (BattlePhase == EBattlePhase::FighterSelection)
+    {
+        UE_LOG(LogSkaldBattle, Log, TEXT("Broadcasting fighter selection phase to controllers"));
+    }
 
     if (UWorld* World = GetWorld())
     {

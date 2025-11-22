@@ -2507,6 +2507,9 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
   }
 
   if (!FighterSelectionWidget || !FighterSelectionWidget->IsInViewport()) {
+    UE_LOG(LogSkaldBattle, Log,
+           TEXT("InitializeFighterSelectionIfNeeded: Controller=%s Participant=%s Budget=%d"),
+           *GetName(), bIsParticipant ? TEXT("true") : TEXT("false"), PendingBudget);
     ShowFighterSelectionUI(PendingBudget, PS->Faction);
   }
 }
@@ -2572,6 +2575,11 @@ void ASkaldPlayerController::ShowFighterSelectionUI(int32 MaxBudget,
     return;
   }
 
+  int32 PlayerId = INDEX_NONE;
+  if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+    PlayerId = PS->GetPlayerId();
+  }
+
   FighterSelectionWidget->PlayerFaction = Faction;
   FighterSelectionWidget->MaxCost = MaxBudget;
   FighterSelectionWidget->ChosenFighters.Reset();
@@ -2595,6 +2603,10 @@ void ASkaldPlayerController::ShowFighterSelectionUI(int32 MaxBudget,
   bShowMouseCursor = true;
   bEnableClickEvents = true;
   bEnableMouseOverEvents = true;
+
+  UE_LOG(LogSkaldBattle, Log,
+         TEXT("ShowFighterSelectionUI: Controller=%s PlayerId=%d Budget=%d Faction=%d"),
+         *GetName(), PlayerId, MaxBudget, static_cast<int32>(Faction));
 }
 
 void ASkaldPlayerController::Client_ShowFighterSelection_Implementation(
@@ -2684,6 +2696,14 @@ void ASkaldPlayerController::Client_OnLockInResult_Implementation(
 void ASkaldPlayerController::HandleBattlePhaseChanged() {
   if (const ASkaldGameState *SGS =
           GetWorld() ? GetWorld()->GetGameState<ASkaldGameState>() : nullptr) {
+    if (SGS->BattlePhase == EBattlePhase::FighterSelection) {
+      UE_LOG(LogSkaldBattle, Log,
+             TEXT("PlayerController %s entering FighterSelection phase"),
+             *GetName());
+      RequestBattleStateIfNeeded();
+      InitializeFighterSelectionIfNeeded();
+    }
+
     if (SGS->BattlePhase == EBattlePhase::Deploy) {
       UE_LOG(LogSkaldBattle, Log,
              TEXT("PlayerController %s entering Deploy phase; fighters will be"

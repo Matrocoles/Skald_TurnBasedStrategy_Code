@@ -21,6 +21,7 @@ UENUM(BlueprintType)
 enum class EBattlePhase : uint8
 {
     None,
+    FighterSelection,
     Deploy,
     // Additional phases can be added here as the flow expands
 };
