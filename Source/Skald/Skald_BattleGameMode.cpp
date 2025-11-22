@@ -751,6 +751,11 @@ void ASkald_BattleGameMode::SyncBattlePlayerEntry(ASkaldPlayerState *PlayerState
   Entry.bIsAI = PlayerState->bIsAI;
   Entry.PendingArmyBudget = PlayerState->PendingArmyBudget;
 
+  UE_LOG(LogSkaldBattle, Log,
+         TEXT("SyncBattlePlayerEntry: PlayerId=%d Name=%s Faction=%d Budget=%d AI=%s"),
+         Entry.PlayerId, *Entry.DisplayName, static_cast<int32>(Entry.Faction),
+         Entry.PendingArmyBudget, Entry.bIsAI ? TEXT("true") : TEXT("false"));
+
   GS->UpsertBattleEntry(Entry);
 }
 
@@ -787,6 +792,10 @@ void ASkald_BattleGameMode::BeginPreBattleSelection(ASkaldPlayerState *AttackerP
         DPC->Client_ShowFighterSelection(DefenderBudget, DefenderPS->Faction);
       }
     }
+  }
+
+  if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
+    GS->SetBattlePhase(EBattlePhase::FighterSelection);
   }
 
   LogParticipantLockState(TEXT("BeginPreBattleSelection"));
@@ -1988,12 +1997,26 @@ bool ASkald_BattleGameMode::AreBothParticipantsLocked() const
   }
 
   const FS_BattlePayload &Battle = GI->PendingBattle;
-  if (Battle.AttackerPlayerID <= 0 || Battle.DefenderPlayerID <= 0) {
-    return LockedInPlayers.Num() >= 2;
-  }
+  const ASkaldGameState *GS = GetGameState<ASkaldGameState>();
 
-  return LockedInPlayers.Contains(Battle.AttackerPlayerID) &&
-         LockedInPlayers.Contains(Battle.DefenderPlayerID);
+  auto IsPlayerLocked = [&](int32 PlayerId) {
+    if (PlayerId <= 0) {
+      return false;
+    }
+
+    if (GS) {
+      if (const ASkaldPlayerState *PS = GS->GetPlayerById(PlayerId)) {
+        return PS->bArmyLockedIn;
+      }
+    }
+
+    return LockedInPlayers.Contains(PlayerId);
+  };
+
+  const bool bAttackerLocked = IsPlayerLocked(Battle.AttackerPlayerID);
+  const bool bDefenderLocked = IsPlayerLocked(Battle.DefenderPlayerID);
+
+  return bAttackerLocked && bDefenderLocked;
 }
 
 void ASkald_BattleGameMode::TryAdvanceAfterLockIn()
