@@ -716,6 +716,10 @@ public:
   UFUNCTION()
   void HandlePlayersUpdated();
 
+  /** React to replicated battle participant updates. */
+  UFUNCTION()
+  void HandleBattleEntriesUpdated();
+
   /** React to faction selections in the game instance. */
   UFUNCTION()
   void HandleFactionsUpdated();
