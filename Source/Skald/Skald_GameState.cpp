@@ -213,6 +213,20 @@ void ASkaldGameState::OnRep_BattlePayload()
     {
         GI->PendingBattle = ActiveBattlePayload;
     }
+
+    if (BattlePhase == EBattlePhase::FighterSelection)
+    {
+        if (UWorld* World = GetWorld())
+        {
+            for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+            {
+                if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
+                {
+                    PC->InitializeFighterSelectionIfNeeded();
+                }
+            }
+        }
+    }
 }
 
 void ASkaldGameState::OnRep_BattleEntries()
