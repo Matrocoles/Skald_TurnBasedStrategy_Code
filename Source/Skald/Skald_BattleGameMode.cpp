@@ -427,8 +427,18 @@ void ASkald_BattleGameMode::BeginPlay() {
          ExpectedControllers);
   UE_LOG(LogSkaldBattle, Log, TEXT("BGM BeginPlay. ExpectedControllers=%d"),
          ExpectedControllers);
+
   // Battle bootstrap is deferred until player states have replicated via the
   // travel callbacks (HandleStartingNewPlayer/PostLogin/HandleSeamlessTravelPlayer).
+  // If the streaming-level notification never fires (e.g. when the battle map
+  // is loaded directly), ensure we still run the bootstrap logic on BeginPlay
+  // so participants register and the fighter selection UI can appear.
+  if (!bPendingStreamingActivation)
+  {
+    UE_LOG(LogSkaldBattle, Verbose,
+           TEXT("BattleGM BeginPlay: streaming activation missing; triggering bootstrap manually."));
+    bPendingStreamingActivation = true;
+  }
   ProcessStreamingActivation();
 }
 
