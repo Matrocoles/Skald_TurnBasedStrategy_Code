@@ -103,6 +103,20 @@ void ASkaldPlayerState::OnRep_DeployableUnits() {
   }
 }
 
+void ASkaldPlayerState::OnRep_PendingArmyBudget()
+{
+  if (APlayerController* PC = GetOwner<APlayerController>())
+  {
+    if (ASkaldPlayerController* SkaldPC = Cast<ASkaldPlayerController>(PC))
+    {
+      UE_LOG(LogSkaldBattle, Log,
+             TEXT("OnRep_PendingArmyBudget: PlayerId=%d Budget=%d Controller=%s"),
+             GetPlayerId(), PendingArmyBudget, *GetNameSafe(SkaldPC));
+      SkaldPC->InitializeFighterSelectionIfNeeded();
+    }
+  }
+}
+
 void ASkaldPlayerState::OnRep_HasLockedIn() {
   if (UWorld *World = GetWorld()) {
     if (ASkaldGameState *GS = World->GetGameState<ASkaldGameState>()) {

@@ -42,7 +42,8 @@ protected:
                         FString &Error) override;
   virtual void BeginPlay() override;
   virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-  virtual void HandleStartingNewPlayer(APlayerController *NewPlayer) override;
+  virtual void HandleStartingNewPlayer_Implementation(
+      APlayerController *NewPlayer) override;
   virtual void PostLogin(APlayerController *NewPlayer) override;
   virtual void HandleSeamlessTravelPlayer(AController *&C) override;
   virtual void TryInitializeWorldAndStart() override;
@@ -87,7 +88,7 @@ private:
   void QueueDeferredController(AController *Controller);
   bool ControllerHasStablePlayerId(AController *Controller) const;
   void ProcessStreamingActivation();
-  void SyncBattlePlayerEntry(class ASkaldPlayerState *PlayerState);
+  void SyncBattlePlayerEntry(class ASkaldPlayerState *PlayerState) const;
   void StartBootstrapTimer();
 
   /** Controllers waiting for bootstrap while we rebuild the roster. */

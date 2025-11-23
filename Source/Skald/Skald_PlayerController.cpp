@@ -309,8 +309,6 @@ void ASkaldPlayerController::CacheGameReferences() {
           this, &ASkaldPlayerController::HandleTurnIndexChanged);
       CachedGameState->OnBattleEntriesUpdated.RemoveDynamic(
           this, &ASkaldPlayerController::HandleBattleEntriesUpdated);
-      CachedGameState->OnBattlePayloadUpdated.RemoveDynamic(
-          this, &ASkaldPlayerController::HandleBattlePayloadUpdated);
     }
     CachedGameState = WorldGameState;
   }
@@ -330,11 +328,6 @@ void ASkaldPlayerController::CacheGameReferences() {
             this, &ASkaldPlayerController::HandleBattleEntriesUpdated)) {
       CachedGameState->OnBattleEntriesUpdated.AddDynamic(
           this, &ASkaldPlayerController::HandleBattleEntriesUpdated);
-    }
-    if (!CachedGameState->OnBattlePayloadUpdated.IsAlreadyBound(
-            this, &ASkaldPlayerController::HandleBattlePayloadUpdated)) {
-      CachedGameState->OnBattlePayloadUpdated.AddDynamic(
-          this, &ASkaldPlayerController::HandleBattlePayloadUpdated);
     }
   } else {
     bNeedsRetry = true;
@@ -2514,6 +2507,9 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
   }
 
   if (!FighterSelectionWidget || !FighterSelectionWidget->IsInViewport()) {
+    UE_LOG(LogSkaldBattle, Log,
+           TEXT("InitializeFighterSelectionIfNeeded: Controller=%s Participant=%s Budget=%d"),
+           *GetName(), bIsParticipant ? TEXT("true") : TEXT("false"), PendingBudget);
     ShowFighterSelectionUI(PendingBudget, PS->Faction);
   }
 }
@@ -2579,6 +2575,11 @@ void ASkaldPlayerController::ShowFighterSelectionUI(int32 MaxBudget,
     return;
   }
 
+  int32 PlayerId = INDEX_NONE;
+  if (ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
+    PlayerId = PS->GetPlayerId();
+  }
+
   FighterSelectionWidget->PlayerFaction = Faction;
   FighterSelectionWidget->MaxCost = MaxBudget;
   FighterSelectionWidget->ChosenFighters.Reset();
@@ -2602,10 +2603,17 @@ void ASkaldPlayerController::ShowFighterSelectionUI(int32 MaxBudget,
   bShowMouseCursor = true;
   bEnableClickEvents = true;
   bEnableMouseOverEvents = true;
+
+  UE_LOG(LogSkaldBattle, Log,
+         TEXT("ShowFighterSelectionUI: Controller=%s PlayerId=%d Budget=%d Faction=%d"),
+         *GetName(), PlayerId, MaxBudget, static_cast<int32>(Faction));
 }
 
 void ASkaldPlayerController::Client_ShowFighterSelection_Implementation(
     int32 MaxBudget, ESkaldFaction Faction) {
+  UE_LOG(LogSkaldBattle, Log,
+         TEXT("Client_ShowFighterSelection: Controller=%s Budget=%d Faction=%d"),
+         *GetName(), MaxBudget, static_cast<int32>(Faction));
   ShowFighterSelectionUI(MaxBudget, Faction);
 }
 
@@ -2691,6 +2699,14 @@ void ASkaldPlayerController::Client_OnLockInResult_Implementation(
 void ASkaldPlayerController::HandleBattlePhaseChanged() {
   if (const ASkaldGameState *SGS =
           GetWorld() ? GetWorld()->GetGameState<ASkaldGameState>() : nullptr) {
+    if (SGS->BattlePhase == EBattlePhase::FighterSelection) {
+      UE_LOG(LogSkaldBattle, Log,
+             TEXT("PlayerController %s entering FighterSelection phase"),
+             *GetName());
+      RequestBattleStateIfNeeded();
+      InitializeFighterSelectionIfNeeded();
+    }
+
     if (SGS->BattlePhase == EBattlePhase::Deploy) {
       UE_LOG(LogSkaldBattle, Log,
              TEXT("PlayerController %s entering Deploy phase; fighters will be"
@@ -4977,11 +4993,6 @@ void ASkaldPlayerController::HandlePlayersUpdated() {
 }
 
 void ASkaldPlayerController::HandleBattleEntriesUpdated() {
-  DetermineControlledBattleSide();
-  InitializeFighterSelectionIfNeeded();
-}
-
-void ASkaldPlayerController::HandleBattlePayloadUpdated() {
   DetermineControlledBattleSide();
   InitializeFighterSelectionIfNeeded();
 }

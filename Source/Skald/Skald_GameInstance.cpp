@@ -818,6 +818,21 @@ void USkaldGameInstance::HandleWorldBeginPlay(UWorld *LoadedWorld) {
          *GetNameSafe(LoadedWorld),
          static_cast<int32>(LoadedWorld->GetNetMode()));
 
+  const FString CurrentLevel =
+      UGameplayStatics::GetCurrentLevelName(this, /*bRemovePrefixString=*/true);
+  const bool bDetectedBattleMap =
+      CurrentLevel.Equals(TEXT("BattleMap"), ESearchCase::IgnoreCase);
+
+  // Keep the battle-map state in sync with the actual level in case the travel
+  // RPC was missed (e.g. late-joining clients or failed multicast). This ensures
+  // PlayerControllers on the new map can immediately initialise their battle
+  // UI such as fighter selection. Only auto-promote into battle state when the
+  // default BattleMap is detected to avoid clearing an existing battle flag when
+  // travelling to named battle maps selected from the configured map lists.
+  if (bDetectedBattleMap && !bIsInBattleMap) {
+    SetBattleMapActive(true);
+  }
+
   SetTravelPending(false);
 
   if (bHasPendingStatusMessage && !PendingStatusMessage.IsEmpty()) {

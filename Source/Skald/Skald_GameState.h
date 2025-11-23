@@ -16,12 +16,12 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(FSkaldBattleRoundUpdated, int32, R
                                              InitiativeWinner, int32, AttackerActivations, int32, DefenderActivations,
                                              bool, bIsAttackerTurn);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSkaldBattleEntriesUpdated);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSkaldBattlePayloadUpdated);
 
 UENUM(BlueprintType)
 enum class EBattlePhase : uint8
 {
     None,
+    FighterSelection,
     Deploy,
     // Additional phases can be added here as the flow expands
 };
@@ -63,10 +63,6 @@ public:
     /** Broadcast when battle participants replicate/change. */
     UPROPERTY(BlueprintAssignable, Category="GameState|Events")
     FSkaldBattleEntriesUpdated OnBattleEntriesUpdated;
-
-    /** Broadcast when the active battle payload updates/replicates. */
-    UPROPERTY(BlueprintAssignable, Category="GameState|Events")
-    FSkaldBattlePayloadUpdated OnBattlePayloadUpdated;
 
     /** Cached snapshot of the pending battle readiness state. */
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_PendingBattleReady,

@@ -137,6 +137,8 @@ class SKALD_API ASkaldPlayerController : public APlayerController {
   friend class ASkaldGameMode;
   /** Allow the player state to notify us when its player ID changes. */
   friend class ASkaldPlayerState;
+  /** Allow the game state to initialize fighter selection when battle data replicates. */
+  friend class ASkaldGameState;
 #if defined(WITH_AUTOMATION_TESTS) && WITH_AUTOMATION_TESTS
   /** Permit the automation test subclass to access validation helpers. */
   friend class ATestPlayerController;
@@ -719,10 +721,6 @@ public:
   /** React to replicated battle participant updates. */
   UFUNCTION()
   void HandleBattleEntriesUpdated();
-
-  /** React to replicated battle payload updates. */
-  UFUNCTION()
-  void HandleBattlePayloadUpdated();
 
   /** React to faction selections in the game instance. */
   UFUNCTION()

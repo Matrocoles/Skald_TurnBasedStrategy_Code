@@ -427,8 +427,18 @@ void ASkald_BattleGameMode::BeginPlay() {
          ExpectedControllers);
   UE_LOG(LogSkaldBattle, Log, TEXT("BGM BeginPlay. ExpectedControllers=%d"),
          ExpectedControllers);
+
   // Battle bootstrap is deferred until player states have replicated via the
   // travel callbacks (HandleStartingNewPlayer/PostLogin/HandleSeamlessTravelPlayer).
+  // If the streaming-level notification never fires (e.g. when the battle map
+  // is loaded directly), ensure we still run the bootstrap logic on BeginPlay
+  // so participants register and the fighter selection UI can appear.
+  if (!bPendingStreamingActivation)
+  {
+    UE_LOG(LogSkaldBattle, Verbose,
+           TEXT("BattleGM BeginPlay: streaming activation missing; triggering bootstrap manually."));
+    bPendingStreamingActivation = true;
+  }
   ProcessStreamingActivation();
 }
 
@@ -443,6 +453,7 @@ void ASkald_BattleGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason) {
 }
 
 void ASkald_BattleGameMode::NotifyBattleLevelActivated() {
+  UE_LOG(LogSkaldBattle, Log, TEXT("BattleGM: Battle level activated; deferring bootstrap until BeginPlay."));
   bPendingStreamingActivation = true;
   ProcessStreamingActivation();
 }
@@ -731,33 +742,10 @@ bool ASkald_BattleGameMode::ControllerHasStablePlayerId(
   return false;
 }
 
-void ASkald_BattleGameMode::SyncBattlePlayerEntry(ASkaldPlayerState *PlayerState)
+void ASkald_BattleGameMode::SyncBattlePlayerEntry(ASkaldPlayerState *PlayerState) const
 {
   if (!HasAuthority() || !PlayerState)
   {
-    return;
-  }
-
-  const int32 ResolvedId = ResolveBattlePlayerId(PlayerState);
-  if (ResolvedId <= 0)
-  {
-    UE_LOG(LogSkaldBattle, Verbose,
-           TEXT("SyncBattlePlayerEntry: deferring sync for %s (PlayerId pending)"),
-           *GetNameSafe(PlayerState));
-
-    if (UWorld* World = GetWorld())
-    {
-      FTimerDelegate RetryDelegate = FTimerDelegate::CreateWeakLambda(
-          this, [this, WeakPS = TWeakObjectPtr<ASkaldPlayerState>(PlayerState)]()
-          {
-            if (WeakPS.IsValid())
-            {
-              SyncBattlePlayerEntry(WeakPS.Get());
-            }
-          });
-      World->GetTimerManager().SetTimerForNextTick(RetryDelegate);
-    }
-
     return;
   }
 
@@ -767,18 +755,17 @@ void ASkald_BattleGameMode::SyncBattlePlayerEntry(ASkaldPlayerState *PlayerState
     return;
   }
 
-  // Ensure the replicated PlayerId is populated so clients can resolve the entry.
-  if (PlayerState->GetPlayerId() != ResolvedId)
-  {
-    PlayerState->SetPlayerId(ResolvedId);
-  }
-
   FBattlePlayerEntry Entry;
-  Entry.PlayerId = ResolvedId;
+  Entry.PlayerId = PlayerState->GetPlayerId();
   Entry.DisplayName = PlayerState->GetResolvedPlayerName(TEXT("BattleGM.SyncBattlePlayerEntry"));
   Entry.Faction = PlayerState->Faction;
   Entry.bIsAI = PlayerState->bIsAI;
   Entry.PendingArmyBudget = PlayerState->PendingArmyBudget;
+
+  UE_LOG(LogSkaldBattle, Log,
+         TEXT("SyncBattlePlayerEntry: PlayerId=%d Name=%s Faction=%d Budget=%d AI=%s"),
+         Entry.PlayerId, *Entry.DisplayName, static_cast<int32>(Entry.Faction),
+         Entry.PendingArmyBudget, Entry.bIsAI ? TEXT("true") : TEXT("false"));
 
   GS->UpsertBattleEntry(Entry);
 }
@@ -818,6 +805,10 @@ void ASkald_BattleGameMode::BeginPreBattleSelection(ASkaldPlayerState *AttackerP
     }
   }
 
+  if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
+    GS->SetBattlePhase(EBattlePhase::FighterSelection);
+  }
+
   LogParticipantLockState(TEXT("BeginPreBattleSelection"));
 }
 
@@ -845,6 +836,11 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
     return;
   }
 
+  UE_LOG(LogSkaldBattle, Log,
+         TEXT("BattleGM SetupPendingBattle: building battle payload (TravelValid=%d BattleValid=%d)"),
+         GI->GetTravelState().bValid ? 1 : 0,
+         GI->PendingBattle.FromTerritoryID > 0 ? 1 : 0);
+
   ASkaldGameState *GS = GetGameState<ASkaldGameState>();
   if (!GS) {
     UE_LOG(LogSkaldBattle, Warning,
@@ -870,6 +866,63 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
   Battle.TargetTerritoryID = Battle.TargetTerritoryID > 0
                                  ? Battle.TargetTerritoryID
                                  : TS.DefenderTerritory;
+
+  auto BackfillFromSlots = [&](int32& PlayerId, FString& DisplayName,
+                               ESkaldFaction& Faction, bool& bIsAI)
+  {
+    if (PlayerId > 0)
+    {
+      return;
+    }
+
+    for (const FPendingControllerSlot& Slot : GPendingControllers)
+    {
+      if (!Slot.Controller.IsValid())
+      {
+        continue;
+      }
+
+      if (Slot.PlayerId > 0)
+      {
+        PlayerId = Slot.PlayerId;
+      }
+      else if (AController* Controller = Slot.Controller.Get())
+      {
+        PlayerId = GetPlayerIdFrom(Controller);
+      }
+
+      if (PlayerId <= 0)
+      {
+        continue;
+      }
+
+      if (DisplayName.IsEmpty())
+      {
+        DisplayName = Slot.DisplayName;
+      }
+
+      if (Faction == ESkaldFaction::None)
+      {
+        if (const ASkaldPlayerState* SlotPS = Slot.Controller.IsValid()
+                                                 ? Slot.Controller->GetPlayerState<ASkaldPlayerState>()
+                                                 : nullptr)
+        {
+          Faction = SlotPS->Faction;
+          bIsAI = SlotPS->bIsAI;
+        }
+      }
+
+      UE_LOG(LogSkaldBattle, Log,
+             TEXT("SetupPendingBattle: Backfilled participant from slots (PlayerId=%d Name=%s Faction=%d AI=%s)"),
+             PlayerId, *DisplayName, static_cast<int32>(Faction), bIsAI ? TEXT("true") : TEXT("false"));
+      return;
+    }
+  };
+
+  BackfillFromSlots(Battle.AttackerPlayerID, Battle.AttackerDisplayName,
+                    Battle.AttackerFaction, Battle.bAttackerIsAI);
+  BackfillFromSlots(Battle.DefenderPlayerID, Battle.DefenderDisplayName,
+                    Battle.DefenderFaction, Battle.bDefenderIsAI);
 
   // When travelling into the battle map we depend on OnControllerReady to
   // populate the pending controller slots. In practice the callbacks can fire
@@ -928,6 +981,40 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
       Acquire(Battle.AttackerPlayerID, Battle.bAttackerIsAI);
   AController *DefenderC =
       Acquire(Battle.DefenderPlayerID, Battle.bDefenderIsAI);
+
+  auto SpawnAIController = [&]() -> AController * {
+    if (!AIControllerClass || !World) {
+      return nullptr;
+    }
+
+    FTransform SpawnTransform = FTransform::Identity;
+    ASkaldAIController *NewAI = Cast<ASkaldAIController>(
+        World->SpawnActorDeferred<APlayerController>(
+            AIControllerClass, SpawnTransform, nullptr, nullptr,
+            ESpawnActorCollisionHandlingMethod::AlwaysSpawn));
+    if (!NewAI) {
+      return nullptr;
+    }
+
+    NewAI->FinishSpawning(SpawnTransform);
+    if (NewAI->PlayerState == nullptr) {
+      NewAI->InitPlayerState();
+    }
+    if (ASkaldPlayerState *AIState =
+            NewAI->GetPlayerState<ASkaldPlayerState>()) {
+      AIState->bIsAI = true;
+    }
+
+    AssignControllerSlot(NewAI);
+    return NewAI;
+  };
+
+  if (!AttackerC && Battle.bAttackerIsAI) {
+    AttackerC = SpawnAIController();
+  }
+  if (!DefenderC && Battle.bDefenderIsAI) {
+    DefenderC = SpawnAIController();
+  }
 
   if (!AttackerC || !DefenderC) {
     UE_LOG(LogSkaldBattle, Error,
@@ -1088,6 +1175,10 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
          TEXT("BattleGM: BeginPreBattleSelection started (AttackerID=%d DefenderID=%d Budgets=%d/%d)"),
          Battle.AttackerPlayerID, Battle.DefenderPlayerID, AttackerBudget,
          DefenderBudget);
+
+  UE_LOG(LogSkaldBattle, Log,
+         TEXT("BattleGM: Battle phase advancing to FighterSelection (NetMode=%d)"),
+         static_cast<int32>(GetNetMode()));
 
   if (ASkaldGameState *SyncGS = GetGameState<ASkaldGameState>()) {
     SyncGS->SetActiveBattlePayload(Battle);
@@ -1679,12 +1770,13 @@ void ASkald_BattleGameMode::StartBootstrapTimer()
   }
 }
 
-void ASkald_BattleGameMode::HandleStartingNewPlayer(APlayerController *NewPlayer) {
+void ASkald_BattleGameMode::HandleStartingNewPlayer_Implementation(
+    APlayerController *NewPlayer) {
   UE_LOG(LogSkaldBattle, Log,
          TEXT("HandleStartingNewPlayer: %s (HasAuthority=%d)"),
          *GetNameSafe(NewPlayer), HasAuthority() ? 1 : 0);
 
-  Super::HandleStartingNewPlayer(NewPlayer);
+  Super::HandleStartingNewPlayer_Implementation(NewPlayer);
 
   if (!HasAuthority()) {
     return;
@@ -2016,12 +2108,26 @@ bool ASkald_BattleGameMode::AreBothParticipantsLocked() const
   }
 
   const FS_BattlePayload &Battle = GI->PendingBattle;
-  if (Battle.AttackerPlayerID <= 0 || Battle.DefenderPlayerID <= 0) {
-    return LockedInPlayers.Num() >= 2;
-  }
+  const ASkaldGameState *GS = GetGameState<ASkaldGameState>();
 
-  return LockedInPlayers.Contains(Battle.AttackerPlayerID) &&
-         LockedInPlayers.Contains(Battle.DefenderPlayerID);
+  auto IsPlayerLocked = [&](int32 PlayerId) {
+    if (PlayerId <= 0) {
+      return false;
+    }
+
+    if (GS) {
+      if (const ASkaldPlayerState *PS = GS->GetPlayerById(PlayerId)) {
+        return PS->bArmyLockedIn;
+      }
+    }
+
+    return LockedInPlayers.Contains(PlayerId);
+  };
+
+  const bool bAttackerLocked = IsPlayerLocked(Battle.AttackerPlayerID);
+  const bool bDefenderLocked = IsPlayerLocked(Battle.DefenderPlayerID);
+
+  return bAttackerLocked && bDefenderLocked;
 }
 
 void ASkald_BattleGameMode::TryAdvanceAfterLockIn()
