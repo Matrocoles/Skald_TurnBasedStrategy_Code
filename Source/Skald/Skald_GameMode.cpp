@@ -1100,6 +1100,16 @@ void ASkaldGameMode::RefreshHUDs() {
     return;
   }
 
+  if (const UWorld *World = GetWorld()) {
+    // HUD refresh can be triggered during world teardown (e.g. on travel), so
+    // avoid creating any new widgets while the world is being destroyed.
+    if (World->bIsTearingDown) {
+      UE_LOG(LogSkald, Verbose,
+             TEXT("[HUD] Skipping RefreshHUDs because world is tearing down"));
+      return;
+    }
+  }
+
   // Ensure all AI players have valid names before refreshing any HUDs.
   for (APlayerState *PSBase : GS->PlayerArray) {
     if (ASkaldPlayerState *SPS = Cast<ASkaldPlayerState>(PSBase)) {
