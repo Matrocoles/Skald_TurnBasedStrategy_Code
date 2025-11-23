@@ -623,6 +623,16 @@ void USkaldMainHUDWidget::RebuildPlayerList(
     return;
   }
 
+  if (const UWorld *World = GetWorld()) {
+    // Avoid creating widgets while the world is tearing down (e.g. during
+    // travel), which would trigger an ensure in CreateWidget.
+    if (World->bIsTearingDown) {
+      UE_LOG(LogSkaldUI, Verbose,
+             TEXT("[HUD] Skipping player list rebuild because world is tearing down"));
+      return;
+    }
+  }
+
   PlayerListBox->ClearChildren();
 
   UEnum *FactionEnum = StaticEnum<ESkaldFaction>();
