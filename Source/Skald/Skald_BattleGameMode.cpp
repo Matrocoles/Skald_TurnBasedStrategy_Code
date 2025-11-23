@@ -427,14 +427,8 @@ void ASkald_BattleGameMode::BeginPlay() {
          ExpectedControllers);
   UE_LOG(LogSkaldBattle, Log, TEXT("BGM BeginPlay. ExpectedControllers=%d"),
          ExpectedControllers);
-
-  EnsureBattleControllers();
-
-  GetWorldTimerManager().SetTimer(
-      WaitForPlayersHandle, this, &ASkald_BattleGameMode::PollBattleBootstrap, 0.25f,
-      true);
-  PollBattleBootstrap();
-
+  // Battle bootstrap is deferred until player states have replicated via the
+  // travel callbacks (HandleStartingNewPlayer/PostLogin/HandleSeamlessTravelPlayer).
   ProcessStreamingActivation();
 }
 
@@ -735,6 +729,58 @@ bool ASkald_BattleGameMode::ControllerHasStablePlayerId(
   }
 
   return false;
+}
+
+void ASkald_BattleGameMode::SyncBattlePlayerEntry(ASkaldPlayerState *PlayerState)
+{
+  if (!HasAuthority() || !PlayerState)
+  {
+    return;
+  }
+
+  const int32 ResolvedId = ResolveBattlePlayerId(PlayerState);
+  if (ResolvedId <= 0)
+  {
+    UE_LOG(LogSkaldBattle, Verbose,
+           TEXT("SyncBattlePlayerEntry: deferring sync for %s (PlayerId pending)"),
+           *GetNameSafe(PlayerState));
+
+    if (UWorld* World = GetWorld())
+    {
+      FTimerDelegate RetryDelegate = FTimerDelegate::CreateWeakLambda(
+          this, [this, WeakPS = TWeakObjectPtr<ASkaldPlayerState>(PlayerState)]()
+          {
+            if (WeakPS.IsValid())
+            {
+              SyncBattlePlayerEntry(WeakPS.Get());
+            }
+          });
+      World->GetTimerManager().SetTimerForNextTick(RetryDelegate);
+    }
+
+    return;
+  }
+
+  ASkaldGameState *GS = GetGameState<ASkaldGameState>();
+  if (!GS)
+  {
+    return;
+  }
+
+  // Ensure the replicated PlayerId is populated so clients can resolve the entry.
+  if (PlayerState->GetPlayerId() != ResolvedId)
+  {
+    PlayerState->SetPlayerId(ResolvedId);
+  }
+
+  FBattlePlayerEntry Entry;
+  Entry.PlayerId = ResolvedId;
+  Entry.DisplayName = PlayerState->GetResolvedPlayerName(TEXT("BattleGM.SyncBattlePlayerEntry"));
+  Entry.Faction = PlayerState->Faction;
+  Entry.bIsAI = PlayerState->bIsAI;
+  Entry.PendingArmyBudget = PlayerState->PendingArmyBudget;
+
+  GS->UpsertBattleEntry(Entry);
 }
 
 void ASkald_BattleGameMode::BeginPreBattleSelection(ASkaldPlayerState *AttackerPS,
@@ -1042,6 +1088,13 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
          TEXT("BattleGM: BeginPreBattleSelection started (AttackerID=%d DefenderID=%d Budgets=%d/%d)"),
          Battle.AttackerPlayerID, Battle.DefenderPlayerID, AttackerBudget,
          DefenderBudget);
+
+  if (ASkaldGameState *SyncGS = GetGameState<ASkaldGameState>()) {
+    SyncGS->SetActiveBattlePayload(Battle);
+  }
+
+  SyncBattlePlayerEntry(AttackerPS);
+  SyncBattlePlayerEntry(DefenderPS);
 
   AutoCommitAIArmy(AttackerPS, AttackerPS->bIsAI ? AttackerBudget : 0);
   AutoCommitAIArmy(DefenderPS, DefenderPS->bIsAI ? DefenderBudget : 0);
@@ -1607,6 +1660,64 @@ void ASkald_BattleGameMode::TryInitializeWorldAndStart() {
   GetWorldTimerManager().ClearTimer(RetryInitTimerHandle);
 }
 
+void ASkald_BattleGameMode::StartBootstrapTimer()
+{
+  if (!HasAuthority())
+  {
+    return;
+  }
+
+  if (!GetWorldTimerManager().IsTimerActive(WaitForPlayersHandle))
+  {
+    GetWorldTimerManager().SetTimer(
+        WaitForPlayersHandle, this, &ASkald_BattleGameMode::PollBattleBootstrap, 0.25f, true);
+  }
+
+  if (HasActorBegunPlay())
+  {
+    PollBattleBootstrap();
+  }
+}
+
+void ASkald_BattleGameMode::HandleStartingNewPlayer(APlayerController *NewPlayer) {
+  UE_LOG(LogSkaldBattle, Log,
+         TEXT("HandleStartingNewPlayer: %s (HasAuthority=%d)"),
+         *GetNameSafe(NewPlayer), HasAuthority() ? 1 : 0);
+
+  Super::HandleStartingNewPlayer(NewPlayer);
+
+  if (!HasAuthority()) {
+    return;
+  }
+
+  if (!IsValid(NewPlayer)) {
+    return;
+  }
+
+  if (ASkaldPlayerState *PS = NewPlayer->GetPlayerState<ASkaldPlayerState>()) {
+    SyncBattlePlayerEntry(PS);
+    StartBootstrapTimer();
+    return;
+  }
+
+  if (UWorld *World = GetWorld()) {
+    FTimerDelegate RetryDelegate = FTimerDelegate::CreateWeakLambda(
+        this, [this, WeakPC = TWeakObjectPtr<APlayerController>(NewPlayer)]() {
+          if (!WeakPC.IsValid()) {
+            return;
+          }
+
+          if (ASkaldPlayerState *RetryPS =
+                  WeakPC->GetPlayerState<ASkaldPlayerState>()) {
+            SyncBattlePlayerEntry(RetryPS);
+            StartBootstrapTimer();
+          }
+        });
+
+    World->GetTimerManager().SetTimerForNextTick(RetryDelegate);
+  }
+}
+
 void ASkald_BattleGameMode::HandleSeamlessTravelPlayer(AController *&C) {
   UE_LOG(LogSkaldBattle, Log,
          TEXT("HandleSeamlessTravelPlayer: %s (HasAuthority=%d)"),
@@ -1619,6 +1730,9 @@ void ASkald_BattleGameMode::HandleSeamlessTravelPlayer(AController *&C) {
   }
 
   if (AController *Controller = C) {
+    if (ASkaldPlayerState *PS = Controller->GetPlayerState<ASkaldPlayerState>()) {
+      SyncBattlePlayerEntry(PS);
+    }
     OnControllerReady(Controller);
   }
 }
@@ -1627,6 +1741,10 @@ void ASkald_BattleGameMode::PostLogin(APlayerController *NewPlayer) {
   Super::PostLogin(NewPlayer);
 
   UE_LOG(LogSkaldBattle, Log, TEXT("PostLogin: %s"), *GetNameSafe(NewPlayer));
+  if (ASkaldPlayerState *PS = NewPlayer->GetPlayerState<ASkaldPlayerState>()) {
+    SyncBattlePlayerEntry(PS);
+  }
+  StartBootstrapTimer();
   OnControllerReady(NewPlayer);
 }
 
@@ -1737,7 +1855,13 @@ void ASkald_BattleGameMode::OnControllerReady(AController *Controller) {
     return;
   }
 
+  if (ASkaldPlayerState *PS = Controller->GetPlayerState<ASkaldPlayerState>()) {
+    SyncBattlePlayerEntry(PS);
+  }
+
   AssignControllerSlot(Controller);
+
+  StartBootstrapTimer();
 
   if (Controller) {
     TArray<AController *> SingleController;

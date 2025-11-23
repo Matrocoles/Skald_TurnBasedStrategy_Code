@@ -15,6 +15,8 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FFighterRosterUpdated);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(FSkaldBattleRoundUpdated, int32, RoundNumber, ESkaldFaction,
                                              InitiativeWinner, int32, AttackerActivations, int32, DefenderActivations,
                                              bool, bIsAttackerTurn);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSkaldBattleEntriesUpdated);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSkaldBattlePayloadUpdated);
 
 UENUM(BlueprintType)
 enum class EBattlePhase : uint8
@@ -58,10 +60,26 @@ public:
     UPROPERTY(BlueprintAssignable, Category="GameState|Events")
     FFighterRosterUpdated OnFighterRosterUpdated;
 
+    /** Broadcast when battle participants replicate/change. */
+    UPROPERTY(BlueprintAssignable, Category="GameState|Events")
+    FSkaldBattleEntriesUpdated OnBattleEntriesUpdated;
+
+    /** Broadcast when the active battle payload updates/replicates. */
+    UPROPERTY(BlueprintAssignable, Category="GameState|Events")
+    FSkaldBattlePayloadUpdated OnBattlePayloadUpdated;
+
     /** Cached snapshot of the pending battle readiness state. */
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_PendingBattleReady,
               Category="GameState|Battle")
     FSkaldBattleReadyState PendingBattleReadyState;
+
+    /** Replicated view of the active battle payload. */
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_BattlePayload, Category="GameState|Battle")
+    FS_BattlePayload ActiveBattlePayload;
+
+    /** Replicated list of participants travelling into the battle. */
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_BattleEntries, Category="GameState|Battle")
+    TArray<FBattlePlayerEntry> BattleEntries;
 
     /** Current grid-battle round number (replicated for clients without a battle manager). */
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_BattleRoundState, Category="GameState|Battle")
@@ -146,6 +164,23 @@ public:
         return PendingBattleReadyState;
     }
 
+    /** Accessor for the replicated battle payload. */
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="GameState|Battle")
+    const FS_BattlePayload& GetActiveBattlePayload() const { return ActiveBattlePayload; }
+
+    /** Replicated participant list for UI binding. */
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="GameState|Battle")
+    const TArray<FBattlePlayerEntry>& GetBattleEntries() const { return BattleEntries; }
+
+    /** Update the replicated battle payload on the server. */
+    void SetActiveBattlePayload(const FS_BattlePayload& Payload);
+
+    /** Add/update a participant entry on the server. */
+    void UpsertBattleEntry(const FBattlePlayerEntry& Entry);
+
+    /** Get a participant entry for a specific player. */
+    bool GetBattleEntryForPlayer(int32 PlayerId, FBattlePlayerEntry& OutEntry) const;
+
     /** Server-only helper used by the battle manager to update round data. */
     void SetBattleRoundState(int32 RoundNumber, ESkaldFaction InitiativeWinner, int32 AttackerActivations,
                              int32 DefenderActivations, bool bIsAttackerTurn);
@@ -177,6 +212,12 @@ protected:
 
     UFUNCTION()
     void OnRep_BattlePhase();
+
+    UFUNCTION()
+    void OnRep_BattlePayload();
+
+    UFUNCTION()
+    void OnRep_BattleEntries();
 
     UFUNCTION()
     void OnRep_CurrentTurnIndex();
