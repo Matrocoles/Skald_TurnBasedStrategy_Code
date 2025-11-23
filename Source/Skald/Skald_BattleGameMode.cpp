@@ -867,6 +867,63 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
                                  ? Battle.TargetTerritoryID
                                  : TS.DefenderTerritory;
 
+  auto BackfillFromSlots = [&](int32& PlayerId, FString& DisplayName,
+                               ESkaldFaction& Faction, bool& bIsAI)
+  {
+    if (PlayerId > 0)
+    {
+      return;
+    }
+
+    for (const FPendingControllerSlot& Slot : GPendingControllers)
+    {
+      if (!Slot.Controller.IsValid())
+      {
+        continue;
+      }
+
+      if (Slot.PlayerId > 0)
+      {
+        PlayerId = Slot.PlayerId;
+      }
+      else if (AController* Controller = Slot.Controller.Get())
+      {
+        PlayerId = GetPlayerIdFrom(Controller);
+      }
+
+      if (PlayerId <= 0)
+      {
+        continue;
+      }
+
+      if (DisplayName.IsEmpty())
+      {
+        DisplayName = Slot.DisplayName;
+      }
+
+      if (Faction == ESkaldFaction::None)
+      {
+        if (const ASkaldPlayerState* SlotPS = Slot.Controller.IsValid()
+                                                 ? Slot.Controller->GetPlayerState<ASkaldPlayerState>()
+                                                 : nullptr)
+        {
+          Faction = SlotPS->Faction;
+          bIsAI = SlotPS->bIsAI;
+        }
+      }
+
+      UE_LOG(LogSkaldBattle, Log,
+             TEXT("SetupPendingBattle: Backfilled participant from slots (PlayerId=%d Name=%s Faction=%d AI=%s)"),
+             PlayerId, *DisplayName, static_cast<int32>(Faction), bIsAI ? TEXT("true") : TEXT("false"));
+      return;
+    }
+  };
+
+  BackfillFromSlots(Battle.AttackerPlayerID, Battle.AttackerDisplayName,
+                    Battle.AttackerFaction, Battle.bAttackerIsAI);
+  BackfillFromSlots(Battle.DefenderPlayerID, Battle.DefenderDisplayName,
+                    Battle.DefenderFaction, Battle.bDefenderIsAI);
+
   // When travelling into the battle map we depend on OnControllerReady to
   // populate the pending controller slots. In practice the callbacks can fire
   // before the battle mode finishes bootstrapping, which means SetupPendingBattle
@@ -924,6 +981,40 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
       Acquire(Battle.AttackerPlayerID, Battle.bAttackerIsAI);
   AController *DefenderC =
       Acquire(Battle.DefenderPlayerID, Battle.bDefenderIsAI);
+
+  auto SpawnAIController = [&]() -> AController * {
+    if (!AIControllerClass || !World) {
+      return nullptr;
+    }
+
+    FTransform SpawnTransform = FTransform::Identity;
+    ASkaldAIController *NewAI = Cast<ASkaldAIController>(
+        World->SpawnActorDeferred<APlayerController>(
+            AIControllerClass, SpawnTransform, nullptr, nullptr,
+            ESpawnActorCollisionHandlingMethod::AlwaysSpawn));
+    if (!NewAI) {
+      return nullptr;
+    }
+
+    NewAI->FinishSpawning(SpawnTransform);
+    if (NewAI->PlayerState == nullptr) {
+      NewAI->InitPlayerState();
+    }
+    if (ASkaldPlayerState *AIState =
+            NewAI->GetPlayerState<ASkaldPlayerState>()) {
+      AIState->bIsAI = true;
+    }
+
+    AssignControllerSlot(NewAI);
+    return NewAI;
+  };
+
+  if (!AttackerC && Battle.bAttackerIsAI) {
+    AttackerC = SpawnAIController();
+  }
+  if (!DefenderC && Battle.bDefenderIsAI) {
+    DefenderC = SpawnAIController();
+  }
 
   if (!AttackerC || !DefenderC) {
     UE_LOG(LogSkaldBattle, Error,
