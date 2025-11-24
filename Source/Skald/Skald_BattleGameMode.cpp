@@ -1224,6 +1224,12 @@ void ASkald_BattleGameMode::PollBattleBootstrap() {
     return;
   }
 
+  // In standalone play we need to make sure the expected attacker/defender
+  // controllers exist on the battle map before we count them. Otherwise the
+  // bootstrap waits forever (no fighter selection widget, no battle start)
+  // because only the human controller travelled from the overworld.
+  EnsureBattleControllers();
+
   int32 ControllerCount = 0;
   for (FConstControllerIterator It = World->GetControllerIterator(); It; ++It) {
     if (It->Get()) {
