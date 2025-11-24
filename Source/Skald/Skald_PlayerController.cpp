@@ -6432,19 +6432,18 @@ bool ASkaldPlayerController::ShouldDisplayPrepareForBattlePrompt(
   if (bMatchesAttacker) {
     const bool bReadyStateHasAttackerId =
         ReadyState.AttackerPlayerID > INDEX_NONE;
-    const bool bReadyStateConflictsWithPrompt =
-        bReadyStateHasAttackerId &&
-        ReadyState.AttackerPlayerID != PromptData.AttackerPlayerID;
 
-    if (bReadyStateConflictsWithPrompt) {
-      UE_LOG(LogSkaldReady, Warning,
-             TEXT("Proceeding with prepare prompt for %s despite attacker ready state mismatch (ReadyState=%d Prompt=%d)."),
-             *GetName(), ReadyState.AttackerPlayerID, PromptData.AttackerPlayerID);
-    } else if (!bReadyStateHasAttackerId) {
+    if (!bReadyStateHasAttackerId) {
       UE_LOG(LogSkaldReady, Verbose,
              TEXT("Proceeding with prepare prompt for %s because attacker readiness data is not yet available."),
              *GetName());
     } else {
+      if (ReadyState.AttackerPlayerID != LocalPlayerID) {
+        UE_LOG(LogSkaldReady, Warning,
+               TEXT("Skipping prepare prompt for %s: ready state attacker ID %d no longer matches local PlayerID %d."),
+               *GetName(), ReadyState.AttackerPlayerID, LocalPlayerID);
+        return false;
+      }
       if (ReadyState.bAttackerIsAI) {
         UE_LOG(LogSkaldReady, Verbose,
                TEXT("Skipping prepare prompt for %s because attacker is AI-controlled."),
@@ -6463,19 +6462,18 @@ bool ASkaldPlayerController::ShouldDisplayPrepareForBattlePrompt(
   if (bMatchesDefender) {
     const bool bReadyStateHasDefenderId =
         ReadyState.DefenderPlayerID > INDEX_NONE;
-    const bool bReadyStateConflictsWithPrompt =
-        bReadyStateHasDefenderId &&
-        ReadyState.DefenderPlayerID != PromptData.DefenderPlayerID;
 
-    if (bReadyStateConflictsWithPrompt) {
-      UE_LOG(LogSkaldReady, Warning,
-             TEXT("Proceeding with prepare prompt for %s despite defender ready state mismatch (ReadyState=%d Prompt=%d)."),
-             *GetName(), ReadyState.DefenderPlayerID, PromptData.DefenderPlayerID);
-    } else if (!bReadyStateHasDefenderId) {
+    if (!bReadyStateHasDefenderId) {
       UE_LOG(LogSkaldReady, Verbose,
              TEXT("Proceeding with prepare prompt for %s because defender readiness data is not yet available."),
              *GetName());
     } else {
+      if (ReadyState.DefenderPlayerID != LocalPlayerID) {
+        UE_LOG(LogSkaldReady, Warning,
+               TEXT("Skipping prepare prompt for %s: ready state defender ID %d no longer matches local PlayerID %d."),
+               *GetName(), ReadyState.DefenderPlayerID, LocalPlayerID);
+        return false;
+      }
       if (ReadyState.bDefenderIsAI) {
         UE_LOG(LogSkaldReady, Verbose,
                TEXT("Skipping prepare prompt for %s because defender is AI-controlled."),
