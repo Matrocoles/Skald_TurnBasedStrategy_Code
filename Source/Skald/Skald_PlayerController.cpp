@@ -2287,6 +2287,8 @@ void ASkaldPlayerController::OnRep_PlayerState() {
 
   RefreshFactionCursorFromState();
 
+  InitializeFighterSelectionIfNeeded();
+
   if (!MainHUD) {
     return;
   }
