@@ -2472,7 +2472,7 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
   }
 
   ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
-  if (!PS || PS->bArmyLockedIn) {
+  if (!PS || PS->bArmyLockedIn || PS->bIsAI) {
     return;
   }
 

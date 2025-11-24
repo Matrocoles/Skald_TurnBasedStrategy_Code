@@ -2138,6 +2138,29 @@ bool ASkald_BattleGameMode::AreBothParticipantsLocked() const
 
 void ASkald_BattleGameMode::TryAdvanceAfterLockIn()
 {
+  auto AutoLockAIIfNeeded = [this](ASkaldPlayerState* PlayerPS)
+  {
+    if (!PlayerPS || !PlayerPS->bIsAI || PlayerPS->bArmyLockedIn)
+    {
+      return;
+    }
+
+    AutoCommitAIArmy(PlayerPS, PlayerPS->PendingArmyBudget);
+
+    if (PlayerPS->bArmyLockedIn)
+    {
+      RegisterPlayerLockIn(PlayerPS->GetPlayerId());
+    }
+  };
+
+  if (const ASkaldGameState* GS = GetGameState<ASkaldGameState>())
+  {
+    const FS_BattlePayload& Battle = GS->GetActiveBattlePayload();
+
+    AutoLockAIIfNeeded(GS->GetPlayerById(Battle.AttackerPlayerID));
+    AutoLockAIIfNeeded(GS->GetPlayerById(Battle.DefenderPlayerID));
+  }
+
   LogParticipantLockState(TEXT("TryAdvanceAfterLockIn"));
 
   if (!AreBothParticipantsLocked()) {
