@@ -3406,6 +3406,10 @@ void ASkaldPlayerController::DetectBattleMap() {
   } else {
     ShowOverworldHUD();
   }
+
+  if (IsLocalController()) {
+    InitializeFighterSelectionIfNeeded();
+  }
 }
 
 void ASkaldPlayerController::HandleWorldBeginPlay(UWorld *LoadedWorld) {
