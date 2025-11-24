@@ -2217,12 +2217,12 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
     }
 
     const bool bIsCapitalAttack = SeededBattle.IsCapitalAttack;
-    bool bShouldStreamSelectedMap = true;
+    // Battle maps are always loaded via travel instead of streaming sub-levels.
+    bool bShouldStreamSelectedMap = false;
     TSoftObjectPtr<UWorld> SelectedBattleMap;
     if (bIsCapitalAttack && CapitalMaps.Num() > 0) {
       const int32 Index = FMath::RandRange(0, CapitalMaps.Num() - 1);
       SelectedBattleMap = CapitalMaps[Index];
-      bShouldStreamSelectedMap = true;
       UE_LOG(LogSkald, Verbose,
              TEXT("TriggerGridBattle: capital attack selecting map '%s'."),
              *SelectedBattleMap.ToString());
@@ -2230,11 +2230,9 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
       const int32 Index = FMath::RandRange(0, BattleMapEntries.Num() - 1);
       const FBattleMapDescriptor &Entry = BattleMapEntries[Index];
       SelectedBattleMap = Entry.Map;
-      bShouldStreamSelectedMap = Entry.bStreamAsSubLevel;
     } else if (BattleMaps.Num() > 0) {
       const int32 Index = FMath::RandRange(0, BattleMaps.Num() - 1);
       SelectedBattleMap = BattleMaps[Index];
-      bShouldStreamSelectedMap = true;
     } else if (bIsCapitalAttack) {
       UE_LOG(LogSkald, Warning,
              TEXT("TriggerGridBattle: capital attack has no CapitalMaps configured; falling back to default map."));
@@ -2242,13 +2240,15 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
     if (SelectedBattleMap.IsNull()) {
       SelectedBattleMap = TSoftObjectPtr<UWorld>(
           FSoftObjectPath(TEXT("/Game/Blueprints/Maps/BattleMap.BattleMap")));
-      bShouldStreamSelectedMap = true;
     }
 
+    // Streaming sub-levels is unsupported for battle maps because we always
+    // travel to the selected map. Preserve the logging from the previous logic
+    // to aid future debugging if streaming is reintroduced.
     const ENetMode NetMode = World->GetNetMode();
-    if (NetMode != NM_Standalone && bShouldStreamSelectedMap) {
+    if (bShouldStreamSelectedMap) {
       UE_LOG(LogSkald, Log,
-             TEXT("TriggerGridBattle: forcing travel for net mode %d (streaming only supported in standalone)."),
+             TEXT("TriggerGridBattle: streaming battle maps is disabled; travelling instead (net mode %d)."),
              static_cast<int32>(NetMode));
       bShouldStreamSelectedMap = false;
     }
@@ -2271,7 +2271,10 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
     TravelState.ExpectedControllers = ValidControllers;
     TravelState.AttackerTerritory = SeededBattle.FromTerritoryID;
     TravelState.DefenderTerritory = SeededBattle.TargetTerritoryID;
-    TravelState.ReturnMap = ResolveCanonicalReturnMapFromWorld(World);
+    // Ensure the travel state reuses the canonical (or fallback) return map we
+    // already resolved for the pending battle payload so clients always know
+    // where to go back after combat.
+    TravelState.ReturnMap = SeededBattle.ReturnMap;
 
     AWorldMap *WorldMap = ResolveWorldMap();
     TArray<FS_Territory> TerritorySnapshots;

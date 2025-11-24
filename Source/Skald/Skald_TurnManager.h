@@ -19,7 +19,8 @@ struct FBattleMapDescriptor {
   GENERATED_BODY()
 
 public:
-  FBattleMapDescriptor() : bStreamAsSubLevel(true) {}
+  // Battle maps are travelled to rather than streamed as sub-levels.
+  FBattleMapDescriptor() : bStreamAsSubLevel(false) {}
 
   UPROPERTY(EditAnywhere, BlueprintReadWrite)
   TSoftObjectPtr<UWorld> Map;
