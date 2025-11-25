@@ -2451,7 +2451,16 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
   const bool bOnBattleMap =
       bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap);
   if (!bOnBattleMap) {
-    if (FighterSelectionWidget) {
+    bool bNeedsSelectionUI = false;
+    if (const ASkaldPlayerState *SelectionPS = GetPlayerState<ASkaldPlayerState>()) {
+      bNeedsSelectionUI = !SelectionPS->bArmyLockedIn &&
+                          SelectionPS->PendingArmyBudget > 0;
+    }
+
+    // Avoid tearing down the selection UI for clients that still need to lock
+    // in fighters; late battle-map detection can temporarily report that we are
+    // not on a battle map even though the player must complete selection.
+    if (!bNeedsSelectionUI && FighterSelectionWidget) {
       FighterSelectionWidget->RemoveFromParent();
       FighterSelectionWidget = nullptr;
     }
