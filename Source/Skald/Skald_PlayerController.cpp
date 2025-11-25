@@ -4463,7 +4463,20 @@ void ASkaldPlayerController::ServerRequestPendingBattleState_Implementation() {
 
   const FS_BattlePayload BattlePayload = GI->PendingBattle;
   const FSkaldTravelState TravelState = GI->GetTravelState();
-  const bool bBattleMapActive = GI->bIsInBattleMap;
+
+  bool bBattleMapActive = GI->bIsInBattleMap;
+
+  // Late-joining clients may ask for battle state before the GameInstance has
+  // been marked as being on a battle map. Guard against this by deriving the
+  // battle-map flag from the current level as well so we do not clear their
+  // local battle flow (e.g. fighter selection UI) with a false negative.
+  if (!bBattleMapActive) {
+    if (UWorld *World = GetWorld()) {
+      const FString CurrentLevel =
+          UGameplayStatics::GetCurrentLevelName(World, /*bRemovePrefixString=*/true);
+      bBattleMapActive = CurrentLevel.Equals(TEXT("BattleMap"), ESearchCase::IgnoreCase);
+    }
+  }
 
   ClientApplyPendingBattleState(BattlePayload, TravelState, bBattleMapActive);
 }
