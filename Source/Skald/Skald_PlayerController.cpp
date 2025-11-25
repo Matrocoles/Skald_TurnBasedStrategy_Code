@@ -4466,11 +4466,17 @@ void ASkaldPlayerController::ServerRequestPendingBattleState_Implementation() {
 
   bool bBattleMapActive = GI->bIsInBattleMap;
 
+  const bool bHasPendingBattleResolution =
+      GI->bPendingBattleResolution || GI->PendingBattleResolution.bValid;
+
   // Late-joining clients may ask for battle state before the GameInstance has
   // been marked as being on a battle map. Guard against this by deriving the
   // battle-map flag from the current level as well so we do not clear their
   // local battle flow (e.g. fighter selection UI) with a false negative.
-  if (!bBattleMapActive) {
+  // However, when the server has already cleared the battle-map flag after a
+  // resolution while still on the battle map, preserve that state so we do not
+  // resurrect completed battles for reconnecting clients.
+  if (!bBattleMapActive && !bHasPendingBattleResolution) {
     if (UWorld *World = GetWorld()) {
       const FString CurrentLevel =
           UGameplayStatics::GetCurrentLevelName(World, /*bRemovePrefixString=*/true);
