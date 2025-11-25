@@ -2450,6 +2450,23 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
 
   const bool bOnBattleMap =
       bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap);
+  const FS_BattlePayload CachedBattle = CachedGameState
+                                            ? CachedGameState->GetActiveBattlePayload()
+                                            : CachedGameInstance
+                                                  ? CachedGameInstance->PendingBattle
+                                                  : FS_BattlePayload();
+
+  int32 LocalPlayerId = INDEX_NONE;
+  if (const ASkaldPlayerState *SelectionPS = GetPlayerState<ASkaldPlayerState>()) {
+    LocalPlayerId = ResolveStablePlayerId(SelectionPS);
+  }
+
+  const bool bHasPendingBattle = CachedBattle.FromTerritoryID > 0 &&
+                                 CachedBattle.TargetTerritoryID > 0;
+  const bool bLocalIsBattleParticipant = bHasPendingBattle &&
+                                         (CachedBattle.AttackerPlayerID == LocalPlayerId ||
+                                          CachedBattle.DefenderPlayerID == LocalPlayerId);
+
   if (!bOnBattleMap) {
     bool bNeedsSelectionUI = false;
     if (const ASkaldPlayerState *SelectionPS = GetPlayerState<ASkaldPlayerState>()) {
@@ -2458,9 +2475,10 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
     }
 
     // Avoid tearing down the selection UI for clients that still need to lock
-    // in fighters; late battle-map detection can temporarily report that we are
-    // not on a battle map even though the player must complete selection.
-    if (!bNeedsSelectionUI && FighterSelectionWidget) {
+    // in fighters or that already know they are part of an incoming battle;
+    // late battle-map detection can temporarily report that we are not on a
+    // battle map even though the player must complete selection.
+    if (!bNeedsSelectionUI && !bLocalIsBattleParticipant && FighterSelectionWidget) {
       FighterSelectionWidget->RemoveFromParent();
       FighterSelectionWidget = nullptr;
     }
