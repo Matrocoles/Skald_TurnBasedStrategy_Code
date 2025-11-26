@@ -1861,9 +1861,16 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
     LocalPS = PC->GetPlayerState<ASkaldPlayerState>();
   }
 
+  const int32 LocalStableId =
+      LocalPS ? LocalPS->GetStablePlayerId() : static_cast<int32>(INDEX_NONE);
+  const int32 OwnerStableId =
+      IsValid(Territory->OwningPlayer)
+          ? Territory->OwningPlayer->GetStablePlayerId()
+          : static_cast<int32>(INDEX_NONE);
+
   const bool bOwnedByLocal =
-      LocalPS && IsValid(Territory->OwningPlayer) &&
-      Territory->OwningPlayer->GetPlayerId() == LocalPS->GetPlayerId();
+      LocalStableId != static_cast<int32>(INDEX_NONE) &&
+      LocalStableId == OwnerStableId;
 
   if (bSelectingRetreatDestination) {
     if (bAwaitingRetreatConfirmation) {
