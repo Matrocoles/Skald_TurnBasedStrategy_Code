@@ -92,6 +92,24 @@ ASkaldPlayerState* ASkaldGameState::GetPlayerById(int32 PlayerID) const
     return nullptr;
 }
 
+ASkaldPlayerState* ASkaldGameState::GetPlayerByStableId(int32 StableId) const
+{
+    if (StableId == INDEX_NONE)
+    {
+        return nullptr;
+    }
+
+    for (ASkaldPlayerState* PS : Players)
+    {
+        if (PS && PS->GetStablePlayerId() == StableId)
+        {
+            return PS;
+        }
+    }
+
+    return nullptr;
+}
+
 void ASkaldGameState::OnRep_Players()
 {
     SortAndDedupPlayers();
@@ -234,6 +252,27 @@ void ASkaldGameState::OnRep_BattleParticipants()
     UE_LOG(LogSkaldBattle, Log,
            TEXT("GameState BattleParticipants replicated (%d participants)"),
            BattleParticipants.Num());
+
+    if (APlayerController* LocalPC = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr)
+    {
+        if (ASkaldPlayerState* LocalPS = LocalPC->GetPlayerState<ASkaldPlayerState>())
+        {
+            const int32 LocalStableId = LocalPS->GetStablePlayerId();
+            const FBattlePlayerEntry* Found = BattleParticipants.FindByPredicate(
+                [LocalStableId](const FBattlePlayerEntry& Entry)
+                {
+                    return Entry.PlayerId == LocalStableId;
+                });
+
+            if (Found && !LocalPS->bIsActiveBattlePlayer)
+            {
+                UE_LOG(LogSkaldBattle, Log,
+                       TEXT("OnRep_BattleParticipants: Marking local player %s (StableId=%d) as active battle participant"),
+                       *LocalPS->GetResolvedPlayerName(TEXT("OnRep_BattleParticipants")), LocalStableId);
+                LocalPS->bIsActiveBattlePlayer = true;
+            }
+        }
+    }
 
     if (BattlePhase == EBattlePhase::FighterSelection)
     {

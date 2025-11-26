@@ -174,6 +174,7 @@ public:
   virtual bool Initialize() override;
   virtual void NativeConstruct() override;
   virtual void NativePreConstruct() override;
+  virtual void NativeDestruct() override;
 
   /** Faction of the player owning this selection widget. */
   UPROPERTY(BlueprintReadOnly, Category = "Skald|Fighter")

@@ -228,11 +228,18 @@ void UFighterSelectionWidget::NativePreConstruct()
 
 void UFighterSelectionWidget::NativeConstruct() {
   Super::NativeConstruct();
+  UE_LOG(LogSkaldUI, Log, TEXT("[FighterSelection] Constructed widget %s"), *GetName());
   SetIsFocusable(true);
   SetFocus();
   SetLockInButtonEnabled(true);
   UpdateCostDisplay();
   PopulateFighterList();
+}
+
+void UFighterSelectionWidget::NativeDestruct()
+{
+    UE_LOG(LogSkaldUI, Log, TEXT("[FighterSelection] Destructing widget %s"), *GetName());
+    Super::NativeDestruct();
 }
 
 void UFighterSelectionWidget::PopulateFighterList() {
