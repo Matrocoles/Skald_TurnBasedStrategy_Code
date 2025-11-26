@@ -1937,14 +1937,14 @@ void ATurnManager::CacheBattleParticipants(const FS_BattlePayload &Battle)
   };
 
   auto ResolveParticipantStateByStableId = [GameState](int32 StableId,
-                                                      const TCHAR *Role)
+                                                      const TCHAR *RoleLabel)
       -> ASkaldPlayerState * {
     ASkaldPlayerState *ByStable = GameState->GetPlayerByStableId(StableId);
     if (ByStable)
     {
       UE_LOG(LogSkaldBattle, Log,
              TEXT("CacheBattleParticipants: Resolved %s via StableId=%d -> %s"),
-             Role, StableId,
+             RoleLabel, StableId,
              *ByStable->GetResolvedPlayerName(TEXT("CacheBattleParticipants.Stable")));
     }
     return ByStable;
