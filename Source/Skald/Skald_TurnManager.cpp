@@ -1917,10 +1917,12 @@ void ATurnManager::CacheBattleParticipants(const FS_BattlePayload &Battle)
   GameState->ResetBattleParticipants();
 
   auto BuildEntry = [&](ASkaldPlayerState *Participant, int32 PlayerId, const FString &DisplayName,
-                        ESkaldFaction Faction, bool bIsAI)
+                        ESkaldFaction Faction, bool bIsAI, bool bResolvedByStableId)
   {
     FBattlePlayerEntry Entry;
-    Entry.PlayerId = Participant ? Participant->GetPlayerId() : PlayerId;
+    Entry.PlayerId = bResolvedByStableId && Participant ? PlayerId
+                                                        : Participant ? Participant->GetPlayerId()
+                                                                      : PlayerId;
     Entry.DisplayName = Participant ? Participant->GetResolvedPlayerName(TEXT("CacheBattleParticipants")) : DisplayName;
     Entry.Faction = Participant && Participant->Faction != ESkaldFaction::None ? Participant->Faction : Faction;
     Entry.bIsAI = Participant ? Participant->bIsAI : bIsAI;
@@ -1949,21 +1951,23 @@ void ATurnManager::CacheBattleParticipants(const FS_BattlePayload &Battle)
   };
 
   ASkaldPlayerState *Attacker = GameState->GetPlayerById(Battle.AttackerPlayerID);
+  const bool bAttackerResolvedByStableId = !Attacker;
   if (!Attacker)
   {
     Attacker = ResolveParticipantStateByStableId(Battle.AttackerPlayerID, TEXT("Attacker"));
   }
 
   ASkaldPlayerState *Defender = GameState->GetPlayerById(Battle.DefenderPlayerID);
+  const bool bDefenderResolvedByStableId = !Defender;
   if (!Defender)
   {
     Defender = ResolveParticipantStateByStableId(Battle.DefenderPlayerID, TEXT("Defender"));
   }
 
   BuildEntry(Attacker, Battle.AttackerPlayerID, Battle.AttackerDisplayName, Battle.AttackerFaction,
-             Battle.bAttackerIsAI);
+             Battle.bAttackerIsAI, bAttackerResolvedByStableId && Attacker != nullptr);
   BuildEntry(Defender, Battle.DefenderPlayerID, Battle.DefenderDisplayName, Battle.DefenderFaction,
-             Battle.bDefenderIsAI);
+             Battle.bDefenderIsAI, bDefenderResolvedByStableId && Defender != nullptr);
 }
 
 void ATurnManager::BeginReadyPhase(const FS_BattlePayload &Battle,
