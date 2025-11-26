@@ -753,13 +753,13 @@ bool ASkald_BattleGameMode::IsRegisteredBattleParticipant(
     return false;
   }
 
-  const ASkaldGameState *GameState = GetGameState<ASkaldGameState>();
-  if (!GameState) {
+  const ASkaldGameState *SkaldGameState = GetGameState<ASkaldGameState>();
+  if (!SkaldGameState) {
     return false;
   }
 
   FBattlePlayerEntry Entry;
-  const bool bFound = GameState->GetBattleEntryForPlayer(PlayerId, Entry);
+  const bool bFound = SkaldGameState->GetBattleEntryForPlayer(PlayerId, Entry);
   UE_LOG(LogSkaldBattle, Log,
          TEXT("IsRegisteredBattleParticipant PlayerId=%d Name=%s Found=%d ActiveFlag=%d"),
          PlayerId, *PlayerState->GetResolvedPlayerName(TEXT("RegisteredParticipant")),
