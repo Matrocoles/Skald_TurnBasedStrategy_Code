@@ -130,6 +130,11 @@ public:
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="GameState")
     ASkaldPlayerState* GetPlayerById(int32 PlayerID) const;
 
+    /**
+     * Locate a player state by its stable (persistent across travel) id.
+     */
+    ASkaldPlayerState* GetPlayerByStableId(int32 StableId) const;
+
     /** Server API to set/update roster. */
     UFUNCTION(Server, Reliable)
     void ServerSetFighterRoster(const TArray<FFighterDefinition>& InRoster);

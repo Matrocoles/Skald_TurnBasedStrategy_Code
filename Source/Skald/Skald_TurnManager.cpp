@@ -1934,8 +1934,31 @@ void ATurnManager::CacheBattleParticipants(const FS_BattlePayload &Battle)
     MarkParticipantActive(Participant);
   };
 
+  auto ResolveParticipantStateByStableId = [GameState](int32 StableId,
+                                                      const TCHAR *Role)
+      -> ASkaldPlayerState * {
+    ASkaldPlayerState *ByStable = GameState->GetPlayerByStableId(StableId);
+    if (ByStable)
+    {
+      UE_LOG(LogSkaldBattle, Log,
+             TEXT("CacheBattleParticipants: Resolved %s via StableId=%d -> %s"),
+             Role, StableId,
+             *ByStable->GetResolvedPlayerName(TEXT("CacheBattleParticipants.Stable")));
+    }
+    return ByStable;
+  };
+
   ASkaldPlayerState *Attacker = GameState->GetPlayerById(Battle.AttackerPlayerID);
+  if (!Attacker)
+  {
+    Attacker = ResolveParticipantStateByStableId(Battle.AttackerPlayerID, TEXT("Attacker"));
+  }
+
   ASkaldPlayerState *Defender = GameState->GetPlayerById(Battle.DefenderPlayerID);
+  if (!Defender)
+  {
+    Defender = ResolveParticipantStateByStableId(Battle.DefenderPlayerID, TEXT("Defender"));
+  }
 
   BuildEntry(Attacker, Battle.AttackerPlayerID, Battle.AttackerDisplayName, Battle.AttackerFaction,
              Battle.bAttackerIsAI);

@@ -2483,6 +2483,9 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
     // late battle-map detection can temporarily report that we are not on a
     // battle map even though the player must complete selection.
     if (!bNeedsSelectionUI && !bLocalIsBattleParticipant && FighterSelectionWidget) {
+      UE_LOG(LogSkaldBattle, Log,
+             TEXT("InitializeFighterSelectionIfNeeded: Removing widget (not on battle map and not participant). Controller=%s"),
+             *GetName());
       FighterSelectionWidget->RemoveFromParent();
       FighterSelectionWidget = nullptr;
     }
@@ -2496,6 +2499,9 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
   // input mode back to UI-only.
   if (bBattleHUDReadyToShow) {
     if (FighterSelectionWidget) {
+      UE_LOG(LogSkaldBattle, Log,
+             TEXT("InitializeFighterSelectionIfNeeded: Battle HUD ready, removing FighterSelection from %s"),
+             *GetName());
       FighterSelectionWidget->RemoveFromParent();
       FighterSelectionWidget = nullptr;
     }
@@ -2537,10 +2543,10 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
 
   if (!bIsParticipant || PendingBudget <= 0 || !bInSelectionPhase) {
     UE_LOG(LogSkaldBattle, Log,
-           TEXT("InitializeFighterSelectionIfNeeded: Skipping widget (Local=%s Participant=%d Phase=%d Budget=%d ActiveFlag=%d)"),
+           TEXT("InitializeFighterSelectionIfNeeded: Skipping widget (Local=%s Participant=%d Phase=%d Budget=%d ActiveFlag=%d OnBattleMap=%d)"),
            *GetNameSafe(this), bIsParticipant ? 1 : 0,
            CachedGameState ? static_cast<int32>(CachedGameState->BattlePhase) : -1, PendingBudget,
-           PS->bIsActiveBattlePlayer ? 1 : 0);
+           PS->bIsActiveBattlePlayer ? 1 : 0, bOnBattleMap ? 1 : 0);
     return;
   }
 
