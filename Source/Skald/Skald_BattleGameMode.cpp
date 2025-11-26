@@ -742,6 +742,55 @@ bool ASkald_BattleGameMode::ControllerHasStablePlayerId(
   return false;
 }
 
+bool ASkald_BattleGameMode::IsRegisteredBattleParticipant(
+    const ASkaldPlayerState *PlayerState) const {
+  if (!PlayerState) {
+    return false;
+  }
+
+  const int32 PlayerId = ResolveBattlePlayerId(PlayerState);
+  if (PlayerId <= 0) {
+    return false;
+  }
+
+  const ASkaldGameState *GameState = GetGameState<ASkaldGameState>();
+  if (!GameState) {
+    return false;
+  }
+
+  FBattlePlayerEntry Entry;
+  const bool bFound = GameState->GetBattleEntryForPlayer(PlayerId, Entry);
+  UE_LOG(LogSkaldBattle, Log,
+         TEXT("IsRegisteredBattleParticipant PlayerId=%d Name=%s Found=%d ActiveFlag=%d"),
+         PlayerId, *PlayerState->GetResolvedPlayerName(TEXT("RegisteredParticipant")),
+         bFound ? 1 : 0, PlayerState->bIsActiveBattlePlayer ? 1 : 0);
+  return bFound || PlayerState->bIsActiveBattlePlayer;
+}
+
+void ASkald_BattleGameMode::RegisterParticipantController(AController *Controller) {
+  if (!HasAuthority() || !Controller) {
+    return;
+  }
+
+  if (!Controller->PlayerState) {
+    Controller->InitPlayerState();
+  }
+
+  if (ASkaldPlayerState *PS = Controller->GetPlayerState<ASkaldPlayerState>()) {
+    if (IsRegisteredBattleParticipant(PS)) {
+      PS->bIsActiveBattlePlayer = true;
+      SyncBattlePlayerEntry(PS);
+      UE_LOG(LogSkaldBattle, Log,
+             TEXT("RegisterParticipantController: accepted %s (Id=%d AI=%d)"),
+             *GetNameSafe(Controller), PS->GetPlayerId(), PS->bIsAI ? 1 : 0);
+    } else {
+      UE_LOG(LogSkaldBattle, Warning,
+             TEXT("RegisterParticipantController: controller %s (Id=%d) is not in BattleParticipants"),
+             *GetNameSafe(Controller), PS->GetPlayerId());
+    }
+  }
+}
+
 void ASkald_BattleGameMode::SyncBattlePlayerEntry(ASkaldPlayerState *PlayerState) const
 {
   if (!HasAuthority() || !PlayerState)
@@ -1794,6 +1843,7 @@ void ASkald_BattleGameMode::HandleStartingNewPlayer_Implementation(
 
   if (ASkaldPlayerState *PS = NewPlayer->GetPlayerState<ASkaldPlayerState>()) {
     SyncBattlePlayerEntry(PS);
+    RegisterParticipantController(NewPlayer);
     StartBootstrapTimer();
     return;
   }
@@ -1830,6 +1880,7 @@ void ASkald_BattleGameMode::HandleSeamlessTravelPlayer(AController *&C) {
   if (AController *Controller = C) {
     if (ASkaldPlayerState *PS = Controller->GetPlayerState<ASkaldPlayerState>()) {
       SyncBattlePlayerEntry(PS);
+      RegisterParticipantController(Controller);
     }
     OnControllerReady(Controller);
   }
@@ -1841,6 +1892,7 @@ void ASkald_BattleGameMode::PostLogin(APlayerController *NewPlayer) {
   UE_LOG(LogSkaldBattle, Log, TEXT("PostLogin: %s"), *GetNameSafe(NewPlayer));
   if (ASkaldPlayerState *PS = NewPlayer->GetPlayerState<ASkaldPlayerState>()) {
     SyncBattlePlayerEntry(PS);
+    RegisterParticipantController(NewPlayer);
   }
   StartBootstrapTimer();
   OnControllerReady(NewPlayer);
@@ -1954,6 +2006,12 @@ void ASkald_BattleGameMode::OnControllerReady(AController *Controller) {
   }
 
   if (ASkaldPlayerState *PS = Controller->GetPlayerState<ASkaldPlayerState>()) {
+    if (IsRegisteredBattleParticipant(PS)) {
+      PS->bIsActiveBattlePlayer = true;
+      UE_LOG(LogSkaldBattle, Log,
+             TEXT("OnControllerReady: participant confirmed for %s (Id=%d)"),
+             *GetNameSafe(Controller), PS->GetPlayerId());
+    }
     SyncBattlePlayerEntry(PS);
   }
 

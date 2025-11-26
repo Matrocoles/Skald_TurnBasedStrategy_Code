@@ -83,6 +83,7 @@ void ASkaldPlayerState::GetLifetimeReplicatedProps(
   DOREPLIFETIME(ASkaldPlayerState, PendingArmy);
   DOREPLIFETIME(ASkaldPlayerState, PendingArmyBudget);
   DOREPLIFETIME(ASkaldPlayerState, bArmyLockedIn);
+  DOREPLIFETIME(ASkaldPlayerState, bIsActiveBattlePlayer);
   DOREPLIFETIME(ASkaldPlayerState, bIsAI);
   DOREPLIFETIME(ASkaldPlayerState, DeployableUnits);
   DOREPLIFETIME(ASkaldPlayerState, InitiativeRoll);

@@ -69,6 +69,10 @@ public:
   UPROPERTY(Replicated, BlueprintReadOnly, Category = "Skald|Player")
   bool bArmyLockedIn = false;
 
+  /** True when this player is registered for an active or pending battle. */
+  UPROPERTY(Replicated, BlueprintReadOnly, Category = "Skald|Battle")
+  bool bIsActiveBattlePlayer = false;
+
   /** Whether this player is controlled by AI. */
   UPROPERTY(BlueprintReadWrite, ReplicatedUsing = OnRep_IsAI,
             Category = "PlayerState")

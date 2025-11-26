@@ -1880,6 +1880,69 @@ void ATurnManager::RequestPrepareBattle(const FS_BattlePayload &Battle) {
   BeginReadyPhase(Battle, TEXT("RequestPrepareBattle"));
 }
 
+void ATurnManager::MarkParticipantActive(ASkaldPlayerState *Participant) const
+{
+  if (!Participant)
+  {
+    return;
+  }
+
+  Participant->bIsActiveBattlePlayer = true;
+  UE_LOG(LogSkaldBattle, Log, TEXT("MarkParticipantActive PlayerId=%d Name=%s"),
+         Participant->GetPlayerId(),
+         *Participant->GetResolvedPlayerName(TEXT("MarkParticipantActive")));
+}
+
+void ATurnManager::CacheBattleParticipants(const FS_BattlePayload &Battle)
+{
+  if (!HasAuthority())
+  {
+    return;
+  }
+
+  ASkaldGameState *GameState = GetWorld() ? GetWorld()->GetGameState<ASkaldGameState>() : nullptr;
+  if (!GameState)
+  {
+    return;
+  }
+
+  for (APlayerState *PlayerState : GameState->PlayerArray)
+  {
+    if (ASkaldPlayerState *SkaldPS = Cast<ASkaldPlayerState>(PlayerState))
+    {
+      SkaldPS->bIsActiveBattlePlayer = false;
+    }
+  }
+
+  GameState->ResetBattleParticipants();
+
+  auto BuildEntry = [&](ASkaldPlayerState *Participant, int32 PlayerId, const FString &DisplayName,
+                        ESkaldFaction Faction, bool bIsAI)
+  {
+    FBattlePlayerEntry Entry;
+    Entry.PlayerId = Participant ? Participant->GetPlayerId() : PlayerId;
+    Entry.DisplayName = Participant ? Participant->GetResolvedPlayerName(TEXT("CacheBattleParticipants")) : DisplayName;
+    Entry.Faction = Participant && Participant->Faction != ESkaldFaction::None ? Participant->Faction : Faction;
+    Entry.bIsAI = Participant ? Participant->bIsAI : bIsAI;
+
+    UE_LOG(LogSkaldBattle, Log,
+           TEXT("CacheBattleParticipants: PlayerId=%d Name=%s Faction=%d AI=%s"),
+           Entry.PlayerId, *Entry.DisplayName, static_cast<int32>(Entry.Faction),
+           Entry.bIsAI ? TEXT("true") : TEXT("false"));
+
+    GameState->UpsertBattleEntry(Entry);
+    MarkParticipantActive(Participant);
+  };
+
+  ASkaldPlayerState *Attacker = GameState->GetPlayerById(Battle.AttackerPlayerID);
+  ASkaldPlayerState *Defender = GameState->GetPlayerById(Battle.DefenderPlayerID);
+
+  BuildEntry(Attacker, Battle.AttackerPlayerID, Battle.AttackerDisplayName, Battle.AttackerFaction,
+             Battle.bAttackerIsAI);
+  BuildEntry(Defender, Battle.DefenderPlayerID, Battle.DefenderDisplayName, Battle.DefenderFaction,
+             Battle.bDefenderIsAI);
+}
+
 void ATurnManager::BeginReadyPhase(const FS_BattlePayload &Battle,
                                    const TCHAR *Context) {
   FS_BattlePayload NormalizedBattle = Battle;
@@ -2035,6 +2098,8 @@ void ATurnManager::BeginReadyPhase(const FS_BattlePayload &Battle,
                           NormalizedBattle.DefenderFaction,
                           NormalizedBattle.DefenderFactionEmblem,
                           TEXT("Defender"));
+
+  CacheBattleParticipants(NormalizedBattle);
 
   UE_LOG(LogSkaldReady, Verbose,
          TEXT("%s: caching battle participants for ready state (Attacker=%d AI=%s, Defender=%d AI=%s)"),

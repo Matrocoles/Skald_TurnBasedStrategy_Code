@@ -2456,6 +2456,10 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
                                                   ? CachedGameInstance->PendingBattle
                                                   : FS_BattlePayload();
 
+  const bool bInSelectionPhase = CachedGameState
+                                     ? CachedGameState->BattlePhase == EBattlePhase::FighterSelection
+                                     : true;
+
   int32 LocalPlayerId = INDEX_NONE;
   if (const ASkaldPlayerState *SelectionPS = GetPlayerState<ASkaldPlayerState>()) {
     LocalPlayerId = ResolveStablePlayerId(SelectionPS);
@@ -2509,7 +2513,7 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
 
   const int32 PlayerID = ResolveStablePlayerId(PS);
   int32 PendingBudget = PS->PendingArmyBudget;
-  bool bIsParticipant = false;
+  bool bIsParticipant = PS->bIsActiveBattlePlayer;
 
   if (CachedGameState) {
     FBattlePlayerEntry Entry;
@@ -2531,7 +2535,12 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
     bIsParticipant = true;
   }
 
-  if (!bIsParticipant || PendingBudget <= 0) {
+  if (!bIsParticipant || PendingBudget <= 0 || !bInSelectionPhase) {
+    UE_LOG(LogSkaldBattle, Log,
+           TEXT("InitializeFighterSelectionIfNeeded: Skipping widget (Local=%s Participant=%d Phase=%d Budget=%d ActiveFlag=%d)"),
+           *GetNameSafe(this), bIsParticipant ? 1 : 0,
+           CachedGameState ? static_cast<int32>(CachedGameState->BattlePhase) : -1, PendingBudget,
+           PS->bIsActiveBattlePlayer ? 1 : 0);
     return;
   }
 
