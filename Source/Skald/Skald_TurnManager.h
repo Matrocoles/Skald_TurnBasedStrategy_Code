@@ -270,6 +270,8 @@ protected:
   FSkaldBattleReadyState PendingBattleReadyState;
 
   void CommitPendingBattleReadyState(const TCHAR *Context);
+  void CacheBattleParticipants(const FS_BattlePayload &Battle);
+  void MarkParticipantActive(ASkaldPlayerState *Participant) const;
   bool TryAutoReadyAI(const TCHAR *Context);
   ASkaldPlayerController *FindControllerByPlayerId(int32 PlayerId) const;
   void ClearActiveRetreatContext();

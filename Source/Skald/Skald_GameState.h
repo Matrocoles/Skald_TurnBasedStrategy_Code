@@ -74,8 +74,8 @@ public:
     FS_BattlePayload ActiveBattlePayload;
 
     /** Replicated list of participants travelling into the battle. */
-    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_BattleEntries, Category="GameState|Battle")
-    TArray<FBattlePlayerEntry> BattleEntries;
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_BattleParticipants, Category="GameState|Battle")
+    TArray<FBattlePlayerEntry> BattleParticipants;
 
     /** Current grid-battle round number (replicated for clients without a battle manager). */
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_BattleRoundState, Category="GameState|Battle")
@@ -166,13 +166,16 @@ public:
 
     /** Replicated participant list for UI binding. */
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="GameState|Battle")
-    const TArray<FBattlePlayerEntry>& GetBattleEntries() const { return BattleEntries; }
+    const TArray<FBattlePlayerEntry>& GetBattleEntries() const { return BattleParticipants; }
 
     /** Update the replicated battle payload on the server. */
     void SetActiveBattlePayload(const FS_BattlePayload& Payload);
 
     /** Add/update a participant entry on the server. */
     void UpsertBattleEntry(const FBattlePlayerEntry& Entry);
+
+    /** Clear the replicated battle participants prior to repopulation. */
+    void ResetBattleParticipants();
 
     /** Get a participant entry for a specific player. */
     bool GetBattleEntryForPlayer(int32 PlayerId, FBattlePlayerEntry& OutEntry) const;
@@ -213,7 +216,7 @@ protected:
     void OnRep_BattlePayload();
 
     UFUNCTION()
-    void OnRep_BattleEntries();
+    void OnRep_BattleParticipants();
 
     UFUNCTION()
     void OnRep_CurrentTurnIndex();

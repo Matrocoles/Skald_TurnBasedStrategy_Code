@@ -431,6 +431,11 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
     PlayerDataArray[Index].Resources = PS->Resources;
   }
 
+  UE_LOG(LogSkaldBattle, Log,
+         TEXT("RegisterPlayer: PlayerId=%d Name=%s AI=%d NetMode=%d"), PS->GetPlayerId(),
+         *PS->GetResolvedPlayerName(TEXT("RegisterPlayer")), PS->bIsAI ? 1 : 0,
+         static_cast<int32>(GetNetMode()));
+
   // Notify listeners that player data has changed and refresh HUDs on the
   // next tick once replication has a chance to update clients.
   GS->OnPlayersUpdated.Broadcast();

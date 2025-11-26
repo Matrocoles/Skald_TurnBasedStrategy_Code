@@ -87,6 +87,8 @@ private:
   void ProcessDeferredControllers();
   void QueueDeferredController(AController *Controller);
   bool ControllerHasStablePlayerId(AController *Controller) const;
+  bool IsRegisteredBattleParticipant(const ASkaldPlayerState *PlayerState) const;
+  void RegisterParticipantController(AController *Controller);
   void ProcessStreamingActivation();
   void SyncBattlePlayerEntry(class ASkaldPlayerState *PlayerState) const;
   void StartBootstrapTimer();

@@ -27,7 +27,7 @@ void ASkaldGameState::GetLifetimeReplicatedProps(
     DOREPLIFETIME(ASkaldGameState, BattlePhase);
     DOREPLIFETIME(ASkaldGameState, PendingBattleReadyState);
     DOREPLIFETIME(ASkaldGameState, ActiveBattlePayload);
-    DOREPLIFETIME(ASkaldGameState, BattleEntries);
+    DOREPLIFETIME(ASkaldGameState, BattleParticipants);
     DOREPLIFETIME(ASkaldGameState, CurrentBattleRound);
     DOREPLIFETIME(ASkaldGameState, BattleInitiativeWinner);
     DOREPLIFETIME(ASkaldGameState, RemainingAttackerActivations);
@@ -229,11 +229,11 @@ void ASkaldGameState::OnRep_BattlePayload()
     }
 }
 
-void ASkaldGameState::OnRep_BattleEntries()
+void ASkaldGameState::OnRep_BattleParticipants()
 {
     UE_LOG(LogSkaldBattle, Log,
-           TEXT("GameState BattleEntries replicated (%d participants)"),
-           BattleEntries.Num());
+           TEXT("GameState BattleParticipants replicated (%d participants)"),
+           BattleParticipants.Num());
 
     if (BattlePhase == EBattlePhase::FighterSelection)
     {
@@ -360,7 +360,7 @@ void ASkaldGameState::UpsertBattleEntry(const FBattlePlayerEntry& Entry)
     }
 
     bool bUpdated = false;
-    for (FBattlePlayerEntry& Existing : BattleEntries)
+    for (FBattlePlayerEntry& Existing : BattleParticipants)
     {
         if (Existing.PlayerId == Entry.PlayerId)
         {
@@ -372,16 +372,28 @@ void ASkaldGameState::UpsertBattleEntry(const FBattlePlayerEntry& Entry)
 
   if (!bUpdated)
   {
-    BattleEntries.Add(Entry);
+    BattleParticipants.Add(Entry);
   }
 
-  OnRep_BattleEntries();
+  OnRep_BattleParticipants();
   ForceNetUpdate();
+}
+
+void ASkaldGameState::ResetBattleParticipants()
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    UE_LOG(LogSkaldBattle, Log, TEXT("GameState ResetBattleParticipants"));
+    BattleParticipants.Reset();
+    OnRep_BattleParticipants();
 }
 
 bool ASkaldGameState::GetBattleEntryForPlayer(int32 PlayerId, FBattlePlayerEntry& OutEntry) const
 {
-    const FBattlePlayerEntry* Found = BattleEntries.FindByPredicate([PlayerId](const FBattlePlayerEntry& Candidate)
+    const FBattlePlayerEntry* Found = BattleParticipants.FindByPredicate([PlayerId](const FBattlePlayerEntry& Candidate)
     {
         return Candidate.PlayerId == PlayerId;
     });
