@@ -316,6 +316,13 @@ void USkaldGameInstance::SetTravelPending(bool bInPending) {
   }
 }
 
+bool USkaldGameInstance::IsTravelPending() const { return bTravelPending; }
+
+bool USkaldGameInstance::ShouldBypassLobbyTransition() const {
+  return bTravelPending || TravelState.bValid ||
+         PendingTravelTerritories.Num() > 0 || bResumeTurns;
+}
+
 void USkaldGameInstance::ShowGlobalStatusMessage(const FText &Message,
                                                  float DisplayDuration,
                                                  bool bPersistUntilCleared) {
@@ -1169,9 +1176,12 @@ void USkaldGameInstance::HandleNetworkFailure(
 
   ResetSessionState();
 
-  if (World) {
+  if (World && !ShouldBypassLobbyTransition()) {
     const FName LobbyMap(TEXT("/Game/Blueprints/Maps/Skald_Lobby"));
     UGameplayStatics::OpenLevel(World, LobbyMap);
+  } else if (ShouldBypassLobbyTransition()) {
+    UE_LOG(LogSkald, Log,
+           TEXT("HandleNetworkFailure: skipping lobby transition due to pending travel resume."));
   }
 }
 
@@ -1191,6 +1201,12 @@ void USkaldGameInstance::ResetSessionData() { ResetSessionState(); }
 
 void USkaldGameInstance::ReturnToMainMenu() {
   ResetSessionState();
+
+  if (ShouldBypassLobbyTransition()) {
+    UE_LOG(LogSkald, Log,
+           TEXT("ReturnToMainMenu: bypassing lobby travel while battle payload is pending."));
+    return;
+  }
 
   if (UWorld *World = GetWorld()) {
     const FName LobbyMap(TEXT("/Game/Blueprints/Maps/Skald_Lobby"));

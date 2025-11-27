@@ -301,6 +301,13 @@ public:
   UFUNCTION(BlueprintCallable)
   void SetTravelPending(bool bInPending);
 
+  /** Whether the game instance currently expects a travel to complete. */
+  UFUNCTION(BlueprintCallable, BlueprintPure)
+  bool IsTravelPending() const;
+
+  /** Guard against returning to the lobby while a travel payload is queued. */
+  bool ShouldBypassLobbyTransition() const;
+
   /** Display a global status message across all player HUDs. */
   UFUNCTION(BlueprintCallable, Category = "UI")
   void ShowGlobalStatusMessage(const FText &Message, float DisplayDuration, bool bPersistUntilCleared);

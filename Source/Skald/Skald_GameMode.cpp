@@ -75,6 +75,7 @@ ASkaldGameMode::ASkaldGameMode() {
   TurnManager = nullptr;
   TurnManagerClass = ATurnManager::StaticClass();
   WorldMap = nullptr;
+  bUseSeamlessTravel = true;
   bTurnsStarted = false;
   bWorldInitialized = false;
   bAIPlayersSpawned = false;
@@ -208,12 +209,48 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
     return;
   }
 
+  USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+  const bool bTravelPending = GI && GI->IsTravelPending();
+
+  const ASkaldGameState *GS = GetGameState<ASkaldGameState>();
+  const ASkaldPlayerState *IncomingPS =
+      PC ? PC->GetPlayerState<ASkaldPlayerState>() : nullptr;
+  ASkaldPlayerState *ReusedPS = nullptr;
+
   if (bWorldInitialized) {
-    UE_LOG(LogSkald, Warning,
-           TEXT("PostLogin rejecting %s: overworld already initialized, controller will be destroyed (ControlChannel close expected)."),
-           *PC->GetName());
-    PC->ClientMessage(TEXT("Game already in progress."));
-    PC->Destroy();
+    if (GS && IncomingPS) {
+      for (APlayerState *ExistingPSBase : GS->PlayerArray) {
+        ASkaldPlayerState *ExistingPS =
+            Cast<ASkaldPlayerState>(ExistingPSBase);
+        if (!ExistingPS) {
+          continue;
+        }
+
+        if (ExistingPS->GetPlayerId() == IncomingPS->GetPlayerId()) {
+          ReusedPS = ExistingPS;
+          break;
+        }
+      }
+
+      if (ReusedPS && ReusedPS != IncomingPS) {
+        UE_LOG(LogSkald, Log,
+               TEXT("PostLogin reattaching controller %s to existing PlayerId %d"),
+               *PC->GetName(), ReusedPS->GetPlayerId());
+        if (ASkaldGameState *MutableGS = GetGameState<ASkaldGameState>()) {
+          MutableGS->RemovePlayerState(IncomingPS);
+        }
+        IncomingPS->Destroy();
+        PC->PlayerState = ReusedPS;
+        ReusedPS->SetOwner(PC);
+      }
+    }
+
+    if (!bTravelPending && !ReusedPS) {
+      UE_LOG(LogSkald, Warning,
+             TEXT("PostLogin rejecting %s: overworld already initialized, controller will be destroyed (ControlChannel close expected)."),
+             *PC->GetName());
+      PC->ClientMessage(TEXT("Game already in progress."));
+      PC->Destroy();
     return;
   }
 
