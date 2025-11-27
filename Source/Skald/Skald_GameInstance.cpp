@@ -39,8 +39,8 @@ using Skald::PropertyAccess::ReadBoolProperty;
 using Skald::PropertyAccess::ReadIntProperty;
 using Skald::PropertyAccess::WriteBoolProperty;
 
-DECLARE_LOG_CATEGORY_EXTERN(LogNetPartialBunch, Log, All);
-DECLARE_LOG_CATEGORY_EXTERN(LogHandshake, Log, All);
+DEFINE_LOG_CATEGORY_STATIC(LogNetPartialBunch, Log, All);
+DEFINE_LOG_CATEGORY_STATIC(LogHandshake, Log, All);
 
 namespace {
 
