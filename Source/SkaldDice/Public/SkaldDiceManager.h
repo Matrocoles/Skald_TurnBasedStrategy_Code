@@ -63,12 +63,14 @@ public:
      * @param EnemyResults Results that should be tinted for the opposing side.
      * @param bForInitiative Whether this scripted roll represents an initiative comparison.
      * @param DurationOverride Optional fixed duration for the presentation. Negative values use config timing.
+     * @param ForcedRollId Optional roll identifier to reuse (e.g., from server authoritative flow).
      */
     UFUNCTION(BlueprintCallable, Category = "Dice")
     FGuid PlayScriptedRoll(const TArray<int32>& PlayerResults, const TArray<int32>& EnemyResults,
         bool bForInitiative, float DurationOverride = -1.f,
         FLinearColor PlayerColor = FLinearColor::Transparent,
-        FLinearColor EnemyColor = FLinearColor::Transparent);
+        FLinearColor EnemyColor = FLinearColor::Transparent,
+        const FGuid& ForcedRollId = FGuid());
 
     /** Returns the duration before arena and dice are fully cleaned up. */
     float GetCleanupDelay() const;
