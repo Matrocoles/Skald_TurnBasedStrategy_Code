@@ -209,6 +209,9 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
   }
 
   if (bWorldInitialized) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("PostLogin rejecting %s: overworld already initialized, controller will be destroyed (ControlChannel close expected)."),
+           *PC->GetName());
     PC->ClientMessage(TEXT("Game already in progress."));
     PC->Destroy();
     return;
@@ -337,6 +340,23 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
 
   if (TurnManager) {
     if (!TurnManager->GetControllers().Contains(PC)) {
+      for (ASkaldPlayerController *ExistingController :
+           TurnManager->GetControllers()) {
+        if (!ExistingController || ExistingController == PC) {
+          continue;
+        }
+
+        if (const ASkaldPlayerState *ExistingPS =
+                ExistingController->GetPlayerState<ASkaldPlayerState>()) {
+          if (PS && ExistingPS->GetPlayerId() == PS->GetPlayerId()) {
+            UE_LOG(LogSkald, Warning,
+                   TEXT("RegisterPlayer: PlayerId %d already bound to %s; late/duplicate registration from %s may close connection."),
+                   PS->GetPlayerId(), *ExistingController->GetName(),
+                   *PC->GetName());
+          }
+        }
+      }
+
       TurnManager->RegisterController(PC);
       UE_LOG(LogSkald, Log, TEXT("RegisterPlayer: ControllerCount=%d"),
              TurnManager->GetControllerCount());

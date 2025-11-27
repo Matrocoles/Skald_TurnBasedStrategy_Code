@@ -112,6 +112,10 @@ public:
   UPROPERTY(BlueprintReadWrite, Category = "Network")
   bool bIsHost = false;
 
+  /** Enable verbose connection logging to trace ControlChannel closes. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Network|Debug")
+  bool bVerboseControlChannelLogging = false;
+
   /** Address to join when acting as a client. */
   UPROPERTY(BlueprintReadWrite, Category = "Network")
   FString JoinAddress;
@@ -399,6 +403,7 @@ private:
   void AttemptResumeAfterTravel();
   void RequestPendingBattleResolution(UWorld *LoadedWorld);
   void AttemptResolvePendingBattle(int32 Attempt);
+  void EnableControlChannelDiagnostics() const;
   void ResetSessionState();
 
   TWeakObjectPtr<UWorld> PendingResumeWorld;

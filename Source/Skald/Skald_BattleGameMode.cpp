@@ -2161,7 +2161,18 @@ void ASkald_BattleGameMode::RegisterPlayerLockIn(int32 PlayerId)
     return;
   }
 
+  if (LockedInPlayers.Contains(PlayerId))
+  {
+    UE_LOG(LogSkaldBattle, Verbose,
+           TEXT("RegisterPlayerLockIn: PlayerId=%d already locked; duplicate notice for ControlChannel tracing."),
+           PlayerId);
+    return;
+  }
+
   LockedInPlayers.Add(PlayerId);
+  UE_LOG(LogSkaldBattle, Log,
+         TEXT("RegisterPlayerLockIn: PlayerId=%d locked (Total=%d)"), PlayerId,
+         LockedInPlayers.Num());
 }
 
 bool ASkald_BattleGameMode::AreBothParticipantsLocked() const

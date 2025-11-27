@@ -1903,6 +1903,10 @@ void ATurnManager::CacheBattleParticipants(const FS_BattlePayload &Battle)
   ASkaldGameState *GameState = GetWorld() ? GetWorld()->GetGameState<ASkaldGameState>() : nullptr;
   if (!GameState)
   {
+    UE_LOG(LogSkaldReady, Warning,
+           TEXT("CacheBattleParticipants aborted: GameState missing (From=%d To=%d Attacker=%d Defender=%d)."),
+           Battle.FromTerritoryID, Battle.TargetTerritoryID, Battle.AttackerPlayerID,
+           Battle.DefenderPlayerID);
     return;
   }
 
@@ -2073,6 +2077,30 @@ void ATurnManager::BeginReadyPhase(const FS_BattlePayload &Battle,
     return nullptr;
   };
 
+  ASkaldPlayerState *AttackerState = ResolveParticipantState(true);
+  ASkaldPlayerState *DefenderState = ResolveParticipantState(false);
+
+  const auto LogParticipantResolution = [&](const TCHAR *ParticipantRole,
+                                            ASkaldPlayerState *Participant,
+                                            int32 PlayerId) {
+    if (Participant) {
+      if (PlayerId > 0 && Participant->GetPlayerId() != PlayerId) {
+        UE_LOG(LogSkaldReady, Warning,
+               TEXT("%s: %s resolved to PlayerId=%d but payload expected %d (potential slot mismatch)."),
+               Context ? Context : TEXT("BeginReadyPhase"), ParticipantRole,
+               Participant->GetPlayerId(), PlayerId);
+      }
+      return;
+    }
+
+    if (PlayerId > 0) {
+      UE_LOG(LogSkaldReady, Warning,
+             TEXT("%s: %s PlayerId %d missing during ready phase; clients may see ControlChannel close if state never registers."),
+             Context ? Context : TEXT("BeginReadyPhase"), ParticipantRole,
+             PlayerId);
+    }
+  };
+
   auto ApplyParticipantDetails =
       [&](ASkaldPlayerState *Participant, int32 &PlayerId, bool &bIsAI,
           FString &DisplayName, ESkaldFaction &Faction,
@@ -2110,21 +2138,24 @@ void ATurnManager::BeginReadyPhase(const FS_BattlePayload &Battle,
         }
       };
 
-  ApplyParticipantDetails(ResolveParticipantState(true),
-                          NormalizedBattle.AttackerPlayerID,
+  ApplyParticipantDetails(AttackerState, NormalizedBattle.AttackerPlayerID,
                           NormalizedBattle.bAttackerIsAI,
                           NormalizedBattle.AttackerDisplayName,
                           NormalizedBattle.AttackerFaction,
                           NormalizedBattle.AttackerFactionEmblem,
                           TEXT("Attacker"));
 
-  ApplyParticipantDetails(ResolveParticipantState(false),
-                          NormalizedBattle.DefenderPlayerID,
+  ApplyParticipantDetails(DefenderState, NormalizedBattle.DefenderPlayerID,
                           NormalizedBattle.bDefenderIsAI,
                           NormalizedBattle.DefenderDisplayName,
                           NormalizedBattle.DefenderFaction,
                           NormalizedBattle.DefenderFactionEmblem,
                           TEXT("Defender"));
+
+  LogParticipantResolution(TEXT("Attacker"), AttackerState,
+                           NormalizedBattle.AttackerPlayerID);
+  LogParticipantResolution(TEXT("Defender"), DefenderState,
+                           NormalizedBattle.DefenderPlayerID);
 
   CacheBattleParticipants(NormalizedBattle);
 
