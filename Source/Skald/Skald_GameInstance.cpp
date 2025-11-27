@@ -24,7 +24,6 @@
 #include "Skald_TurnManager.h"
 #include "TimerManager.h"
 #include "Styling/CoreStyle.h"
-#include "PacketHandlers/PacketHandler.h"
 #include "UI/SkaldUIHelpers.h"
 #include "UI/SkaldMainHUDWidget.h"
 #include "Widgets/Images/SImage.h"
