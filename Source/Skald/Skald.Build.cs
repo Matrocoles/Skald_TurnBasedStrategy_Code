@@ -32,6 +32,8 @@ public class Skald : ModuleRules
                         "Slate",
                         "SlateCore",
                         "UMG",
+                        // Required for LogHandshake and LogNetPartialBunch logging categories
+                        "PacketHandler",
                         "OnlineSubsystem",
                         "OnlineSubsystemUtils",
                         "Landscape",
