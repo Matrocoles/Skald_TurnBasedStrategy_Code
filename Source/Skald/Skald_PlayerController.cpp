@@ -4567,7 +4567,7 @@ void ASkaldPlayerController::ClientStartPhysicalDiceRoll_Implementation(
   if (USkaldDiceManager *DiceManager = ResolveDiceManager()) {
     const FGuid LocalRollId = DiceManager->PlayScriptedRoll(
         PlayerResults, EnemyResults, bForInitiative, -1.f, PlayerColor,
-        EnemyColor);
+        EnemyColor, RollId);
     ensure(!LocalRollId.IsValid() || LocalRollId == RollId);
   }
 }

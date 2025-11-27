@@ -160,7 +160,7 @@ bool USkaldDiceManager::DidRollUsePhysicalDice(const FGuid& RollId) const
 
 FGuid USkaldDiceManager::PlayScriptedRoll(const TArray<int32>& PlayerResults,
     const TArray<int32>& EnemyResults, bool bForInitiative, float DurationOverride,
-    FLinearColor PlayerColor, FLinearColor EnemyColor)
+    FLinearColor PlayerColor, FLinearColor EnemyColor, const FGuid& ForcedRollId)
 {
     const int32 PlayerDice = PlayerResults.Num();
     const int32 EnemyDice = EnemyResults.Num();
@@ -182,7 +182,7 @@ FGuid USkaldDiceManager::PlayScriptedRoll(const TArray<int32>& PlayerResults,
     const float MaxDuration = Config ? Config->RollDurationMax : 1.5f;
     const float Duration = DurationOverride > 0.f ? DurationOverride : FMath::Clamp(FMath::FRandRange(MinDuration, MaxDuration), MinDuration, MaxDuration);
 
-    const FGuid RollId = FGuid::NewGuid();
+    const FGuid RollId = ForcedRollId.IsValid() ? ForcedRollId : FGuid::NewGuid();
     FActiveRoll& Roll = AddRoll(PlayerDice, EnemyDice, Duration, RollId,
         bForInitiative, PlayerColor, EnemyColor);
     Roll.RollId = RollId;
