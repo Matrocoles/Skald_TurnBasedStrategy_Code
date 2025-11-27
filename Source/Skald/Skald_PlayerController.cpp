@@ -2979,7 +2979,6 @@ void ASkaldPlayerController::HideOverworldHUDForBattle() {
   HideMainHUD();
 
   bBattleHUDVisible = false;
-  bBattleHUDReadyToShow = false;
   if (BattleHudWidget) {
     BattleHudWidget->SetVisibility(ESlateVisibility::Collapsed);
   }
