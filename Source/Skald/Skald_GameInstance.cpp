@@ -169,6 +169,10 @@ void USkaldGameInstance::Init() {
         this, &USkaldGameInstance::HandleNetworkFailure);
   }
 
+  if (bVerboseControlChannelLogging) {
+    EnableControlChannelDiagnostics();
+  }
+
   if (bAutoInitialiseDiceSubsystem) {
     InitialiseDiceManager();
   }
@@ -1150,6 +1154,7 @@ void USkaldGameInstance::HideDeployWidget() {
 void USkaldGameInstance::HandleNetworkFailure(
     UWorld *World, UNetDriver * /*Driver*/,
     ENetworkFailure::Type /*FailureType*/, const FString &ErrorString) {
+  UE_LOG(LogSkald, Error, TEXT("Network failure detected: %s"), *ErrorString);
   if (GEngine) {
     GEngine->AddOnScreenDebugMessage(
         -1, 5.f, FColor::Red,
@@ -1165,6 +1170,18 @@ void USkaldGameInstance::HandleNetworkFailure(
     const FName LobbyMap(TEXT("/Game/Blueprints/Maps/Skald_Lobby"));
     UGameplayStatics::OpenLevel(World, LobbyMap);
   }
+}
+
+void USkaldGameInstance::EnableControlChannelDiagnostics() const {
+#if !NO_LOGGING
+  UE_LOG(LogSkald, Log,
+         TEXT("Enabling verbose net driver logging for ControlChannel close tracing."));
+  UE_SET_LOG_VERBOSITY(LogNet, VeryVerbose);
+  UE_SET_LOG_VERBOSITY(LogNetTraffic, VeryVerbose);
+  UE_SET_LOG_VERBOSITY(LogNetPartialBunch, VeryVerbose);
+  UE_SET_LOG_VERBOSITY(LogHandshake, VeryVerbose);
+  UE_SET_LOG_VERBOSITY(LogNetDormancy, Verbose);
+#endif
 }
 
 void USkaldGameInstance::ResetSessionData() { ResetSessionState(); }
