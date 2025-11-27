@@ -24,6 +24,7 @@
 #include "Skald_TurnManager.h"
 #include "TimerManager.h"
 #include "Styling/CoreStyle.h"
+#include "PacketHandlers/PacketHandler.h"
 #include "UI/SkaldUIHelpers.h"
 #include "UI/SkaldMainHUDWidget.h"
 #include "Widgets/Images/SImage.h"
@@ -38,6 +39,9 @@
 using Skald::PropertyAccess::ReadBoolProperty;
 using Skald::PropertyAccess::ReadIntProperty;
 using Skald::PropertyAccess::WriteBoolProperty;
+
+DECLARE_LOG_CATEGORY_EXTERN(LogNetPartialBunch, Log, All);
+DECLARE_LOG_CATEGORY_EXTERN(LogHandshake, Log, All);
 
 namespace {
 
