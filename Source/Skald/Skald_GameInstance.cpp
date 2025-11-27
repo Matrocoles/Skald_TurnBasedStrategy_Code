@@ -318,9 +318,20 @@ void USkaldGameInstance::SetTravelPending(bool bInPending) {
 
 bool USkaldGameInstance::IsTravelPending() const { return bTravelPending; }
 
+bool USkaldGameInstance::HasPendingBattleTravelContext() const {
+  const bool bHasTravelCache = TravelState.bValid ||
+                               PendingTravelTerritories.Num() > 0;
+  const bool bHasBattlePayload =
+      PendingBattle.AttackerPlayerID > 0 || PendingBattle.DefenderPlayerID > 0;
+  const bool bHasPendingResolution =
+      bPendingBattleResolution || PendingBattleResolution.bValid;
+
+  return bHasTravelCache || bHasBattlePayload || bHasPendingResolution ||
+         bResumeTurns;
+}
+
 bool USkaldGameInstance::ShouldBypassLobbyTransition() const {
-  return bTravelPending || TravelState.bValid ||
-         PendingTravelTerritories.Num() > 0 || bResumeTurns;
+  return bTravelPending || HasPendingBattleTravelContext();
 }
 
 void USkaldGameInstance::ShowGlobalStatusMessage(const FText &Message,

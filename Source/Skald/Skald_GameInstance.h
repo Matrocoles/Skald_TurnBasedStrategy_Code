@@ -412,6 +412,7 @@ private:
   void AttemptResolvePendingBattle(int32 Attempt);
   void EnableControlChannelDiagnostics() const;
   void ResetSessionState();
+  bool HasPendingBattleTravelContext() const;
 
   TWeakObjectPtr<UWorld> PendingResumeWorld;
   FTimerHandle PendingResumeDelayHandle;

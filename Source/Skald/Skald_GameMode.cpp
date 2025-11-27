@@ -217,6 +217,28 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
       PC ? PC->GetPlayerState<ASkaldPlayerState>() : nullptr;
   ASkaldPlayerState *ReusedPS = nullptr;
 
+  bool bExpectedBattleParticipant = false;
+  if (GI && IncomingPS) {
+    const int32 IncomingPlayerId = IncomingPS->GetPlayerId();
+    if (IncomingPlayerId > 0) {
+      const FSkaldTravelState &TravelState = GI->GetTravelState();
+      if (TravelState.bValid) {
+        for (const FS_PlayerData &Snapshot : TravelState.PlayerSnapshots) {
+          if (Snapshot.PlayerID == IncomingPlayerId) {
+            bExpectedBattleParticipant = true;
+            break;
+          }
+        }
+      }
+
+      if (!bExpectedBattleParticipant) {
+        const FS_BattlePayload &BattlePayload = GI->PendingBattle;
+        bExpectedBattleParticipant = IncomingPlayerId == BattlePayload.AttackerPlayerID ||
+                                     IncomingPlayerId == BattlePayload.DefenderPlayerID;
+      }
+    }
+  }
+
   if (bWorldInitialized) {
     if (GS && IncomingPS) {
       for (APlayerState *ExistingPSBase : GS->PlayerArray) {
@@ -245,7 +267,13 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
       }
     }
 
-    if (!bTravelPending && !ReusedPS) {
+    if (bExpectedBattleParticipant) {
+      UE_LOG(LogSkald, Log,
+             TEXT("PostLogin preserving %s for pending battle participant PlayerId=%d"),
+             *PC->GetName(), IncomingPS ? IncomingPS->GetPlayerId() : -1);
+    }
+
+    if (!bTravelPending && !ReusedPS && !bExpectedBattleParticipant) {
       UE_LOG(LogSkald, Warning,
              TEXT("PostLogin rejecting %s: overworld already initialized, controller will be destroyed (ControlChannel close expected)."),
              *PC->GetName());
