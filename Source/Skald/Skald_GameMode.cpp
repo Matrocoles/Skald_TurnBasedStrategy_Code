@@ -212,8 +212,8 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
   const bool bTravelPending = GI && GI->IsTravelPending();
 
-  const ASkaldGameState *GS = GetGameState<ASkaldGameState>();
-  const ASkaldPlayerState *IncomingPS =
+  ASkaldGameState *GS = GetGameState<ASkaldGameState>();
+  ASkaldPlayerState *IncomingPS =
       PC ? PC->GetPlayerState<ASkaldPlayerState>() : nullptr;
   ASkaldPlayerState *ReusedPS = nullptr;
 
@@ -251,7 +251,8 @@ void ASkaldGameMode::PostLogin(APlayerController *NewPlayer) {
              *PC->GetName());
       PC->ClientMessage(TEXT("Game already in progress."));
       PC->Destroy();
-    return;
+      return;
+    }
   }
 
   RegisterPlayer(PC);
