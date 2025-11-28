@@ -162,7 +162,8 @@ void UQuitConfirmationWidget::HandleYesClicked()
     {
         if (USkaldGameInstance* GameInstance = World->GetGameInstance<USkaldGameInstance>())
         {
-            GameInstance->ReturnToMainMenu();
+            GameInstance->EndMultiplayerSession(/*bHostInitiated=*/true,
+                                                TEXT("QuitConfirmation"));
         }
     }
 }

@@ -373,6 +373,10 @@ public:
                             ENetworkFailure::Type FailureType,
                             const FString &ErrorString);
 
+  /** Explicit, host-gated multiplayer session shutdown entry point. */
+  void EndMultiplayerSession(bool bHostInitiated, const FString &Reason,
+                             bool bForceShutdown = false);
+
   /** Return to the main menu and clear any in-progress session data. */
   UFUNCTION(BlueprintCallable, Category = "Skald|Menu")
   void ReturnToMainMenu();

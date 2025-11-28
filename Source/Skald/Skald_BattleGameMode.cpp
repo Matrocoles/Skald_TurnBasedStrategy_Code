@@ -443,6 +443,11 @@ void ASkald_BattleGameMode::BeginPlay() {
 }
 
 void ASkald_BattleGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason) {
+  const ENetMode NetMode = GetNetMode();
+  UE_LOG(LogSkaldBattle, Warning,
+         TEXT("BattleGameMode EndPlay (Reason=%d, NetMode=%d). Battle maps should remain connected until the host explicitly ends the session."),
+         static_cast<int32>(EndPlayReason), static_cast<int32>(NetMode));
+
   if (UWorld *World = GetWorld()) {
     World->GetTimerManager().ClearTimer(WaitForPlayersHandle);
   }

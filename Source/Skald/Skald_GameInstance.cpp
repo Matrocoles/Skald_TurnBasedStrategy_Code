@@ -1185,15 +1185,9 @@ void USkaldGameInstance::HandleNetworkFailure(
   bIsMultiplayer = false;
   bIsHost = false;
 
-  ResetSessionState();
-
-  if (World && !ShouldBypassLobbyTransition()) {
-    const FName LobbyMap(TEXT("/Game/Blueprints/Maps/Skald_Lobby"));
-    UGameplayStatics::OpenLevel(World, LobbyMap);
-  } else if (ShouldBypassLobbyTransition()) {
-    UE_LOG(LogSkald, Log,
-           TEXT("HandleNetworkFailure: skipping lobby transition due to pending travel resume."));
-  }
+  // Network failures are forced shutdowns that bypass host intent checks.
+  EndMultiplayerSession(/*bHostInitiated=*/false, TEXT("NetworkFailure"),
+                        /*bForceShutdown=*/true);
 }
 
 void USkaldGameInstance::EnableControlChannelDiagnostics() const {
@@ -1210,19 +1204,45 @@ void USkaldGameInstance::EnableControlChannelDiagnostics() const {
 
 void USkaldGameInstance::ResetSessionData() { ResetSessionState(); }
 
-void USkaldGameInstance::ReturnToMainMenu() {
+void USkaldGameInstance::EndMultiplayerSession(bool bHostInitiated,
+                                               const FString &Reason,
+                                               bool bForceShutdown) {
+  UWorld *World = GetWorld();
+  const ENetMode NetMode = World ? World->GetNetMode() : NM_Standalone;
+  const FString ReasonString = Reason.IsEmpty() ? TEXT("Unspecified") : Reason;
+
+  UE_LOG(LogSkald, Warning,
+         TEXT("[SESSION END] Requested | Reason=%s | HostInitiated=%s | Force=%s | NetMode=%d"),
+         *ReasonString, bHostInitiated ? TEXT("true") : TEXT("false"),
+         bForceShutdown ? TEXT("true") : TEXT("false"), static_cast<int32>(NetMode));
+
+  // Prevent implicit shutdowns during multiplayer play unless explicitly forced
+  // (e.g. network failure) or requested by the host.
+  if (!bForceShutdown && bIsMultiplayer && NetMode != NM_Standalone &&
+      !bHostInitiated) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("EndMultiplayerSession ignored: request not host-initiated while in multiplayer (Reason=%s)."),
+           *ReasonString);
+    return;
+  }
+
   ResetSessionState();
 
   if (ShouldBypassLobbyTransition()) {
     UE_LOG(LogSkald, Log,
-           TEXT("ReturnToMainMenu: bypassing lobby travel while battle payload is pending."));
+           TEXT("EndMultiplayerSession: bypassing lobby travel while battle payload is pending (Reason=%s)."),
+           *ReasonString);
     return;
   }
 
-  if (UWorld *World = GetWorld()) {
+  if (World) {
     const FName LobbyMap(TEXT("/Game/Blueprints/Maps/Skald_Lobby"));
     UGameplayStatics::OpenLevel(World, LobbyMap);
   }
+}
+
+void USkaldGameInstance::ReturnToMainMenu() {
+  EndMultiplayerSession(/*bHostInitiated=*/true, TEXT("ReturnToMainMenu"));
 }
 
 void USkaldGameInstance::RequestPendingBattleResolution(UWorld *LoadedWorld) {
