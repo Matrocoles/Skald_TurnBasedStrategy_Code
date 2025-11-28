@@ -122,7 +122,7 @@ public:
 
   /** Number of AI opponents requested by the player. */
   UPROPERTY(BlueprintReadWrite, Category = "Player")
-  int32 AIPlayersToSpawn = 1;
+  int32 AIPlayersToSpawn = 0;
 
   /** Number of human players that locked in before leaving the lobby. */
   UPROPERTY(BlueprintReadWrite, Category = "Player")

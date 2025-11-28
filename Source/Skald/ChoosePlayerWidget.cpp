@@ -106,10 +106,10 @@ void UChoosePlayerWidget::OnLockIn()
         }
     }
 
-    int32 AICount = 1;
+    int32 AICount = 0;
     if (AICountSpinBox)
     {
-        AICount = FMath::Clamp(FMath::RoundToInt(AICountSpinBox->GetValue()), 1, 3);
+        AICount = FMath::Clamp(FMath::RoundToInt(AICountSpinBox->GetValue()), 0, 3);
     }
 
     if (UWorld* World = GetWorld())
@@ -165,7 +165,7 @@ void UChoosePlayerWidget::UpdateLockInEnabled()
 {
     const bool bHasName = DisplayNameBox && !DisplayNameBox->GetText().IsEmpty();
     const bool bHasFaction = FactionComboBox && !FactionComboBox->GetSelectedOption().IsEmpty();
-    const bool bHasAI = AICountSpinBox && AICountSpinBox->GetValue() >= 1.f;
+    const bool bHasAI = AICountSpinBox && AICountSpinBox->GetValue() >= 0.f;
     if (LockInButton)
     {
         LockInButton->SetIsEnabled(bHasName && bHasFaction && bHasAI);

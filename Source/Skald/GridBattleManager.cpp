@@ -1686,7 +1686,7 @@ bool UGridBattleManager::IsSideAIControlled(bool bForAttackers) const
 
     const USkaldGameInstance* GameInstance = World->GetGameInstance<USkaldGameInstance>();
     int32 TargetPlayerId = INDEX_NONE;
-    bool bPendingBattleAIFlag = true;
+    bool bPendingBattleAIFlag = false;
     FString ParticipantDisplayName;
     ESkaldFaction ParticipantFaction = ESkaldFaction::None;
 
@@ -1720,7 +1720,7 @@ bool UGridBattleManager::IsSideAIControlled(bool bForAttackers) const
 
     if (!GameInstance)
     {
-        return true;
+        return false;
     }
 
     bool bMatchedPlayerState = false;
