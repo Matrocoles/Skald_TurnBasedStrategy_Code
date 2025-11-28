@@ -305,6 +305,10 @@ public:
   UFUNCTION(BlueprintCallable, BlueprintPure)
   bool IsTravelPending() const;
 
+  /** Whether there is cached travel or battle state that needs to be
+   *  resolved before returning to the lobby or tearing down UI. */
+  bool HasPendingBattleTravelContext() const;
+
   /** Guard against returning to the lobby while a travel payload is queued. */
   bool ShouldBypassLobbyTransition() const;
 
@@ -416,7 +420,6 @@ private:
   void AttemptResolvePendingBattle(int32 Attempt);
   void EnableControlChannelDiagnostics() const;
   void ResetSessionState();
-  bool HasPendingBattleTravelContext() const;
 
   TWeakObjectPtr<UWorld> PendingResumeWorld;
   FTimerHandle PendingResumeDelayHandle;

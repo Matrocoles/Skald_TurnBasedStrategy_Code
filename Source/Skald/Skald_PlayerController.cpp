@@ -2464,10 +2464,8 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
                                      ? CachedGameState->BattlePhase == EBattlePhase::FighterSelection
                                      : true;
 
-  int32 LocalPlayerId = INDEX_NONE;
-  if (const ASkaldPlayerState *SelectionPS = GetPlayerState<ASkaldPlayerState>()) {
-    LocalPlayerId = ResolveStablePlayerId(SelectionPS);
-  }
+  ASkaldPlayerState *SelectionPS = GetPlayerState<ASkaldPlayerState>();
+  int32 LocalPlayerId = SelectionPS ? ResolveStablePlayerId(SelectionPS) : INDEX_NONE;
 
   const bool bHasPendingBattle = CachedBattle.FromTerritoryID > 0 &&
                                  CachedBattle.TargetTerritoryID > 0;
@@ -2476,11 +2474,8 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
                                           CachedBattle.DefenderPlayerID == LocalPlayerId);
 
   if (!bHasBattleContext) {
-    bool bNeedsSelectionUI = false;
-    if (const ASkaldPlayerState *SelectionPS = GetPlayerState<ASkaldPlayerState>()) {
-      bNeedsSelectionUI = !SelectionPS->bArmyLockedIn &&
-                          SelectionPS->PendingArmyBudget > 0;
-    }
+    const bool bNeedsSelectionUI = SelectionPS && !SelectionPS->bArmyLockedIn &&
+                                   SelectionPS->PendingArmyBudget > 0;
 
     // Avoid tearing down the selection UI for clients that still need to lock
     // in fighters or that already know they are part of an incoming battle;
