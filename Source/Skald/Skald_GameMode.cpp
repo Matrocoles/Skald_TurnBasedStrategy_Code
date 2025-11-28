@@ -331,6 +331,24 @@ void ASkaldGameMode::HandleSeamlessTravelPlayer(AController *&C) {
   }
 }
 
+void ASkaldGameMode::GetSeamlessTravelActorList(bool bToEntry,
+                                                TArray<AActor *> &ActorList) {
+  Super::GetSeamlessTravelActorList(bToEntry, ActorList);
+
+  if (AGameStateBase *GS = GameState) {
+    ActorList.AddUnique(GS);
+  }
+
+  if (TurnManager) {
+    ActorList.AddUnique(TurnManager);
+  }
+
+  UE_LOG(LogSkaldBattle, Log,
+         TEXT("SeamlessTravelActorList (ToEntry=%d): %d actors (includes GameState=%s TurnManager=%s)"),
+         bToEntry ? 1 : 0, ActorList.Num(), *GetNameSafe(GameState),
+         *GetNameSafe(TurnManager));
+}
+
 void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
   // Bail out if the controller has been destroyed or is otherwise invalid.
   if (!IsValid(PC)) {
