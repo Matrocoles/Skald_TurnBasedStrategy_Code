@@ -39,6 +39,18 @@ struct FSkaldTravelState
   TArray<int32> HumanOwnedTerritories;
 
   UPROPERTY(BlueprintReadWrite, EditAnywhere)
+  int32 AttackerPlayerId = INDEX_NONE;
+
+  UPROPERTY(BlueprintReadWrite, EditAnywhere)
+  int32 DefenderPlayerId = INDEX_NONE;
+
+  UPROPERTY(BlueprintReadWrite, EditAnywhere)
+  int32 AttackerArmyBudget = 0;
+
+  UPROPERTY(BlueprintReadWrite, EditAnywhere)
+  int32 DefenderArmyBudget = 0;
+
+  UPROPERTY(BlueprintReadWrite, EditAnywhere)
   int32 AttackerTerritory = -1;
 
   UPROPERTY(BlueprintReadWrite, EditAnywhere)

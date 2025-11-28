@@ -11,6 +11,7 @@ class ASkaldPlayerState;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSkaldPlayersUpdated);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSkaldTurnIndexChanged, int32, NewTurnIndex);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSkaldActivePlayerChanged, int32, NewActivePlayerId);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FFighterRosterUpdated);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(FSkaldBattleRoundUpdated, int32, RoundNumber, ESkaldFaction,
                                              InitiativeWinner, int32, AttackerActivations, int32, DefenderActivations,
@@ -241,6 +242,9 @@ protected:
     /** Keep CurrentTurnIndex in bounds after roster changes. */
     void ClampTurnIndex();
 
+    /** Update ActivePlayerId to mirror the replicated turn owner. */
+    void SyncActivePlayerFromIndex();
+
     /** Keep Players unique & stably ordered by PlayerId. */
     void SortAndDedupPlayers();
 
@@ -255,5 +259,20 @@ public:
     /** Broadcast whenever the replicated battle round state changes. */
     UPROPERTY(BlueprintAssignable, Category="GameState|Events")
     FSkaldBattleRoundUpdated OnBattleRoundUpdated;
+
+    /** PlayerId for the controller that currently owns the turn (replicated). */
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_ActivePlayerId, Category="GameState|Turn")
+    int32 ActivePlayerId = INDEX_NONE;
+
+    /** Broadcast whenever ActivePlayerId changes (server + clients). */
+    UPROPERTY(BlueprintAssignable, Category="GameState|Events")
+    FSkaldActivePlayerChanged OnActivePlayerChanged;
+
+    /** RepNotify for ActivePlayerId. */
+    UFUNCTION()
+    void OnRep_ActivePlayerId();
+
+    /** Update ActivePlayerId and broadcast to listeners. */
+    void SetActivePlayerId(int32 NewActivePlayerId);
 };
 

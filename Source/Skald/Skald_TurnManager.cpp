@@ -414,6 +414,22 @@ void ATurnManager::OnRep_CurrentPhase(ETurnPhase PreviousPhase) {
   UE_LOG(LogSkald, Verbose, TEXT("OnRep_CurrentPhase: %s -> %s"), *PreviousLabel,
          *NewLabel);
 
+  // Ensure clients refresh their HUDs and local turn/phase visibility from
+  // replicated data without waiting for the next server broadcast. This keeps
+  // phase buttons correct for the owning controller even when the host isn't
+  // the active player.
+  if (UWorld *World = GetWorld())
+  {
+    for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+    {
+      if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(It->Get()))
+      {
+        PC->RefreshTurnDataFromState();
+        PC->HandleReplicatedTurnOwnership();
+      }
+    }
+  }
+
   OnWorldStateChanged.Broadcast();
 }
 
@@ -950,14 +966,20 @@ void ATurnManager::ApplyReinforcementsAndResources(ASkaldPlayerState *PS,
 void ATurnManager::SyncGameStateTurnIndex() {
   if (ASkaldGameState *GS = GetWorld()->GetGameState<ASkaldGameState>()) {
     int32 NewIndex = -1;
+    int32 NewActivePlayerId = INDEX_NONE;
     if (Controllers.IsValidIndex(CurrentIndex) &&
         Controllers[CurrentIndex].IsValid()) {
       if (ASkaldPlayerState *PS =
               Controllers[CurrentIndex]->GetPlayerState<ASkaldPlayerState>()) {
         NewIndex = GS->PlayerArray.IndexOfByKey(PS);
+        NewActivePlayerId = PS->GetPlayerId();
       }
     }
     GS->CurrentTurnIndex = NewIndex;
+    GS->SetActivePlayerId(NewActivePlayerId);
+    UE_LOG(LogSkald, Log,
+           TEXT("[TurnState] SyncGameStateTurnIndex -> Index=%d PlayerId=%d"),
+           NewIndex, NewActivePlayerId);
     GS->OnTurnIndexChanged.Broadcast(NewIndex);
   }
 }
@@ -1928,7 +1950,7 @@ void ATurnManager::CacheBattleParticipants(const FS_BattlePayload &Battle)
   GameState->ResetBattleParticipants();
 
   auto BuildEntry = [&](ASkaldPlayerState *Participant, int32 PlayerId, const FString &DisplayName,
-                        ESkaldFaction Faction, bool bIsAI, bool bResolvedByStableId)
+                        ESkaldFaction Faction, bool bIsAI, bool bResolvedByStableId, int32 PendingBudget)
   {
     FBattlePlayerEntry Entry;
     Entry.PlayerId = bResolvedByStableId && Participant ? PlayerId
@@ -1937,6 +1959,7 @@ void ATurnManager::CacheBattleParticipants(const FS_BattlePayload &Battle)
     Entry.DisplayName = Participant ? Participant->GetResolvedPlayerName(TEXT("CacheBattleParticipants")) : DisplayName;
     Entry.Faction = Participant && Participant->Faction != ESkaldFaction::None ? Participant->Faction : Faction;
     Entry.bIsAI = Participant ? Participant->bIsAI : bIsAI;
+    Entry.PendingArmyBudget = PendingBudget;
 
     UE_LOG(LogSkaldBattle, Log,
            TEXT("CacheBattleParticipants: PlayerId=%d Name=%s Faction=%d AI=%s"),
@@ -1975,15 +1998,35 @@ void ATurnManager::CacheBattleParticipants(const FS_BattlePayload &Battle)
     Defender = ResolveParticipantStateByStableId(Battle.DefenderPlayerID, TEXT("Defender"));
   }
 
+  const int32 AttackerBudget = Battle.ArmyCountSent;
+  const int32 DefenderBudget = Battle.DefenderArmyCount > 0 ? Battle.DefenderArmyCount : Battle.ArmyCountSent;
+
   BuildEntry(Attacker, Battle.AttackerPlayerID, Battle.AttackerDisplayName, Battle.AttackerFaction,
-             Battle.bAttackerIsAI, bAttackerResolvedByStableId && Attacker != nullptr);
+             Battle.bAttackerIsAI, bAttackerResolvedByStableId && Attacker != nullptr, AttackerBudget);
   BuildEntry(Defender, Battle.DefenderPlayerID, Battle.DefenderDisplayName, Battle.DefenderFaction,
-             Battle.bDefenderIsAI, bDefenderResolvedByStableId && Defender != nullptr);
+             Battle.bDefenderIsAI, bDefenderResolvedByStableId && Defender != nullptr, DefenderBudget);
 }
 
 void ATurnManager::BeginReadyPhase(const FS_BattlePayload &Battle,
                                    const TCHAR *Context) {
+  if (!HasAuthority()) {
+    UE_LOG(LogSkaldReady, Warning,
+           TEXT("BeginReadyPhase called without authority; ignoring."));
+    return;
+  }
+
   FS_BattlePayload NormalizedBattle = Battle;
+
+  if (NormalizedBattle.DefenderArmyCount <= 0) {
+    NormalizedBattle.DefenderArmyCount = NormalizedBattle.ArmyCountSent;
+  }
+
+  UE_LOG(LogSkaldReady, Log,
+         TEXT("[BattlePrep] BeginReadyPhase Context=%s Attacker=%d Defender=%d From=%d To=%d AttackerBudget=%d DefenderBudget=%d"),
+         Context ? Context : TEXT("BeginReadyPhase"), NormalizedBattle.AttackerPlayerID,
+         NormalizedBattle.DefenderPlayerID, NormalizedBattle.FromTerritoryID,
+         NormalizedBattle.TargetTerritoryID, NormalizedBattle.ArmyCountSent,
+         NormalizedBattle.DefenderArmyCount);
 
   ClearActiveRetreatContext();
 
@@ -2163,6 +2206,10 @@ void ATurnManager::BeginReadyPhase(const FS_BattlePayload &Battle,
                            NormalizedBattle.AttackerPlayerID);
   LogParticipantResolution(TEXT("Defender"), DefenderState,
                            NormalizedBattle.DefenderPlayerID);
+
+  if (GameState) {
+    GameState->SetActiveBattlePayload(NormalizedBattle);
+  }
 
   CacheBattleParticipants(NormalizedBattle);
 
@@ -2401,6 +2448,15 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
     TravelState.ExpectedControllers = ValidControllers;
     TravelState.AttackerTerritory = SeededBattle.FromTerritoryID;
     TravelState.DefenderTerritory = SeededBattle.TargetTerritoryID;
+    TravelState.AttackerPlayerId = SeededBattle.AttackerPlayerID;
+    TravelState.DefenderPlayerId = SeededBattle.DefenderPlayerID;
+    TravelState.AttackerArmyBudget = SeededBattle.ArmyCountSent;
+    TravelState.DefenderArmyBudget = SeededBattle.DefenderArmyCount;
+    if (TravelState.DefenderArmyBudget <= 0) {
+      TravelState.DefenderArmyBudget =
+          SeededBattle.DefenderArmyCount > 0 ? SeededBattle.DefenderArmyCount
+                                             : SeededBattle.ArmyCountSent;
+    }
     // Ensure the travel state reuses the canonical (or fallback) return map we
     // already resolved for the pending battle payload so clients always know
     // where to go back after combat.

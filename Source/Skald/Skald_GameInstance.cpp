@@ -232,10 +232,12 @@ void USkaldGameInstance::SetTravelState(const FSkaldTravelState &InState) {
     PendingTravelTerritories = TravelState.CachedTerritories;
   }
   UE_LOG(LogSkald, Log,
-         TEXT("GameInstance travel state set: Expected=%d Attacker=%d Defender=%d HumanTerritories=%d CachedTerritories=%d"),
+         TEXT("GameInstance travel state set: Expected=%d Attacker=%d Defender=%d HumanTerritories=%d CachedTerritories=%d AttackerId=%d DefenderId=%d AttackerBudget=%d DefenderBudget=%d"),
          TravelState.ExpectedControllers, TravelState.AttackerTerritory,
          TravelState.DefenderTerritory, TravelState.HumanOwnedTerritories.Num(),
-         TravelState.CachedTerritories.Num());
+         TravelState.CachedTerritories.Num(), TravelState.AttackerPlayerId,
+         TravelState.DefenderPlayerId, TravelState.AttackerArmyBudget,
+         TravelState.DefenderArmyBudget);
 
   if (TravelState.CachedTerritories.Num() == 0) {
     UE_LOG(LogSkald, Warning,

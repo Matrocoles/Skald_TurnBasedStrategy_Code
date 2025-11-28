@@ -920,6 +920,18 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
   Battle.TargetTerritoryID = Battle.TargetTerritoryID > 0
                                  ? Battle.TargetTerritoryID
                                  : TS.DefenderTerritory;
+  if (Battle.AttackerPlayerID <= 0 && TS.AttackerPlayerId > 0) {
+    Battle.AttackerPlayerID = TS.AttackerPlayerId;
+  }
+  if (Battle.DefenderPlayerID <= 0 && TS.DefenderPlayerId > 0) {
+    Battle.DefenderPlayerID = TS.DefenderPlayerId;
+  }
+  if (Battle.ArmyCountSent <= 0 && TS.AttackerArmyBudget > 0) {
+    Battle.ArmyCountSent = TS.AttackerArmyBudget;
+  }
+  if (Battle.DefenderArmyCount <= 0 && TS.DefenderArmyBudget > 0) {
+    Battle.DefenderArmyCount = TS.DefenderArmyBudget;
+  }
 
   auto BackfillFromSlots = [&](int32& PlayerId, FString& DisplayName,
                                ESkaldFaction& Faction, bool& bIsAI)
