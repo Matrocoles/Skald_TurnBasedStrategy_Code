@@ -117,6 +117,7 @@ private:
   void OnRep_IsAI();
 
   virtual void OnRep_PlayerId() override;
+  virtual void CopyProperties(APlayerState *NewPlayerState) override;
 
   UFUNCTION()
   void OnRep_StablePlayerId();
