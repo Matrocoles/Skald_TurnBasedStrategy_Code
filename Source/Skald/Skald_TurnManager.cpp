@@ -456,6 +456,13 @@ void ATurnManager::BeginPlay() {
 }
 
 void ATurnManager::EndPlay(const EEndPlayReason::Type EndPlayReason) {
+  if (UWorld *World = GetWorld()) {
+    const ENetMode NetMode = World->GetNetMode();
+    UE_LOG(LogSkald, Warning,
+           TEXT("TurnManager EndPlay (Reason=%d, NetMode=%d). Battle and turn flow should not tear down multiplayer sessions implicitly."),
+           static_cast<int32>(EndPlayReason), static_cast<int32>(NetMode));
+  }
+
   if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
     GI->OnBattleMapStateChanged.RemoveDynamic(
         this, &ATurnManager::HandleBattleMapStateChanged);
