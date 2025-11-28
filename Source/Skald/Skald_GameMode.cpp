@@ -3194,6 +3194,7 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
       }
       if (NewIndex != INDEX_NONE) {
         GSLocal->CurrentTurnIndex = NewIndex; // RepNotify → OnTurnIndexChanged
+        GSLocal->SetActivePlayerId(PS->GetPlayerId());
         GSLocal->OnTurnIndexChanged.Broadcast(
             NewIndex); // optional immediate local broadcast
       } else {

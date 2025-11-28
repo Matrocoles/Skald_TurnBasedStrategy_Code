@@ -307,28 +307,35 @@ void ASkaldPlayerController::CacheGameReferences() {
           this, &ASkaldPlayerController::HandlePlayersUpdated);
       CachedGameState->OnTurnIndexChanged.RemoveDynamic(
           this, &ASkaldPlayerController::HandleTurnIndexChanged);
+      CachedGameState->OnActivePlayerChanged.RemoveDynamic(
+          this, &ASkaldPlayerController::HandleActivePlayerChanged);
       CachedGameState->OnBattleEntriesUpdated.RemoveDynamic(
           this, &ASkaldPlayerController::HandleBattleEntriesUpdated);
     }
     CachedGameState = WorldGameState;
   }
 
-  if (CachedGameState) {
-    if (!CachedGameState->OnPlayersUpdated.IsAlreadyBound(
-            this, &ASkaldPlayerController::HandlePlayersUpdated)) {
-      CachedGameState->OnPlayersUpdated.AddDynamic(
-          this, &ASkaldPlayerController::HandlePlayersUpdated);
-    }
-    if (!CachedGameState->OnTurnIndexChanged.IsAlreadyBound(
-            this, &ASkaldPlayerController::HandleTurnIndexChanged)) {
-      CachedGameState->OnTurnIndexChanged.AddDynamic(
-          this, &ASkaldPlayerController::HandleTurnIndexChanged);
-    }
-    if (!CachedGameState->OnBattleEntriesUpdated.IsAlreadyBound(
-            this, &ASkaldPlayerController::HandleBattleEntriesUpdated)) {
-      CachedGameState->OnBattleEntriesUpdated.AddDynamic(
-          this, &ASkaldPlayerController::HandleBattleEntriesUpdated);
-    }
+    if (CachedGameState) {
+      if (!CachedGameState->OnPlayersUpdated.IsAlreadyBound(
+              this, &ASkaldPlayerController::HandlePlayersUpdated)) {
+        CachedGameState->OnPlayersUpdated.AddDynamic(
+            this, &ASkaldPlayerController::HandlePlayersUpdated);
+      }
+      if (!CachedGameState->OnTurnIndexChanged.IsAlreadyBound(
+              this, &ASkaldPlayerController::HandleTurnIndexChanged)) {
+        CachedGameState->OnTurnIndexChanged.AddDynamic(
+            this, &ASkaldPlayerController::HandleTurnIndexChanged);
+      }
+      if (!CachedGameState->OnActivePlayerChanged.IsAlreadyBound(
+              this, &ASkaldPlayerController::HandleActivePlayerChanged)) {
+        CachedGameState->OnActivePlayerChanged.AddDynamic(
+            this, &ASkaldPlayerController::HandleActivePlayerChanged);
+      }
+      if (!CachedGameState->OnBattleEntriesUpdated.IsAlreadyBound(
+              this, &ASkaldPlayerController::HandleBattleEntriesUpdated)) {
+        CachedGameState->OnBattleEntriesUpdated.AddDynamic(
+            this, &ASkaldPlayerController::HandleBattleEntriesUpdated);
+      }
   } else {
     bNeedsRetry = true;
     UE_LOG(LogSkald, Verbose,
@@ -3510,6 +3517,7 @@ void ASkaldPlayerController::NotifyTurnEnded(const FString &PlayerName) {
 }
 
 void ASkaldPlayerController::NotifyTurnEndedLocal(const FString &PlayerName) {
+  bLocalTurnActive = false;
   if (MainHUD) {
     MainHUD->ShowTurnEnded(PlayerName);
   }
@@ -3541,6 +3549,11 @@ bool ASkaldPlayerController::IsMyTurn() const {
     return false;
   }
 
+  const int32 MyPlayerId = MyPlayerState->GetPlayerId();
+  if (GameState->ActivePlayerId != INDEX_NONE) {
+    return GameState->ActivePlayerId == MyPlayerId;
+  }
+
   if (ASkaldPlayerState *Current = GameState->GetCurrentPlayer()) {
     return Current == MyPlayerState;
   }
@@ -3561,6 +3574,7 @@ void ASkaldPlayerController::StartTurn() {
         const int32 NewIndex = GS->PlayerArray.IndexOfByKey(MyPS);
         if (NewIndex != INDEX_NONE) {
           GS->CurrentTurnIndex = NewIndex;
+          GS->SetActivePlayerId(MyPS->GetPlayerId());
           GS->OnTurnIndexChanged.Broadcast(NewIndex);
         }
       }
@@ -3569,6 +3583,7 @@ void ASkaldPlayerController::StartTurn() {
 }
 
 void ASkaldPlayerController::ExecuteLocalTurnStart() {
+  bLocalTurnActive = true;
   UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
       this, nullptr, EMouseLockMode::DoNotLock, false);
   bShowMouseCursor = true;
@@ -3591,6 +3606,56 @@ void ASkaldPlayerController::EndTurn() {
   if (!EnsureTurnManager(TEXT("EndTurn"))) {
     return;
   }
+
+  if (!HasAuthority()) {
+    UE_LOG(LogSkald, Log,
+           TEXT("[TurnState] %s requesting ServerEndTurn (ActivePlayerId=%d)"),
+           *GetName(),
+           GetWorld() && GetWorld()->GetGameState<ASkaldGameState>()
+               ? GetWorld()->GetGameState<ASkaldGameState>()->ActivePlayerId
+               : INDEX_NONE);
+    ServerEndTurn();
+    return;
+  }
+
+  TurnManager->AdvanceTurn();
+}
+
+void ASkaldPlayerController::ServerEndTurn_Implementation() {
+  if (!EnsureTurnManager(TEXT("ServerEndTurn"))) {
+    return;
+  }
+
+  ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
+  const int32 PlayerId = PS ? PS->GetPlayerId() : INDEX_NONE;
+  ASkaldGameState *GS = GetWorld() ? GetWorld()->GetGameState<ASkaldGameState>()
+                                   : nullptr;
+
+  if (!PS || !GS) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("[TurnState] ServerEndTurn rejected: PS=%s GS=%s for %s"),
+           PS ? TEXT("valid") : TEXT("null"), GS ? TEXT("valid") : TEXT("null"),
+           *GetName());
+    return;
+  }
+
+  const bool bOwnsTurnViaActiveId = GS->ActivePlayerId == PlayerId;
+  const bool bOwnsTurnViaIndex =
+      GS->GetCurrentPlayer() && GS->GetCurrentPlayer()->GetPlayerId() == PlayerId;
+
+  if (!bOwnsTurnViaActiveId && !bOwnsTurnViaIndex) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("[TurnState] ServerEndTurn rejected for %s: PlayerId=%d ActivePlayerId=%d IndexOwner=%s"),
+           *GetName(), PlayerId, GS->ActivePlayerId,
+           GS->GetCurrentPlayer()
+               ? *GS->GetCurrentPlayer()->GetResolvedPlayerName(TEXT("ServerEndTurn"))
+               : TEXT("none"));
+    return;
+  }
+
+  UE_LOG(LogSkald, Log,
+         TEXT("[TurnState] ServerEndTurn advancing turn for PlayerId=%d"),
+         PlayerId);
 
   TurnManager->AdvanceTurn();
 }
@@ -3650,11 +3715,21 @@ void ASkaldPlayerController::HandleEndPhaseInternal() {
     }
 
     if (ASkaldGameState *GS = GetWorld()->GetGameState<ASkaldGameState>()) {
+      const int32 PlayerId = PS->GetPlayerId();
+      const bool bOwnsTurnViaActiveId = GS->ActivePlayerId == PlayerId;
       const int32 MyIndex = GS->PlayerArray.IndexOfByKey(PS);
-      if (MyIndex == INDEX_NONE || GS->CurrentTurnIndex != MyIndex) {
+      const bool bOwnsTurnViaIndex =
+          MyIndex != INDEX_NONE && GS->CurrentTurnIndex == MyIndex;
+      if (!bOwnsTurnViaActiveId && !bOwnsTurnViaIndex) {
+        const FString IndexOwner =
+            GS->GetCurrentPlayer()
+                ? GS->GetCurrentPlayer()->GetResolvedPlayerName(
+                      TEXT("HandleEndPhaseInternal"))
+                : TEXT("none");
         UE_LOG(LogSkald, Warning,
-               TEXT("HandleEndPhaseInternal: %s attempted to end phase out of turn."),
-               *GetName());
+               TEXT("HandleEndPhaseInternal: %s attempted to end phase out of turn (PlayerId=%d ActivePlayerId=%d CurrentIndex=%d Owner=%s)"),
+               *GetName(), PlayerId, GS->ActivePlayerId, GS->CurrentTurnIndex,
+               *IndexOwner);
         return;
       }
     } else {
@@ -4538,6 +4613,26 @@ void ASkaldPlayerController::ClientApplyPendingBattleState_Implementation(
   if (CachedGameInstance) {
     CachedGameInstance->SetTravelState(TravelState);
     CachedGameInstance->PendingBattle = Battle;
+    if (CachedGameInstance->PendingBattle.AttackerPlayerID <= 0 &&
+        TravelState.AttackerPlayerId > 0) {
+      CachedGameInstance->PendingBattle.AttackerPlayerID =
+          TravelState.AttackerPlayerId;
+    }
+    if (CachedGameInstance->PendingBattle.DefenderPlayerID <= 0 &&
+        TravelState.DefenderPlayerId > 0) {
+      CachedGameInstance->PendingBattle.DefenderPlayerID =
+          TravelState.DefenderPlayerId;
+    }
+    if (CachedGameInstance->PendingBattle.ArmyCountSent <= 0 &&
+        TravelState.AttackerArmyBudget > 0) {
+      CachedGameInstance->PendingBattle.ArmyCountSent =
+          TravelState.AttackerArmyBudget;
+    }
+    if (CachedGameInstance->PendingBattle.DefenderArmyCount <= 0 &&
+        TravelState.DefenderArmyBudget > 0) {
+      CachedGameInstance->PendingBattle.DefenderArmyCount =
+          TravelState.DefenderArmyBudget;
+    }
     CachedGameInstance->SetBattleMapActive(bBattleMapActive);
   }
 
@@ -5067,6 +5162,45 @@ void ASkaldPlayerController::HandleTurnIndexChanged(int32 NewIndex) {
   UE_LOG(LogSkald, Log, TEXT("[TurnState] Controller %s observed turn index %d"),
          *GetName(), NewIndex);
   RefreshTurnDataFromState();
+
+  HandleReplicatedTurnOwnership();
+}
+
+void ASkaldPlayerController::HandleActivePlayerChanged(
+    int32 NewActivePlayerId) {
+  UE_LOG(LogSkald, Log,
+         TEXT("[TurnState] Controller %s observed active player id %d"),
+         *GetName(), NewActivePlayerId);
+  RefreshTurnDataFromState();
+
+  HandleReplicatedTurnOwnership();
+}
+
+void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
+  const bool bIsMyTurn = IsMyTurn();
+  const ETurnPhase Phase = TurnManager ? TurnManager->GetCurrentPhase()
+                                       : ETurnPhase::None;
+  UE_LOG(LogSkald, Log,
+         TEXT("[TurnState] Controller %s turn ownership check: Phase=%s ActiveId=%d IsMyTurn=%s LocalTurnActive=%s"),
+         *GetName(), *UEnum::GetValueAsString(Phase),
+         CachedGameState ? CachedGameState->ActivePlayerId : INDEX_NONE,
+         bIsMyTurn ? TEXT("true") : TEXT("false"),
+         bLocalTurnActive ? TEXT("true") : TEXT("false"));
+
+  if (MainHUD) {
+    MainHUD->SyncPhaseButtons(bIsMyTurn);
+  }
+
+  if (bIsMyTurn && !bLocalTurnActive) {
+    UE_LOG(LogSkald, Log,
+           TEXT("[TurnState] Controller %s starting local turn from replicated state."),
+           *GetName());
+    ExecuteLocalTurnStart();
+  }
+
+  if (!bIsMyTurn) {
+    bLocalTurnActive = false;
+  }
 }
 
 void ASkaldPlayerController::RefreshTurnDataFromState() {
@@ -5075,7 +5209,12 @@ void ASkaldPlayerController::RefreshTurnDataFromState() {
   }
 
   int32 CurrentStableId = -1;
-  if (ASkaldPlayerState *CurrentPS = CachedGameState->GetCurrentPlayer()) {
+  if (CachedGameState->ActivePlayerId != INDEX_NONE) {
+    if (ASkaldPlayerState *ActivePS = CachedGameState->GetPlayerById(
+            CachedGameState->ActivePlayerId)) {
+      CurrentStableId = ActivePS->GetStablePlayerId();
+    }
+  } else if (ASkaldPlayerState *CurrentPS = CachedGameState->GetCurrentPlayer()) {
     CurrentStableId = CurrentPS->GetStablePlayerId();
   }
 
@@ -5128,6 +5267,12 @@ void ASkaldPlayerController::HandleWorldStateChanged() {
   }
 
   ShowMainHUD();
+
+  // Replicated phase changes and turn owner swaps can arrive while we are
+  // rebuilding the HUD after travel. Refresh here so clients evaluate turn
+  // ownership locally instead of depending on host-driven button toggles.
+  RefreshTurnDataFromState();
+  HandleReplicatedTurnOwnership();
 
   if (!bIsBattleMap && bPendingOverworldBattleResults &&
       CachedBattleResultDisplayData.bValid) {

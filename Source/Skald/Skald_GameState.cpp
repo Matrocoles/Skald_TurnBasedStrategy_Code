@@ -33,6 +33,7 @@ void ASkaldGameState::GetLifetimeReplicatedProps(
     DOREPLIFETIME(ASkaldGameState, RemainingAttackerActivations);
     DOREPLIFETIME(ASkaldGameState, RemainingDefenderActivations);
     DOREPLIFETIME(ASkaldGameState, bBattleAttackerTurn);
+    DOREPLIFETIME(ASkaldGameState, ActivePlayerId);
 }
 
 void ASkaldGameState::AddPlayerState(APlayerState* PlayerState)
@@ -47,6 +48,7 @@ void ASkaldGameState::AddPlayerState(APlayerState* PlayerState)
             Players.Add(SkaldPlayer);
             SortAndDedupPlayers();
             ClampTurnIndex();
+            SyncActivePlayerFromIndex();
             OnPlayersUpdated.Broadcast();
         }
     }
@@ -63,6 +65,7 @@ void ASkaldGameState::RemovePlayerState(APlayerState* PlayerState)
         {
             Players.RemoveAt(RemovedIndex);
             ClampTurnIndex();
+            SyncActivePlayerFromIndex();
             OnPlayersUpdated.Broadcast();
             // Also notify turn change if index moved
             OnTurnIndexChanged.Broadcast(CurrentTurnIndex);
@@ -117,10 +120,36 @@ void ASkaldGameState::OnRep_Players()
     OnPlayersUpdated.Broadcast();
 }
 
+void ASkaldGameState::SyncActivePlayerFromIndex()
+{
+    ASkaldPlayerState* CurrentPS = GetCurrentPlayer();
+    const int32 NewActiveId = CurrentPS ? CurrentPS->GetPlayerId() : INDEX_NONE;
+    SetActivePlayerId(NewActiveId);
+}
+
 void ASkaldGameState::OnRep_CurrentTurnIndex()
 {
     ClampTurnIndex();
+    SyncActivePlayerFromIndex();
     OnTurnIndexChanged.Broadcast(CurrentTurnIndex);
+}
+
+void ASkaldGameState::OnRep_ActivePlayerId()
+{
+    UE_LOG(LogSkald, Log, TEXT("[TurnState] ActivePlayerId replicated: %d"), ActivePlayerId);
+    OnActivePlayerChanged.Broadcast(ActivePlayerId);
+}
+
+void ASkaldGameState::SetActivePlayerId(int32 NewActivePlayerId)
+{
+    if (ActivePlayerId == NewActivePlayerId)
+    {
+        return;
+    }
+
+    ActivePlayerId = NewActivePlayerId;
+    UE_LOG(LogSkald, Log, TEXT("[TurnState] Active player set to %d"), ActivePlayerId);
+    OnActivePlayerChanged.Broadcast(ActivePlayerId);
 }
 
 void ASkaldGameState::OnRep_FighterRoster()
@@ -230,6 +259,49 @@ void ASkaldGameState::OnRep_BattlePayload()
     if (USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>())
     {
         GI->PendingBattle = ActiveBattlePayload;
+
+        // Late-joining clients rebuild travel metadata from replicated payloads
+        // so battle ownership and budgets are available even when the multicast
+        // travel RPC was missed.
+        FSkaldTravelState TravelState = GI->GetTravelState();
+        bool bUpdatedTravel = false;
+
+        if (ActiveBattlePayload.AttackerPlayerID > 0 &&
+            TravelState.AttackerPlayerId != ActiveBattlePayload.AttackerPlayerID)
+        {
+            TravelState.AttackerPlayerId = ActiveBattlePayload.AttackerPlayerID;
+            bUpdatedTravel = true;
+        }
+
+        if (ActiveBattlePayload.DefenderPlayerID > 0 &&
+            TravelState.DefenderPlayerId != ActiveBattlePayload.DefenderPlayerID)
+        {
+            TravelState.DefenderPlayerId = ActiveBattlePayload.DefenderPlayerID;
+            bUpdatedTravel = true;
+        }
+
+        if (ActiveBattlePayload.ArmyCountSent > 0 &&
+            TravelState.AttackerArmyBudget != ActiveBattlePayload.ArmyCountSent)
+        {
+            TravelState.AttackerArmyBudget = ActiveBattlePayload.ArmyCountSent;
+            bUpdatedTravel = true;
+        }
+
+        const int32 ReplicatedDefenderBudget =
+            ActiveBattlePayload.DefenderArmyCount > 0
+                ? ActiveBattlePayload.DefenderArmyCount
+                : ActiveBattlePayload.ArmyCountSent;
+        if (ReplicatedDefenderBudget > 0 &&
+            TravelState.DefenderArmyBudget != ReplicatedDefenderBudget)
+        {
+            TravelState.DefenderArmyBudget = ReplicatedDefenderBudget;
+            bUpdatedTravel = true;
+        }
+
+        if (bUpdatedTravel)
+        {
+            GI->SetTravelState(TravelState);
+        }
     }
 
     if (UWorld* World = GetWorld())
@@ -242,6 +314,7 @@ void ASkaldGameState::OnRep_BattlePayload()
                 // replicated payloads instead of assuming the original RPC timing
                 // path. This covers both the battle HUD and fighter selection UI.
                 PC->RequestBattleStateIfNeeded();
+                PC->DetermineControlledBattleSide();
 
                 if (BattlePhase == EBattlePhase::FighterSelection)
                 {
@@ -286,6 +359,7 @@ void ASkaldGameState::OnRep_BattleParticipants()
             if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
             {
                 PC->RequestBattleStateIfNeeded();
+                PC->DetermineControlledBattleSide();
 
                 if (BattlePhase == EBattlePhase::FighterSelection)
                 {
@@ -338,6 +412,7 @@ void ASkaldGameState::ClampTurnIndex()
     if (PlayerCount == 0)
     {
         CurrentTurnIndex = 0;
+        SetActivePlayerId(INDEX_NONE);
         return;
     }
 
@@ -345,6 +420,8 @@ void ASkaldGameState::ClampTurnIndex()
     {
         CurrentTurnIndex = FMath::Clamp(CurrentTurnIndex, 0, FMath::Max(0, PlayerCount - 1));
     }
+
+    SyncActivePlayerFromIndex();
 }
 
 void ASkaldGameState::SortAndDedupPlayers()

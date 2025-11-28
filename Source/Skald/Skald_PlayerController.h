@@ -140,6 +140,8 @@ class SKALD_API ASkaldPlayerController : public APlayerController {
   friend class ASkaldPlayerState;
   /** Allow the game state to initialize fighter selection when battle data replicates. */
   friend class ASkaldGameState;
+  /** Allow the turn manager to trigger HUD refresh when phase state replicates. */
+  friend class ATurnManager;
 #if defined(WITH_AUTOMATION_TESTS) && WITH_AUTOMATION_TESTS
   /** Permit the automation test subclass to access validation helpers. */
   friend class ATestPlayerController;
@@ -163,6 +165,14 @@ public:
 
   UFUNCTION(BlueprintCallable, Category = "Turn")
   virtual void EndTurn();
+
+  /**
+   * Server authoritative handler for ending the active player's turn.
+   * Validates ownership using replicated turn state to avoid host-only
+   * advancement paths.
+   */
+  UFUNCTION(Server, Reliable)
+  void ServerEndTurn();
 
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Turn")
   bool IsMyTurn() const;
@@ -948,6 +958,9 @@ protected:
   void RefreshTurnDataFromState();
   UFUNCTION()
   void HandleTurnIndexChanged(int32 NewIndex);
+  UFUNCTION()
+  void HandleActivePlayerChanged(int32 NewActivePlayerId);
+  void HandleReplicatedTurnOwnership();
 
   /** Helper to update cached state whenever the replicated turn manager changes. */
   void ApplyTurnManager(ATurnManager *Manager);
@@ -1049,6 +1062,9 @@ private:
   UPROPERTY(BlueprintReadOnly, Category = "Turn",
             meta = (AllowPrivateAccess = "true"))
   bool bIsBattleMap = false;
+
+  /** Tracks if ExecuteLocalTurnStart has been triggered for the active turn. */
+  bool bLocalTurnActive = false;
 
   /** Prevents redundant pending battle state requests while waiting for a reply. */
   bool bPendingBattleStateRequest = false;
