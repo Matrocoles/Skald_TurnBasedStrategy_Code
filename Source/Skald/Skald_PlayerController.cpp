@@ -5179,7 +5179,7 @@ void ASkaldPlayerController::HandleActivePlayerChanged(
 void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
   const bool bIsMyTurn = IsMyTurn();
   const ETurnPhase Phase = TurnManager ? TurnManager->GetCurrentPhase()
-                                       : ETurnPhase::None;
+                                       : ETurnPhase::Reinforcement;
   UE_LOG(LogSkald, Log,
          TEXT("[TurnState] Controller %s turn ownership check: Phase=%s ActiveId=%d IsMyTurn=%s LocalTurnActive=%s"),
          *GetName(), *UEnum::GetValueAsString(Phase),
