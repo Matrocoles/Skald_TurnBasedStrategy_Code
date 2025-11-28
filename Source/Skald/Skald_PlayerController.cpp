@@ -2330,6 +2330,20 @@ void ASkaldPlayerController::PlayerTick(float DeltaTime) {
     return;
   }
 
+  // If the player has locked in their fighters and the battle manager became
+  // available after the selection UI closed, ensure the battle HUD is
+  // constructed and displayed.
+  if (bBattleHUDReadyToShow && !bBattleHUDVisible) {
+    if (!CachedGameInstance) {
+      CachedGameInstance = GetGameInstance<USkaldGameInstance>();
+    }
+
+    if (CachedGameInstance && CachedGameInstance->GridBattleManager) {
+      InitializeBattleHUD();
+      EnsureBattleHUDVisible();
+    }
+  }
+
   UpdateCursorFX();
 
   const bool bIsHoveringInteractable = IsCursorOverInteractableSlateWidget();
