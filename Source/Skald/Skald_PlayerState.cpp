@@ -192,6 +192,27 @@ void ASkaldPlayerState::OnRep_PlayerId() {
   }
 }
 
+void ASkaldPlayerState::CopyProperties(APlayerState *NewPlayerState) {
+  Super::CopyProperties(NewPlayerState);
+
+  if (ASkaldPlayerState *SkaldPS = Cast<ASkaldPlayerState>(NewPlayerState)) {
+    SkaldPS->PlayerDisplayName = PlayerDisplayName;
+    SkaldPS->Faction = Faction;
+    SkaldPS->PendingArmy = PendingArmy;
+    SkaldPS->PendingArmyBudget = PendingArmyBudget;
+    SkaldPS->bArmyLockedIn = bArmyLockedIn;
+    SkaldPS->bIsActiveBattlePlayer = bIsActiveBattlePlayer;
+    SkaldPS->bIsAI = bIsAI;
+    SkaldPS->DeployableUnits = DeployableUnits;
+    SkaldPS->InitiativeRoll = InitiativeRoll;
+    SkaldPS->Resources = Resources;
+    SkaldPS->bHasLockedIn = bHasLockedIn;
+    SkaldPS->IsEliminated = IsEliminated;
+    SkaldPS->StablePlayerId = StablePlayerId;
+    SkaldPS->SelectedTerritory = SelectedTerritory;
+  }
+}
+
 void ASkaldPlayerState::ResetArmyPlacementDeployments() {
   ArmyPlacementDeployments.Reset();
 }

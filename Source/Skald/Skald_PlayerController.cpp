@@ -2450,6 +2450,10 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
 
   const bool bOnBattleMap =
       bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap);
+  const bool bHasBattleContext =
+      bOnBattleMap || (CachedGameInstance &&
+                       (CachedGameInstance->IsTravelPending() ||
+                        CachedGameInstance->HasPendingBattleTravelContext()));
   const FS_BattlePayload CachedBattle = CachedGameState
                                             ? CachedGameState->GetActiveBattlePayload()
                                             : CachedGameInstance
@@ -2471,7 +2475,7 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
                                          (CachedBattle.AttackerPlayerID == LocalPlayerId ||
                                           CachedBattle.DefenderPlayerID == LocalPlayerId);
 
-  if (!bOnBattleMap) {
+  if (!bHasBattleContext) {
     bool bNeedsSelectionUI = false;
     if (const ASkaldPlayerState *SelectionPS = GetPlayerState<ASkaldPlayerState>()) {
       bNeedsSelectionUI = !SelectionPS->bArmyLockedIn &&
@@ -2484,8 +2488,9 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
     // battle map even though the player must complete selection.
     if (!bNeedsSelectionUI && !bLocalIsBattleParticipant && FighterSelectionWidget) {
       UE_LOG(LogSkaldBattle, Log,
-             TEXT("InitializeFighterSelectionIfNeeded: Removing widget (not on battle map and not participant). Controller=%s"),
-             *GetName());
+             TEXT("InitializeFighterSelectionIfNeeded: Removing widget (no battle context; Participant=%d Budget=%d TravelPending=%d). Controller=%s"),
+             bLocalIsBattleParticipant ? 1 : 0, SelectionPS ? SelectionPS->PendingArmyBudget : 0,
+             CachedGameInstance && CachedGameInstance->IsTravelPending() ? 1 : 0, *GetName());
       FighterSelectionWidget->RemoveFromParent();
       FighterSelectionWidget = nullptr;
     }

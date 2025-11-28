@@ -12,6 +12,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Blueprint/UserWidget.h"
 #include "Engine/GameViewportClient.h"
+#include "HAL/IConsoleManager.h"
 #include "Skald.h"
 #include "SkaldLogging.h"
 #include "Skald_BattleGameMode.h"
@@ -141,6 +142,24 @@ void USkaldGameInstance::Init() {
   Super::Init();
   SeedCombatRandomStream(FMath::Rand());
   TakenFactions.Empty();
+
+  auto EnforceSeamlessFlag = [](const TCHAR *CVarName, int32 DesiredValue) {
+    if (IConsoleVariable *CVar = IConsoleManager::Get().FindConsoleVariable(CVarName)) {
+      const int32 Existing = CVar->GetInt();
+      if (Existing != DesiredValue) {
+        CVar->Set(DesiredValue);
+        UE_LOG(LogSkald, Log,
+               TEXT("Enforcing %s=%d for seamless travel (previous=%d)"), CVarName,
+               DesiredValue, Existing);
+      } else {
+        UE_LOG(LogSkald, Verbose,
+               TEXT("Seamless travel flag already set: %s=%d"), CVarName, Existing);
+      }
+    }
+  };
+
+  EnforceSeamlessFlag(TEXT("net.UseSeamlessTravel"), 1);
+  EnforceSeamlessFlag(TEXT("net.AllowPIESeamlessTravel"), 1);
 
   PendingLobbyPlayers.Reset();
   ExpectedLobbyPlayerCount = 0;

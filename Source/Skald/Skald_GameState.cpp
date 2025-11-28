@@ -232,13 +232,18 @@ void ASkaldGameState::OnRep_BattlePayload()
         GI->PendingBattle = ActiveBattlePayload;
     }
 
-    if (BattlePhase == EBattlePhase::FighterSelection)
+    if (UWorld* World = GetWorld())
     {
-        if (UWorld* World = GetWorld())
+        for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
         {
-            for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+            if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
             {
-                if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
+                // Ensure late-joining controllers rebuild all dependent state from
+                // replicated payloads instead of assuming the original RPC timing
+                // path. This covers both the battle HUD and fighter selection UI.
+                PC->RequestBattleStateIfNeeded();
+
+                if (BattlePhase == EBattlePhase::FighterSelection)
                 {
                     PC->InitializeFighterSelectionIfNeeded();
                 }
@@ -274,13 +279,15 @@ void ASkaldGameState::OnRep_BattleParticipants()
         }
     }
 
-    if (BattlePhase == EBattlePhase::FighterSelection)
+    if (UWorld* World = GetWorld())
     {
-        if (UWorld* World = GetWorld())
+        for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
         {
-            for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+            if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
             {
-                if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
+                PC->RequestBattleStateIfNeeded();
+
+                if (BattlePhase == EBattlePhase::FighterSelection)
                 {
                     PC->InitializeFighterSelectionIfNeeded();
                 }
@@ -301,6 +308,22 @@ void ASkaldGameState::OnRep_PendingBattleReady()
            PendingBattleReadyState.bDefenderReady ? TEXT("true") : TEXT("false"),
            PendingBattleReadyState.bDefenderIsAI ? TEXT("true") : TEXT("false"),
            PendingBattleReadyState.LastUpdatedTimeSeconds);
+
+    // Ensure clients that (re)connect mid-battle can rebuild their local
+    // selection state and UI when readiness changes arrive after the battle
+    // phase was initially replicated. This keeps fighter selection and payload
+    // handoff resilient to late joins and seamless travel timing.
+    if (UWorld* World = GetWorld())
+    {
+        for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+        {
+            if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
+            {
+                PC->RequestBattleStateIfNeeded();
+                PC->InitializeFighterSelectionIfNeeded();
+            }
+        }
+    }
 }
 
 void ASkaldGameState::OnRep_BattleRoundState()

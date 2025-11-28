@@ -57,6 +57,8 @@ public:
   virtual void PostLogin(APlayerController *NewPlayer) override;
   virtual void Logout(AController *Exiting) override;
   virtual void HandleSeamlessTravelPlayer(AController *&C) override;
+  virtual void
+  GetSeamlessTravelActorList(bool bToEntry, TArray<AActor *> &ActorList) override;
 
   /** Advance army placement to the next controller. */
   void AdvanceArmyPlacement();
