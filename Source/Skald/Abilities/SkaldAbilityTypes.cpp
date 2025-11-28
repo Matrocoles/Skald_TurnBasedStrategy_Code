@@ -62,6 +62,13 @@ TMap<ESkaldFaction, FSkaldFactionAbilitySet> BuildFactionAbilityMap()
 
     AbilityDefinitionsById.Reset();
 
+    // Provide a benign fallback for invalid/placeholder factions so ability
+    // resolution does not fail when the battle state references an unassigned
+    // faction (ESkaldFaction::None). This prevents startup warnings and keeps
+    // loadout initialisation consistent for both host and client in cases
+    // where the faction assignment is delayed.
+    Result.Add(ESkaldFaction::None, FSkaldFactionAbilitySet());
+
     {
         FSkaldFactionAbilitySet Set;
         Set.Passive = MakePassive(

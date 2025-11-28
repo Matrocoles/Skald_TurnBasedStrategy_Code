@@ -1287,7 +1287,7 @@ void USkaldGameInstance::AttemptResolvePendingBattle(int32 Attempt) {
 void USkaldGameInstance::ResetSessionState() {
   // Clear any per-session state so a fresh lobby is created.
   JoinAddress.Empty();
-  AIPlayersToSpawn = 1;
+  AIPlayersToSpawn = 0;
   bIsMultiplayer = false;
   bIsHost = false;
   Faction = ESkaldFaction::Human;
