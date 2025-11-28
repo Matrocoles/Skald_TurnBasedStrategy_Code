@@ -14,6 +14,7 @@
 #include "Templates/SharedPointer.h"
 #include "SkaldDiceOverlayWidget.h"
 #include "SkaldDiceResultWidget.h"
+#include "FactionCursorData.h"
 #include "Skald_PlayerController.generated.h"
 
 class ATurnManager;
