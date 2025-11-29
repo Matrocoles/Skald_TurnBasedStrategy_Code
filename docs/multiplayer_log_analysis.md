@@ -58,3 +58,13 @@ Since remote clients never finish the travel, their replicated actors (including
 ## Recommendations
 1. Verify in-editor and packaged builds that the new `ServerTravel` path moves all clients to the OverviewMap and that replicated actors such as the turn manager initialise correctly. 【F:Source/Skald/LobbyGameMode.cpp†L362-L379】
 2. Monitor multiplayer playtests for any lingering warnings about missing replicated state after travel and capture updated logs if issues persist. 【F:docs/multiplayer_log_analysis.md†L66-L75】
+
+## Nov 2025 play session review
+The supplied client log shows a successful seamless travel from the lobby to `OverviewMap` (8.97 seconds) without tearing down the net driver, so the previous travel regression is not present. However two gameplay issues stand out:
+
+1. `SkaldMainHUDWidget` logs `could not find GameMode` immediately after arrival on `OverviewMap`. Clients do not own a GameMode, so this warning means the HUD still queries `GetAuthGameMode()` during `NativeConstruct`. The call succeeds only on the host and is expected to be `nullptr` for remote players, so the warning is noisy and signals the widget is binding to server-only state. The HUD should instead depend on `ASkald_GameState` and other replicated components when running on clients.
+2. Turn ownership replication thrashes during startup. The client observes `ActivePlayerId` sequence `-1 → 0 → 261 → 262`, then later returns to `261`, toggling `LocalTurnActive` from false to true and back again within a few seconds. That oscillation likely comes from `ASkald_TurnManager` initializing the turn order and then resetting it when the second player joins. The rapid handoff can briefly show the wrong "my turn" UI and risks double-initializing per-turn UI logic. We should audit the turn manager to avoid broadcasting intermediate `ActivePlayerId` values to clients (e.g., stage initialization server-side and replicate only the final starting player/phase once all controllers are registered).
+
+**Next steps:**
+- Adjust `USkaldMainHUDWidget::NativeConstruct` to skip GameMode lookups on clients and bind via GameState instead, eliminating client-side warnings and avoiding server-only references.
+- Add a stabilization guard in `ASkald_TurnManager` so the replicated `ActivePlayerId` does not flip through placeholder values while players finish joining the overview map.
