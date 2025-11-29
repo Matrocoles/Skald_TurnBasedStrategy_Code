@@ -3830,9 +3830,23 @@ bool ASkaldPlayerController::ValidateAttack(int32 FromID, int32 ToID,
     return false;
   }
 
+  if (Source == Target) {
+    if (OutError) {
+      *OutError = TEXT("Cannot attack the same territory");
+    }
+    return false;
+  }
+
   if (Source->OwningPlayer != PS) {
     if (OutError) {
       *OutError = TEXT("You may only attack from territories you control");
+    }
+    return false;
+  }
+
+  if (Target->OwningPlayer == PS) {
+    if (OutError) {
+      *OutError = TEXT("You may only attack enemy territories");
     }
     return false;
   }
