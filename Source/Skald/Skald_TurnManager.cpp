@@ -967,13 +967,23 @@ void ATurnManager::SyncGameStateTurnIndex() {
   if (ASkaldGameState *GS = GetWorld()->GetGameState<ASkaldGameState>()) {
     int32 NewIndex = -1;
     int32 NewActivePlayerId = INDEX_NONE;
+    ASkaldPlayerState *ActivePlayerState = nullptr;
     if (Controllers.IsValidIndex(CurrentIndex) &&
         Controllers[CurrentIndex].IsValid()) {
       if (ASkaldPlayerState *PS =
               Controllers[CurrentIndex]->GetPlayerState<ASkaldPlayerState>()) {
         NewIndex = GS->PlayerArray.IndexOfByKey(PS);
         NewActivePlayerId = PS->GetPlayerId();
+        ActivePlayerState = PS;
       }
+    }
+
+    // Avoid thrashing the replicated ActivePlayerId while players reconnect to
+    // the overview map after travel. If we previously had a valid active
+    // player, keep broadcasting that stable value until the controllers have
+    // fully re-registered and we can resolve a new one.
+    if (!ActivePlayerState && GS->ActivePlayerId != INDEX_NONE) {
+      return;
     }
     GS->CurrentTurnIndex = NewIndex;
     GS->SetActivePlayerId(NewActivePlayerId);

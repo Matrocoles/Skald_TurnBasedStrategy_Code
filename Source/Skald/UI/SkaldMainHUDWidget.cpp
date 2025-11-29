@@ -135,12 +135,16 @@ void USkaldMainHUDWidget::NativeConstruct() {
     Root->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
   }
 
-  GameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
-  if (!GameMode) {
-    UE_LOG(LogSkald, Warning,
-           TEXT("SkaldMainHUDWidget could not find GameMode."));
+  UWorld *World = GetWorld();
+  if (World && World->HasAuthority()) {
+    GameMode = World->GetAuthGameMode<ASkaldGameMode>();
+    if (!GameMode) {
+      UE_LOG(LogSkald, Warning,
+             TEXT("SkaldMainHUDWidget could not find GameMode."));
+    }
   }
-  GameState = GetWorld()->GetGameState<ASkaldGameState>();
+
+  GameState = World ? World->GetGameState<ASkaldGameState>() : nullptr;
   if (!GameState) {
     UE_LOG(LogSkald, Warning,
            TEXT("SkaldMainHUDWidget could not find GameState."));
