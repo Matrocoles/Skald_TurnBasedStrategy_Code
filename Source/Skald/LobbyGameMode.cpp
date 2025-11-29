@@ -250,7 +250,7 @@ void ALobbyGameMode::AssignPlayerToSlot(ASkaldPlayerState* PlayerState)
         if (APlayerController* OwningPlayerController = Cast<APlayerController>(OwningController))
         {
             OwningPlayerController->ClientMessage(TEXT("Lobby is full."));
-            OwningPlayerController->ClientTravel(TEXT("/Game/Blueprints/Maps/Skald_Lobby"), TRAVEL_Absolute);
+            OwningPlayerController->ClientReturnToMainMenuWithTextReason(TEXT("Lobby is full."));
         }
     }
 }

@@ -1256,7 +1256,15 @@ void USkaldGameInstance::EndMultiplayerSession(bool bHostInitiated,
     return;
   }
 
-  if (World) {
+  if (!World) {
+    return;
+  }
+
+  const FString CurrentLevelName =
+      UGameplayStatics::GetCurrentLevelName(World, /*bRemovePrefix=*/true);
+  const bool bAlreadyInLobby = CurrentLevelName.Equals(TEXT("Skald_Lobby"));
+
+  if (!bAlreadyInLobby) {
     const FName LobbyMap(TEXT("/Game/Blueprints/Maps/Skald_Lobby"));
     UGameplayStatics::OpenLevel(World, LobbyMap);
   }
