@@ -11,6 +11,7 @@
 #include "Engine/Engine.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "Materials/MaterialInterface.h"
 #include "Skald.h"
 #include "SkaldLogging.h"
@@ -36,6 +37,17 @@ AWorldMap::AWorldMap() {
 
 void AWorldMap::BeginPlay() {
   Super::BeginPlay();
+
+  // When territories are replicated (client-side), rebuild the local cache so
+  // lookups like GetTerritoryById work correctly for HUD interactions.
+  if (Territories.Num() == 0) {
+    for (TActorIterator<ATerritory> It(GetWorld()); It; ++It) {
+      ATerritory *Territory = *It;
+      if (IsValid(Territory) && Territory->GetOwner() == this) {
+        RegisterTerritory(Territory);
+      }
+    }
+  }
 
   for (ATerritory *Territory : Territories) {
     if (IsValid(Territory)) {
@@ -743,6 +755,9 @@ bool AWorldMap::IsCapitalCandidate(int32 TerritoryId) const {
 bool AWorldMap::AreTerritoriesAdjacent(const ATerritory *A,
                                        const ATerritory *B) const {
   if (!A || !B) {
+    return false;
+  }
+  if (A == B) {
     return false;
   }
   if (A->IsAdjacentTo(B) || B->IsAdjacentTo(A)) {
