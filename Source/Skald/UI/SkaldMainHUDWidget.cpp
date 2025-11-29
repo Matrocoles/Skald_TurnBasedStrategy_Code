@@ -136,7 +136,7 @@ void USkaldMainHUDWidget::NativeConstruct() {
   }
 
   UWorld *World = GetWorld();
-  if (World && World->HasAuthority()) {
+  if (World && World->GetNetMode() != NM_Client) {
     GameMode = World->GetAuthGameMode<ASkaldGameMode>();
     if (!GameMode) {
       UE_LOG(LogSkald, Warning,
@@ -252,11 +252,11 @@ void USkaldMainHUDWidget::NativeConstruct() {
       const float EffectiveDuration = bPersistent ? 0.f : ActiveDuration;
       ShowStatusMessage(ActiveStatus, EffectiveDuration);
 
-      if (bPersistent && EffectiveDuration > KINDA_SMALL_NUMBER) {
-        if (UWorld *World = GetWorld()) {
-          World->GetTimerManager().ClearTimer(StatusMessageTimerHandle);
+        if (bPersistent && EffectiveDuration > KINDA_SMALL_NUMBER) {
+          if (World) {
+            World->GetTimerManager().ClearTimer(StatusMessageTimerHandle);
+          }
         }
-      }
     }
   }
 }
