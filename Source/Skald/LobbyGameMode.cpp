@@ -250,7 +250,7 @@ void ALobbyGameMode::AssignPlayerToSlot(ASkaldPlayerState* PlayerState)
         if (APlayerController* OwningPlayerController = Cast<APlayerController>(OwningController))
         {
             OwningPlayerController->ClientMessage(TEXT("Lobby is full."));
-            OwningPlayerController->ClientReturnToMainMenuWithTextReason(TEXT("Lobby is full."));
+            OwningPlayerController->ClientReturnToMainMenuWithTextReason(FText::FromString(TEXT("Lobby is full.")));
         }
     }
 }
