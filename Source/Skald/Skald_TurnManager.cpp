@@ -2917,10 +2917,14 @@ void ATurnManager::NotifyPlayerReadyForBattle(int32 PlayerID, bool bReady) {
                                    ? GetWorld()->GetGameState<ASkaldGameState>()
                                    : nullptr;
   if (GameState) {
-    if (ASkaldPlayerState *PlayerState = GameState->GetPlayerByStableId(PlayerID)) {
-      PlayerID = ResolveStableOrPlayerId(PlayerState);
-    } else if (ASkaldPlayerState *PlayerState = GameState->GetPlayerById(PlayerID)) {
-      PlayerID = ResolveStableOrPlayerId(PlayerState);
+    ASkaldPlayerState *ResolvedPlayerState =
+        GameState->GetPlayerByStableId(PlayerID);
+    if (!ResolvedPlayerState) {
+      ResolvedPlayerState = GameState->GetPlayerById(PlayerID);
+    }
+
+    if (ResolvedPlayerState) {
+      PlayerID = ResolveStableOrPlayerId(ResolvedPlayerState);
     }
   }
 
