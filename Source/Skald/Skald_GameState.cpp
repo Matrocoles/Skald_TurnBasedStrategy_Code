@@ -561,18 +561,16 @@ void ASkaldGameState::SortAndDedupPlayers()
     // while PlayerStates are re-initialising. Attempting to dereference them
     // during the sort would otherwise cause access violations when returning
     // to the world map after a battle.
-    Players.RemoveAll([](const TObjectPtr<ASkaldPlayerState>& Player)
+    Players.RemoveAll([](const ASkaldPlayerState* Player)
     {
-        return Player.Get() == nullptr;
+        return Player == nullptr;
     });
 
     // Stable order by persistent StablePlayerId for deterministic turns/HUD
     // lists even across travel. Fall back to engine PlayerId if a stable value
     // has not yet been assigned.
-    Players.Sort([](const TObjectPtr<ASkaldPlayerState>& A, const TObjectPtr<ASkaldPlayerState>& B)
+    Players.Sort([](const ASkaldPlayerState* PlayerA, const ASkaldPlayerState* PlayerB)
     {
-        ASkaldPlayerState* const PlayerA = A.Get();
-        ASkaldPlayerState* const PlayerB = B.Get();
         if (PlayerA == PlayerB)
         {
             return false;
