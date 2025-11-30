@@ -122,8 +122,8 @@ bool FArmyPlacementInitiativeOrderTest::RunTest(const FString &Parameters) {
 
   FSkaldGameModeAutomationAccessor::BeginArmyPlacementPhase(GameMode);
 
-  const int32 IndexA = GameState->PlayerArray.IndexOfByKey(StateA);
-  const int32 IndexB = GameState->PlayerArray.IndexOfByKey(StateB);
+  const int32 IndexA = GameState->FindTurnIndexForStableId(StateA->GetStablePlayerId());
+  const int32 IndexB = GameState->FindTurnIndexForStableId(StateB->GetStablePlayerId());
   TestTrue(TEXT("PlayerA index valid"), IndexA != INDEX_NONE);
   TestTrue(TEXT("PlayerB index valid"), IndexB != INDEX_NONE);
   TestEqual(TEXT("PlayerA deployable units"), StateA->DeployableUnits, 40);
@@ -247,7 +247,7 @@ bool FAIArmyPlacementAutoAdvanceTest::RunTest(const FString &Parameters) {
 
   FSkaldGameModeAutomationAccessor::BeginArmyPlacementPhase(GameMode);
 
-  const int32 HumanIndex = GameState->PlayerArray.IndexOfByKey(HumanState);
+  const int32 HumanIndex = GameState->FindTurnIndexForStableId(HumanState->GetStablePlayerId());
   TestTrue(TEXT("Human player index valid"), HumanIndex != INDEX_NONE);
   TestEqual(TEXT("AI leftover units automatically placed"), AIState->DeployableUnits, 0);
   TestEqual(TEXT("AI territory received remaining units"), TerritoryAI->ArmyUnits, 41);
@@ -271,7 +271,7 @@ bool FAIArmyPlacementAutoAdvanceTest::RunTest(const FString &Parameters) {
   const int32 ExpectedIndex = Controllers.IndexOfByKey(AIController);
   TestEqual(TEXT("AI with initiative begins normal turn"), CurrentIndex, ExpectedIndex);
 
-  const int32 AIIndex = GameState->PlayerArray.IndexOfByKey(AIState);
+  const int32 AIIndex = GameState->FindTurnIndexForStableId(AIState->GetStablePlayerId());
   TestEqual(TEXT("GameState turn index returned to AI"), GameState->CurrentTurnIndex, AIIndex);
 
   return true;
@@ -351,7 +351,7 @@ bool FAIArmyPlacementFailsafeRespectsHumanTest::RunTest(
 
   FSkaldGameModeAutomationAccessor::BeginArmyPlacementPhase(GameMode);
 
-  const int32 HumanIndex = GameState->PlayerArray.IndexOfByKey(HumanState);
+  const int32 HumanIndex = GameState->FindTurnIndexForStableId(HumanState->GetStablePlayerId());
   TestTrue(TEXT("Human player index valid"), HumanIndex != INDEX_NONE);
   TestEqual(TEXT("Human receives placement turn"), GameState->CurrentTurnIndex,
             HumanIndex);

@@ -1554,7 +1554,7 @@ void ASkaldPlayerController::InitializeHUDWidget() {
     TArray<FS_PlayerData> Players;
     BuildPlayerDataArray(Players);
     const ASkaldPlayerState *CurrentPS = CachedGameState->GetCurrentPlayer();
-    const int32 CurrentID = CurrentPS ? CurrentPS->GetPlayerId() : -1;
+    const int32 CurrentID = CurrentPS ? ResolveStablePlayerId(CurrentPS) : -1;
     MainHUD->RefreshFromState(CurrentID, /*TurnNumber*/ 1,
                               ETurnPhase::Reinforcement, Players);
   }
@@ -2306,6 +2306,12 @@ void ASkaldPlayerController::OnRep_PlayerState() {
     MainHUD->SyncPhaseButtons(MainHUD->CurrentPlayerID ==
                                     MainHUD->LocalPlayerID);
   }
+
+  // Newly replicated player state might already be the active turn owner.
+  // Refresh local state so clients don't wait for the next host-driven
+  // broadcast to enable their HUD and input.
+  RefreshTurnDataFromState();
+  HandleReplicatedTurnOwnership();
 }
 
 void ASkaldPlayerController::OnPossess(APawn *InPawn) {
@@ -2442,6 +2448,8 @@ void ASkaldPlayerController::ApplyTurnManager(ATurnManager *Manager) {
     // saved game) immediately synchronise the HUD so players can interact with
     // the correct phase buttons without waiting for the next broadcast.
     HandleWorldStateChanged();
+    RefreshTurnDataFromState();
+    HandleReplicatedTurnOwnership();
   }
 }
 
@@ -2764,6 +2772,16 @@ void ASkaldPlayerController::Client_OnLockInResult_Implementation(
 void ASkaldPlayerController::HandleBattlePhaseChanged() {
   if (const ASkaldGameState *SGS =
           GetWorld() ? GetWorld()->GetGameState<ASkaldGameState>() : nullptr) {
+    // Ensure each owning client initializes its own HUD/camera when entering a
+    // battle-related phase instead of waiting for host-driven RPCs.
+    if (IsLocalController()) {
+      DetectBattleMap();
+      InitializeBattleHUD();
+      UpdateBattleCameraMode();
+      RefreshTurnDataFromState();
+      HandleReplicatedTurnOwnership();
+    }
+
     if (SGS->BattlePhase == EBattlePhase::FighterSelection) {
       UE_LOG(LogSkaldBattle, Log,
              TEXT("PlayerController %s entering FighterSelection phase"),
@@ -3488,6 +3506,18 @@ void ASkaldPlayerController::HandleWorldBeginPlay(UWorld *LoadedWorld) {
   }
 
   InitializeFighterSelectionIfNeeded();
+
+  // Reconstruct HUD/turn ownership from replicated state immediately after
+  // loading so clients don't wait for the next broadcast to gain control.
+  RefreshTurnDataFromState();
+  HandleReplicatedTurnOwnership();
+
+  // On battle maps, rebuild the replicated battle context (HUD, camera,
+  // selection UI) so travel timing doesn't leave the client waiting for a
+  // host-driven kickoff.
+  if (bIsBattleMap) {
+    HandleReplicatedBattlePayload();
+  }
 }
 
 void ASkaldPlayerController::ShowTurnAnnouncement(const FString &PlayerName,
@@ -3547,10 +3577,6 @@ void ASkaldPlayerController::ClientNotifyTurnEnded_Implementation(
   NotifyTurnEndedLocal(PlayerName);
 }
 
-void ASkaldPlayerController::ClientStartTurnInternal_Implementation() {
-  ExecuteLocalTurnStart();
-}
-
 bool ASkaldPlayerController::IsMyTurn() const {
   const UWorld *World = GetWorld();
   if (!World) {
@@ -3563,36 +3589,38 @@ bool ASkaldPlayerController::IsMyTurn() const {
     return false;
   }
 
-  const int32 MyPlayerId = MyPlayerState->GetPlayerId();
+  const int32 MyStableId = MyPlayerState->GetStablePlayerId();
   if (GameState->ActivePlayerId != INDEX_NONE) {
-    return GameState->ActivePlayerId == MyPlayerId;
+    return GameState->ActivePlayerId == MyStableId;
   }
 
   if (ASkaldPlayerState *Current = GameState->GetCurrentPlayer()) {
-    return Current == MyPlayerState;
+    return Current->GetStablePlayerId() == MyStableId;
   }
 
   return false;
 }
 
 void ASkaldPlayerController::StartTurn() {
-  if (IsLocalController()) {
-    ExecuteLocalTurnStart();
-  } else {
-    ClientStartTurnInternal();
-  }
-
   if (HasAuthority()) {
     if (ASkaldGameState *GS = GetWorld()->GetGameState<ASkaldGameState>()) {
       if (ASkaldPlayerState *MyPS = GetPlayerState<ASkaldPlayerState>()) {
-        const int32 NewIndex = GS->PlayerArray.IndexOfByKey(MyPS);
+        int32 NewIndex = GS->FindTurnIndexForStableId(MyPS->GetStablePlayerId());
+        if (NewIndex == INDEX_NONE) {
+          NewIndex = GS->PlayerArray.IndexOfByKey(MyPS);
+        }
         if (NewIndex != INDEX_NONE) {
           GS->CurrentTurnIndex = NewIndex;
-          GS->SetActivePlayerId(MyPS->GetPlayerId());
+          GS->SetActivePlayerId(MyPS->GetStablePlayerId());
           GS->OnTurnIndexChanged.Broadcast(NewIndex);
         }
       }
     }
+  }
+
+  if (IsLocalController()) {
+    RefreshTurnDataFromState();
+    HandleReplicatedTurnOwnership();
   }
 }
 
@@ -3641,7 +3669,7 @@ void ASkaldPlayerController::ServerEndTurn_Implementation() {
   }
 
   ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>();
-  const int32 PlayerId = PS ? PS->GetPlayerId() : INDEX_NONE;
+  const int32 PlayerId = PS ? PS->GetStablePlayerId() : INDEX_NONE;
   ASkaldGameState *GS = GetWorld() ? GetWorld()->GetGameState<ASkaldGameState>()
                                    : nullptr;
 
@@ -3655,7 +3683,8 @@ void ASkaldPlayerController::ServerEndTurn_Implementation() {
 
   const bool bOwnsTurnViaActiveId = GS->ActivePlayerId == PlayerId;
   const bool bOwnsTurnViaIndex =
-      GS->GetCurrentPlayer() && GS->GetCurrentPlayer()->GetPlayerId() == PlayerId;
+      GS->GetCurrentPlayer() &&
+      GS->GetCurrentPlayer()->GetStablePlayerId() == PlayerId;
 
   if (!bOwnsTurnViaActiveId && !bOwnsTurnViaIndex) {
     UE_LOG(LogSkald, Warning,
@@ -3729,9 +3758,12 @@ void ASkaldPlayerController::HandleEndPhaseInternal() {
     }
 
     if (ASkaldGameState *GS = GetWorld()->GetGameState<ASkaldGameState>()) {
-      const int32 PlayerId = PS->GetPlayerId();
+      const int32 PlayerId = PS->GetStablePlayerId();
       const bool bOwnsTurnViaActiveId = GS->ActivePlayerId == PlayerId;
-      const int32 MyIndex = GS->PlayerArray.IndexOfByKey(PS);
+      int32 MyIndex = GS->FindTurnIndexForStableId(PlayerId);
+      if (MyIndex == INDEX_NONE) {
+        MyIndex = GS->PlayerArray.IndexOfByKey(PS);
+      }
       const bool bOwnsTurnViaIndex =
           MyIndex != INDEX_NONE && GS->CurrentTurnIndex == MyIndex;
       if (!bOwnsTurnViaActiveId && !bOwnsTurnViaIndex) {
@@ -5178,6 +5210,14 @@ void ASkaldPlayerController::HandlePlayersUpdated() {
     }
   }
 
+  // Player registration changes can occur while traveling or reconnecting;
+  // reevaluate turn ownership and HUD state locally so the newly active
+  // controller enables its own UI without depending on host-side prompts.
+  if (IsLocalController()) {
+    RefreshTurnDataFromState();
+    HandleReplicatedTurnOwnership();
+  }
+
   InitializeFighterSelectionIfNeeded();
 }
 
@@ -5189,6 +5229,9 @@ void ASkaldPlayerController::HandleBattleEntriesUpdated() {
 void ASkaldPlayerController::HandleTurnIndexChanged(int32 NewIndex) {
   UE_LOG(LogSkald, Log, TEXT("[TurnState] Controller %s observed turn index %d"),
          *GetName(), NewIndex);
+  if (IsLocalController()) {
+    InitializeHUDWidget();
+  }
   RefreshTurnDataFromState();
 
   HandleReplicatedTurnOwnership();
@@ -5199,12 +5242,85 @@ void ASkaldPlayerController::HandleActivePlayerChanged(
   UE_LOG(LogSkald, Log,
          TEXT("[TurnState] Controller %s observed active player id %d"),
          *GetName(), NewActivePlayerId);
+  if (IsLocalController()) {
+    InitializeHUDWidget();
+  }
   RefreshTurnDataFromState();
 
   HandleReplicatedTurnOwnership();
 }
 
+void ASkaldPlayerController::HandleReplicatedPhaseChange(
+    ETurnPhase NewPhase) {
+  UE_LOG(LogSkald, Log,
+         TEXT("[TurnState] Controller %s handling replicated phase %s"),
+         *GetName(), *UEnum::GetValueAsString(NewPhase));
+
+  if (IsLocalController()) {
+    InitializeHUDWidget();
+  }
+
+  if (MainHUD) {
+    MainHUD->UpdatePhaseBanner(NewPhase);
+  }
+
+  // Ensure turn ownership is reevaluated before phase-specific UI toggles run
+  // so the active player immediately gains control even if the server-side
+  // broadcast was skipped or delayed (e.g., after travel).
+  HandleReplicatedTurnOwnership();
+
+  switch (NewPhase) {
+  case ETurnPhase::Attack:
+    HandleAttackPhaseLocal();
+    break;
+  case ETurnPhase::Engineering:
+    HandleEngineeringPhaseLocal();
+    break;
+  case ETurnPhase::Treasure:
+    HandleTreasurePhaseLocal();
+    break;
+  case ETurnPhase::Movement:
+    HandleMovementPhaseLocal();
+    break;
+  case ETurnPhase::EndTurn:
+    HandleEndTurnPhaseLocal();
+    break;
+  case ETurnPhase::Revolt:
+    HandleRevoltPhaseLocal();
+    break;
+  default:
+    break;
+  }
+}
+
+void ASkaldPlayerController::HandleReplicatedBattlePayload() {
+  if (!IsLocalController()) {
+    return;
+  }
+
+  DetectBattleMap();
+  InitializeBattleHUD();
+  RefreshFactionCursorFromState();
+  RequestBattleStateIfNeeded();
+  DetermineControlledBattleSide();
+  InitializeFighterSelectionIfNeeded();
+  UpdateBattleCameraMode();
+
+  // Battle travel can race with phase/turn updates; refresh from replicated
+  // state so the active participant immediately regains control when arriving
+  // on the battle map.
+  RefreshTurnDataFromState();
+  HandleReplicatedTurnOwnership();
+  HandleReplicatedTurnStart();
+}
+
 void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
+  if (!IsLocalController()) {
+    return;
+  }
+
+  InitializeHUDWidget();
+
   const bool bIsMyTurn = IsMyTurn();
   const ETurnPhase Phase = TurnManager ? TurnManager->GetCurrentPhase()
                                        : ETurnPhase::Reinforcement;
@@ -5228,6 +5344,61 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
 
   if (!bIsMyTurn) {
     bLocalTurnActive = false;
+
+    // Ensure non-active players fully release world input and phase buttons
+    // instead of inheriting the host's UI state.
+    UWidgetBlueprintLibrary::SetInputMode_GameOnly(this);
+    bShowMouseCursor = false;
+    bEnableClickEvents = false;
+    bEnableMouseOverEvents = false;
+
+    if (MainHUD) {
+      MainHUD->SyncPhaseButtons(false);
+    }
+  }
+}
+
+void ASkaldPlayerController::HandleReplicatedTurnStart()
+{
+  if (!IsLocalController())
+  {
+    return;
+  }
+
+  InitializeHUDWidget();
+
+  const ASkaldGameState* GS = CachedGameState;
+  if (!GS)
+  {
+    GS = GetWorld() ? GetWorld()->GetGameState<ASkaldGameState>() : nullptr;
+  }
+
+  if (!GS || GS->ActivePlayerId == INDEX_NONE)
+  {
+    return;
+  }
+
+  const ASkaldPlayerState* ActivePS = GS->GetPlayerByStableId(GS->ActivePlayerId);
+  if (!ActivePS)
+  {
+    return;
+  }
+
+  const FString PlayerName = ActivePS->GetResolvedPlayerName(TEXT("HandleReplicatedTurnStart"));
+  const bool bIsMyTurn = IsMyTurn();
+  ShowTurnAnnouncementLocal(PlayerName, bIsMyTurn);
+
+  // Clear any lingering initiative overlays or dice holds now that the owning
+  // client is starting a replicated turn, ensuring UI setup does not depend on
+  // host-driven calls.
+  if (MainHUD)
+  {
+    MainHUD->SetAwaitingStrategicInitiative(false);
+  }
+
+  if (USkaldDiceManager* DiceManager = ResolveDiceManager())
+  {
+    DiceManager->SetHoldInitiativeDice(false);
   }
 }
 
@@ -5238,7 +5409,7 @@ void ASkaldPlayerController::RefreshTurnDataFromState() {
 
   int32 CurrentStableId = -1;
   if (CachedGameState->ActivePlayerId != INDEX_NONE) {
-    if (ASkaldPlayerState *ActivePS = CachedGameState->GetPlayerById(
+    if (ASkaldPlayerState *ActivePS = CachedGameState->GetPlayerByStableId(
             CachedGameState->ActivePlayerId)) {
       CurrentStableId = ActivePS->GetStablePlayerId();
     }
@@ -5271,9 +5442,23 @@ void ASkaldPlayerController::HandleFactionsUpdated() {
 
 void ASkaldPlayerController::HandleBattleMapStateChanged(bool /*bInBattleMap*/) {
   DetectBattleMap();
+  InitializeBattleHUD();
   InitializeFighterSelectionIfNeeded();
   RefreshFactionCursorFromState();
   RequestBattleStateIfNeeded();
+  DetermineControlledBattleSide();
+  UpdateBattleCameraMode();
+
+  // Re-evaluate turn/phase ownership when swapping maps so clients re-enable
+  // their own HUD and controls without waiting for host-driven prompts.
+  RefreshTurnDataFromState();
+  HandleReplicatedTurnOwnership();
+  HandleReplicatedTurnStart();
+
+  // Ensure battle-map travel reconstructs any replicated payload data so the
+  // local player regains fighter selection, HUD, and camera context even if
+  // the original travel RPC was missed.
+  HandleReplicatedBattlePayload();
 }
 
 void ASkaldPlayerController::HandleWorldStateChanged() {
@@ -5301,6 +5486,7 @@ void ASkaldPlayerController::HandleWorldStateChanged() {
   // ownership locally instead of depending on host-driven button toggles.
   RefreshTurnDataFromState();
   HandleReplicatedTurnOwnership();
+  HandleReplicatedTurnStart();
 
   if (!bIsBattleMap && bPendingOverworldBattleResults &&
       CachedBattleResultDisplayData.bValid) {
@@ -8958,6 +9144,14 @@ void ASkaldPlayerController::HandlePlayerIdUpdated() {
   DetermineControlledBattleSide();
   UpdateBattleHUDButtons();
   RefreshLockedInFighterList();
+
+  // Stable player IDs drive replicated turn ownership. When the local ID
+  // changes, immediately resync the HUD and input state instead of waiting
+  // for the next phase or active-player replication tick.
+  if (IsLocalController()) {
+    RefreshTurnDataFromState();
+    HandleReplicatedTurnOwnership();
+  }
 
   if (IsLocalController()) {
     const bool bRefreshedSelection = RefreshLocalTerritorySelection();

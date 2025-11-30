@@ -524,7 +524,11 @@ void ASkaldGameMode::RegisterPlayer(ASkaldPlayerController *PC) {
     PS->SetPlayerName(EffectiveName);
   }
 
-  const int32 Index = GS->PlayerArray.IndexOfByKey(PS);
+  int32 Index = GS->FindTurnIndexForStableId(PS->GetStablePlayerId());
+  if (Index == INDEX_NONE)
+  {
+    Index = GS->PlayerArray.IndexOfByKey(PS);
+  }
   if (PlayerDataArray.IsValidIndex(Index)) {
     PlayerDataArray[Index].PlayerID = PS->GetPlayerId();
     PlayerDataArray[Index].PlayerName =
@@ -3182,38 +3186,26 @@ void ASkaldGameMode::AdvanceArmyPlacement() {
 
     // Mark whose placement turn it is so HUDs sync on all clients.
     if (ASkaldGameState *GSLocal = GetGameState<ASkaldGameState>()) {
-      int32 NewIndex = GSLocal->PlayerArray.IndexOfByKey(PS);
+      int32 NewIndex = GSLocal->FindTurnIndexForStableId(PS->GetStablePlayerId());
       if (NewIndex == INDEX_NONE) {
         NewIndex = GSLocal->PlayerArray.IndexOfByPredicate(
             [PS](const APlayerState *PlayerState) {
               const ASkaldPlayerState *SkaldPlayerState =
                   Cast<ASkaldPlayerState>(PlayerState);
               return SkaldPlayerState &&
-                     SkaldPlayerState->GetPlayerId() == PS->GetPlayerId();
+                     SkaldPlayerState->GetStablePlayerId() ==
+                         PS->GetStablePlayerId();
             });
       }
       if (NewIndex != INDEX_NONE) {
         GSLocal->CurrentTurnIndex = NewIndex; // RepNotify → OnTurnIndexChanged
-        GSLocal->SetActivePlayerId(PS->GetPlayerId());
+        GSLocal->SetActivePlayerId(PS->GetStablePlayerId());
         GSLocal->OnTurnIndexChanged.Broadcast(
             NewIndex); // optional immediate local broadcast
       } else {
         UE_LOG(LogSkald, Warning,
                TEXT("AdvanceArmyPlacement: Unable to resolve GameState index for %s; HUD turn sync skipped."),
                *PS->GetResolvedPlayerName(TEXT("AdvanceArmyPlacement_MissingIndex")));
-      }
-    }
-
-    // Announce whose placement turn it is.
-    const FString PlayerName =
-        PS->GetResolvedPlayerName(TEXT("AdvanceArmyPlacement_Announcement"));
-    for (ASkaldPlayerController *Controller : Controllers) {
-      const bool bIsActive = Controller == PC;
-      Controller->ShowTurnAnnouncement(PlayerName, bIsActive);
-      Controller->ClientClearStrategicInitiativeOverlay();
-      if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
-        HUD->UpdateTurnBanner(PS->GetPlayerId(), 1);
-        HUD->SetAwaitingStrategicInitiative(false);
       }
     }
 
@@ -3358,12 +3350,9 @@ void ASkaldGameMode::HandleArmyPlacementFailsafe() {
   // than force-advancing into the main turn sequence. The failsafe should only
   // trip when an AI controller stalls during placement.
   if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
-    if (GS->PlayerArray.IsValidIndex(GS->CurrentTurnIndex)) {
-      if (ASkaldPlayerState *ActivePS =
-              Cast<ASkaldPlayerState>(GS->PlayerArray[GS->CurrentTurnIndex])) {
-        if (!ActivePS->bIsAI) {
-          return;
-        }
+    if (ASkaldPlayerState *ActivePS = GS->GetPlayerAtTurnIndex(GS->CurrentTurnIndex)) {
+      if (!ActivePS->bIsAI) {
+        return;
       }
     }
   }
@@ -3970,8 +3959,9 @@ void ASkaldGameMode::FillSaveGame(USkaldSaveGame *SaveGameObject) const {
       FS_Territory &TerrData = SaveGameObject->Territories.Emplace_GetRef();
       TerrData.TerritoryID = Territory->TerritoryID;
       TerrData.TerritoryName = Territory->TerritoryName;
-      TerrData.OwnerPlayerID =
-          Territory->OwningPlayer ? Territory->OwningPlayer->GetPlayerId() : 0;
+      TerrData.OwnerPlayerID = Territory->OwningPlayer
+                                     ? Territory->OwningPlayer->GetStablePlayerId()
+                                     : 0;
       TerrData.IsCapital = Territory->bIsCapital;
       TerrData.CapitalOwner = TerrData.OwnerPlayerID;
       TerrData.ArmyUnits = Territory->ArmyUnits;
@@ -4075,7 +4065,7 @@ void ASkaldGameMode::FillSaveGame(USkaldSaveGame *SaveGameObject) const {
 
     if (ASkaldPlayerState *PS =
             Controller->GetPlayerState<ASkaldPlayerState>()) {
-      ControllerSave.PlayerId = PS->GetPlayerId();
+      ControllerSave.PlayerId = PS->GetStablePlayerId();
       ControllerSave.PlayerName = PS->PlayerDisplayName;
       ControllerSave.Faction = PS->Faction;
       if (GameInstance) {
@@ -4095,7 +4085,7 @@ void ASkaldGameMode::FillSaveGame(USkaldSaveGame *SaveGameObject) const {
       }
 
       if (Index == SaveGameObject->GameFlow.ActiveTurnIndex) {
-        ActivePlayerId = PS->GetPlayerId();
+        ActivePlayerId = PS->GetStablePlayerId();
       }
     }
 

@@ -838,9 +838,6 @@ public:
   void ClientNotifyTurnEnded(const FString &PlayerName);
 
   UFUNCTION(Client, Reliable)
-  void ClientStartTurnInternal();
-
-  UFUNCTION(Client, Reliable)
   void ClientHandlePhaseChanged(ETurnPhase NewPhase);
 
   /** Local entry points so standalone/authority controllers can trigger the
@@ -961,6 +958,9 @@ protected:
   UFUNCTION()
   void HandleActivePlayerChanged(int32 NewActivePlayerId);
   void HandleReplicatedTurnOwnership();
+  void HandleReplicatedTurnStart();
+  void HandleReplicatedPhaseChange(ETurnPhase NewPhase);
+  void HandleReplicatedBattlePayload();
 
   /** Helper to update cached state whenever the replicated turn manager changes. */
   void ApplyTurnManager(ATurnManager *Manager);

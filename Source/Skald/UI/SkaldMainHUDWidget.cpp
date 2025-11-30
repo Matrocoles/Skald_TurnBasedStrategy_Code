@@ -557,7 +557,8 @@ void USkaldMainHUDWidget::UpdateTerritoryInfo(const FString &TerritoryName,
         if (ATerritory *Sel = PS->SelectedTerritory.Get()) {
           bOwnedByLocal =
               (Sel->OwningPlayer &&
-               Sel->OwningPlayer->GetPlayerId() == PS->GetPlayerId());
+               Sel->OwningPlayer->GetStablePlayerId() ==
+                   PS->GetStablePlayerId());
           if (bOwnedByLocal) {
             bIsCapital = Sel->bIsCapital;
           }
@@ -843,7 +844,7 @@ void USkaldMainHUDWidget::ShowPrepareForBattleDialog(
   bool bLocalIsDefender = false;
   if (APlayerController *OwnerPC = GetOwningPlayer()) {
     if (ASkaldPlayerState *LocalPS = OwnerPC->GetPlayerState<ASkaldPlayerState>()) {
-      const int32 PlayerId = LocalPS->GetPlayerId();
+      const int32 PlayerId = LocalPS->GetStablePlayerId();
       if (EffectiveLocalId <= 0 && PlayerId > 0) {
         EffectiveLocalId = PlayerId;
       }
@@ -2212,7 +2213,7 @@ int32 USkaldMainHUDWidget::ResolveLocalPlayerId() const {
   if (const APlayerController *PC = GetOwningPlayer()) {
     if (const ASkaldPlayerState *LocalPS =
             PC->GetPlayerState<ASkaldPlayerState>()) {
-      return LocalPS->GetPlayerId();
+      return LocalPS->GetStablePlayerId();
     }
   }
   return -1;
@@ -2233,7 +2234,7 @@ void USkaldMainHUDWidget::HandlePlayersUpdated() {
   for (APlayerState *PSBase : GameState->PlayerArray) {
     if (ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
       FS_PlayerData Data;
-      Data.PlayerID = PS->GetPlayerId();
+      Data.PlayerID = PS->GetStablePlayerId();
       Data.PlayerName =
           PS->GetResolvedPlayerName(TEXT("SkaldMainHUDWidget::RefreshPlayers"));
       Data.IsAI = PS->bIsAI;
@@ -2257,7 +2258,7 @@ void USkaldMainHUDWidget::HandleTurnIndexChanged(int32 /*NewTurnIndex*/) {
   int32 NewTurnNumber = TurnNumber;
   if (GameState) {
     if (ASkaldPlayerState *PS = GameState->GetCurrentPlayer()) {
-      NewPlayerID = PS->GetPlayerId();
+      NewPlayerID = PS->GetStablePlayerId();
     }
 
     const int32 PlayerCount = GameState->PlayerArray.Num();
@@ -2474,7 +2475,7 @@ void USkaldMainHUDWidget::HandleDeployClicked() {
   }
 
   if (!Territory || !Territory->OwningPlayer ||
-      Territory->OwningPlayer->GetPlayerId() != PS->GetPlayerId()) {
+      Territory->OwningPlayer->GetStablePlayerId() != PS->GetStablePlayerId()) {
     UE_LOG(LogSkald, Warning,
            TEXT("HandleDeployClicked failed: invalid territory %d"),
            SelectedSourceID);

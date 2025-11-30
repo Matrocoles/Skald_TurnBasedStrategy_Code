@@ -127,6 +127,12 @@ public:
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="GameState")
     ASkaldPlayerState* GetCurrentPlayer() const;
 
+    /** Retrieve a player state by its turn index using the stable roster. */
+    ASkaldPlayerState* GetPlayerAtTurnIndex(int32 Index) const;
+
+    /** Find the turn index for a given stable player identifier. */
+    int32 FindTurnIndexForStableId(int32 StableId) const;
+
     /** Retrieve a player state by its PlayerID. */
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="GameState")
     ASkaldPlayerState* GetPlayerById(int32 PlayerID) const;
@@ -214,6 +220,13 @@ public:
 protected:
     UFUNCTION()
     void OnRep_Players();
+
+    /**
+     * When the replicated player roster changes, prompt every controller to
+     * rebuild HUD/turn ownership locally so clients don't rely on host-driven
+     * turn-start RPCs.
+     */
+    void RefreshControllersFromPlayers();
 
     UFUNCTION()
     void OnRep_BattlePhase();
