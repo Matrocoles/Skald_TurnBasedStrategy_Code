@@ -1,6 +1,7 @@
 #include "UI/SkaldTooltipStatics.h"
 
 #include "Blueprint/UserWidget.h"
+#include "Engine/World.h"
 #include "Internationalization/Text.h"
 #include "UI/SkaldTooltipWidget.h"
 #include "Components/Widget.h"
@@ -18,6 +19,11 @@ void USkaldTooltipStatics::ApplyTooltip(
   }
 
   if (UWorld *World = TargetWidget->GetWorld()) {
+    if (World->bIsTearingDown) {
+      TargetWidget->SetToolTipText(TooltipText);
+      return;
+    }
+
     if (USkaldTooltipWidget *TooltipWidget =
             CreateWidget<USkaldTooltipWidget>(World, TooltipClass)) {
       TooltipWidget->SetTooltipLabelText(TooltipText);
