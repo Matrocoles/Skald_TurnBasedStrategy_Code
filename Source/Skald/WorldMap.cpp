@@ -283,6 +283,10 @@ bool AWorldMap::GenerateTerritoriesFromTable() {
       Territory->bIsCapital = Data->bIsCapital;
       Territory->ContinentID = Data->ContinentID;
       Territory->AdjacentTerritories.Reset();
+      // Ensure the replicated properties (especially TerritoryID) are sent to
+      // clients immediately so selections/requests made right after level load
+      // use the correct identifiers instead of the default zero value.
+      Territory->ForceNetUpdate();
       RegisterTerritory(Territory);
 
       SpawnedLocations.Add(Data->TerritoryID, Territory->GetActorLocation());
@@ -490,6 +494,15 @@ bool AWorldMap::GenerateTerritoriesFromTable() {
 
 void AWorldMap::RegisterTerritory(ATerritory *Territory) {
   if (Territory && !Territories.Contains(Territory)) {
+    if (HasAuthority()) {
+      if (Territory->TerritoryID == 0) {
+        UE_LOG(LogSkald, Warning,
+               TEXT("WorldMap %s registering territory %s with missing ID; clients may see ID 0"),
+               *GetName(), *Territory->GetName());
+      }
+      Territory->ForceNetUpdate();
+    }
+
     Territory->SetOwner(this);
     Territory->SetSelectionDecalAdditionalHeightOffset(
         TerritorySelectionDecalHeightOffset);
