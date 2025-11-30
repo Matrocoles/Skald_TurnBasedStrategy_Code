@@ -773,6 +773,15 @@ bool AWorldMap::IsOwnedBy(const ATerritory *Territory,
   if (!Territory || !Player || !IsValid(Territory->OwningPlayer)) {
     return false;
   }
+
+  const int32 TerritoryStableId = Territory->OwningPlayer->GetStablePlayerId();
+  const int32 CandidateStableId = Player->GetStablePlayerId();
+  if (TerritoryStableId > 0 && CandidateStableId > 0) {
+    return TerritoryStableId == CandidateStableId;
+  }
+
+  // Fall back to transient player IDs only if no stable identifiers are set
+  // yet (e.g., very early in initialization) so ownership still resolves.
   return Territory->OwningPlayer->GetPlayerId() == Player->GetPlayerId();
 }
 
@@ -791,7 +800,7 @@ int32 AWorldMap::AutoPlaceUnitsForAI(ASkaldPlayerState *PlayerState) {
   if (OwnedTerritories.Num() == 0) {
     UE_LOG(LogSkald, Warning,
            TEXT("AutoPlaceUnitsForAI: PlayerState %d owns no territories"),
-           PlayerState->GetPlayerId());
+           PlayerState->GetStablePlayerId());
     return 0;
   }
 

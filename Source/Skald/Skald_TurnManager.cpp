@@ -43,6 +43,22 @@
 #endif
 
 namespace {
+int32 ResolveStableOrPlayerId(const ASkaldPlayerState* PlayerState)
+{
+  if (!PlayerState)
+  {
+    return INDEX_NONE;
+  }
+
+  const int32 StableId = PlayerState->GetStablePlayerId();
+  if (StableId > 0)
+  {
+    return StableId;
+  }
+
+  return PlayerState->GetPlayerId();
+}
+
 constexpr float BattleResultReturnDelaySeconds = 5.0f;
 constexpr int32 MaxMovementActionsPerMovementPhase = 2;
 FString GetWorldPackageName(const UWorld *World);
@@ -426,6 +442,7 @@ void ATurnManager::OnRep_CurrentPhase(ETurnPhase PreviousPhase) {
       {
         PC->RefreshTurnDataFromState();
         PC->HandleReplicatedTurnOwnership();
+        PC->HandleReplicatedPhaseChange(CurrentPhase);
       }
     }
   }
@@ -972,8 +989,11 @@ void ATurnManager::SyncGameStateTurnIndex() {
         Controllers[CurrentIndex].IsValid()) {
       if (ASkaldPlayerState *PS =
               Controllers[CurrentIndex]->GetPlayerState<ASkaldPlayerState>()) {
-        NewIndex = GS->PlayerArray.IndexOfByKey(PS);
-        NewActivePlayerId = PS->GetPlayerId();
+        NewIndex = GS->FindTurnIndexForStableId(PS->GetStablePlayerId());
+        if (NewIndex == INDEX_NONE) {
+          NewIndex = GS->PlayerArray.IndexOfByKey(PS);
+        }
+        NewActivePlayerId = PS->GetStablePlayerId();
         ActivePlayerState = PS;
       }
     }
@@ -988,7 +1008,7 @@ void ATurnManager::SyncGameStateTurnIndex() {
     GS->CurrentTurnIndex = NewIndex;
     GS->SetActivePlayerId(NewActivePlayerId);
     UE_LOG(LogSkald, Log,
-           TEXT("[TurnState] SyncGameStateTurnIndex -> Index=%d PlayerId=%d"),
+           TEXT("[TurnState] SyncGameStateTurnIndex -> Index=%d StableId=%d"),
            NewIndex, NewActivePlayerId);
     GS->OnTurnIndexChanged.Broadcast(NewIndex);
   }
@@ -1002,9 +1022,11 @@ bool ATurnManager::TryResumeSavedTurnState(USkaldGameInstance *GameInstance) {
   }
 
   const int32 SavedIndex = GI->SavedTurnIndex;
-  const int32 SavedPlayerId = GI->SavedTurnPlayerId;
+  // SavedTurnPlayerId stores the stable player identifier for the active turn
+  // participant when we left the overview map.
+  const int32 SavedStableId = GI->SavedTurnPlayerId;
 
-  auto ResolveIndexForPlayerId = [&](int32 PlayerId) -> int32 {
+  auto ResolveIndexForStableId = [&](int32 PlayerId) -> int32 {
     if (PlayerId <= 0) {
       return INDEX_NONE;
     }
@@ -1016,7 +1038,7 @@ bool ATurnManager::TryResumeSavedTurnState(USkaldGameInstance *GameInstance) {
       if (ASkaldPlayerController *Candidate = Controllers[Index].Get()) {
         if (ASkaldPlayerState *PS =
                 Candidate->GetPlayerState<ASkaldPlayerState>()) {
-          if (PS->GetPlayerId() == PlayerId) {
+          if (PS->GetStablePlayerId() == PlayerId) {
             return Index;
           }
         }
@@ -1025,7 +1047,7 @@ bool ATurnManager::TryResumeSavedTurnState(USkaldGameInstance *GameInstance) {
     return INDEX_NONE;
   };
 
-  int32 TargetIndex = ResolveIndexForPlayerId(SavedPlayerId);
+  int32 TargetIndex = ResolveIndexForStableId(SavedStableId);
   if (!Controllers.IsValidIndex(TargetIndex) || !Controllers[TargetIndex].IsValid()) {
     TargetIndex = SavedIndex;
   }
@@ -1118,35 +1140,15 @@ void ATurnManager::StartTurns(ASkaldPlayerController *StartingController) {
   }
 
   ASkaldPlayerState *PS = CurrentController->GetPlayerState<ASkaldPlayerState>();
-  const FString PlayerName =
-      GetResolvedPlayerName(PS, TEXT("StartTurns_Current"));
   ApplyReinforcementsAndResources(PS, TEXT("StartTurns"));
 
   CurrentPhase = ETurnPhase::Reinforcement;
-  for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr :
-       Controllers) {
-    if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
-      const bool bIsActive = Controller == CurrentController;
-      Controller->ShowTurnAnnouncement(PlayerName, bIsActive);
-      ASkaldPlayerState *ControllerPS =
-          Controller->GetPlayerState<ASkaldPlayerState>();
-      const bool bIsAI = ControllerPS && ControllerPS->bIsAI;
-      if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
-        HUD->UpdateTurnBanner(PS ? PS->GetPlayerId() : -1, 1);
-        HUD->UpdatePhaseBanner(CurrentPhase);
-      } else if (!bIsAI && Controller->IsLocalController()) {
-        UE_LOG(LogSkald, Warning,
-               TEXT("StartTurns: Controller %s missing HUD widget"),
-               *Controller->GetName());
-        if (GEngine) {
-          GEngine->AddOnScreenDebugMessage(
-              -1, 5.f, FColor::Yellow,
-              FString::Printf(TEXT("StartTurns: no HUD for %s"),
-                              *Controller->GetName()));
-        }
-      }
-    }
-  }
+
+  // Mirror the replicated phase change path locally so the listen server host
+  // refreshes HUD, camera, and turn ownership from replicated state rather
+  // than host-only UI calls. Remote clients will respond via
+  // OnRep_CurrentPhase.
+  BroadcastCurrentPhase();
 
   SyncGameStateTurnIndex();
   CurrentController->StartTurn();
@@ -1170,14 +1172,6 @@ void ATurnManager::AdvanceTurn() {
   ASkaldPlayerController *PreviousController =
       Controllers.IsValidIndex(CurrentIndex) ? Controllers[CurrentIndex].Get()
                                              : nullptr;
-  FString PreviousPlayerName;
-  if (PreviousController) {
-    if (ASkaldPlayerState *PrevPS =
-            PreviousController->GetPlayerState<ASkaldPlayerState>()) {
-      PreviousPlayerName =
-          GetResolvedPlayerName(PrevPS, TEXT("AdvanceTurn_Previous"));
-    }
-  }
 
   const int32 PreviousIndex = CurrentIndex;
 
@@ -1227,24 +1221,14 @@ void ATurnManager::AdvanceTurn() {
           Controllers[CurrentIndex].Get()) {
     ASkaldPlayerState *PS =
         CurrentController->GetPlayerState<ASkaldPlayerState>();
-    const FString PlayerName =
-        GetResolvedPlayerName(PS, TEXT("AdvanceTurn_Current"));
     ResetMovementActionsForActivePlayer();
     ApplyReinforcementsAndResources(PS, TEXT("AdvanceTurn"));
 
     CurrentPhase = ETurnPhase::Reinforcement;
-    for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr :
-         Controllers) {
-      if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
-        const bool bIsActive = Controller == CurrentController;
-        Controller->NotifyTurnEnded(PreviousPlayerName);
-        Controller->ShowTurnAnnouncement(PlayerName, bIsActive);
-        if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
-          HUD->UpdateTurnBanner(PS ? PS->GetPlayerId() : -1, 1);
-          HUD->UpdatePhaseBanner(CurrentPhase);
-        }
-      }
-    }
+
+    // Phase replication will drive HUD/turn updates on clients; mirror that
+    // path locally for the listen server host without issuing host-only RPCs.
+    BroadcastCurrentPhase();
 
     CurrentController->StartTurn();
     SyncGameStateTurnIndex();
@@ -1348,7 +1332,7 @@ int32 ATurnManager::GetActivePlayerId() const {
       ControllerPtr.IsValid()) {
     if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
       if (ASkaldPlayerState *PS = Controller->GetPlayerState<ASkaldPlayerState>()) {
-        return PS->GetPlayerId();
+        return PS->GetStablePlayerId();
       }
     }
   }
@@ -1385,7 +1369,8 @@ bool ATurnManager::BeginBattleResultAcknowledgementWindow() {
       continue;
     }
 
-    const int32 PlayerId = PS->GetPlayerId();
+    const int32 StableId = PS->GetStablePlayerId();
+    const int32 PlayerId = StableId > 0 ? StableId : PS->GetPlayerId();
     if (PlayerId > 0) {
       PendingBattleResultAckPlayerIds.Add(PlayerId);
     }
@@ -1431,7 +1416,7 @@ void ATurnManager::NotifyBattleResultAcknowledged(int32 PlayerID) {
            TEXT("Battle result acknowledgements complete; resuming AI decisions."));
   } else {
     UE_LOG(LogSkald, Verbose,
-           TEXT("Battle result acknowledgement received from PlayerID=%d; Remaining=%d"),
+           TEXT("Battle result acknowledgement received from StablePlayerID=%d; Remaining=%d"),
            PlayerID, PendingBattleResultAckPlayerIds.Num());
   }
 }
@@ -1513,7 +1498,8 @@ void ATurnManager::RequestDefenderRetreat(
 
   ASkaldPlayerState *RequestingState =
       RequestingController->GetPlayerState<ASkaldPlayerState>();
-  if (!RequestingState || RequestingState->GetPlayerId() != DefendingPlayerId) {
+  const int32 RequestingId = ResolveStableOrPlayerId(RequestingState);
+  if (!RequestingState || RequestingId != DefendingPlayerId) {
     UE_LOG(LogSkaldReady, Warning,
            TEXT("RequestDefenderRetreat rejected: controller %s is not the defender."),
            *GetNameSafe(RequestingController));
@@ -2144,11 +2130,12 @@ void ATurnManager::BeginReadyPhase(const FS_BattlePayload &Battle,
                                             ASkaldPlayerState *Participant,
                                             int32 PlayerId) {
     if (Participant) {
-      if (PlayerId > 0 && Participant->GetPlayerId() != PlayerId) {
+      const int32 ResolvedId = ResolveStableOrPlayerId(Participant);
+      if (PlayerId > 0 && ResolvedId != PlayerId) {
         UE_LOG(LogSkaldReady, Warning,
                TEXT("%s: %s resolved to PlayerId=%d but payload expected %d (potential slot mismatch)."),
                Context ? Context : TEXT("BeginReadyPhase"), ParticipantRole,
-               Participant->GetPlayerId(), PlayerId);
+               ResolvedId, PlayerId);
       }
       return;
     }
@@ -2169,7 +2156,7 @@ void ATurnManager::BeginReadyPhase(const FS_BattlePayload &Battle,
           return;
         }
 
-        const int32 ResolvedId = Participant->GetPlayerId();
+        const int32 ResolvedId = ResolveStableOrPlayerId(Participant);
         if (ResolvedId > 0 && ResolvedId != PlayerId) {
           UE_LOG(LogSkald, Verbose,
                  TEXT("%s: remapping %s PlayerID from %d to %d using %s"),
@@ -2216,6 +2203,17 @@ void ATurnManager::BeginReadyPhase(const FS_BattlePayload &Battle,
                            NormalizedBattle.AttackerPlayerID);
   LogParticipantResolution(TEXT("Defender"), DefenderState,
                            NormalizedBattle.DefenderPlayerID);
+
+  auto ResolveParticipantId = [&](ASkaldPlayerState *Participant,
+                                  int32 PlayerId) {
+    const int32 StableId = ResolveStableOrPlayerId(Participant);
+    return StableId > 0 ? StableId : PlayerId;
+  };
+
+  NormalizedBattle.AttackerPlayerID =
+      ResolveParticipantId(AttackerState, NormalizedBattle.AttackerPlayerID);
+  NormalizedBattle.DefenderPlayerID =
+      ResolveParticipantId(DefenderState, NormalizedBattle.DefenderPlayerID);
 
   if (GameState) {
     GameState->SetActiveBattlePayload(NormalizedBattle);
@@ -2377,7 +2375,7 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
         Controllers[CurrentIndex].IsValid()) {
       if (ASkaldPlayerState *PS =
               Controllers[CurrentIndex]->GetPlayerState<ASkaldPlayerState>()) {
-        SavedPlayerId = PS->GetPlayerId();
+        SavedPlayerId = PS->GetStablePlayerId();
       }
     }
 
@@ -2541,6 +2539,24 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
       }
     }
 
+    auto ResolveSnapshotPlayerId = [](ASkaldPlayerState *PS) {
+      if (!PS) {
+        return 0;
+      }
+
+      const int32 StableId = PS->GetStablePlayerId();
+      if (StableId > 0) {
+        return StableId;
+      }
+
+      const int32 AuthoritativeId = PS->GetAuthoritativePlayerId();
+      if (AuthoritativeId > 0) {
+        return AuthoritativeId;
+      }
+
+      return PS->GetPlayerId();
+    };
+
     auto ResolveControllerIndex = [&](ASkaldPlayerState *State) -> int32 {
       if (!State) {
         return INDEX_NONE;
@@ -2559,7 +2575,7 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
       for (APlayerState *BasePS : GS->PlayerArray) {
         if (ASkaldPlayerState *SkaldPS = Cast<ASkaldPlayerState>(BasePS)) {
           FS_PlayerData Snapshot;
-          Snapshot.PlayerID = SkaldPS->GetPlayerId();
+          Snapshot.PlayerID = ResolveSnapshotPlayerId(SkaldPS);
           Snapshot.PlayerName = SkaldPS->GetResolvedPlayerName(TEXT("TravelState"));
           Snapshot.DisplayName = SkaldPS->PlayerDisplayName;
           Snapshot.DesiredControllerIndex = ResolveControllerIndex(SkaldPS);
@@ -2584,29 +2600,29 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
         }
       }
 
-      TSet<int32> ValidPlayerIds;
-      for (APlayerState *BasePS : GS->PlayerArray) {
-        ASkaldPlayerState *SkaldPS = Cast<ASkaldPlayerState>(BasePS);
-        if (!SkaldPS) {
-          continue;
-        }
+        TSet<int32> ValidPlayerIds;
+        for (APlayerState *BasePS : GS->PlayerArray) {
+          ASkaldPlayerState *SkaldPS = Cast<ASkaldPlayerState>(BasePS);
+          if (!SkaldPS) {
+            continue;
+          }
 
-        const int32 PlayerId = SkaldPS->GetPlayerId();
-        if (PlayerId <= 0) {
-          continue;
-        }
+          const int32 PlayerId = ResolveSnapshotPlayerId(SkaldPS);
+          if (PlayerId <= 0) {
+            continue;
+          }
 
-        ValidPlayerIds.Add(PlayerId);
+          ValidPlayerIds.Add(PlayerId);
 
         FS_PlayerData *SnapshotPtr = nullptr;
-        if (int32 *ExistingIndex = SnapshotIndexById.Find(PlayerId)) {
-          SnapshotPtr = &TravelState.PlayerSnapshots[*ExistingIndex];
-        } else {
-          const int32 NewIndex = TravelState.PlayerSnapshots.AddDefaulted();
-          SnapshotPtr = &TravelState.PlayerSnapshots[NewIndex];
-          SnapshotPtr->PlayerID = PlayerId;
-          SnapshotIndexById.Add(PlayerId, NewIndex);
-        }
+          if (int32 *ExistingIndex = SnapshotIndexById.Find(PlayerId)) {
+            SnapshotPtr = &TravelState.PlayerSnapshots[*ExistingIndex];
+          } else {
+            const int32 NewIndex = TravelState.PlayerSnapshots.AddDefaulted();
+            SnapshotPtr = &TravelState.PlayerSnapshots[NewIndex];
+            SnapshotPtr->PlayerID = PlayerId;
+            SnapshotIndexById.Add(PlayerId, NewIndex);
+          }
 
         SnapshotPtr->PlayerName =
             SkaldPS->GetResolvedPlayerName(TEXT("TravelState"));
@@ -2681,10 +2697,13 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
         }
       }
       if (!Resolved && GS && OutPlayerID > 0) {
-        Resolved = GS->GetPlayerById(OutPlayerID);
+        Resolved = GS->GetPlayerByStableId(OutPlayerID);
+        if (!Resolved) {
+          Resolved = GS->GetPlayerById(OutPlayerID);
+        }
       }
       if (Resolved) {
-        OutPlayerID = Resolved->GetPlayerId();
+        OutPlayerID = ResolveSnapshotPlayerId(Resolved);
         OutName = Resolved->GetResolvedPlayerName(TEXT("TriggerGridBattle"));
         OutFaction = Resolved->Faction;
         bOutIsAI = Resolved->bIsAI;
@@ -2892,6 +2911,17 @@ void ATurnManager::NotifyPlayerReadyForBattle(int32 PlayerID, bool bReady) {
     UE_LOG(LogSkaldReady, Verbose,
            TEXT("NotifyPlayerReadyForBattle ignored: no pending battle."));
     return;
+  }
+
+  ASkaldGameState *GameState = GetWorld()
+                                   ? GetWorld()->GetGameState<ASkaldGameState>()
+                                   : nullptr;
+  if (GameState) {
+    if (ASkaldPlayerState *PlayerState = GameState->GetPlayerByStableId(PlayerID)) {
+      PlayerID = ResolveStableOrPlayerId(PlayerState);
+    } else if (ASkaldPlayerState *PlayerState = GameState->GetPlayerById(PlayerID)) {
+      PlayerID = ResolveStableOrPlayerId(PlayerState);
+    }
   }
 
   const auto ApplyReadyState = [&](int32 ParticipantId, bool bParticipantIsAI,
@@ -3982,18 +4012,18 @@ bool ATurnManager::CaptureWorldSnapshot(
 
   OutSnapshot.Reserve(WorldMapForSnapshot->Territories.Num());
 
-  for (ATerritory *Territory : WorldMapForSnapshot->Territories) {
-    if (!Territory) {
-      continue;
-    }
+    for (ATerritory *Territory : WorldMapForSnapshot->Territories) {
+      if (!Territory) {
+        continue;
+      }
 
-    FS_Territory Snapshot;
-    Snapshot.TerritoryID = Territory->TerritoryID;
-    Snapshot.TerritoryName = Territory->TerritoryName;
-    ASkaldPlayerState *OwnerPS = Territory->OwningPlayer;
-    Snapshot.OwnerPlayerID = OwnerPS ? OwnerPS->GetPlayerId() : 0;
-    Snapshot.IsCapital = Territory->bIsCapital;
-    Snapshot.CapitalOwner = Snapshot.OwnerPlayerID;
+      FS_Territory Snapshot;
+      Snapshot.TerritoryID = Territory->TerritoryID;
+      Snapshot.TerritoryName = Territory->TerritoryName;
+      ASkaldPlayerState *OwnerPS = Territory->OwningPlayer;
+      Snapshot.OwnerPlayerID = OwnerPS ? ResolveStableOrPlayerId(OwnerPS) : 0;
+      Snapshot.IsCapital = Territory->bIsCapital;
+      Snapshot.CapitalOwner = Snapshot.OwnerPlayerID;
     Snapshot.ArmyUnits = Territory->ArmyUnits;
     Snapshot.ContinentID = Territory->ContinentID;
     Snapshot.Location = Territory->GetActorLocation();
@@ -4203,10 +4233,9 @@ void ATurnManager::EndCurrentPhase() {
     bool bBlockAdvance = false;
     ASkaldPlayerState *ActivePS = nullptr;
     if (ASkaldGameState *GS = GetWorld()->GetGameState<ASkaldGameState>()) {
-      if (GS->PlayerArray.IsValidIndex(GS->CurrentTurnIndex)) {
-        ActivePS = Cast<ASkaldPlayerState>(GS->PlayerArray[GS->CurrentTurnIndex]);
-        if (ActivePS && !ActivePS->bIsAI && ActivePS->DeployableUnits > 0) {
-          bool bCanPlaceMore = false;
+      ActivePS = GS->GetPlayerAtTurnIndex(GS->CurrentTurnIndex);
+      if (ActivePS && !ActivePS->bIsAI && ActivePS->DeployableUnits > 0) {
+        bool bCanPlaceMore = false;
           if (AWorldMap *WorldMap = ResolveWorldMap()) {
             for (ATerritory *Terr : WorldMap->Territories) {
               if (Terr && Terr->OwningPlayer == ActivePS) {
@@ -4360,32 +4389,13 @@ bool ATurnManager::BroadcastCurrentPhase() {
   for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr :
        Controllers) {
     if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {
-      if (USkaldMainHUDWidget *HUD = Controller->GetHUDWidget()) {
-        HUD->UpdatePhaseBanner(CurrentPhase);
-      }
-
-      switch (CurrentPhase) {
-      case ETurnPhase::Attack:
-        Controller->HandleAttackPhase();
-        break;
-      case ETurnPhase::Engineering:
-        Controller->HandleEngineeringPhase();
-        break;
-      case ETurnPhase::Treasure:
-        Controller->HandleTreasurePhase();
-        break;
-      case ETurnPhase::Movement:
-        Controller->HandleMovementPhase();
-        break;
-      case ETurnPhase::EndTurn:
-        Controller->HandleEndTurnPhase();
-        break;
-      case ETurnPhase::Revolt:
-        Controller->HandleRevoltPhase();
-        break;
-      default:
-        break;
-      }
+      // Mirror the client-side replication path locally so the listen server
+      // host refreshes phase UI, turn ownership, and battle HUD without
+      // issuing host-driven RPCs. Remote clients will respond via
+      // OnRep_CurrentPhase and the replicated GameState/turn state.
+      Controller->RefreshTurnDataFromState();
+      Controller->HandleReplicatedTurnOwnership();
+      Controller->HandleReplicatedPhaseChange(CurrentPhase);
     }
   }
 

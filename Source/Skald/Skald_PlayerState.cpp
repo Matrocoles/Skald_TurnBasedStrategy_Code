@@ -175,13 +175,21 @@ void ASkaldPlayerState::OnRep_PlayerId() {
   if (APlayerController *PC = GetOwner<APlayerController>()) {
     if (ASkaldPlayerController *SkaldPC = Cast<ASkaldPlayerController>(PC)) {
       if (USkaldMainHUDWidget *HUD = SkaldPC->GetHUDWidget()) {
-        const bool bLocalIdChanged = (HUD->LocalPlayerID != GetPlayerId());
-        HUD->LocalPlayerID = GetPlayerId();
+        const int32 StableId = GetStablePlayerId();
+        const bool bLocalIdChanged = (HUD->LocalPlayerID != StableId);
+        HUD->LocalPlayerID = StableId;
         if (bLocalIdChanged) {
-          HUD->SyncPhaseButtons(HUD->CurrentPlayerID == HUD->LocalPlayerID);
+          HUD->SyncPhaseButtons(HUD->CurrentPlayerID == StableId);
         }
       }
+
       SkaldPC->HandlePlayerIdUpdated();
+
+      // Resolve turn ownership locally whenever a stable ID replicates so
+      // each owning client can enable their own HUD/input without waiting on
+      // host-driven prompts.
+      SkaldPC->RefreshTurnDataFromState();
+      SkaldPC->HandleReplicatedTurnOwnership();
     }
   }
 

@@ -50,12 +50,20 @@ int32 ResolveSnapshotPlayerId(const ASkaldPlayerState *PlayerState) {
     return 0;
   }
 
-  const int32 ReplicatedId = PlayerState->GetPlayerId();
-  if (ReplicatedId > 0) {
-    return ReplicatedId;
+  // Prefer the replicated stable identifier so world snapshots and restores
+  // remain consistent across travel/reconnects instead of relying on
+  // connection-scoped PlayerIds that differ per client.
+  const int32 StableId = PlayerState->GetStablePlayerId();
+  if (StableId > 0) {
+    return StableId;
   }
 
-  return PlayerState->GetAuthoritativePlayerId();
+  const int32 AuthoritativeId = PlayerState->GetAuthoritativePlayerId();
+  if (AuthoritativeId > 0) {
+    return AuthoritativeId;
+  }
+
+  return PlayerState->GetPlayerId();
 }
 
 FLinearColor ResolveDefaultFactionColor(ESkaldFaction InFaction) {

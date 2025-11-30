@@ -50,6 +50,11 @@ static int32 ResolveBattlePlayerId(const ASkaldPlayerState *PlayerState) {
     return INDEX_NONE;
   }
 
+  const int32 StableId = PlayerState->GetStablePlayerId();
+  if (StableId > 0) {
+    return StableId;
+  }
+
   const int32 ReplicatedId = PlayerState->GetPlayerId();
   if (ReplicatedId > 0) {
     return ReplicatedId;
@@ -220,7 +225,7 @@ ASkaldPlayerState *EnsureBattleParticipant(ASkaldGameState *GameState, UWorld *W
         !ExistingName.Equals(DisplayName, ESearchCase::IgnoreCase)) {
       UE_LOG(LogSkaldBattle, Warning,
              TEXT("EnsureBattleParticipant: refusing to override display name for PlayerId %d (existing='%s' requested='%s')"),
-             Target->GetPlayerId(), *ExistingName, *DisplayName);
+            ResolveBattlePlayerId(Target), *ExistingName, *DisplayName);
       return;
     }
 
@@ -248,7 +253,7 @@ ASkaldPlayerState *EnsureBattleParticipant(ASkaldGameState *GameState, UWorld *W
 
   for (APlayerState *BasePS : GameState->PlayerArray) {
     ASkaldPlayerState *Candidate = Cast<ASkaldPlayerState>(BasePS);
-    if (!Candidate || Candidate->GetPlayerId() != PlayerID) {
+    if (!Candidate || ResolveBattlePlayerId(Candidate) != PlayerID) {
       continue;
     }
 
@@ -283,7 +288,7 @@ ASkaldPlayerState *EnsureBattleParticipant(ASkaldGameState *GameState, UWorld *W
         if (!PlayerB) {
           return true;
         }
-        return PlayerA->GetPlayerId() < PlayerB->GetPlayerId();
+      return ResolveBattlePlayerId(PlayerA) < ResolveBattlePlayerId(PlayerB);
       });
       bAddedToList = true;
     }
@@ -575,7 +580,10 @@ void ASkald_BattleGameMode::EnsureBattleControllers() {
     }
 
     if (ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>()) {
-      ControllersById.Add(PS->GetPlayerId(), PC);
+      const int32 ResolvedId = ResolveBattlePlayerId(PS);
+      if (ResolvedId > 0) {
+        ControllersById.Add(ResolvedId, PC);
+      }
     }
   }
 
@@ -643,7 +651,10 @@ void ASkald_BattleGameMode::EnsureBattleControllers() {
     NewController->FinishSpawning(SpawnTransform);
     ASkaldPlayerState *NewPS = EnsurePlayerState(NewController, true);
     if (NewPS) {
-      ControllersById.Add(NewPS->GetPlayerId(), NewController);
+      const int32 ResolvedId = ResolveBattlePlayerId(NewPS);
+      if (ResolvedId > 0) {
+        ControllersById.Add(ResolvedId, NewController);
+      }
     }
 
     AIControllers.Add(NewController);
@@ -667,8 +678,9 @@ void ASkald_BattleGameMode::EnsureBattleControllers() {
       continue;
     }
 
-    const int32 PreviousId = PS->GetPlayerId();
-    if (Participant.PlayerId > 0 && PreviousId != Participant.PlayerId) {
+    const int32 PreviousId = ResolveBattlePlayerId(PS);
+    if (Participant.PlayerId > 0 && PreviousId != Participant.PlayerId &&
+        PreviousId > 0) {
       ControllersById.Remove(PreviousId);
     }
 
@@ -787,11 +799,11 @@ void ASkald_BattleGameMode::RegisterParticipantController(AController *Controlle
       SyncBattlePlayerEntry(PS);
       UE_LOG(LogSkaldBattle, Log,
              TEXT("RegisterParticipantController: accepted %s (Id=%d AI=%d)"),
-             *GetNameSafe(Controller), PS->GetPlayerId(), PS->bIsAI ? 1 : 0);
+            *GetNameSafe(Controller), ResolveBattlePlayerId(PS), PS->bIsAI ? 1 : 0);
     } else {
       UE_LOG(LogSkaldBattle, Warning,
              TEXT("RegisterParticipantController: controller %s (Id=%d) is not in BattleParticipants"),
-             *GetNameSafe(Controller), PS->GetPlayerId());
+            *GetNameSafe(Controller), ResolveBattlePlayerId(PS));
     }
   }
 }
@@ -810,7 +822,7 @@ void ASkald_BattleGameMode::SyncBattlePlayerEntry(ASkaldPlayerState *PlayerState
   }
 
   FBattlePlayerEntry Entry;
-  Entry.PlayerId = PlayerState->GetPlayerId();
+  Entry.PlayerId = ResolveBattlePlayerId(PlayerState);
   Entry.DisplayName = PlayerState->GetResolvedPlayerName(TEXT("BattleGM.SyncBattlePlayerEntry"));
   Entry.Faction = PlayerState->Faction;
   Entry.bIsAI = PlayerState->bIsAI;
@@ -1137,7 +1149,7 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
     ASkaldPlayerState *PlayerState =
         (InOutPlayerId > 0) ? GS->GetPlayerById(InOutPlayerId) : nullptr;
     if (!PlayerState && SlotPlayerState) {
-      InOutPlayerId = SlotPlayerState->GetPlayerId();
+      InOutPlayerId = ResolveBattlePlayerId(SlotPlayerState);
       PlayerState = SlotPlayerState;
     }
     if (!PlayerState) {
@@ -1257,10 +1269,10 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
   AutoCommitAIArmy(DefenderPS, DefenderPS->bIsAI ? DefenderBudget : 0);
 
   if (AttackerPS && AttackerPS->bIsAI && AttackerPS->bArmyLockedIn) {
-    RegisterPlayerLockIn(AttackerPS->GetPlayerId());
+    RegisterPlayerLockIn(ResolveBattlePlayerId(AttackerPS));
   }
   if (DefenderPS && DefenderPS->bIsAI && DefenderPS->bArmyLockedIn) {
-    RegisterPlayerLockIn(DefenderPS->GetPlayerId());
+    RegisterPlayerLockIn(ResolveBattlePlayerId(DefenderPS));
   }
 
   bSetupCompleted = true;
@@ -1531,7 +1543,7 @@ void ASkald_BattleGameMode::AutoCommitAIArmy(ASkaldPlayerState *PlayerState,
 
   UE_LOG(LogSkald, Log,
          TEXT("BattleGM AutoCommitAIArmy: PlayerId=%d Budget=%d"),
-         PlayerState->GetPlayerId(), Budget);
+         ResolveBattlePlayerId(PlayerState), Budget);
 
   TArray<FFighterDefinition> Definitions =
       BattleManager->GetFightersForFaction(PlayerState->Faction);
@@ -1568,7 +1580,7 @@ void ASkald_BattleGameMode::AutoCommitAIArmy(ASkaldPlayerState *PlayerState,
 
   UE_LOG(LogSkald, Log,
          TEXT("BattleGM AutoCommitAIArmy: Locked %d fighters for PlayerId=%d"),
-         PlayerState->PendingArmy.Num(), PlayerState->GetPlayerId());
+         PlayerState->PendingArmy.Num(), ResolveBattlePlayerId(PlayerState));
 }
 
 void ASkald_BattleGameMode::SpawnFighterSide(const TArray<FFighterDefinition> &Roster,
@@ -2027,7 +2039,7 @@ void ASkald_BattleGameMode::OnControllerReady(AController *Controller) {
       PS->bIsActiveBattlePlayer = true;
       UE_LOG(LogSkaldBattle, Log,
              TEXT("OnControllerReady: participant confirmed for %s (Id=%d)"),
-             *GetNameSafe(Controller), PS->GetPlayerId());
+             *GetNameSafe(Controller), ResolveBattlePlayerId(PS));
     }
     SyncBattlePlayerEntry(PS);
   }
@@ -2140,7 +2152,7 @@ void ASkald_BattleGameMode::HandleHumanLockIn(
   }
 
   const FS_BattlePayload &Battle = GI->PendingBattle;
-  const int32 PlayerId = PS->GetPlayerId();
+  const int32 PlayerId = ResolveBattlePlayerId(PS);
   if (PlayerId != Battle.AttackerPlayerID &&
       PlayerId != Battle.DefenderPlayerID) {
     PC->Client_OnLockInResult(false, TEXT("Not part of pending battle"));
@@ -2235,7 +2247,7 @@ void ASkald_BattleGameMode::TryAdvanceAfterLockIn()
 
     if (PlayerPS->bArmyLockedIn)
     {
-      RegisterPlayerLockIn(PlayerPS->GetPlayerId());
+      RegisterPlayerLockIn(ResolveBattlePlayerId(PlayerPS));
     }
   };
 
@@ -2339,7 +2351,7 @@ bool ASkald_BattleGameMode::ValidateAndRecordSelection(
 
   UE_LOG(LogSkaldBattle, Log,
          TEXT("ValidateAndRecordSelection: Player %d locked in %d fighters (Cost=%d / Budget=%d)"),
-         PlayerState->GetPlayerId(), PlayerState->PendingArmy.Num(), TotalCost,
+         ResolveBattlePlayerId(PlayerState), PlayerState->PendingArmy.Num(), TotalCost,
          Budget);
 
   return true;
