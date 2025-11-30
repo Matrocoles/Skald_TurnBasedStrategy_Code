@@ -99,7 +99,7 @@ int32 ASkaldGameState::FindTurnIndexForStableId(int32 StableId) const
 
     for (int32 Index = 0; Index < Players.Num(); ++Index)
     {
-        if (const ASkaldPlayerState* PS = Players[Index].Get())
+        if (const ASkaldPlayerState* PS = Players[Index])
         {
             if (PS->GetStablePlayerId() == StableId)
             {
