@@ -209,6 +209,7 @@ void UGridBattleManager::InitBattle(const TArray<FFighter>& Attackers, const TAr
     DefenderSurvivorArmyCost = 0;
     bTeamsAssigned = false;
     bBattleConcluded = false;
+    bBattleConclusionBroadcasted = false;
     bAwaitingInitiativeRoll = false;
     if (!bInitiativeRollAwaitingResults)
     {
@@ -1147,7 +1148,6 @@ void UGridBattleManager::ReportAttackResolution(AFighterPawn* Attacker, AFighter
         }
     }
 
-    const bool bHadListeners = OnAttackResolved.IsBound();
     OnAttackResolved.Broadcast(Attacker, Defender, Result);
 
     // NOTE: do NOT define any other functions inside here.
@@ -1169,17 +1169,51 @@ void UGridBattleManager::ApplyManualRollFromPlayer(ASkaldPlayerController* Playe
         return;
     }
 
+    if (World->GetNetMode() == NM_Client)
+    {
+        UE_LOG(LogSkaldBattle, Warning, TEXT("[ManualRoll] Ignored non-authority submission from %s for %s"),
+            *GetNameSafe(Player),
+            *GetNameSafe(Attacker));
+        return;
+    }
+
+    if (!Attacker->IsAwaitingPhysicalAttackRoll())
+    {
+        UE_LOG(LogSkaldBattle, Verbose, TEXT("[ManualRoll] Ignored stale roll from %s for %s (not awaiting roll)"),
+            *GetNameSafe(Player),
+            *GetNameSafe(Attacker));
+        return;
+    }
+
+    ASkaldPlayerState* PlayerState = Player->GetPlayerState<ASkaldPlayerState>();
+    ASkaldPlayerController* AttackerController = Cast<ASkaldPlayerController>(Attacker->GetController());
+    if (AttackerController && AttackerController != Player)
+    {
+        UE_LOG(LogSkaldBattle, Warning, TEXT("[ManualRoll] Rejected roll from %s: attacker %s is owned by %s"),
+            *GetNameSafe(Player),
+            *GetNameSafe(Attacker),
+            *GetNameSafe(AttackerController));
+        return;
+    }
+
+    if (!AttackerController && PlayerState && PlayerState->Faction != ESkaldFaction::None && PlayerState->Faction != Attacker->Faction)
+    {
+        UE_LOG(LogSkaldBattle, Warning, TEXT("[ManualRoll] Rejected roll from %s: faction mismatch (Player=%d, Attacker=%d)"),
+            *GetNameSafe(Player),
+            static_cast<int32>(PlayerState->Faction),
+            static_cast<int32>(Attacker->Faction));
+        return;
+    }
+
     const int32 ClampedValue = FMath::Clamp(RollValue, 1, 6);
 
-    UE_LOG(LogSkaldBattle, Log, TEXT("[ManualRoll] %s submitted roll %d for %s"),
+    UE_LOG(LogSkaldBattle, Log, TEXT("[ManualRoll] Accepted %s roll %d for %s"),
         *GetNameSafe(Player),
         ClampedValue,
         *GetNameSafe(Attacker));
 
-    // TODO: integrate this value into your actual dice pipeline.
-    // For now, this just logs. You can later:
-    //  - feed it into your dice manager, or
-    //  - store it on the battle manager and have your attack logic read it.
+    // Note: physical dice values are authoritatively consumed by AFighterPawn::ProcessPhysicalDiceRollResults.
+    // This endpoint is currently used as a server-side validation gate and telemetry hook.
 }
 
 void UGridBattleManager::ReportSimulatedAttackResolution(const FDiceRollResult& Result)
@@ -1905,10 +1939,11 @@ void UGridBattleManager::EndBattle()
 
 void UGridBattleManager::BroadcastBattleConcluded()
 {
-    if (!bBattleConcluded)
+    if (!bBattleConcluded || bBattleConclusionBroadcasted)
     {
         return;
     }
+    bBattleConclusionBroadcasted = true;
 
     if (UWorld* World = GetWorld())
     {
