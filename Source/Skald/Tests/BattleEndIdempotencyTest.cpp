@@ -3,23 +3,6 @@
 #if WITH_AUTOMATION_TESTS
 
 #include "GridBattleManager.h"
-#include "UObject/Object.h"
-
-UCLASS()
-class USkaldBattleEndListener final : public UObject
-{
-  GENERATED_BODY()
-
-public:
-  int32 NotificationCount = 0;
-
-  UFUNCTION()
-  void HandleBattleEnded(ESkaldFaction /*WinningFaction*/, int32 /*AttackerCasualties*/, int32 /*DefenderCasualties*/)
-  {
-    ++NotificationCount;
-  }
-};
-
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldBattleEndIdempotencyTest,
                                  "Skald.Battle.EndBattleIdempotent",
                                  EAutomationTestFlags::EditorContext |
@@ -28,22 +11,24 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldBattleEndIdempotencyTest,
 bool FSkaldBattleEndIdempotencyTest::RunTest(const FString& Parameters)
 {
   UGridBattleManager* Manager = NewObject<UGridBattleManager>();
-  USkaldBattleEndListener* Listener = NewObject<USkaldBattleEndListener>();
+  int32 NotificationCount = 0;
 
   TestNotNull(TEXT("Battle manager created"), Manager);
-  TestNotNull(TEXT("Listener created"), Listener);
-  if (!Manager || !Listener)
+  if (!Manager)
   {
     return false;
   }
 
-  Manager->OnBattleEnded.AddDynamic(Listener, &USkaldBattleEndListener::HandleBattleEnded);
+  Manager->OnBattleEnded.AddLambda([&NotificationCount](ESkaldFaction /*WinningFaction*/, int32 /*AttackerCasualties*/, int32 /*DefenderCasualties*/)
+  {
+    ++NotificationCount;
+  });
 
   Manager->EndBattle();
   Manager->EndBattle();
 
   TestEqual(TEXT("OnBattleEnded should broadcast once across duplicate EndBattle calls"),
-            Listener->NotificationCount, 1);
+            NotificationCount, 1);
   return true;
 }
 
