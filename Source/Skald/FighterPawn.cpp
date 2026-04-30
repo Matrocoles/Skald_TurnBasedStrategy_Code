@@ -3318,6 +3318,11 @@ void AFighterPawn::ServerSubmitPhysicalDiceRoll_Implementation(
     UE_LOG(LogTemp, Warning,
            TEXT("ServerSubmitPhysicalDiceRoll rejected for %s: missing pending attack target."),
            *GetNameSafe(this));
+    CancelAIDiceRollDelay();
+    bAwaitingPhysicalAttackRoll = false;
+    PendingAttackRollId.Invalidate();
+    PendingPhysicalAttackTarget.Reset();
+    PendingAttackTarget.Reset();
     return;
   }
 
