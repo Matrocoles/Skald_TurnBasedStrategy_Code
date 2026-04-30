@@ -201,6 +201,8 @@ public:
 
   /** Retrieve the payload for a pending battle, if any. */
   const FS_BattlePayload &GetPendingBattlePayload() const { return PendingBattle; }
+  bool ResolveBattleReturnMapNameForTesting(FString &OutReturnMapName,
+                                            FString &OutReturnMapSource) const;
 
   /** Retrieve the cached battle preparation payload. */
   const FS_BattlePayload &GetPendingBattlePreparation() const
@@ -362,6 +364,8 @@ protected:
   void ClearBattleEndBinding(USkaldGameInstance *GameInstance);
 
   void CompleteBattleConclusion();
+  bool ResolveBattleReturnMapName(FString &OutReturnMapName,
+                                  FString &OutReturnMapSource) const;
 
   /** Notify controllers and HUDs of a phase change. */
   bool BroadcastCurrentPhase();

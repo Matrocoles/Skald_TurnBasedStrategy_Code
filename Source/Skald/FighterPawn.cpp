@@ -3299,6 +3299,28 @@ void AFighterPawn::ProcessPhysicalDiceRollResults(
 
 void AFighterPawn::ServerSubmitPhysicalDiceRoll_Implementation(
     const FGuid &RollId, const TArray<int32> &Results) {
+  if (!bAwaitingPhysicalAttackRoll) {
+    UE_LOG(LogTemp, Verbose,
+           TEXT("ServerSubmitPhysicalDiceRoll ignored for %s: not awaiting a roll."),
+           *GetNameSafe(this));
+    return;
+  }
+
+  if (!RollId.IsValid() || !PendingAttackRollId.IsValid() ||
+      RollId != PendingAttackRollId) {
+    UE_LOG(LogTemp, Warning,
+           TEXT("ServerSubmitPhysicalDiceRoll rejected for %s: invalid or stale RollId (Received=%s, Pending=%s)."),
+           *GetNameSafe(this), *RollId.ToString(), *PendingAttackRollId.ToString());
+    return;
+  }
+
+  if (!PendingPhysicalAttackTarget.IsValid()) {
+    UE_LOG(LogTemp, Warning,
+           TEXT("ServerSubmitPhysicalDiceRoll rejected for %s: missing pending attack target."),
+           *GetNameSafe(this));
+    return;
+  }
+
   ProcessPhysicalDiceRollResults(RollId, Results);
 }
 

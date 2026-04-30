@@ -610,6 +610,7 @@ private:
 
     /** Ensures EndBattle only broadcasts once per encounter. */
     bool bBattleConcluded = false;
+    bool bBattleConclusionBroadcasted = false;
 
     /** Whether we are waiting for a player-driven initiative roll. */
     bool bAwaitingInitiativeRoll = false;
@@ -692,4 +693,3 @@ private:
     /** Timers used to auto-trigger manual attack rolls for AI controlled fighters. */
     TMap<TWeakObjectPtr<AFighterPawn>, FTimerHandle> PendingAutoManualAttackRolls;
 };
-

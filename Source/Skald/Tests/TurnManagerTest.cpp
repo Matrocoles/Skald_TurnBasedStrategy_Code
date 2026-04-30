@@ -6,6 +6,7 @@
 #include "Tests/SkaldAutomationTestHelpers.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
+#include "Skald_GameInstance.h"
 #include "Engine/World.h"
 #include "Territory.h"
 #include "WorldMap.h"
@@ -268,6 +269,128 @@ bool FSkaldTurnManagerPromptMatchesWithoutPlayerIdTest::RunTest(
   TestTrue(TEXT("Defender receives prompt despite missing PlayerId"),
            DefenderController->bPromptVisible);
 
+  return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FSkaldTurnManagerReturnMapPrefersPendingBattleTest,
+    "Skald.TurnManager.ReturnMapPrefersPendingBattle",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSkaldTurnManagerReturnMapPrefersPendingBattleTest::RunTest(
+    const FString &Parameters) {
+  Skald::Tests::FScopedAutomationTestWorld TestWorld;
+  UWorld *World = TestWorld.Get();
+  TestNotNull(TEXT("World created"), World);
+  if (!World) {
+    return false;
+  }
+
+  ATurnManager *TM = World->SpawnActor<ATurnManager>();
+  USkaldGameInstance *GI = World->GetGameInstance<USkaldGameInstance>();
+  TestNotNull(TEXT("TurnManager"), TM);
+  TestNotNull(TEXT("GameInstance"), GI);
+  if (!TM || !GI) {
+    return false;
+  }
+
+  FS_BattlePayload Battle;
+  Battle.ReturnMap = TEXT("/Game/Maps/WorldMap");
+  TM->SetPendingBattlePayload(Battle);
+
+  FS_BattlePayload GIBattle;
+  GIBattle.ReturnMap = TEXT("/Game/Maps/SomeOtherMap");
+  GI->PendingBattle = GIBattle;
+  GI->SetPendingReturnMap(TEXT("/Game/Maps/FallbackMap"));
+
+  FString ResolvedMap;
+  FString ResolvedSource;
+  const bool bResolved =
+      TM->ResolveBattleReturnMapNameForTesting(ResolvedMap, ResolvedSource);
+
+  TestTrue(TEXT("Resolved return map"), bResolved);
+  TestEqual(TEXT("PendingBattle takes precedence"), ResolvedSource,
+            FString(TEXT("PendingBattle.ReturnMap")));
+  TestEqual(TEXT("Resolved canonical map"), ResolvedMap,
+            FString(TEXT("/Game/Maps/WorldMap")));
+  return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FSkaldTurnManagerReturnMapUsesGameInstancePendingBattleTest,
+    "Skald.TurnManager.ReturnMapUsesGameInstancePendingBattle",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSkaldTurnManagerReturnMapUsesGameInstancePendingBattleTest::RunTest(
+    const FString &Parameters) {
+  Skald::Tests::FScopedAutomationTestWorld TestWorld;
+  UWorld *World = TestWorld.Get();
+  TestNotNull(TEXT("World created"), World);
+  if (!World) {
+    return false;
+  }
+
+  ATurnManager *TM = World->SpawnActor<ATurnManager>();
+  USkaldGameInstance *GI = World->GetGameInstance<USkaldGameInstance>();
+  TestNotNull(TEXT("TurnManager"), TM);
+  TestNotNull(TEXT("GameInstance"), GI);
+  if (!TM || !GI) {
+    return false;
+  }
+
+  TM->SetPendingBattlePayload(FS_BattlePayload());
+
+  FS_BattlePayload GIBattle;
+  GIBattle.ReturnMap = TEXT("/Game/Maps/WorldMap");
+  GI->PendingBattle = GIBattle;
+  GI->SetPendingReturnMap(TEXT("/Game/Maps/FallbackMap"));
+
+  FString ResolvedMap;
+  FString ResolvedSource;
+  const bool bResolved =
+      TM->ResolveBattleReturnMapNameForTesting(ResolvedMap, ResolvedSource);
+
+  TestTrue(TEXT("Resolved return map"), bResolved);
+  TestEqual(TEXT("GameInstance pending battle used"), ResolvedSource,
+            FString(TEXT("GameInstance.PendingBattle.ReturnMap")));
+  TestEqual(TEXT("Resolved canonical map"), ResolvedMap,
+            FString(TEXT("/Game/Maps/WorldMap")));
+  return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FSkaldTurnManagerReturnMapUsesPendingReturnMapTest,
+    "Skald.TurnManager.ReturnMapUsesPendingReturnMap",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSkaldTurnManagerReturnMapUsesPendingReturnMapTest::RunTest(
+    const FString &Parameters) {
+  Skald::Tests::FScopedAutomationTestWorld TestWorld;
+  UWorld *World = TestWorld.Get();
+  TestNotNull(TEXT("World created"), World);
+  if (!World) {
+    return false;
+  }
+
+  ATurnManager *TM = World->SpawnActor<ATurnManager>();
+  USkaldGameInstance *GI = World->GetGameInstance<USkaldGameInstance>();
+  TestNotNull(TEXT("TurnManager"), TM);
+  TestNotNull(TEXT("GameInstance"), GI);
+  if (!TM || !GI) {
+    return false;
+  }
+
+  TM->SetPendingBattlePayload(FS_BattlePayload());
+  GI->PendingBattle = FS_BattlePayload();
+  GI->SetPendingReturnMap(TEXT("/Game/Maps/WorldMap"));
+
+  FString ResolvedMap;
+  FString ResolvedSource;
+  const bool bResolved =
+      TM->ResolveBattleReturnMapNameForTesting(ResolvedMap, ResolvedSource);
+
+  TestTrue(TEXT("Resolved return map"), bResolved);
+  TestEqual(TEXT("GameInstance pending return map used"), ResolvedSource,
+            FString(TEXT("GameInstance.PendingReturnMap")));
+  TestEqual(TEXT("Resolved canonical map"), ResolvedMap,
+            FString(TEXT("/Game/Maps/WorldMap")));
   return true;
 }
 

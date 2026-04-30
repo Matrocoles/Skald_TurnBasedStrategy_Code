@@ -571,65 +571,36 @@ void ATurnManager::CompleteBattleConclusion() {
 
   FString ReturnMapName;
   FString ReturnMapSource;
-
-  auto TryResolveReturnMap = [&](const FString &Candidate,
-                                 const TCHAR *SourceLabel) {
-    if (Candidate.IsEmpty()) {
-      return false;
-    }
-
-    FString Canonical = EnsureLongPackageName(Candidate, nullptr);
-    if (Canonical.IsEmpty() && World) {
-      Canonical = EnsureLongPackageName(Candidate, World);
-    }
-    if (Canonical.IsEmpty()) {
-      UE_LOG(LogSkald, Warning,
-             TEXT("HandleGridBattleEnded: %s value '%s' is not a valid long package name."),
-             SourceLabel, *Candidate);
-      return false;
-    }
-
-    ReturnMapName = MoveTemp(Canonical);
-    ReturnMapSource = SourceLabel;
-    return true;
-  };
-
-  if (!TryResolveReturnMap(PendingBattle.ReturnMap,
-                           TEXT("PendingBattle.ReturnMap")) &&
-      GI) {
-    if (!TryResolveReturnMap(GI->PendingBattle.ReturnMap,
-                             TEXT("GameInstance.PendingBattle.ReturnMap"))) {
-      TryResolveReturnMap(GI->GetPendingReturnMap(),
-                          TEXT("GameInstance.PendingReturnMap"));
-    }
+  if (!ResolveBattleReturnMapName(ReturnMapName, ReturnMapSource)) {
+    const FString PendingBattleValue = PendingBattle.ReturnMap;
+    const FString GameInstanceValue = GI ? GI->PendingBattle.ReturnMap : FString();
+    const TCHAR *PendingValueForLog =
+        PendingBattleValue.IsEmpty() ? TEXT("<Empty>") : *PendingBattleValue;
+    const TCHAR *GameInstanceValueForLog =
+        GameInstanceValue.IsEmpty() ? TEXT("<Empty>") : *GameInstanceValue;
+    UE_LOG(LogSkald, Error,
+           TEXT("HandleGridBattleEnded: unable to resolve return map (Pending='%s', GI='%s')."),
+           PendingValueForLog, GameInstanceValueForLog);
+    bBattleReturnPending = false;
+    return;
   }
 
-  if (ReturnMapName.IsEmpty()) {
-    const FString FallbackMap = GetFallbackOverviewMapPackageName();
-    if (TryResolveReturnMap(FallbackMap, TEXT("FallbackOverviewMap"))) {
-      if (GI) {
-        GI->SetPendingReturnMap(ReturnMapName);
-      }
-    } else {
-      const FString PendingBattleValue = PendingBattle.ReturnMap;
-      const FString GameInstanceValue = GI ? GI->PendingBattle.ReturnMap : FString();
-      const TCHAR *PendingValueForLog =
-          PendingBattleValue.IsEmpty() ? TEXT("<Empty>") : *PendingBattleValue;
-      const TCHAR *GameInstanceValueForLog =
-          GameInstanceValue.IsEmpty() ? TEXT("<Empty>") : *GameInstanceValue;
-      UE_LOG(LogSkald, Error,
-             TEXT("HandleGridBattleEnded: unable to resolve return map (Pending='%s', GI='%s')."),
-             PendingValueForLog, GameInstanceValueForLog);
-      bBattleReturnPending = false;
-      return;
-    }
+  if (ReturnMapSource == TEXT("FallbackOverviewMap") && GI) {
+    GI->SetPendingReturnMap(ReturnMapName);
   }
 
   UE_LOG(LogSkald, Verbose,
          TEXT("HandleGridBattleEnded: resolved return map '%s' from %s."),
          *ReturnMapName, *ReturnMapSource);
 
-  ResolveGridBattleResult();
+  const bool bHasPendingResolution =
+      GI && GI->bPendingBattleResolution && GI->PendingBattleResolution.bValid;
+  if (bHasPendingResolution) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("HandleGridBattleEnded: reusing already captured pending battle resolution."));
+  } else {
+    ResolveGridBattleResult();
+  }
 
   if (GI) {
     GI->SetTravelPending(true);
@@ -691,6 +662,60 @@ void ATurnManager::CompleteBattleConclusion() {
   }
 
   bBattleReturnPending = false;
+}
+
+bool ATurnManager::ResolveBattleReturnMapName(FString &OutReturnMapName,
+                                              FString &OutReturnMapSource) const {
+  OutReturnMapName.Reset();
+  OutReturnMapSource.Reset();
+
+  UWorld *World = GetWorld();
+  USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+
+  auto TryResolveReturnMap = [&](const FString &Candidate,
+                                 const TCHAR *SourceLabel) {
+    if (Candidate.IsEmpty()) {
+      return false;
+    }
+
+    FString Canonical = EnsureLongPackageName(Candidate, nullptr);
+    if (Canonical.IsEmpty() && World) {
+      Canonical = EnsureLongPackageName(Candidate, World);
+    }
+    if (Canonical.IsEmpty()) {
+      UE_LOG(LogSkald, Warning,
+             TEXT("ResolveBattleReturnMapName: %s value '%s' is not a valid long package name."),
+             SourceLabel, *Candidate);
+      return false;
+    }
+
+    OutReturnMapName = MoveTemp(Canonical);
+    OutReturnMapSource = SourceLabel;
+    return true;
+  };
+
+  if (TryResolveReturnMap(PendingBattle.ReturnMap, TEXT("PendingBattle.ReturnMap"))) {
+    return true;
+  }
+
+  if (GI) {
+    if (TryResolveReturnMap(GI->PendingBattle.ReturnMap,
+                            TEXT("GameInstance.PendingBattle.ReturnMap"))) {
+      return true;
+    }
+    if (TryResolveReturnMap(GI->GetPendingReturnMap(),
+                            TEXT("GameInstance.PendingReturnMap"))) {
+      return true;
+    }
+  }
+
+  const FString FallbackMap = GetFallbackOverviewMapPackageName();
+  return TryResolveReturnMap(FallbackMap, TEXT("FallbackOverviewMap"));
+}
+
+bool ATurnManager::ResolveBattleReturnMapNameForTesting(
+    FString &OutReturnMapName, FString &OutReturnMapSource) const {
+  return ResolveBattleReturnMapName(OutReturnMapName, OutReturnMapSource);
 }
 
 void ATurnManager::HandleBattleMapStateChanged(bool bInBattleMap) {

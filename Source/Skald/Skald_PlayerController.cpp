@@ -9419,6 +9419,23 @@ void ASkaldPlayerController::ServerTriggerManualAttackRoll_Implementation(AFight
         return;
     }
 
+    ASkaldPlayerController* AttackerController = Cast<ASkaldPlayerController>(Attacker->GetController());
+    if (AttackerController && AttackerController != this)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("ServerTriggerManualAttackRoll rejected: %s does not own %s (Owner=%s)"),
+            *GetNameSafe(this),
+            *GetNameSafe(Attacker),
+            *GetNameSafe(AttackerController));
+        return;
+    }
+
+    if (!Attacker->IsAwaitingPhysicalAttackRoll())
+    {
+        UE_LOG(LogTemp, Verbose, TEXT("ServerTriggerManualAttackRoll ignored for %s (not awaiting manual roll)"),
+            *GetNameSafe(Attacker));
+        return;
+    }
+
     UE_LOG(LogTemp, Warning, TEXT("ServerTriggerManualAttackRoll called for %s"), *GetNameSafe(Attacker));
     Attacker->NotifyAIAttackPresentationReady();
     Attacker->TriggerManualAttackRoll();
@@ -9428,6 +9445,23 @@ void ASkaldPlayerController::ServerNotifyAIAttackOverviewComplete_Implementation
 {
     if (!Attacker)
     {
+        return;
+    }
+
+    ASkaldPlayerController* AttackerController = Cast<ASkaldPlayerController>(Attacker->GetController());
+    if (AttackerController && AttackerController != this)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("ServerNotifyAIAttackOverviewComplete rejected: %s does not own %s (Owner=%s)"),
+            *GetNameSafe(this),
+            *GetNameSafe(Attacker),
+            *GetNameSafe(AttackerController));
+        return;
+    }
+
+    if (!Attacker->IsAwaitingPhysicalAttackRoll())
+    {
+        UE_LOG(LogTemp, Verbose, TEXT("ServerNotifyAIAttackOverviewComplete ignored for %s (not awaiting manual roll)"),
+            *GetNameSafe(Attacker));
         return;
     }
 
