@@ -124,5 +124,10 @@ private:
 
   /** True when NotifyBattleLevelActivated ran before BeginPlay completed. */
   bool bPendingStreamingActivation = false;
-};
 
+  /** Last payload signature that completed setup; used for idempotency. */
+  uint32 LastCompletedSetupSignature = 0;
+
+  /** Signature currently being processed by setup. */
+  uint32 ActiveSetupSignature = 0;
+};
