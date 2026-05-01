@@ -5334,7 +5334,7 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
   const EBattlePhase BattlePhase =
       CachedGameState ? CachedGameState->BattlePhase : EBattlePhase::None;
   const bool bInBattleInputFlow =
-      bOnBattleMap || BattlePhase != EBattlePhase::None;
+      bIsBattleMap || BattlePhase != EBattlePhase::None;
   UE_LOG(LogSkald, Log,
          TEXT("[TurnState] Controller %s turn ownership check: Phase=%s ActiveId=%d IsMyTurn=%s LocalTurnActive=%s"),
          *GetName(), *UEnum::GetValueAsString(Phase),
