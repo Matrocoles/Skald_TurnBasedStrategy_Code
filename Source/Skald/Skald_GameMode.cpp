@@ -39,6 +39,8 @@
 #include "Containers/Set.h"
 
 namespace {
+static void NormalizeSinglePlayerControllerRoles(UWorld *World,
+                                                 const USkaldGameInstance *GI);
 constexpr float StartGameTimeout = 10.f;
 constexpr int32 StartingResources = 100;
 constexpr float RetryInitDelay = 0.01f;

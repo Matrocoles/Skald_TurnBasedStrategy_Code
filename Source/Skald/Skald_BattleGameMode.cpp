@@ -28,6 +28,8 @@
 #include "Math/RotationMatrix.h"
 
 namespace {
+static void NormalizeSinglePlayerControllerRoles(UWorld *World,
+                                                 const USkaldGameInstance *GI);
 
 struct FPendingControllerSlot {
   TWeakObjectPtr<AController> Controller;
