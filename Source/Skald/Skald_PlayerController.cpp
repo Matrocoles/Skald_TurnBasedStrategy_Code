@@ -1524,16 +1524,9 @@ void ASkaldPlayerController::InitializeHUDWidget() {
     return;
   }
 
-  if (!IsLocalPlayerController()) {
+  if (!CanCreateLocalUIWidget()) {
     UE_LOG(LogSkald, Verbose,
-           TEXT("InitializeHUDWidget skipped: controller %s is not local."),
-           *GetName());
-    return;
-  }
-
-  if (!GetLocalPlayer()) {
-    UE_LOG(LogSkald, Verbose,
-           TEXT("InitializeHUDWidget skipped: controller %s has no local player."),
+           TEXT("InitializeHUDWidget skipped: controller %s is not eligible for local UI."),
            *GetName());
     return;
   }
@@ -1612,8 +1605,13 @@ void ASkaldPlayerController::InitializeHUDWidget() {
   }
 }
 
+bool ASkaldPlayerController::CanCreateLocalUIWidget() const {
+  return IsLocalController() && IsLocalPlayerController() &&
+         GetLocalPlayer() != nullptr;
+}
+
 void ASkaldPlayerController::InitializeChoosePlayerWidget() {
-  if (!IsLocalPlayerController() || !GetLocalPlayer()) {
+  if (!CanCreateLocalUIWidget()) {
     return;
   }
 
@@ -1919,7 +1917,7 @@ void ASkaldPlayerController::HideMainHUD() {
 
 void ASkaldPlayerController::ShowBattleResultWidget(
     const FBattleResultDisplayData &DisplayData) {
-  if (!IsLocalController() || !DisplayData.bValid) {
+  if (!CanCreateLocalUIWidget() || !DisplayData.bValid) {
     return;
   }
 
@@ -1993,7 +1991,7 @@ void ASkaldPlayerController::ToggleInGameMenu() {
 }
 
 void ASkaldPlayerController::ShowInGameMenu() {
-  if (!IsLocalController()) {
+  if (!CanCreateLocalUIWidget()) {
     return;
   }
 
@@ -2139,7 +2137,7 @@ void ASkaldPlayerController::RefreshFactionCursorFromState() {
 }
 
 void ASkaldPlayerController::ApplyFactionCursor() {
-  if (!IsLocalController()) {
+  if (!CanCreateLocalUIWidget()) {
     return;
   }
 
@@ -2629,7 +2627,7 @@ void ASkaldPlayerController::RequestBattleStateIfNeeded() {
 
 void ASkaldPlayerController::ShowFighterSelectionUI(int32 MaxBudget,
                                                     ESkaldFaction Faction) {
-  if (!IsLocalController() || GetLocalPlayer() == nullptr) {
+  if (!CanCreateLocalUIWidget()) {
     return;
   }
 
@@ -2872,7 +2870,7 @@ void ASkaldPlayerController::Server_CommitArmy_Implementation(
 }
 
 void ASkaldPlayerController::InitializeBattleHUD() {
-  if (!IsLocalPlayerController() || !GetLocalPlayer())
+  if (!CanCreateLocalUIWidget())
     return;
   if (!BattleHUDWidgetClass)
     return;
@@ -5333,6 +5331,10 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
   const bool bIsMyTurn = IsMyTurn();
   const ETurnPhase Phase = TurnManager ? TurnManager->GetCurrentPhase()
                                        : ETurnPhase::Reinforcement;
+  const EBattlePhase BattlePhase =
+      CachedGameState ? CachedGameState->BattlePhase : EBattlePhase::None;
+  const bool bInBattleInputFlow =
+      bOnBattleMap || BattlePhase != EBattlePhase::None;
   UE_LOG(LogSkald, Log,
          TEXT("[TurnState] Controller %s turn ownership check: Phase=%s ActiveId=%d IsMyTurn=%s LocalTurnActive=%s"),
          *GetName(), *UEnum::GetValueAsString(Phase),
@@ -5342,6 +5344,12 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
 
   if (MainHUD) {
     MainHUD->SyncPhaseButtons(bIsMyTurn);
+  }
+
+  // Battle preparation/selection controls are managed by battle flow. Avoid
+  // having overworld turn ownership logic steal input mode or cursor state.
+  if (bInBattleInputFlow) {
+    return;
   }
 
   if (bIsMyTurn && !bLocalTurnActive) {
@@ -8594,7 +8602,7 @@ void ASkaldPlayerController::HandlePendingPresentationTimerTick() {
 }
 
 void ASkaldPlayerController::EnsureDiceWidgets() {
-  if (!IsLocalController() || GetLocalPlayer() == nullptr) {
+  if (!CanCreateLocalUIWidget()) {
     return;
   }
 

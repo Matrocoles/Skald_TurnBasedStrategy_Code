@@ -55,17 +55,23 @@ static int32 ResolveBattlePlayerId(const ASkaldPlayerState *PlayerState) {
     return StableId;
   }
 
-  const int32 ReplicatedId = PlayerState->GetPlayerId();
-  if (ReplicatedId > 0) {
-    return ReplicatedId;
-  }
-
   const int32 AuthoritativeId = PlayerState->GetAuthoritativePlayerId();
   if (AuthoritativeId > 0) {
     return AuthoritativeId;
   }
 
   return INDEX_NONE;
+}
+
+static uint32 BuildBattleSetupSignature(const FS_BattlePayload& Battle) {
+  uint32 Hash = 0;
+  Hash = HashCombine(Hash, ::GetTypeHash(Battle.FromTerritoryID));
+  Hash = HashCombine(Hash, ::GetTypeHash(Battle.TargetTerritoryID));
+  Hash = HashCombine(Hash, ::GetTypeHash(Battle.AttackerPlayerID));
+  Hash = HashCombine(Hash, ::GetTypeHash(Battle.DefenderPlayerID));
+  Hash = HashCombine(Hash, ::GetTypeHash(Battle.ArmyCountSent));
+  Hash = HashCombine(Hash, ::GetTypeHash(Battle.DefenderArmyCount));
+  return Hash;
 }
 
 static int32 GetPlayerIdFrom(AController *C) {
@@ -892,6 +898,7 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
   auto ResetSetupAttempt = [this]() {
     bSetupStarted = false;
     GBattleSetupTriggered = false;
+    ActiveSetupSignature = 0;
   };
 
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
@@ -944,6 +951,27 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
   if (Battle.DefenderArmyCount <= 0 && TS.DefenderArmyBudget > 0) {
     Battle.DefenderArmyCount = TS.DefenderArmyBudget;
   }
+
+  const uint32 SetupSignature = BuildBattleSetupSignature(Battle);
+  if (LastCompletedSetupSignature != 0 &&
+      LastCompletedSetupSignature == SetupSignature) {
+    UE_LOG(LogSkaldBattle, Verbose,
+           TEXT("SetupPendingBattle: skipping duplicate completed setup (Signature=%u)"),
+           SetupSignature);
+    bSetupCompleted = true;
+    bSetupStarted = false;
+    GBattleSetupTriggered = false;
+    return;
+  }
+
+  if (ActiveSetupSignature != 0 && ActiveSetupSignature == SetupSignature &&
+      bSetupStarted) {
+    UE_LOG(LogSkaldBattle, Verbose,
+           TEXT("SetupPendingBattle: duplicate in-flight setup ignored (Signature=%u)"),
+           SetupSignature);
+    return;
+  }
+  ActiveSetupSignature = SetupSignature;
 
   auto BackfillFromSlots = [&](int32& PlayerId, FString& DisplayName,
                                ESkaldFaction& Faction, bool& bIsAI)
@@ -1276,6 +1304,8 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
   }
 
   bSetupCompleted = true;
+  LastCompletedSetupSignature = SetupSignature;
+  ActiveSetupSignature = 0;
   GI->PendingBattle = Battle;
 
   TryAdvanceAfterLockIn();
@@ -2041,7 +2071,9 @@ void ASkald_BattleGameMode::OnControllerReady(AController *Controller) {
              TEXT("OnControllerReady: participant confirmed for %s (Id=%d)"),
              *GetNameSafe(Controller), ResolveBattlePlayerId(PS));
     }
-    SyncBattlePlayerEntry(PS);
+    if (ResolveBattlePlayerId(PS) > 0) {
+      SyncBattlePlayerEntry(PS);
+    }
   }
 
   AssignControllerSlot(Controller);
@@ -2411,4 +2443,3 @@ void ASkald_BattleGameMode::LogParticipantLockState(const TCHAR *Context)
          *DescribeParticipant(Battle.DefenderPlayerID), *LockedIds,
          *UEnum::GetValueAsString(GS->BattlePhase));
 }
-

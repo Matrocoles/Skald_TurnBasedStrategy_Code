@@ -981,6 +981,9 @@ protected:
   /** Set up the main HUD widget for the local player. */
   virtual void InitializeHUDWidget();
 
+  /** True when this controller is allowed to create viewport/UI widgets. */
+  bool CanCreateLocalUIWidget() const;
+
 public:
   void BeginRetreatSelectionLocal(int32 DefendingTerritoryID,
                                   const TArray<int32> &CandidateTerritoryIDs);
