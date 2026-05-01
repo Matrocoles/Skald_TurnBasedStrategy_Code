@@ -1,4 +1,5 @@
 #include "Skald_PlayerController.h"
+#include "Skald_AIController.h"
 
 #include "Engine/World.h"
 #include "Engine/Engine.h"
