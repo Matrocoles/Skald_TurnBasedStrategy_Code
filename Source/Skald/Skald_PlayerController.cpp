@@ -427,7 +427,7 @@ bool ASkaldPlayerController::TryUseAbilitySlot(ESkaldAbilitySlot Slot) {
 }
 
 void ASkaldPlayerController::HandleAbilityInput(ESkaldAbilitySlot Slot) {
-  if (!IsLocalController() || GetLocalPlayer() == nullptr) {
+  if (!CanCreateLocalUIWidget()) {
     return;
   }
 
@@ -2473,7 +2473,7 @@ ATurnManager *ASkaldPlayerController::FindTurnManagerActor() const {
 }
 
 void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
-  if (!IsLocalController() || GetLocalPlayer() == nullptr) {
+  if (!CanCreateLocalUIWidget()) {
     return;
   }
 
@@ -2775,7 +2775,7 @@ void ASkaldPlayerController::Client_OnLockInResult_Implementation(
 }
 
 void ASkaldPlayerController::HandleBattlePhaseChanged() {
-  if (!IsLocalController() || GetLocalPlayer() == nullptr) {
+  if (!CanCreateLocalUIWidget()) {
     return;
   }
 
@@ -5331,7 +5331,7 @@ void ASkaldPlayerController::HandleReplicatedBattlePayload() {
 }
 
 void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
-  if (!IsLocalController() || GetLocalPlayer() == nullptr) {
+  if (!CanCreateLocalUIWidget()) {
     return;
   }
 
@@ -6985,7 +6985,7 @@ void ASkaldPlayerController::ResetPendingReadyPromptState() {
 
 void ASkaldPlayerController::ShowPrepareForBattlePromptLocal(
     const FPrepareForBattlePromptData &PromptData) {
-  if (!IsLocalController() || GetLocalPlayer() == nullptr) {
+  if (!CanCreateLocalUIWidget()) {
     UE_LOG(LogSkaldReady, Verbose,
            TEXT("Skipping prepare-for-battle prompt for %s: controller has no local player."),
            *GetName());
@@ -7010,7 +7010,7 @@ void ASkaldPlayerController::ShowPrepareForBattlePromptLocal(
 
 void ASkaldPlayerController::ShowPrepareForBattlePromptLocal_Internal(
     const FPrepareForBattlePromptData &PromptData) {
-  if (!IsLocalController() || GetLocalPlayer() == nullptr) {
+  if (!CanCreateLocalUIWidget()) {
     ResetPendingReadyPromptState();
     return;
   }
