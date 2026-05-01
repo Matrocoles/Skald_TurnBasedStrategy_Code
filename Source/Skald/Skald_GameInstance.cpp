@@ -1,4 +1,5 @@
 #include "Skald_GameInstance.h"
+#include "Engine/LocalPlayer.h"
 
 #include "Engine/World.h"
 #include "Engine/Engine.h"
@@ -1193,7 +1194,13 @@ void USkaldGameInstance::ShowDeployWidget() {
       return;
     }
 
-    DeployWidget = CreateWidget<UUserWidget>(LocalSkaldPC, WidgetClass);
+    if (ULocalPlayer* LocalPlayer = LocalSkaldPC->GetLocalPlayer()) {
+      DeployWidget = CreateWidget<UUserWidget>(LocalPlayer, WidgetClass);
+    } else {
+      UE_LOG(LogSkald, Warning,
+             TEXT("ShowDeployWidget skipped: local controller has no LocalPlayer."));
+      return;
+    }
   }
 
   if (!DeployWidget) {
