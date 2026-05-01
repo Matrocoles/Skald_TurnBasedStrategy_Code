@@ -3,6 +3,7 @@
 #include "LoadGameWidget.h"
 #include "SettingsWidget.h"
 #include "Components/Button.h"
+#include "Engine/LocalPlayer.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "UObject/ConstructorHelpers.h"
@@ -57,15 +58,18 @@ void ULobbyMenuWidget::NativeConstruct()
 
 void ULobbyMenuWidget::OnStartGame()
 {
-    if (UWorld* World = GetWorld())
+    if (APlayerController* PC = GetOwningPlayer())
     {
         if (StartGameWidgetClass)
         {
-            if (UStartGameWidget* Widget = CreateWidget<UStartGameWidget>(World, StartGameWidgetClass))
+            if (ULocalPlayer* LocalPlayer = PC->GetLocalPlayer())
             {
-                Widget->SetLobbyMenu(this);
-                Widget->AddToViewport();
-                SetVisibility(ESlateVisibility::Hidden);
+                if (UStartGameWidget* Widget = CreateWidget<UStartGameWidget>(LocalPlayer, StartGameWidgetClass))
+                {
+                    Widget->SetLobbyMenu(this);
+                    Widget->AddToViewport();
+                    SetVisibility(ESlateVisibility::Hidden);
+                }
             }
         }
     }
@@ -73,7 +77,7 @@ void ULobbyMenuWidget::OnStartGame()
 
 void ULobbyMenuWidget::OnLoadGame()
 {
-    if (UWorld* World = GetWorld())
+    if (APlayerController* PC = GetOwningPlayer())
     {
         if (!LoadGameWidgetClass)
         {
@@ -81,21 +85,24 @@ void ULobbyMenuWidget::OnLoadGame()
             return;
         }
 
-        if (ULoadGameWidget* Widget = CreateWidget<ULoadGameWidget>(World, LoadGameWidgetClass))
+        if (ULocalPlayer* LocalPlayer = PC->GetLocalPlayer())
         {
-            // Pass a reference to the lobby so it can be restored later
-            Widget->SetLobbyMenu(this);
-            Widget->AddToViewport();
+            if (ULoadGameWidget* Widget = CreateWidget<ULoadGameWidget>(LocalPlayer, LoadGameWidgetClass))
+            {
+                // Pass a reference to the lobby so it can be restored later
+                Widget->SetLobbyMenu(this);
+                Widget->AddToViewport();
 
-            // Hide the lobby while the load-game menu is active
-            SetVisibility(ESlateVisibility::Hidden);
+                // Hide the lobby while the load-game menu is active
+                SetVisibility(ESlateVisibility::Hidden);
+            }
         }
     }
 }
 
 void ULobbyMenuWidget::OnSettings()
 {
-    if (UWorld* World = GetWorld())
+    if (APlayerController* PC = GetOwningPlayer())
     {
         if (!SettingsWidgetClass)
         {
@@ -103,11 +110,14 @@ void ULobbyMenuWidget::OnSettings()
             return;
         }
 
-        if (USettingsWidget* Widget = CreateWidget<USettingsWidget>(World, SettingsWidgetClass))
+        if (ULocalPlayer* LocalPlayer = PC->GetLocalPlayer())
         {
-            Widget->SetLobbyMenu(this);
-            Widget->AddToViewport();
-            SetVisibility(ESlateVisibility::Hidden);
+            if (USettingsWidget* Widget = CreateWidget<USettingsWidget>(LocalPlayer, SettingsWidgetClass))
+            {
+                Widget->SetLobbyMenu(this);
+                Widget->AddToViewport();
+                SetVisibility(ESlateVisibility::Hidden);
+            }
         }
     }
 }
@@ -130,4 +140,3 @@ void ULobbyMenuWidget::HandleFighterRosterUpdated()
         }
     }
 }
-

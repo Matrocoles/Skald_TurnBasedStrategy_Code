@@ -1,5 +1,6 @@
 #include "LobbyPlayerController.h"
 #include "Blueprint/UserWidget.h"
+#include "Engine/LocalPlayer.h"
 #include "LobbyGameMode.h"
 #include "LobbyGameState.h"
 #include "LobbyMenuWidget.h"
@@ -27,6 +28,12 @@ void ALobbyPlayerController::BeginPlay()
 
 void ALobbyPlayerController::InitLobbyUI()
 {
+    ULocalPlayer* LocalPlayer = GetLocalPlayer();
+    if (!IsLocalController() || !IsLocalPlayerController() || !LocalPlayer || Player != LocalPlayer)
+    {
+        return;
+    }
+
     USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>();
     const bool bInMultiplayerLobby = GI && GI->bIsMultiplayer;
 
@@ -34,7 +41,7 @@ void ALobbyPlayerController::InitLobbyUI()
     {
         if (!LobbySessionWidgetInstance && LobbySessionWidgetClass)
         {
-            LobbySessionWidgetInstance = CreateWidget<ULobbySessionWidget>(this, LobbySessionWidgetClass);
+            LobbySessionWidgetInstance = CreateWidget<ULobbySessionWidget>(LocalPlayer, LobbySessionWidgetClass);
             if (LobbySessionWidgetInstance)
             {
                 LobbySessionWidgetInstance->AddToViewport();
@@ -52,7 +59,7 @@ void ALobbyPlayerController::InitLobbyUI()
     {
         if (!LobbyWidgetInstance && LobbyWidgetClass)
         {
-            LobbyWidgetInstance = CreateWidget<ULobbyMenuWidget>(this, LobbyWidgetClass);
+            LobbyWidgetInstance = CreateWidget<ULobbyMenuWidget>(LocalPlayer, LobbyWidgetClass);
             if (LobbyWidgetInstance)
             {
                 LobbyWidgetInstance->AddToViewport();
@@ -63,7 +70,7 @@ void ALobbyPlayerController::InitLobbyUI()
         bool bShowingTitleScreen = false;
         if (!TitleScreenWidgetInstance && TitleScreenWidgetClass)
         {
-            TitleScreenWidgetInstance = CreateWidget<UTitleScreenWidget>(this, TitleScreenWidgetClass);
+            TitleScreenWidgetInstance = CreateWidget<UTitleScreenWidget>(LocalPlayer, TitleScreenWidgetClass);
             if (TitleScreenWidgetInstance)
             {
                 TitleScreenWidgetInstance->OnDismissed.AddDynamic(this, &ALobbyPlayerController::HandleTitleScreenDismissed);

@@ -13,6 +13,7 @@
 #include "Engine/Canvas.h"
 #include "Engine/CanvasRenderTarget2D.h"
 #include "Engine/Engine.h"
+#include "Engine/LocalPlayer.h"
 #include "Engine/Texture2D.h"
 #include "CanvasItem.h"
 #include "Kismet/GameplayStatics.h"
@@ -639,6 +640,7 @@ void USkaldMainHUDWidget::RebuildPlayerList(
   }
 
   PlayerListBox->ClearChildren();
+  ULocalPlayer *OwningLocalPlayer = GetOwningLocalPlayer();
 
   UEnum *FactionEnum = StaticEnum<ESkaldFaction>();
   const bool bUseCustomEntries = PlayerListEntryWidgetClass != nullptr;
@@ -657,8 +659,13 @@ void USkaldMainHUDWidget::RebuildPlayerList(
     const int32 TerritoryCount = Player.TerritoriesOwned;
 
     if (bUseCustomEntries) {
+      if (!OwningLocalPlayer) {
+        UE_LOG(LogSkaldUI, Verbose,
+               TEXT("[HUD] Skipping custom player list entries due to missing owning local player."));
+        break;
+      }
       USkaldPlayerListEntryWidget *EntryWidget =
-          CreateWidget<USkaldPlayerListEntryWidget>(GetOwningPlayer(),
+          CreateWidget<USkaldPlayerListEntryWidget>(OwningLocalPlayer,
                                                     PlayerListEntryWidgetClass);
       if (!EntryWidget) {
         continue;
@@ -830,9 +837,14 @@ void USkaldMainHUDWidget::ShowPrepareForBattleDialog(
            TEXT("ShowPrepareForBattleDialog: PrepareForBattleWidgetClass null"));
     return;
   }
+  if (!GetOwningLocalPlayer()) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("ShowPrepareForBattleDialog: missing owning local player"));
+    return;
+  }
 
   ActivePrepareForBattleWidget = CreateWidget<UPrepareForBattleWidget>(
-      GetWorld(), PrepareForBattleWidgetClass);
+      GetOwningLocalPlayer(), PrepareForBattleWidgetClass);
   if (!ActivePrepareForBattleWidget) {
     UE_LOG(LogSkald, Warning,
            TEXT("ShowPrepareForBattleDialog: failed to create widget"));
@@ -1948,8 +1960,14 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
       SelectedTargetID = Territory->TerritoryID;
       ShowSelectionPromptMessage(FText::GetEmpty(), false);
       if (ConfirmAttackWidgetClass) {
+        if (!GetOwningLocalPlayer()) {
+          UE_LOG(LogSkald, Warning,
+                 TEXT("OnTerritoryClickedUI: missing owning local player for confirm widget"));
+          ShowErrorMessage(TEXT("Could not open confirm attack UI"));
+          return;
+        }
         ActiveConfirmWidget = CreateWidget<UConfirmAttackWidget>(
-            GetWorld(), ConfirmAttackWidgetClass);
+            GetOwningLocalPlayer(), ConfirmAttackWidgetClass);
         if (ActiveConfirmWidget) {
           int32 MaxUnits = 1;
           if (AWorldMap *WorldMap =
@@ -2124,8 +2142,20 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
       ActiveDeployWidget = nullptr;
     }
 
+    if (!GetOwningLocalPlayer()) {
+      UE_LOG(LogSkald, Warning,
+             TEXT("OnTerritoryClickedUI: missing owning local player for deploy widget"));
+      const FText Error = ResolveSelectionPromptText(
+          SkaldSelectionPromptKeys::MoveDeployUICreationFailed,
+          NSLOCTEXT("SkaldHUD", "MoveDeployUICreationFailed",
+                    "Could not open deploy UI."));
+      ShowSelectionErrorMessage(Error);
+      CancelMoveSelection();
+      return;
+    }
+
     ActiveDeployWidget =
-        CreateWidget<UDeployWidget>(GetWorld(), DeployWidgetClass);
+        CreateWidget<UDeployWidget>(GetOwningLocalPlayer(), DeployWidgetClass);
     if (!ActiveDeployWidget) {
       const FText Error = ResolveSelectionPromptText(
           SkaldSelectionPromptKeys::MoveDeployUICreationFailed,
@@ -2511,8 +2541,15 @@ void USkaldMainHUDWidget::HandleDeployClicked() {
     MaxDeployable = FMath::Min(MaxDeployable, RemainingCapacity);
   }
 
+  if (!GetOwningLocalPlayer()) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("HandleDeployClicked failed: missing owning local player"));
+    ShowErrorMessage(TEXT("Could not open deploy UI"));
+    return;
+  }
+
   ActiveDeployWidget =
-      CreateWidget<UDeployWidget>(GetWorld(), DeployWidgetClass);
+      CreateWidget<UDeployWidget>(GetOwningLocalPlayer(), DeployWidgetClass);
   if (ActiveDeployWidget) {
     ActiveDeployWidget->SetupDeployment(Territory, PS, this, MaxDeployable);
     ActiveDeployWidget->AddToViewport();
