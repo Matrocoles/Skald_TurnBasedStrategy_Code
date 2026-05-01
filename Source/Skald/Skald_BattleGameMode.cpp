@@ -192,6 +192,35 @@ static void RefreshControllerSlotForState(ASkaldPlayerState *State) {
   }
 }
 
+static void NormalizeSinglePlayerControllerRoles(UWorld *World,
+                                                 const USkaldGameInstance *GI) {
+  if (!World || !GI || GI->bIsMultiplayer) {
+    return;
+  }
+
+  for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator();
+       It; ++It) {
+    ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(*It);
+    if (!PC) {
+      continue;
+    }
+
+    ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>();
+    if (!PS) {
+      continue;
+    }
+
+    const bool bShouldBeAI = IsAIControllerIdentity(PC);
+    if (PS->bIsAI != bShouldBeAI) {
+      UE_LOG(LogSkaldBattle, Verbose,
+             TEXT("NormalizeSinglePlayerControllerRoles: %s bIsAI %d -> %d"),
+             *GetNameSafe(PC), PS->bIsAI ? 1 : 0, bShouldBeAI ? 1 : 0);
+      PS->bIsAI = bShouldBeAI;
+      AssignControllerSlot(PC);
+    }
+  }
+}
+
 void BuildTerritoryMap(const TArray<FS_Territory> &Source,
                        TMap<int32, FS_Territory> &Destination) {
   Destination.Reset();
