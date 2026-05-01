@@ -166,8 +166,9 @@ void ASkaldAIController::InitializeHUDWidget() {
 
 void ASkaldAIController::ShowPrepareForBattlePromptLocal(
     const FPrepareForBattlePromptData &PromptData) {
-  Super::ShowPrepareForBattlePromptLocal(PromptData);
-
+  // AI controllers never display local widgets. Avoid the base implementation
+  // because it can queue UI prompt retries/timers intended for human players.
+  HidePrepareForBattlePromptLocal();
   ProcessPrepareForBattlePrompt(PromptData);
 }
 
@@ -1514,17 +1515,17 @@ void ASkaldAIController::SetupBattleAutomation() {
   // across PIE travel / BeginPlay re-entry edge cases.
   CachedBattleManager->OnActiveFighterChanged.RemoveDynamic(
       this, &ASkaldAIController::HandleActiveFighterChanged);
-  CachedBattleManager->OnActiveFighterChanged.AddDynamic(
+  CachedBattleManager->OnActiveFighterChanged.AddUniqueDynamic(
       this, &ASkaldAIController::HandleActiveFighterChanged);
 
   CachedBattleManager->OnRoundStarted.RemoveDynamic(
       this, &ASkaldAIController::HandleRoundStarted);
-  CachedBattleManager->OnRoundStarted.AddDynamic(
+  CachedBattleManager->OnRoundStarted.AddUniqueDynamic(
       this, &ASkaldAIController::HandleRoundStarted);
 
   CachedBattleManager->OnBattleEnded.RemoveDynamic(
       this, &ASkaldAIController::HandleBattleEnded);
-  CachedBattleManager->OnBattleEnded.AddDynamic(
+  CachedBattleManager->OnBattleEnded.AddUniqueDynamic(
       this, &ASkaldAIController::HandleBattleEnded);
 
   DetermineControlledBattleSide();

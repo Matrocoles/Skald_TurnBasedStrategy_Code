@@ -154,6 +154,25 @@ void ASkaldGameState::OnRep_Players()
     RefreshControllersFromPlayers();
 }
 
+namespace {
+bool ShouldProcessUIController(const ASkaldPlayerController* PC) {
+    if (!PC || !PC->CanCreateLocalUIWidget()) {
+        return false;
+    }
+
+    const FString ClassName = PC->GetClass() ? PC->GetClass()->GetName() : FString();
+    const FString InstanceName = PC->GetName();
+    if (ClassName.Contains(TEXT("AiController"), ESearchCase::IgnoreCase) ||
+        ClassName.Contains(TEXT("AIController"), ESearchCase::IgnoreCase) ||
+        InstanceName.Contains(TEXT("AiController"), ESearchCase::IgnoreCase) ||
+        InstanceName.Contains(TEXT("AIController"), ESearchCase::IgnoreCase)) {
+        return false;
+    }
+
+    return true;
+}
+}
+
 void ASkaldGameState::RefreshControllersFromPlayers()
 {
     if (UWorld* World = GetWorld())
@@ -162,7 +181,7 @@ void ASkaldGameState::RefreshControllersFromPlayers()
         {
             if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
             {
-                if (!PC->IsLocalController())
+                if (!ShouldProcessUIController(PC))
                 {
                     continue;
                 }
@@ -196,7 +215,7 @@ void ASkaldGameState::OnRep_CurrentTurnIndex()
         {
             if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
             {
-                if (!PC->IsLocalController() || PC->GetLocalPlayer() == nullptr)
+                if (!ShouldProcessUIController(PC))
                 {
                     continue;
                 }
@@ -222,7 +241,7 @@ void ASkaldGameState::OnRep_ActivePlayerId()
         {
             if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
             {
-                if (!PC->IsLocalController() || PC->GetLocalPlayer() == nullptr)
+                if (!ShouldProcessUIController(PC))
                 {
                     continue;
                 }
@@ -423,7 +442,7 @@ void ASkaldGameState::OnRep_BattlePayload()
         {
             if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
             {
-                if (!PC->IsLocalController() || PC->GetLocalPlayer() == nullptr)
+                if (!ShouldProcessUIController(PC))
                 {
                     continue;
                 }
@@ -469,7 +488,7 @@ void ASkaldGameState::OnRep_BattleParticipants()
         {
             if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
             {
-                if (!PC->IsLocalController() || PC->GetLocalPlayer() == nullptr)
+                if (!ShouldProcessUIController(PC))
                 {
                     continue;
                 }
@@ -517,7 +536,7 @@ void ASkaldGameState::OnRep_PendingBattleReady()
         {
             if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
             {
-                if (!PC->IsLocalController() || PC->GetLocalPlayer() == nullptr)
+                if (!ShouldProcessUIController(PC))
                 {
                     continue;
                 }
@@ -549,7 +568,7 @@ void ASkaldGameState::OnRep_BattleRoundState()
         {
             if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
             {
-                if (!PC->IsLocalController() || PC->GetLocalPlayer() == nullptr)
+                if (!ShouldProcessUIController(PC))
                 {
                     continue;
                 }
@@ -738,7 +757,7 @@ void ASkaldGameState::OnRep_BattlePhase()
         {
             if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
             {
-                if (!PC->IsLocalController())
+                if (!ShouldProcessUIController(PC))
                 {
                     continue;
                 }
