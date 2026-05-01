@@ -1159,6 +1159,32 @@ void USkaldGameInstance::InitialiseDiceManager() {
 }
 
 void USkaldGameInstance::ShowDeployWidget() {
+  UWorld *World = GetWorld();
+  ASkaldPlayerController *LocalSkaldPC = nullptr;
+  if (World) {
+    for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator();
+         It; ++It) {
+      if (ASkaldPlayerController *Candidate = Cast<ASkaldPlayerController>(It->Get())) {
+        if (Candidate->IsLocalController() && Candidate->IsLocalPlayerController()) {
+          if (const ASkaldPlayerState *PlayerState =
+                  Candidate->GetPlayerState<ASkaldPlayerState>()) {
+            if (PlayerState->bIsAI) {
+              continue;
+            }
+          }
+          LocalSkaldPC = Candidate;
+          break;
+        }
+      }
+    }
+  }
+
+  if (!LocalSkaldPC) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("ShowDeployWidget skipped: no eligible local human player controller."));
+    return;
+  }
+
   if (!DeployWidget) {
     TSubclassOf<UUserWidget> WidgetClass = DeployWidgetClass;
     if (!WidgetClass) {
@@ -1167,7 +1193,7 @@ void USkaldGameInstance::ShowDeployWidget() {
       return;
     }
 
-    DeployWidget = CreateWidget<UUserWidget>(this, WidgetClass);
+    DeployWidget = CreateWidget<UUserWidget>(LocalSkaldPC, WidgetClass);
   }
 
   if (!DeployWidget) {
@@ -1176,11 +1202,7 @@ void USkaldGameInstance::ShowDeployWidget() {
 
   if (!DeployWidget->IsInViewport()) {
     DeployWidget->AddToViewport();
-    if (UWorld *World = GetWorld()) {
-      if (APlayerController *PC = World->GetFirstPlayerController()) {
-        FocusWidgetUIOnly(PC, DeployWidget);
-      }
-    }
+    FocusWidgetUIOnly(LocalSkaldPC, DeployWidget);
   }
 }
 
