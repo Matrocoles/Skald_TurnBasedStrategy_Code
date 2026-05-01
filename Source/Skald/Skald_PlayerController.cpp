@@ -6968,17 +6968,10 @@ void ASkaldPlayerController::ResetPendingReadyPromptState() {
 
 void ASkaldPlayerController::ShowPrepareForBattlePromptLocal(
     const FPrepareForBattlePromptData &PromptData) {
-  if (!IsLocalController()) {
-    return;
-  }
-
-  if (GetLocalPlayer() == nullptr) {
-    PendingReadyPrompt = PromptData;
-    bPendingReadyPrompt = true;
+  if (!IsLocalController() || GetLocalPlayer() == nullptr) {
     UE_LOG(LogSkaldReady, Verbose,
-           TEXT("Deferring prepare-for-battle prompt for %s until local player is available."),
+           TEXT("Skipping prepare-for-battle prompt for %s: controller has no local player."),
            *GetName());
-    RegisterPendingReadyPromptRetry();
     return;
   }
 
@@ -7000,14 +6993,8 @@ void ASkaldPlayerController::ShowPrepareForBattlePromptLocal(
 
 void ASkaldPlayerController::ShowPrepareForBattlePromptLocal_Internal(
     const FPrepareForBattlePromptData &PromptData) {
-  if (!IsLocalController()) {
-    return;
-  }
-
-  if (GetLocalPlayer() == nullptr) {
-    PendingReadyPrompt = PromptData;
-    bPendingReadyPrompt = true;
-    RegisterPendingReadyPromptRetry();
+  if (!IsLocalController() || GetLocalPlayer() == nullptr) {
+    ResetPendingReadyPromptState();
     return;
   }
 
