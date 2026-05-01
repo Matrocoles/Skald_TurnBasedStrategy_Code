@@ -1562,7 +1562,7 @@ void ASkaldPlayerController::InitializeHUDWidget() {
     return;
   }
 
-  MainHUD = CreateWidget<USkaldMainHUDWidget>(this, MainHUDClass);
+  MainHUD = CreateWidget<USkaldMainHUDWidget>(GetLocalPlayer(), MainHUDClass);
   if (!MainHUD) {
     return;
   }
@@ -1652,7 +1652,7 @@ void ASkaldPlayerController::InitializeChoosePlayerWidget() {
   }
 
   ChoosePlayerWidget =
-      CreateWidget<UChoosePlayerWidget>(this, ChoosePlayerWidgetClass);
+      CreateWidget<UChoosePlayerWidget>(GetLocalPlayer(), ChoosePlayerWidgetClass);
   if (!ChoosePlayerWidget) {
     return;
   }
@@ -1963,7 +1963,7 @@ void ASkaldPlayerController::ShowBattleResultWidget(
     return;
   }
 
-  if (UUserWidget *Widget = CreateWidget<UUserWidget>(this, VictoryWidgetClass)) {
+  if (UUserWidget *Widget = CreateWidget<UUserWidget>(GetLocalPlayer(), VictoryWidgetClass)) {
     if (UBattleResultWidget *ResultWidget = Cast<UBattleResultWidget>(Widget)) {
       ResultWidget->SetBattleOutcome(
           DisplayData.bPlayerWon, DisplayData.bPlayerLost,
@@ -2033,7 +2033,7 @@ void ASkaldPlayerController::ShowInGameMenu() {
     }
 
     if (InGameMenuWidgetClass) {
-      InGameMenuWidget = CreateWidget<UInGameMenuWidget>(this, InGameMenuWidgetClass);
+      InGameMenuWidget = CreateWidget<UInGameMenuWidget>(GetLocalPlayer(), InGameMenuWidgetClass);
       if (InGameMenuWidget) {
         InGameMenuWidget->SetVisibility(ESlateVisibility::Hidden);
         InGameMenuWidget->AddToViewport(90);
@@ -2190,7 +2190,7 @@ void ASkaldPlayerController::ApplyFactionCursor() {
   if (CursorTexture) {
     if (!ActiveCursorWidget) {
       ActiveCursorWidget =
-          CreateWidget<UFactionCursorWidget>(this, UFactionCursorWidget::StaticClass());
+          CreateWidget<UFactionCursorWidget>(GetLocalPlayer(), UFactionCursorWidget::StaticClass());
     }
 
     if (ActiveCursorWidget) {
@@ -2928,7 +2928,7 @@ void ASkaldPlayerController::InitializeBattleHUD() {
     return;
   if (!BattleHudWidget) {
     BattleHudWidget =
-        CreateWidget<UBattleHUDWidget>(this, BattleHUDWidgetClass);
+        CreateWidget<UBattleHUDWidget>(GetLocalPlayer(), BattleHUDWidgetClass);
     if (BattleHudWidget) {
       BattleHudWidget->AddToViewport(20);
       BattleHudWidget->SetVisibility(ESlateVisibility::Collapsed);
@@ -8667,7 +8667,7 @@ void ASkaldPlayerController::EnsureDiceWidgets() {
 
   const bool bShouldSpawnOverlay = bAutoPresentDiceRolls || bAutoPresentInitiativeRolls;
   if (bShouldSpawnOverlay && !DiceOverlayWidget && DiceOverlayWidgetClass) {
-    DiceOverlayWidget = CreateWidget<USkaldDiceOverlayWidget>(this, DiceOverlayWidgetClass);
+    DiceOverlayWidget = CreateWidget<USkaldDiceOverlayWidget>(GetLocalPlayer(), DiceOverlayWidgetClass);
     if (DiceOverlayWidget) {
       DiceOverlayWidget->AddToViewport(32);
       DiceOverlayWidget->SetVisibility(ESlateVisibility::Collapsed);
@@ -8675,7 +8675,7 @@ void ASkaldPlayerController::EnsureDiceWidgets() {
   }
 
   if (bAutoPresentInitiativeRolls && !DiceResultWidget && DiceResultWidgetClass) {
-    DiceResultWidget = CreateWidget<USkaldDiceResultWidget>(this, DiceResultWidgetClass);
+    DiceResultWidget = CreateWidget<USkaldDiceResultWidget>(GetLocalPlayer(), DiceResultWidgetClass);
     if (DiceResultWidget) {
       DiceResultWidget->AddToViewport(33);
       DiceResultWidget->SetVisibility(ESlateVisibility::Collapsed);
