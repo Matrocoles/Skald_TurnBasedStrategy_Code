@@ -244,6 +244,32 @@ ASkald_BattleGameMode *ASkaldPlayerController::ResolveBattleGameMode() {
   return nullptr;
 }
 
+
+namespace {
+bool IsAIControllerIdentity(const ASkaldPlayerController* Controller) {
+  if (!Controller) {
+    return false;
+  }
+
+  if (Controller->IsA<ASkaldAIController>()) {
+    return true;
+  }
+
+  if (const ASkaldPlayerState* PS = Controller->GetPlayerState<ASkaldPlayerState>()) {
+    if (PS->bIsAI) {
+      return true;
+    }
+  }
+
+  const FString ClassName = Controller->GetClass() ? Controller->GetClass()->GetName() : FString();
+  const FString InstanceName = Controller->GetName();
+  return ClassName.Contains(TEXT("AiController"), ESearchCase::IgnoreCase) ||
+         ClassName.Contains(TEXT("AIController"), ESearchCase::IgnoreCase) ||
+         InstanceName.Contains(TEXT("AiController"), ESearchCase::IgnoreCase) ||
+         InstanceName.Contains(TEXT("AIController"), ESearchCase::IgnoreCase);
+}
+}
+
 ASkaldPlayerController::ASkaldPlayerController() {
   TurnManager = nullptr;
   HUDRef = nullptr;
@@ -427,7 +453,7 @@ bool ASkaldPlayerController::TryUseAbilitySlot(ESkaldAbilitySlot Slot) {
 }
 
 void ASkaldPlayerController::HandleAbilityInput(ESkaldAbilitySlot Slot) {
-  if (!IsLocalController() || GetLocalPlayer() == nullptr) {
+  if (!CanCreateLocalUIWidget()) {
     return;
   }
 
@@ -1515,6 +1541,10 @@ AFighterPawn *ASkaldPlayerController::ResolveCellAbilityPrimaryTarget(
 }
 
 void ASkaldPlayerController::InitializeHUDWidget() {
+  if (IsAIControllerIdentity(this)) {
+    return;
+  }
+
   if (MainHUD) {
     return;
   }
@@ -1607,8 +1637,16 @@ void ASkaldPlayerController::InitializeHUDWidget() {
 }
 
 bool ASkaldPlayerController::CanCreateLocalUIWidget() const {
-  return IsLocalController() && IsLocalPlayerController() &&
-         GetLocalPlayer() != nullptr;
+  if (!IsLocalController() || !IsLocalPlayerController() ||
+      GetLocalPlayer() == nullptr || Player == nullptr) {
+    return false;
+  }
+
+  if (IsAIControllerIdentity(this)) {
+    return false;
+  }
+
+  return true;
 }
 
 void ASkaldPlayerController::InitializeChoosePlayerWidget() {
@@ -2472,7 +2510,7 @@ ATurnManager *ASkaldPlayerController::FindTurnManagerActor() const {
 }
 
 void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
-  if (!IsLocalController() || GetLocalPlayer() == nullptr) {
+  if (!CanCreateLocalUIWidget()) {
     return;
   }
 
@@ -2774,7 +2812,7 @@ void ASkaldPlayerController::Client_OnLockInResult_Implementation(
 }
 
 void ASkaldPlayerController::HandleBattlePhaseChanged() {
-  if (!IsLocalController() || GetLocalPlayer() == nullptr) {
+  if (!CanCreateLocalUIWidget()) {
     return;
   }
 
@@ -5306,6 +5344,13 @@ void ASkaldPlayerController::HandleReplicatedBattlePayload() {
     return;
   }
 
+  // AI controllers can be considered local on the server but have no attached
+  // local player, so they must never attempt to spawn UI widgets.
+  if (!CanCreateLocalUIWidget()) {
+    RefreshTurnDataFromState();
+    return;
+  }
+
   DetectBattleMap();
   InitializeBattleHUD();
   RefreshFactionCursorFromState();
@@ -5323,7 +5368,7 @@ void ASkaldPlayerController::HandleReplicatedBattlePayload() {
 }
 
 void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
-  if (!IsLocalController() || GetLocalPlayer() == nullptr) {
+  if (IsAIControllerIdentity(this) || !CanCreateLocalUIWidget()) {
     return;
   }
 
@@ -6977,7 +7022,7 @@ void ASkaldPlayerController::ResetPendingReadyPromptState() {
 
 void ASkaldPlayerController::ShowPrepareForBattlePromptLocal(
     const FPrepareForBattlePromptData &PromptData) {
-  if (!IsLocalController() || GetLocalPlayer() == nullptr) {
+  if (!CanCreateLocalUIWidget()) {
     UE_LOG(LogSkaldReady, Verbose,
            TEXT("Skipping prepare-for-battle prompt for %s: controller has no local player."),
            *GetName());
@@ -7002,7 +7047,7 @@ void ASkaldPlayerController::ShowPrepareForBattlePromptLocal(
 
 void ASkaldPlayerController::ShowPrepareForBattlePromptLocal_Internal(
     const FPrepareForBattlePromptData &PromptData) {
-  if (!IsLocalController() || GetLocalPlayer() == nullptr) {
+  if (!CanCreateLocalUIWidget()) {
     ResetPendingReadyPromptState();
     return;
   }
