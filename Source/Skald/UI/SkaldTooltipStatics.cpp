@@ -26,8 +26,10 @@ void USkaldTooltipStatics::ApplyTooltip(
     }
 
     ULocalPlayer *OwningLocalPlayer = nullptr;
+    APlayerController* OwningPlayerController = nullptr;
     if (UUserWidget *OwningUserWidget = TargetWidget->GetTypedOuter<UUserWidget>()) {
       OwningLocalPlayer = OwningUserWidget->GetOwningLocalPlayer();
+      OwningPlayerController = OwningUserWidget->GetOwningPlayer();
     }
 
     if (!OwningLocalPlayer) {
@@ -36,7 +38,7 @@ void USkaldTooltipStatics::ApplyTooltip(
     }
 
     if (USkaldTooltipWidget *TooltipWidget =
-            CreateWidget<USkaldTooltipWidget>(OwningLocalPlayer, TooltipClass)) {
+            CreateWidget<USkaldTooltipWidget>(OwningPlayerController, TooltipClass)) {
       TooltipWidget->SetTooltipLabelText(TooltipText);
       TargetWidget->SetToolTip(TooltipWidget);
       return;

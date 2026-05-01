@@ -278,7 +278,7 @@ void UFighterSelectionWidget::PopulateFighterList() {
   }
   for (const FFighterDefinition &Fighter : AvailableFighters) {
     if (UFighterEntryWidget* Entry =
-            CreateWidget<UFighterEntryWidget>(OwningLocalPlayer, FighterEntryClass)) {
+            CreateWidget<UFighterEntryWidget>(GetOwningPlayer(), FighterEntryClass)) {
       Entry->Init(Fighter, this);
       FighterList->AddChild(Entry);
       ++Added;

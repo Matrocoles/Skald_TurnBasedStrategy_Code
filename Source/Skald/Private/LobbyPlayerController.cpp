@@ -41,7 +41,7 @@ void ALobbyPlayerController::InitLobbyUI()
     {
         if (!LobbySessionWidgetInstance && LobbySessionWidgetClass)
         {
-            LobbySessionWidgetInstance = CreateWidget<ULobbySessionWidget>(LocalPlayer, LobbySessionWidgetClass);
+            LobbySessionWidgetInstance = CreateWidget<ULobbySessionWidget>(this, LobbySessionWidgetClass);
             if (LobbySessionWidgetInstance)
             {
                 LobbySessionWidgetInstance->AddToViewport();
@@ -59,7 +59,7 @@ void ALobbyPlayerController::InitLobbyUI()
     {
         if (!LobbyWidgetInstance && LobbyWidgetClass)
         {
-            LobbyWidgetInstance = CreateWidget<ULobbyMenuWidget>(LocalPlayer, LobbyWidgetClass);
+            LobbyWidgetInstance = CreateWidget<ULobbyMenuWidget>(this, LobbyWidgetClass);
             if (LobbyWidgetInstance)
             {
                 LobbyWidgetInstance->AddToViewport();
@@ -70,7 +70,7 @@ void ALobbyPlayerController::InitLobbyUI()
         bool bShowingTitleScreen = false;
         if (!TitleScreenWidgetInstance && TitleScreenWidgetClass)
         {
-            TitleScreenWidgetInstance = CreateWidget<UTitleScreenWidget>(LocalPlayer, TitleScreenWidgetClass);
+            TitleScreenWidgetInstance = CreateWidget<UTitleScreenWidget>(this, TitleScreenWidgetClass);
             if (TitleScreenWidgetInstance)
             {
                 TitleScreenWidgetInstance->OnDismissed.AddDynamic(this, &ALobbyPlayerController::HandleTitleScreenDismissed);

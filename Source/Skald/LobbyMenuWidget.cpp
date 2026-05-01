@@ -64,7 +64,7 @@ void ULobbyMenuWidget::OnStartGame()
         {
             if (ULocalPlayer* LocalPlayer = PC->GetLocalPlayer())
             {
-                if (UStartGameWidget* Widget = CreateWidget<UStartGameWidget>(LocalPlayer, StartGameWidgetClass))
+                if (UStartGameWidget* Widget = CreateWidget<UStartGameWidget>(PC, StartGameWidgetClass))
                 {
                     Widget->SetLobbyMenu(this);
                     Widget->AddToViewport();
@@ -87,7 +87,7 @@ void ULobbyMenuWidget::OnLoadGame()
 
         if (ULocalPlayer* LocalPlayer = PC->GetLocalPlayer())
         {
-            if (ULoadGameWidget* Widget = CreateWidget<ULoadGameWidget>(LocalPlayer, LoadGameWidgetClass))
+            if (ULoadGameWidget* Widget = CreateWidget<ULoadGameWidget>(PC, LoadGameWidgetClass))
             {
                 // Pass a reference to the lobby so it can be restored later
                 Widget->SetLobbyMenu(this);
@@ -112,7 +112,7 @@ void ULobbyMenuWidget::OnSettings()
 
         if (ULocalPlayer* LocalPlayer = PC->GetLocalPlayer())
         {
-            if (USettingsWidget* Widget = CreateWidget<USettingsWidget>(LocalPlayer, SettingsWidgetClass))
+            if (USettingsWidget* Widget = CreateWidget<USettingsWidget>(PC, SettingsWidgetClass))
             {
                 Widget->SetLobbyMenu(this);
                 Widget->AddToViewport();

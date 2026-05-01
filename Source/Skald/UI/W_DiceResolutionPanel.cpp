@@ -30,6 +30,7 @@
 #include "Types/SlateEnums.h"
 #include "Widgets/Layout/SScrollBox.h"
 #include "Runtime/Launch/Resources/Version.h"
+#include "SkaldLogging.h"
 
 static UUniformGridSlot* AddToUniformGridWithPadding(
     UWidgetTree* WidgetTree,
@@ -743,7 +744,7 @@ void UW_DiceResolutionPanel::RevealNextDie()
                        TEXT("DiceResolutionPanel: missing owning LocalPlayer; falling back to text-only outcome row."));
             }
             UW_DiceResolutionEntryWidget* EntryWidget = OwningLocalPlayer
-                ? CreateWidget<UW_DiceResolutionEntryWidget>(OwningLocalPlayer, OutcomeEntryWidgetClass)
+                ? CreateWidget<UW_DiceResolutionEntryWidget>(GetOwningPlayer(), OutcomeEntryWidgetClass)
                 : nullptr;
             if (EntryWidget)
             {

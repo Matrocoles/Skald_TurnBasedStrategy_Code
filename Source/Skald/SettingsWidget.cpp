@@ -228,7 +228,7 @@ void USettingsWidget::OnExit()
     {
         if (ULocalPlayer* LocalPlayer = PC->GetLocalPlayer())
         {
-            if (UQuitConfirmationWidget* Widget = CreateWidget<UQuitConfirmationWidget>(LocalPlayer, UQuitConfirmationWidget::StaticClass()))
+            if (UQuitConfirmationWidget* Widget = CreateWidget<UQuitConfirmationWidget>(PC, UQuitConfirmationWidget::StaticClass()))
             {
                 Widget->SetOwningSettings(this);
                 Widget->AddToViewport(100);
