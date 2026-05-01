@@ -1195,7 +1195,7 @@ void USkaldGameInstance::ShowDeployWidget() {
     }
 
     if (ULocalPlayer* LocalPlayer = LocalSkaldPC->GetLocalPlayer()) {
-      DeployWidget = CreateWidget<UUserWidget>(PC, WidgetClass);
+      DeployWidget = CreateWidget<UUserWidget>(LocalSkaldPC, WidgetClass);
     } else {
       UE_LOG(LogSkald, Warning,
              TEXT("ShowDeployWidget skipped: local controller has no LocalPlayer."));
