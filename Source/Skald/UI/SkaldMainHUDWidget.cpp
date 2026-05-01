@@ -658,7 +658,7 @@ void USkaldMainHUDWidget::RebuildPlayerList(
 
     if (bUseCustomEntries) {
       USkaldPlayerListEntryWidget *EntryWidget =
-          CreateWidget<USkaldPlayerListEntryWidget>(GetOwningPlayer(),
+          CreateWidget<USkaldPlayerListEntryWidget>(GetOwningLocalPlayer(),
                                                     PlayerListEntryWidgetClass);
       if (!EntryWidget) {
         continue;
@@ -832,7 +832,7 @@ void USkaldMainHUDWidget::ShowPrepareForBattleDialog(
   }
 
   ActivePrepareForBattleWidget = CreateWidget<UPrepareForBattleWidget>(
-      GetWorld(), PrepareForBattleWidgetClass);
+      GetOwningLocalPlayer(), PrepareForBattleWidgetClass);
   if (!ActivePrepareForBattleWidget) {
     UE_LOG(LogSkald, Warning,
            TEXT("ShowPrepareForBattleDialog: failed to create widget"));
@@ -1949,7 +1949,7 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
       ShowSelectionPromptMessage(FText::GetEmpty(), false);
       if (ConfirmAttackWidgetClass) {
         ActiveConfirmWidget = CreateWidget<UConfirmAttackWidget>(
-            GetWorld(), ConfirmAttackWidgetClass);
+            GetOwningLocalPlayer(), ConfirmAttackWidgetClass);
         if (ActiveConfirmWidget) {
           int32 MaxUnits = 1;
           if (AWorldMap *WorldMap =
@@ -2125,7 +2125,7 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
     }
 
     ActiveDeployWidget =
-        CreateWidget<UDeployWidget>(GetWorld(), DeployWidgetClass);
+        CreateWidget<UDeployWidget>(GetOwningLocalPlayer(), DeployWidgetClass);
     if (!ActiveDeployWidget) {
       const FText Error = ResolveSelectionPromptText(
           SkaldSelectionPromptKeys::MoveDeployUICreationFailed,
@@ -2512,7 +2512,7 @@ void USkaldMainHUDWidget::HandleDeployClicked() {
   }
 
   ActiveDeployWidget =
-      CreateWidget<UDeployWidget>(GetWorld(), DeployWidgetClass);
+      CreateWidget<UDeployWidget>(GetOwningLocalPlayer(), DeployWidgetClass);
   if (ActiveDeployWidget) {
     ActiveDeployWidget->SetupDeployment(Territory, PS, this, MaxDeployable);
     ActiveDeployWidget->AddToViewport();
