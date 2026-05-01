@@ -13,8 +13,11 @@ public:
     int32 NotificationCount = 0;
 
     UFUNCTION()
-    void HandleBattleEnded(ESkaldFaction /*WinningFaction*/, int32 /*AttackerCasualties*/, int32 /*DefenderCasualties*/)
+    void HandleBattleEnded(ESkaldFaction WinningFaction, int32 AttackerCasualties, int32 DefenderCasualties)
     {
+        (void)WinningFaction;
+        (void)AttackerCasualties;
+        (void)DefenderCasualties;
         ++NotificationCount;
     }
 };
