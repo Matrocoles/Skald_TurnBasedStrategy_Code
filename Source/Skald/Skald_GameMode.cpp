@@ -81,6 +81,34 @@ bool IsAIControllerIdentity(const ASkaldPlayerController *Controller) {
          InstanceName.Contains(TEXT("AiController"), ESearchCase::IgnoreCase) ||
          InstanceName.Contains(TEXT("AIController"), ESearchCase::IgnoreCase);
 }
+
+static void NormalizeSinglePlayerControllerRoles(UWorld *World,
+                                                 const USkaldGameInstance *GI) {
+  if (!World || !GI || GI->bIsMultiplayer) {
+    return;
+  }
+
+  for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator();
+       It; ++It) {
+    ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(*It);
+    if (!PC) {
+      continue;
+    }
+
+    ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>();
+    if (!PS) {
+      continue;
+    }
+
+    const bool bShouldBeAI = IsAIControllerIdentity(PC);
+    if (PS->bIsAI != bShouldBeAI) {
+      UE_LOG(LogSkald, Verbose,
+             TEXT("NormalizeSinglePlayerControllerRoles: %s bIsAI %d -> %d"),
+             *GetNameSafe(PC), PS->bIsAI ? 1 : 0, bShouldBeAI ? 1 : 0);
+      PS->bIsAI = bShouldBeAI;
+    }
+  }
+}
 // Instance variables moved into ASkaldGameMode to avoid cross-instance
 // interference; see header for declarations.
 } // namespace
