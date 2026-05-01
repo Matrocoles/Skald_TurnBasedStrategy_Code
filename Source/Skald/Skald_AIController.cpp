@@ -1510,21 +1510,22 @@ void ASkaldAIController::SetupBattleAutomation() {
     return;
   }
 
-  if (!CachedBattleManager->OnActiveFighterChanged.IsAlreadyBound(
-          this, &ASkaldAIController::HandleActiveFighterChanged)) {
-    CachedBattleManager->OnActiveFighterChanged.AddDynamic(
-        this, &ASkaldAIController::HandleActiveFighterChanged);
-  }
-  if (!CachedBattleManager->OnRoundStarted.IsAlreadyBound(
-          this, &ASkaldAIController::HandleRoundStarted)) {
-    CachedBattleManager->OnRoundStarted.AddDynamic(
-        this, &ASkaldAIController::HandleRoundStarted);
-  }
-  if (!CachedBattleManager->OnBattleEnded.IsAlreadyBound(
-          this, &ASkaldAIController::HandleBattleEnded)) {
-    CachedBattleManager->OnBattleEnded.AddDynamic(
-        this, &ASkaldAIController::HandleBattleEnded);
-  }
+  // Defensive rebind: remove first to avoid duplicate multicast bindings
+  // across PIE travel / BeginPlay re-entry edge cases.
+  CachedBattleManager->OnActiveFighterChanged.RemoveDynamic(
+      this, &ASkaldAIController::HandleActiveFighterChanged);
+  CachedBattleManager->OnActiveFighterChanged.AddDynamic(
+      this, &ASkaldAIController::HandleActiveFighterChanged);
+
+  CachedBattleManager->OnRoundStarted.RemoveDynamic(
+      this, &ASkaldAIController::HandleRoundStarted);
+  CachedBattleManager->OnRoundStarted.AddDynamic(
+      this, &ASkaldAIController::HandleRoundStarted);
+
+  CachedBattleManager->OnBattleEnded.RemoveDynamic(
+      this, &ASkaldAIController::HandleBattleEnded);
+  CachedBattleManager->OnBattleEnded.AddDynamic(
+      this, &ASkaldAIController::HandleBattleEnded);
 
   DetermineControlledBattleSide();
   ScheduleTryActivateNextFighter();

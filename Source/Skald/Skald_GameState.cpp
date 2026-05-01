@@ -162,6 +162,10 @@ void ASkaldGameState::RefreshControllersFromPlayers()
         {
             if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
             {
+                if (!PC->IsLocalController() || PC->GetLocalPlayer() == nullptr)
+                {
+                    continue;
+                }
                 PC->RefreshTurnDataFromState();
                 PC->HandleReplicatedTurnOwnership();
                 PC->HandleReplicatedTurnStart();
@@ -192,6 +196,10 @@ void ASkaldGameState::OnRep_CurrentTurnIndex()
         {
             if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
             {
+                if (!PC->IsLocalController() || PC->GetLocalPlayer() == nullptr)
+                {
+                    continue;
+                }
                 PC->RefreshTurnDataFromState();
                 PC->HandleReplicatedTurnOwnership();
                 PC->HandleReplicatedTurnStart();
@@ -214,6 +222,10 @@ void ASkaldGameState::OnRep_ActivePlayerId()
         {
             if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
             {
+                if (!PC->IsLocalController() || PC->GetLocalPlayer() == nullptr)
+                {
+                    continue;
+                }
                 PC->RefreshTurnDataFromState();
                 PC->HandleReplicatedTurnOwnership();
                 PC->HandleReplicatedTurnStart();
@@ -411,6 +423,10 @@ void ASkaldGameState::OnRep_BattlePayload()
         {
             if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
             {
+                if (!PC->IsLocalController() || PC->GetLocalPlayer() == nullptr)
+                {
+                    continue;
+                }
                 // Ensure late-joining controllers rebuild all dependent state from
                 // replicated payloads instead of assuming the original RPC timing
                 // path. This covers both the battle HUD and fighter selection UI.
@@ -453,6 +469,10 @@ void ASkaldGameState::OnRep_BattleParticipants()
         {
             if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
             {
+                if (!PC->IsLocalController() || PC->GetLocalPlayer() == nullptr)
+                {
+                    continue;
+                }
                 PC->RequestBattleStateIfNeeded();
 
                 // Ensure each owning client rebuilds their local HUD, camera, and
@@ -497,6 +517,10 @@ void ASkaldGameState::OnRep_PendingBattleReady()
         {
             if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
             {
+                if (!PC->IsLocalController() || PC->GetLocalPlayer() == nullptr)
+                {
+                    continue;
+                }
                 PC->RequestBattleStateIfNeeded();
                 PC->InitializeBattleHUD();
                 PC->DetermineControlledBattleSide();
@@ -525,6 +549,10 @@ void ASkaldGameState::OnRep_BattleRoundState()
         {
             if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
             {
+                if (!PC->IsLocalController() || PC->GetLocalPlayer() == nullptr)
+                {
+                    continue;
+                }
                 PC->RequestBattleStateIfNeeded();
                 PC->InitializeBattleHUD();
                 PC->DetermineControlledBattleSide();
@@ -710,6 +738,10 @@ void ASkaldGameState::OnRep_BattlePhase()
         {
             if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
             {
+                if (!PC->IsLocalController() || PC->GetLocalPlayer() == nullptr)
+                {
+                    continue;
+                }
                 // Rebuild local battle context from replicated state so every
                 // client (including listen servers) initializes their own HUD,
                 // camera, and turn ownership without relying on host-driven
