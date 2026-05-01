@@ -426,7 +426,7 @@ bool ASkaldPlayerController::TryUseAbilitySlot(ESkaldAbilitySlot Slot) {
 }
 
 void ASkaldPlayerController::HandleAbilityInput(ESkaldAbilitySlot Slot) {
-  if (!IsLocalController()) {
+  if (!IsLocalController() || GetLocalPlayer() == nullptr) {
     return;
   }
 
@@ -2059,7 +2059,7 @@ void ASkaldPlayerController::TryBindWorldMap() {
                      this, &ASkaldPlayerController::HandleTerritorySelected),
                  TEXT("Failed to bind HandleTerritorySelected to WorldMap."));
     }
-    if (IsLocalController()) {
+    if (IsLocalController() && GetLocalPlayer() != nullptr) {
       if (RefreshLocalTerritorySelection()) {
         bPendingLocalSelectionRefresh = false;
       }
@@ -2469,7 +2469,7 @@ ATurnManager *ASkaldPlayerController::FindTurnManagerActor() const {
 }
 
 void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
-  if (!IsLocalController()) {
+  if (!IsLocalController() || GetLocalPlayer() == nullptr) {
     return;
   }
 
@@ -2624,7 +2624,7 @@ void ASkaldPlayerController::RequestBattleStateIfNeeded() {
 
 void ASkaldPlayerController::ShowFighterSelectionUI(int32 MaxBudget,
                                                     ESkaldFaction Faction) {
-  if (!IsLocalController()) {
+  if (!IsLocalController() || GetLocalPlayer() == nullptr) {
     return;
   }
 
@@ -2774,7 +2774,7 @@ void ASkaldPlayerController::HandleBattlePhaseChanged() {
           GetWorld() ? GetWorld()->GetGameState<ASkaldGameState>() : nullptr) {
     // Ensure each owning client initializes its own HUD/camera when entering a
     // battle-related phase instead of waiting for host-driven RPCs.
-    if (IsLocalController()) {
+    if (IsLocalController() && GetLocalPlayer() != nullptr) {
       DetectBattleMap();
       InitializeBattleHUD();
       UpdateBattleCameraMode();

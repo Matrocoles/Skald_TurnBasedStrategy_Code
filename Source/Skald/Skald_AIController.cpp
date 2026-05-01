@@ -1510,12 +1510,21 @@ void ASkaldAIController::SetupBattleAutomation() {
     return;
   }
 
-  CachedBattleManager->OnActiveFighterChanged.AddDynamic(
-      this, &ASkaldAIController::HandleActiveFighterChanged);
-  CachedBattleManager->OnRoundStarted.AddDynamic(
-      this, &ASkaldAIController::HandleRoundStarted);
-  CachedBattleManager->OnBattleEnded.AddDynamic(
-      this, &ASkaldAIController::HandleBattleEnded);
+  if (!CachedBattleManager->OnActiveFighterChanged.IsAlreadyBound(
+          this, &ASkaldAIController::HandleActiveFighterChanged)) {
+    CachedBattleManager->OnActiveFighterChanged.AddDynamic(
+        this, &ASkaldAIController::HandleActiveFighterChanged);
+  }
+  if (!CachedBattleManager->OnRoundStarted.IsAlreadyBound(
+          this, &ASkaldAIController::HandleRoundStarted)) {
+    CachedBattleManager->OnRoundStarted.AddDynamic(
+        this, &ASkaldAIController::HandleRoundStarted);
+  }
+  if (!CachedBattleManager->OnBattleEnded.IsAlreadyBound(
+          this, &ASkaldAIController::HandleBattleEnded)) {
+    CachedBattleManager->OnBattleEnded.AddDynamic(
+        this, &ASkaldAIController::HandleBattleEnded);
+  }
 
   DetermineControlledBattleSide();
   ScheduleTryActivateNextFighter();
