@@ -57,6 +57,28 @@ const TArray<FString> FantasyAINames = {
     TEXT("Vaelis Stormbinder"), TEXT("Wrenna Shadeleaf"),
     TEXT("Xandar Starforge"), TEXT("Ysolde Whisperwind"),
     TEXT("Zarek Ironbloom")};
+
+bool IsAIControllerIdentity(const ASkaldPlayerController *Controller) {
+  if (!Controller) {
+    return false;
+  }
+  if (Controller->IsA<ASkaldAIController>()) {
+    return true;
+  }
+  if (const ASkaldPlayerState *PS =
+          Controller->GetPlayerState<ASkaldPlayerState>()) {
+    if (PS->bIsAI) {
+      return true;
+    }
+  }
+  const FString ClassName =
+      Controller->GetClass() ? Controller->GetClass()->GetName() : FString();
+  const FString InstanceName = Controller->GetName();
+  return ClassName.Contains(TEXT("AiController"), ESearchCase::IgnoreCase) ||
+         ClassName.Contains(TEXT("AIController"), ESearchCase::IgnoreCase) ||
+         InstanceName.Contains(TEXT("AiController"), ESearchCase::IgnoreCase) ||
+         InstanceName.Contains(TEXT("AIController"), ESearchCase::IgnoreCase);
+}
 // Instance variables moved into ASkaldGameMode to avoid cross-instance
 // interference; see header for declarations.
 } // namespace
@@ -1181,7 +1203,12 @@ void ASkaldGameMode::BeginPreBattleSelection(ASkaldPlayerState *A,
     A->bArmyLockedIn = false;
     if (ASkaldPlayerController *APC =
             Cast<ASkaldPlayerController>(A->GetOwner())) {
+      if (IsAIControllerIdentity(APC)) {
+        APC = nullptr;
+      }
+      if (APC) {
       APC->Client_ShowFighterSelection(ABudget, A->Faction);
+      }
     }
   }
 
@@ -1191,7 +1218,12 @@ void ASkaldGameMode::BeginPreBattleSelection(ASkaldPlayerState *A,
     D->bArmyLockedIn = false;
     if (ASkaldPlayerController *DPC =
             Cast<ASkaldPlayerController>(D->GetOwner())) {
+      if (IsAIControllerIdentity(DPC)) {
+        DPC = nullptr;
+      }
+      if (DPC) {
       DPC->Client_ShowFighterSelection(DBudget, D->Faction);
+      }
     }
   }
 }
@@ -1504,9 +1536,8 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
            GetWorld()->GetPlayerControllerIterator();
        It; ++It) {
     if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(*It)) {
-      ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>();
-      const bool bIsAI = PS && PS->bIsAI;
-      if (!bIsAI && PC->IsLocalController() && !PC->GetHUDWidget()) {
+      if (!IsAIControllerIdentity(PC) && PC->IsLocalController() &&
+          !PC->GetHUDWidget()) {
         FTimerDelegate RetryInit = FTimerDelegate::CreateUObject(
             this, &ASkaldGameMode::TryInitializeWorldAndStart);
         GetWorldTimerManager().ClearTimer(RetryInitTimerHandle);
@@ -3830,8 +3861,7 @@ bool ASkaldGameMode::InitializeWorld() {
          It; ++It) {
       if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(*It)) {
         ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>();
-        const bool bIsAI = PS && PS->bIsAI;
-        if (!bIsAI && PS) {
+        if (!IsAIControllerIdentity(PC) && PS) {
           const int32 RollValue = PS->InitiativeRoll;
           const bool bWon = (PS == HighestPS);
           const int32 *RoundPtr = StrategicInitiativeRoundByPlayer.Find(PS);
@@ -3850,10 +3880,9 @@ bool ASkaldGameMode::InitializeWorld() {
          It; ++It) {
       if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(*It)) {
         ASkaldPlayerState *PS = PC->GetPlayerState<ASkaldPlayerState>();
-        const bool bIsAI = PS && PS->bIsAI;
         if (USkaldMainHUDWidget *HUD = PC->GetHUDWidget()) {
           HUD->UpdateInitiativeText(Message);
-        } else if (!bIsAI && PC->IsLocalController()) {
+        } else if (!IsAIControllerIdentity(PC) && PC->IsLocalController()) {
           UE_LOG(LogSkald, Warning,
                  TEXT("InitializeWorld: Controller %s missing HUD widget"),
                  *PC->GetName());
