@@ -10,6 +10,7 @@
 #include "Engine/Canvas.h"
 #include "Engine/CanvasRenderTarget2D.h"
 #include "Engine/Engine.h"
+#include "Engine/LocalPlayer.h"
 #include "Styling/SlateBrush.h"
 #include "Styling/SlateColor.h"
 #include "Engine/World.h"
@@ -694,9 +695,16 @@ UBattleHUDWidget::FindOrCreateLockedInEntry(AFighterPawn *Fighter) {
     return nullptr;
   }
 
-  if (ULockedInFighterEntryWidget *NewEntry =
-          CreateWidget<ULockedInFighterEntryWidget>(this,
-                                                   LockedInFighterEntryClass)) {
+  ULocalPlayer *OwningLocalPlayer = GetOwningLocalPlayer();
+  if (!OwningLocalPlayer) {
+    UE_LOG(LogSkaldUI, Warning,
+           TEXT("BattleHUD: missing owning LocalPlayer; skipping locked-in fighter entry widget creation."));
+    return nullptr;
+  }
+  ULockedInFighterEntryWidget *NewEntry =
+      CreateWidget<ULockedInFighterEntryWidget>(OwningLocalPlayer,
+                                                LockedInFighterEntryClass);
+  if (NewEntry) {
     NewEntry->OnEntryClicked.AddDynamic(
         this, &UBattleHUDWidget::HandleLockedInEntryClicked);
     NewEntry->OnEntryRemoved.AddDynamic(
@@ -722,8 +730,16 @@ UBattleHUDWidget::FindOrCreateEnemyLockedInEntry(AFighterPawn *Fighter) {
     return nullptr;
   }
 
-  if (ULockedInFighterEntryWidget *NewEntry =
-          CreateWidget<ULockedInFighterEntryWidget>(this, LockedInFighterEntryClass)) {
+  ULocalPlayer *OwningLocalPlayer = GetOwningLocalPlayer();
+  if (!OwningLocalPlayer) {
+    UE_LOG(LogSkaldUI, Warning,
+           TEXT("BattleHUD: missing owning LocalPlayer; skipping enemy locked-in entry widget creation."));
+    return nullptr;
+  }
+  ULockedInFighterEntryWidget *NewEntry =
+      CreateWidget<ULockedInFighterEntryWidget>(OwningLocalPlayer,
+                                                LockedInFighterEntryClass);
+  if (NewEntry) {
     NewEntry->OnEntryClicked.AddDynamic(
         this, &UBattleHUDWidget::HandleEnemyLockedInEntryClicked);
     NewEntry->OnEntryRemoved.AddDynamic(

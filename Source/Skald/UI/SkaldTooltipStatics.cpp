@@ -1,6 +1,7 @@
 #include "UI/SkaldTooltipStatics.h"
 
 #include "Blueprint/UserWidget.h"
+#include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
 #include "Internationalization/Text.h"
 #include "UI/SkaldTooltipWidget.h"
@@ -24,8 +25,18 @@ void USkaldTooltipStatics::ApplyTooltip(
       return;
     }
 
+    ULocalPlayer *OwningLocalPlayer = nullptr;
+    if (UUserWidget *OwningUserWidget = TargetWidget->GetTypedOuter<UUserWidget>()) {
+      OwningLocalPlayer = OwningUserWidget->GetOwningLocalPlayer();
+    }
+
+    if (!OwningLocalPlayer) {
+      TargetWidget->SetToolTipText(TooltipText);
+      return;
+    }
+
     if (USkaldTooltipWidget *TooltipWidget =
-            CreateWidget<USkaldTooltipWidget>(World, TooltipClass)) {
+            CreateWidget<USkaldTooltipWidget>(OwningLocalPlayer, TooltipClass)) {
       TooltipWidget->SetTooltipLabelText(TooltipText);
       TargetWidget->SetToolTip(TooltipWidget);
       return;
@@ -74,4 +85,3 @@ FText USkaldTooltipStatics::BuildBasicAbilityTooltip(
 
   return FText::GetEmpty();
 }
-
