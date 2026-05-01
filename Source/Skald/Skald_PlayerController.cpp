@@ -2675,8 +2675,17 @@ void ASkaldPlayerController::ShowFighterSelectionUI(int32 MaxBudget,
     if (FighterSelectionWidget) {
       FighterSelectionWidget->RemoveFromParent();
     }
-    FighterSelectionWidget =
-        CreateWidget<UFighterSelectionWidget>(this, FighterSelectionWidgetClass);
+
+    ULocalPlayer *LocalPlayer = GetLocalPlayer();
+    if (!LocalPlayer || Player != LocalPlayer) {
+      UE_LOG(LogSkaldBattle, Warning,
+             TEXT("ShowFighterSelectionUI: Skipping widget creation for controller without attached local player (%s)."),
+             *GetNameSafe(this));
+      return;
+    }
+
+    FighterSelectionWidget = CreateWidget<UFighterSelectionWidget>(
+        LocalPlayer, FighterSelectionWidgetClass);
   }
 
   if (!FighterSelectionWidget) {
