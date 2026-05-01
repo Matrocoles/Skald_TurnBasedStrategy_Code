@@ -2719,6 +2719,17 @@ void ASkaldPlayerController::ShowFighterSelectionUI(int32 MaxBudget,
 
 void ASkaldPlayerController::Client_ShowFighterSelection_Implementation(
     int32 MaxBudget, ESkaldFaction Faction) {
+  if (IsAIControllerIdentity(this)) {
+    UE_LOG(LogSkaldBattle, Warning,
+           TEXT("Client_ShowFighterSelection ignored for AI-identity controller %s"),
+           *GetName());
+    if (FighterSelectionWidget) {
+      FighterSelectionWidget->RemoveFromParent();
+      FighterSelectionWidget = nullptr;
+    }
+    return;
+  }
+
   UE_LOG(LogSkaldBattle, Log,
          TEXT("Client_ShowFighterSelection: Controller=%s Budget=%d Faction=%d"),
          *GetName(), MaxBudget, static_cast<int32>(Faction));

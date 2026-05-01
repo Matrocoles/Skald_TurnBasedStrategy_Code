@@ -1196,6 +1196,8 @@ void ASkaldGameMode::BeginPreBattleSelection(ASkaldPlayerState *A,
   if (!HasAuthority()) {
     return;
   }
+  NormalizeSinglePlayerControllerRoles(GetWorld(),
+                                       GetGameInstance<USkaldGameInstance>());
 
   if (A) {
     A->PendingArmyBudget = ABudget;
@@ -1490,6 +1492,7 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
   }
 
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+  NormalizeSinglePlayerControllerRoles(GetWorld(), GI);
   // Normalize player identifiers before evaluating restoration so cached
   // snapshots that reference previous IDs can resolve the new PlayerState
   // instances spawned after travel.

@@ -872,6 +872,8 @@ void ASkald_BattleGameMode::BeginPreBattleSelection(ASkaldPlayerState *AttackerP
   if (!HasAuthority()) {
     return;
   }
+  NormalizeSinglePlayerControllerRoles(GetWorld(),
+                                       GetGameInstance<USkaldGameInstance>());
 
   if (AttackerPS) {
     AttackerPS->PendingArmyBudget = AttackerBudget;
