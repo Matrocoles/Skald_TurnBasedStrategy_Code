@@ -665,7 +665,7 @@ void USkaldMainHUDWidget::RebuildPlayerList(
         break;
       }
       USkaldPlayerListEntryWidget *EntryWidget =
-          CreateWidget<USkaldPlayerListEntryWidget>(OwningLocalPlayer,
+          CreateWidget<USkaldPlayerListEntryWidget>(GetOwningPlayer(),
                                                     PlayerListEntryWidgetClass);
       if (!EntryWidget) {
         continue;
@@ -2155,7 +2155,7 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
     }
 
     ActiveDeployWidget =
-        CreateWidget<UDeployWidget>(GetOwningLocalPlayer(), DeployWidgetClass);
+        CreateWidget<UDeployWidget>(GetOwningPlayer(), DeployWidgetClass);
     if (!ActiveDeployWidget) {
       const FText Error = ResolveSelectionPromptText(
           SkaldSelectionPromptKeys::MoveDeployUICreationFailed,
@@ -2549,7 +2549,7 @@ void USkaldMainHUDWidget::HandleDeployClicked() {
   }
 
   ActiveDeployWidget =
-      CreateWidget<UDeployWidget>(GetOwningLocalPlayer(), DeployWidgetClass);
+      CreateWidget<UDeployWidget>(GetOwningPlayer(), DeployWidgetClass);
   if (ActiveDeployWidget) {
     ActiveDeployWidget->SetupDeployment(Territory, PS, this, MaxDeployable);
     ActiveDeployWidget->AddToViewport();

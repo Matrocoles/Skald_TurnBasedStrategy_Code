@@ -702,7 +702,7 @@ UBattleHUDWidget::FindOrCreateLockedInEntry(AFighterPawn *Fighter) {
     return nullptr;
   }
   ULockedInFighterEntryWidget *NewEntry =
-      CreateWidget<ULockedInFighterEntryWidget>(OwningLocalPlayer,
+      CreateWidget<ULockedInFighterEntryWidget>(GetOwningPlayer(),
                                                 LockedInFighterEntryClass);
   if (NewEntry) {
     NewEntry->OnEntryClicked.AddDynamic(
@@ -737,7 +737,7 @@ UBattleHUDWidget::FindOrCreateEnemyLockedInEntry(AFighterPawn *Fighter) {
     return nullptr;
   }
   ULockedInFighterEntryWidget *NewEntry =
-      CreateWidget<ULockedInFighterEntryWidget>(OwningLocalPlayer,
+      CreateWidget<ULockedInFighterEntryWidget>(GetOwningPlayer(),
                                                 LockedInFighterEntryClass);
   if (NewEntry) {
     NewEntry->OnEntryClicked.AddDynamic(

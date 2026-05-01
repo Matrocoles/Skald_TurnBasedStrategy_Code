@@ -243,7 +243,7 @@ void UInGameMenuWidget::HandleMainMenuClicked()
     {
         if (ULocalPlayer* LocalPlayer = PC->GetLocalPlayer())
         {
-            if (UQuitConfirmationWidget* Widget = CreateWidget<UQuitConfirmationWidget>(LocalPlayer, WidgetClass))
+            if (UQuitConfirmationWidget* Widget = CreateWidget<UQuitConfirmationWidget>(PC, WidgetClass))
             {
                 Widget->AddToViewport(100);
                 QuitConfirmationWidget = Widget;
@@ -274,7 +274,7 @@ void UInGameMenuWidget::ShowChildWidget(TSubclassOf<UUserWidget> WidgetClass)
     {
         if (ULocalPlayer* LocalPlayer = PC->GetLocalPlayer())
         {
-            if (UUserWidget* Child = CreateWidget<UUserWidget>(LocalPlayer, WidgetClass))
+            if (UUserWidget* Child = CreateWidget<UUserWidget>(PC, WidgetClass))
             {
                 if (USaveGameWidget* SaveWidget = Cast<USaveGameWidget>(Child))
                 {
