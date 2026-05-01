@@ -5,6 +5,7 @@
 #include "Components/Image.h"
 #include "Components/ScrollBox.h"
 #include "Components/TextBlock.h"
+#include "Engine/LocalPlayer.h"
 #include "Engine/Texture2D.h"
 #include "Internationalization/Text.h"
 #include "SkaldLogging.h"
@@ -269,9 +270,15 @@ void UFighterSelectionWidget::PopulateFighterList() {
   });
 
   int32 Added = 0;
+  ULocalPlayer* OwningLocalPlayer = GetOwningLocalPlayer();
+  if (!OwningLocalPlayer) {
+    UE_LOG(LogSkaldUI, Warning,
+           TEXT("[FighterSelection] Skipping list population: missing owning LocalPlayer."));
+    return;
+  }
   for (const FFighterDefinition &Fighter : AvailableFighters) {
-    if (UFighterEntryWidget *Entry =
-            CreateWidget<UFighterEntryWidget>(this, FighterEntryClass)) {
+    if (UFighterEntryWidget* Entry =
+            CreateWidget<UFighterEntryWidget>(OwningLocalPlayer, FighterEntryClass)) {
       Entry->Init(Fighter, this);
       FighterList->AddChild(Entry);
       ++Added;

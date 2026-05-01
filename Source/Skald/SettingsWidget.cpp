@@ -1,4 +1,5 @@
 #include "SettingsWidget.h"
+#include "Engine/LocalPlayer.h"
 #include "Components/Button.h"
 #include "Components/ComboBoxString.h"
 #include "Components/Slider.h"
@@ -225,21 +226,19 @@ void USettingsWidget::OnExit()
 
     if (APlayerController* PC = GetOwningPlayer())
     {
-        if (UQuitConfirmationWidget* Widget = CreateWidget<UQuitConfirmationWidget>(PC, UQuitConfirmationWidget::StaticClass()))
+        if (ULocalPlayer* LocalPlayer = PC->GetLocalPlayer())
         {
-            Widget->SetOwningSettings(this);
-            Widget->AddToViewport(100);
-            ExitConfirmationWidget = Widget;
+            if (UQuitConfirmationWidget* Widget = CreateWidget<UQuitConfirmationWidget>(LocalPlayer, UQuitConfirmationWidget::StaticClass()))
+            {
+                Widget->SetOwningSettings(this);
+                Widget->AddToViewport(100);
+                ExitConfirmationWidget = Widget;
+            }
         }
     }
-    else if (UWorld* World = GetWorld())
+    else
     {
-        if (UQuitConfirmationWidget* Widget = CreateWidget<UQuitConfirmationWidget>(World, UQuitConfirmationWidget::StaticClass()))
-        {
-            Widget->SetOwningSettings(this);
-            Widget->AddToViewport(100);
-            ExitConfirmationWidget = Widget;
-        }
+        UE_LOG(LogTemp, Warning, TEXT("SettingsWidget::OnExit skipped quit confirmation: no owning player/local player."));
     }
 }
 
@@ -307,4 +306,3 @@ void USettingsWidget::ClearExitConfirmation()
         ExitConfirmationWidget.Reset();
     }
 }
-

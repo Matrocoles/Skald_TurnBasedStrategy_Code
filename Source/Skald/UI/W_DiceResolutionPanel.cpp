@@ -19,6 +19,7 @@
 #include "Components/UniformGridSlot.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
+#include "Engine/LocalPlayer.h"
 #include "Components/Widget.h"
 #include "Blueprint/WidgetTree.h"
 #include "Engine/Texture2D.h"
@@ -735,7 +736,16 @@ void UW_DiceResolutionPanel::RevealNextDie()
 
         if (OutcomeEntryWidgetClass)
         {
-            if (UW_DiceResolutionEntryWidget* EntryWidget = CreateWidget<UW_DiceResolutionEntryWidget>(this, OutcomeEntryWidgetClass))
+            ULocalPlayer* OwningLocalPlayer = GetOwningLocalPlayer();
+            if (!OwningLocalPlayer)
+            {
+                UE_LOG(LogSkaldUI, Warning,
+                       TEXT("DiceResolutionPanel: missing owning LocalPlayer; falling back to text-only outcome row."));
+            }
+            UW_DiceResolutionEntryWidget* EntryWidget = OwningLocalPlayer
+                ? CreateWidget<UW_DiceResolutionEntryWidget>(OwningLocalPlayer, OutcomeEntryWidgetClass)
+                : nullptr;
+            if (EntryWidget)
             {
                 EntryWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
                 EntryWidget->ConfigureOutcome(Outcome, RevealIndex, ResolvedTexture);
@@ -1051,4 +1061,3 @@ void UW_DiceResolutionEntryWidget::ConfigureOutcome(const FDiceRollOutcome& Outc
         OutcomeLabelText->SetVisibility(ESlateVisibility::HitTestInvisible);
     }
 }
-
