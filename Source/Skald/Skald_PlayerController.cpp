@@ -2493,9 +2493,10 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
                                                   ? CachedGameInstance->PendingBattle
                                                   : FS_BattlePayload();
 
-  const bool bInSelectionPhase = CachedGameState
-                                     ? CachedGameState->BattlePhase == EBattlePhase::FighterSelection
-                                     : true;
+  const bool bInSelectionPhase =
+      !CachedGameState ||
+      CachedGameState->BattlePhase == EBattlePhase::FighterSelection ||
+      (CachedGameState->BattlePhase == EBattlePhase::None && bHasBattleContext);
 
   ASkaldPlayerState *SelectionPS = GetPlayerState<ASkaldPlayerState>();
   int32 LocalPlayerId = SelectionPS ? ResolveStablePlayerId(SelectionPS) : INDEX_NONE;
@@ -6934,6 +6935,13 @@ void ASkaldPlayerController::ResetPendingReadyPromptState() {
 
 void ASkaldPlayerController::ShowPrepareForBattlePromptLocal(
     const FPrepareForBattlePromptData &PromptData) {
+  if (!IsLocalController() || GetLocalPlayer() == nullptr) {
+    UE_LOG(LogSkaldReady, Verbose,
+           TEXT("Skipping prepare-for-battle prompt for %s: controller has no local player."),
+           *GetName());
+    return;
+  }
+
   const bool bShouldDeferLocalAuthorityPrompt = IsLocalController() && HasAuthority();
 
   if (bShouldDeferLocalAuthorityPrompt) {
@@ -6952,6 +6960,11 @@ void ASkaldPlayerController::ShowPrepareForBattlePromptLocal(
 
 void ASkaldPlayerController::ShowPrepareForBattlePromptLocal_Internal(
     const FPrepareForBattlePromptData &PromptData) {
+  if (!IsLocalController() || GetLocalPlayer() == nullptr) {
+    ResetPendingReadyPromptState();
+    return;
+  }
+
   if (!MainHUD) {
     InitializeHUDWidget();
   }
