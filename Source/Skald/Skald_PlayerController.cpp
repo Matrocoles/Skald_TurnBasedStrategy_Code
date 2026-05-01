@@ -1639,7 +1639,7 @@ void ASkaldPlayerController::InitializeHUDWidget() {
 bool ASkaldPlayerController::CanCreateLocalUIWidget() const {
   return IsLocalController() && IsLocalPlayerController() &&
          GetLocalPlayer() != nullptr && Player != nullptr &&
-         !IsA<ASkaldAIController>();
+         !IsAIControllerIdentity(this);
 }
 
 void ASkaldPlayerController::InitializeChoosePlayerWidget() {
