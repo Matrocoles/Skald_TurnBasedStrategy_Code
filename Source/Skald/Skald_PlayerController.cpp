@@ -1607,22 +1607,8 @@ void ASkaldPlayerController::InitializeHUDWidget() {
 }
 
 bool ASkaldPlayerController::CanCreateLocalUIWidget() const {
-  if (!IsLocalController() || !IsLocalPlayerController() ||
-      GetLocalPlayer() == nullptr) {
-    return false;
-  }
-
-  if (IsA(ASkaldAIController::StaticClass())) {
-    return false;
-  }
-
-  if (const ASkaldPlayerState* PS = GetPlayerState<ASkaldPlayerState>()) {
-    if (PS->bIsAI) {
-      return false;
-    }
-  }
-
-  return true;
+  return IsLocalController() && IsLocalPlayerController() &&
+         GetLocalPlayer() != nullptr;
 }
 
 void ASkaldPlayerController::InitializeChoosePlayerWidget() {
@@ -5348,16 +5334,8 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
                                        : ETurnPhase::Reinforcement;
   const EBattlePhase BattlePhase =
       CachedGameState ? CachedGameState->BattlePhase : EBattlePhase::None;
-  const bool bHasBattleWidgetVisible =
-      FighterSelectionWidget && FighterSelectionWidget->IsInViewport();
-  const bool bBattleTravelContextActive =
-      CachedGameInstance &&
-      (CachedGameInstance->bIsInBattleMap ||
-       CachedGameInstance->IsTravelPending() ||
-       CachedGameInstance->HasPendingBattleTravelContext());
   const bool bInBattleInputFlow =
-      bOnBattleMap || BattlePhase != EBattlePhase::None ||
-      bHasBattleWidgetVisible || bBattleTravelContextActive;
+      bIsBattleMap || BattlePhase != EBattlePhase::None;
   UE_LOG(LogSkald, Log,
          TEXT("[TurnState] Controller %s turn ownership check: Phase=%s ActiveId=%d IsMyTurn=%s LocalTurnActive=%s"),
          *GetName(), *UEnum::GetValueAsString(Phase),
