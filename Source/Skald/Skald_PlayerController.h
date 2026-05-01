@@ -951,6 +951,7 @@ protected:
             Category = "Turn", meta = (ExposeOnSpawn = true))
   TObjectPtr<ATurnManager> TurnManager;
 
+public:
   /** Keep HUD turn/phase widgets aligned with replicated game state. */
   void RefreshTurnDataFromState();
   UFUNCTION()
