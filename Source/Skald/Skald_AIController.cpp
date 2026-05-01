@@ -1515,17 +1515,17 @@ void ASkaldAIController::SetupBattleAutomation() {
   // across PIE travel / BeginPlay re-entry edge cases.
   CachedBattleManager->OnActiveFighterChanged.RemoveDynamic(
       this, &ASkaldAIController::HandleActiveFighterChanged);
-  CachedBattleManager->OnActiveFighterChanged.AddDynamic(
+  CachedBattleManager->OnActiveFighterChanged.AddUniqueDynamic(
       this, &ASkaldAIController::HandleActiveFighterChanged);
 
   CachedBattleManager->OnRoundStarted.RemoveDynamic(
       this, &ASkaldAIController::HandleRoundStarted);
-  CachedBattleManager->OnRoundStarted.AddDynamic(
+  CachedBattleManager->OnRoundStarted.AddUniqueDynamic(
       this, &ASkaldAIController::HandleRoundStarted);
 
   CachedBattleManager->OnBattleEnded.RemoveDynamic(
       this, &ASkaldAIController::HandleBattleEnded);
-  CachedBattleManager->OnBattleEnded.AddDynamic(
+  CachedBattleManager->OnBattleEnded.AddUniqueDynamic(
       this, &ASkaldAIController::HandleBattleEnded);
 
   DetermineControlledBattleSide();

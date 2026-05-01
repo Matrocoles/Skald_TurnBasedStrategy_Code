@@ -244,6 +244,32 @@ ASkald_BattleGameMode *ASkaldPlayerController::ResolveBattleGameMode() {
   return nullptr;
 }
 
+
+namespace {
+bool IsAIControllerIdentity(const ASkaldPlayerController* Controller) {
+  if (!Controller) {
+    return false;
+  }
+
+  if (Controller->IsA<ASkaldAIController>()) {
+    return true;
+  }
+
+  if (const ASkaldPlayerState* PS = Controller->GetPlayerState<ASkaldPlayerState>()) {
+    if (PS->bIsAI) {
+      return true;
+    }
+  }
+
+  const FString ClassName = Controller->GetClass() ? Controller->GetClass()->GetName() : FString();
+  const FString InstanceName = Controller->GetName();
+  return ClassName.Contains(TEXT("AiController"), ESearchCase::IgnoreCase) ||
+         ClassName.Contains(TEXT("AIController"), ESearchCase::IgnoreCase) ||
+         InstanceName.Contains(TEXT("AiController"), ESearchCase::IgnoreCase) ||
+         InstanceName.Contains(TEXT("AIController"), ESearchCase::IgnoreCase);
+}
+}
+
 ASkaldPlayerController::ASkaldPlayerController() {
   TurnManager = nullptr;
   HUDRef = nullptr;
@@ -1515,6 +1541,10 @@ AFighterPawn *ASkaldPlayerController::ResolveCellAbilityPrimaryTarget(
 }
 
 void ASkaldPlayerController::InitializeHUDWidget() {
+  if (IsAIControllerIdentity(this)) {
+    return;
+  }
+
   if (MainHUD) {
     return;
   }
