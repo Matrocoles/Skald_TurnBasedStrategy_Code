@@ -2493,9 +2493,10 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
                                                   ? CachedGameInstance->PendingBattle
                                                   : FS_BattlePayload();
 
-  const bool bInSelectionPhase = CachedGameState
-                                     ? CachedGameState->BattlePhase == EBattlePhase::FighterSelection
-                                     : true;
+  const bool bInSelectionPhase =
+      !CachedGameState ||
+      CachedGameState->BattlePhase == EBattlePhase::FighterSelection ||
+      (CachedGameState->BattlePhase == EBattlePhase::None && bHasBattleContext);
 
   ASkaldPlayerState *SelectionPS = GetPlayerState<ASkaldPlayerState>();
   int32 LocalPlayerId = SelectionPS ? ResolveStablePlayerId(SelectionPS) : INDEX_NONE;
@@ -2774,6 +2775,10 @@ void ASkaldPlayerController::Client_OnLockInResult_Implementation(
 }
 
 void ASkaldPlayerController::HandleBattlePhaseChanged() {
+  if (!IsLocalController() || GetLocalPlayer() == nullptr) {
+    return;
+  }
+
   if (const ASkaldGameState *SGS =
           GetWorld() ? GetWorld()->GetGameState<ASkaldGameState>() : nullptr) {
     // Ensure each owning client initializes its own HUD/camera when entering a
@@ -5319,7 +5324,7 @@ void ASkaldPlayerController::HandleReplicatedBattlePayload() {
 }
 
 void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
-  if (!IsLocalController()) {
+  if (!IsLocalController() || GetLocalPlayer() == nullptr) {
     return;
   }
 
@@ -5349,12 +5354,41 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
   if (!bIsMyTurn) {
     bLocalTurnActive = false;
 
-    // Ensure non-active players fully release world input and phase buttons
-    // instead of inheriting the host's UI state.
-    UWidgetBlueprintLibrary::SetInputMode_GameOnly(this);
-    bShowMouseCursor = false;
-    bEnableClickEvents = false;
-    bEnableMouseOverEvents = false;
+    bool bNeedsBattlePrepUI = bPendingReadyPrompt;
+    if (!bNeedsBattlePrepUI && FighterSelectionWidget && FighterSelectionWidget->IsInViewport()) {
+      bNeedsBattlePrepUI = true;
+    }
+
+    if (!bNeedsBattlePrepUI && CachedGameInstance) {
+      const FS_BattlePayload PendingBattle = CachedGameState
+                                                 ? CachedGameState->GetActiveBattlePayload()
+                                                 : CachedGameInstance->PendingBattle;
+      if (PendingBattle.AttackerPlayerID > 0 && PendingBattle.DefenderPlayerID > 0) {
+        if (ASkaldPlayerState* LocalPS = GetPlayerState<ASkaldPlayerState>()) {
+          const int32 LocalPlayerId = ResolveStablePlayerId(LocalPS);
+          bNeedsBattlePrepUI =
+              (PendingBattle.AttackerPlayerID == LocalPlayerId ||
+               PendingBattle.DefenderPlayerID == LocalPlayerId) &&
+              !LocalPS->bArmyLockedIn;
+        }
+      }
+    }
+
+    if (bNeedsBattlePrepUI) {
+      UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
+          this, nullptr, EMouseLockMode::DoNotLock,
+          /*bHideCursorDuringCapture*/ false);
+      bShowMouseCursor = true;
+      bEnableClickEvents = true;
+      bEnableMouseOverEvents = true;
+    } else {
+      // Ensure non-active players fully release world input and phase buttons
+      // instead of inheriting the host's UI state.
+      UWidgetBlueprintLibrary::SetInputMode_GameOnly(this);
+      bShowMouseCursor = false;
+      bEnableClickEvents = false;
+      bEnableMouseOverEvents = false;
+    }
 
     if (MainHUD) {
       MainHUD->SyncPhaseButtons(false);
@@ -6934,6 +6968,13 @@ void ASkaldPlayerController::ResetPendingReadyPromptState() {
 
 void ASkaldPlayerController::ShowPrepareForBattlePromptLocal(
     const FPrepareForBattlePromptData &PromptData) {
+  if (!IsLocalController() || GetLocalPlayer() == nullptr) {
+    UE_LOG(LogSkaldReady, Verbose,
+           TEXT("Skipping prepare-for-battle prompt for %s: controller has no local player."),
+           *GetName());
+    return;
+  }
+
   const bool bShouldDeferLocalAuthorityPrompt = IsLocalController() && HasAuthority();
 
   if (bShouldDeferLocalAuthorityPrompt) {
@@ -6952,6 +6993,11 @@ void ASkaldPlayerController::ShowPrepareForBattlePromptLocal(
 
 void ASkaldPlayerController::ShowPrepareForBattlePromptLocal_Internal(
     const FPrepareForBattlePromptData &PromptData) {
+  if (!IsLocalController() || GetLocalPlayer() == nullptr) {
+    ResetPendingReadyPromptState();
+    return;
+  }
+
   if (!MainHUD) {
     InitializeHUDWidget();
   }
@@ -8548,7 +8594,7 @@ void ASkaldPlayerController::HandlePendingPresentationTimerTick() {
 }
 
 void ASkaldPlayerController::EnsureDiceWidgets() {
-  if (!IsLocalController()) {
+  if (!IsLocalController() || GetLocalPlayer() == nullptr) {
     return;
   }
 
