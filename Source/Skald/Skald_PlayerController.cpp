@@ -1607,28 +1607,9 @@ void ASkaldPlayerController::InitializeHUDWidget() {
 }
 
 bool ASkaldPlayerController::CanCreateLocalUIWidget() const {
-  if (!IsLocalController() || !IsLocalPlayerController() ||
-      GetLocalPlayer() == nullptr || Player == nullptr) {
-    return false;
-  }
-
-  if (IsA<ASkaldAIController>()) {
-    return false;
-  }
-
-  if (const ASkaldPlayerState *PS = GetPlayerState<ASkaldPlayerState>()) {
-    if (PS->bIsAI) {
-      return false;
-    }
-  }
-
-  const FString ClassName = GetClass() ? GetClass()->GetName() : FString();
-  if (ClassName.Contains(TEXT("AiController"), ESearchCase::IgnoreCase) ||
-      ClassName.Contains(TEXT("AIController"), ESearchCase::IgnoreCase)) {
-    return false;
-  }
-
-  return true;
+  return IsLocalController() && IsLocalPlayerController() &&
+         GetLocalPlayer() != nullptr && Player != nullptr &&
+         !IsA<ASkaldAIController>();
 }
 
 void ASkaldPlayerController::InitializeChoosePlayerWidget() {
