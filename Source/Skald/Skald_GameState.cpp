@@ -154,6 +154,25 @@ void ASkaldGameState::OnRep_Players()
     RefreshControllersFromPlayers();
 }
 
+namespace {
+bool ShouldProcessUIController(const ASkaldPlayerController* PC) {
+    if (!PC || !PC->CanCreateLocalUIWidget()) {
+        return false;
+    }
+
+    const FString ClassName = PC->GetClass() ? PC->GetClass()->GetName() : FString();
+    const FString InstanceName = PC->GetName();
+    if (ClassName.Contains(TEXT("AiController"), ESearchCase::IgnoreCase) ||
+        ClassName.Contains(TEXT("AIController"), ESearchCase::IgnoreCase) ||
+        InstanceName.Contains(TEXT("AiController"), ESearchCase::IgnoreCase) ||
+        InstanceName.Contains(TEXT("AIController"), ESearchCase::IgnoreCase)) {
+        return false;
+    }
+
+    return true;
+}
+}
+
 void ASkaldGameState::RefreshControllersFromPlayers()
 {
     if (UWorld* World = GetWorld())
