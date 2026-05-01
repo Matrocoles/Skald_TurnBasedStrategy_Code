@@ -2775,6 +2775,10 @@ void ASkaldPlayerController::Client_OnLockInResult_Implementation(
 }
 
 void ASkaldPlayerController::HandleBattlePhaseChanged() {
+  if (!IsLocalController() || GetLocalPlayer() == nullptr) {
+    return;
+  }
+
   if (const ASkaldGameState *SGS =
           GetWorld() ? GetWorld()->GetGameState<ASkaldGameState>() : nullptr) {
     // Ensure each owning client initializes its own HUD/camera when entering a
@@ -5320,7 +5324,7 @@ void ASkaldPlayerController::HandleReplicatedBattlePayload() {
 }
 
 void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
-  if (!IsLocalController()) {
+  if (!IsLocalController() || GetLocalPlayer() == nullptr) {
     return;
   }
 

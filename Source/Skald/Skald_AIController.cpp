@@ -141,7 +141,7 @@ void ASkaldAIController::BeginPlay() {
   if (GameInstance) {
     GameInstance->OnBattleMapStateChanged.RemoveDynamic(
         this, &ASkaldAIController::HandleBattleMapStateChanged);
-    GameInstance->OnBattleMapStateChanged.AddDynamic(
+    GameInstance->OnBattleMapStateChanged.AddUniqueDynamic(
         this, &ASkaldAIController::HandleBattleMapStateChanged);
   }
 
