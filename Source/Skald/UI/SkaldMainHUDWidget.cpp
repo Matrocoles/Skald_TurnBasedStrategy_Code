@@ -844,7 +844,7 @@ void USkaldMainHUDWidget::ShowPrepareForBattleDialog(
   }
 
   ActivePrepareForBattleWidget = CreateWidget<UPrepareForBattleWidget>(
-      GetOwningLocalPlayer(), PrepareForBattleWidgetClass);
+      GetOwningPlayer(), PrepareForBattleWidgetClass);
   if (!ActivePrepareForBattleWidget) {
     UE_LOG(LogSkald, Warning,
            TEXT("ShowPrepareForBattleDialog: failed to create widget"));

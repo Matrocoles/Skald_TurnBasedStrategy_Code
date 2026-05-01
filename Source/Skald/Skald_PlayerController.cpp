@@ -2685,7 +2685,7 @@ void ASkaldPlayerController::ShowFighterSelectionUI(int32 MaxBudget,
     }
 
     FighterSelectionWidget = CreateWidget<UFighterSelectionWidget>(
-        LocalPlayer, FighterSelectionWidgetClass);
+        this, FighterSelectionWidgetClass);
   }
 
   if (!FighterSelectionWidget) {
