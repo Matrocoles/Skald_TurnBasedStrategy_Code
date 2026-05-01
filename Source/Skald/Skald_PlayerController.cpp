@@ -1613,6 +1613,10 @@ void ASkaldPlayerController::InitializeHUDWidget() {
 }
 
 void ASkaldPlayerController::InitializeChoosePlayerWidget() {
+  if (!IsLocalPlayerController() || !GetLocalPlayer()) {
+    return;
+  }
+
   if (ChoosePlayerWidget || !ChoosePlayerWidgetClass) {
     return;
   }
@@ -2863,7 +2867,7 @@ void ASkaldPlayerController::Server_CommitArmy_Implementation(
 }
 
 void ASkaldPlayerController::InitializeBattleHUD() {
-  if (!IsLocalController())
+  if (!IsLocalPlayerController() || !GetLocalPlayer())
     return;
   if (!BattleHUDWidgetClass)
     return;
