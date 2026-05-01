@@ -1,4 +1,5 @@
 #include "UI/InGameMenuWidget.h"
+#include "Engine/LocalPlayer.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Components/Button.h"
@@ -240,19 +241,19 @@ void UInGameMenuWidget::HandleMainMenuClicked()
 
     if (APlayerController* PC = GetOwningPlayer())
     {
-        if (UQuitConfirmationWidget* Widget = CreateWidget<UQuitConfirmationWidget>(PC, WidgetClass))
+        if (ULocalPlayer* LocalPlayer = PC->GetLocalPlayer())
         {
-            Widget->AddToViewport(100);
-            QuitConfirmationWidget = Widget;
+            if (UQuitConfirmationWidget* Widget = CreateWidget<UQuitConfirmationWidget>(LocalPlayer, WidgetClass))
+            {
+                Widget->AddToViewport(100);
+                QuitConfirmationWidget = Widget;
+            }
         }
     }
-    else if (UWorld* World = GetWorld())
+    else
     {
-        if (UQuitConfirmationWidget* Widget = CreateWidget<UQuitConfirmationWidget>(World, WidgetClass))
-        {
-            Widget->AddToViewport(100);
-            QuitConfirmationWidget = Widget;
-        }
+        UE_LOG(LogTemp, Warning,
+               TEXT("InGameMenu: skipped quit confirmation widget creation (no owning player/local player)."));
     }
 }
 
@@ -271,34 +272,37 @@ void UInGameMenuWidget::ShowChildWidget(TSubclassOf<UUserWidget> WidgetClass)
 
     if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(GetOwningPlayer()))
     {
-        if (UUserWidget* Child = CreateWidget<UUserWidget>(PC, WidgetClass))
+        if (ULocalPlayer* LocalPlayer = PC->GetLocalPlayer())
         {
-            if (USaveGameWidget* SaveWidget = Cast<USaveGameWidget>(Child))
+            if (UUserWidget* Child = CreateWidget<UUserWidget>(LocalPlayer, WidgetClass))
             {
-                SaveWidget->SetOwningMenu(this);
-            }
-            else if (ULoadGameWidget* LoadWidget = Cast<ULoadGameWidget>(Child))
-            {
-                LoadWidget->SetOwningMenu(this);
-            }
-            else if (USettingsWidget* Settings = Cast<USettingsWidget>(Child))
-            {
-                Settings->SetOwningMenu(this);
-            }
+                if (USaveGameWidget* SaveWidget = Cast<USaveGameWidget>(Child))
+                {
+                    SaveWidget->SetOwningMenu(this);
+                }
+                else if (ULoadGameWidget* LoadWidget = Cast<ULoadGameWidget>(Child))
+                {
+                    LoadWidget->SetOwningMenu(this);
+                }
+                else if (USettingsWidget* Settings = Cast<USettingsWidget>(Child))
+                {
+                    Settings->SetOwningMenu(this);
+                }
 
-            Child->AddToViewport(100);
-            ActiveChildWidget = Child;
+                Child->AddToViewport(100);
+                ActiveChildWidget = Child;
 
-            SetVisibility(ESlateVisibility::Hidden);
-            HandleVisibilityChange(ESlateVisibility::Hidden);
+                SetVisibility(ESlateVisibility::Hidden);
+                HandleVisibilityChange(ESlateVisibility::Hidden);
 
-            FInputModeGameAndUI Mode;
-            // Focus the Slate widget produced by the UUserWidget
-            Mode.SetWidgetToFocus(Child->TakeWidget());
-            Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-            Mode.SetHideCursorDuringCapture(false);
-            PC->SetInputMode(Mode);
-            PC->bShowMouseCursor = true;
+                FInputModeGameAndUI Mode;
+                // Focus the Slate widget produced by the UUserWidget
+                Mode.SetWidgetToFocus(Child->TakeWidget());
+                Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+                Mode.SetHideCursorDuringCapture(false);
+                PC->SetInputMode(Mode);
+                PC->bShowMouseCursor = true;
+            }
         }
     }
 }
