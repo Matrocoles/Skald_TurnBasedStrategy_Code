@@ -166,8 +166,9 @@ void ASkaldAIController::InitializeHUDWidget() {
 
 void ASkaldAIController::ShowPrepareForBattlePromptLocal(
     const FPrepareForBattlePromptData &PromptData) {
-  Super::ShowPrepareForBattlePromptLocal(PromptData);
-
+  // AI controllers never display local widgets. Avoid the base implementation
+  // because it can queue UI prompt retries/timers intended for human players.
+  HidePrepareForBattlePromptLocal();
   ProcessPrepareForBattlePrompt(PromptData);
 }
 
