@@ -45,6 +45,28 @@ static bool IsAIController(const AController *C) {
   return C && C->IsA(ASkaldAIController::StaticClass());
 }
 
+static bool IsAIControllerIdentity(const ASkaldPlayerController *Controller) {
+  if (!Controller) {
+    return false;
+  }
+  if (Controller->IsA<ASkaldAIController>()) {
+    return true;
+  }
+  if (const ASkaldPlayerState *PS =
+          Controller->GetPlayerState<ASkaldPlayerState>()) {
+    if (PS->bIsAI) {
+      return true;
+    }
+  }
+  const FString ClassName =
+      Controller->GetClass() ? Controller->GetClass()->GetName() : FString();
+  const FString InstanceName = Controller->GetName();
+  return ClassName.Contains(TEXT("AiController"), ESearchCase::IgnoreCase) ||
+         ClassName.Contains(TEXT("AIController"), ESearchCase::IgnoreCase) ||
+         InstanceName.Contains(TEXT("AiController"), ESearchCase::IgnoreCase) ||
+         InstanceName.Contains(TEXT("AIController"), ESearchCase::IgnoreCase);
+}
+
 static int32 ResolveBattlePlayerId(const ASkaldPlayerState *PlayerState) {
   if (!PlayerState) {
     return INDEX_NONE;
@@ -859,7 +881,9 @@ void ASkald_BattleGameMode::BeginPreBattleSelection(ASkaldPlayerState *AttackerP
     if (!AttackerPS->bIsAI) {
       if (ASkaldPlayerController *APC =
               Cast<ASkaldPlayerController>(AttackerPS->GetOwner())) {
-        APC->Client_ShowFighterSelection(AttackerBudget, AttackerPS->Faction);
+        if (!IsAIControllerIdentity(APC)) {
+          APC->Client_ShowFighterSelection(AttackerBudget, AttackerPS->Faction);
+        }
       }
     }
   }
@@ -872,7 +896,9 @@ void ASkald_BattleGameMode::BeginPreBattleSelection(ASkaldPlayerState *AttackerP
     if (!DefenderPS->bIsAI) {
       if (ASkaldPlayerController *DPC =
               Cast<ASkaldPlayerController>(DefenderPS->GetOwner())) {
-        DPC->Client_ShowFighterSelection(DefenderBudget, DefenderPS->Faction);
+        if (!IsAIControllerIdentity(DPC)) {
+          DPC->Client_ShowFighterSelection(DefenderBudget, DefenderPS->Faction);
+        }
       }
     }
   }
