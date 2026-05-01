@@ -3,6 +3,7 @@
 #if WITH_AUTOMATION_TESTS
 
 #include "GridBattleManager.h"
+#include "BattleEndIdempotencyTestListener.h"
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldBattleEndIdempotencyTest,
                                  "Skald.Battle.EndBattleIdempotent",
                                  EAutomationTestFlags::EditorContext |
@@ -11,7 +12,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkaldBattleEndIdempotencyTest,
 bool FSkaldBattleEndIdempotencyTest::RunTest(const FString& Parameters)
 {
   UGridBattleManager* Manager = NewObject<UGridBattleManager>();
-  int32 NotificationCount = 0;
+  UBattleEndIdempotencyTestListener* Listener = NewObject<UBattleEndIdempotencyTestListener>();
 
   TestNotNull(TEXT("Battle manager created"), Manager);
   if (!Manager)
@@ -19,16 +20,20 @@ bool FSkaldBattleEndIdempotencyTest::RunTest(const FString& Parameters)
     return false;
   }
 
-  Manager->OnBattleEnded.AddLambda([&NotificationCount](ESkaldFaction /*WinningFaction*/, int32 /*AttackerCasualties*/, int32 /*DefenderCasualties*/)
+  TestNotNull(TEXT("Listener created"), Listener);
+  if (!Listener)
   {
-    ++NotificationCount;
-  });
+    return false;
+  }
+
+  Manager->OnBattleEnded.AddDynamic(Listener,
+                                    &UBattleEndIdempotencyTestListener::HandleBattleEnded);
 
   Manager->EndBattle();
   Manager->EndBattle();
 
   TestEqual(TEXT("OnBattleEnded should broadcast once across duplicate EndBattle calls"),
-            NotificationCount, 1);
+            Listener->NotificationCount, 1);
   return true;
 }
 
