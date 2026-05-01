@@ -8590,7 +8590,7 @@ void ASkaldPlayerController::HandlePendingPresentationTimerTick() {
 }
 
 void ASkaldPlayerController::EnsureDiceWidgets() {
-  if (!IsLocalController()) {
+  if (!IsLocalController() || GetLocalPlayer() == nullptr) {
     return;
   }
 
