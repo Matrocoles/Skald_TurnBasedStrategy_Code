@@ -181,7 +181,7 @@ void ASkaldGameState::RefreshControllersFromPlayers()
         {
             if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
             {
-                if (!ShouldProcessUIController(PC))
+                if (!PC->CanCreateLocalUIWidget())
                 {
                     continue;
                 }
@@ -215,7 +215,7 @@ void ASkaldGameState::OnRep_CurrentTurnIndex()
         {
             if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
             {
-                if (!ShouldProcessUIController(PC))
+                if (!PC->CanCreateLocalUIWidget())
                 {
                     continue;
                 }
@@ -241,7 +241,7 @@ void ASkaldGameState::OnRep_ActivePlayerId()
         {
             if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
             {
-                if (!ShouldProcessUIController(PC))
+                if (!PC->CanCreateLocalUIWidget())
                 {
                     continue;
                 }
@@ -442,7 +442,7 @@ void ASkaldGameState::OnRep_BattlePayload()
         {
             if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
             {
-                if (!ShouldProcessUIController(PC))
+                if (!PC->CanCreateLocalUIWidget())
                 {
                     continue;
                 }
@@ -488,7 +488,7 @@ void ASkaldGameState::OnRep_BattleParticipants()
         {
             if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
             {
-                if (!ShouldProcessUIController(PC))
+                if (!PC->CanCreateLocalUIWidget())
                 {
                     continue;
                 }
@@ -536,7 +536,7 @@ void ASkaldGameState::OnRep_PendingBattleReady()
         {
             if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
             {
-                if (!ShouldProcessUIController(PC))
+                if (!PC->CanCreateLocalUIWidget())
                 {
                     continue;
                 }
@@ -568,7 +568,7 @@ void ASkaldGameState::OnRep_BattleRoundState()
         {
             if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
             {
-                if (!ShouldProcessUIController(PC))
+                if (!PC->CanCreateLocalUIWidget())
                 {
                     continue;
                 }
@@ -757,7 +757,7 @@ void ASkaldGameState::OnRep_BattlePhase()
         {
             if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
             {
-                if (!ShouldProcessUIController(PC))
+                if (!PC->CanCreateLocalUIWidget())
                 {
                     continue;
                 }
