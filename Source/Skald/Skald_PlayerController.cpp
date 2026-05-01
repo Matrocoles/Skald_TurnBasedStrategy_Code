@@ -1608,7 +1608,8 @@ void ASkaldPlayerController::InitializeHUDWidget() {
 
 bool ASkaldPlayerController::CanCreateLocalUIWidget() const {
   return IsLocalController() && IsLocalPlayerController() &&
-         GetLocalPlayer() != nullptr;
+         GetLocalPlayer() != nullptr && Player != nullptr &&
+         !IsA<ASkaldAIController>();
 }
 
 void ASkaldPlayerController::InitializeChoosePlayerWidget() {
@@ -5303,6 +5304,13 @@ void ASkaldPlayerController::HandleReplicatedPhaseChange(
 
 void ASkaldPlayerController::HandleReplicatedBattlePayload() {
   if (!IsLocalController()) {
+    return;
+  }
+
+  // AI controllers can be considered local on the server but have no attached
+  // local player, so they must never attempt to spawn UI widgets.
+  if (!CanCreateLocalUIWidget()) {
+    RefreshTurnDataFromState();
     return;
   }
 
