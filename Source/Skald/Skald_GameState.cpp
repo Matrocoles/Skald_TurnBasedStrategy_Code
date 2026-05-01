@@ -162,7 +162,7 @@ void ASkaldGameState::RefreshControllersFromPlayers()
         {
             if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
             {
-                if (!PC->IsLocalController() || PC->GetLocalPlayer() == nullptr)
+                if (!PC->IsLocalController())
                 {
                     continue;
                 }
@@ -738,7 +738,7 @@ void ASkaldGameState::OnRep_BattlePhase()
         {
             if (ASkaldPlayerController* PC = Cast<ASkaldPlayerController>(It->Get()))
             {
-                if (!PC->IsLocalController() || PC->GetLocalPlayer() == nullptr)
+                if (!PC->IsLocalController())
                 {
                     continue;
                 }
