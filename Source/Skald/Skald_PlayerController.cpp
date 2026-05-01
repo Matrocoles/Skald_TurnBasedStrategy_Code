@@ -5350,12 +5350,41 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
   if (!bIsMyTurn) {
     bLocalTurnActive = false;
 
-    // Ensure non-active players fully release world input and phase buttons
-    // instead of inheriting the host's UI state.
-    UWidgetBlueprintLibrary::SetInputMode_GameOnly(this);
-    bShowMouseCursor = false;
-    bEnableClickEvents = false;
-    bEnableMouseOverEvents = false;
+    bool bNeedsBattlePrepUI = bPendingReadyPrompt;
+    if (!bNeedsBattlePrepUI && FighterSelectionWidget && FighterSelectionWidget->IsInViewport()) {
+      bNeedsBattlePrepUI = true;
+    }
+
+    if (!bNeedsBattlePrepUI && CachedGameInstance) {
+      const FS_BattlePayload PendingBattle = CachedGameState
+                                                 ? CachedGameState->GetActiveBattlePayload()
+                                                 : CachedGameInstance->PendingBattle;
+      if (PendingBattle.AttackerPlayerID > 0 && PendingBattle.DefenderPlayerID > 0) {
+        if (ASkaldPlayerState* LocalPS = GetPlayerState<ASkaldPlayerState>()) {
+          const int32 LocalPlayerId = ResolveStablePlayerId(LocalPS);
+          bNeedsBattlePrepUI =
+              (PendingBattle.AttackerPlayerID == LocalPlayerId ||
+               PendingBattle.DefenderPlayerID == LocalPlayerId) &&
+              !LocalPS->bArmyLockedIn;
+        }
+      }
+    }
+
+    if (bNeedsBattlePrepUI) {
+      UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
+          this, nullptr, EMouseLockMode::DoNotLock,
+          /*bHideCursorDuringCapture*/ false);
+      bShowMouseCursor = true;
+      bEnableClickEvents = true;
+      bEnableMouseOverEvents = true;
+    } else {
+      // Ensure non-active players fully release world input and phase buttons
+      // instead of inheriting the host's UI state.
+      UWidgetBlueprintLibrary::SetInputMode_GameOnly(this);
+      bShowMouseCursor = false;
+      bEnableClickEvents = false;
+      bEnableMouseOverEvents = false;
+    }
 
     if (MainHUD) {
       MainHUD->SyncPhaseButtons(false);
