@@ -1637,16 +1637,9 @@ void ASkaldPlayerController::InitializeHUDWidget() {
 }
 
 bool ASkaldPlayerController::CanCreateLocalUIWidget() const {
-  if (!IsLocalController() || !IsLocalPlayerController() ||
-      GetLocalPlayer() == nullptr || Player == nullptr) {
-    return false;
-  }
-
-  if (IsAIControllerIdentity(this)) {
-    return false;
-  }
-
-  return true;
+  return IsLocalController() && IsLocalPlayerController() &&
+         GetLocalPlayer() != nullptr && Player != nullptr &&
+         !IsA<ASkaldAIController>();
 }
 
 void ASkaldPlayerController::InitializeChoosePlayerWidget() {
@@ -5368,7 +5361,7 @@ void ASkaldPlayerController::HandleReplicatedBattlePayload() {
 }
 
 void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
-  if (IsAIControllerIdentity(this) || !CanCreateLocalUIWidget()) {
+  if (!CanCreateLocalUIWidget()) {
     return;
   }
 
