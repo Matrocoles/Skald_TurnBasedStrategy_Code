@@ -74,14 +74,14 @@ static int32 ResolveBattlePlayerId(const ASkaldPlayerState *PlayerState) {
     return INDEX_NONE;
   }
 
-  const int32 StableId = PlayerState->GetStablePlayerId();
-  if (StableId > 0) {
-    return StableId;
-  }
-
   const int32 AuthoritativeId = PlayerState->GetAuthoritativePlayerId();
   if (AuthoritativeId > 0) {
     return AuthoritativeId;
+  }
+
+  const int32 StableId = PlayerState->GetStablePlayerId();
+  if (StableId > 0) {
+    return StableId;
   }
 
   return INDEX_NONE;
@@ -892,6 +892,52 @@ void ASkald_BattleGameMode::SyncBattlePlayerEntry(ASkaldPlayerState *PlayerState
          Entry.PlayerId, *Entry.DisplayName, static_cast<int32>(Entry.Faction),
          Entry.PendingArmyBudget, Entry.bIsAI ? TEXT("true") : TEXT("false"));
 
+  const FS_BattlePayload ActiveBattle = GS->GetActiveBattlePayload();
+  if (ActiveBattle.AttackerPlayerID > 0 && ActiveBattle.DefenderPlayerID > 0 &&
+      Entry.PlayerId > 0 &&
+      Entry.PlayerId != ActiveBattle.AttackerPlayerID &&
+      Entry.PlayerId != ActiveBattle.DefenderPlayerID) {
+    int32 CanonicalId = INDEX_NONE;
+    for (const FBattlePlayerEntry &ExistingEntry : GS->BattleParticipants) {
+      const bool bNameMatches = ExistingEntry.DisplayName.Equals(
+          Entry.DisplayName, ESearchCase::CaseSensitive);
+      const bool bIsExpectedId =
+          ExistingEntry.PlayerId == ActiveBattle.AttackerPlayerID ||
+          ExistingEntry.PlayerId == ActiveBattle.DefenderPlayerID;
+      if (bNameMatches && bIsExpectedId) {
+        CanonicalId = ExistingEntry.PlayerId;
+        break;
+      }
+    }
+
+    if (CanonicalId <= 0) {
+      if (!ActiveBattle.AttackerDisplayName.IsEmpty() &&
+          ActiveBattle.AttackerDisplayName.Equals(Entry.DisplayName,
+                                                  ESearchCase::CaseSensitive)) {
+        CanonicalId = ActiveBattle.AttackerPlayerID;
+      } else if (!ActiveBattle.DefenderDisplayName.IsEmpty() &&
+                 ActiveBattle.DefenderDisplayName.Equals(
+                     Entry.DisplayName, ESearchCase::CaseSensitive)) {
+        CanonicalId = ActiveBattle.DefenderPlayerID;
+      }
+    }
+
+    if (CanonicalId > 0 && CanonicalId != Entry.PlayerId) {
+      UE_LOG(LogSkaldBattle, Warning,
+             TEXT("Battle participant ID remap: SyncBattlePlayerEntry resolved PlayerId=%d (%s), remapping to canonical payload-linked id %d."),
+             Entry.PlayerId, *Entry.DisplayName, CanonicalId);
+      Entry.PlayerId = CanonicalId;
+    }
+
+    if (Entry.PlayerId != ActiveBattle.AttackerPlayerID &&
+        Entry.PlayerId != ActiveBattle.DefenderPlayerID) {
+      UE_LOG(LogSkaldBattle, Warning,
+             TEXT("Battle participant ID mismatch: SyncBattlePlayerEntry resolved PlayerId=%d (%s) but active payload expects Attacker=%d Defender=%d. This can desync fighter-selection/HUD ownership."),
+             Entry.PlayerId, *Entry.DisplayName, ActiveBattle.AttackerPlayerID,
+             ActiveBattle.DefenderPlayerID);
+    }
+  }
+
   GS->UpsertBattleEntry(Entry);
 }
 
@@ -902,6 +948,13 @@ void ASkald_BattleGameMode::BeginPreBattleSelection(ASkaldPlayerState *AttackerP
 {
   if (!HasAuthority()) {
     return;
+  }
+  if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
+    // Battle participants can carry over stale entries across travel/setup
+    // retries in PIE. Start each pre-battle selection with a clean roster so
+    // attacker/defender lock-in and turn ownership are keyed to the current
+    // payload only.
+    GS->ResetBattleParticipants();
   }
   NormalizeSinglePlayerControllerRoles(GetWorld(),
                                        GetGameInstance<USkaldGameInstance>());
