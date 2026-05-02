@@ -9521,7 +9521,10 @@ void ASkaldPlayerController::ClientShowAttackRollButton_Implementation(
         return;
     }
 
-    HandleAttackRollRequested();
+    // AI-triggered attack rolls are resolved by the authoritative fighter pawn.
+    // Human presenter clients should acknowledge camera/presentation readiness,
+    // not invoke the manual roll RPC that requires fighter ownership.
+    ServerNotifyAIAttackOverviewComplete(Attacker);
 }
 
 void ASkaldPlayerController::ClientHideAttackRollButton_Implementation()
