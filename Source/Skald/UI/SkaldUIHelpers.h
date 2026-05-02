@@ -16,7 +16,9 @@ static inline void FocusWidgetUIOnly(APlayerController *PC, UUserWidget *Widget)
   Widget->SetIsFocusable(true);
   Widget->SetFocus();
 
-  UWidgetBlueprintLibrary::SetInputMode_UIOnlyEx(
+  // Use Game+UI input while focusing modal widgets so the OS cursor remains
+  // visible/interactive even when the viewport previously captured the mouse.
+  UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
       PC, Widget, EMouseLockMode::DoNotLock, false);
   PC->bShowMouseCursor = true;
 }
