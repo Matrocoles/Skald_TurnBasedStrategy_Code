@@ -87,6 +87,8 @@ static int32 ResolveBattlePlayerId(const ASkaldPlayerState *PlayerState) {
   return INDEX_NONE;
 }
 
+static int32 GetPlayerIdFrom(AController *C);
+
 static int32 ResolveCanonicalStableId(AController* Controller,
                                       ASkaldPlayerState* PlayerState,
                                       const FSkaldTravelState* TravelState,
@@ -1065,7 +1067,7 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
     UE_LOG(LogSkaldBattle, Verbose,
            TEXT("SetupPendingBattle: skipping duplicate completed setup (Signature=%u)"),
            SetupSignature);
-    bSetupCompleted = true; SetupCompleteToken = Token; if (USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>()) { GI->bTurnStateFrozenForTravel = false; UE_LOG(LogSkald, Log, TEXT("[TurnFreeze] Ctx=SetupPendingBattle Frozen=0 ActiveId=%d LocalTurnActive=0 Action=evaluate"), GI->GetTravelState().AttackerPlayerId); } UE_LOG(LogSkaldBattle, Log, TEXT("[TravelSummary] Token=%s Expected=%d ParticipantCount=%d SetupAttempts=%d"), *Token, ExpectedControllers, BattleParticipants.Num(), SetupAttemptCounter);
+    bSetupCompleted = true; SetupCompleteToken = Token; if (USkaldGameInstance* LocalGI = GetGameInstance<USkaldGameInstance>()) { LocalGI->bTurnStateFrozenForTravel = false; UE_LOG(LogSkald, Log, TEXT("[TurnFreeze] Ctx=SetupPendingBattle Frozen=0 ActiveId=%d LocalTurnActive=0 Action=evaluate"), LocalGI->GetTravelState().AttackerPlayerId); } UE_LOG(LogSkaldBattle, Log, TEXT("[TravelSummary] Token=%s Expected=%d ParticipantCount=%d SetupAttempts=%d"), *Token, ExpectedControllers, GS ? GS->GetBattleEntries().Num() : 0, SetupAttemptCounter);
     bSetupStarted = false;
     GBattleSetupTriggered = false;
     return;
@@ -1410,7 +1412,7 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
     RegisterPlayerLockIn(ResolveBattlePlayerId(DefenderPS));
   }
 
-  bSetupCompleted = true; SetupCompleteToken = Token; if (USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>()) { GI->bTurnStateFrozenForTravel = false; UE_LOG(LogSkald, Log, TEXT("[TurnFreeze] Ctx=SetupPendingBattle Frozen=0 ActiveId=%d LocalTurnActive=0 Action=evaluate"), GI->GetTravelState().AttackerPlayerId); } UE_LOG(LogSkaldBattle, Log, TEXT("[TravelSummary] Token=%s Expected=%d ParticipantCount=%d SetupAttempts=%d"), *Token, ExpectedControllers, BattleParticipants.Num(), SetupAttemptCounter);
+  bSetupCompleted = true; SetupCompleteToken = Token; if (USkaldGameInstance* LocalGI = GetGameInstance<USkaldGameInstance>()) { LocalGI->bTurnStateFrozenForTravel = false; UE_LOG(LogSkald, Log, TEXT("[TurnFreeze] Ctx=SetupPendingBattle Frozen=0 ActiveId=%d LocalTurnActive=0 Action=evaluate"), LocalGI->GetTravelState().AttackerPlayerId); } UE_LOG(LogSkaldBattle, Log, TEXT("[TravelSummary] Token=%s Expected=%d ParticipantCount=%d SetupAttempts=%d"), *Token, ExpectedControllers, GS ? GS->GetBattleEntries().Num() : 0, SetupAttemptCounter);
   LastCompletedSetupSignature = SetupSignature;
   ActiveSetupSignature = 0;
   GI->PendingBattle = Battle;

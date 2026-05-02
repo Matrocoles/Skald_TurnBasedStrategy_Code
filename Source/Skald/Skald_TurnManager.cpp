@@ -1470,7 +1470,7 @@ void ATurnManager::HandleAttackConfirmed(const FS_BattlePayload &Battle) {
          Battle.FromTerritoryID, Battle.TargetTerritoryID,
          Battle.AttackerPlayerID, Battle.DefenderPlayerID);
 
-  if (USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>()) { GI->bTurnStateFrozenForTravel = true; UE_LOG(LogSkald, Log, TEXT("[TurnFreeze] Ctx=HandleAttackConfirmed Frozen=1 ActiveId=%d LocalTurnActive=0 Action=skip"), ActivePlayerID); }
+  if (USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>()) { GI->bTurnStateFrozenForTravel = true; UE_LOG(LogSkald, Log, TEXT("[TurnFreeze] Ctx=HandleAttackConfirmed Frozen=1 ActiveId=%d LocalTurnActive=0 Action=skip"), GetActivePlayerId()); }
   BeginReadyPhase(Battle, TEXT("HandleAttackConfirmed"));
 }
 
@@ -4404,7 +4404,7 @@ bool ATurnManager::BroadcastCurrentPhase() {
 
   const FString PhaseString = UEnum::GetValueAsString(CurrentPhase);
   UE_LOG(LogSkald, Log, TEXT("[PhaseGuard] From=%s To=%s Active=%d Allowed=%d Reason=%s"),
-         TEXT("Unknown"), *PhaseString, ActivePlayerID, 1, TEXT("BroadcastCurrentPhase"));
+         TEXT("Unknown"), *PhaseString, GetActivePlayerId(), 1, TEXT("BroadcastCurrentPhase"));
   UE_LOG(LogSkald, Log, TEXT("BroadcastCurrentPhase: %s"), *PhaseString);
   if (GEngine) {
     GEngine->AddOnScreenDebugMessage(
