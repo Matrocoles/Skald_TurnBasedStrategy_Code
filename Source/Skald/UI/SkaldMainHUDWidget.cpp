@@ -1960,14 +1960,15 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
       SelectedTargetID = Territory->TerritoryID;
       ShowSelectionPromptMessage(FText::GetEmpty(), false);
       if (ConfirmAttackWidgetClass) {
-        if (!GetOwningLocalPlayer()) {
+        APlayerController* OwningPlayerController = GetOwningPlayer();
+        if (!OwningPlayerController) {
           UE_LOG(LogSkald, Warning,
-                 TEXT("OnTerritoryClickedUI: missing owning local player for confirm widget"));
+                 TEXT("OnTerritoryClickedUI: missing owning player controller for confirm widget"));
           ShowErrorMessage(TEXT("Could not open confirm attack UI"));
           return;
         }
         ActiveConfirmWidget = CreateWidget<UConfirmAttackWidget>(
-            GetOwningLocalPlayer(), ConfirmAttackWidgetClass);
+            OwningPlayerController, ConfirmAttackWidgetClass);
         if (ActiveConfirmWidget) {
           int32 MaxUnits = 1;
           if (AWorldMap *WorldMap =
