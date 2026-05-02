@@ -897,45 +897,10 @@ void ASkald_BattleGameMode::SyncBattlePlayerEntry(ASkaldPlayerState *PlayerState
       Entry.PlayerId > 0 &&
       Entry.PlayerId != ActiveBattle.AttackerPlayerID &&
       Entry.PlayerId != ActiveBattle.DefenderPlayerID) {
-    int32 CanonicalId = INDEX_NONE;
-    for (const FBattlePlayerEntry &ExistingEntry : GS->BattleParticipants) {
-      const bool bNameMatches = ExistingEntry.DisplayName.Equals(
-          Entry.DisplayName, ESearchCase::CaseSensitive);
-      const bool bIsExpectedId =
-          ExistingEntry.PlayerId == ActiveBattle.AttackerPlayerID ||
-          ExistingEntry.PlayerId == ActiveBattle.DefenderPlayerID;
-      if (bNameMatches && bIsExpectedId) {
-        CanonicalId = ExistingEntry.PlayerId;
-        break;
-      }
-    }
-
-    if (CanonicalId <= 0) {
-      if (!ActiveBattle.AttackerDisplayName.IsEmpty() &&
-          ActiveBattle.AttackerDisplayName.Equals(Entry.DisplayName,
-                                                  ESearchCase::CaseSensitive)) {
-        CanonicalId = ActiveBattle.AttackerPlayerID;
-      } else if (!ActiveBattle.DefenderDisplayName.IsEmpty() &&
-                 ActiveBattle.DefenderDisplayName.Equals(
-                     Entry.DisplayName, ESearchCase::CaseSensitive)) {
-        CanonicalId = ActiveBattle.DefenderPlayerID;
-      }
-    }
-
-    if (CanonicalId > 0 && CanonicalId != Entry.PlayerId) {
-      UE_LOG(LogSkaldBattle, Warning,
-             TEXT("Battle participant ID remap: SyncBattlePlayerEntry resolved PlayerId=%d (%s), remapping to canonical payload-linked id %d."),
-             Entry.PlayerId, *Entry.DisplayName, CanonicalId);
-      Entry.PlayerId = CanonicalId;
-    }
-
-    if (Entry.PlayerId != ActiveBattle.AttackerPlayerID &&
-        Entry.PlayerId != ActiveBattle.DefenderPlayerID) {
-      UE_LOG(LogSkaldBattle, Warning,
-             TEXT("Battle participant ID mismatch: SyncBattlePlayerEntry resolved PlayerId=%d (%s) but active payload expects Attacker=%d Defender=%d. This can desync fighter-selection/HUD ownership."),
-             Entry.PlayerId, *Entry.DisplayName, ActiveBattle.AttackerPlayerID,
-             ActiveBattle.DefenderPlayerID);
-    }
+    UE_LOG(LogSkaldBattle, Warning,
+           TEXT("Battle participant ID mismatch: SyncBattlePlayerEntry resolved PlayerId=%d (%s) but active payload expects Attacker=%d Defender=%d. This can desync fighter-selection/HUD ownership."),
+           Entry.PlayerId, *Entry.DisplayName, ActiveBattle.AttackerPlayerID,
+           ActiveBattle.DefenderPlayerID);
   }
 
   GS->UpsertBattleEntry(Entry);
