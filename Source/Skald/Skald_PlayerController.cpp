@@ -2543,7 +2543,6 @@ ATurnManager *ASkaldPlayerController::FindTurnManagerActor() const {
 }
 
 void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
-  LogWidgetCreationContext(this, TEXT("InitializeFighterSelectionIfNeeded"));
   if (!CanCreateLocalUIWidget() || IsAIControllerIdentity(this)) {
     return;
   }
@@ -2875,7 +2874,6 @@ void ASkaldPlayerController::Client_OnLockInResult_Implementation(
 }
 
 void ASkaldPlayerController::HandleBattlePhaseChanged() {
-  LogWidgetCreationContext(this, TEXT("HandleBattlePhaseChanged"));
   if (!CanCreateLocalUIWidget() || IsAIControllerIdentity(this)) {
     return;
   }
