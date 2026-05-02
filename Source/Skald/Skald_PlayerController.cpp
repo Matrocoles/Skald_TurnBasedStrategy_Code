@@ -5434,7 +5434,9 @@ void ASkaldPlayerController::HandleReplicatedBattlePayload() {
 }
 
 void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
-  if (!CanCreateLocalUIWidget()) {
+  // Turn-ownership UI updates must never run on controllers without an attached
+  // local player (notably AI controllers in PIE listen-server sessions).
+  if (!Player || !GetLocalPlayer() || IsAIControllerIdentity(this) || !CanCreateLocalUIWidget()) {
     return;
   }
 
