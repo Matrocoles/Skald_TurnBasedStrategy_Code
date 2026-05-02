@@ -1588,6 +1588,7 @@ void ASkaldPlayerController::InitializeHUDWidget() {
     return;
   }
 
+  LogWidgetCreationContext(this, TEXT("InitializeHUDWidget.MainHUD"));
   MainHUD = CreateWidget<USkaldMainHUDWidget>(this, MainHUDClass);
   if (!MainHUD) {
     return;
@@ -1683,6 +1684,7 @@ void ASkaldPlayerController::InitializeChoosePlayerWidget() {
     return;
   }
 
+  LogWidgetCreationContext(this, TEXT("InitializeChoosePlayerWidget"));
   ChoosePlayerWidget =
       CreateWidget<UChoosePlayerWidget>(this, ChoosePlayerWidgetClass);
   if (!ChoosePlayerWidget) {
@@ -2086,6 +2088,7 @@ void ASkaldPlayerController::ShowInGameMenu() {
     }
 
     if (InGameMenuWidgetClass) {
+      LogWidgetCreationContext(this, TEXT("ShowInGameMenu"));
       InGameMenuWidget = CreateWidget<UInGameMenuWidget>(this, InGameMenuWidgetClass);
       if (InGameMenuWidget) {
         InGameMenuWidget->SetVisibility(ESlateVisibility::Hidden);
@@ -2242,6 +2245,7 @@ void ASkaldPlayerController::ApplyFactionCursor() {
 
   if (CursorTexture) {
     if (!ActiveCursorWidget) {
+      LogWidgetCreationContext(this, TEXT("ApplyFactionCursor"));
       ActiveCursorWidget =
           CreateWidget<UFactionCursorWidget>(this, UFactionCursorWidget::StaticClass());
     }
@@ -2989,6 +2993,7 @@ void ASkaldPlayerController::InitializeBattleHUD() {
   if (!BattleHUDWidgetClass)
     return;
   if (!BattleHudWidget) {
+    LogWidgetCreationContext(this, TEXT("InitializeBattleHUD"));
     BattleHudWidget =
         CreateWidget<UBattleHUDWidget>(this, BattleHUDWidgetClass);
     if (BattleHudWidget) {
@@ -8741,6 +8746,7 @@ void ASkaldPlayerController::EnsureDiceWidgets() {
 
   const bool bShouldSpawnOverlay = bAutoPresentDiceRolls || bAutoPresentInitiativeRolls;
   if (bShouldSpawnOverlay && !DiceOverlayWidget && DiceOverlayWidgetClass) {
+    LogWidgetCreationContext(this, TEXT("EnsureDiceWidgets.Overlay"));
     DiceOverlayWidget = CreateWidget<USkaldDiceOverlayWidget>(this, DiceOverlayWidgetClass);
     if (DiceOverlayWidget) {
       DiceOverlayWidget->AddToViewport(32);
@@ -8749,6 +8755,7 @@ void ASkaldPlayerController::EnsureDiceWidgets() {
   }
 
   if (bAutoPresentInitiativeRolls && !DiceResultWidget && DiceResultWidgetClass) {
+    LogWidgetCreationContext(this, TEXT("EnsureDiceWidgets.Result"));
     DiceResultWidget = CreateWidget<USkaldDiceResultWidget>(this, DiceResultWidgetClass);
     if (DiceResultWidget) {
       DiceResultWidget->AddToViewport(33);
