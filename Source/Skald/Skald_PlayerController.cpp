@@ -260,7 +260,7 @@ void LogWidgetCreationContext(const ASkaldPlayerController* Controller,
                      ClassName.Contains(TEXT("AIController"), ESearchCase::IgnoreCase) ||
                      InstanceName.Contains(TEXT("AiController"), ESearchCase::IgnoreCase) ||
                      InstanceName.Contains(TEXT("AIController"), ESearchCase::IgnoreCase);
-  UE_LOG(LogSkaldBattle, Verbose,
+  UE_LOG(LogSkaldBattle, Warning,
          TEXT("WidgetTrace[%s]: Controller=%s Class=%s LocalController=%d LocalPlayerController=%d Player=%s LocalPlayer=%s IsAIIdentity=%d"),
          Callsite,
          *Controller->GetName(),
