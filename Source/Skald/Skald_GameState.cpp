@@ -210,7 +210,6 @@ void ASkaldGameState::RefreshControllersFromPlayers()
                 }
                 PC->RefreshTurnDataFromState();
                 PC->HandleReplicatedTurnOwnership();
-                PC->HandleReplicatedTurnStart();
             }
         }
     }
@@ -244,7 +243,6 @@ void ASkaldGameState::OnRep_CurrentTurnIndex()
                 }
                 PC->RefreshTurnDataFromState();
                 PC->HandleReplicatedTurnOwnership();
-                PC->HandleReplicatedTurnStart();
             }
         }
     }

@@ -1070,6 +1070,9 @@ private:
   /** Tracks if ExecuteLocalTurnStart has been triggered for the active turn. */
   bool bLocalTurnActive = false;
 
+  /** Debounce replicated turn-announcement spam for the same active player id. */
+  int32 LastAnnouncedActivePlayerId = INDEX_NONE;
+
   /** Prevents redundant pending battle state requests while waiting for a reply. */
   bool bPendingBattleStateRequest = false;
 
