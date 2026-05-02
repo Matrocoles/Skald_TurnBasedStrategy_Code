@@ -157,7 +157,27 @@ void UStartGameWidget::OnHost() { StartGame(true, true); }
 
 void UStartGameWidget::OnJoin() { StartGame(true, false); }
 
-void UStartGameWidget::OnLockIn() { StartGame(false, true); }
+void UStartGameWidget::OnLockIn() {
+  const FString Name = DisplayNameBox ? DisplayNameBox->GetText().ToString() : FString();
+  const FString Option = FactionComboBox ? FactionComboBox->GetSelectedOption() : FString();
+  const bool bHasName = !Name.TrimStartAndEnd().IsEmpty();
+  const bool bHasFaction = !Option.IsEmpty() && Option != TEXT("None") &&
+                           Option != FactionPlaceholderOption;
+
+  if (!bHasName || !bHasFaction) {
+    if (GEngine) {
+      GEngine->AddOnScreenDebugMessage(
+          -1, 4.f, FColor::Yellow,
+          TEXT("Enter a display name and choose a faction before starting singleplayer."));
+    }
+    UE_LOG(LogTemp, Warning,
+           TEXT("StartGameWidget::OnLockIn blocked. NameValid=%d FactionValid=%d SelectedFaction=%s"),
+           bHasName ? 1 : 0, bHasFaction ? 1 : 0, *Option);
+    return;
+  }
+
+  StartGame(false, true);
+}
 
 void UStartGameWidget::OnMainMenu() {
   RemoveFromParent();
