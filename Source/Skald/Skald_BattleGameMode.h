@@ -130,4 +130,7 @@ private:
 
   /** Signature currently being processed by setup. */
   uint32 ActiveSetupSignature = 0;
+  int32 SetupAttemptCounter = 0;
+  FString SetupCompleteToken;
+  TMap<FString, TSet<FString>> RegisteredControllers;
 };

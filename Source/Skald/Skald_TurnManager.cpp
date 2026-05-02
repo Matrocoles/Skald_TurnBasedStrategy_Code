@@ -1460,12 +1460,17 @@ bool ATurnManager::HasPendingBattlePreparation() const {
   return bHasPayload || bHasReadyAssignments || bRetreatInProgress;
 }
 
+static FString GCurrentTravelSessionToken;
+
 void ATurnManager::HandleAttackConfirmed(const FS_BattlePayload &Battle) {
+  if (GCurrentTravelSessionToken.IsEmpty()) { GCurrentTravelSessionToken = FGuid::NewGuid().ToString(EGuidFormats::DigitsWithHyphensLower); }
+  UE_LOG(LogSkald, Log, TEXT("[TravelToken] Token=%s Stage=Create World=%s Ctx=HandleAttackConfirmed PayloadValid=1"), *GCurrentTravelSessionToken, *GetNameSafe(GetWorld()));
   UE_LOG(LogSkaldReady, Log,
          TEXT("AttackConfirmed From=%d To=%d Attacker=%d Defender=%d"),
          Battle.FromTerritoryID, Battle.TargetTerritoryID,
          Battle.AttackerPlayerID, Battle.DefenderPlayerID);
 
+  if (USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>()) { GI->bTurnStateFrozenForTravel = true; UE_LOG(LogSkald, Log, TEXT("[TurnFreeze] Ctx=HandleAttackConfirmed Frozen=1 ActiveId=%d LocalTurnActive=0 Action=skip"), ActivePlayerID); }
   BeginReadyPhase(Battle, TEXT("HandleAttackConfirmed"));
 }
 
@@ -2030,6 +2035,7 @@ void ATurnManager::CacheBattleParticipants(const FS_BattlePayload &Battle)
 
 void ATurnManager::BeginReadyPhase(const FS_BattlePayload &Battle,
                                    const TCHAR *Context) {
+  if (USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>()) { const FSkaldTravelState& TS = GI->GetTravelState(); const bool bComplete = TS.ExpectedControllers > 0 && TS.AttackerPlayerId > 0 && TS.DefenderPlayerId > 0 && TS.CachedTerritories.Num() > 0; UE_LOG(LogSkald, Log, TEXT("[TravelState] Validity=%s Expected=%d Attacker=%d Defender=%d CachedTerritories=%d"), bComplete ? TEXT("Complete") : (TS.bValid ? TEXT("Partial") : TEXT("Invalid")), TS.ExpectedControllers, TS.AttackerPlayerId, TS.DefenderPlayerId, TS.CachedTerritories.Num()); if (!bComplete) { UE_LOG(LogSkald, Warning, TEXT("[TravelState][WARN] Consumed non-complete state")); } }
   if (!HasAuthority()) {
     UE_LOG(LogSkaldReady, Warning,
            TEXT("BeginReadyPhase called without authority; ignoring."));
@@ -2783,6 +2789,9 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
     PendingBattle = PendingPayload;
     bool bStreamingBattle = false;
     if (GI) {
+      TravelState.TravelSessionToken = GCurrentTravelSessionToken;
+      uint32 PayloadHash = 0; PayloadHash = HashCombine(PayloadHash, ::GetTypeHash(PendingPayload.FromTerritoryID)); PayloadHash = HashCombine(PayloadHash, ::GetTypeHash(PendingPayload.TargetTerritoryID));
+      UE_LOG(LogSkald, Log, TEXT("[TravelToken] Token=%s Stage=TriggerGridBattle World=%s Ctx=TriggerGridBattle PayloadValid=1 Hash=%u"), *GCurrentTravelSessionToken, *GetNameSafe(World), PayloadHash);
       GI->SetTravelState(TravelState);
       GI->PendingBattle = PendingPayload;
 
@@ -4394,6 +4403,8 @@ bool ATurnManager::BroadcastCurrentPhase() {
   }
 
   const FString PhaseString = UEnum::GetValueAsString(CurrentPhase);
+  UE_LOG(LogSkald, Log, TEXT("[PhaseGuard] From=%s To=%s Active=%d Allowed=%d Reason=%s"),
+         TEXT("Unknown"), *PhaseString, ActivePlayerID, 1, TEXT("BroadcastCurrentPhase"));
   UE_LOG(LogSkald, Log, TEXT("BroadcastCurrentPhase: %s"), *PhaseString);
   if (GEngine) {
     GEngine->AddOnScreenDebugMessage(

@@ -245,6 +245,11 @@ void USkaldGameInstance::SetTravelState(const FSkaldTravelState &InState) {
     CachedWorldMapTerritories = TravelState.CachedTerritories;
     PendingTravelTerritories = TravelState.CachedTerritories;
   }
+  const bool bComplete = TravelState.ExpectedControllers > 0 && TravelState.AttackerPlayerId > 0 && TravelState.DefenderPlayerId > 0 && TravelState.CachedTerritories.Num() > 0;
+  const bool bPartial = TravelState.ExpectedControllers > 0 || TravelState.AttackerPlayerId > 0 || TravelState.DefenderPlayerId > 0;
+  const TCHAR* Validity = bComplete ? TEXT("Complete") : (bPartial ? TEXT("Partial") : TEXT("Invalid"));
+  UE_LOG(LogSkald, Log, TEXT("[TravelToken] Token=%s Stage=SetTravelState World=%s Ctx=SetTravelState PayloadValid=%d"), *TravelState.TravelSessionToken, *GetNameSafe(GetWorld()), bComplete ? 1 : 0);
+  UE_LOG(LogSkald, Log, TEXT("[TravelState] Validity=%s Expected=%d Attacker=%d Defender=%d CachedTerritories=%d"), Validity, TravelState.ExpectedControllers, TravelState.AttackerPlayerId, TravelState.DefenderPlayerId, TravelState.CachedTerritories.Num());
   UE_LOG(LogSkald, Log,
          TEXT("GameInstance travel state set: Expected=%d Attacker=%d Defender=%d HumanTerritories=%d CachedTerritories=%d AttackerId=%d DefenderId=%d AttackerBudget=%d DefenderBudget=%d"),
          TravelState.ExpectedControllers, TravelState.AttackerTerritory,
@@ -870,7 +875,10 @@ void USkaldGameInstance::HandleCacheWorldMapSnapshotRetry() {
   CacheWorldMapSnapshot();
 }
 
+static int64 GWorldSeqCounter = 0;
+
 void USkaldGameInstance::HandleWorldBeginPlay(UWorld *LoadedWorld) {
+  UE_LOG(LogSkald, Log, TEXT("[WorldSeq] Seq=%lld World=%s Event=HandleWorldBeginPlay Token=%s NetMode=%d"), ++GWorldSeqCounter, *GetNameSafe(LoadedWorld), *TravelState.TravelSessionToken, LoadedWorld ? static_cast<int32>(LoadedWorld->GetNetMode()) : -1);
   if (!LoadedWorld || LoadedWorld->GetGameInstance() != this) {
     return;
   }
@@ -957,6 +965,8 @@ void USkaldGameInstance::HandleWorldBeginPlay(UWorld *LoadedWorld) {
 }
 
 void USkaldGameInstance::HandleDeferredTravelResume(UWorld *LoadedWorld) {
+  UE_LOG(LogSkald, Log, TEXT("[WorldSeq] Seq=%lld World=%s Event=HandleDeferredTravelResume Token=%s NetMode=%d"), ++GWorldSeqCounter, *GetNameSafe(LoadedWorld), *TravelState.TravelSessionToken, LoadedWorld ? static_cast<int32>(LoadedWorld->GetNetMode()) : -1);
+  UE_LOG(LogSkald, Log, TEXT("[TravelToken] Token=%s Stage=HandleDeferredTravelResume World=%s Ctx=HandleDeferredTravelResume PayloadValid=%d"), *TravelState.TravelSessionToken, *GetNameSafe(LoadedWorld), TravelState.bValid ? 1 : 0);
   if (!LoadedWorld || LoadedWorld->GetGameInstance() != this) {
     return;
   }
@@ -1024,6 +1034,8 @@ void USkaldGameInstance::ScheduleTravelResume(UWorld *World) {
 }
 
 void USkaldGameInstance::AttemptResumeAfterTravel() {
+  UE_LOG(LogSkald, Log, TEXT("[WorldSeq] Seq=%lld World=%s Event=AttemptResumeAfterTravel Token=%s NetMode=%d"), ++GWorldSeqCounter, *GetNameSafe(GetWorld()), *TravelState.TravelSessionToken, GetWorld() ? static_cast<int32>(GetWorld()->GetNetMode()) : -1);
+  UE_LOG(LogSkald, Log, TEXT("[TravelToken] Token=%s Stage=AttemptResumeAfterTravel World=%s Ctx=AttemptResumeAfterTravel PayloadValid=%d"), *TravelState.TravelSessionToken, *GetNameSafe(GetWorld()), TravelState.bValid ? 1 : 0);
   UWorld *World = PendingResumeWorld.Get();
   if (!World || World->GetNetMode() == NM_Client) {
     UE_LOG(LogSkald, Warning,
