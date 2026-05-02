@@ -4733,7 +4733,7 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
     return;
   }
 
-  if (PS->SelectedTerritory.Get() == Territory) {
+  if (PS->GetSelectedTerritory() == Territory) {
     UE_LOG(LogSkald, Verbose,
            TEXT("ServerSelectTerritory ignoring duplicate selection of %s for player %s (id %d)."),
            *TerrDesc, *GetName(), SelectingPlayerId);
@@ -5486,11 +5486,6 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
        CachedGameInstance->HasPendingBattleTravelContext());
   const bool bInBattleInputFlow =
       bIsBattleMap || BattlePhase != EBattlePhase::None || bBattleTravelPending;
-  int32 ReportedActiveId = CachedGameState ? CachedGameState->ActivePlayerId : INDEX_NONE;
-  if (ReportedActiveId == INDEX_NONE && TurnManager) {
-    ReportedActiveId = TurnManager->GetActivePlayerId();
-  }
-
   UE_LOG(LogSkald, Log,
          TEXT("[TurnState] Controller %s turn ownership check: Phase=%s ActiveId=%d IsMyTurn=%s LocalTurnActive=%s"),
          *GetName(), *UEnum::GetValueAsString(Phase), ReportedActiveId,
