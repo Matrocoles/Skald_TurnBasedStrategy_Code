@@ -26,6 +26,17 @@
 #include "Skald_GameState.h"
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
+
+namespace {
+void LogHUDWidgetCreationContext(const USkaldMainHUDWidget* Widget, const TCHAR* Callsite) {
+  if (!Widget) return;
+  const APlayerController* PC = Widget->GetOwningPlayer();
+  const ULocalPlayer* LP = Widget->GetOwningLocalPlayer();
+  UE_LOG(LogSkaldUI, Verbose, TEXT("HUDWidgetTrace[%s]: OwningPC=%s Player=%s LocalPlayer=%s"),
+         Callsite, *GetNameSafe(PC), PC ? *GetNameSafe(PC->Player) : TEXT("None"), *GetNameSafe(LP));
+}
+}
+
 #include "Skald_TurnManager.h"
 #include "Territory.h"
 #include "UI/ConfirmAttackWidget.h"
@@ -664,6 +675,7 @@ void USkaldMainHUDWidget::RebuildPlayerList(
                TEXT("[HUD] Skipping custom player list entries due to missing owning local player."));
         break;
       }
+      LogHUDWidgetCreationContext(this, TEXT("RebuildPlayerList.Entry"));
       USkaldPlayerListEntryWidget *EntryWidget =
           CreateWidget<USkaldPlayerListEntryWidget>(GetOwningPlayer(),
                                                     PlayerListEntryWidgetClass);
@@ -843,6 +855,7 @@ void USkaldMainHUDWidget::ShowPrepareForBattleDialog(
     return;
   }
 
+  LogHUDWidgetCreationContext(this, TEXT("ShowPrepareForBattleDialog"));
   ActivePrepareForBattleWidget = CreateWidget<UPrepareForBattleWidget>(
       GetOwningPlayer(), PrepareForBattleWidgetClass);
   if (!ActivePrepareForBattleWidget) {
@@ -1967,6 +1980,7 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
           ShowErrorMessage(TEXT("Could not open confirm attack UI"));
           return;
         }
+        LogHUDWidgetCreationContext(this, TEXT("OnTerritoryClickedUI.ConfirmAttack"));
         ActiveConfirmWidget = CreateWidget<UConfirmAttackWidget>(
             OwningPlayerController, ConfirmAttackWidgetClass);
         if (ActiveConfirmWidget) {
@@ -2155,6 +2169,7 @@ void USkaldMainHUDWidget::OnTerritoryClickedUI(ATerritory *Territory) {
       return;
     }
 
+    LogHUDWidgetCreationContext(this, TEXT("OnTerritoryClickedUI.DeployMove"));
     ActiveDeployWidget =
         CreateWidget<UDeployWidget>(GetOwningPlayer(), DeployWidgetClass);
     if (!ActiveDeployWidget) {
@@ -2549,6 +2564,7 @@ void USkaldMainHUDWidget::HandleDeployClicked() {
     return;
   }
 
+  LogHUDWidgetCreationContext(this, TEXT("HandleDeployClicked.Deploy"));
   ActiveDeployWidget =
       CreateWidget<UDeployWidget>(GetOwningPlayer(), DeployWidgetClass);
   if (ActiveDeployWidget) {
