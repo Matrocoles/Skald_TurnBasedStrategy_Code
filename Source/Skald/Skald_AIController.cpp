@@ -164,6 +164,32 @@ void ASkaldAIController::InitializeHUDWidget() {
          *GetName());
 }
 
+void ASkaldAIController::ShowMainHUD() {
+  // AI controllers do not own local HUD/UI.
+}
+
+void ASkaldAIController::HideMainHUD() {
+  // AI controllers do not own local HUD/UI.
+}
+
+void ASkaldAIController::ShowBattleResultWidget(
+    const FBattleResultDisplayData & /*DisplayData*/) {
+  // AI controllers do not display local battle-result widgets.
+}
+
+void ASkaldAIController::InitializeBattleHUD() {
+  // AI controllers do not create local battle HUD widgets.
+}
+
+void ASkaldAIController::ShowFighterSelectionUI(
+    int32 /*MaxBudget*/, ESkaldFaction /*Faction*/) {
+  // AI controllers do not create local fighter-selection widgets.
+}
+
+void ASkaldAIController::InitializeFighterSelectionIfNeeded() {
+  // AI controllers do not initialize local fighter-selection widgets.
+}
+
 void ASkaldAIController::ShowPrepareForBattlePromptLocal(
     const FPrepareForBattlePromptData &PromptData) {
   // AI controllers never display local widgets. Avoid the base implementation
@@ -3478,4 +3504,3 @@ int32 ASkaldAIController::ChooseRetreatDestination(
              ? CandidateTerritoryIDs[0]
              : BestTerritoryId;
 }
-

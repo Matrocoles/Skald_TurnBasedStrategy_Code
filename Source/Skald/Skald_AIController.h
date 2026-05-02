@@ -30,6 +30,14 @@ public:
   virtual void EndTurn() override;
 
   virtual void InitializeHUDWidget() override;
+  virtual void ShowMainHUD() override;
+  virtual void HideMainHUD() override;
+  virtual void ShowBattleResultWidget(
+      const FBattleResultDisplayData &DisplayData) override;
+  virtual void InitializeBattleHUD() override;
+  virtual void ShowFighterSelectionUI(
+      int32 MaxBudget, ESkaldFaction Faction) override;
+  virtual void InitializeFighterSelectionIfNeeded() override;
   virtual void ShowPrepareForBattlePromptLocal(
       const FPrepareForBattlePromptData &PromptData) override;
 
@@ -333,4 +341,3 @@ private:
   /** PlayerState associated with the current animated placement sequence. */
   TWeakObjectPtr<ASkaldPlayerState> AnimatedPlacementPlayerState;
 };
-

@@ -1965,6 +1965,10 @@ void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
 }
 
 void ASkaldPlayerController::ShowMainHUD() {
+  if (!CanCreateLocalUIWidget()) {
+    return;
+  }
+
   if (MainHUD) {
     MainHUD->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
   }
@@ -1980,6 +1984,10 @@ void ASkaldPlayerController::ShowMainHUD() {
 }
 
 void ASkaldPlayerController::HideMainHUD() {
+  if (!CanCreateLocalUIWidget()) {
+    return;
+  }
+
   if (MainHUD) {
     MainHUD->SetVisibility(ESlateVisibility::Collapsed);
     UWidgetBlueprintLibrary::SetInputMode_GameOnly(this);
@@ -1989,7 +1997,8 @@ void ASkaldPlayerController::HideMainHUD() {
 
 void ASkaldPlayerController::ShowBattleResultWidget(
     const FBattleResultDisplayData &DisplayData) {
-  if (!CanCreateLocalUIWidget() || !DisplayData.bValid) {
+  if (IsAIControllerIdentity(this) || !Player || !GetLocalPlayer() ||
+      !CanCreateLocalUIWidget() || !DisplayData.bValid) {
     return;
   }
 
@@ -2975,7 +2984,7 @@ void ASkaldPlayerController::Server_CommitArmy_Implementation(
 }
 
 void ASkaldPlayerController::InitializeBattleHUD() {
-  if (!CanCreateLocalUIWidget())
+  if (IsAIControllerIdentity(this) || !Player || !GetLocalPlayer() || !CanCreateLocalUIWidget())
     return;
   if (!BattleHUDWidgetClass)
     return;
@@ -7092,7 +7101,7 @@ void ASkaldPlayerController::ResetPendingReadyPromptState() {
 
 void ASkaldPlayerController::ShowPrepareForBattlePromptLocal(
     const FPrepareForBattlePromptData &PromptData) {
-  if (!CanCreateLocalUIWidget()) {
+  if (IsAIControllerIdentity(this) || !Player || !GetLocalPlayer() || !CanCreateLocalUIWidget()) {
     UE_LOG(LogSkaldReady, Verbose,
            TEXT("Skipping prepare-for-battle prompt for %s: controller has no local player."),
            *GetName());
@@ -7117,7 +7126,7 @@ void ASkaldPlayerController::ShowPrepareForBattlePromptLocal(
 
 void ASkaldPlayerController::ShowPrepareForBattlePromptLocal_Internal(
     const FPrepareForBattlePromptData &PromptData) {
-  if (!CanCreateLocalUIWidget()) {
+  if (IsAIControllerIdentity(this) || !Player || !GetLocalPlayer() || !CanCreateLocalUIWidget()) {
     ResetPendingReadyPromptState();
     return;
   }
