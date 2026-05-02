@@ -157,7 +157,27 @@ void UStartGameWidget::OnHost() { StartGame(true, true); }
 
 void UStartGameWidget::OnJoin() { StartGame(true, false); }
 
-void UStartGameWidget::OnLockIn() { StartGame(false, true); }
+void UStartGameWidget::OnLockIn() {
+  const FString Name = DisplayNameBox ? DisplayNameBox->GetText().ToString() : FString();
+  const FString Option = FactionComboBox ? FactionComboBox->GetSelectedOption() : FString();
+  const bool bHasName = !Name.TrimStartAndEnd().IsEmpty();
+  const bool bHasFaction = !Option.IsEmpty() && Option != TEXT("None") &&
+                           Option != FactionPlaceholderOption;
+
+  if (!bHasName || !bHasFaction) {
+    if (GEngine) {
+      GEngine->AddOnScreenDebugMessage(
+          -1, 4.f, FColor::Yellow,
+          TEXT("Enter a display name and choose a faction before starting singleplayer."));
+    }
+    UE_LOG(LogTemp, Warning,
+           TEXT("StartGameWidget::OnLockIn blocked. NameValid=%d FactionValid=%d SelectedFaction=%s"),
+           bHasName ? 1 : 0, bHasFaction ? 1 : 0, *Option);
+    return;
+  }
+
+  StartGame(false, true);
+}
 
 void UStartGameWidget::OnMainMenu() {
   RemoveFromParent();
@@ -197,6 +217,9 @@ UWidget *UStartGameWidget::GenerateFactionOptionWidget(const FString &Option) {
 }
 
 void UStartGameWidget::StartGame(bool bMultiplayer, bool bHost) {
+  UE_LOG(LogTemp, Log, TEXT("[SP_AUDIT] StartGame invoked. Multiplayer=%d Host=%d"),
+         bMultiplayer ? 1 : 0, bHost ? 1 : 0);
+
   if (UWorld *World = GetWorld()) {
     if (USkaldGameInstance *GI = World->GetGameInstance<USkaldGameInstance>()) {
       GI->ResetSessionData();
@@ -228,6 +251,12 @@ void UStartGameWidget::StartGame(bool bMultiplayer, bool bHost) {
           GI->AIPlayersToSpawn =
               FMath::Clamp(FMath::RoundToInt(AICountSpinBox->GetValue()), 1, 3);
         }
+
+        UE_LOG(LogTemp, Log,
+               TEXT("[SP_AUDIT] Singleplayer selections Name=%s Faction=%s AIPlayers=%d"),
+               *GI->DisplayName,
+               *UEnum::GetValueAsString(GI->Faction),
+               GI->AIPlayersToSpawn);
 
         GI->TakenFactions.Empty();
         if (GI->Faction != ESkaldFaction::None) {

@@ -1638,9 +1638,14 @@ void ASkaldPlayerController::InitializeHUDWidget() {
 
 bool ASkaldPlayerController::CanCreateLocalUIWidget() const {
   ULocalPlayer *LocalPlayer = GetLocalPlayer();
+
+  // During map travel the controller's generic Player pointer can be briefly
+  // re-bound before settling back to the same local player instance. Requiring
+  // strict Player==LocalPlayer equality here can incorrectly suppress widget
+  // creation (HUD, battle HUD, dice overlay) on legitimate local controllers.
+  // Gate by local-controller identity + non-AI ownership instead.
   return IsLocalController() && IsLocalPlayerController() &&
-         LocalPlayer != nullptr && Player != nullptr && Player == LocalPlayer &&
-         !IsAIControllerIdentity(this);
+         LocalPlayer != nullptr && !IsAIControllerIdentity(this);
 }
 
 void ASkaldPlayerController::InitializeChoosePlayerWidget() {
@@ -1670,6 +1675,7 @@ void ASkaldPlayerController::InitializeChoosePlayerWidget() {
 
 void ASkaldPlayerController::AutoInitializeFromLobbySelection() {
   if (bHasInitialized) {
+    UE_LOG(LogTemp, Verbose, TEXT("[SP_AUDIT] HandleFactionLockedIn ignored; already initialized for %s"), *GetName());
     return;
   }
 
@@ -1792,8 +1798,15 @@ void ASkaldPlayerController::BeginPlay() {
       }
     }
     if (CachedGameInstance && CachedGameInstance->bIsMultiplayer) {
+      UE_LOG(LogTemp, Log, TEXT("[SP_AUDIT] BeginPlay multiplayer auto-init path for %s"), *GetName());
       AutoInitializeFromLobbySelection();
     } else if (CachedGameInstance && !bHasInitialized) {
+      UE_LOG(LogTemp, Log,
+             TEXT("[SP_AUDIT] BeginPlay singleplayer init for %s Name=%s Faction=%s AIPlayers=%d"),
+             *GetName(),
+             *CachedGameInstance->DisplayName,
+             *UEnum::GetValueAsString(CachedGameInstance->Faction),
+             CachedGameInstance->AIPlayersToSpawn);
       if (!CachedGameMode || !CachedGameMode->IsWorldInitialized()) {
         ServerInitPlayerState(CachedGameInstance->DisplayName,
                               CachedGameInstance->Faction,
@@ -5638,9 +5651,11 @@ void ASkaldPlayerController::HandleFactionLockedIn() {
   }
 
   if (bHasInitialized) {
+    UE_LOG(LogTemp, Verbose, TEXT("[SP_AUDIT] HandleFactionLockedIn ignored; already initialized for %s"), *GetName());
     return;
   }
   bHasInitialized = true;
+  UE_LOG(LogTemp, Log, TEXT("[SP_AUDIT] HandleFactionLockedIn completed for %s"), *GetName());
 
   if (ChoosePlayerWidget) {
     ChoosePlayerWidget->OnPlayerLockedIn.RemoveDynamic(
@@ -9477,6 +9492,12 @@ void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,
 void ASkaldPlayerController::ClientShowAttackRollButton_Implementation(
     AFighterPawn* Attacker, bool bAutoTriggerRoll)
 {
+    if (!Attacker)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[ManualDice] ClientShowAttackRollButton received null attacker"));
+        return;
+    }
+
     UBattleHUDWidget* HUD = BattleHudWidget.Get();
     if (!HUD)
     {
@@ -9505,15 +9526,26 @@ void ASkaldPlayerController::ClientShowAttackRollButton_Implementation(
 
     if (!BattleHudWidget)
     {
+        UE_LOG(LogTemp, Warning,
+            TEXT("[ManualDice] Auto-trigger requested for %s without a battle HUD; acknowledging overview completion directly."),
+            *GetNameSafe(Attacker));
+        ServerNotifyAIAttackOverviewComplete(Attacker);
         return;
     }
 
     if (!BattleHudWidget->IsManualAttackRollPromptActive())
     {
+        UE_LOG(LogTemp, Warning,
+            TEXT("[ManualDice] Auto-trigger requested for %s before manual prompt became active; acknowledging overview completion directly."),
+            *GetNameSafe(Attacker));
+        ServerNotifyAIAttackOverviewComplete(Attacker);
         return;
     }
 
-    HandleAttackRollRequested();
+    // AI-triggered attack rolls are resolved by the authoritative fighter pawn.
+    // Human presenter clients should acknowledge camera/presentation readiness,
+    // not invoke the manual roll RPC that requires fighter ownership.
+    ServerNotifyAIAttackOverviewComplete(Attacker);
 }
 
 void ASkaldPlayerController::ClientHideAttackRollButton_Implementation()
