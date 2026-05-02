@@ -39,6 +39,14 @@ enum class ETurnPhase : uint8
 
 /** Factions a player or fighter can belong to. */
 UENUM(BlueprintType)
+enum class ETravelStateValidity : uint8
+{
+    Invalid,
+    Partial,
+    Complete
+};
+
+UENUM(BlueprintType)
 enum class ESkaldFaction : uint8
 {
     None       UMETA(DisplayName = "None"),

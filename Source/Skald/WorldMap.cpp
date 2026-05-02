@@ -494,8 +494,19 @@ bool AWorldMap::GenerateTerritoriesFromTable() {
 
 void AWorldMap::RegisterTerritory(ATerritory *Territory) {
   if (Territory && !Territories.Contains(Territory)) {
+    static int32 GTerritoryRegTotal = 0;
+    static int32 GTerritoryRegMissing = 0;
+    static int32 GTerritoryRegDuplicates = 0;
+    ++GTerritoryRegTotal;
+    const int32 InputId = Territory->TerritoryID;
+    bool bDuplicate = false;
+    for (const ATerritory* Existing : Territories) {
+      if (Existing && Existing->TerritoryID == InputId && InputId > 0) { bDuplicate = true; break; }
+    }
+    if (bDuplicate) { ++GTerritoryRegDuplicates; }
     if (HasAuthority()) {
       if (Territory->TerritoryID == 0) {
+        ++GTerritoryRegMissing;
         int32 MaxExistingTerritoryId = 0;
         for (const ATerritory *ExistingTerritory : Territories) {
           if (!IsValid(ExistingTerritory)) {
@@ -512,6 +523,11 @@ void AWorldMap::RegisterTerritory(ATerritory *Territory) {
       }
       Territory->ForceNetUpdate();
     }
+
+    UE_LOG(LogSkald, Log, TEXT("[TerritoryReg] Territory=%s InputId=%d ResolvedId=%d Duplicate=%d"),
+           *GetNameSafe(Territory), InputId, Territory->TerritoryID, bDuplicate ? 1 : 0);
+    UE_LOG(LogSkald, Log, TEXT("[TerritoryRegSummary] Total=%d Missing=%d Duplicates=%d"),
+           GTerritoryRegTotal, GTerritoryRegMissing, GTerritoryRegDuplicates);
 
     Territory->SetOwner(this);
     Territory->SetSelectionDecalAdditionalHeightOffset(

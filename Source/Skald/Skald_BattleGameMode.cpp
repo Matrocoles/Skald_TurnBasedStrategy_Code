@@ -87,6 +87,23 @@ static int32 ResolveBattlePlayerId(const ASkaldPlayerState *PlayerState) {
   return INDEX_NONE;
 }
 
+static int32 ResolveCanonicalStableId(AController* Controller,
+                                      ASkaldPlayerState* PlayerState,
+                                      const FSkaldTravelState* TravelState,
+                                      FString& OutReason) {
+  const int32 PSId = PlayerState ? ResolveBattlePlayerId(PlayerState) : INDEX_NONE;
+  const int32 TravelAttacker = TravelState ? TravelState->AttackerPlayerId : INDEX_NONE;
+  const int32 TravelDefender = TravelState ? TravelState->DefenderPlayerId : INDEX_NONE;
+  const int32 CachedId = GetPlayerIdFrom(Controller);
+  int32 Chosen = PSId > 0 ? PSId : (CachedId > 0 ? CachedId : INDEX_NONE);
+  OutReason = PSId > 0 ? TEXT("PlayerState") : (CachedId > 0 ? TEXT("ControllerCache") : TEXT("None"));
+  if (Chosen <= 0 && TravelAttacker > 0) { Chosen = TravelAttacker; OutReason = TEXT("TravelAttacker"); }
+  if (Chosen <= 0 && TravelDefender > 0) { Chosen = TravelDefender; OutReason = TEXT("TravelDefender"); }
+  UE_LOG(LogSkaldBattle, Log, TEXT("[StableIdAudit] Ctx=ResolveCanonicalStableId Controller=%s PSId=%d TravelId=%d CachedId=%d Chosen=%d Reason=%s"),
+         *GetNameSafe(Controller), PSId, (TravelAttacker > 0 ? TravelAttacker : TravelDefender), CachedId, Chosen, *OutReason);
+  return Chosen;
+}
+
 static uint32 BuildBattleSetupSignature(const FS_BattlePayload& Battle) {
   uint32 Hash = 0;
   Hash = HashCombine(Hash, ::GetTypeHash(Battle.FromTerritoryID));
@@ -398,6 +415,7 @@ void ASkald_BattleGameMode::InitializeBattleGameMode(const FString &MapName,
 
 void ASkald_BattleGameMode::InitGame(const FString &Map, const FString &Options,
                                      FString &Error) {
+  if (const USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>()) { UE_LOG(LogSkaldBattle, Log, TEXT("[TravelToken] Token=%s Stage=BattleGM.InitGame World=%s Ctx=InitGame PayloadValid=%d"), *GI->GetTravelSessionToken(), *GetNameSafe(GetWorld()), GI->GetTravelState().bValid ? 1 : 0); }
   Super::InitGame(Map, Options, Error);
 
   GPendingControllers.Reset();
@@ -453,6 +471,7 @@ void ASkald_BattleGameMode::InitGame(const FString &Map, const FString &Options,
 }
 
 void ASkald_BattleGameMode::BeginPlay() {
+  if (const USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>()) { UE_LOG(LogSkaldBattle, Log, TEXT("[TravelToken] Token=%s Stage=BattleGM.BeginPlay World=%s Ctx=BeginPlay PayloadValid=%d"), *GI->GetTravelSessionToken(), *GetNameSafe(GetWorld()), GI->GetTravelState().bValid ? 1 : 0); }
   Super::BeginPlay();
 
   if (!BattleManager) {
@@ -853,12 +872,16 @@ void ASkald_BattleGameMode::RegisterParticipantController(AController *Controlle
   }
 
   if (ASkaldPlayerState *PS = Controller->GetPlayerState<ASkaldPlayerState>()) {
+    const USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>();
+    const FSkaldTravelState* TS = GI ? &GI->GetTravelState() : nullptr;
+    FString Why;
+    const int32 CanonicalId = ResolveCanonicalStableId(Controller, PS, TS, Why);
     if (IsRegisteredBattleParticipant(PS)) {
       PS->bIsActiveBattlePlayer = true;
       SyncBattlePlayerEntry(PS);
       UE_LOG(LogSkaldBattle, Log,
              TEXT("RegisterParticipantController: accepted %s (Id=%d AI=%d)"),
-            *GetNameSafe(Controller), ResolveBattlePlayerId(PS), PS->bIsAI ? 1 : 0);
+            *GetNameSafe(Controller), CanonicalId, PS->bIsAI ? 1 : 0);
     } else {
       UE_LOG(LogSkaldBattle, Warning,
              TEXT("RegisterParticipantController: controller %s (Id=%d) is not in BattleParticipants"),
@@ -881,7 +904,10 @@ void ASkald_BattleGameMode::SyncBattlePlayerEntry(ASkaldPlayerState *PlayerState
   }
 
   FBattlePlayerEntry Entry;
-  Entry.PlayerId = ResolveBattlePlayerId(PlayerState);
+  FString Why;
+  const USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>();
+  const FSkaldTravelState* TS = GI ? &GI->GetTravelState() : nullptr;
+  Entry.PlayerId = ResolveCanonicalStableId(PlayerState ? PlayerState->GetOwner<AController>() : nullptr, PlayerState, TS, Why);
   Entry.DisplayName = PlayerState->GetResolvedPlayerName(TEXT("BattleGM.SyncBattlePlayerEntry"));
   Entry.Faction = PlayerState->Faction;
   Entry.bIsAI = PlayerState->bIsAI;
@@ -962,6 +988,10 @@ void ASkald_BattleGameMode::BeginPreBattleSelection(ASkaldPlayerState *AttackerP
 }
 
 void ASkald_BattleGameMode::SetupPendingBattle() {
+  ++SetupAttemptCounter;
+  const FString Token = GetGameInstance<USkaldGameInstance>() ? GetGameInstance<USkaldGameInstance>()->GetTravelSessionToken() : FString();
+  UE_LOG(LogSkaldBattle, Log, TEXT("[SetupTrace] Token=%s Attempt=%d Source=direct AlreadyComplete=%d"), *Token, SetupAttemptCounter, bSetupCompleted ? 1 : 0);
+  if (bSetupCompleted && SetupCompleteToken == Token) { UE_LOG(LogSkaldBattle, Warning, TEXT("[SetupTrace][WARN] Duplicate setup entry")); }
   if (!HasAuthority()) {
     return;
   }
@@ -1035,7 +1065,7 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
     UE_LOG(LogSkaldBattle, Verbose,
            TEXT("SetupPendingBattle: skipping duplicate completed setup (Signature=%u)"),
            SetupSignature);
-    bSetupCompleted = true;
+    bSetupCompleted = true; SetupCompleteToken = Token; if (USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>()) { GI->bTurnStateFrozenForTravel = false; UE_LOG(LogSkald, Log, TEXT("[TurnFreeze] Ctx=SetupPendingBattle Frozen=0 ActiveId=%d LocalTurnActive=0 Action=evaluate"), GI->GetTravelState().AttackerPlayerId); } UE_LOG(LogSkaldBattle, Log, TEXT("[TravelSummary] Token=%s Expected=%d ParticipantCount=%d SetupAttempts=%d"), *Token, ExpectedControllers, BattleParticipants.Num(), SetupAttemptCounter);
     bSetupStarted = false;
     GBattleSetupTriggered = false;
     return;
@@ -1380,7 +1410,7 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
     RegisterPlayerLockIn(ResolveBattlePlayerId(DefenderPS));
   }
 
-  bSetupCompleted = true;
+  bSetupCompleted = true; SetupCompleteToken = Token; if (USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>()) { GI->bTurnStateFrozenForTravel = false; UE_LOG(LogSkald, Log, TEXT("[TurnFreeze] Ctx=SetupPendingBattle Frozen=0 ActiveId=%d LocalTurnActive=0 Action=evaluate"), GI->GetTravelState().AttackerPlayerId); } UE_LOG(LogSkaldBattle, Log, TEXT("[TravelSummary] Token=%s Expected=%d ParticipantCount=%d SetupAttempts=%d"), *Token, ExpectedControllers, BattleParticipants.Num(), SetupAttemptCounter);
   LastCompletedSetupSignature = SetupSignature;
   ActiveSetupSignature = 0;
   GI->PendingBattle = Battle;
@@ -2084,6 +2114,11 @@ bool ASkald_BattleGameMode::TrySetupBattleWhenReady() {
 }
 
 void ASkald_BattleGameMode::OnControllerReady(AController *Controller) {
+  const FString Token = GetGameInstance<USkaldGameInstance>() ? GetGameInstance<USkaldGameInstance>()->GetTravelSessionToken() : FString();
+  const FString CKey = GetNameSafe(Controller);
+  TSet<FString>& Seen = RegisteredControllers.FindOrAdd(Token);
+  const bool bFirst = !Seen.Contains(CKey); if (bFirst) Seen.Add(CKey);
+  UE_LOG(LogSkaldBattle, Log, TEXT("[ParticipantGuard] Ctx=OnControllerReady Controller=%s Token=%s FirstTime=%d Action=%s"), *CKey, *Token, bFirst ? 1:0, bFirst?TEXT("apply"):TEXT("skip"));
   UE_LOG(LogSkaldBattle, Log, TEXT("OnControllerReady: %s  HasAuthority=%d"),
          *GetNameSafe(Controller), HasAuthority() ? 1 : 0);
 

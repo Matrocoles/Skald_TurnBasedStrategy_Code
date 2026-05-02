@@ -70,6 +70,9 @@ struct FSkaldTravelState
 
   UPROPERTY(BlueprintReadWrite, EditAnywhere)
   bool bValid = false;
+
+  UPROPERTY(BlueprintReadWrite, EditAnywhere)
+  FString TravelSessionToken;
 };
 
 USTRUCT(BlueprintType)
@@ -189,6 +192,9 @@ public:
   /** True while a ServerTravel call is in flight. */
   UPROPERTY(Transient)
   bool bTravelPending = false;
+
+  UPROPERTY(Transient)
+  bool bTurnStateFrozenForTravel = false;
 
   /** Active battle game mode controlling the streamed combat scene. */
   UPROPERTY(Transient)
@@ -368,6 +374,7 @@ public:
 
   UFUNCTION(BlueprintCallable, BlueprintPure)
   const FSkaldTravelState &GetTravelState() const { return TravelState; }
+  FString GetTravelSessionToken() const { return TravelState.TravelSessionToken; }
 
   UFUNCTION(BlueprintCallable)
   void ShowDeployWidget();
