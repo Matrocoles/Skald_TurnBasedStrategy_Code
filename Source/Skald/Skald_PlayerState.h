@@ -148,6 +148,9 @@ public:
   /** Stable identifier safe to use for routing selection events client-side. */
   int32 GetStablePlayerId() const;
 
+  /** Returns the currently selected territory for this player. */
+  class ATerritory *GetSelectedTerritory() const { return SelectedTerritory.Get(); }
+
   /** Server-side setter used to validate and update the player's selection. */
   void SetSelectedTerritory(class ATerritory *Territory);
 
