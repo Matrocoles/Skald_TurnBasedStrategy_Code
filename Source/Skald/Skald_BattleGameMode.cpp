@@ -903,6 +903,13 @@ void ASkald_BattleGameMode::BeginPreBattleSelection(ASkaldPlayerState *AttackerP
   if (!HasAuthority()) {
     return;
   }
+  if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
+    // Battle participants can carry over stale entries across travel/setup
+    // retries in PIE. Start each pre-battle selection with a clean roster so
+    // attacker/defender lock-in and turn ownership are keyed to the current
+    // payload only.
+    GS->ResetBattleParticipants();
+  }
   NormalizeSinglePlayerControllerRoles(GetWorld(),
                                        GetGameInstance<USkaldGameInstance>());
 
