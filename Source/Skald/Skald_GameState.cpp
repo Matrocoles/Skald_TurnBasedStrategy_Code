@@ -13,7 +13,21 @@ namespace
 {
 bool ShouldProcessLocalBattleUIController(const ASkaldPlayerController* PC)
 {
-    return PC && !PC->IsA<ASkaldAIController>() && PC->CanCreateLocalUIWidget();
+    if (!PC)
+    {
+        return false;
+    }
+
+    const bool bIsAIController = PC->IsA<ASkaldAIController>();
+    const bool bCanCreateUI = PC->CanCreateLocalUIWidget();
+    const bool bShouldProcess = !bIsAIController && bCanCreateUI;
+
+    UE_LOG(LogSkaldBattle, Verbose,
+           TEXT("ShouldProcessLocalBattleUIController: Controller=%s Class=%s IsAI=%d CanCreateLocalUI=%d Result=%d"),
+           *PC->GetName(), *GetNameSafe(PC->GetClass()), bIsAIController ? 1 : 0,
+           bCanCreateUI ? 1 : 0, bShouldProcess ? 1 : 0);
+
+    return bShouldProcess;
 }
 }
 

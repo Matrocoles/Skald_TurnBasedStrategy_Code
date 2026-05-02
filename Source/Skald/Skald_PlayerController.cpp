@@ -246,6 +246,32 @@ ASkald_BattleGameMode *ASkaldPlayerController::ResolveBattleGameMode() {
 
 
 namespace {
+void LogWidgetCreationContext(const ASkaldPlayerController* Controller,
+                              const TCHAR* Callsite) {
+  if (!Controller) {
+    return;
+  }
+
+  const ULocalPlayer* LocalPlayer = Controller->GetLocalPlayer();
+  const FString ClassName = Controller->GetClass() ? Controller->GetClass()->GetName() : FString();
+  const FString InstanceName = Controller->GetName();
+  const bool bIsAI = Controller->IsA<ASkaldAIController>() ||
+                     ClassName.Contains(TEXT("AiController"), ESearchCase::IgnoreCase) ||
+                     ClassName.Contains(TEXT("AIController"), ESearchCase::IgnoreCase) ||
+                     InstanceName.Contains(TEXT("AiController"), ESearchCase::IgnoreCase) ||
+                     InstanceName.Contains(TEXT("AIController"), ESearchCase::IgnoreCase);
+  UE_LOG(LogSkaldBattle, Verbose,
+         TEXT("WidgetTrace[%s]: Controller=%s Class=%s LocalController=%d LocalPlayerController=%d Player=%s LocalPlayer=%s IsAIIdentity=%d"),
+         Callsite,
+         *Controller->GetName(),
+         *GetNameSafe(Controller->GetClass()),
+         Controller->IsLocalController() ? 1 : 0,
+         Controller->IsLocalPlayerController() ? 1 : 0,
+         *GetNameSafe(Controller->Player),
+         *GetNameSafe(LocalPlayer),
+         bIsAI ? 1 : 0);
+}
+
 bool IsAIControllerIdentity(const ASkaldPlayerController* Controller) {
   if (!Controller) {
     return false;
@@ -2681,6 +2707,7 @@ void ASkaldPlayerController::RequestBattleStateIfNeeded() {
 
 void ASkaldPlayerController::ShowFighterSelectionUI(int32 MaxBudget,
                                                     ESkaldFaction Faction) {
+  LogWidgetCreationContext(this, TEXT("ShowFighterSelectionUI"));
   if (!CanCreateLocalUIWidget()) {
     return;
   }
