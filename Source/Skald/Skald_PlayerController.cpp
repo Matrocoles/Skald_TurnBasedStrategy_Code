@@ -2003,6 +2003,10 @@ void ASkaldPlayerController::ShowBattleResultWidget(
     return;
   }
 
+  if (!CanCreateLocalUIWidget()) {
+    return;
+  }
+
   if (UUserWidget *Widget = CreateWidget<UUserWidget>(this, VictoryWidgetClass)) {
     if (UBattleResultWidget *ResultWidget = Cast<UBattleResultWidget>(Widget)) {
       ResultWidget->SetBattleOutcome(
