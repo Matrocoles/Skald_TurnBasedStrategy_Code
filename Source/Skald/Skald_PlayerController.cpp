@@ -1637,8 +1637,9 @@ void ASkaldPlayerController::InitializeHUDWidget() {
 }
 
 bool ASkaldPlayerController::CanCreateLocalUIWidget() const {
+  ULocalPlayer *LocalPlayer = GetLocalPlayer();
   return IsLocalController() && IsLocalPlayerController() &&
-         GetLocalPlayer() != nullptr && Player != nullptr &&
+         LocalPlayer != nullptr && Player != nullptr && Player == LocalPlayer &&
          !IsAIControllerIdentity(this);
 }
 
@@ -8662,6 +8663,14 @@ void ASkaldPlayerController::HandlePendingPresentationTimerTick() {
 
 void ASkaldPlayerController::EnsureDiceWidgets() {
   if (!CanCreateLocalUIWidget()) {
+    return;
+  }
+
+  ULocalPlayer *LocalPlayer = GetLocalPlayer();
+  if (!LocalPlayer || Player != LocalPlayer) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("EnsureDiceWidgets: skipping widget creation for controller without attached local player (%s)."),
+           *GetNameSafe(this));
     return;
   }
 
