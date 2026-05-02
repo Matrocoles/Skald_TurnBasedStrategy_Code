@@ -97,8 +97,24 @@ static int32 ResolveCanonicalStableId(AController* Controller,
   const int32 TravelAttacker = TravelState ? TravelState->AttackerPlayerId : INDEX_NONE;
   const int32 TravelDefender = TravelState ? TravelState->DefenderPlayerId : INDEX_NONE;
   const int32 CachedId = GetPlayerIdFrom(Controller);
+  const bool bTravelIdsValid = TravelAttacker > 0 && TravelDefender > 0;
+  const bool bPlayerStateLooksAI = PlayerState ? PlayerState->bIsAI : IsAIController(Controller);
   int32 Chosen = PSId > 0 ? PSId : (CachedId > 0 ? CachedId : INDEX_NONE);
   OutReason = PSId > 0 ? TEXT("PlayerState") : (CachedId > 0 ? TEXT("ControllerCache") : TEXT("None"));
+
+  // During travel bootstrapping, seamless-travel reassignment can temporarily
+  // surface a local PlayerState id that does not match the battle payload
+  // (e.g. transient 261 while payload expects 260). Prefer canonical travel
+  // identities when current ids are outside the active attacker/defender pair.
+  if (bTravelIdsValid &&
+      Chosen > 0 &&
+      Chosen != TravelAttacker &&
+      Chosen != TravelDefender) {
+    Chosen = bPlayerStateLooksAI ? TravelDefender : TravelAttacker;
+    OutReason = bPlayerStateLooksAI ? TEXT("TravelCanonicalDefender")
+                                    : TEXT("TravelCanonicalAttacker");
+  }
+
   if (Chosen <= 0 && TravelAttacker > 0) { Chosen = TravelAttacker; OutReason = TEXT("TravelAttacker"); }
   if (Chosen <= 0 && TravelDefender > 0) { Chosen = TravelDefender; OutReason = TEXT("TravelDefender"); }
   UE_LOG(LogSkaldBattle, Log, TEXT("[StableIdAudit] Ctx=ResolveCanonicalStableId Controller=%s PSId=%d TravelId=%d CachedId=%d Chosen=%d Reason=%s"),
@@ -422,6 +438,8 @@ void ASkald_BattleGameMode::InitGame(const FString &Map, const FString &Options,
 
   GPendingControllers.Reset();
   GBattleSetupTriggered = false;
+  RegisteredControllers.Reset();
+  SetupCompleteToken.Reset();
 
   CachedHumanTerritoryIDs.Reset();
   CachedTerritoryMap.Reset();
@@ -2121,6 +2139,9 @@ void ASkald_BattleGameMode::OnControllerReady(AController *Controller) {
   TSet<FString>& Seen = RegisteredControllers.FindOrAdd(Token);
   const bool bFirst = !Seen.Contains(CKey); if (bFirst) Seen.Add(CKey);
   UE_LOG(LogSkaldBattle, Log, TEXT("[ParticipantGuard] Ctx=OnControllerReady Controller=%s Token=%s FirstTime=%d Action=%s"), *CKey, *Token, bFirst ? 1:0, bFirst?TEXT("apply"):TEXT("skip"));
+  if (!bFirst) {
+    return;
+  }
   UE_LOG(LogSkaldBattle, Log, TEXT("OnControllerReady: %s  HasAuthority=%d"),
          *GetNameSafe(Controller), HasAuthority() ? 1 : 0);
 
@@ -2134,6 +2155,15 @@ void ASkald_BattleGameMode::OnControllerReady(AController *Controller) {
   }
 
   if (!HasAuthority()) {
+    return;
+  }
+
+  // A late callback from a previous travel session should never mutate the
+  // current battle bootstrap state.
+  if (!Token.IsEmpty() && !SetupCompleteToken.IsEmpty() && SetupCompleteToken != Token) {
+    UE_LOG(LogSkaldBattle, Warning,
+           TEXT("OnControllerReady: ignoring stale callback for %s (Token=%s SetupToken=%s)"),
+           *GetNameSafe(Controller), *Token, *SetupCompleteToken);
     return;
   }
 

@@ -5501,6 +5501,12 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
   // Battle preparation/selection controls are managed by battle flow. Avoid
   // having overworld turn ownership logic steal input mode or cursor state.
   if (bInBattleInputFlow) {
+    if (!bIsMyTurn && bLocalTurnActive) {
+      UE_LOG(LogSkald, Verbose,
+             TEXT("[TurnState] Controller %s clearing stale local turn while battle flow is active."),
+             *GetName());
+      bLocalTurnActive = false;
+    }
     return;
   }
 
