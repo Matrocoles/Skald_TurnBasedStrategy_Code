@@ -32,7 +32,7 @@ void LogHUDWidgetCreationContext(const USkaldMainHUDWidget* Widget, const TCHAR*
   if (!Widget) return;
   const APlayerController* PC = Widget->GetOwningPlayer();
   const ULocalPlayer* LP = Widget->GetOwningLocalPlayer();
-  UE_LOG(LogSkaldUI, Warning, TEXT("HUDWidgetTrace[%s]: OwningPC=%s Player=%s LocalPlayer=%s"),
+  UE_LOG(LogSkaldUI, Verbose, TEXT("HUDWidgetTrace[%s]: OwningPC=%s Player=%s LocalPlayer=%s"),
          Callsite, *GetNameSafe(PC), PC ? *GetNameSafe(PC->Player) : TEXT("None"), *GetNameSafe(LP));
 }
 }
