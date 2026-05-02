@@ -1665,12 +1665,12 @@ void ASkaldPlayerController::InitializeHUDWidget() {
 bool ASkaldPlayerController::CanCreateLocalUIWidget() const {
   ULocalPlayer *LocalPlayer = GetLocalPlayer();
 
-  // Widgets must only be created by true local, non-AI controllers that are
-  // currently attached to a player object. Avoid requiring strict
-  // Player==LocalPlayer equality because travel/rebinding windows can
-  // temporarily desynchronize those pointers for legitimate local controllers.
+  // UI widgets owned by a player controller require that controller to be
+  // attached to a valid local player. In PIE listen-server sessions, AI
+  // controllers can transiently look "local" from a net-mode perspective but
+  // still have no local player attachment, which causes CreateWidget errors.
   return IsLocalController() && IsLocalPlayerController() &&
-         LocalPlayer != nullptr && Player != nullptr &&
+         LocalPlayer != nullptr && Player == LocalPlayer &&
          !IsAIControllerIdentity(this);
 }
 
@@ -2009,6 +2009,10 @@ void ASkaldPlayerController::ShowBattleResultWidget(
   ClearBattleResultWidget();
 
   if (!VictoryWidgetClass) {
+    return;
+  }
+
+  if (!CanCreateLocalUIWidget()) {
     return;
   }
 
