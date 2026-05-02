@@ -2782,10 +2782,15 @@ void ASkaldPlayerController::ShowFighterSelectionUI(int32 MaxBudget,
   FighterSelectionWidget->UpdateCostDisplay();
 
   FighterSelectionWidget->AddToViewport(30);
-  FocusWidgetUIOnly(this, FighterSelectionWidget);
+  FighterSelectionWidget->SetIsFocusable(true);
+  FighterSelectionWidget->SetFocus();
+  UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
+      this, FighterSelectionWidget, EMouseLockMode::DoNotLock,
+      /*bHideCursorDuringCapture*/ false);
   bShowMouseCursor = true;
   bEnableClickEvents = true;
   bEnableMouseOverEvents = true;
+  DefaultMouseCaptureMode = EMouseCaptureMode::NoCapture;
 
   UE_LOG(LogSkaldBattle, Log,
          TEXT("ShowFighterSelectionUI: Controller=%s PlayerId=%d Budget=%d Faction=%d"),
@@ -2920,6 +2925,13 @@ void ASkaldPlayerController::HandleBattlePhaseChanged() {
              TEXT("PlayerController %s entering Deploy phase; fighters will be"
                   " spawned automatically."),
              *GetName());
+
+      if (bBattleHUDReadyToShow && !bBattleHUDVisible) {
+        EnsureBattleHUDVisible();
+      }
+    } else if (SGS->BattlePhase != EBattlePhase::FighterSelection &&
+               bBattleHUDReadyToShow && !bBattleHUDVisible) {
+      EnsureBattleHUDVisible();
     }
   }
 }
@@ -4721,6 +4733,13 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
     return;
   }
 
+  if (PS->SelectedTerritory.Get() == Territory) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("ServerSelectTerritory ignoring duplicate selection of %s for player %s (id %d)."),
+           *TerrDesc, *GetName(), SelectingPlayerId);
+    return;
+  }
+
   PS->SetSelectedTerritory(Territory);
   UE_LOG(LogSkald, Log,
          TEXT("ServerSelectTerritory applied selection of %s for player %s (StableId=%d)"),
@@ -5461,12 +5480,20 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
                                        : ETurnPhase::Reinforcement;
   const EBattlePhase BattlePhase =
       CachedGameState ? CachedGameState->BattlePhase : EBattlePhase::None;
+  const bool bBattleTravelPending =
+      CachedGameInstance &&
+      (CachedGameInstance->IsTravelPending() ||
+       CachedGameInstance->HasPendingBattleTravelContext());
   const bool bInBattleInputFlow =
-      bIsBattleMap || BattlePhase != EBattlePhase::None;
+      bIsBattleMap || BattlePhase != EBattlePhase::None || bBattleTravelPending;
+  int32 ReportedActiveId = CachedGameState ? CachedGameState->ActivePlayerId : INDEX_NONE;
+  if (ReportedActiveId == INDEX_NONE && TurnManager) {
+    ReportedActiveId = TurnManager->GetActivePlayerId();
+  }
+
   UE_LOG(LogSkald, Log,
          TEXT("[TurnState] Controller %s turn ownership check: Phase=%s ActiveId=%d IsMyTurn=%s LocalTurnActive=%s"),
-         *GetName(), *UEnum::GetValueAsString(Phase),
-         CachedGameState ? CachedGameState->ActivePlayerId : INDEX_NONE,
+         *GetName(), *UEnum::GetValueAsString(Phase), ReportedActiveId,
          bIsMyTurn ? TEXT("true") : TEXT("false"),
          bLocalTurnActive ? TEXT("true") : TEXT("false"));
 
@@ -5511,16 +5538,20 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
     }
 
     if (bNeedsBattlePrepUI) {
-      UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
-          this, nullptr, EMouseLockMode::DoNotLock,
-          /*bHideCursorDuringCapture*/ false);
+      if (!bShowMouseCursor || !bEnableClickEvents || !bEnableMouseOverEvents) {
+        UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
+            this, nullptr, EMouseLockMode::DoNotLock,
+            /*bHideCursorDuringCapture*/ false);
+      }
       bShowMouseCursor = true;
       bEnableClickEvents = true;
       bEnableMouseOverEvents = true;
     } else {
       // Ensure non-active players fully release world input and phase buttons
       // instead of inheriting the host's UI state.
-      UWidgetBlueprintLibrary::SetInputMode_GameOnly(this);
+      if (bShowMouseCursor || bEnableClickEvents || bEnableMouseOverEvents) {
+        UWidgetBlueprintLibrary::SetInputMode_GameOnly(this);
+      }
       bShowMouseCursor = false;
       bEnableClickEvents = false;
       bEnableMouseOverEvents = false;
@@ -7152,10 +7183,11 @@ void ASkaldPlayerController::ShowPrepareForBattlePromptLocal_Internal(
     }
 
     MainHUD->ShowPrepareForBattleDialog(PromptData);
+    bPendingReadyPrompt = true;
+    PendingReadyPrompt = PromptData;
     UE_LOG(LogSkaldReady, Verbose,
            TEXT("Displayed prepare-for-battle prompt for %s immediately."),
            *GetName());
-    ResetPendingReadyPromptState();
     return;
   }
 
@@ -9285,6 +9317,11 @@ int32 ASkaldPlayerController::ResolveStablePlayerId(
     const ASkaldPlayerState *InPlayerState) const {
   if (!InPlayerState) {
     return static_cast<int32>(INDEX_NONE);
+  }
+
+  const int32 AuthoritativeId = InPlayerState->GetAuthoritativePlayerId();
+  if (AuthoritativeId > 0) {
+    return AuthoritativeId;
   }
 
   return InPlayerState->GetStablePlayerId();

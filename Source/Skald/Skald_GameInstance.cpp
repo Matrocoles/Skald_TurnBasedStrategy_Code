@@ -236,6 +236,11 @@ USkaldGameInstance::GetFactionEmblem(ESkaldFaction InFaction) const {
 void USkaldGameInstance::SetTravelState(const FSkaldTravelState &InState) {
   TravelState = InState;
   TravelState.bValid = true;
+  if (TravelState.CachedTerritories.Num() == 0 &&
+      CachedWorldMapTerritories.Num() > 0) {
+    TravelState.CachedTerritories = CachedWorldMapTerritories;
+  }
+
   if (TravelState.CachedTerritories.Num() > 0) {
     CachedWorldMapTerritories = TravelState.CachedTerritories;
     PendingTravelTerritories = TravelState.CachedTerritories;
@@ -248,7 +253,9 @@ void USkaldGameInstance::SetTravelState(const FSkaldTravelState &InState) {
          TravelState.DefenderPlayerId, TravelState.AttackerArmyBudget,
          TravelState.DefenderArmyBudget);
 
-  if (TravelState.CachedTerritories.Num() == 0) {
+  const bool bHasBattleTerritoryContext =
+      TravelState.AttackerTerritory > 0 || TravelState.DefenderTerritory > 0;
+  if (TravelState.CachedTerritories.Num() == 0 && bHasBattleTerritoryContext) {
     UE_LOG(LogSkald, Warning,
            TEXT("GameInstance travel state missing cached territories snapshot"));
   }

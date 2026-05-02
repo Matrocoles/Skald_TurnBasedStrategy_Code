@@ -2472,13 +2472,19 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
     ASkaldGameState *GS = World->GetGameState<ASkaldGameState>();
 
     FSkaldTravelState TravelState;
-    int32 ValidControllers = 0;
+    int32 ValidHumanControllers = 0;
     for (const TWeakObjectPtr<ASkaldPlayerController> &Ptr : Controllers) {
-      if (Ptr.IsValid()) {
-        ++ValidControllers;
+      if (!Ptr.IsValid()) {
+        continue;
+      }
+
+      const ASkaldPlayerState *ControllerPS =
+          Ptr->GetPlayerState<ASkaldPlayerState>();
+      if (!ControllerPS || !ControllerPS->bIsAI) {
+        ++ValidHumanControllers;
       }
     }
-    TravelState.ExpectedControllers = ValidControllers;
+    TravelState.ExpectedControllers = FMath::Max(1, ValidHumanControllers);
     TravelState.AttackerTerritory = SeededBattle.FromTerritoryID;
     TravelState.DefenderTerritory = SeededBattle.TargetTerritoryID;
     TravelState.AttackerPlayerId = SeededBattle.AttackerPlayerID;

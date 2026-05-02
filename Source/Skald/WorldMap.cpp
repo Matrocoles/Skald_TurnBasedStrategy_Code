@@ -496,9 +496,19 @@ void AWorldMap::RegisterTerritory(ATerritory *Territory) {
   if (Territory && !Territories.Contains(Territory)) {
     if (HasAuthority()) {
       if (Territory->TerritoryID == 0) {
+        int32 MaxExistingTerritoryId = 0;
+        for (const ATerritory *ExistingTerritory : Territories) {
+          if (!IsValid(ExistingTerritory)) {
+            continue;
+          }
+          MaxExistingTerritoryId =
+              FMath::Max(MaxExistingTerritoryId, ExistingTerritory->TerritoryID);
+        }
+
+        Territory->TerritoryID = MaxExistingTerritoryId + 1;
         UE_LOG(LogSkald, Warning,
-               TEXT("WorldMap %s registering territory %s with missing ID; clients may see ID 0"),
-               *GetName(), *Territory->GetName());
+               TEXT("WorldMap %s auto-assigned missing TerritoryID=%d to %s during registration."),
+               *GetName(), Territory->TerritoryID, *Territory->GetName());
       }
       Territory->ForceNetUpdate();
     }
