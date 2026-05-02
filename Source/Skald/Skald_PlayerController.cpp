@@ -9482,6 +9482,12 @@ void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,
 void ASkaldPlayerController::ClientShowAttackRollButton_Implementation(
     AFighterPawn* Attacker, bool bAutoTriggerRoll)
 {
+    if (!Attacker)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[ManualDice] ClientShowAttackRollButton received null attacker"));
+        return;
+    }
+
     UBattleHUDWidget* HUD = BattleHudWidget.Get();
     if (!HUD)
     {
