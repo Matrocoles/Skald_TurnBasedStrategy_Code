@@ -4733,6 +4733,13 @@ void ASkaldPlayerController::ServerSelectTerritory_Implementation(
     return;
   }
 
+  if (PS->GetSelectedTerritory() == Territory) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("ServerSelectTerritory ignoring duplicate selection of %s for player %s (id %d)."),
+           *TerrDesc, *GetName(), SelectingPlayerId);
+    return;
+  }
+
   PS->SetSelectedTerritory(Territory);
   UE_LOG(LogSkald, Log,
          TEXT("ServerSelectTerritory applied selection of %s for player %s (StableId=%d)"),
@@ -5481,8 +5488,7 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
       bIsBattleMap || BattlePhase != EBattlePhase::None || bBattleTravelPending;
   UE_LOG(LogSkald, Log,
          TEXT("[TurnState] Controller %s turn ownership check: Phase=%s ActiveId=%d IsMyTurn=%s LocalTurnActive=%s"),
-         *GetName(), *UEnum::GetValueAsString(Phase),
-         CachedGameState ? CachedGameState->ActivePlayerId : INDEX_NONE,
+         *GetName(), *UEnum::GetValueAsString(Phase), ReportedActiveId,
          bIsMyTurn ? TEXT("true") : TEXT("false"),
          bLocalTurnActive ? TEXT("true") : TEXT("false"));
 
@@ -5527,16 +5533,20 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
     }
 
     if (bNeedsBattlePrepUI) {
-      UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
-          this, nullptr, EMouseLockMode::DoNotLock,
-          /*bHideCursorDuringCapture*/ false);
+      if (!bShowMouseCursor || !bEnableClickEvents || !bEnableMouseOverEvents) {
+        UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
+            this, nullptr, EMouseLockMode::DoNotLock,
+            /*bHideCursorDuringCapture*/ false);
+      }
       bShowMouseCursor = true;
       bEnableClickEvents = true;
       bEnableMouseOverEvents = true;
     } else {
       // Ensure non-active players fully release world input and phase buttons
       // instead of inheriting the host's UI state.
-      UWidgetBlueprintLibrary::SetInputMode_GameOnly(this);
+      if (bShowMouseCursor || bEnableClickEvents || bEnableMouseOverEvents) {
+        UWidgetBlueprintLibrary::SetInputMode_GameOnly(this);
+      }
       bShowMouseCursor = false;
       bEnableClickEvents = false;
       bEnableMouseOverEvents = false;
@@ -9302,6 +9312,11 @@ int32 ASkaldPlayerController::ResolveStablePlayerId(
     const ASkaldPlayerState *InPlayerState) const {
   if (!InPlayerState) {
     return static_cast<int32>(INDEX_NONE);
+  }
+
+  const int32 AuthoritativeId = InPlayerState->GetAuthoritativePlayerId();
+  if (AuthoritativeId > 0) {
+    return AuthoritativeId;
   }
 
   return InPlayerState->GetStablePlayerId();

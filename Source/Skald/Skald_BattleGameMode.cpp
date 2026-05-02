@@ -1353,6 +1353,10 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
 
   LockedInPlayers.Reset();
 
+  if (ASkaldGameState *SyncGS = GetGameState<ASkaldGameState>()) {
+    SyncGS->SetActiveBattlePayload(Battle);
+  }
+
   BeginPreBattleSelection(AttackerPS, DefenderPS, AttackerBudget, DefenderBudget);
   UE_LOG(LogSkaldBattle, Log,
          TEXT("BattleGM: BeginPreBattleSelection started (AttackerID=%d DefenderID=%d Budgets=%d/%d)"),
@@ -1362,10 +1366,6 @@ void ASkald_BattleGameMode::SetupPendingBattle() {
   UE_LOG(LogSkaldBattle, Log,
          TEXT("BattleGM: Battle phase advancing to FighterSelection (NetMode=%d)"),
          static_cast<int32>(GetNetMode()));
-
-  if (ASkaldGameState *SyncGS = GetGameState<ASkaldGameState>()) {
-    SyncGS->SetActiveBattlePayload(Battle);
-  }
 
   SyncBattlePlayerEntry(AttackerPS);
   SyncBattlePlayerEntry(DefenderPS);
