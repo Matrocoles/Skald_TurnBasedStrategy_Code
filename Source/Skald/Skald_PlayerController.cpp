@@ -1665,13 +1665,13 @@ void ASkaldPlayerController::InitializeHUDWidget() {
 bool ASkaldPlayerController::CanCreateLocalUIWidget() const {
   ULocalPlayer *LocalPlayer = GetLocalPlayer();
 
-  // During map travel the controller's generic Player pointer can be briefly
-  // re-bound before settling back to the same local player instance. Requiring
-  // strict Player==LocalPlayer equality here can incorrectly suppress widget
-  // creation (HUD, battle HUD, dice overlay) on legitimate local controllers.
-  // Gate by local-controller identity + non-AI ownership instead.
+  // Widgets must only be created by true local, non-AI controllers that are
+  // currently attached to a player object. Avoid requiring strict
+  // Player==LocalPlayer equality because travel/rebinding windows can
+  // temporarily desynchronize those pointers for legitimate local controllers.
   return IsLocalController() && IsLocalPlayerController() &&
-         LocalPlayer != nullptr && !IsAIControllerIdentity(this);
+         LocalPlayer != nullptr && Player != nullptr &&
+         !IsAIControllerIdentity(this);
 }
 
 void ASkaldPlayerController::InitializeChoosePlayerWidget() {
@@ -1965,6 +1965,10 @@ void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
 }
 
 void ASkaldPlayerController::ShowMainHUD() {
+  if (!CanCreateLocalUIWidget()) {
+    return;
+  }
+
   if (MainHUD) {
     MainHUD->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
   }
@@ -1980,6 +1984,10 @@ void ASkaldPlayerController::ShowMainHUD() {
 }
 
 void ASkaldPlayerController::HideMainHUD() {
+  if (!CanCreateLocalUIWidget()) {
+    return;
+  }
+
   if (MainHUD) {
     MainHUD->SetVisibility(ESlateVisibility::Collapsed);
     UWidgetBlueprintLibrary::SetInputMode_GameOnly(this);
@@ -1989,7 +1997,8 @@ void ASkaldPlayerController::HideMainHUD() {
 
 void ASkaldPlayerController::ShowBattleResultWidget(
     const FBattleResultDisplayData &DisplayData) {
-  if (!CanCreateLocalUIWidget() || !DisplayData.bValid) {
+  if (IsAIControllerIdentity(this) || !Player || !GetLocalPlayer() ||
+      !CanCreateLocalUIWidget() || !DisplayData.bValid) {
     return;
   }
 
@@ -2971,7 +2980,7 @@ void ASkaldPlayerController::Server_CommitArmy_Implementation(
 }
 
 void ASkaldPlayerController::InitializeBattleHUD() {
-  if (!CanCreateLocalUIWidget())
+  if (IsAIControllerIdentity(this) || !Player || !GetLocalPlayer() || !CanCreateLocalUIWidget())
     return;
   if (!BattleHUDWidgetClass)
     return;
@@ -5430,7 +5439,9 @@ void ASkaldPlayerController::HandleReplicatedBattlePayload() {
 }
 
 void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
-  if (!CanCreateLocalUIWidget()) {
+  // Turn-ownership UI updates must never run on controllers without an attached
+  // local player (notably AI controllers in PIE listen-server sessions).
+  if (!Player || !GetLocalPlayer() || IsAIControllerIdentity(this) || !CanCreateLocalUIWidget()) {
     return;
   }
 
@@ -7086,7 +7097,7 @@ void ASkaldPlayerController::ResetPendingReadyPromptState() {
 
 void ASkaldPlayerController::ShowPrepareForBattlePromptLocal(
     const FPrepareForBattlePromptData &PromptData) {
-  if (!CanCreateLocalUIWidget()) {
+  if (IsAIControllerIdentity(this) || !Player || !GetLocalPlayer() || !CanCreateLocalUIWidget()) {
     UE_LOG(LogSkaldReady, Verbose,
            TEXT("Skipping prepare-for-battle prompt for %s: controller has no local player."),
            *GetName());
@@ -7111,7 +7122,7 @@ void ASkaldPlayerController::ShowPrepareForBattlePromptLocal(
 
 void ASkaldPlayerController::ShowPrepareForBattlePromptLocal_Internal(
     const FPrepareForBattlePromptData &PromptData) {
-  if (!CanCreateLocalUIWidget()) {
+  if (IsAIControllerIdentity(this) || !Player || !GetLocalPlayer() || !CanCreateLocalUIWidget()) {
     ResetPendingReadyPromptState();
     return;
   }

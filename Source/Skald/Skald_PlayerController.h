@@ -240,10 +240,10 @@ public:
   USkaldMainHUDWidget *GetHUDWidget() const { return MainHUD; }
 
   UFUNCTION(BlueprintCallable)
-  void ShowMainHUD();
+  virtual void ShowMainHUD();
 
   UFUNCTION(BlueprintCallable)
-  void HideMainHUD();
+  virtual void HideMainHUD();
 
   UFUNCTION(BlueprintCallable, Category = "UI")
   void ToggleInGameMenu();
@@ -574,7 +574,7 @@ protected:
   /** Tracks whether the cursor was hovering an interactable widget last tick. */
   bool bWasHoveringInteractable = false;
 
-  void ShowBattleResultWidget(const FBattleResultDisplayData &DisplayData);
+  virtual void ShowBattleResultWidget(const FBattleResultDisplayData &DisplayData);
   void ClearBattleResultWidget();
 
   UFUNCTION()
@@ -1006,7 +1006,7 @@ private:
   /** Initialize the player state using lobby selections instead of the legacy widget. */
   void AutoInitializeFromLobbySelection();
 
-  void InitializeBattleHUD();
+  virtual void InitializeBattleHUD();
   void ShowOverworldHUD();
   void HideOverworldHUDForBattle();
   UGridOverlayComponent *FindGridOverlay() const;
@@ -1117,7 +1117,7 @@ private:
   void EnsureBattleHUDVisible();
 
   /** Spawn or refresh the fighter selection UI. */
-  void ShowFighterSelectionUI(int32 MaxBudget, ESkaldFaction Faction);
+  virtual void ShowFighterSelectionUI(int32 MaxBudget, ESkaldFaction Faction);
 
   /** Ensure a valid TurnManager is available, attempting reacquisition if
    * needed. */
@@ -1125,7 +1125,7 @@ private:
 
   /** Create the fighter selection widget if we are on a battle map and it is
    * not already shown. */
-  void InitializeFighterSelectionIfNeeded();
+  virtual void InitializeFighterSelectionIfNeeded();
 
   void CancelCommandMode();
   void HighlightClickedCell(UGridOverlayComponent *Grid, const FIntPoint &Cell);
