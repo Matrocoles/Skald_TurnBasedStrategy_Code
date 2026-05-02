@@ -16,14 +16,20 @@ void ULockedInFighterEntryWidget::NativeConstruct() {
   Super::NativeConstruct();
 
   if (ClickButton) {
-    ClickButton->OnClicked.AddDynamic(this,
-                                      &ULockedInFighterEntryWidget::HandleEntryButtonClicked);
+    ClickButton->OnClicked.RemoveDynamic(
+        this, &ULockedInFighterEntryWidget::HandleEntryButtonClicked);
+    ClickButton->OnClicked.AddDynamic(
+        this, &ULockedInFighterEntryWidget::HandleEntryButtonClicked);
   }
 
   ApplyVisualState();
 }
 
 void ULockedInFighterEntryWidget::NativeDestruct() {
+  if (ClickButton) {
+    ClickButton->OnClicked.RemoveDynamic(
+        this, &ULockedInFighterEntryWidget::HandleEntryButtonClicked);
+  }
   ResetEntry();
   Super::NativeDestruct();
 }
@@ -238,4 +244,3 @@ void ULockedInFighterEntryWidget::BroadcastEntryClicked() {
     OnEntryClicked.Broadcast(Fighter);
   }
 }
-

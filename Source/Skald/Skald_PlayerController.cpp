@@ -2782,10 +2782,15 @@ void ASkaldPlayerController::ShowFighterSelectionUI(int32 MaxBudget,
   FighterSelectionWidget->UpdateCostDisplay();
 
   FighterSelectionWidget->AddToViewport(30);
-  FocusWidgetUIOnly(this, FighterSelectionWidget);
+  FighterSelectionWidget->SetIsFocusable(true);
+  FighterSelectionWidget->SetFocus();
+  UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
+      this, FighterSelectionWidget, EMouseLockMode::DoNotLock,
+      /*bHideCursorDuringCapture*/ false);
   bShowMouseCursor = true;
   bEnableClickEvents = true;
   bEnableMouseOverEvents = true;
+  DefaultMouseCaptureMode = EMouseCaptureMode::NoCapture;
 
   UE_LOG(LogSkaldBattle, Log,
          TEXT("ShowFighterSelectionUI: Controller=%s PlayerId=%d Budget=%d Faction=%d"),
@@ -5468,8 +5473,12 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
                                        : ETurnPhase::Reinforcement;
   const EBattlePhase BattlePhase =
       CachedGameState ? CachedGameState->BattlePhase : EBattlePhase::None;
+  const bool bBattleTravelPending =
+      CachedGameInstance &&
+      (CachedGameInstance->IsTravelPending() ||
+       CachedGameInstance->HasPendingBattleTravelContext());
   const bool bInBattleInputFlow =
-      bIsBattleMap || BattlePhase != EBattlePhase::None;
+      bIsBattleMap || BattlePhase != EBattlePhase::None || bBattleTravelPending;
   UE_LOG(LogSkald, Log,
          TEXT("[TurnState] Controller %s turn ownership check: Phase=%s ActiveId=%d IsMyTurn=%s LocalTurnActive=%s"),
          *GetName(), *UEnum::GetValueAsString(Phase),
@@ -7159,10 +7168,11 @@ void ASkaldPlayerController::ShowPrepareForBattlePromptLocal_Internal(
     }
 
     MainHUD->ShowPrepareForBattleDialog(PromptData);
+    bPendingReadyPrompt = true;
+    PendingReadyPrompt = PromptData;
     UE_LOG(LogSkaldReady, Verbose,
            TEXT("Displayed prepare-for-battle prompt for %s immediately."),
            *GetName());
-    ResetPendingReadyPromptState();
     return;
   }
 
