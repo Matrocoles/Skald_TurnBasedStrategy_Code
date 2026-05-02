@@ -2517,7 +2517,15 @@ ATurnManager *ASkaldPlayerController::FindTurnManagerActor() const {
 }
 
 void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
-  if (!CanCreateLocalUIWidget()) {
+  if (!CanCreateLocalUIWidget() || IsAIControllerIdentity(this)) {
+    return;
+  }
+
+  ULocalPlayer *LocalPlayer = GetLocalPlayer();
+  if (!LocalPlayer || Player != LocalPlayer) {
+    UE_LOG(LogSkaldBattle, Verbose,
+           TEXT("InitializeFighterSelectionIfNeeded: Skipping non-owning controller %s (Player=%s LocalPlayer=%s)"),
+           *GetNameSafe(this), *GetNameSafe(Player), *GetNameSafe(LocalPlayer));
     return;
   }
 
@@ -2839,7 +2847,7 @@ void ASkaldPlayerController::Client_OnLockInResult_Implementation(
 }
 
 void ASkaldPlayerController::HandleBattlePhaseChanged() {
-  if (!CanCreateLocalUIWidget()) {
+  if (!CanCreateLocalUIWidget() || IsAIControllerIdentity(this)) {
     return;
   }
 
