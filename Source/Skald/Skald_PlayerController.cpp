@@ -1665,13 +1665,13 @@ void ASkaldPlayerController::InitializeHUDWidget() {
 bool ASkaldPlayerController::CanCreateLocalUIWidget() const {
   ULocalPlayer *LocalPlayer = GetLocalPlayer();
 
-  // During map travel the controller's generic Player pointer can be briefly
-  // re-bound before settling back to the same local player instance. Requiring
-  // strict Player==LocalPlayer equality here can incorrectly suppress widget
-  // creation (HUD, battle HUD, dice overlay) on legitimate local controllers.
-  // Gate by local-controller identity + non-AI ownership instead.
+  // Widgets must only be created by true local, non-AI controllers that are
+  // currently attached to a player object. Avoid requiring strict
+  // Player==LocalPlayer equality because travel/rebinding windows can
+  // temporarily desynchronize those pointers for legitimate local controllers.
   return IsLocalController() && IsLocalPlayerController() &&
-         LocalPlayer != nullptr && !IsAIControllerIdentity(this);
+         LocalPlayer != nullptr && Player != nullptr &&
+         !IsAIControllerIdentity(this);
 }
 
 void ASkaldPlayerController::InitializeChoosePlayerWidget() {
