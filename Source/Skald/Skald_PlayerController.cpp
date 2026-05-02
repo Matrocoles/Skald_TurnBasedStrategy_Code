@@ -2920,6 +2920,13 @@ void ASkaldPlayerController::HandleBattlePhaseChanged() {
              TEXT("PlayerController %s entering Deploy phase; fighters will be"
                   " spawned automatically."),
              *GetName());
+
+      if (bBattleHUDReadyToShow && !bBattleHUDVisible) {
+        EnsureBattleHUDVisible();
+      }
+    } else if (SGS->BattlePhase != EBattlePhase::FighterSelection &&
+               bBattleHUDReadyToShow && !bBattleHUDVisible) {
+      EnsureBattleHUDVisible();
     }
   }
 }
