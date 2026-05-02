@@ -9505,11 +9505,19 @@ void ASkaldPlayerController::ClientShowAttackRollButton_Implementation(
 
     if (!BattleHudWidget)
     {
+        UE_LOG(LogTemp, Warning,
+            TEXT("[ManualDice] Auto-trigger requested for %s without a battle HUD; acknowledging overview completion directly."),
+            *GetNameSafe(Attacker));
+        ServerNotifyAIAttackOverviewComplete(Attacker);
         return;
     }
 
     if (!BattleHudWidget->IsManualAttackRollPromptActive())
     {
+        UE_LOG(LogTemp, Warning,
+            TEXT("[ManualDice] Auto-trigger requested for %s before manual prompt became active; acknowledging overview completion directly."),
+            *GetNameSafe(Attacker));
+        ServerNotifyAIAttackOverviewComplete(Attacker);
         return;
     }
 
