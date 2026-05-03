@@ -161,8 +161,12 @@ void USkaldMainHUDWidget::NativeConstruct() {
     UE_LOG(LogSkald, Warning,
            TEXT("SkaldMainHUDWidget could not find GameState."));
   } else {
+    GameState->OnPlayersUpdated.RemoveDynamic(
+        this, &USkaldMainHUDWidget::HandlePlayersUpdated);
     GameState->OnPlayersUpdated.AddDynamic(
         this, &USkaldMainHUDWidget::HandlePlayersUpdated);
+    GameState->OnTurnIndexChanged.RemoveDynamic(
+        this, &USkaldMainHUDWidget::HandleTurnIndexChanged);
     // React to replicated turn changes.
     GameState->OnTurnIndexChanged.AddDynamic(
         this, &USkaldMainHUDWidget::HandleTurnIndexChanged);
@@ -179,32 +183,44 @@ void USkaldMainHUDWidget::NativeConstruct() {
   }
 
   if (AttackButton) {
+    AttackButton->OnClicked.RemoveDynamic(
+        this, &USkaldMainHUDWidget::BeginAttackSelection);
     AttackButton->OnClicked.AddDynamic(
         this, &USkaldMainHUDWidget::BeginAttackSelection);
     AttackButton->SetVisibility(ESlateVisibility::Collapsed);
   }
   if (MoveButton) {
+    MoveButton->OnClicked.RemoveDynamic(this,
+                                        &USkaldMainHUDWidget::BeginMoveSelection);
     MoveButton->OnClicked.AddDynamic(this,
                                      &USkaldMainHUDWidget::BeginMoveSelection);
     MoveButton->SetVisibility(ESlateVisibility::Collapsed);
   }
   if (EndTurnButton) {
+    EndTurnButton->OnClicked.RemoveDynamic(
+        this, &USkaldMainHUDWidget::HandleEndTurnClicked);
     EndTurnButton->OnClicked.AddDynamic(
         this, &USkaldMainHUDWidget::HandleEndTurnClicked);
     EndTurnButton->SetVisibility(ESlateVisibility::Visible);
   }
   if (EndPhaseButton) {
+    EndPhaseButton->OnClicked.RemoveDynamic(
+        this, &USkaldMainHUDWidget::HandleEndPhaseClicked);
     EndPhaseButton->OnClicked.AddDynamic(
         this, &USkaldMainHUDWidget::HandleEndPhaseClicked);
     EndPhaseButton->SetVisibility(ESlateVisibility::Visible);
   }
   if (DeployButton) {
+    DeployButton->OnClicked.RemoveDynamic(
+        this, &USkaldMainHUDWidget::HandleDeployClicked);
     DeployButton->OnClicked.AddDynamic(
         this, &USkaldMainHUDWidget::HandleDeployClicked);
     DeployButton->SetVisibility(ESlateVisibility::Collapsed);
   }
 
   if (RollInitiativeButton) {
+    RollInitiativeButton->OnClicked.RemoveDynamic(
+        this, &USkaldMainHUDWidget::HandleStrategicInitiativeRollPressed);
     RollInitiativeButton->OnClicked.AddDynamic(
         this, &USkaldMainHUDWidget::HandleStrategicInitiativeRollPressed);
     RollInitiativeButton->SetVisibility(ESlateVisibility::Collapsed);
@@ -231,8 +247,12 @@ void USkaldMainHUDWidget::NativeConstruct() {
   }
 
   if (DiceResolutionPanel) {
+    DiceResolutionPanel->OnResolutionComplete.RemoveDynamic(
+        this, &USkaldMainHUDWidget::HandleDicePanelResolved);
     DiceResolutionPanel->OnResolutionComplete.AddDynamic(
         this, &USkaldMainHUDWidget::HandleDicePanelResolved);
+    DiceResolutionPanel->OnDiceOutcomeRevealed.RemoveDynamic(
+        this, &USkaldMainHUDWidget::HandleDiceOutcomeRevealed);
     DiceResolutionPanel->OnDiceOutcomeRevealed.AddDynamic(
         this, &USkaldMainHUDWidget::HandleDiceOutcomeRevealed);
     TArray<UTexture2D *> DiceFaceTexturePtrs;
@@ -1003,6 +1023,8 @@ void USkaldMainHUDWidget::ShowPrepareForBattleDialog(
       bLocalIsDefender ? ESlateVisibility::Visible
                         : ESlateVisibility::Collapsed);
   if (bLocalIsDefender) {
+    ActivePrepareForBattleWidget->OnRetreatButtonClicked.RemoveDynamic(
+        this, &USkaldMainHUDWidget::HandleRetreatClicked);
     ActivePrepareForBattleWidget->OnRetreatButtonClicked.AddDynamic(
         this, &USkaldMainHUDWidget::HandleRetreatClicked);
     if (ActivePrepareForBattleWidget->RetreatButton) {
@@ -1013,6 +1035,8 @@ void USkaldMainHUDWidget::ShowPrepareForBattleDialog(
   ActivePrepareForBattleWidget->SetVisibility(ESlateVisibility::Visible);
   ActivePrepareForBattleWidget->SetRenderOpacity(1.f);
   ActivePrepareForBattleWidget->SetIsEnabled(true);
+  ActivePrepareForBattleWidget->OnPrepareButtonClicked.RemoveDynamic(
+      this, &USkaldMainHUDWidget::HandlePrepareForBattleClicked);
   ActivePrepareForBattleWidget->OnPrepareButtonClicked.AddDynamic(
       this, &USkaldMainHUDWidget::HandlePrepareForBattleClicked);
   ActivePrepareForBattleWidget->AddToViewport(20);

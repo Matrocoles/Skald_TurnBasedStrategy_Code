@@ -402,6 +402,7 @@ void AFighterPawn::BeginPlay() {
     ActivationWidgetBack->InitWidget();
   }
 
+  OnHealthChanged.RemoveDynamic(this, &AFighterPawn::HandleHealthChanged);
   OnHealthChanged.AddDynamic(this, &AFighterPawn::HandleHealthChanged);
   OnHealthChanged.Broadcast(Stats.Health);
 
