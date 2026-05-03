@@ -5488,6 +5488,27 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
       bIsBattleMap || BattlePhase != EBattlePhase::None || bBattleTravelPending;
   const int32 ReportedActiveId =
       CachedGameState ? CachedGameState->ActivePlayerId : INDEX_NONE;
+
+  const bool bTurnOwnershipStateUnchanged =
+      LastTurnOwnershipActivePlayerId == ReportedActiveId &&
+      LastTurnOwnershipPhase == Phase &&
+      LastTurnOwnershipBattlePhaseValue == static_cast<uint8>(BattlePhase) &&
+      bLastTurnOwnershipIsMyTurn == bIsMyTurn &&
+      bLastTurnOwnershipBattleTravelPending == bBattleTravelPending;
+
+  LastTurnOwnershipActivePlayerId = ReportedActiveId;
+  LastTurnOwnershipPhase = Phase;
+  LastTurnOwnershipBattlePhaseValue = static_cast<uint8>(BattlePhase);
+  bLastTurnOwnershipIsMyTurn = bIsMyTurn;
+  bLastTurnOwnershipBattleTravelPending = bBattleTravelPending;
+
+  // Replication callbacks fan in from multiple paths (phase, active player,
+  // payload, map transition). When all turn-ownership inputs are unchanged,
+  // avoid reapplying local input/cursor/HUD state to prevent gameplay churn.
+  if (bTurnOwnershipStateUnchanged) {
+    return;
+  }
+
   UE_LOG(LogSkald, Log,
          TEXT("[TurnState] Controller %s turn ownership check: Phase=%s ActiveId=%d IsMyTurn=%s LocalTurnActive=%s"),
          *GetName(), *UEnum::GetValueAsString(Phase), ReportedActiveId,
