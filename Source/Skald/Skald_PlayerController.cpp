@@ -5498,6 +5498,22 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
     MainHUD->SyncPhaseButtons(bIsMyTurn);
   }
 
+  // Keep fighter-selection interaction stable even if replicated turn/battle
+  // flags momentarily lag. Without this guard, turn-ownership refreshes can
+  // fall through to the non-active-player branch and force GameOnly input,
+  // which hides the cursor on click until focus changes.
+  if (FighterSelectionWidget && FighterSelectionWidget->IsInViewport()) {
+    if (!bShowMouseCursor || !bEnableClickEvents || !bEnableMouseOverEvents) {
+      UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
+          this, FighterSelectionWidget, EMouseLockMode::DoNotLock,
+          /*bHideCursorDuringCapture*/ false);
+    }
+    bShowMouseCursor = true;
+    bEnableClickEvents = true;
+    bEnableMouseOverEvents = true;
+    return;
+  }
+
   // Battle preparation/selection controls are managed by battle flow. Avoid
   // having overworld turn ownership logic steal input mode or cursor state.
   if (bInBattleInputFlow) {
