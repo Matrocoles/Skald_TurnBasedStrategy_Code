@@ -5492,17 +5492,15 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
   const bool bTurnOwnershipStateUnchanged =
       LastTurnOwnershipActivePlayerId == ReportedActiveId &&
       LastTurnOwnershipPhase == Phase &&
-      LastTurnOwnershipBattlePhaseValue == static_cast<uint8>(BattlePhase) &&
+      LastTurnOwnershipBattlePhase == BattlePhase &&
       bLastTurnOwnershipIsMyTurn == bIsMyTurn &&
-      bLastTurnOwnershipBattleTravelPending == bBattleTravelPending &&
-      bLastTurnOwnershipIsBattleMap == bIsBattleMap;
+      bLastTurnOwnershipBattleTravelPending == bBattleTravelPending;
 
   LastTurnOwnershipActivePlayerId = ReportedActiveId;
   LastTurnOwnershipPhase = Phase;
-  LastTurnOwnershipBattlePhaseValue = static_cast<uint8>(BattlePhase);
+  LastTurnOwnershipBattlePhase = BattlePhase;
   bLastTurnOwnershipIsMyTurn = bIsMyTurn;
   bLastTurnOwnershipBattleTravelPending = bBattleTravelPending;
-  bLastTurnOwnershipIsBattleMap = bIsBattleMap;
 
   // Replication callbacks fan in from multiple paths (phase, active player,
   // payload, map transition). When all turn-ownership inputs are unchanged,

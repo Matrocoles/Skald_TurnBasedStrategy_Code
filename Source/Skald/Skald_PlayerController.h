@@ -1076,10 +1076,9 @@ private:
   /** Debounce redundant turn-ownership refreshes for identical replicated state. */
   int32 LastTurnOwnershipActivePlayerId = INDEX_NONE;
   ETurnPhase LastTurnOwnershipPhase = ETurnPhase::Reinforcement;
-  uint8 LastTurnOwnershipBattlePhaseValue = 0;
+  EBattlePhase LastTurnOwnershipBattlePhase = EBattlePhase::None;
   bool bLastTurnOwnershipIsMyTurn = false;
   bool bLastTurnOwnershipBattleTravelPending = false;
-  bool bLastTurnOwnershipIsBattleMap = false;
 
   /** Prevents redundant pending battle state requests while waiting for a reply. */
   bool bPendingBattleStateRequest = false;
