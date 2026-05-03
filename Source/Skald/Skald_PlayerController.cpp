@@ -5583,6 +5583,7 @@ void ASkaldPlayerController::HandleReplicatedTurnStart()
 
   if (!GS || GS->ActivePlayerId == INDEX_NONE)
   {
+    LastAnnouncedActivePlayerId = INDEX_NONE;
     return;
   }
 
@@ -5592,9 +5593,13 @@ void ASkaldPlayerController::HandleReplicatedTurnStart()
     return;
   }
 
-  const FString PlayerName = ActivePS->GetResolvedPlayerName(TEXT("HandleReplicatedTurnStart"));
-  const bool bIsMyTurn = IsMyTurn();
-  ShowTurnAnnouncementLocal(PlayerName, bIsMyTurn);
+  if (LastAnnouncedActivePlayerId != GS->ActivePlayerId)
+  {
+    const FString PlayerName = ActivePS->GetResolvedPlayerName(TEXT("HandleReplicatedTurnStart"));
+    const bool bIsMyTurn = IsMyTurn();
+    ShowTurnAnnouncementLocal(PlayerName, bIsMyTurn);
+    LastAnnouncedActivePlayerId = GS->ActivePlayerId;
+  }
 
   // Clear any lingering initiative overlays or dice holds now that the owning
   // client is starting a replicated turn, ensuring UI setup does not depend on

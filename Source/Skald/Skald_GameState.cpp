@@ -210,6 +210,9 @@ void ASkaldGameState::RefreshControllersFromPlayers()
                 }
                 PC->RefreshTurnDataFromState();
                 PC->HandleReplicatedTurnOwnership();
+                // Fallback turn-start kick for cases where CurrentTurnIndex
+                // replication locally mutates ActivePlayerId before an
+                // ActivePlayerId RepNotify can fire on this client.
                 PC->HandleReplicatedTurnStart();
             }
         }
@@ -244,6 +247,9 @@ void ASkaldGameState::OnRep_CurrentTurnIndex()
                 }
                 PC->RefreshTurnDataFromState();
                 PC->HandleReplicatedTurnOwnership();
+                // Keep turn-start flow aligned for roster/connection refresh
+                // paths (late join/reconnect) where we need a local fallback
+                // if ActivePlayerId RepNotify does not execute afterward.
                 PC->HandleReplicatedTurnStart();
             }
         }
