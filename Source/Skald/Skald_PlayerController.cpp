@@ -5492,13 +5492,13 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
   const bool bTurnOwnershipStateUnchanged =
       LastTurnOwnershipActivePlayerId == ReportedActiveId &&
       LastTurnOwnershipPhase == Phase &&
-      LastTurnOwnershipBattlePhaseValue == static_cast<uint8>(BattlePhase) &&
+      LastTurnOwnershipBattlePhase == BattlePhase &&
       bLastTurnOwnershipIsMyTurn == bIsMyTurn &&
       bLastTurnOwnershipBattleTravelPending == bBattleTravelPending;
 
   LastTurnOwnershipActivePlayerId = ReportedActiveId;
   LastTurnOwnershipPhase = Phase;
-  LastTurnOwnershipBattlePhaseValue = static_cast<uint8>(BattlePhase);
+  LastTurnOwnershipBattlePhase = BattlePhase;
   bLastTurnOwnershipIsMyTurn = bIsMyTurn;
   bLastTurnOwnershipBattleTravelPending = bBattleTravelPending;
 
