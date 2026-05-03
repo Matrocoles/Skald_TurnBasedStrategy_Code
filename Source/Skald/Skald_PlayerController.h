@@ -1073,6 +1073,14 @@ private:
   /** Debounce replicated turn-announcement spam for the same active player id. */
   int32 LastAnnouncedActivePlayerId = INDEX_NONE;
 
+  /** Debounce redundant turn-ownership refreshes for identical replicated state. */
+  int32 LastTurnOwnershipActivePlayerId = INDEX_NONE;
+  ETurnPhase LastTurnOwnershipPhase = ETurnPhase::Reinforcement;
+  uint8 LastTurnOwnershipBattlePhaseValue = 0;
+  bool bLastTurnOwnershipIsMyTurn = false;
+  bool bLastTurnOwnershipBattleTravelPending = false;
+  bool bLastTurnOwnershipIsBattleMap = false;
+
   /** Prevents redundant pending battle state requests while waiting for a reply. */
   bool bPendingBattleStateRequest = false;
 
