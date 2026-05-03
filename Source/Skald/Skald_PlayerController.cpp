@@ -5502,20 +5502,15 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
   bLastTurnOwnershipIsMyTurn = bIsMyTurn;
   bLastTurnOwnershipBattleTravelPending = bBattleTravelPending;
 
-  // Replication callbacks fan in from multiple paths (phase, active player,
-  // payload, map transition). When all turn-ownership inputs are unchanged,
-  // avoid reapplying local input/cursor/HUD state to prevent gameplay churn.
-  if (bTurnOwnershipStateUnchanged) {
-    return;
+  if (!bTurnOwnershipStateUnchanged) {
+    UE_LOG(LogSkald, Log,
+           TEXT("[TurnState] Controller %s turn ownership check: Phase=%s ActiveId=%d IsMyTurn=%s LocalTurnActive=%s"),
+           *GetName(), *UEnum::GetValueAsString(Phase), ReportedActiveId,
+           bIsMyTurn ? TEXT("true") : TEXT("false"),
+           bLocalTurnActive ? TEXT("true") : TEXT("false"));
   }
 
-  UE_LOG(LogSkald, Log,
-         TEXT("[TurnState] Controller %s turn ownership check: Phase=%s ActiveId=%d IsMyTurn=%s LocalTurnActive=%s"),
-         *GetName(), *UEnum::GetValueAsString(Phase), ReportedActiveId,
-         bIsMyTurn ? TEXT("true") : TEXT("false"),
-         bLocalTurnActive ? TEXT("true") : TEXT("false"));
-
-  if (MainHUD) {
+  if (MainHUD && !bTurnOwnershipStateUnchanged) {
     MainHUD->SyncPhaseButtons(bIsMyTurn);
   }
 
