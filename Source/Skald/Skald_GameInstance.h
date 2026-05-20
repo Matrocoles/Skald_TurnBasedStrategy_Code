@@ -184,6 +184,10 @@ public:
   /** Runtime helper responsible for streaming battle levels into the overworld. */
   UPROPERTY(Transient)
   TObjectPtr<USkaldBattleLevelManager> BattleLevelStreamingManager = nullptr;
+  UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Streaming")
+  TSoftObjectPtr<UWorld> OverviewSublevel;
+  UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Streaming")
+  TSoftObjectPtr<UWorld> DiceBoardSublevel;
 
   /** True when the game has travelled to a dedicated battle map. */
   UPROPERTY(BlueprintReadWrite, Category = "Battle")
@@ -389,6 +393,8 @@ public:
   /** Apply the configured dice roll data asset to the dice subsystem. */
   UFUNCTION(BlueprintCallable, Category = "Dice")
   void ApplyDiceRollConfig();
+  UFUNCTION(BlueprintCallable, Category = "Streaming")
+  bool SetDiceBoardStreamedActive(bool bShouldBeActive);
 
   /** Handle network failures and return to the lobby. */
   UFUNCTION()
