@@ -86,6 +86,16 @@ void USkaldBattleLevelManager::Initialise(USkaldGameInstance *InOwner) {
   OwningInstance = InOwner;
 }
 
+void USkaldBattleLevelManager::ConfigurePersistentSublevels(
+    const TSoftObjectPtr<UWorld>& InOverviewLevel,
+    const TSoftObjectPtr<UWorld>& InDiceBoardLevel) {
+  ConfiguredOverviewLevel = InOverviewLevel;
+  ConfiguredDiceBoardLevel = InDiceBoardLevel;
+  UE_LOG(LogSkald, Log,
+         TEXT("BattleLevelManager: configured persistent sublevels (overview=%s dice=%s)"),
+         *ConfiguredOverviewLevel.ToString(), *ConfiguredDiceBoardLevel.ToString());
+}
+
 bool USkaldBattleLevelManager::RequestBattleLevel(
     UWorld *World, const TSoftObjectPtr<UWorld> &BattleLevel,
     const FS_BattlePayload &BattlePayload) {
@@ -286,6 +296,43 @@ void USkaldBattleLevelManager::ReleaseBattleLevel() {
 
   UE_LOG(LogSkald, Log, TEXT("BattleLevelManager: Unloading battle level"));
 
+}
+
+bool USkaldBattleLevelManager::SetDiceBoardActive(UWorld* World, bool bShouldBeActive) {
+  if (!World) {
+    UE_LOG(LogSkald, Warning, TEXT("BattleLevelManager: SetDiceBoardActive failed (world is null)"));
+    return false;
+  }
+
+  if (ConfiguredDiceBoardLevel.IsNull()) {
+    UE_LOG(LogSkald, Warning, TEXT("BattleLevelManager: SetDiceBoardActive failed (dice board level is not configured)"));
+    return false;
+  }
+
+  if (bShouldBeActive) {
+    ULevelStreaming* DiceStreamingLevel = ActiveDiceStreamingLevel.Get();
+    if (!DiceStreamingLevel &&
+        !ResolveOrStreamLevel(World, ConfiguredDiceBoardLevel, DiceStreamingLevel, TEXT("DiceBoard"))) {
+      return false;
+    }
+
+    ActiveDiceStreamingLevel = DiceStreamingLevel;
+    DiceStreamingLevel->SetShouldBeLoaded(true);
+    DiceStreamingLevel->SetShouldBeVisible(true);
+    ApplyVisibilityForCurrentMode();
+    HideNonBattleLevels();
+    UE_LOG(LogSkald, Log, TEXT("BattleLevelManager: Dice board activated as streamed sublevel"));
+    return true;
+  }
+
+  if (ULevelStreaming* DiceStreamingLevel = ActiveDiceStreamingLevel.Get()) {
+    DiceStreamingLevel->SetShouldBeVisible(false);
+    ApplyVisibilityForCurrentMode();
+    RestoreNonBattleLevels();
+    UE_LOG(LogSkald, Log, TEXT("BattleLevelManager: Dice board hidden"));
+  }
+  ActiveDiceStreamingLevel.Reset();
+  return true;
 }
 
 void USkaldBattleLevelManager::HandleLevelLoaded() {
@@ -596,7 +643,8 @@ void USkaldBattleLevelManager::HideNonBattleLevels() {
       continue;
     }
 
-    if (IsStreamingLevelPartOfBattleMap(OtherLevel)) {
+    if (IsStreamingLevelPartOfBattleMap(OtherLevel) ||
+        IsStreamingLevelPartOfDiceBoard(OtherLevel)) {
       continue;
     }
 
@@ -781,3 +829,79 @@ bool USkaldBattleLevelManager::IsStreamingLevelPartOfBattleMap(
   return false;
 }
 
+bool USkaldBattleLevelManager::ResolveOrStreamLevel(
+    UWorld* World, const TSoftObjectPtr<UWorld>& LevelAsset,
+    ULevelStreaming*& OutStreamingLevel, const TCHAR* ContextLabel) {
+  OutStreamingLevel = nullptr;
+  if (!World || LevelAsset.IsNull()) {
+    return false;
+  }
+
+  const FSoftObjectPath RequestedPath = LevelAsset.ToSoftObjectPath();
+  const FString RequestedPackage = RequestedPath.GetLongPackageName();
+  for (ULevelStreaming* ExistingLevel : World->GetStreamingLevels()) {
+    if (!ExistingLevel) {
+      continue;
+    }
+
+    const FString ExistingPackage = ResolveStreamingLevelPackageName(ExistingLevel);
+    if (!RequestedPackage.IsEmpty() &&
+        ExistingPackage.Equals(RequestedPackage, ESearchCase::IgnoreCase)) {
+      OutStreamingLevel = ExistingLevel;
+      UE_LOG(LogSkald, Log, TEXT("BattleLevelManager: Reusing %s streaming level %s"),
+             ContextLabel, *ExistingPackage);
+      return true;
+    }
+  }
+
+  bool bLoadSuccess = false;
+  OutStreamingLevel = ULevelStreamingDynamic::LoadLevelInstanceBySoftObjectPtr(
+      World, LevelAsset, FVector::ZeroVector, FRotator::ZeroRotator, bLoadSuccess);
+  if (!OutStreamingLevel || !bLoadSuccess) {
+    UE_LOG(LogSkald, Error, TEXT("BattleLevelManager: Failed to stream %s level %s"),
+           ContextLabel, *LevelAsset.ToString());
+    OutStreamingLevel = nullptr;
+    return false;
+  }
+
+  UE_LOG(LogSkald, Log, TEXT("BattleLevelManager: Stream request issued for %s level %s"),
+         ContextLabel, *LevelAsset.ToString());
+  return true;
+}
+
+void USkaldBattleLevelManager::ApplyVisibilityForCurrentMode() {
+  if (ULevelStreaming* DiceLevel = ActiveDiceStreamingLevel.Get()) {
+    DiceLevel->SetShouldBeLoaded(true);
+    DiceLevel->SetShouldBeVisible(true);
+  }
+}
+
+bool USkaldBattleLevelManager::IsStreamingLevelPartOfDiceBoard(ULevelStreaming* Level) const {
+  if (!Level) {
+    return false;
+  }
+
+  if (ActiveDiceStreamingLevel.IsValid() && Level == ActiveDiceStreamingLevel.Get()) {
+    return true;
+  }
+
+  const FString DicePackage =
+      ConfiguredDiceBoardLevel.ToSoftObjectPath().GetLongPackageName();
+  if (DicePackage.IsEmpty()) {
+    return false;
+  }
+
+  const FString LevelPackage = ResolveStreamingLevelPackageName(Level);
+  if (LevelPackage.IsEmpty()) {
+    return false;
+  }
+
+  if (LevelPackage.Equals(DicePackage, ESearchCase::IgnoreCase)) {
+    return true;
+  }
+
+  const FString DiceShortName = FPackageName::GetShortName(DicePackage);
+  const FString LevelShortName = FPackageName::GetShortName(LevelPackage);
+  return !DiceShortName.IsEmpty() &&
+         LevelShortName.Equals(DiceShortName, ESearchCase::IgnoreCase);
+}

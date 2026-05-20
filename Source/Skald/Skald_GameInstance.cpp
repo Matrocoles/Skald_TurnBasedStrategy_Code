@@ -194,6 +194,10 @@ void USkaldGameInstance::Init() {
     BattleLevelStreamingManager = NewObject<USkaldBattleLevelManager>(this);
     BattleLevelStreamingManager->Initialise(this);
   }
+  if (BattleLevelStreamingManager) {
+    BattleLevelStreamingManager->ConfigurePersistentSublevels(
+        OverviewSublevel, DiceBoardSublevel);
+  }
 
   if (GEngine) {
     GEngine->OnNetworkFailure().AddUObject(
@@ -1146,6 +1150,27 @@ void USkaldGameInstance::SeedCombatRandomStream(int32 Seed) {
 
 void USkaldGameInstance::ApplyDiceRollConfig() {
   InitialiseDiceManager();
+}
+
+bool USkaldGameInstance::SetDiceBoardStreamedActive(bool bShouldBeActive) {
+  if (!BattleLevelStreamingManager) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("GameInstance SetDiceBoardStreamedActive failed: Battle level manager missing"));
+    return false;
+  }
+
+  UWorld* World = GetWorld();
+  if (!World) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("GameInstance SetDiceBoardStreamedActive failed: no active world"));
+    return false;
+  }
+
+  const bool bSuccess = BattleLevelStreamingManager->SetDiceBoardActive(World, bShouldBeActive);
+  UE_LOG(LogSkald, Log, TEXT("GameInstance SetDiceBoardStreamedActive -> %s (success=%s)"),
+         bShouldBeActive ? TEXT("active") : TEXT("inactive"),
+         bSuccess ? TEXT("true") : TEXT("false"));
+  return bSuccess;
 }
 
 void USkaldGameInstance::InitialiseDiceManager() {
