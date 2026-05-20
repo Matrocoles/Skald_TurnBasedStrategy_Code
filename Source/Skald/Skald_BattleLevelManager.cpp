@@ -319,6 +319,7 @@ bool USkaldBattleLevelManager::SetDiceBoardActive(UWorld* World, bool bShouldBeA
     ActiveDiceStreamingLevel = DiceStreamingLevel;
     DiceStreamingLevel->SetShouldBeLoaded(true);
     DiceStreamingLevel->SetShouldBeVisible(true);
+    ApplyVisibilityForCurrentMode();
     HideNonBattleLevels();
     UE_LOG(LogSkald, Log, TEXT("BattleLevelManager: Dice board activated as streamed sublevel"));
     return true;
@@ -326,6 +327,7 @@ bool USkaldBattleLevelManager::SetDiceBoardActive(UWorld* World, bool bShouldBeA
 
   if (ULevelStreaming* DiceStreamingLevel = ActiveDiceStreamingLevel.Get()) {
     DiceStreamingLevel->SetShouldBeVisible(false);
+    ApplyVisibilityForCurrentMode();
     RestoreNonBattleLevels();
     UE_LOG(LogSkald, Log, TEXT("BattleLevelManager: Dice board hidden"));
   }
@@ -641,7 +643,8 @@ void USkaldBattleLevelManager::HideNonBattleLevels() {
       continue;
     }
 
-    if (IsStreamingLevelPartOfBattleMap(OtherLevel)) {
+    if (IsStreamingLevelPartOfBattleMap(OtherLevel) ||
+        IsStreamingLevelPartOfDiceBoard(OtherLevel)) {
       continue;
     }
 
@@ -866,5 +869,39 @@ bool USkaldBattleLevelManager::ResolveOrStreamLevel(
   return true;
 }
 
-void USkaldBattleLevelManager::ApplyVisibilityForCurrentMode() {}
-bool USkaldBattleLevelManager::IsStreamingLevelPartOfDiceBoard(ULevelStreaming* Level) const { return false; }
+void USkaldBattleLevelManager::ApplyVisibilityForCurrentMode() {
+  if (ULevelStreaming* DiceLevel = ActiveDiceStreamingLevel.Get()) {
+    DiceLevel->SetShouldBeLoaded(true);
+    DiceLevel->SetShouldBeVisible(true);
+  }
+}
+
+bool USkaldBattleLevelManager::IsStreamingLevelPartOfDiceBoard(ULevelStreaming* Level) const {
+  if (!Level) {
+    return false;
+  }
+
+  if (ActiveDiceStreamingLevel.IsValid() && Level == ActiveDiceStreamingLevel.Get()) {
+    return true;
+  }
+
+  const FString DicePackage =
+      ConfiguredDiceBoardLevel.ToSoftObjectPath().GetLongPackageName();
+  if (DicePackage.IsEmpty()) {
+    return false;
+  }
+
+  const FString LevelPackage = ResolveStreamingLevelPackageName(Level);
+  if (LevelPackage.IsEmpty()) {
+    return false;
+  }
+
+  if (LevelPackage.Equals(DicePackage, ESearchCase::IgnoreCase)) {
+    return true;
+  }
+
+  const FString DiceShortName = FPackageName::GetShortName(DicePackage);
+  const FString LevelShortName = FPackageName::GetShortName(LevelPackage);
+  return !DiceShortName.IsEmpty() &&
+         LevelShortName.Equals(DiceShortName, ESearchCase::IgnoreCase);
+}
