@@ -54,6 +54,7 @@ class UImage;
 class UCanvasPanel;
 class UFactionCursorWidget;
 struct FSkaldTravelState;
+enum class EBattlePhase : uint8;
 
 /** Command issued by the player during a battle. */
 UENUM()
