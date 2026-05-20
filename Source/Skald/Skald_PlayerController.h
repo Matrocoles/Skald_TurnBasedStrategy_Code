@@ -54,6 +54,7 @@ class UImage;
 class UCanvasPanel;
 class UFactionCursorWidget;
 struct FSkaldTravelState;
+enum class EBattlePhase : uint8;
 
 /** Command issued by the player during a battle. */
 UENUM()
@@ -1076,7 +1077,7 @@ private:
   /** Debounce redundant turn-ownership refreshes for identical replicated state. */
   int32 LastTurnOwnershipActivePlayerId = INDEX_NONE;
   ETurnPhase LastTurnOwnershipPhase = ETurnPhase::Reinforcement;
-  EBattlePhase LastTurnOwnershipBattlePhase = EBattlePhase::None;
+  EBattlePhase LastTurnOwnershipBattlePhase;
   bool bLastTurnOwnershipIsMyTurn = false;
   bool bLastTurnOwnershipBattleTravelPending = false;
 
