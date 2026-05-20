@@ -1562,24 +1562,28 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     PopulateAIPlayers();
   }
 
-  // Ensure local human controllers have their HUD widgets initialized before
-  // proceeding with world initialization. Retry on the next tick if any are
-  // still pending.
+  // Track local human controllers that do not yet have a HUD widget. This is
+  // a common transient state during map startup and should not block game
+  // initialization. We keep retrying HUD refresh separately while allowing
+  // turn/world readiness logic to continue.
+  bool bMissingLocalHUD = false;
   for (FConstPlayerControllerIterator It =
            GetWorld()->GetPlayerControllerIterator();
        It; ++It) {
     if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(*It)) {
       if (!IsAIControllerIdentity(PC) && PC->IsLocalController() &&
           !PC->GetHUDWidget()) {
-        FTimerDelegate RetryInit = FTimerDelegate::CreateUObject(
-            this, &ASkaldGameMode::TryInitializeWorldAndStart);
-        GetWorldTimerManager().ClearTimer(RetryInitTimerHandle);
-        GetWorldTimerManager().SetTimer(RetryInitTimerHandle, RetryInit,
-                                        RetryInitDelay, false);
-        GetWorldTimerManager().SetTimerForNextTick(RetryInit);
-        return;
+        bMissingLocalHUD = true;
+        UE_LOG(LogSkald, Verbose,
+               TEXT("TryInitializeWorldAndStart: local controller %s has no HUD yet; continuing startup and scheduling HUD refresh."),
+               *GetNameSafe(PC));
       }
     }
+  }
+  if (bMissingLocalHUD) {
+    FTimerDelegate RefreshDelegate =
+        FTimerDelegate::CreateUObject(this, &ASkaldGameMode::RefreshHUDs);
+    GetWorldTimerManager().SetTimerForNextTick(RefreshDelegate);
   }
 
   const bool bNeedsSnapshotRestore =
