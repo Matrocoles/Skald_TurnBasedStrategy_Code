@@ -25,6 +25,8 @@ class SKALD_API USkaldBattleLevelManager : public UObject {
 
 public:
   void Initialise(USkaldGameInstance *InOwner);
+  void ConfigurePersistentSublevels(const TSoftObjectPtr<UWorld>& InOverviewLevel,
+                                    const TSoftObjectPtr<UWorld>& InDiceBoardLevel);
 
   /** Attempt to stream in the specified battle level. Returns true when the
    * request was issued successfully. */
@@ -33,6 +35,8 @@ public:
 
   /** Unload any active streamed battle level. */
   void ReleaseBattleLevel();
+  bool SetDiceBoardActive(UWorld* World, bool bShouldBeActive);
+  bool IsDiceBoardActive() const { return ActiveDiceStreamingLevel.IsValid(); }
 
   /** Returns whether a streamed battle level is currently active. */
   bool IsBattleLevelActive() const { return ActiveStreamingLevel.IsValid(); }
@@ -41,6 +45,10 @@ private:
   void HideNonBattleLevels();
   void RestoreNonBattleLevels();
   bool IsStreamingLevelPartOfBattleMap(ULevelStreaming *Level) const;
+  bool ResolveOrStreamLevel(UWorld* World, const TSoftObjectPtr<UWorld>& LevelAsset,
+                            ULevelStreaming*& OutStreamingLevel, const TCHAR* ContextLabel);
+  void ApplyVisibilityForCurrentMode();
+  bool IsStreamingLevelPartOfDiceBoard(ULevelStreaming* Level) const;
 
   void HandleLevelLoaded();
   void HandleLevelUnloaded();
@@ -55,7 +63,10 @@ private:
 
   TWeakObjectPtr<USkaldGameInstance> OwningInstance;
   TWeakObjectPtr<ULevelStreaming> ActiveStreamingLevel;
+  TWeakObjectPtr<ULevelStreaming> ActiveDiceStreamingLevel;
   TSoftObjectPtr<UWorld> RequestedBattleLevel;
+  TSoftObjectPtr<UWorld> ConfiguredOverviewLevel;
+  TSoftObjectPtr<UWorld> ConfiguredDiceBoardLevel;
   FDelegateHandle LevelAddedToWorldHandle;
   FDelegateHandle LevelRemovedFromWorldHandle;
   FTSTicker::FDelegateHandle StreamingStatusTickerHandle;
