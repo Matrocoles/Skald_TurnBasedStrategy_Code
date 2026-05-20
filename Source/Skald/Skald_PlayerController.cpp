@@ -325,6 +325,7 @@ ASkaldPlayerController::ASkaldPlayerController() {
   bBattleHUDVisible = false;
   bBattleHUDReadyToShow = false;
   bPendingLocalSelectionRefresh = false;
+  LastTurnOwnershipBattlePhase = EBattlePhase::None;
 
   static ConstructorHelpers::FClassFinder<UChoosePlayerWidget> ChooseBP(
       TEXT("/Game/Blueprints/UI/Skald_ChoosePlayerWidget"));

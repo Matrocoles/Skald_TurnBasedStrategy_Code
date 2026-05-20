@@ -1077,7 +1077,7 @@ private:
   /** Debounce redundant turn-ownership refreshes for identical replicated state. */
   int32 LastTurnOwnershipActivePlayerId = INDEX_NONE;
   ETurnPhase LastTurnOwnershipPhase = ETurnPhase::Reinforcement;
-  EBattlePhase LastTurnOwnershipBattlePhase = EBattlePhase::None;
+  EBattlePhase LastTurnOwnershipBattlePhase;
   bool bLastTurnOwnershipIsMyTurn = false;
   bool bLastTurnOwnershipBattleTravelPending = false;
 
