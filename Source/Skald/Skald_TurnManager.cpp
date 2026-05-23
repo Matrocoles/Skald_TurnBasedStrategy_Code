@@ -2831,7 +2831,20 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
            TravelState.HumanOwnedTerritories.Num(),
            TravelState.CachedTerritories.Num());
 
-    if (!bShouldStreamSelectedMap || !bStreamingBattle) {
+    if (bShouldStreamSelectedMap && !bStreamingBattle) {
+      UE_LOG(LogSkald, Warning,
+             TEXT("TriggerGridBattle: battle level streaming failed for %s; scheduling retry instead of map travel."),
+             *SelectedBattleMap.ToSoftObjectPath().ToString());
+      DeferredPendingBattle = PendingPayload;
+      if (World &&
+          !World->GetTimerManager().IsTimerActive(PendingBattleTravelRetryHandle)) {
+        FTimerDelegate RetryDelegate = FTimerDelegate::CreateUObject(
+            this, &ATurnManager::RetryPendingBattleTravel);
+        constexpr float RetryDelaySeconds = 0.15f;
+        World->GetTimerManager().SetTimer(PendingBattleTravelRetryHandle,
+                                          RetryDelegate, RetryDelaySeconds, false);
+      }
+    } else if (!bShouldStreamSelectedMap) {
       if (World->GetNetMode() != NM_Standalone) {
         MulticastPrepareBattleTravel(TravelState, PendingPayload);
       }
