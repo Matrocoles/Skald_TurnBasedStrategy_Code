@@ -2835,6 +2835,13 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
       UE_LOG(LogSkald, Warning,
              TEXT("TriggerGridBattle: battle level streaming failed for %s; scheduling retry instead of map travel."),
              *SelectedBattleMap.ToSoftObjectPath().ToString());
+      if (GI) {
+        // Clear the in-flight travel gate before scheduling a retry. Streaming
+        // failure marks travel pending earlier in this function to block
+        // premature battle flow, but leaving it set would cause the retry path
+        // to immediately defer again at the TriggerGridBattle guard.
+        GI->SetTravelPending(false);
+      }
       DeferredPendingBattle = PendingPayload;
       if (World &&
           !World->GetTimerManager().IsTimerActive(PendingBattleTravelRetryHandle)) {
