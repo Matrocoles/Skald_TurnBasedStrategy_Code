@@ -352,7 +352,8 @@ private:
 
   /** PlayerState associated with the current animated placement sequence. */
   TWeakObjectPtr<ASkaldPlayerState> AnimatedPlacementPlayerState;
-};
+
   /** Optional data-driven mapping from ability id to AI decision category. */
   UPROPERTY(EditDefaultsOnly, Category = "AI|Data")
   UDataTable *AbilityCategoryTable = nullptr;
+};
