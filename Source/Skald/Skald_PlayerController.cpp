@@ -2693,7 +2693,8 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
            TEXT("InitializeFighterSelectionIfNeeded: Skipping widget (Local=%s Participant=%d Phase=%d Budget=%d ActiveFlag=%d OnBattleMap=%d HasContext=%d InSelectionPhase=%d)"),
            *GetNameSafe(this), bIsParticipant ? 1 : 0,
            CachedGameState ? static_cast<int32>(CachedGameState->BattlePhase) : -1, PendingBudget,
-           PS->bIsActiveBattlePlayer ? 1 : 0, bOnBattleMap ? 1 : 0);
+           PS->bIsActiveBattlePlayer ? 1 : 0, bOnBattleMap ? 1 : 0,
+           bHasBattleContext ? 1 : 0, bInSelectionPhase ? 1 : 0);
 
     // Preserve cursor + UI input whenever the fighter-selection widget already
     // exists. Replicated turn ownership updates can temporarily report a
