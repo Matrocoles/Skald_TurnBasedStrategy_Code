@@ -6,6 +6,7 @@
 #include "Containers/Set.h"
 #include "Skald_PlayerController.h"
 #include "TimerManager.h"
+#include "Engine/DataTable.h"
 #include "Skald_AIController.generated.h"
 
 class AFighterPawn;
@@ -16,6 +17,17 @@ class UGridOverlayComponent;
 class USkaldAbilityComponent;
 struct FSkaldAbilityState;
 struct FSkaldAbilityTargetingInfo;
+
+USTRUCT(BlueprintType)
+struct FSkaldAIAbilityCategoryRow : public FTableRowBase {
+  GENERATED_BODY()
+
+  UPROPERTY(EditAnywhere, BlueprintReadWrite)
+  FName AbilityId;
+
+  UPROPERTY(EditAnywhere, BlueprintReadWrite)
+  uint8 Category = 0;
+};
 
 /**
  * Controller handling AI turn logic.
@@ -341,3 +353,6 @@ private:
   /** PlayerState associated with the current animated placement sequence. */
   TWeakObjectPtr<ASkaldPlayerState> AnimatedPlacementPlayerState;
 };
+  /** Optional data-driven mapping from ability id to AI decision category. */
+  UPROPERTY(EditDefaultsOnly, Category = "AI|Data")
+  UDataTable *AbilityCategoryTable = nullptr;

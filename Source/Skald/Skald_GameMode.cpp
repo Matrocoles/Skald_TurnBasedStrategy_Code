@@ -73,13 +73,7 @@ bool IsAIControllerIdentity(const ASkaldPlayerController *Controller) {
       return true;
     }
   }
-  const FString ClassName =
-      Controller->GetClass() ? Controller->GetClass()->GetName() : FString();
-  const FString InstanceName = Controller->GetName();
-  return ClassName.Contains(TEXT("AiController"), ESearchCase::IgnoreCase) ||
-         ClassName.Contains(TEXT("AIController"), ESearchCase::IgnoreCase) ||
-         InstanceName.Contains(TEXT("AiController"), ESearchCase::IgnoreCase) ||
-         InstanceName.Contains(TEXT("AIController"), ESearchCase::IgnoreCase);
+  return false;
 }
 
 static void NormalizeSinglePlayerControllerRoles(UWorld *World,

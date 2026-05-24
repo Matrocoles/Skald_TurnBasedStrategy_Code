@@ -59,8 +59,8 @@ enum class EAIFactionAbilityCategory : uint8 {
   AllySupport
 };
 
-EAIFactionAbilityCategory ResolveFactionAbilityCategory(const FName &AbilityId) {
-  static const TMap<FName, EAIFactionAbilityCategory> AbilityCategoryMap = {
+TMap<FName, EAIFactionAbilityCategory> BuildDefaultAbilityCategoryMap() {
+  return {
       {TEXT("Ability_Inflicted_Line"), EAIFactionAbilityCategory::AttackDamageBuff},
       {TEXT("Ability_Inflicted_Elite"), EAIFactionAbilityCategory::AoEAttack},
       {TEXT("Ability_Empire_Elite"), EAIFactionAbilityCategory::AoEAttack},
@@ -99,8 +99,27 @@ EAIFactionAbilityCategory ResolveFactionAbilityCategory(const FName &AbilityId) 
       {TEXT("Ability_Dwarf_Skirmish"), EAIFactionAbilityCategory::AttackDamageBuff},
       {TEXT("Ability_Dwarf_Elite"), EAIFactionAbilityCategory::AoEAttack}
   };
+}
 
-  if (const EAIFactionAbilityCategory *Found = AbilityCategoryMap.Find(AbilityId)) {
+EAIFactionAbilityCategory ResolveFactionAbilityCategory(
+    const FName &AbilityId, const UDataTable *AbilityCategoryTable) {
+  static const TMap<FName, EAIFactionAbilityCategory> DefaultAbilityCategoryMap =
+      BuildDefaultAbilityCategoryMap();
+
+  if (AbilityCategoryTable) {
+    TArray<FSkaldAIAbilityCategoryRow *> Rows;
+    AbilityCategoryTable->GetAllRows(TEXT("AIAbilityCategory"), Rows);
+    for (const FSkaldAIAbilityCategoryRow *Row : Rows) {
+      if (!Row || Row->AbilityId.IsNone()) {
+        continue;
+      }
+      if (Row->AbilityId == AbilityId) {
+        return static_cast<EAIFactionAbilityCategory>(Row->Category);
+      }
+    }
+  }
+
+  if (const EAIFactionAbilityCategory *Found = DefaultAbilityCategoryMap.Find(AbilityId)) {
     return *Found;
   }
 
@@ -146,6 +165,16 @@ void ASkaldAIController::BeginPlay() {
   }
 
   SetupBattleAutomation();
+
+  if (AbilityCategoryTable) {
+    TArray<FSkaldAIAbilityCategoryRow *> Rows;
+    AbilityCategoryTable->GetAllRows(TEXT("AIAbilityCategoryValidation"), Rows);
+    UE_LOG(LogSkald, Log, TEXT("AI ability category table loaded with %d rows."),
+           Rows.Num());
+  } else {
+    UE_LOG(LogSkald, Warning,
+           TEXT("AI ability category table not configured; falling back to native defaults."));
+  }
 
   if (GameInstance && GameInstance->bIsInBattleMap) {
     HandleBattleMapStateChanged(true);
@@ -1906,7 +1935,7 @@ float ASkaldAIController::ComputeAbilityActivationBonus(
     return 0.f;
   }
 
-  switch (ResolveFactionAbilityCategory(AbilityState.Definition.AbilityId)) {
+  switch (ResolveFactionAbilityCategory(AbilityState.Definition.AbilityId, AbilityCategoryTable)) {
   case EAIFactionAbilityCategory::AttackDamageBuff:
     return 60.f + Fighter->Stats.AttackDamage * 2.f +
            Fighter->Stats.AttackDice * 2.f;
@@ -1932,7 +1961,7 @@ float ASkaldAIController::ComputeAbilityAttackScoreBonus(
 
   const FName AbilityId = AbilityState.Definition.AbilityId;
   const EAIFactionAbilityCategory Category =
-      ResolveFactionAbilityCategory(AbilityId);
+      ResolveFactionAbilityCategory(AbilityId, AbilityCategoryTable);
 
   float Bonus = 0.f;
   switch (Category) {
@@ -2010,7 +2039,7 @@ bool ASkaldAIController::ShouldTriggerAbilityForAttack(
   }
 
   const EAIFactionAbilityCategory Category =
-      ResolveFactionAbilityCategory(AbilityState.Definition.AbilityId);
+      ResolveFactionAbilityCategory(AbilityState.Definition.AbilityId, AbilityCategoryTable);
   if (Category != EAIFactionAbilityCategory::AttackDamageBuff &&
       Category != EAIFactionAbilityCategory::AttackDebuffEnemy &&
       Category != EAIFactionAbilityCategory::AoEAttack) {
@@ -2138,7 +2167,7 @@ bool ASkaldAIController::TryUseMovementAbility(AFighterPawn *Fighter,
 
   const FName AbilityId = AbilityState->Definition.AbilityId;
   const ESkaldAbilityCostType AbilityCost = AbilityState->Definition.CostType;
-  if (ResolveFactionAbilityCategory(AbilityId) !=
+  if (ResolveFactionAbilityCategory(AbilityId, AbilityCategoryTable) !=
       EAIFactionAbilityCategory::MovementBuff) {
     return false;
   }
