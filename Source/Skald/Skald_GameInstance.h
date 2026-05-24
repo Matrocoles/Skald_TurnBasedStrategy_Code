@@ -185,11 +185,11 @@ public:
   UPROPERTY(Transient)
   TObjectPtr<USkaldBattleLevelManager> BattleLevelStreamingManager = nullptr;
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Streaming",
-            meta = (DisplayName = "Overview Streamed Sublevel"))
-  FSoftObjectPath OverviewSublevel;
+            meta = (DisplayName = "Overview Streamed Sublevel", AllowedClasses = "/Script/Engine.World"))
+  TSoftObjectPtr<UWorld> OverviewSublevel;
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Streaming",
-            meta = (DisplayName = "Dice Board Streamed Sublevel"))
-  FSoftObjectPath DiceBoardSublevel;
+            meta = (DisplayName = "Dice Board Streamed Sublevel", AllowedClasses = "/Script/Engine.World"))
+  TSoftObjectPtr<UWorld> DiceBoardSublevel;
 
   /** True when the game has travelled to a dedicated battle map. */
   UPROPERTY(BlueprintReadWrite, Category = "Battle")
