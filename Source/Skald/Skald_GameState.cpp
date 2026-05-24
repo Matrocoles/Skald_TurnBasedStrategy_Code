@@ -433,6 +433,20 @@ void ASkaldGameState::OnRep_BattlePayload()
             bUpdatedTravel = true;
         }
 
+        if (ActiveBattlePayload.FromTerritoryID > 0 &&
+            TravelState.AttackerTerritory != ActiveBattlePayload.FromTerritoryID)
+        {
+            TravelState.AttackerTerritory = ActiveBattlePayload.FromTerritoryID;
+            bUpdatedTravel = true;
+        }
+
+        if (ActiveBattlePayload.TargetTerritoryID > 0 &&
+            TravelState.DefenderTerritory != ActiveBattlePayload.TargetTerritoryID)
+        {
+            TravelState.DefenderTerritory = ActiveBattlePayload.TargetTerritoryID;
+            bUpdatedTravel = true;
+        }
+
         if (ActiveBattlePayload.ArmyCountSent > 0 &&
             TravelState.AttackerArmyBudget != ActiveBattlePayload.ArmyCountSent)
         {
@@ -448,6 +462,12 @@ void ASkaldGameState::OnRep_BattlePayload()
             TravelState.DefenderArmyBudget != ReplicatedDefenderBudget)
         {
             TravelState.DefenderArmyBudget = ReplicatedDefenderBudget;
+            bUpdatedTravel = true;
+        }
+
+        if (TravelState.ExpectedControllers <= 0)
+        {
+            TravelState.ExpectedControllers = 1;
             bUpdatedTravel = true;
         }
 
