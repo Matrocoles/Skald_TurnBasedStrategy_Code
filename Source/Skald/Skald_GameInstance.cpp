@@ -196,7 +196,8 @@ void USkaldGameInstance::Init() {
   }
   if (BattleLevelStreamingManager) {
     BattleLevelStreamingManager->ConfigurePersistentSublevels(
-        OverviewSublevel, DiceBoardSublevel);
+        TSoftObjectPtr<UWorld>(OverviewSublevel),
+        TSoftObjectPtr<UWorld>(DiceBoardSublevel));
   }
 
   if (GEngine) {
