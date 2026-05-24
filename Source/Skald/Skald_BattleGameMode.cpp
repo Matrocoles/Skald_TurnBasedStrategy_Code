@@ -2337,10 +2337,24 @@ void ASkald_BattleGameMode::HandleHumanLockIn(
     return;
   }
 
-  const FS_BattlePayload &Battle = GI->PendingBattle;
+  FS_BattlePayload Battle = GI->PendingBattle;
+  if (const ASkaldGameState* GS = GetGameState<ASkaldGameState>()) {
+    const FS_BattlePayload ActivePayload = GS->GetActiveBattlePayload();
+    if (ActivePayload.AttackerPlayerID > 0 && ActivePayload.DefenderPlayerID > 0) {
+      Battle = ActivePayload;
+    }
+  }
+
   const int32 PlayerId = ResolveBattlePlayerId(PS);
-  if (PlayerId != Battle.AttackerPlayerID &&
-      PlayerId != Battle.DefenderPlayerID) {
+  const bool bPlayerMatchesPayload =
+      (PlayerId == Battle.AttackerPlayerID || PlayerId == Battle.DefenderPlayerID);
+  const bool bPlayerMarkedParticipant = PS->bIsActiveBattlePlayer;
+
+  if (!bPlayerMatchesPayload && !bPlayerMarkedParticipant) {
+    UE_LOG(LogSkaldBattle, Warning,
+           TEXT("HandleHumanLockIn: rejecting lock-in for PlayerId=%d (Payload Attacker=%d Defender=%d ActiveFlag=%d)"),
+           PlayerId, Battle.AttackerPlayerID, Battle.DefenderPlayerID,
+           bPlayerMarkedParticipant ? 1 : 0);
     PC->Client_OnLockInResult(false, TEXT("Not part of pending battle"));
     return;
   }
