@@ -2693,6 +2693,21 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
            *GetNameSafe(this), bIsParticipant ? 1 : 0,
            CachedGameState ? static_cast<int32>(CachedGameState->BattlePhase) : -1, PendingBudget,
            PS->bIsActiveBattlePlayer ? 1 : 0, bOnBattleMap ? 1 : 0);
+
+    // Preserve cursor + UI input whenever the fighter-selection widget already
+    // exists. Replicated turn ownership updates can temporarily report a
+    // non-selection phase during travel/load, and forcing GameOnly in that
+    // window hides the cursor even though the selection UI is visible.
+    if (FighterSelectionWidget && FighterSelectionWidget->IsInViewport()) {
+      if (!bShowMouseCursor || !bEnableClickEvents || !bEnableMouseOverEvents) {
+        UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
+            this, FighterSelectionWidget, EMouseLockMode::DoNotLock,
+            /*bHideCursorDuringCapture*/ false);
+      }
+      bShowMouseCursor = true;
+      bEnableClickEvents = true;
+      bEnableMouseOverEvents = true;
+    }
     return;
   }
 
