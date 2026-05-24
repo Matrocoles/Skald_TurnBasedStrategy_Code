@@ -13,16 +13,17 @@
 #define GENERATED_USTRUCT_BODY(...)
 #define GENERATED_IINTERFACE_BODY(...)
 
-#define DECLARE_DYNAMIC_MULTICAST_DELEGATE(...)
-#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(...)
-#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(...)
-#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(...)
-#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(...)
-#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(...)
-#define DECLARE_DYNAMIC_DELEGATE(...)
-#define DECLARE_DYNAMIC_DELEGATE_OneParam(...)
-#define DECLARE_DYNAMIC_DELEGATE_TwoParams(...)
-#define DECLARE_DYNAMIC_DELEGATE_ThreeParams(...)
+// Keep delegate type names visible to IntelliSense by declaring placeholders.
+#define DECLARE_DYNAMIC_MULTICAST_DELEGATE(DelegateName) struct DelegateName {};
+#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(DelegateName, ...) struct DelegateName {};
+#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(DelegateName, ...) struct DelegateName {};
+#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(DelegateName, ...) struct DelegateName {};
+#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(DelegateName, ...) struct DelegateName {};
+#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(DelegateName, ...) struct DelegateName {};
+#define DECLARE_DYNAMIC_DELEGATE(DelegateName) struct DelegateName {};
+#define DECLARE_DYNAMIC_DELEGATE_OneParam(DelegateName, ...) struct DelegateName {};
+#define DECLARE_DYNAMIC_DELEGATE_TwoParams(DelegateName, ...) struct DelegateName {};
+#define DECLARE_DYNAMIC_DELEGATE_ThreeParams(DelegateName, ...) struct DelegateName {};
 
 #define SKALD_API
 #define SKALDDICE_API
