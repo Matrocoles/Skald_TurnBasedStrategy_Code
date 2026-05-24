@@ -98,25 +98,33 @@ static int32 ResolveCanonicalStableId(AController* Controller,
   const int32 TravelDefender = TravelState ? TravelState->DefenderPlayerId : INDEX_NONE;
   const int32 CachedId = GetPlayerIdFrom(Controller);
   const bool bTravelIdsValid = TravelAttacker > 0 && TravelDefender > 0;
-  const bool bPlayerStateLooksAI = PlayerState ? PlayerState->bIsAI : IsAIController(Controller);
   int32 Chosen = PSId > 0 ? PSId : (CachedId > 0 ? CachedId : INDEX_NONE);
   OutReason = PSId > 0 ? TEXT("PlayerState") : (CachedId > 0 ? TEXT("ControllerCache") : TEXT("None"));
 
   // During travel bootstrapping, seamless-travel reassignment can temporarily
-  // surface a local PlayerState id that does not match the battle payload
-  // (e.g. transient 261 while payload expects 260). Prefer canonical travel
-  // identities when current ids are outside the active attacker/defender pair.
+  // surface ids outside the active attacker/defender pair. Only canonicalize
+  // when we have a concrete identity match; avoid role-based reassignment that
+  // can incorrectly map a human defender to the attacker id.
   if (bTravelIdsValid &&
       Chosen > 0 &&
       Chosen != TravelAttacker &&
       Chosen != TravelDefender) {
-    Chosen = bPlayerStateLooksAI ? TravelDefender : TravelAttacker;
-    OutReason = bPlayerStateLooksAI ? TEXT("TravelCanonicalDefender")
-                                    : TEXT("TravelCanonicalAttacker");
+    if (CachedId == TravelAttacker || CachedId == TravelDefender) {
+      Chosen = CachedId;
+      OutReason = TEXT("TravelCanonicalControllerCache");
+    } else if (PSId == TravelAttacker || PSId == TravelDefender) {
+      Chosen = PSId;
+      OutReason = TEXT("TravelCanonicalPlayerState");
+    } else {
+      UE_LOG(LogSkaldBattle, Warning,
+             TEXT("[StableIdAudit][WARN] Unmapped participant id (Controller=%s PSId=%d CachedId=%d TravelAttacker=%d TravelDefender=%d). Keeping current id to avoid incorrect role swap."),
+             *GetNameSafe(Controller), PSId, CachedId, TravelAttacker,
+             TravelDefender);
+    }
   }
 
-  if (Chosen <= 0 && TravelAttacker > 0) { Chosen = TravelAttacker; OutReason = TEXT("TravelAttacker"); }
-  if (Chosen <= 0 && TravelDefender > 0) { Chosen = TravelDefender; OutReason = TEXT("TravelDefender"); }
+  if (Chosen <= 0 && TravelAttacker > 0) { Chosen = TravelAttacker; OutReason = TEXT("TravelAttackerFallback"); }
+  if (Chosen <= 0 && TravelDefender > 0) { Chosen = TravelDefender; OutReason = TEXT("TravelDefenderFallback"); }
   UE_LOG(LogSkaldBattle, Log, TEXT("[StableIdAudit] Ctx=ResolveCanonicalStableId Controller=%s PSId=%d TravelId=%d CachedId=%d Chosen=%d Reason=%s"),
          *GetNameSafe(Controller), PSId, (TravelAttacker > 0 ? TravelAttacker : TravelDefender), CachedId, Chosen, *OutReason);
   return Chosen;
