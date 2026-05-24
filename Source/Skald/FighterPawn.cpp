@@ -567,10 +567,17 @@ void AFighterPawn::RebuildVisualMovementPath(const FVector &Destination) {
   bool bConstructedFromGridPath = false;
 
   if (UGridOverlayComponent *Grid = GetGrid()) {
-    FIntPoint StartAnchor = MovementSourceCell;
-    if (!Grid->IsCellInBounds(StartAnchor)) {
-      StartAnchor = Grid->WorldToGrid(StartLocation);
+    if (!Grid->IsInitialized()) {
+      UE_LOG(LogSkald, Verbose,
+             TEXT("RebuildVisualMovementPath fallback: grid not initialized for fighter %s"),
+             *GetNameSafe(this));
+      Grid = nullptr;
     }
+    if (Grid != nullptr) {
+      FIntPoint StartAnchor = MovementSourceCell;
+      if (!Grid->IsCellInBounds(StartAnchor)) {
+        StartAnchor = Grid->WorldToGrid(StartLocation);
+      }
 
     FIntPoint TargetAnchor = CurrentCell;
     if (!Grid->IsCellInBounds(TargetAnchor)) {
