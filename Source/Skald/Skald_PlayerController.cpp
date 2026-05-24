@@ -2687,9 +2687,10 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
     bIsParticipant = true;
   }
 
-  if (!bIsParticipant || PendingBudget <= 0 || !bInSelectionPhase) {
+  const bool bCanShowSelectionUI = bInSelectionPhase || bHasBattleContext;
+  if (!bIsParticipant || PendingBudget <= 0 || !bCanShowSelectionUI) {
     UE_LOG(LogSkaldBattle, Log,
-           TEXT("InitializeFighterSelectionIfNeeded: Skipping widget (Local=%s Participant=%d Phase=%d Budget=%d ActiveFlag=%d OnBattleMap=%d)"),
+           TEXT("InitializeFighterSelectionIfNeeded: Skipping widget (Local=%s Participant=%d Phase=%d Budget=%d ActiveFlag=%d OnBattleMap=%d HasContext=%d InSelectionPhase=%d)"),
            *GetNameSafe(this), bIsParticipant ? 1 : 0,
            CachedGameState ? static_cast<int32>(CachedGameState->BattlePhase) : -1, PendingBudget,
            PS->bIsActiveBattlePlayer ? 1 : 0, bOnBattleMap ? 1 : 0);
