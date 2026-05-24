@@ -1,7 +1,10 @@
 #pragma once
 
+#include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Abilities/SkaldAbilityTypes.h"
+#include "UObject/ScriptDelegates.h"
+#include "Misc/Optional.h"
 #include "Templates/SharedPointer.h"
 #include "SkaldAbilityComponent.generated.h"
 
@@ -594,4 +597,3 @@ protected:
     /** Ability identifier used for the active Raincaller template. */
     FName RaincallerTemplateSourceId = NAME_None;
 };
-
