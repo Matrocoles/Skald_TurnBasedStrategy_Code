@@ -239,6 +239,10 @@ public:
   UPROPERTY(EditDefaultsOnly, Category = "UI")
   TSubclassOf<UUserWidget> DeployWidgetClass;
 
+  /** Editor probe: confirms C++ reflection updates are appearing in this BP defaults panel. */
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI", meta = (DisplayName = "Streaming Settings Version"))
+  int32 StreamingSettingsVersion = 2;
+
   /** Editor configurable palette mapping factions to their UI colours. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player")
   TMap<ESkaldFaction, FLinearColor> FactionColors;
