@@ -116,8 +116,10 @@ static int32 ResolveCanonicalStableId(AController* Controller,
       Chosen = PSId;
       OutReason = TEXT("TravelCanonicalPlayerState");
     } else {
+      Chosen = TravelAttacker;
+      OutReason = TEXT("TravelCanonicalFallbackAttacker");
       UE_LOG(LogSkaldBattle, Warning,
-             TEXT("[StableIdAudit][WARN] Unmapped participant id (Controller=%s PSId=%d CachedId=%d TravelAttacker=%d TravelDefender=%d). Keeping current id to avoid incorrect role swap."),
+             TEXT("[StableIdAudit][WARN] Unmapped participant id (Controller=%s PSId=%d CachedId=%d TravelAttacker=%d TravelDefender=%d). Falling back to attacker travel id to avoid persisting a transient mapping."),
              *GetNameSafe(Controller), PSId, CachedId, TravelAttacker,
              TravelDefender);
     }
