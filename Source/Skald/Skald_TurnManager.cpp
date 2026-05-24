@@ -2433,8 +2433,9 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
     }
 
     const bool bIsCapitalAttack = SeededBattle.IsCapitalAttack;
-    // Battle maps are always loaded via travel instead of streaming sub-levels.
-    bool bShouldStreamSelectedMap = false;
+    // Prefer in-world streamed battle transitions so turn/payload state remains
+    // in the same persistent world rather than relying on map travel.
+    bool bShouldStreamSelectedMap = true;
     TSoftObjectPtr<UWorld> SelectedBattleMap;
     if (bIsCapitalAttack && CapitalMaps.Num() > 0) {
       const int32 Index = FMath::RandRange(0, CapitalMaps.Num() - 1);
@@ -2458,16 +2459,12 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
           FSoftObjectPath(TEXT("/Game/Blueprints/Maps/BattleMap.BattleMap")));
     }
 
-    // Streaming sub-levels is unsupported for battle maps because we always
-    // travel to the selected map. Preserve the logging from the previous logic
-    // to aid future debugging if streaming is reintroduced.
+    // Keep this guard for environments where streaming may be disabled and we
+    // need to fall back to travel.
     const ENetMode NetMode = World->GetNetMode();
-    if (bShouldStreamSelectedMap) {
-      UE_LOG(LogSkald, Log,
-             TEXT("TriggerGridBattle: streaming battle maps is disabled; travelling instead (net mode %d)."),
-             static_cast<int32>(NetMode));
-      bShouldStreamSelectedMap = false;
-    }
+    UE_LOG(LogSkald, Log,
+           TEXT("TriggerGridBattle: streaming battle map transition enabled (net mode %d)."),
+           static_cast<int32>(NetMode));
 
     FString MapToLoad =
         SelectedBattleMap.ToSoftObjectPath().GetLongPackageName();
