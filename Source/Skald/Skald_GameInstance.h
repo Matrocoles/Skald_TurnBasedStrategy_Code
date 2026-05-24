@@ -184,12 +184,12 @@ public:
   /** Runtime helper responsible for streaming battle levels into the overworld. */
   UPROPERTY(Transient)
   TObjectPtr<USkaldBattleLevelManager> BattleLevelStreamingManager = nullptr;
-  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Streaming",
-            meta = (DisplayName = "Overview Streamed Sublevel"))
-  TSoftObjectPtr<UWorld> OverviewSublevel;
-  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Streaming",
-            meta = (DisplayName = "Dice Board Streamed Sublevel"))
-  TSoftObjectPtr<UWorld> DiceBoardSublevel;
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI|Streaming",
+            meta = (DisplayName = "Overview Streamed Sublevel", AllowedClasses = "World"))
+  FSoftObjectPath OverviewSublevel;
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI|Streaming",
+            meta = (DisplayName = "Dice Board Streamed Sublevel", AllowedClasses = "World"))
+  FSoftObjectPath DiceBoardSublevel;
 
   /** True when the game has travelled to a dedicated battle map. */
   UPROPERTY(BlueprintReadWrite, Category = "Battle")
@@ -238,6 +238,7 @@ public:
   /** Widget class used when showing the deploy overlay via the viewport. */
   UPROPERTY(EditDefaultsOnly, Category = "UI")
   TSubclassOf<UUserWidget> DeployWidgetClass;
+
 
   /** Editor configurable palette mapping factions to their UI colours. */
   UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player")
