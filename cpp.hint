@@ -1,0 +1,28 @@
+// Visual Studio IntelliSense macro hints for Unreal Engine projects.
+// This file is consumed by VS/C++ browsing to reduce false diagnostics.
+
+#define UCLASS(...)
+#define USTRUCT(...)
+#define UENUM(...)
+#define UINTERFACE(...)
+#define UFUNCTION(...)
+#define UPROPERTY(...)
+#define UDELEGATE(...)
+#define GENERATED_BODY(...)
+#define GENERATED_UCLASS_BODY(...)
+#define GENERATED_USTRUCT_BODY(...)
+#define GENERATED_IINTERFACE_BODY(...)
+
+#define DECLARE_DYNAMIC_MULTICAST_DELEGATE(...)
+#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(...)
+#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(...)
+#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(...)
+#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(...)
+#define DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(...)
+#define DECLARE_DYNAMIC_DELEGATE(...)
+#define DECLARE_DYNAMIC_DELEGATE_OneParam(...)
+#define DECLARE_DYNAMIC_DELEGATE_TwoParams(...)
+#define DECLARE_DYNAMIC_DELEGATE_ThreeParams(...)
+
+#define SKALD_API
+#define SKALDDICE_API
