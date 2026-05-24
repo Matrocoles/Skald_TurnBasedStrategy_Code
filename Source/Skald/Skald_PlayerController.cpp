@@ -8,6 +8,7 @@
 #include "ChoosePlayerWidget.h"
 #include "Components/InputComponent.h"
 #include "Engine/EngineTypes.h"
+#include "Engine/LocalPlayer.h"
 #include "Engine/Level.h"
 #include "EngineUtils.h"
 #include "FighterDataLibrary.h"
@@ -183,6 +184,14 @@ bool IsCursorOverInteractableSlateWidget() {
   }
 
   return false;
+}
+
+bool HasUsableLocalViewport(const ASkaldPlayerController* Controller) {
+  if (!Controller) {
+    return false;
+  }
+  const ULocalPlayer* LocalPlayer = Controller->GetLocalPlayer();
+  return LocalPlayer != nullptr && LocalPlayer->ViewportClient != nullptr;
 }
 }
 
@@ -1589,6 +1598,13 @@ void ASkaldPlayerController::InitializeHUDWidget() {
     return;
   }
 
+  if (!HasUsableLocalViewport(this)) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("InitializeHUDWidget deferred: LocalPlayer or ViewportClient unavailable for %s."),
+           *GetName());
+    return;
+  }
+
   LogWidgetCreationContext(this, TEXT("InitializeHUDWidget.MainHUD"));
   MainHUD = CreateWidget<USkaldMainHUDWidget>(this, MainHUDClass);
   if (!MainHUD) {
@@ -2726,7 +2742,7 @@ void ASkaldPlayerController::RequestBattleStateIfNeeded() {
 void ASkaldPlayerController::ShowFighterSelectionUI(int32 MaxBudget,
                                                     ESkaldFaction Faction) {
   LogWidgetCreationContext(this, TEXT("ShowFighterSelectionUI"));
-  if (!CanCreateLocalUIWidget()) {
+  if (!CanCreateLocalUIWidget() || !HasUsableLocalViewport(this)) {
     return;
   }
 
@@ -7180,7 +7196,8 @@ void ASkaldPlayerController::ResetPendingReadyPromptState() {
 
 void ASkaldPlayerController::ShowPrepareForBattlePromptLocal(
     const FPrepareForBattlePromptData &PromptData) {
-  if (IsAIControllerIdentity(this) || !Player || !GetLocalPlayer() || !CanCreateLocalUIWidget()) {
+  if (IsAIControllerIdentity(this) || !Player || !CanCreateLocalUIWidget() ||
+      !HasUsableLocalViewport(this)) {
     UE_LOG(LogSkaldReady, Verbose,
            TEXT("Skipping prepare-for-battle prompt for %s: controller has no local player."),
            *GetName());
@@ -7205,7 +7222,8 @@ void ASkaldPlayerController::ShowPrepareForBattlePromptLocal(
 
 void ASkaldPlayerController::ShowPrepareForBattlePromptLocal_Internal(
     const FPrepareForBattlePromptData &PromptData) {
-  if (IsAIControllerIdentity(this) || !Player || !GetLocalPlayer() || !CanCreateLocalUIWidget()) {
+  if (IsAIControllerIdentity(this) || !Player || !CanCreateLocalUIWidget() ||
+      !HasUsableLocalViewport(this)) {
     ResetPendingReadyPromptState();
     return;
   }

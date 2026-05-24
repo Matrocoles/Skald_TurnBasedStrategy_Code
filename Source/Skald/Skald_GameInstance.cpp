@@ -1041,7 +1041,7 @@ void USkaldGameInstance::ScheduleTravelResume(UWorld *World) {
 void USkaldGameInstance::AttemptResumeAfterTravel() {
   UE_LOG(LogSkald, Log, TEXT("[WorldSeq] Seq=%lld World=%s Event=AttemptResumeAfterTravel Token=%s NetMode=%d"), ++GWorldSeqCounter, *GetNameSafe(GetWorld()), *TravelState.TravelSessionToken, GetWorld() ? static_cast<int32>(GetWorld()->GetNetMode()) : -1);
   UE_LOG(LogSkald, Log, TEXT("[TravelToken] Token=%s Stage=AttemptResumeAfterTravel World=%s Ctx=AttemptResumeAfterTravel PayloadValid=%d"), *TravelState.TravelSessionToken, *GetNameSafe(GetWorld()), TravelState.bValid ? 1 : 0);
-  UWorld *World = PendingResumeWorld.Get();
+  UWorld *World = PendingResumeWorld.IsValid() ? PendingResumeWorld.Get() : nullptr;
   if (!World || World->GetNetMode() == NM_Client) {
     UE_LOG(LogSkald, Warning,
            TEXT("AttemptResumeAfterTravel aborted: World=%s NetMode=%d"),
