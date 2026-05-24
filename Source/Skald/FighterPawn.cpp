@@ -567,7 +567,7 @@ void AFighterPawn::RebuildVisualMovementPath(const FVector &Destination) {
   bool bConstructedFromGridPath = false;
 
   if (UGridOverlayComponent *Grid = GetGrid()) {
-    if (Grid != nullptr) {
+    if (Grid != nullptr && Grid->HasInitializedGrid()) {
       FIntPoint StartAnchor = MovementSourceCell;
       if (!Grid->IsCellInBounds(StartAnchor)) {
         StartAnchor = Grid->WorldToGrid(StartLocation);

@@ -142,6 +142,10 @@ public:
   UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Grid")
   bool IsCellInBounds(const FIntPoint &GridCoord) const;
 
+  /** Whether the grid has completed BeginPlay initialization and sampled data is ready. */
+  UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Grid")
+  bool HasInitializedGrid() const { return bHasInitializedGrid; }
+
   /** Spawn a persistent trap marker at the supplied grid coordinate. */
   UFUNCTION(BlueprintCallable, Category = "Grid|Trap")
   UDecalComponent *AddTrapMarker(const FIntPoint &GridCoord);
