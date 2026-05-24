@@ -184,12 +184,12 @@ public:
   /** Runtime helper responsible for streaming battle levels into the overworld. */
   UPROPERTY(Transient)
   TObjectPtr<USkaldBattleLevelManager> BattleLevelStreamingManager = nullptr;
-  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Streaming",
-            meta = (DisplayName = "Overview Streamed Sublevel"))
-  TSoftObjectPtr<UWorld> OverviewSublevel;
-  UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Streaming",
-            meta = (DisplayName = "Dice Board Streamed Sublevel"))
-  TSoftObjectPtr<UWorld> DiceBoardSublevel;
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Streaming",
+            meta = (DisplayName = "Overview Streamed Sublevel", AllowedClasses = "/Script/Engine.World"))
+  FSoftObjectPath OverviewSublevel;
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Streaming",
+            meta = (DisplayName = "Dice Board Streamed Sublevel", AllowedClasses = "/Script/Engine.World"))
+  FSoftObjectPath DiceBoardSublevel;
 
   /** True when the game has travelled to a dedicated battle map. */
   UPROPERTY(BlueprintReadWrite, Category = "Battle")
