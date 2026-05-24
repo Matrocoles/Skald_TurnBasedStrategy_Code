@@ -15,6 +15,8 @@ bool USkaldSaveGameLibrary::SaveSkaldGame(USkaldSaveGame *SaveGameObject,
 
   SaveGameObject->SaveName = SlotName;
   SaveGameObject->SaveDate = FDateTime::Now();
+  SaveGameObject->SaveDateUtc = FDateTime::UtcNow();
+  SaveGameObject->SaveSchemaVersion = USkaldSaveGame::CurrentSchemaVersion;
 
   return UGameplayStatics::SaveGameToSlot(SaveGameObject, SlotName, UserIndex);
 }
@@ -25,6 +27,12 @@ USkaldSaveGame *USkaldSaveGameLibrary::LoadSkaldGame(const FString &SlotName,
       UGameplayStatics::LoadGameFromSlot(SlotName, UserIndex));
   if (LoadedGame) {
     LoadedGame->SaveName = SlotName;
+    if (LoadedGame->SaveDateUtc == FDateTime()) {
+      LoadedGame->SaveDateUtc = LoadedGame->SaveDate;
+    }
+    if (LoadedGame->SaveSchemaVersion <= 0) {
+      LoadedGame->SaveSchemaVersion = 1;
+    }
   }
   return LoadedGame;
 }

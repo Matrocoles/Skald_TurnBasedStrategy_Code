@@ -207,6 +207,8 @@ class SKALD_API USkaldSaveGame : public USaveGame
     GENERATED_BODY()
 
 public:
+    /** Current native save schema version used for backward compatibility checks. */
+    static constexpr int32 CurrentSchemaVersion = 1;
     USkaldSaveGame();
 
     /** Name of the save slot. */
@@ -216,6 +218,14 @@ public:
     /** Date the save was created. */
     UPROPERTY(BlueprintReadWrite, Category="SaveGame", SaveGame)
     FDateTime SaveDate;
+
+    /** Date the save was created in UTC for deterministic cross-timezone ordering. */
+    UPROPERTY(BlueprintReadWrite, Category="SaveGame", SaveGame)
+    FDateTime SaveDateUtc;
+
+    /** Save schema version written with this save object. */
+    UPROPERTY(BlueprintReadWrite, Category="SaveGame", SaveGame)
+    int32 SaveSchemaVersion = CurrentSchemaVersion;
 
     /** Legacy turn number (retained for backwards compatibility). */
     UPROPERTY(BlueprintReadWrite, Category="SaveGame", SaveGame)
@@ -281,4 +291,3 @@ public:
     UPROPERTY(BlueprintReadWrite, Category="SaveGame", SaveGame)
     FSkaldWorldStateSaveData WorldState;
 };
-

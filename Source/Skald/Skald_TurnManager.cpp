@@ -43,6 +43,24 @@
 #endif
 
 namespace {
+bool IsSupportedPhaseTransition(const ETurnPhase From, const ETurnPhase To) {
+  switch (From) {
+  case ETurnPhase::Reinforcement:
+    return To == ETurnPhase::Attack;
+  case ETurnPhase::Attack:
+    return To == ETurnPhase::Engineering;
+  case ETurnPhase::Engineering:
+    return To == ETurnPhase::Treasure;
+  case ETurnPhase::Treasure:
+    return To == ETurnPhase::Movement;
+  case ETurnPhase::Movement:
+    return To == ETurnPhase::EndTurn;
+  case ETurnPhase::EndTurn:
+    return To == ETurnPhase::Revolt;
+  default:
+    return false;
+  }
+}
 int32 ResolveStableOrPlayerId(const ASkaldPlayerState* PlayerState)
 {
   if (!PlayerState)
@@ -4228,7 +4246,12 @@ void ATurnManager::BeginAttackPhase() {
   }
 
   // Enter the attack phase and notify all listeners so they can swap controls.
+  const ETurnPhase PreviousPhase = CurrentPhase;
   CurrentPhase = ETurnPhase::Attack;
+  ensureAlwaysMsgf(IsSupportedPhaseTransition(PreviousPhase, CurrentPhase),
+                   TEXT("Invalid phase transition: %s -> %s"),
+                   *StaticEnum<ETurnPhase>()->GetValueAsString(PreviousPhase),
+                   *StaticEnum<ETurnPhase>()->GetValueAsString(CurrentPhase));
 
   BroadcastCurrentPhase();
 }
@@ -4242,6 +4265,7 @@ void ATurnManager::AdvancePhase() {
     }
   }
 
+  const ETurnPhase PreviousPhase = CurrentPhase;
   if (CurrentPhase == ETurnPhase::Reinforcement) {
     BeginAttackPhase();
     return;
@@ -4267,6 +4291,10 @@ void ATurnManager::AdvancePhase() {
   default:
     return;
   }
+  ensureAlwaysMsgf(IsSupportedPhaseTransition(PreviousPhase, CurrentPhase),
+                   TEXT("Invalid phase transition: %s -> %s"),
+                   *StaticEnum<ETurnPhase>()->GetValueAsString(PreviousPhase),
+                   *StaticEnum<ETurnPhase>()->GetValueAsString(CurrentPhase));
 
   BroadcastCurrentPhase();
 }
