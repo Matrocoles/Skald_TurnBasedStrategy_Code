@@ -574,19 +574,19 @@ void ALobbyGameMode::TryLaunchMatch(APlayerController* RequestingController)
 
         if (bIsStandalone)
         {
-            UGameplayStatics::OpenLevel(this, FName(TEXT("/Game/Blueprints/Maps/OverviewMap")), true, TEXT("listen"));
+            UGameplayStatics::OpenLevel(this, FName(TEXT("/Game/Blueprints/Maps/L_PersistentRoot")), true, TEXT("listen"));
             return;
         }
 
         if (bIsPIE)
         {
             bUseSeamlessTravel = true;
-            World->ServerTravel(TEXT("/Game/Blueprints/Maps/OverviewMap?listen"), /*bAbsolute=*/false, /*bShouldSkipGameNotify=*/false);
+            World->ServerTravel(TEXT("/Game/Blueprints/Maps/L_PersistentRoot?listen"), /*bAbsolute=*/false, /*bShouldSkipGameNotify=*/false);
             return;
         }
 
         bUseSeamlessTravel = true;
-        World->ServerTravel(TEXT("/Game/Blueprints/Maps/OverviewMap?listen"), /*bAbsolute=*/false, /*bShouldSkipGameNotify=*/false);
+        World->ServerTravel(TEXT("/Game/Blueprints/Maps/L_PersistentRoot?listen"), /*bAbsolute=*/false, /*bShouldSkipGameNotify=*/false);
     }
 }
 
