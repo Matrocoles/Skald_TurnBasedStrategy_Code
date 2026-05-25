@@ -2687,7 +2687,10 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
     bIsParticipant = true;
   }
 
-  const bool bCanShowSelectionUI = bInSelectionPhase || bHasBattleContext;
+  // Only allow lock-in UI once we're actually on the battle map.
+  // Showing it during travel can let clients submit lock-in before a battle
+  // GameMode exists, which drops the selection RPC on the floor.
+  const bool bCanShowSelectionUI = bOnBattleMap && bInSelectionPhase;
   if (!bIsParticipant || PendingBudget <= 0 || !bCanShowSelectionUI) {
     UE_LOG(LogSkaldBattle, Log,
            TEXT("InitializeFighterSelectionIfNeeded: Skipping widget (Local=%s Participant=%d Phase=%d Budget=%d ActiveFlag=%d OnBattleMap=%d HasContext=%d InSelectionPhase=%d)"),
@@ -2886,6 +2889,9 @@ void ASkaldPlayerController::Server_LockInSelection_Implementation(
     UE_LOG(LogSkaldBattle, Warning,
            TEXT("Server_LockInSelection: BattleGameMode not resolved for %s"),
            *GetName());
+    Client_OnLockInResult(
+        false,
+        TEXT("Battle is still loading. Please wait a moment and lock in again."));
   }
 }
 
