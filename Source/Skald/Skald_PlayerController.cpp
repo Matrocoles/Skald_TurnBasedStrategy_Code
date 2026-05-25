@@ -3609,58 +3609,12 @@ void ASkaldPlayerController::DetectBattleMap() {
   if (!CachedGameInstance) {
     CachedGameInstance = GetGameInstance<USkaldGameInstance>();
   }
-  if (CachedGameInstance && CachedGameInstance->bIsInBattleMap) {
-    bDetectedBattleMap = true;
-  }
-
-  FString CurrentMap;
-  if (!bDetectedBattleMap) {
-    CurrentMap = UGameplayStatics::GetCurrentLevelName(this, true);
-    if (CurrentMap.Equals(TEXT("BattleMap"), ESearchCase::IgnoreCase)) {
-      bDetectedBattleMap = true;
-    }
-  }
-
-  if (!bDetectedBattleMap) {
-    ATurnManager *TM = TurnManager;
-    if (!TM) {
-      if (!CachedGameMode) {
-        CachedGameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
-      }
-      if (CachedGameMode) {
-        TM = CachedGameMode->GetTurnManager();
-      }
-      if (!TM) {
-        TM = FindTurnManagerActor();
-      }
-    }
-
-    if (TM) {
-      if (CurrentMap.IsEmpty()) {
-        CurrentMap = UGameplayStatics::GetCurrentLevelName(this, true);
-      }
-
-      auto MatchesCurrentMap = [&](const TSoftObjectPtr<UWorld> &MapPtr) {
-        return CurrentMap.Equals(MapPtr.ToSoftObjectPath().GetAssetName(),
-                                 ESearchCase::IgnoreCase);
-      };
-
-      for (const TSoftObjectPtr<UWorld> &Map : TM->BattleMaps) {
-        if (MatchesCurrentMap(Map)) {
-          bDetectedBattleMap = true;
-          break;
-        }
-      }
-
-      if (!bDetectedBattleMap) {
-        for (const FBattleMapDescriptor &Entry : TM->BattleMapEntries) {
-          if (MatchesCurrentMap(Entry.Map)) {
-            bDetectedBattleMap = true;
-            break;
-          }
-        }
-      }
-    }
+  // Battle maps are now streamed exclusively into the persistent world.
+  // Current level name and map-descriptor checks are no longer reliable
+  // indicators of battle context because the active UWorld does not switch.
+  // Treat the game-instance streamed-battle flag as the authoritative source.
+  if (CachedGameInstance) {
+    bDetectedBattleMap = CachedGameInstance->bIsInBattleMap;
   }
 
   bIsBattleMap = bDetectedBattleMap;
