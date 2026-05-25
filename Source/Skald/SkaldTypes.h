@@ -201,10 +201,10 @@ inline uint32 GetTypeHash(const FS_BattlePayload& Payload)
     Hash = HashCombine(Hash, ::GetTypeHash(Payload.TargetTerritoryID));
     Hash = HashCombine(Hash, ::GetTypeHash(Payload.ArmyCountSent));
     Hash = HashCombine(Hash, ::GetTypeHash(Payload.DefenderArmyCount));
-    Hash = HashCombine(Hash, ::GetTypeHash(Payload.AttackerTerritoryName));
-    Hash = HashCombine(Hash, ::GetTypeHash(Payload.DefenderTerritoryName));
-    Hash = HashCombine(Hash, ::GetTypeHash(Payload.AttackerDisplayName));
-    Hash = HashCombine(Hash, ::GetTypeHash(Payload.DefenderDisplayName));
+    Hash = HashCombine(Hash, FCrc::StrCrc32(*Payload.AttackerTerritoryName));
+    Hash = HashCombine(Hash, FCrc::StrCrc32(*Payload.DefenderTerritoryName));
+    Hash = HashCombine(Hash, FCrc::StrCrc32(*Payload.AttackerDisplayName));
+    Hash = HashCombine(Hash, FCrc::StrCrc32(*Payload.DefenderDisplayName));
     Hash = HashCombine(Hash, ::GetTypeHash(Payload.AttackerFaction));
     Hash = HashCombine(Hash, ::GetTypeHash(Payload.DefenderFaction));
     Hash = HashCombine(Hash, ::GetTypeHash(Payload.bAttackerIsAI));
@@ -213,7 +213,7 @@ inline uint32 GetTypeHash(const FS_BattlePayload& Payload)
     Hash = HashCombine(Hash, ::GetTypeHash(Payload.TreasureFlag));
     Hash = HashCombine(Hash, ::GetTypeHash(Payload.TurnNumber));
     Hash = HashCombine(Hash, ::GetTypeHash(Payload.RandomSeed));
-    Hash = HashCombine(Hash, ::GetTypeHash(Payload.ReturnMap));
+    Hash = HashCombine(Hash, FCrc::StrCrc32(*Payload.ReturnMap));
     Hash = HashCombine(Hash, ::GetTypeHash(Payload.AttackerFactionEmblem));
     Hash = HashCombine(Hash, ::GetTypeHash(Payload.DefenderFactionEmblem));
 
