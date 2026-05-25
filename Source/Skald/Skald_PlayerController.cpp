@@ -281,7 +281,7 @@ void LogWidgetCreationContext(const ASkaldPlayerController* Controller,
          bIsAI ? 1 : 0);
 }
 
-bool IsAIControllerIdentity(const ASkaldPlayerController* Controller) {
+bool IsAIControllerIdentity_PlayerController(const ASkaldPlayerController* Controller) {
   if (!Controller) {
     return false;
   }
@@ -1577,7 +1577,7 @@ AFighterPawn *ASkaldPlayerController::ResolveCellAbilityPrimaryTarget(
 }
 
 void ASkaldPlayerController::InitializeHUDWidget() {
-  if (IsAIControllerIdentity(this)) {
+  if (IsAIControllerIdentity_PlayerController(this)) {
     return;
   }
 
@@ -1689,7 +1689,7 @@ bool ASkaldPlayerController::CanCreateLocalUIWidget() const {
   // still have no local player attachment, which causes CreateWidget errors.
   return IsLocalController() && IsLocalPlayerController() &&
          LocalPlayer != nullptr && Player == LocalPlayer &&
-         !IsAIControllerIdentity(this);
+         !IsAIControllerIdentity_PlayerController(this);
 }
 
 void ASkaldPlayerController::InitializeChoosePlayerWidget() {
@@ -2016,7 +2016,7 @@ void ASkaldPlayerController::HideMainHUD() {
 
 void ASkaldPlayerController::ShowBattleResultWidget(
     const FBattleResultDisplayData &DisplayData) {
-  if (IsAIControllerIdentity(this) || !Player || !GetLocalPlayer() ||
+  if (IsAIControllerIdentity_PlayerController(this) || !Player || !GetLocalPlayer() ||
       !CanCreateLocalUIWidget() || !DisplayData.bValid) {
     return;
   }
@@ -2577,7 +2577,7 @@ ATurnManager *ASkaldPlayerController::FindTurnManagerActor() const {
 }
 
 void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
-  if (!CanCreateLocalUIWidget() || IsAIControllerIdentity(this)) {
+  if (!CanCreateLocalUIWidget() || IsAIControllerIdentity_PlayerController(this)) {
     return;
   }
 
@@ -2833,7 +2833,7 @@ void ASkaldPlayerController::ShowFighterSelectionUI(int32 MaxBudget,
 
 void ASkaldPlayerController::Client_ShowFighterSelection_Implementation(
     int32 MaxBudget, ESkaldFaction Faction) {
-  if (IsAIControllerIdentity(this)) {
+  if (IsAIControllerIdentity_PlayerController(this)) {
     UE_LOG(LogSkaldBattle, Warning,
            TEXT("Client_ShowFighterSelection ignored for AI-identity controller %s"),
            *GetName());
@@ -2930,7 +2930,7 @@ void ASkaldPlayerController::Client_OnLockInResult_Implementation(
 }
 
 void ASkaldPlayerController::HandleBattlePhaseChanged() {
-  if (!CanCreateLocalUIWidget() || IsAIControllerIdentity(this)) {
+  if (!CanCreateLocalUIWidget() || IsAIControllerIdentity_PlayerController(this)) {
     return;
   }
 
@@ -3034,7 +3034,7 @@ void ASkaldPlayerController::Server_CommitArmy_Implementation(
 }
 
 void ASkaldPlayerController::InitializeBattleHUD() {
-  if (IsAIControllerIdentity(this) || !Player || !GetLocalPlayer() || !CanCreateLocalUIWidget())
+  if (IsAIControllerIdentity_PlayerController(this) || !Player || !GetLocalPlayer() || !CanCreateLocalUIWidget())
     return;
   if (!BattleHUDWidgetClass)
     return;
@@ -5503,7 +5503,7 @@ void ASkaldPlayerController::HandleReplicatedBattlePayload() {
 void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
   // Turn-ownership UI updates must never run on controllers without an attached
   // local player (notably AI controllers in PIE listen-server sessions).
-  if (!Player || !GetLocalPlayer() || IsAIControllerIdentity(this) || !CanCreateLocalUIWidget()) {
+  if (!Player || !GetLocalPlayer() || IsAIControllerIdentity_PlayerController(this) || !CanCreateLocalUIWidget()) {
     return;
   }
 
@@ -7213,7 +7213,7 @@ void ASkaldPlayerController::ResetPendingReadyPromptState() {
 
 void ASkaldPlayerController::ShowPrepareForBattlePromptLocal(
     const FPrepareForBattlePromptData &PromptData) {
-  if (IsAIControllerIdentity(this) || !Player || !CanCreateLocalUIWidget() ||
+  if (IsAIControllerIdentity_PlayerController(this) || !Player || !CanCreateLocalUIWidget() ||
       !HasUsableLocalViewport(this)) {
     UE_LOG(LogSkaldReady, Verbose,
            TEXT("Skipping prepare-for-battle prompt for %s: controller has no local player."),
@@ -7239,7 +7239,7 @@ void ASkaldPlayerController::ShowPrepareForBattlePromptLocal(
 
 void ASkaldPlayerController::ShowPrepareForBattlePromptLocal_Internal(
     const FPrepareForBattlePromptData &PromptData) {
-  if (IsAIControllerIdentity(this) || !Player || !CanCreateLocalUIWidget() ||
+  if (IsAIControllerIdentity_PlayerController(this) || !Player || !CanCreateLocalUIWidget() ||
       !HasUsableLocalViewport(this)) {
     ResetPendingReadyPromptState();
     return;
