@@ -293,18 +293,9 @@ void ASkald_PlayerCharacter::MoveForward(float Value)
 {
 	if (bBattleCameraActive)
         {
-                if (bBattleCameraLocked)
+                if (bBattleCameraLocked && !FMath::IsNearlyZero(Value))
                 {
-                        if (!FMath::IsNearlyZero(Value))
-                        {
-                                bHasManuallyRotatedWhileLocked = true;
-
-                                const float DeltaTime = GetWorld() ? GetWorld()->GetDeltaSeconds() : 0.f;
-                                const float PitchDelta = Value * BattleKeyboardPitchSpeed * DeltaTime;
-                                const float NewPitch = DesiredBattleRotation.Pitch + PitchDelta;
-                                DesiredBattleRotation.Pitch = FMath::Clamp(NewPitch, MinBattlePitch, MaxBattlePitch);
-                        }
-                        return;
+                        ClearBattleCameraLock();
                 }
 
                 BattleMoveInput.X = Value;
@@ -336,17 +327,9 @@ void ASkald_PlayerCharacter::MoveRight(float Value)
 {
 	if (bBattleCameraActive)
         {
-                if (bBattleCameraLocked)
+                if (bBattleCameraLocked && !FMath::IsNearlyZero(Value))
                 {
-                        if (!FMath::IsNearlyZero(Value))
-                        {
-                                bHasManuallyRotatedWhileLocked = true;
-
-                                const float DeltaTime = GetWorld() ? GetWorld()->GetDeltaSeconds() : 0.f;
-                                const float YawDelta = Value * BattleKeyboardYawSpeed * DeltaTime;
-                                DesiredBattleRotation.Yaw = FRotator::NormalizeAxis(DesiredBattleRotation.Yaw + YawDelta);
-                        }
-                        return;
+                        ClearBattleCameraLock();
                 }
 
                 BattleMoveInput.Y = Value;
