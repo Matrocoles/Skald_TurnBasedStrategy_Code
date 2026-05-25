@@ -40,6 +40,7 @@ public:
 
   /** Returns whether a streamed battle level is currently active. */
   bool IsBattleLevelActive() const { return ActiveStreamingLevel.IsValid(); }
+  bool IsBattleLevelFullyReady() const;
 
 private:
   void HideNonBattleLevels();
@@ -78,6 +79,7 @@ private:
   struct FHiddenStreamingLevelState {
     TWeakObjectPtr<ULevelStreaming> Level;
     bool bWasVisible = false;
+    bool bWasLoaded = false;
   };
 
   struct FHiddenPersistentActorState {
