@@ -2838,10 +2838,16 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
       } else {
         GI->SetTravelPending(true);
       }
-      GI->SetBattleMapActive(true);
 
-      if (World->GetNetMode() != NM_Standalone) {
-        MulticastSetBattleMapActive(true);
+      // Do not mark the battle map as active until the streamed level is
+      // actually loaded/visible. Prematurely setting this flag keeps the
+      // overworld running while UI/state machines repeatedly try to enter
+      // ready-for-battle.
+      if (!bShouldStreamSelectedMap) {
+        GI->SetBattleMapActive(true);
+        if (World->GetNetMode() != NM_Standalone) {
+          MulticastSetBattleMapActive(true);
+        }
       }
     }
 
@@ -3544,7 +3550,8 @@ void ATurnManager::MulticastStreamBattleLevel_Implementation(
 
   GI->SetTravelState(TravelState);
   GI->PendingBattle = BattlePayload;
-  GI->SetBattleMapActive(true);
+  // Keep this false until the battle streaming level is actually active.
+  GI->SetBattleMapActive(false);
 
   if (USkaldBattleLevelManager *BattleLevelManager =
           GI->GetBattleLevelManager()) {
