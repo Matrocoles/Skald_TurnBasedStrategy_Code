@@ -1775,6 +1775,11 @@ void ASkald_BattleGameMode::SpawnFighterSide(const TArray<FFighterDefinition> &R
 
   UGridOverlayComponent *Grid =
       Skald::GridOverlay::FindActiveGridOverlay(GetWorld());
+  if (!Grid) {
+    UE_LOG(LogSkaldBattle, Warning,
+           TEXT("SpawnFighterSide: No active grid overlay found; aborting spawn to avoid invalid world placement."));
+    return;
+  }
 
   const int32 Edge = BattleSpawnEdgeColumns;
   int32 GridWidth = Grid ? Grid->GetWidth() : UGridBattleManager::GridSize;
@@ -1819,11 +1824,53 @@ void ASkald_BattleGameMode::SpawnFighterSide(const TArray<FFighterDefinition> &R
                                 : MaxAnchorX;
     const int32 ClampedMaxSpawnX = FMath::Max(MinSpawnX, MaxSpawnX);
 
-    Cell.X = GI->CombatRandomStream.RandRange(MinSpawnX, ClampedMaxSpawnX);
-    Cell.Y = GI->CombatRandomStream.RandRange(0, MaxAnchorY);
+    const int32 MinSpawnY = 0;
+    const int32 MaxSpawnY = MaxAnchorY;
 
-    FVector TerrainLocation =
-        Grid ? Grid->GridToWorld(Cell) : FVector::ZeroVector;
+    TArray<FIntPoint> CandidateCells;
+    CandidateCells.Reserve((ClampedMaxSpawnX - MinSpawnX + 1) *
+                           (MaxSpawnY - MinSpawnY + 1));
+    for (int32 CandidateX = MinSpawnX; CandidateX <= ClampedMaxSpawnX; ++CandidateX) {
+      for (int32 CandidateY = MinSpawnY; CandidateY <= MaxSpawnY; ++CandidateY) {
+        CandidateCells.Emplace(CandidateX, CandidateY);
+      }
+    }
+
+    for (int32 Index = CandidateCells.Num() - 1; Index > 0; --Index) {
+      const int32 SwapIndex = GI->CombatRandomStream.RandRange(0, Index);
+      CandidateCells.Swap(Index, SwapIndex);
+    }
+
+    bool bFoundValidCell = false;
+    for (const FIntPoint &CandidateCell : CandidateCells) {
+      bool bBlocked = false;
+      const TArray<FIntPoint> CandidateFootprint =
+          DefaultPawn ? DefaultPawn->GetOccupiedCells(CandidateCell)
+                      : TArray<FIntPoint>{CandidateCell};
+
+      for (const FIntPoint &OccupiedCell : CandidateFootprint) {
+        if (!Grid->IsCellInBounds(OccupiedCell) || Grid->IsOccupied(OccupiedCell) ||
+            Grid->IsObscured(OccupiedCell)) {
+          bBlocked = true;
+          break;
+        }
+      }
+
+      if (!bBlocked) {
+        Cell = CandidateCell;
+        bFoundValidCell = true;
+        break;
+      }
+    }
+
+    if (!bFoundValidCell) {
+      UE_LOG(LogSkaldBattle, Warning,
+             TEXT("SpawnFighterSide: Could not find open grid cell for fighter %s on %s side."),
+             *Def.Id.ToString(), bAsAttacker ? TEXT("attacker") : TEXT("defender"));
+      continue;
+    }
+
+    FVector TerrainLocation = Grid->GridToWorld(Cell);
     float RequestedHalfHeight = 0.f;
     if (DefaultPawn) {
       RequestedHalfHeight = DefaultPawn->GetSimpleCollisionHalfHeight();
@@ -1929,6 +1976,17 @@ void ASkald_BattleGameMode::TryLaunchBattle() {
   if (!AreBothParticipantsLocked()) {
     UE_LOG(LogSkaldBattle, Verbose,
            TEXT("BattleGM TryLaunchBattle: waiting for participants to confirm lock-in"));
+    return;
+  }
+
+  UGridOverlayComponent *ActiveGrid =
+      Skald::GridOverlay::FindActiveGridOverlay(World);
+  if (!ActiveGrid) {
+    UE_LOG(LogSkaldBattle, Verbose,
+           TEXT("BattleGM TryLaunchBattle: Active grid overlay not ready yet; retrying launch next tick."));
+    FTimerDelegate RetryLaunch =
+        FTimerDelegate::CreateUObject(this, &ASkald_BattleGameMode::TryLaunchBattle);
+    GetWorldTimerManager().SetTimerForNextTick(RetryLaunch);
     return;
   }
 
