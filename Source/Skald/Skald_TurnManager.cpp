@@ -2342,6 +2342,14 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
   SeededBattle.RandomSeed = FMath::Rand();
 
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+  if (GI && GI->bIsInBattleMap) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("TriggerGridBattle ignored: battle map already active (Token=%s From=%d To=%d)."),
+           *GCurrentTravelSessionToken, Battle.FromTerritoryID,
+           Battle.TargetTerritoryID);
+    return;
+  }
+
   if (GI && (GI->bTravelPending || GI->bPendingBattleResolution)) {
     UE_LOG(LogSkald, Verbose,
            TEXT("TriggerGridBattle deferred: travel/resolution in progress (TravelPending=%s PendingResolution=%s)"),
