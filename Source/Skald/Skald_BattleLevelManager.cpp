@@ -395,9 +395,13 @@ void USkaldBattleLevelManager::HandleLevelLoaded() {
                    *GetNameSafe(LoadedLevel), *GetNameSafe(DefaultGameModeClass),
                    *DefaultClassPath);
 
-            if (!DefaultClassPath.Contains(TEXT("Skald_BattleGameMode_SC"))) {
+            const bool bMatchesCanonicalBlueprint =
+                DefaultClassPath.Contains(TEXT("Skald_BattleGameMode_SC"));
+            const bool bMatchesLegacyTypoBlueprint =
+                DefaultClassPath.Contains(TEXT("Skald_BatlleGameMode_SC"));
+            if (!bMatchesCanonicalBlueprint && !bMatchesLegacyTypoBlueprint) {
               UE_LOG(LogSkald, Warning,
-                     TEXT("BattleLevelManager: Expected Skald_BattleGameMode_SC as the default battle GameMode for streamed maps."));
+                     TEXT("BattleLevelManager: Expected Skald_BattleGameMode_SC (or legacy Skald_BatlleGameMode_SC) as the default battle GameMode for streamed maps."));
             }
 
             if (DefaultGameModeClass->IsChildOf(

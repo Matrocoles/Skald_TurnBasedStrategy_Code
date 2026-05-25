@@ -239,8 +239,31 @@ USkaldGameInstance::GetFactionEmblem(ESkaldFaction InFaction) const {
 }
 
 void USkaldGameInstance::SetTravelState(const FSkaldTravelState &InState) {
+  const FSkaldTravelState PreviousState = TravelState;
   TravelState = InState;
   TravelState.bValid = true;
+
+  // Replicated travel-state updates can arrive in multiple passes. Preserve
+  // the previously issued travel token when the incoming state omits it so
+  // all setup stages remain correlated to the same battle session.
+  if (TravelState.TravelSessionToken.IsEmpty() &&
+      !PreviousState.TravelSessionToken.IsEmpty()) {
+    TravelState.TravelSessionToken = PreviousState.TravelSessionToken;
+  }
+
+  // Keep established participant/controller fields when a partial update has
+  // not filled them yet. This avoids temporarily regressing to an "invalid"
+  // travel state between replication passes.
+  if (TravelState.ExpectedControllers <= 0 &&
+      PreviousState.ExpectedControllers > 0) {
+    TravelState.ExpectedControllers = PreviousState.ExpectedControllers;
+  }
+  if (TravelState.AttackerPlayerId <= 0 && PreviousState.AttackerPlayerId > 0) {
+    TravelState.AttackerPlayerId = PreviousState.AttackerPlayerId;
+  }
+  if (TravelState.DefenderPlayerId <= 0 && PreviousState.DefenderPlayerId > 0) {
+    TravelState.DefenderPlayerId = PreviousState.DefenderPlayerId;
+  }
   if (TravelState.CachedTerritories.Num() == 0 &&
       CachedWorldMapTerritories.Num() > 0) {
     TravelState.CachedTerritories = CachedWorldMapTerritories;
