@@ -5626,6 +5626,14 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
       }
     }
 
+    if (!bNeedsBattlePrepUI && CachedGameInstance) {
+      const bool bOnBattleMapNow = bIsBattleMap || CachedGameInstance->bIsInBattleMap;
+      const bool bHasBattleHudContext = bBattleHUDVisible || bBattleHUDReadyToShow;
+      if (bOnBattleMapNow && bHasBattleHudContext) {
+        bNeedsBattlePrepUI = true;
+      }
+    }
+
     if (bNeedsBattlePrepUI) {
       if (!bShowMouseCursor || !bEnableClickEvents || !bEnableMouseOverEvents) {
         UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
