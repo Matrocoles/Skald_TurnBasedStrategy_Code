@@ -348,7 +348,9 @@ void USkaldGameInstance::SetTravelPending(bool bInPending) {
                                            .HAlign(HAlign_Center)
                                            .VAlign(VAlign_Center)[SNew(STextBlock)
                                                                      .Justification(ETextJustify::Center)
-                                                                     .Text(NSLOCTEXT("Skald", "TravelLoadingText", "Loading overworld..."))
+                                                                     .Text(HasPendingBattleTravelContext()
+                                                                               ? NSLOCTEXT("Skald", "TravelLoadingBattleText", "Loading battle map...")
+                                                                               : NSLOCTEXT("Skald", "TravelLoadingText", "Loading overworld..."))
                                                                      .Font(FCoreStyle::GetDefaultFontStyle("Bold", 32))
                                                                      .ColorAndOpacity(FLinearColor::White)]];
 
@@ -895,8 +897,18 @@ void USkaldGameInstance::HandleWorldBeginPlay(UWorld *LoadedWorld) {
 
   const FString CurrentLevel =
       UGameplayStatics::GetCurrentLevelName(this, /*bRemovePrefixString=*/true);
-  const bool bDetectedBattleMap =
-      CurrentLevel.Equals(TEXT("BattleMap"), ESearchCase::IgnoreCase);
+
+  bool bDetectedBattleMap =
+      CurrentLevel.Equals(TEXT("BattleMap"), ESearchCase::IgnoreCase) ||
+      CurrentLevel.StartsWith(TEXT("Battle"), ESearchCase::IgnoreCase);
+
+  if (!bDetectedBattleMap) {
+    if (const AGameModeBase *GM = LoadedWorld->GetAuthGameMode()) {
+      const FString GMClassName = GM->GetClass()->GetName();
+      bDetectedBattleMap = GMClassName.Contains(TEXT("BattleGameMode"),
+                                                ESearchCase::IgnoreCase);
+    }
+  }
 
   // Keep the battle-map state in sync with the actual level in case the travel
   // RPC was missed (e.g. late-joining clients or failed multicast). This ensures
@@ -904,8 +916,8 @@ void USkaldGameInstance::HandleWorldBeginPlay(UWorld *LoadedWorld) {
   // UI such as fighter selection. Only auto-promote into battle state when the
   // default BattleMap is detected to avoid clearing an existing battle flag when
   // travelling to named battle maps selected from the configured map lists.
-  if (bDetectedBattleMap && !bIsInBattleMap) {
-    SetBattleMapActive(true);
+  if (bDetectedBattleMap != bIsInBattleMap) {
+    SetBattleMapActive(bDetectedBattleMap);
   }
 
   SetTravelPending(false);
