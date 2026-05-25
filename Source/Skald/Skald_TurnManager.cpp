@@ -3132,47 +3132,6 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
     return;
   }
 
-  auto ShouldDeferForOpponentAIDecision =
-      [&](ASkaldPlayerController *Participant, bool bParticipantIsAttacker) {
-        if (!bHasAuthority || !Participant) {
-          return false;
-        }
-
-        const bool bOpponentIsAI = bParticipantIsAttacker
-                                        ? PendingBattleReadyState.bDefenderIsAI
-                                        : PendingBattleReadyState.bAttackerIsAI;
-
-        if (!bOpponentIsAI) {
-          return false;
-        }
-
-        const int32 OpponentPlayerId = bParticipantIsAttacker
-                                           ? PendingBattleReadyState.DefenderPlayerID
-                                           : PendingBattleReadyState.AttackerPlayerID;
-
-        if (OpponentPlayerId == INDEX_NONE) {
-          return false;
-        }
-
-        const bool bOpponentReady = bParticipantIsAttacker
-                                        ? PendingBattleReadyState.bDefenderReady
-                                        : PendingBattleReadyState.bAttackerReady;
-
-        if (bOpponentReady) {
-          return false;
-        }
-
-        const TCHAR *WaitingOnRole = bParticipantIsAttacker ? TEXT("defender")
-                                                            : TEXT("attacker");
-        UE_LOG(LogSkaldReady, Verbose,
-               TEXT("%s: deferring prepare prompt for %s while AI %s resolves decision."),
-               ResolvedLogContext, *GetNameSafe(Participant), WaitingOnRole);
-        return true;
-      };
-
-  bool bAttackerDeferred = false;
-  bool bDefenderDeferred = false;
-
   UWorld *World = GetWorld();
   ASkaldGameState *GameState =
       World ? World->GetGameState<ASkaldGameState>() : nullptr;
@@ -3401,14 +3360,6 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
                  TEXT("%s: participant flagged as AI but controller %s is not ASkaldAIController."),
                  LogContext, *Controller->GetName());
         }
-      } else if (ShouldDeferForOpponentAIDecision(Controller, bIsAttacker)) {
-        if (bIsAttacker) {
-          bAttackerDeferred = true;
-        }
-        if (bIsDefender) {
-          bDefenderDeferred = true;
-        }
-        continue;
       } else {
         UE_LOG(LogSkaldReady, Log,
                TEXT("WidgetSpawned PC=%s Role=%s Battle=%d->%d"),
@@ -3448,15 +3399,13 @@ void ATurnManager::BroadcastPrepareForBattlePrompt(
     }
   }
 
-  if (bNeedsAttackerConfirmation && !bAttackerMatched &&
-      !bAttackerDeferred) {
+  if (bNeedsAttackerConfirmation && !bAttackerMatched) {
     UE_LOG(LogSkald, Warning,
            TEXT("%s: pending attacker PlayerID %d has no registered controller."),
            LogContext, PendingBattleReadyState.AttackerPlayerID);
   }
 
-  if (bNeedsDefenderConfirmation && !bDefenderMatched &&
-      !bDefenderDeferred) {
+  if (bNeedsDefenderConfirmation && !bDefenderMatched) {
     UE_LOG(LogSkald, Warning,
            TEXT("%s: pending defender PlayerID %d has no registered controller."),
            LogContext, PendingBattleReadyState.DefenderPlayerID);
