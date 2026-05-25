@@ -192,6 +192,39 @@ struct SKALD_API FS_BattlePayload
     FString ReturnMap;
 };
 
+inline uint32 GetTypeHash(const FS_BattlePayload& Payload)
+{
+    uint32 Hash = 0;
+    Hash = HashCombine(Hash, ::GetTypeHash(Payload.AttackerPlayerID));
+    Hash = HashCombine(Hash, ::GetTypeHash(Payload.DefenderPlayerID));
+    Hash = HashCombine(Hash, ::GetTypeHash(Payload.FromTerritoryID));
+    Hash = HashCombine(Hash, ::GetTypeHash(Payload.TargetTerritoryID));
+    Hash = HashCombine(Hash, ::GetTypeHash(Payload.ArmyCountSent));
+    Hash = HashCombine(Hash, ::GetTypeHash(Payload.DefenderArmyCount));
+    Hash = HashCombine(Hash, ::GetTypeHash(Payload.AttackerTerritoryName));
+    Hash = HashCombine(Hash, ::GetTypeHash(Payload.DefenderTerritoryName));
+    Hash = HashCombine(Hash, ::GetTypeHash(Payload.AttackerDisplayName));
+    Hash = HashCombine(Hash, ::GetTypeHash(Payload.DefenderDisplayName));
+    Hash = HashCombine(Hash, ::GetTypeHash(Payload.AttackerFaction));
+    Hash = HashCombine(Hash, ::GetTypeHash(Payload.DefenderFaction));
+    Hash = HashCombine(Hash, ::GetTypeHash(Payload.bAttackerIsAI));
+    Hash = HashCombine(Hash, ::GetTypeHash(Payload.bDefenderIsAI));
+    Hash = HashCombine(Hash, ::GetTypeHash(Payload.IsCapitalAttack));
+    Hash = HashCombine(Hash, ::GetTypeHash(Payload.TreasureFlag));
+    Hash = HashCombine(Hash, ::GetTypeHash(Payload.TurnNumber));
+    Hash = HashCombine(Hash, ::GetTypeHash(Payload.RandomSeed));
+    Hash = HashCombine(Hash, ::GetTypeHash(Payload.ReturnMap));
+    Hash = HashCombine(Hash, ::GetTypeHash(Payload.AttackerFactionEmblem));
+    Hash = HashCombine(Hash, ::GetTypeHash(Payload.DefenderFactionEmblem));
+
+    for (const int32 SiegeId : Payload.AssignedSiegeIDs)
+    {
+        Hash = HashCombine(Hash, ::GetTypeHash(SiegeId));
+    }
+
+    return Hash;
+}
+
 USTRUCT(BlueprintType)
 struct SKALD_API FBattlePlayerEntry
 {
