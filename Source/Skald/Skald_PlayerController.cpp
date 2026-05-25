@@ -5609,6 +5609,13 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
       bShowMouseCursor = true;
       bEnableClickEvents = true;
       bEnableMouseOverEvents = true;
+      // Battle prep UI (fighter lock-in, streamed battle travel, etc.) still
+      // needs world interaction for camera movement and grid picks. If input
+      // was previously suppressed by a UI-only flow, explicitly re-enable it
+      // here so replicated turn ownership updates cannot strand the local
+      // player in a non-interactive state.
+      SetIgnoreMoveInput(false);
+      SetIgnoreLookInput(false);
     } else {
       // Ensure non-active players fully release world input and phase buttons
       // instead of inheriting the host's UI state.
