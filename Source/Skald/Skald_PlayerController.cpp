@@ -2982,11 +2982,17 @@ void ASkaldPlayerController::HandleBattlePhaseChanged() {
                   " spawned automatically."),
              *GetName());
 
-      if (bBattleHUDReadyToShow && !bBattleHUDVisible) {
+      if (!bBattleHUDVisible) {
+        // Battle HUD visibility can be reset by intermediate UI transitions
+        // (e.g. overworld HUD teardown) between lock-in and deploy. Always
+        // force a local re-show when entering deploy so initiative controls are
+        // guaranteed to appear.
+        bBattleHUDReadyToShow = true;
         EnsureBattleHUDVisible();
       }
     } else if (SGS->BattlePhase != EBattlePhase::FighterSelection &&
-               bBattleHUDReadyToShow && !bBattleHUDVisible) {
+               !bBattleHUDVisible) {
+      bBattleHUDReadyToShow = true;
       EnsureBattleHUDVisible();
     }
   }
