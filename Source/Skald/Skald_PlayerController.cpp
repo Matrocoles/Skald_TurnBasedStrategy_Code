@@ -3566,7 +3566,10 @@ void ASkaldPlayerController::HandleLockedInEntrySelected(AFighterPawn *Fighter) 
   }
   UpdateLockedInSelectionHighlight();
 
-  if (IsLocalController() && bIsBattleMap) {
+  const bool bBattleMapActive =
+      bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap);
+
+  if (IsLocalController() && bBattleMapActive) {
     if (Fighter->IsAlive()) {
       if (ASkald_PlayerCharacter *CameraPawn = Cast<ASkald_PlayerCharacter>(GetPawn())) {
         CameraPawn->FocusCameraOnActor(Fighter);
@@ -3592,7 +3595,10 @@ void ASkaldPlayerController::HandleEnemyLockedInEntrySelected(
   }
   UpdateLockedInSelectionHighlight();
 
-  if (IsLocalController() && bIsBattleMap) {
+  const bool bBattleMapActive =
+      bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap);
+
+  if (IsLocalController() && bBattleMapActive) {
     if (Fighter->IsAlive()) {
       if (ASkald_PlayerCharacter *CameraPawn = Cast<ASkald_PlayerCharacter>(GetPawn())) {
         CameraPawn->FocusCameraOnActor(Fighter);
@@ -5862,9 +5868,12 @@ void ASkaldPlayerController::UpdateBattleCameraMode() {
     return;
   }
 
-  CameraPawn->SetBattleCameraActive(bIsBattleMap);
+  const bool bBattleMapActive =
+      bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap);
 
-  if (!bIsBattleMap) {
+  CameraPawn->SetBattleCameraActive(bBattleMapActive);
+
+  if (!bBattleMapActive) {
     CameraPawn->ClearCameraFocus();
     return;
   }
