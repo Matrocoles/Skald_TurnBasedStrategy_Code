@@ -2749,9 +2749,11 @@ void ASkaldPlayerController::RequestBattleStateIfNeeded() {
   }
 
   const bool bInBattle = bIsBattleMap || CachedGameInstance->bIsInBattleMap;
-  const bool bHasPendingBattleContext =
-      CachedGameInstance->IsTravelPending() ||
-      CachedGameInstance->HasPendingBattleTravelContext();
+  // Restrict pre-map pending-state requests to active travel only. Using
+  // HasPendingBattleTravelContext() here can remain true after battle resolve
+  // (e.g., cached valid TravelState), which causes repeated
+  // ServerRequestPendingBattleState RPCs whenever PendingBattle is empty.
+  const bool bHasPendingBattleContext = CachedGameInstance->IsTravelPending();
   if (!bInBattle && !bHasPendingBattleContext) {
     bPendingBattleStateRequest = false;
     return;
@@ -5535,9 +5537,7 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
   const EBattlePhase BattlePhase =
       CachedGameState ? CachedGameState->BattlePhase : EBattlePhase::None;
   const bool bBattleTravelPending =
-      CachedGameInstance &&
-      (CachedGameInstance->IsTravelPending() ||
-       CachedGameInstance->HasPendingBattleTravelContext());
+      CachedGameInstance && CachedGameInstance->IsTravelPending();
   const bool bInBattleInputFlow =
       bIsBattleMap || BattlePhase != EBattlePhase::None || bBattleTravelPending;
   const int32 ReportedActiveId =
