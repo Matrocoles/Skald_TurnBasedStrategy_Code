@@ -2053,7 +2053,7 @@ void ATurnManager::CacheBattleParticipants(const FS_BattlePayload &Battle)
 
 void ATurnManager::BeginReadyPhase(const FS_BattlePayload &Battle,
                                    const TCHAR *Context) {
-  if (USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>()) { const FSkaldTravelState& TS = GI->GetTravelState(); const bool bComplete = TS.ExpectedControllers > 0 && TS.AttackerPlayerId > 0 && TS.DefenderPlayerId > 0 && TS.CachedTerritories.Num() > 0; UE_LOG(LogSkald, Log, TEXT("[TravelState] Validity=%s Expected=%d Attacker=%d Defender=%d CachedTerritories=%d"), bComplete ? TEXT("Complete") : (TS.bValid ? TEXT("Partial") : TEXT("Invalid")), TS.ExpectedControllers, TS.AttackerPlayerId, TS.DefenderPlayerId, TS.CachedTerritories.Num()); if (!bComplete) { UE_LOG(LogSkald, Warning, TEXT("[TravelState][WARN] Consumed non-complete state")); } }
+  if (USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>()) { const FSkaldTravelState& TS = GI->GetTravelState(); const bool bComplete = TS.ExpectedControllers > 0 && TS.AttackerPlayerId > 0 && TS.DefenderPlayerId > 0 && TS.CachedTerritories.Num() > 0; UE_LOG(LogSkald, Log, TEXT("[TravelState] Validity=%s Expected=%d Attacker=%d Defender=%d CachedTerritories=%d"), bComplete ? TEXT("Complete") : (TS.bValid ? TEXT("Partial") : TEXT("Invalid")), TS.ExpectedControllers, TS.AttackerPlayerId, TS.DefenderPlayerId, TS.CachedTerritories.Num()); if (TS.bValid && !bComplete) { UE_LOG(LogSkald, Warning, TEXT("[TravelState][WARN] Consumed non-complete state")); } }
   if (!HasAuthority()) {
     UE_LOG(LogSkaldReady, Warning,
            TEXT("BeginReadyPhase called without authority; ignoring."));

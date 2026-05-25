@@ -2749,7 +2749,10 @@ void ASkaldPlayerController::RequestBattleStateIfNeeded() {
   }
 
   const bool bInBattle = bIsBattleMap || CachedGameInstance->bIsInBattleMap;
-  if (!bInBattle) {
+  const bool bHasPendingBattleContext =
+      CachedGameInstance->IsTravelPending() ||
+      CachedGameInstance->HasPendingBattleTravelContext();
+  if (!bInBattle && !bHasPendingBattleContext) {
     bPendingBattleStateRequest = false;
     return;
   }
