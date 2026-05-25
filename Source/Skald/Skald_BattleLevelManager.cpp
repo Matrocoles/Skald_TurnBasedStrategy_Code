@@ -363,6 +363,23 @@ void USkaldBattleLevelManager::HandleLevelLoaded() {
       UWorld *OwningWorld = ActiveStreamingLevel->GetWorld();
       ULevel *LoadedLevel = ActiveStreamingLevel->GetLoadedLevel();
       if (OwningWorld && LoadedLevel && OwningWorld->GetNetMode() != NM_Client) {
+        ASkald_BattleGameMode *ExistingBattleGM = nullptr;
+        for (AActor *LevelActor : LoadedLevel->Actors) {
+          ASkald_BattleGameMode *CandidateBattleGM = Cast<ASkald_BattleGameMode>(LevelActor);
+          if (CandidateBattleGM) {
+            ExistingBattleGM = CandidateBattleGM;
+            break;
+          }
+        }
+
+        if (ExistingBattleGM) {
+          ActiveBattleGameMode = ExistingBattleGM;
+          GI->SetActiveBattleGameMode(ExistingBattleGM);
+          UE_LOG(LogSkald, Log,
+                 TEXT("BattleLevelManager: Reusing existing battle game mode actor %s from streamed level."),
+                 *GetNameSafe(ExistingBattleGM));
+        }
+
         TSubclassOf<ASkald_BattleGameMode> BattleGameModeClass = nullptr;
         if (AWorldSettings *WorldSettings = LoadedLevel->GetWorldSettings()) {
           UClass *DefaultGameModeClass = nullptr;
@@ -415,7 +432,7 @@ void USkaldBattleLevelManager::HandleLevelLoaded() {
                  TEXT("BattleLevelManager: Falling back to native Skald_BattleGameMode for battle map."));
         }
 
-        if (BattleGameModeClass) {
+        if (BattleGameModeClass && !ExistingBattleGM) {
           const FTransform SpawnTransform = FTransform::Identity;
           FActorSpawnParameters SpawnParams;
           SpawnParams.SpawnCollisionHandlingOverride =
