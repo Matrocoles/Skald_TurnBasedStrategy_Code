@@ -132,5 +132,7 @@ private:
   uint32 ActiveSetupSignature = 0;
   int32 SetupAttemptCounter = 0;
   FString SetupCompleteToken;
+  /** Travel token currently being processed by SetupPendingBattle. */
+  FString SetupInProgressToken;
   TMap<FString, TSet<FString>> RegisteredControllers;
 };
