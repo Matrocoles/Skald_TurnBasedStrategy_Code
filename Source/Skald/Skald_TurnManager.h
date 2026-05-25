@@ -279,6 +279,8 @@ protected:
   void ClearActiveRetreatContext();
   /** Payload for the next battle waiting on travel/resolution to finish. */
   FS_BattlePayload DeferredPendingBattle;
+  /** Last battle payload hash processed by TriggerGridBattle for duplicate suppression. */
+  uint32 LastTriggeredBattlePayloadHash = 0;
 
   UPROPERTY()
   AWorldMap *CachedWorldMap;

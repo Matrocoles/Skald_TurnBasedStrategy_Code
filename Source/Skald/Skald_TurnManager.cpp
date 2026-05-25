@@ -2340,8 +2340,17 @@ void ATurnManager::BeginReadyPhase(const FS_BattlePayload &Battle,
 void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
   FS_BattlePayload SeededBattle = Battle;
   SeededBattle.RandomSeed = FMath::Rand();
+  const uint32 BattlePayloadHash = GetTypeHash(Battle);
 
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
+  if (GI && GI->IsTravelPending() && LastTriggeredBattlePayloadHash != 0 &&
+      LastTriggeredBattlePayloadHash == BattlePayloadHash) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("TriggerGridBattle ignored duplicate while travel pending (Hash=%u From=%d To=%d Attacker=%d Defender=%d)."),
+           BattlePayloadHash, Battle.FromTerritoryID, Battle.TargetTerritoryID,
+           Battle.AttackerPlayerID, Battle.DefenderPlayerID);
+    return;
+  }
   if (GI && GI->bIsInBattleMap) {
     UE_LOG(LogSkald, Warning,
            TEXT("TriggerGridBattle ignored: battle map already active (Token=%s From=%d To=%d)."),
@@ -2415,6 +2424,7 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
   }
   PendingBattle = SeededBattle;
   DeferredPendingBattle = FS_BattlePayload();
+  LastTriggeredBattlePayloadHash = BattlePayloadHash;
 
   if (GI) {
     GI->SeedCombatRandomStream(SeededBattle.RandomSeed);

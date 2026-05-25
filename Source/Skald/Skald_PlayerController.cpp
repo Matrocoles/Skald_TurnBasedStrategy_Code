@@ -2695,8 +2695,10 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
       CachedGameInstance ? CachedGameInstance->GetBattleLevelManager() : nullptr;
   const bool bBattleStreamReady =
       !BattleLevelManager || BattleLevelManager->IsBattleLevelFullyReady();
+  const bool bLikelyBattleContextReady =
+      bOnBattleMap || (bHasBattleContext && bInSelectionPhase && bBattleStreamReady);
   const bool bCanShowSelectionUI =
-      bOnBattleMap && bInSelectionPhase && bBattleStreamReady &&
+      bLikelyBattleContextReady && bInSelectionPhase && bBattleStreamReady &&
       !CachedGameInstance->IsTravelPending();
   if (!bIsParticipant || PendingBudget <= 0 || !bCanShowSelectionUI) {
     UE_LOG(LogSkaldBattle, Log,
