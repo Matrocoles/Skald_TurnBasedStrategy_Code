@@ -297,7 +297,7 @@ void UStartGameWidget::TravelToGameplayMap(APlayerController *PC,
   }
 
   const FName LobbyLevel(TEXT("/Game/Blueprints/Maps/Skald_Lobby"));
-  const FName GameplayLevel(TEXT("/Game/Blueprints/Maps/OverviewMap"));
+  const FName GameplayLevel(TEXT("/Game/Blueprints/Maps/L_PersistentRoot"));
   const FName TargetLevel = bMultiplayer ? LobbyLevel : GameplayLevel;
 
   FString Options;
