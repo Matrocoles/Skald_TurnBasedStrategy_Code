@@ -30,6 +30,7 @@
 #include "Skald_GameInstance.h"
 #include "Skald_GameMode.h"
 #include "Skald_BattleGameMode.h"
+#include "Skald_BattleLevelManager.h"
 #include "SkaldLogging.h"
 #include "Skald_GameState.h"
 #include "Skald_PlayerState.h"
@@ -2690,14 +2691,22 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
   // Only allow lock-in UI once we're actually on the battle map.
   // Showing it during travel can let clients submit lock-in before a battle
   // GameMode exists, which drops the selection RPC on the floor.
-  const bool bCanShowSelectionUI = bOnBattleMap && bInSelectionPhase;
+  const USkaldBattleLevelManager* BattleLevelManager =
+      CachedGameInstance ? CachedGameInstance->GetBattleLevelManager() : nullptr;
+  const bool bBattleStreamReady =
+      !BattleLevelManager || BattleLevelManager->IsBattleLevelFullyReady();
+  const bool bCanShowSelectionUI =
+      bOnBattleMap && bInSelectionPhase && bBattleStreamReady &&
+      !CachedGameInstance->IsTravelPending();
   if (!bIsParticipant || PendingBudget <= 0 || !bCanShowSelectionUI) {
     UE_LOG(LogSkaldBattle, Log,
-           TEXT("InitializeFighterSelectionIfNeeded: Skipping widget (Local=%s Participant=%d Phase=%d Budget=%d ActiveFlag=%d OnBattleMap=%d HasContext=%d InSelectionPhase=%d)"),
+           TEXT("InitializeFighterSelectionIfNeeded: Skipping widget (Local=%s Participant=%d Phase=%d Budget=%d ActiveFlag=%d OnBattleMap=%d HasContext=%d InSelectionPhase=%d StreamReady=%d TravelPending=%d)"),
            *GetNameSafe(this), bIsParticipant ? 1 : 0,
            CachedGameState ? static_cast<int32>(CachedGameState->BattlePhase) : -1, PendingBudget,
            PS->bIsActiveBattlePlayer ? 1 : 0, bOnBattleMap ? 1 : 0,
-           bHasBattleContext ? 1 : 0, bInSelectionPhase ? 1 : 0);
+           bHasBattleContext ? 1 : 0, bInSelectionPhase ? 1 : 0,
+           bBattleStreamReady ? 1 : 0,
+           CachedGameInstance->IsTravelPending() ? 1 : 0);
 
     // Preserve cursor + UI input whenever the fighter-selection widget already
     // exists. Replicated turn ownership updates can temporarily report a

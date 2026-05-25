@@ -632,6 +632,16 @@ bool USkaldBattleLevelManager::TickStreamingStatus(float DeltaTime) {
   return ActiveStreamingLevel.IsValid();
 }
 
+bool USkaldBattleLevelManager::IsBattleLevelFullyReady() const {
+  const ULevelStreaming* StreamingLevel = ActiveStreamingLevel.Get();
+  if (!StreamingLevel) {
+    return false;
+  }
+
+  return bActiveLevelShouldBeLoaded && StreamingLevel->IsLevelLoaded() &&
+         StreamingLevel->IsLevelVisible();
+}
+
 void USkaldBattleLevelManager::HideNonBattleLevels() {
   RestoreNonBattleLevels();
 
@@ -666,13 +676,15 @@ void USkaldBattleLevelManager::HideNonBattleLevels() {
     }
 
     const bool bWasVisible = OtherLevel->IsLevelVisible();
-    if (!bWasVisible) {
+    const bool bWasLoaded = OtherLevel->ShouldBeLoaded();
+    if (!bWasVisible && !bWasLoaded) {
       continue;
     }
 
     FHiddenStreamingLevelState State;
     State.Level = OtherLevel;
     State.bWasVisible = bWasVisible;
+    State.bWasLoaded = bWasLoaded;
     HiddenStreamingLevels.Add(State);
 
     FString LevelLabel = OtherLevel->GetWorldAssetPackageName();
@@ -680,6 +692,7 @@ void USkaldBattleLevelManager::HideNonBattleLevels() {
       LevelLabel = OtherLevel->GetWorldAsset().ToSoftObjectPath().ToString();
     }
 
+    OtherLevel->SetShouldBeLoaded(false);
     OtherLevel->SetShouldBeVisible(false);
     UE_LOG(LogSkald, Verbose,
            TEXT("BattleLevelManager: Hiding streaming level %s while battle map active"),
@@ -747,6 +760,7 @@ void USkaldBattleLevelManager::RestoreNonBattleLevels() {
 
   for (const FHiddenStreamingLevelState &State : HiddenStreamingLevels) {
     if (ULevelStreaming *Level = State.Level.Get()) {
+      Level->SetShouldBeLoaded(State.bWasLoaded);
       Level->SetShouldBeVisible(State.bWasVisible);
       if (State.bWasVisible) {
         FString LevelLabel = Level->GetWorldAssetPackageName();
