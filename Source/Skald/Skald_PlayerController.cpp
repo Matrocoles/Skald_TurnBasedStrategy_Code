@@ -2447,6 +2447,15 @@ void ASkaldPlayerController::PlayerTick(float DeltaTime) {
     return;
   }
 
+  DetectBattleMap();
+  if (bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap)) {
+    APawn* ControlledPawn = GetPawn();
+    if (ControlledPawn && GetViewTarget() != ControlledPawn) {
+      SetViewTarget(ControlledPawn);
+      ReconcileBattleInputState(TEXT("PlayerTick.ViewTargetRepair"));
+    }
+  }
+
   // If the player has locked in their fighters and the battle manager became
   // available after the selection UI closed, ensure the battle HUD is
   // constructed and displayed.
