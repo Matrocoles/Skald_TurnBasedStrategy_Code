@@ -283,6 +283,22 @@ void ASkaldGameState::SetActivePlayerId(int32 NewActivePlayerId)
 
     ActivePlayerId = NewActivePlayerId;
     UE_LOG(LogSkald, Log, TEXT("[TurnState] Active player set to %d"), ActivePlayerId);
+    FString TurnRoster;
+    for (APlayerState* PSBase : PlayerArray)
+    {
+        const ASkaldPlayerState* PS = Cast<ASkaldPlayerState>(PSBase);
+        if (!PS)
+        {
+            continue;
+        }
+        TurnRoster += FString::Printf(TEXT("[Name=%s PlayerId=%d StableId=%d AI=%d] "),
+                                      *PS->GetResolvedPlayerName(TEXT("SetActivePlayerId_Log")),
+                                      PS->GetPlayerId(),
+                                      PS->GetStablePlayerId(),
+                                      PS->bIsAI ? 1 : 0);
+    }
+    UE_LOG(LogSkald, Log, TEXT("[StartupAudit] ActivePlayerChange ActiveId=%d Roster=%s"),
+           ActivePlayerId, *TurnRoster);
     OnActivePlayerChanged.Broadcast(ActivePlayerId);
 
     // Listen servers won't receive OnRep callbacks, so proactively refresh
