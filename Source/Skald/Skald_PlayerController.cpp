@@ -5856,7 +5856,9 @@ void ASkaldPlayerController::HandleFactionLockedIn() {
   bShowMouseCursor = true;
   bEnableClickEvents = true;
   bEnableMouseOverEvents = true;
-  DefaultMouseCaptureMode = EMouseCaptureMode::NoCapture;
+  DefaultMouseCaptureMode =
+      EMouseCaptureMode::CapturePermanently_IncludingInitialMouseDown;
+  SetMouseCaptureMode(DefaultMouseCaptureMode);
   SetIgnoreMoveInput(false);
   SetIgnoreLookInput(false);
   RefreshFactionCursorFromState();
@@ -5931,7 +5933,9 @@ void ASkaldPlayerController::ReconcileBattleInputState(const TCHAR* Context) {
   bShowMouseCursor = true;
   bEnableClickEvents = true;
   bEnableMouseOverEvents = true;
-  DefaultMouseCaptureMode = EMouseCaptureMode::NoCapture;
+  DefaultMouseCaptureMode =
+      EMouseCaptureMode::CapturePermanently_IncludingInitialMouseDown;
+  SetMouseCaptureMode(DefaultMouseCaptureMode);
   SetIgnoreMoveInput(false);
   SetIgnoreLookInput(false);
   UpdateBattleCameraMode();
