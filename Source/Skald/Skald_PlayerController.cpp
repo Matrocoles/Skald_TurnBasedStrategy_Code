@@ -6083,13 +6083,17 @@ void ASkaldPlayerController::HandleGridClick() {
   if (!IsLocalController())
     return;
 
+  DetectBattleMap();
+  const bool bBattleMapActive =
+      bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap);
+
   if (IsCursorOverInteractableSlateWidget()) {
     return;
   }
 
   // Non-battle map handling
   FHitResult Hit;
-  if (!bIsBattleMap) {
+  if (!bBattleMapActive) {
     if (!HasResolvedLocalPlayerId()) {
       UE_LOG(LogSkald, Verbose,
              TEXT("HandleGridClick ignoring world map click until the controller finishes registration."));
@@ -6510,7 +6514,7 @@ void ASkaldPlayerController::HandleGridClick() {
 
     SetSelectedFighter(CellFighter);
 
-    if (!IsFriendlyFighter(CellFighter) && IsLocalController() && bIsBattleMap) {
+    if (!IsFriendlyFighter(CellFighter) && IsLocalController() && bBattleMapActive) {
       if (ASkald_PlayerCharacter *CameraPawn = Cast<ASkald_PlayerCharacter>(GetPawn())) {
         CameraPawn->FocusCameraOnActor(CellFighter);
       }
@@ -6658,7 +6662,10 @@ void ASkaldPlayerController::HandleClearSelectionPressed() {
     return;
   }
 
-  if (!bIsBattleMap) {
+  DetectBattleMap();
+  const bool bBattleMapActive =
+      bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap);
+  if (!bBattleMapActive) {
     if (!HasResolvedLocalPlayerId()) {
       UE_LOG(LogSkald, Verbose,
              TEXT("HandleClearSelectionPressed ignoring deselect until the controller finishes registration."));
@@ -6677,7 +6684,10 @@ void ASkaldPlayerController::HandleRightClick() {
     return;
   }
 
-  if (!bIsBattleMap) {
+  DetectBattleMap();
+  const bool bBattleMapActive =
+      bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap);
+  if (!bBattleMapActive) {
     return;
   }
 
