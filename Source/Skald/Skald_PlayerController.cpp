@@ -2695,10 +2695,14 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
       CachedGameInstance ? CachedGameInstance->GetBattleLevelManager() : nullptr;
   const bool bBattleStreamReady =
       !BattleLevelManager || BattleLevelManager->IsBattleLevelFullyReady();
+  // Streaming readiness can occasionally lag a frame behind map activation.
+  // Once the local controller is on the battle map, treat streaming as ready so
+  // we don't permanently gate fighter selection / input behind a stale flag.
+  const bool bEffectiveStreamReady = bBattleStreamReady || bOnBattleMap;
   const bool bLikelyBattleContextReady =
-      bOnBattleMap || (bHasBattleContext && bInSelectionPhase && bBattleStreamReady);
+      bOnBattleMap || (bHasBattleContext && bInSelectionPhase && bEffectiveStreamReady);
   const bool bCanShowSelectionUI =
-      bLikelyBattleContextReady && bInSelectionPhase && bBattleStreamReady &&
+      bLikelyBattleContextReady && bInSelectionPhase && bEffectiveStreamReady &&
       !CachedGameInstance->IsTravelPending();
   if (!bIsParticipant || PendingBudget <= 0 || !bCanShowSelectionUI) {
     UE_LOG(LogSkaldBattle, Log,
