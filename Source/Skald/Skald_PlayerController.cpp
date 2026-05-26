@@ -5624,12 +5624,27 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
       }
     }
 
-    if (bNeedsBattlePrepUI) {
-      if (!bShowMouseCursor || !bEnableClickEvents || !bEnableMouseOverEvents) {
-        UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
-            this, nullptr, EMouseLockMode::DoNotLock,
-            /*bHideCursorDuringCapture*/ false);
+    const bool bHudAwaitingStrategicInitiative =
+        MainHUD && MainHUD->IsAwaitingStrategicInitiative();
+    const bool bNeedsStrategicInitiativeUI =
+        bAwaitingStrategicInitiativeRoll || PendingStrategicInitiativeRoll > 0 ||
+        bHudAwaitingStrategicInitiative;
+    if (bNeedsBattlePrepUI || bNeedsStrategicInitiativeUI) {
+      // Keep focus anchored to the active UI surface when strategic initiative
+      // is awaiting input. Passing nullptr can leave focus on the viewport and
+      // make clicks appear to register (SFX) without driving widget actions
+      // until OS focus is toggled (e.g. Win key).
+      UWidget* InputFocusWidget = nullptr;
+      if (bNeedsStrategicInitiativeUI && MainHUD && MainHUD->IsInViewport()) {
+        InputFocusWidget = MainHUD;
+      } else if (FighterSelectionWidget && FighterSelectionWidget->IsInViewport()) {
+        InputFocusWidget = FighterSelectionWidget;
+      } else if (BattleHUD && BattleHUD->IsInViewport()) {
+        InputFocusWidget = BattleHUD;
       }
+      UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
+          this, InputFocusWidget, EMouseLockMode::DoNotLock,
+          /*bHideCursorDuringCapture*/ false);
       bShowMouseCursor = true;
       bEnableClickEvents = true;
       bEnableMouseOverEvents = true;
@@ -5874,8 +5889,9 @@ void ASkaldPlayerController::HandleFactionLockedIn() {
   bShowMouseCursor = true;
   bEnableClickEvents = true;
   bEnableMouseOverEvents = true;
-  DefaultMouseCaptureMode =
-      EMouseCaptureMode::CapturePermanently_IncludingInitialMouseDown;
+  // Never permanently capture in overview; that can trap focus/clicks in PIE
+  // and block interaction with initiative UI and even the editor window.
+  DefaultMouseCaptureMode = EMouseCaptureMode::NoCapture;
   if (UGameViewportClient* GameViewport = GetWorld() ? GetWorld()->GetGameViewport() : nullptr) {
     GameViewport->SetMouseCaptureMode(DefaultMouseCaptureMode);
   }
@@ -5953,8 +5969,7 @@ void ASkaldPlayerController::ReconcileBattleInputState(const TCHAR* Context) {
   bShowMouseCursor = true;
   bEnableClickEvents = true;
   bEnableMouseOverEvents = true;
-  DefaultMouseCaptureMode =
-      EMouseCaptureMode::CapturePermanently_IncludingInitialMouseDown;
+  DefaultMouseCaptureMode = EMouseCaptureMode::CaptureDuringMouseDown;
   if (UGameViewportClient* GameViewport = GetWorld() ? GetWorld()->GetGameViewport() : nullptr) {
     GameViewport->SetMouseCaptureMode(DefaultMouseCaptureMode);
   }
@@ -6932,11 +6947,10 @@ void ASkaldPlayerController::HandleAttackRollRequested() {
 }
 
 void ASkaldPlayerController::HandleStrategicInitiativeRollRequested() {
-  bAwaitingStrategicInitiativeRoll = false;
-
+  // Keep the local prompt active until the authoritative server response
+  // arrives; clearing too early can strand the player in a stale UI state if
+  // the request races with replicated startup updates.
   if (MainHUD) {
-    MainHUD->HideStrategicInitiativePrompt();
-
     const FText RollingText =
         NSLOCTEXT("Skald", "StrategicInitiativeRolling",
                   "Rolling for initiative...");
@@ -7032,6 +7046,22 @@ void ASkaldPlayerController::ClientPromptStrategicInitiative_Implementation(
     MainHUD->ShowStrategicInitiativePrompt(PromptText);
     MainHUD->SetAwaitingStrategicInitiative(true);
   }
+
+  // Strategic-initiative prompt is a pure UI interaction in overview. Release
+  // viewport capture so clicks do not get trapped in PIE and editor controls
+  // (including Stop) remain reachable.
+  UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
+      this, MainHUD, EMouseLockMode::DoNotLock, false);
+  DefaultMouseCaptureMode = EMouseCaptureMode::NoCapture;
+  if (UGameViewportClient *GameViewport =
+          GetWorld() ? GetWorld()->GetGameViewport() : nullptr) {
+    GameViewport->SetMouseCaptureMode(DefaultMouseCaptureMode);
+  }
+  bShowMouseCursor = true;
+  bEnableClickEvents = true;
+  bEnableMouseOverEvents = true;
+  SetIgnoreMoveInput(false);
+  SetIgnoreLookInput(false);
 }
 
 void ASkaldPlayerController::ServerConfirmStrategicInitiativeRollReady_Implementation() {
