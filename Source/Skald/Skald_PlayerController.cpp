@@ -2436,6 +2436,7 @@ void ASkaldPlayerController::OnPossess(APawn *InPawn) {
   }
 
   UpdateBattleCameraMode();
+  ReconcileBattleInputState(TEXT("OnPossess"));
 }
 
 void ASkaldPlayerController::PlayerTick(float DeltaTime) {
@@ -5490,6 +5491,7 @@ void ASkaldPlayerController::HandleReplicatedBattlePayload() {
   RefreshTurnDataFromState();
   HandleReplicatedTurnOwnership();
   HandleReplicatedTurnStart();
+  ReconcileBattleInputState(TEXT("HandleReplicatedBattlePayload"));
 }
 
 void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
@@ -5745,6 +5747,7 @@ void ASkaldPlayerController::HandleBattleMapStateChanged(bool /*bInBattleMap*/) 
   // local player regains fighter selection, HUD, and camera context even if
   // the original travel RPC was missed.
   HandleReplicatedBattlePayload();
+  ReconcileBattleInputState(TEXT("HandleBattleMapStateChanged"));
 }
 
 void ASkaldPlayerController::HandleWorldStateChanged() {
@@ -5896,6 +5899,49 @@ void ASkaldPlayerController::UpdateBattleCameraMode() {
   }
 }
 
+void ASkaldPlayerController::ReconcileBattleInputState(const TCHAR* Context) {
+  if (!IsLocalController() || !CanCreateLocalUIWidget()) {
+    return;
+  }
+
+  if (!CachedGameInstance) {
+    CachedGameInstance = GetGameInstance<USkaldGameInstance>();
+  }
+
+  DetectBattleMap();
+  const bool bBattleMapActive =
+      bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap);
+  if (!bBattleMapActive) {
+    return;
+  }
+
+  UWidget* FocusWidget = nullptr;
+  if (FighterSelectionWidget && FighterSelectionWidget->IsInViewport()) {
+    FocusWidget = FighterSelectionWidget;
+  } else if (BattleHUD && BattleHUD->IsInViewport()) {
+    FocusWidget = BattleHUD;
+  } else if (MainHUD && MainHUD->IsInViewport()) {
+    FocusWidget = MainHUD;
+  }
+
+  UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
+      this, FocusWidget, EMouseLockMode::DoNotLock,
+      /*bHideCursorDuringCapture*/ false);
+  FocusGameViewport(this);
+  bShowMouseCursor = true;
+  bEnableClickEvents = true;
+  bEnableMouseOverEvents = true;
+  DefaultMouseCaptureMode = EMouseCaptureMode::NoCapture;
+  SetIgnoreMoveInput(false);
+  SetIgnoreLookInput(false);
+  UpdateBattleCameraMode();
+
+  UE_LOG(LogSkaldBattle, Verbose,
+         TEXT("BattleInputReconciler[%s]: Controller=%s BattleMap=%d FocusWidget=%s"),
+         Context ? Context : TEXT("Unknown"), *GetName(), bBattleMapActive ? 1 : 0,
+         *GetNameSafe(FocusWidget));
+}
+
 void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
   UE_LOG(LogSkaldUI, Log,
          TEXT("HandleFighterSelectionLockedIn: Controller=%s Local=%s Pawn=%s"),
@@ -5935,6 +5981,8 @@ void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
       !bBattleHUDVisible) {
     EnsureBattleHUDVisible();
   }
+
+  ReconcileBattleInputState(TEXT("HandleFighterSelectionLockedIn"));
 
   if (CachedGameInstance && CachedGameInstance->GridBattleManager)
   {
