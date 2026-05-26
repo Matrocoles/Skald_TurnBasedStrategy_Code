@@ -5624,7 +5624,9 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
       }
     }
 
-    if (bNeedsBattlePrepUI) {
+    const bool bNeedsStrategicInitiativeUI =
+        bAwaitingStrategicInitiativeRoll || PendingStrategicInitiativeRoll > 0;
+    if (bNeedsBattlePrepUI || bNeedsStrategicInitiativeUI) {
       if (!bShowMouseCursor || !bEnableClickEvents || !bEnableMouseOverEvents) {
         UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
             this, nullptr, EMouseLockMode::DoNotLock,
@@ -5874,8 +5876,9 @@ void ASkaldPlayerController::HandleFactionLockedIn() {
   bShowMouseCursor = true;
   bEnableClickEvents = true;
   bEnableMouseOverEvents = true;
-  DefaultMouseCaptureMode =
-      EMouseCaptureMode::CapturePermanently_IncludingInitialMouseDown;
+  // Never permanently capture in overview; that can trap focus/clicks in PIE
+  // and block interaction with initiative UI and even the editor window.
+  DefaultMouseCaptureMode = EMouseCaptureMode::NoCapture;
   if (UGameViewportClient* GameViewport = GetWorld() ? GetWorld()->GetGameViewport() : nullptr) {
     GameViewport->SetMouseCaptureMode(DefaultMouseCaptureMode);
   }
@@ -5953,8 +5956,7 @@ void ASkaldPlayerController::ReconcileBattleInputState(const TCHAR* Context) {
   bShowMouseCursor = true;
   bEnableClickEvents = true;
   bEnableMouseOverEvents = true;
-  DefaultMouseCaptureMode =
-      EMouseCaptureMode::CapturePermanently_IncludingInitialMouseDown;
+  DefaultMouseCaptureMode = EMouseCaptureMode::CaptureDuringMouseDown;
   if (UGameViewportClient* GameViewport = GetWorld() ? GetWorld()->GetGameViewport() : nullptr) {
     GameViewport->SetMouseCaptureMode(DefaultMouseCaptureMode);
   }
