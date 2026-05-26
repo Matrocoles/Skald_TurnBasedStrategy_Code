@@ -2447,6 +2447,15 @@ void ASkaldPlayerController::PlayerTick(float DeltaTime) {
     return;
   }
 
+  DetectBattleMap();
+  if (bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap)) {
+    APawn* ControlledPawn = GetPawn();
+    if (ControlledPawn && GetViewTarget() != ControlledPawn) {
+      SetViewTarget(ControlledPawn);
+      ReconcileBattleInputState(TEXT("PlayerTick.ViewTargetRepair"));
+    }
+  }
+
   // If the player has locked in their fighters and the battle manager became
   // available after the selection UI closed, ensure the battle HUD is
   // constructed and displayed.
@@ -5943,6 +5952,17 @@ void ASkaldPlayerController::ReconcileBattleInputState(const TCHAR* Context) {
   }
   SetIgnoreMoveInput(false);
   SetIgnoreLookInput(false);
+  APawn* ControlledPawn = GetPawn();
+  if (ControlledPawn) {
+    if (GetViewTarget() != ControlledPawn) {
+      SetViewTarget(ControlledPawn);
+    }
+  } else {
+    UE_LOG(LogSkaldBattle, Verbose,
+           TEXT("BattleInputReconciler[%s]: no possessed pawn yet for %s"),
+           Context ? Context : TEXT("Unknown"), *GetName());
+  }
+
   UpdateBattleCameraMode();
 
   UE_LOG(LogSkaldBattle, Verbose,
