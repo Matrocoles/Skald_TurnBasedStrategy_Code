@@ -1671,14 +1671,14 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     ASkaldPlayerController *OwningController =
         PS ? Cast<ASkaldPlayerController>(PS->GetOwner()) : nullptr;
     if (!IsValid(OwningController)) {
+      // During map transitions and early startup, PlayerState ownership can lag
+      // behind controller registration for a short period. Removing these
+      // PlayerStates here can incorrectly drop the local human entry and allow
+      // AI ownership to become the only remaining active participant.
       UE_LOG(LogSkald, Warning,
-             TEXT("TryInitializeWorldAndStart: Removing PlayerState %s with no "
-                  "controller"),
+             TEXT("TryInitializeWorldAndStart: Deferring PlayerState %s with no "
+                  "controller (will retry)"),
              *GetNameSafe(PS));
-      GS->RemovePlayerState(PS);
-      PlayerDataArray.RemoveAll([PS](const FS_PlayerData &Data) {
-        return Data.PlayerID == PS->GetPlayerId();
-      });
       bNeedsRetry = true;
       continue;
     }
