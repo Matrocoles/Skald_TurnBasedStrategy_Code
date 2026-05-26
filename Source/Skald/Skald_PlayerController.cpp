@@ -5544,6 +5544,14 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
            *GetName(), *UEnum::GetValueAsString(Phase), ReportedActiveId,
            bIsMyTurn ? TEXT("true") : TEXT("false"),
            bLocalTurnActive ? TEXT("true") : TEXT("false"));
+    UE_LOG(LogSkald, Log,
+           TEXT("[StartupAudit] TurnOwnership Controller=%s LocalStableId=%d CurrentPSStableId=%d ActiveId=%d Phase=%s BattlePhase=%s"),
+           *GetNameSafe(this), GetResolvedLocalPlayerId(),
+           GetPlayerState<ASkaldPlayerState>()
+               ? GetPlayerState<ASkaldPlayerState>()->GetStablePlayerId()
+               : INDEX_NONE,
+           ReportedActiveId, *UEnum::GetValueAsString(Phase),
+           *UEnum::GetValueAsString(BattlePhase));
   }
 
   if (MainHUD && !bTurnOwnershipStateUnchanged) {
@@ -6954,6 +6962,11 @@ void ASkaldPlayerController::ShowPendingStrategicInitiativeResult() {
   ASkald_PlayerCharacter *CameraPawn = Cast<ASkald_PlayerCharacter>(GetPawn());
   if (CameraPawn && !CameraPawn->IsBattleCameraActive() && CameraPawn->BeginStrategicInitiativeCameraView()) {
     bStrategicInitiativeCameraActive = true;
+    UE_LOG(LogSkald, Log,
+           TEXT("[StartupAudit] StrategicInitiativeCamera Begin Controller=%s Pawn=%s ActivePlayerId=%d LocalStableId=%d"),
+           *GetNameSafe(this), *GetNameSafe(CameraPawn),
+           CachedGameState ? CachedGameState->ActivePlayerId : INDEX_NONE,
+           GetResolvedLocalPlayerId());
     EnsureDiceManagerBindings();
   }
 
@@ -8706,6 +8719,11 @@ void ASkaldPlayerController::RestoreStrategicInitiativeCamera() {
   if (!bStrategicInitiativeCameraActive) {
     return;
   }
+  UE_LOG(LogSkald, Log,
+         TEXT("[StartupAudit] StrategicInitiativeCamera Restore Controller=%s ActivePlayerId=%d LocalStableId=%d"),
+         *GetNameSafe(this),
+         CachedGameState ? CachedGameState->ActivePlayerId : INDEX_NONE,
+         GetResolvedLocalPlayerId());
 
   bStrategicInitiativeCameraActive = false;
 
