@@ -1090,6 +1090,7 @@ private:
   void DetectBattleMap();
 
   void RequestBattleStateIfNeeded();
+  void ReconcileBattleInputState(const TCHAR* Context);
 
   void BuildPlayerDataArray(TArray<FS_PlayerData> &OutPlayers) const;
 
