@@ -3127,6 +3127,25 @@ void ASkaldGameMode::BeginArmyPlacementPhase() {
   ArmyPlacementLeader.Reset();
   PendingArmyPlacementAIController.Reset();
   PlacementIndex = -1;
+  if (ASkaldGameState* GS = GetGameState<ASkaldGameState>()) {
+    const int32 ActiveStableId = GS->ActivePlayerId;
+    if (ActiveStableId != INDEX_NONE) {
+      const TArray<ASkaldPlayerController*> Controllers = TurnManager->GetControllers();
+      for (int32 Index = 0; Index < Controllers.Num(); ++Index) {
+        ASkaldPlayerController* PC = Controllers[Index];
+        ASkaldPlayerState* PS = PC ? PC->GetPlayerState<ASkaldPlayerState>() : nullptr;
+        if (PS && PS->GetStablePlayerId() == ActiveStableId) {
+          // AdvanceArmyPlacement pre-increments PlacementIndex, so store
+          // previous slot to start with the active initiative winner.
+          PlacementIndex = Index - 1;
+          UE_LOG(LogSkald, Log,
+                 TEXT("BeginArmyPlacementPhase: preserving initiative leader StableId=%d Index=%d Controller=%s"),
+                 ActiveStableId, Index, *GetNameSafe(PC));
+          break;
+        }
+      }
+    }
+  }
   AdvanceArmyPlacement();
 }
 
