@@ -5624,14 +5624,27 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
       }
     }
 
+    const bool bHudAwaitingStrategicInitiative =
+        MainHUD && MainHUD->IsAwaitingStrategicInitiative();
     const bool bNeedsStrategicInitiativeUI =
-        bAwaitingStrategicInitiativeRoll || PendingStrategicInitiativeRoll > 0;
+        bAwaitingStrategicInitiativeRoll || PendingStrategicInitiativeRoll > 0 ||
+        bHudAwaitingStrategicInitiative;
     if (bNeedsBattlePrepUI || bNeedsStrategicInitiativeUI) {
-      if (!bShowMouseCursor || !bEnableClickEvents || !bEnableMouseOverEvents) {
-        UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
-            this, nullptr, EMouseLockMode::DoNotLock,
-            /*bHideCursorDuringCapture*/ false);
+      // Keep focus anchored to the active UI surface when strategic initiative
+      // is awaiting input. Passing nullptr can leave focus on the viewport and
+      // make clicks appear to register (SFX) without driving widget actions
+      // until OS focus is toggled (e.g. Win key).
+      UWidget* InputFocusWidget = nullptr;
+      if (bNeedsStrategicInitiativeUI && MainHUD && MainHUD->IsInViewport()) {
+        InputFocusWidget = MainHUD;
+      } else if (FighterSelectionWidget && FighterSelectionWidget->IsInViewport()) {
+        InputFocusWidget = FighterSelectionWidget;
+      } else if (BattleHUD && BattleHUD->IsInViewport()) {
+        InputFocusWidget = BattleHUD;
       }
+      UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
+          this, InputFocusWidget, EMouseLockMode::DoNotLock,
+          /*bHideCursorDuringCapture*/ false);
       bShowMouseCursor = true;
       bEnableClickEvents = true;
       bEnableMouseOverEvents = true;

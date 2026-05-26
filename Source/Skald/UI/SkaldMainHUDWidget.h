@@ -272,6 +272,9 @@ public:
   /** Toggle the HUD state while awaiting the strategic initiative roll. */
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD|Initiative")
   void SetAwaitingStrategicInitiative(bool bAwaiting);
+  bool IsAwaitingStrategicInitiative() const {
+    return bAwaitingStrategicInitiative;
+  }
 
   /** Show an in-progress enemy turn message without auto-hiding. */
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
