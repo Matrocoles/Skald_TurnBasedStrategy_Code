@@ -5624,7 +5624,9 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
       }
     }
 
-    if (bNeedsBattlePrepUI) {
+    const bool bNeedsStrategicInitiativeUI =
+        bAwaitingStrategicInitiativeRoll || PendingStrategicInitiativeRoll > 0;
+    if (bNeedsBattlePrepUI || bNeedsStrategicInitiativeUI) {
       if (!bShowMouseCursor || !bEnableClickEvents || !bEnableMouseOverEvents) {
         UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
             this, nullptr, EMouseLockMode::DoNotLock,
@@ -5874,8 +5876,9 @@ void ASkaldPlayerController::HandleFactionLockedIn() {
   bShowMouseCursor = true;
   bEnableClickEvents = true;
   bEnableMouseOverEvents = true;
-  DefaultMouseCaptureMode =
-      EMouseCaptureMode::CapturePermanently_IncludingInitialMouseDown;
+  // Never permanently capture in overview; that can trap focus/clicks in PIE
+  // and block interaction with initiative UI and even the editor window.
+  DefaultMouseCaptureMode = EMouseCaptureMode::NoCapture;
   if (UGameViewportClient* GameViewport = GetWorld() ? GetWorld()->GetGameViewport() : nullptr) {
     GameViewport->SetMouseCaptureMode(DefaultMouseCaptureMode);
   }
@@ -5953,8 +5956,7 @@ void ASkaldPlayerController::ReconcileBattleInputState(const TCHAR* Context) {
   bShowMouseCursor = true;
   bEnableClickEvents = true;
   bEnableMouseOverEvents = true;
-  DefaultMouseCaptureMode =
-      EMouseCaptureMode::CapturePermanently_IncludingInitialMouseDown;
+  DefaultMouseCaptureMode = EMouseCaptureMode::CaptureDuringMouseDown;
   if (UGameViewportClient* GameViewport = GetWorld() ? GetWorld()->GetGameViewport() : nullptr) {
     GameViewport->SetMouseCaptureMode(DefaultMouseCaptureMode);
   }
@@ -6932,11 +6934,10 @@ void ASkaldPlayerController::HandleAttackRollRequested() {
 }
 
 void ASkaldPlayerController::HandleStrategicInitiativeRollRequested() {
-  bAwaitingStrategicInitiativeRoll = false;
-
+  // Keep the local prompt active until the authoritative server response
+  // arrives; clearing too early can strand the player in a stale UI state if
+  // the request races with replicated startup updates.
   if (MainHUD) {
-    MainHUD->HideStrategicInitiativePrompt();
-
     const FText RollingText =
         NSLOCTEXT("Skald", "StrategicInitiativeRolling",
                   "Rolling for initiative...");
@@ -7032,6 +7033,22 @@ void ASkaldPlayerController::ClientPromptStrategicInitiative_Implementation(
     MainHUD->ShowStrategicInitiativePrompt(PromptText);
     MainHUD->SetAwaitingStrategicInitiative(true);
   }
+
+  // Strategic-initiative prompt is a pure UI interaction in overview. Release
+  // viewport capture so clicks do not get trapped in PIE and editor controls
+  // (including Stop) remain reachable.
+  UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
+      this, MainHUD, EMouseLockMode::DoNotLock, false);
+  DefaultMouseCaptureMode = EMouseCaptureMode::NoCapture;
+  if (UGameViewportClient *GameViewport =
+          GetWorld() ? GetWorld()->GetGameViewport() : nullptr) {
+    GameViewport->SetMouseCaptureMode(DefaultMouseCaptureMode);
+  }
+  bShowMouseCursor = true;
+  bEnableClickEvents = true;
+  bEnableMouseOverEvents = true;
+  SetIgnoreMoveInput(false);
+  SetIgnoreLookInput(false);
 }
 
 void ASkaldPlayerController::ServerConfirmStrategicInitiativeRollReady_Implementation() {

@@ -1864,6 +1864,32 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     bTurnsStarted = true;
   }
 
+  // If startup state drifts into an initialized-but-not-started path without
+  // any initiative rolls recorded, force the strategic initiative prompt before
+  // StartTurns. This prevents default controller ordering (often AI first) from
+  // silently starting the match and leaving overview UI actions as no-ops.
+  bool bAnyInitiativeRollRecorded = false;
+  for (APlayerState *PSBase : GS->PlayerArray) {
+    if (const ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
+      if (PS->InitiativeRoll > 0) {
+        bAnyInitiativeRollRecorded = true;
+        break;
+      }
+    }
+  }
+
+  const bool bShouldForceStrategicInitiative =
+      bReadyToStart && !bTurnsStarted && TurnManager &&
+      !TurnManager->HasTurnsStarted() && !bAwaitingStrategicInitiativeInput &&
+      !bStrategicInitiativePromptIssued && !bAnyInitiativeRollRecorded;
+
+  if (bShouldForceStrategicInitiative) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("TryInitializeWorldAndStart: forcing strategic initiative before StartTurns (no recorded initiative rolls)."));
+    BeginStrategicInitiativePhase();
+    return;
+  }
+
   if (bWorldInitialized && bReadyToStart && !bTurnsStarted && TurnManager &&
       !TurnManager->HasTurnsStarted() &&
       TurnManager->GetCurrentPhase() != ETurnPhase::ArmyPlacement &&
@@ -3346,16 +3372,29 @@ int32 ASkaldGameMode::ResolveExpectedControllerCount() const {
 
   if (const ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
     TSet<const ASkaldPlayerController *> UniqueControllers;
+    TSet<int32> UniqueStableIds;
     for (const APlayerState *PlayerStateBase : GS->PlayerArray) {
       const ASkaldPlayerState *PS =
           Cast<ASkaldPlayerState>(PlayerStateBase);
+      if (!PS) {
+        continue;
+      }
+
+      const int32 StableId = PS->GetStablePlayerId();
+      if (StableId != INDEX_NONE) {
+        UniqueStableIds.Add(StableId);
+      }
+
       const ASkaldPlayerController *ControllerOwner =
-          PS ? Cast<ASkaldPlayerController>(PS->GetOwner()) : nullptr;
+          Cast<ASkaldPlayerController>(PS->GetOwner());
       if (ControllerOwner) {
         UniqueControllers.Add(ControllerOwner);
       }
     }
-    ExpectedCount = UniqueControllers.Num();
+    // During seamless travel startup a PlayerState can exist briefly without
+    // an owning controller. Count stable IDs too so army placement waits for
+    // those controllers instead of starting with an incomplete roster.
+    ExpectedCount = FMath::Max(UniqueControllers.Num(), UniqueStableIds.Num());
   }
 
   const USkaldGameInstance *GI =
