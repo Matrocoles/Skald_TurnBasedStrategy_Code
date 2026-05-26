@@ -3130,9 +3130,9 @@ void ASkaldGameMode::BeginArmyPlacementPhase() {
   if (ASkaldGameState* GS = GetGameState<ASkaldGameState>()) {
     const int32 ActiveStableId = GS->ActivePlayerId;
     if (ActiveStableId != INDEX_NONE) {
-      const TArray<ASkaldPlayerController*> Controllers = TurnManager->GetControllers();
-      for (int32 Index = 0; Index < Controllers.Num(); ++Index) {
-        ASkaldPlayerController* PC = Controllers[Index];
+      const TArray<ASkaldPlayerController*> OrderedControllers = TurnManager->GetControllers();
+      for (int32 Index = 0; Index < OrderedControllers.Num(); ++Index) {
+        ASkaldPlayerController* PC = OrderedControllers[Index];
         ASkaldPlayerState* PS = PC ? PC->GetPlayerState<ASkaldPlayerState>() : nullptr;
         if (PS && PS->GetStablePlayerId() == ActiveStableId) {
           // AdvanceArmyPlacement pre-increments PlacementIndex, so store
