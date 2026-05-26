@@ -3346,16 +3346,29 @@ int32 ASkaldGameMode::ResolveExpectedControllerCount() const {
 
   if (const ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
     TSet<const ASkaldPlayerController *> UniqueControllers;
+    TSet<int32> UniqueStableIds;
     for (const APlayerState *PlayerStateBase : GS->PlayerArray) {
       const ASkaldPlayerState *PS =
           Cast<ASkaldPlayerState>(PlayerStateBase);
+      if (!PS) {
+        continue;
+      }
+
+      const int32 StableId = PS->GetStablePlayerId();
+      if (StableId != INDEX_NONE) {
+        UniqueStableIds.Add(StableId);
+      }
+
       const ASkaldPlayerController *ControllerOwner =
-          PS ? Cast<ASkaldPlayerController>(PS->GetOwner()) : nullptr;
+          Cast<ASkaldPlayerController>(PS->GetOwner());
       if (ControllerOwner) {
         UniqueControllers.Add(ControllerOwner);
       }
     }
-    ExpectedCount = UniqueControllers.Num();
+    // During seamless travel startup a PlayerState can exist briefly without
+    // an owning controller. Count stable IDs too so army placement waits for
+    // those controllers instead of starting with an incomplete roster.
+    ExpectedCount = FMath::Max(UniqueControllers.Num(), UniqueStableIds.Num());
   }
 
   const USkaldGameInstance *GI =
