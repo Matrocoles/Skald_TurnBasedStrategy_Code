@@ -9,6 +9,7 @@
 #include "Components/InputComponent.h"
 #include "Engine/EngineTypes.h"
 #include "Engine/LocalPlayer.h"
+#include "Engine/GameViewportClient.h"
 #include "Engine/Level.h"
 #include "EngineUtils.h"
 #include "FighterDataLibrary.h"
@@ -5858,7 +5859,9 @@ void ASkaldPlayerController::HandleFactionLockedIn() {
   bEnableMouseOverEvents = true;
   DefaultMouseCaptureMode =
       EMouseCaptureMode::CapturePermanently_IncludingInitialMouseDown;
-  SetMouseCaptureMode(DefaultMouseCaptureMode);
+  if (UGameViewportClient* GameViewport = GetWorld() ? GetWorld()->GetGameViewport() : nullptr) {
+    GameViewport->SetMouseCaptureMode(DefaultMouseCaptureMode);
+  }
   SetIgnoreMoveInput(false);
   SetIgnoreLookInput(false);
   RefreshFactionCursorFromState();
@@ -5935,7 +5938,9 @@ void ASkaldPlayerController::ReconcileBattleInputState(const TCHAR* Context) {
   bEnableMouseOverEvents = true;
   DefaultMouseCaptureMode =
       EMouseCaptureMode::CapturePermanently_IncludingInitialMouseDown;
-  SetMouseCaptureMode(DefaultMouseCaptureMode);
+  if (UGameViewportClient* GameViewport = GetWorld() ? GetWorld()->GetGameViewport() : nullptr) {
+    GameViewport->SetMouseCaptureMode(DefaultMouseCaptureMode);
+  }
   SetIgnoreMoveInput(false);
   SetIgnoreLookInput(false);
   UpdateBattleCameraMode();
