@@ -1864,6 +1864,32 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     bTurnsStarted = true;
   }
 
+  // If startup state drifts into an initialized-but-not-started path without
+  // any initiative rolls recorded, force the strategic initiative prompt before
+  // StartTurns. This prevents default controller ordering (often AI first) from
+  // silently starting the match and leaving overview UI actions as no-ops.
+  bool bAnyInitiativeRollRecorded = false;
+  for (APlayerState *PSBase : GS->PlayerArray) {
+    if (const ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase)) {
+      if (PS->InitiativeRoll > 0) {
+        bAnyInitiativeRollRecorded = true;
+        break;
+      }
+    }
+  }
+
+  const bool bShouldForceStrategicInitiative =
+      bReadyToStart && !bTurnsStarted && TurnManager &&
+      !TurnManager->HasTurnsStarted() && !bAwaitingStrategicInitiativeInput &&
+      !bStrategicInitiativePromptIssued && !bAnyInitiativeRollRecorded;
+
+  if (bShouldForceStrategicInitiative) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("TryInitializeWorldAndStart: forcing strategic initiative before StartTurns (no recorded initiative rolls)."));
+    BeginStrategicInitiativePhase();
+    return;
+  }
+
   if (bWorldInitialized && bReadyToStart && !bTurnsStarted && TurnManager &&
       !TurnManager->HasTurnsStarted() &&
       TurnManager->GetCurrentPhase() != ETurnPhase::ArmyPlacement &&
