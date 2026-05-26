@@ -1388,6 +1388,23 @@ void ASkaldGameMode::NormalizePlayerStateIds() {
     }
   }
 
+  {
+    FString Snapshot;
+    for (APlayerState *PSBase : GS->PlayerArray) {
+      const ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase);
+      if (!PS) {
+        continue;
+      }
+      Snapshot += FString::Printf(
+          TEXT("[Name=%s PlayerId=%d StableId=%d AI=%d Locked=%d] "),
+          *PS->GetResolvedPlayerName(TEXT("NormalizePlayerStateIds_Log")),
+          PS->GetPlayerId(), PS->GetStablePlayerId(), PS->bIsAI ? 1 : 0,
+          PS->bHasLockedIn ? 1 : 0);
+    }
+    UE_LOG(LogSkald, Log, TEXT("[StartupAudit] NormalizePlayerStateIds Snapshot %s"),
+           *Snapshot);
+  }
+
   auto RemoveFromPool = [](TArray<int32> &Pool, int32 Value) {
     const int32 Index = Pool.Find(Value);
     if (Index != INDEX_NONE) {
