@@ -1388,6 +1388,23 @@ void ASkaldGameMode::NormalizePlayerStateIds() {
     }
   }
 
+  {
+    FString Snapshot;
+    for (APlayerState *PSBase : GS->PlayerArray) {
+      const ASkaldPlayerState *PS = Cast<ASkaldPlayerState>(PSBase);
+      if (!PS) {
+        continue;
+      }
+      Snapshot += FString::Printf(
+          TEXT("[Name=%s PlayerId=%d StableId=%d AI=%d Locked=%d] "),
+          *PS->GetResolvedPlayerName(TEXT("NormalizePlayerStateIds_Log")),
+          PS->GetPlayerId(), PS->GetStablePlayerId(), PS->bIsAI ? 1 : 0,
+          PS->bHasLockedIn ? 1 : 0);
+    }
+    UE_LOG(LogSkald, Log, TEXT("[StartupAudit] NormalizePlayerStateIds Snapshot %s"),
+           *Snapshot);
+  }
+
   auto RemoveFromPool = [](TArray<int32> &Pool, int32 Value) {
     const int32 Index = Pool.Find(Value);
     if (Index != INDEX_NONE) {
@@ -1654,14 +1671,14 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     ASkaldPlayerController *OwningController =
         PS ? Cast<ASkaldPlayerController>(PS->GetOwner()) : nullptr;
     if (!IsValid(OwningController)) {
+      // During map transitions and early startup, PlayerState ownership can lag
+      // behind controller registration for a short period. Removing these
+      // PlayerStates here can incorrectly drop the local human entry and allow
+      // AI ownership to become the only remaining active participant.
       UE_LOG(LogSkald, Warning,
-             TEXT("TryInitializeWorldAndStart: Removing PlayerState %s with no "
-                  "controller"),
+             TEXT("TryInitializeWorldAndStart: Deferring PlayerState %s with no "
+                  "controller (will retry)"),
              *GetNameSafe(PS));
-      GS->RemovePlayerState(PS);
-      PlayerDataArray.RemoveAll([PS](const FS_PlayerData &Data) {
-        return Data.PlayerID == PS->GetPlayerId();
-      });
       bNeedsRetry = true;
       continue;
     }
@@ -3110,6 +3127,25 @@ void ASkaldGameMode::BeginArmyPlacementPhase() {
   ArmyPlacementLeader.Reset();
   PendingArmyPlacementAIController.Reset();
   PlacementIndex = -1;
+  if (ASkaldGameState* GS = GetGameState<ASkaldGameState>()) {
+    const int32 ActiveStableId = GS->ActivePlayerId;
+    if (ActiveStableId != INDEX_NONE) {
+      const TArray<ASkaldPlayerController*> Controllers = TurnManager->GetControllers();
+      for (int32 Index = 0; Index < Controllers.Num(); ++Index) {
+        ASkaldPlayerController* PC = Controllers[Index];
+        ASkaldPlayerState* PS = PC ? PC->GetPlayerState<ASkaldPlayerState>() : nullptr;
+        if (PS && PS->GetStablePlayerId() == ActiveStableId) {
+          // AdvanceArmyPlacement pre-increments PlacementIndex, so store
+          // previous slot to start with the active initiative winner.
+          PlacementIndex = Index - 1;
+          UE_LOG(LogSkald, Log,
+                 TEXT("BeginArmyPlacementPhase: preserving initiative leader StableId=%d Index=%d Controller=%s"),
+                 ActiveStableId, Index, *GetNameSafe(PC));
+          break;
+        }
+      }
+    }
+  }
   AdvanceArmyPlacement();
 }
 
