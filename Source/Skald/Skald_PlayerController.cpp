@@ -3773,7 +3773,7 @@ bool ASkaldPlayerController::IsMyTurn() const {
   // CurrentTurnIndex still points at a default roster entry. Treat this state
   // as "no owner yet" so local HUD actions (e.g. initiative button paths) do
   // not run optimistic local-turn logic that server authority can reject.
-  const ASkaldTurnManager* LocalTurnManager = TurnManager;
+  const ATurnManager* LocalTurnManager = TurnManager;
   if (!LocalTurnManager && World) {
     LocalTurnManager = World->GetAuthGameMode<ASkaldGameMode>()
                            ? World->GetAuthGameMode<ASkaldGameMode>()
