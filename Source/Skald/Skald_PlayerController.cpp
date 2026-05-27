@@ -3769,6 +3769,21 @@ bool ASkaldPlayerController::IsMyTurn() const {
     return GameState->ActivePlayerId == MyStableId;
   }
 
+  // During startup, replicated active-id can transiently be INDEX_NONE while
+  // CurrentTurnIndex still points at a default roster entry. Treat this state
+  // as "no owner yet" so local HUD actions (e.g. initiative button paths) do
+  // not run optimistic local-turn logic that server authority can reject.
+  const ASkaldTurnManager* LocalTurnManager = TurnManager;
+  if (!LocalTurnManager && World) {
+    LocalTurnManager = World->GetAuthGameMode<ASkaldGameMode>()
+                           ? World->GetAuthGameMode<ASkaldGameMode>()
+                                 ->GetTurnManager()
+                           : nullptr;
+  }
+  if (LocalTurnManager && !LocalTurnManager->HasTurnsStarted()) {
+    return false;
+  }
+
   if (ASkaldPlayerState *Current = GameState->GetCurrentPlayer()) {
     return Current->GetStablePlayerId() == MyStableId;
   }
