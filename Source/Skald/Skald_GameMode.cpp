@@ -1510,6 +1510,13 @@ void ASkaldGameMode::NormalizePlayerStateIds() {
 }
 
 void ASkaldGameMode::TryInitializeWorldAndStart() {
+  auto ScheduleRetryInit = [this]() {
+    FTimerDelegate RetryInit = FTimerDelegate::CreateUObject(
+        this, &ASkaldGameMode::TryInitializeWorldAndStart);
+    GetWorldTimerManager().ClearTimer(RetryInitTimerHandle);
+    GetWorldTimerManager().SetTimer(RetryInitTimerHandle, RetryInit,
+                                    RetryInitDelay, false);
+  };
   ASkaldGameState *GS = GetGameState<ASkaldGameState>();
   if (!GS || !TurnManager) {
     return;
@@ -1607,12 +1614,7 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
           GI && (GI->bResumeTurns || GI->GetPendingTravelSnapshot().Num() > 0 ||
                  GI->CachedWorldMapTerritories.Num() > 0);
       if (bShouldRetryRestore) {
-        FTimerDelegate RetryInit = FTimerDelegate::CreateUObject(
-            this, &ASkaldGameMode::TryInitializeWorldAndStart);
-        GetWorldTimerManager().ClearTimer(RetryInitTimerHandle);
-        GetWorldTimerManager().SetTimer(RetryInitTimerHandle, RetryInit,
-                                        RetryInitDelay, false);
-        GetWorldTimerManager().SetTimerForNextTick(RetryInit);
+        ScheduleRetryInit();
         return;
       }
       bWantsResume = GI && GI->bResumeTurns;
@@ -1655,12 +1657,7 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
                           ExpectedControllerCount));
     }
 
-    FTimerDelegate RetryInit = FTimerDelegate::CreateUObject(
-        this, &ASkaldGameMode::TryInitializeWorldAndStart);
-    GetWorldTimerManager().ClearTimer(RetryInitTimerHandle);
-    GetWorldTimerManager().SetTimer(RetryInitTimerHandle, RetryInit,
-                                    RetryInitDelay, false);
-    GetWorldTimerManager().SetTimerForNextTick(RetryInit);
+    ScheduleRetryInit();
     return;
   }
   TSet<ASkaldPlayerController *> UniqueControllers;
@@ -1717,12 +1714,7 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     FTimerDelegate RefreshDelegate =
         FTimerDelegate::CreateUObject(this, &ASkaldGameMode::RefreshHUDs);
     GetWorldTimerManager().SetTimerForNextTick(RefreshDelegate);
-    FTimerDelegate RetryInit = FTimerDelegate::CreateUObject(
-        this, &ASkaldGameMode::TryInitializeWorldAndStart);
-    GetWorldTimerManager().ClearTimer(RetryInitTimerHandle);
-    GetWorldTimerManager().SetTimer(RetryInitTimerHandle, RetryInit,
-                                    RetryInitDelay, false);
-    GetWorldTimerManager().SetTimerForNextTick(RetryInit);
+    ScheduleRetryInit();
     return;
   }
 
@@ -1730,12 +1722,7 @@ void ASkaldGameMode::TryInitializeWorldAndStart() {
     const bool bResumed =
         TurnManager && TurnManager->AttemptResumeSavedTurnState();
     if (!bResumed) {
-      FTimerDelegate RetryInit = FTimerDelegate::CreateUObject(
-          this, &ASkaldGameMode::TryInitializeWorldAndStart);
-      GetWorldTimerManager().ClearTimer(RetryInitTimerHandle);
-      GetWorldTimerManager().SetTimer(RetryInitTimerHandle, RetryInit,
-                                      RetryInitDelay, false);
-      GetWorldTimerManager().SetTimerForNextTick(RetryInit);
+      ScheduleRetryInit();
       return;
     }
 
