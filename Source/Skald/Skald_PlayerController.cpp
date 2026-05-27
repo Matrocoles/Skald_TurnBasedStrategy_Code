@@ -5573,6 +5573,27 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
     MainHUD->SyncPhaseButtons(bIsMyTurn);
   }
 
+  const bool bHudAwaitingStrategicInitiative =
+      MainHUD && MainHUD->IsAwaitingStrategicInitiative();
+  const bool bNeedsStrategicInitiativeUI =
+      bAwaitingStrategicInitiativeRoll || PendingStrategicInitiativeRoll > 0 ||
+      bHudAwaitingStrategicInitiative;
+
+  // Strategic initiative can become active while turn ownership is still
+  // settling. Force UI-focused input mode whenever that overlay is visible so
+  // the first click is consumed by the button action instead of just restoring
+  // focus/capture to the PIE viewport.
+  if (bNeedsStrategicInitiativeUI && MainHUD && MainHUD->IsInViewport()) {
+    UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
+        this, MainHUD, EMouseLockMode::DoNotLock,
+        /*bHideCursorDuringCapture*/ false);
+    bShowMouseCursor = true;
+    bEnableClickEvents = true;
+    bEnableMouseOverEvents = true;
+    SetIgnoreMoveInput(false);
+    SetIgnoreLookInput(false);
+  }
+
   // Keep fighter-selection interaction stable even if replicated turn/battle
   // flags momentarily lag. Without this guard, turn-ownership refreshes can
   // fall through to the non-active-player branch and force GameOnly input,
@@ -5639,11 +5660,6 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
       }
     }
 
-    const bool bHudAwaitingStrategicInitiative =
-        MainHUD && MainHUD->IsAwaitingStrategicInitiative();
-    const bool bNeedsStrategicInitiativeUI =
-        bAwaitingStrategicInitiativeRoll || PendingStrategicInitiativeRoll > 0 ||
-        bHudAwaitingStrategicInitiative;
     if (bNeedsBattlePrepUI || bNeedsStrategicInitiativeUI) {
       // Keep focus anchored to the active UI surface when strategic initiative
       // is awaiting input. Passing nullptr can leave focus on the viewport and
