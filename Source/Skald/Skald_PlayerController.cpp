@@ -6076,17 +6076,12 @@ void ASkaldPlayerController::ReconcileBattleInputState(const TCHAR* Context) {
   }
   SetIgnoreMoveInput(false);
   SetIgnoreLookInput(false);
-  const bool bBattleUIActive =
-      (FighterSelectionWidget && FighterSelectionWidget->IsInViewport()) ||
-      (BattleHUD && BattleHUD->IsInViewport()) || bBattleHUDReadyToShow ||
-      bBattleHUDVisible;
-
   APawn* ControlledPawn = GetPawn();
-  if (bBattleUIActive && ControlledPawn) {
+  if (ControlledPawn) {
     if (GetViewTarget() != ControlledPawn) {
       SetViewTarget(ControlledPawn);
     }
-  } else if (bBattleUIActive && !ControlledPawn) {
+  } else {
     UE_LOG(LogSkaldBattle, Verbose,
            TEXT("BattleInputReconciler[%s]: no possessed pawn yet for %s"),
            Context ? Context : TEXT("Unknown"), *GetName());
