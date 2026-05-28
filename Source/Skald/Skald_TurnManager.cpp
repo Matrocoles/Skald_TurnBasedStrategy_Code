@@ -1050,8 +1050,7 @@ void ATurnManager::SyncGameStateTurnIndex() {
     if (const USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
       const FSkaldTravelState &TravelState = GI->GetTravelState();
       const bool bBattleTurnStateFrozen =
-          GI->bTurnStateFrozenForTravel || GI->IsTravelPending() ||
-          GI->bIsInBattleMap || GS->BattlePhase != EBattlePhase::None;
+          GI->bTurnStateFrozenForTravel || GI->IsTravelPending();
       const int32 FrozenActivePlayerId =
           TravelState.AttackerPlayerId > 0 ? TravelState.AttackerPlayerId
                                            : GS->ActivePlayerId;
