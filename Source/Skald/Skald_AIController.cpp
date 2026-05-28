@@ -3224,27 +3224,23 @@ void ASkaldAIController::HandleBattleMapExit() {
 }
 
 void ASkaldAIController::ScheduleTryActivateNextFighter() {
-  if (CachedBattleManager.IsValid() &&
-      CachedBattleManager->IsAwaitingAttackPresentation()) {
-    if (UWorld *World = GetWorld()) {
-      World->GetTimerManager().ClearTimer(ActivationGapTimerHandle);
-    }
-    return;
-  }
+  float Delay = ActivationGapDelay;
 
   if (CachedBattleManager.IsValid() &&
-      CachedBattleManager->IsAwaitingInitiativeRoll()) {
-    if (UWorld *World = GetWorld()) {
-      World->GetTimerManager().ClearTimer(ActivationGapTimerHandle);
-    }
-    return;
+      (CachedBattleManager->IsAwaitingAttackPresentation() ||
+       CachedBattleManager->IsAwaitingInitiativeRoll())) {
+    // Battle startup can race delegate binding against the initiative and
+    // presentation phases. Keep a lightweight retry alive so an AI side that
+    // wins initiative cannot miss the single OnRoundStarted notification and
+    // leave the battle waiting with no active fighter.
+    Delay = FMath::Max(0.1f, FMath::Min(ActivationGapDelay, 0.25f));
   }
 
   if (UWorld *World = GetWorld()) {
     World->GetTimerManager().ClearTimer(ActivationGapTimerHandle);
     World->GetTimerManager().SetTimer(
         ActivationGapTimerHandle, this, &ASkaldAIController::TryActivateNextFighter,
-        ActivationGapDelay, false);
+        Delay, false);
   }
 }
 
@@ -3278,10 +3274,12 @@ void ASkaldAIController::TryActivateNextFighter() {
   }
 
   if (CachedBattleManager->IsAwaitingAttackPresentation()) {
+    ScheduleTryActivateNextFighter();
     return;
   }
 
   if (CachedBattleManager->IsAwaitingInitiativeRoll()) {
+    ScheduleTryActivateNextFighter();
     return;
   }
 
