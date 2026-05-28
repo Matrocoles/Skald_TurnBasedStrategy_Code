@@ -3637,12 +3637,32 @@ void ASkaldPlayerController::DetectBattleMap() {
   if (!CachedGameInstance) {
     CachedGameInstance = GetGameInstance<USkaldGameInstance>();
   }
-  // Battle maps are now streamed exclusively into the persistent world.
-  // Current level name and map-descriptor checks are no longer reliable
-  // indicators of battle context because the active UWorld does not switch.
-  // Treat the game-instance streamed-battle flag as the authoritative source.
+  // Battle maps are streamed into the persistent world, so the current UWorld
+  // name is not a reliable indicator. Prefer the game-instance battle flag, but
+  // recover if it was cleared by a persistent-world BeginPlay after the streamed
+  // battle level/manager was already initialized.
   if (CachedGameInstance) {
     bDetectedBattleMap = CachedGameInstance->bIsInBattleMap;
+
+    if (!bDetectedBattleMap) {
+      if (const USkaldBattleLevelManager* BattleLevelManager =
+              CachedGameInstance->GetBattleLevelManager()) {
+        bDetectedBattleMap = BattleLevelManager->IsBattleLevelActive() ||
+                             BattleLevelManager->IsBattleLevelFullyReady();
+      }
+    }
+
+    if (!bDetectedBattleMap) {
+      bDetectedBattleMap = CachedGameInstance->GridBattleManager != nullptr ||
+                           CachedGameInstance->GetActiveBattleGameMode() != nullptr;
+    }
+
+    if (bDetectedBattleMap && !CachedGameInstance->bIsInBattleMap) {
+      UE_LOG(LogSkaldBattle, Warning,
+             TEXT("DetectBattleMap: restoring streamed battle-map active flag for %s"),
+             *GetName());
+      CachedGameInstance->SetBattleMapActive(true);
+    }
   }
 
   bIsBattleMap = bDetectedBattleMap;
