@@ -6107,6 +6107,30 @@ void ASkaldPlayerController::HandlePostLockInBattleInputReconcileTick() {
 
   const bool bBattleMapActive =
       bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap);
+
+  if (bBattleMapActive) {
+    InitializeBattleHUD();
+    if (CachedGameInstance && CachedGameInstance->GridBattleManager &&
+        !bBattleHUDVisible) {
+      EnsureBattleHUDVisible();
+    }
+    UpdateBattleCameraMode();
+    UpdateBattleHUDButtons();
+
+    UWidgetBlueprintLibrary::SetInputMode_GameOnly(this);
+    FocusGameViewport(this);
+    bShowMouseCursor = true;
+    bEnableClickEvents = true;
+    bEnableMouseOverEvents = true;
+    DefaultMouseCaptureMode = EMouseCaptureMode::CaptureDuringMouseDown;
+    if (UGameViewportClient* GameViewport =
+            World->GetGameViewport()) {
+      GameViewport->SetMouseCaptureMode(DefaultMouseCaptureMode);
+    }
+    SetIgnoreMoveInput(false);
+    SetIgnoreLookInput(false);
+  }
+
   constexpr int32 MaxRetries = 20;
   ++PostLockInBattleInputRetryCount;
 
@@ -6131,29 +6155,9 @@ void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
 
   bBattleHUDReadyToShow = true;
 
-  // Ensure the HUD is initialized so the controller is bound to active-fighter
-  // updates even if no pawn has been selected yet.
-  InitializeBattleHUD();
-
   SelectedFighter = nullptr;
   LockedActiveFighter = nullptr;
   CancelCommandMode();
-  UpdateBattleHUDButtons();
-
-  // Lock-in closes the selection modal and hands control back to battle input.
-  // Use game-only input so camera drag/rotate works immediately, while still
-  // keeping cursor + click traces enabled for pawn selection.
-  UWidgetBlueprintLibrary::SetInputMode_GameOnly(this);
-  FocusGameViewport(this);
-  bShowMouseCursor = true;
-  bEnableClickEvents = true;
-  bEnableMouseOverEvents = true;
-  DefaultMouseCaptureMode = EMouseCaptureMode::CaptureDuringMouseDown;
-  if (UGameViewportClient* GameViewport = GetWorld() ? GetWorld()->GetGameViewport() : nullptr) {
-    GameViewport->SetMouseCaptureMode(DefaultMouseCaptureMode);
-  }
-  SetIgnoreMoveInput(false);
-  SetIgnoreLookInput(false);
 
   if (!CachedGameInstance) {
     CachedGameInstance = GetGameInstance<USkaldGameInstance>();
@@ -6173,12 +6177,44 @@ void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
     }
   }
 
-  if (CachedGameInstance && CachedGameInstance->GridBattleManager &&
-      !bBattleHUDVisible) {
-    EnsureBattleHUDVisible();
+  DetectBattleMap();
+  const bool bBattleMapActive =
+      bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap);
+
+  if (bBattleMapActive) {
+    // Ensure the HUD/camera/input stack is initialized only after battle-map
+    // activation is visible on this controller.
+    InitializeBattleHUD();
+    if (CachedGameInstance && CachedGameInstance->GridBattleManager &&
+        !bBattleHUDVisible) {
+      EnsureBattleHUDVisible();
+    }
+    UpdateBattleHUDButtons();
+    UpdateBattleCameraMode();
+
+    // Lock-in closes the selection modal and hands control back to battle input.
+    // Use game-only input so camera drag/rotate works immediately, while still
+    // keeping cursor + click traces enabled for pawn selection.
+    UWidgetBlueprintLibrary::SetInputMode_GameOnly(this);
+    FocusGameViewport(this);
+    bShowMouseCursor = true;
+    bEnableClickEvents = true;
+    bEnableMouseOverEvents = true;
+    DefaultMouseCaptureMode = EMouseCaptureMode::CaptureDuringMouseDown;
+    if (UGameViewportClient* GameViewport =
+            GetWorld() ? GetWorld()->GetGameViewport() : nullptr) {
+      GameViewport->SetMouseCaptureMode(DefaultMouseCaptureMode);
+    }
+    SetIgnoreMoveInput(false);
+    SetIgnoreLookInput(false);
+
+    ReconcileBattleInputState(TEXT("HandleFighterSelectionLockedIn"));
+  } else {
+    UE_LOG(LogSkaldBattle, Verbose,
+           TEXT("HandleFighterSelectionLockedIn: Waiting for battle-map active flag before HUD/camera/input setup on %s"),
+           *GetName());
   }
 
-  ReconcileBattleInputState(TEXT("HandleFighterSelectionLockedIn"));
   SchedulePostLockInBattleInputReconcile();
 
   if (CachedGameInstance && CachedGameInstance->GridBattleManager)
