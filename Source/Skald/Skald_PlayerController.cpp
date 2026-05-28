@@ -3238,10 +3238,12 @@ void ASkaldPlayerController::ShowOverworldHUD() {
 void ASkaldPlayerController::HideOverworldHUDForBattle() {
   HideMainHUD();
 
-  bBattleHUDVisible = false;
-  if (BattleHudWidget) {
-    BattleHudWidget->SetVisibility(ESlateVisibility::Collapsed);
-  }
+  // Only tear down overworld presentation here. This function is called by
+  // battle-map detection/reconciliation paths after fighter lock-in, so
+  // collapsing the battle HUD here races with EnsureBattleHUDVisible() and can
+  // leave the local player with no battle HUD or camera input once streaming
+  // finishes. Battle HUD lifetime/visibility is managed by
+  // EnsureBattleHUDVisible(), ShowOverworldHUD(), and battle-end cleanup.
 
   if (UWorld *World = GetWorld()) {
     if (AWorldMap *WorldMap = Cast<AWorldMap>(
@@ -3659,8 +3661,22 @@ void ASkaldPlayerController::DetectBattleMap() {
 
   if (bIsBattleMap) {
     HideOverworldHUDForBattle();
+
+    const bool bSelectionVisible =
+        FighterSelectionWidget && FighterSelectionWidget->IsInViewport() &&
+        FighterSelectionWidget->GetVisibility() != ESlateVisibility::Collapsed &&
+        FighterSelectionWidget->GetVisibility() != ESlateVisibility::Hidden;
+    const bool bBattlePhaseAllowsHud =
+        !CachedGameState ||
+        CachedGameState->BattlePhase != EBattlePhase::FighterSelection;
+
+    // The battle manager is created after Deploy/TryLaunchBattle, while
+    // streamed level callbacks can re-run DetectBattleMap in between. If a
+    // previous pass already consumed bBattleHUDReadyToShow, still restore the
+    // HUD once there is an active battle manager and no modal selection widget.
     if (CachedGameInstance && CachedGameInstance->GridBattleManager &&
-        bBattleHUDReadyToShow) {
+        !bSelectionVisible && bBattlePhaseAllowsHud &&
+        (bBattleHUDReadyToShow || !bBattleHUDVisible)) {
       EnsureBattleHUDVisible();
     }
   } else {
