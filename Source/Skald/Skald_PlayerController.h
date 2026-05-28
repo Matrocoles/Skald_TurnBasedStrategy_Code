@@ -833,6 +833,8 @@ public:
 
   UFUNCTION(Client, Reliable)
   void ClientEnemyRetreated();
+  UFUNCTION(Client, Reliable)
+  void ClientRetreatSuccessful();
 
   UFUNCTION(Client, Reliable)
   void ClientShowTurnAnnouncement(const FString &PlayerName, bool bIsMyTurn);
@@ -975,6 +977,7 @@ public:
   bool TryShowPendingReadyPrompt();
   bool ShouldDisplayPrepareForBattlePrompt(
       const FPrepareForBattlePromptData &PromptData);
+  bool IsPrepareForBattlePromptSuppressed() const;
   void ResetPendingReadyPromptState();
   void ShowPrepareForBattlePromptLocal_Internal(
       const FPrepareForBattlePromptData &PromptData);
@@ -994,6 +997,7 @@ public:
   void CompleteRetreatSelectionLocal();
   virtual void NotifyRetreatFailed(const FText &Message);
   void NotifyEnemyRetreated();
+  void NotifyRetreatSuccessful();
 private:
   /** Display the stored strategic initiative roll if one is pending. */
   void ShowPendingStrategicInitiativeResult();
@@ -1347,6 +1351,7 @@ private:
 
   /** Whether a prepare-for-battle prompt is awaiting HUD initialization. */
   bool bPendingReadyPrompt = false;
+  float SuppressPreparePromptUntilTime = -1.f;
 
   /** Last strategic round index that triggered the initiative prompt audio. */
   int32 LastStrategicInitiativeSoundRound = INDEX_NONE;

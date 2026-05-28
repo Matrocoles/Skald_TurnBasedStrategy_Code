@@ -1130,8 +1130,7 @@ bool USkaldMainHUDWidget::ShowEnemyRetreatedMessage() {
 
   if (ActivePrepareForBattleWidget) {
     const FText RetreatMessage = NSLOCTEXT(
-        "SkaldHUD", "PrepareEnemyRetreatedStatus",
-        "Enemy retreated. Returning to map...");
+        "SkaldHUD", "PrepareEnemyRetreatedStatus", "Enemy Retreated");
     ActivePrepareForBattleWidget->ShowRetreatStatus(RetreatMessage, 0.f);
 
     ActivePrepareForBattleWidget->SetRetreatButtonVisibility(
@@ -1186,6 +1185,32 @@ bool USkaldMainHUDWidget::ShowEnemyRetreatedMessage() {
   }
 
   return bDisplayedRetreatStatus;
+}
+
+void USkaldMainHUDWidget::ShowRetreatSuccessfulMessage() {
+  if (!EndingTurnText) {
+    return;
+  }
+
+  ApplyBroadcastStyle(true);
+  EndingTurnText->SetText(
+      NSLOCTEXT("SkaldHUD", "RetreatSuccessfulMessage", "Retreat successful."));
+  EndingTurnText->SetVisibility(ESlateVisibility::Visible);
+
+  if (UWorld *World = GetWorld()) {
+    FTimerManager &TimerManager = World->GetTimerManager();
+    TimerManager.ClearTimer(TurnMessageTimerHandle);
+
+    const TWeakObjectPtr<USkaldMainHUDWidget> WeakThis(this);
+    FTimerDelegate TimerDelegate;
+    TimerDelegate.BindLambda([WeakThis]() {
+      if (WeakThis.IsValid()) {
+        WeakThis->HideEndingTurn();
+      }
+    });
+
+    TimerManager.SetTimer(TurnMessageTimerHandle, TimerDelegate, 2.f, false);
+  }
 }
 
 void USkaldMainHUDWidget::HandleRetreatClicked() {

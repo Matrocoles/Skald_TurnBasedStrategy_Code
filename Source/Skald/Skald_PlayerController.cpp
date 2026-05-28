@@ -7221,6 +7221,14 @@ bool ASkaldPlayerController::TryShowPendingReadyPrompt() {
     return false;
   }
 
+  if (IsPrepareForBattlePromptSuppressed()) {
+    UE_LOG(LogSkaldReady, Verbose,
+           TEXT("Discarding cached prepare-for-battle prompt for %s because prompts are temporarily suppressed after retreat."),
+           *GetName());
+    ResetPendingReadyPromptState();
+    return true;
+  }
+
   if (!ShouldDisplayPrepareForBattlePrompt(PendingReadyPrompt)) {
     UE_LOG(LogSkaldReady, Log,
            TEXT("Discarding cached prepare-for-battle prompt for %s because ready state changed."),
@@ -7280,28 +7288,36 @@ void ASkaldPlayerController::NotifyEnemyRetreated() {
     InitializeHUDWidget();
   }
 
-  const bool bDisplayedStatus = MainHUD && MainHUD->ShowEnemyRetreatedMessage();
+  HidePrepareForBattlePromptLocal();
+  if (UWorld *World = GetWorld()) {
+    SuppressPreparePromptUntilTime = World->GetTimeSeconds() + 2.f;
+  }
 
-  if (bDisplayedStatus) {
-    if (UWorld *World = GetWorld()) {
-      FTimerManager &TimerManager = World->GetTimerManager();
-      TimerManager.ClearTimer(EnemyRetreatHidePromptHandle);
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(EnemyRetreatHidePromptHandle);
+  }
 
-      const TWeakObjectPtr<ASkaldPlayerController> WeakThis(this);
-      FTimerDelegate TimerDelegate;
-      TimerDelegate.BindLambda([WeakThis]() {
-        if (WeakThis.IsValid()) {
-          WeakThis->HidePrepareForBattlePromptLocal();
-        }
-      });
+  if (MainHUD) {
+    MainHUD->ShowEnemyRetreatedMessage();
+  }
+}
 
-      TimerManager.SetTimer(EnemyRetreatHidePromptHandle, TimerDelegate, 2.f,
-                            false);
-    } else {
-      HidePrepareForBattlePromptLocal();
-    }
-  } else {
-    HidePrepareForBattlePromptLocal();
+void ASkaldPlayerController::NotifyRetreatSuccessful() {
+  HidePrepareForBattlePromptLocal();
+  if (UWorld *World = GetWorld()) {
+    SuppressPreparePromptUntilTime = World->GetTimeSeconds() + 2.f;
+  }
+
+  if (UWorld *World = GetWorld()) {
+    World->GetTimerManager().ClearTimer(EnemyRetreatHidePromptHandle);
+  }
+
+  if (!MainHUD) {
+    InitializeHUDWidget();
+  }
+
+  if (MainHUD) {
+    MainHUD->ShowRetreatSuccessfulMessage();
   }
 }
 
@@ -7472,6 +7488,14 @@ void ASkaldPlayerController::ShowPrepareForBattlePromptLocal_Internal(
   ShowMainHUD();
 
   if (MainHUD) {
+    if (IsPrepareForBattlePromptSuppressed()) {
+      UE_LOG(LogSkaldReady, Verbose,
+             TEXT("Discarding prepare-for-battle prompt for %s because prompts are temporarily suppressed after retreat."),
+             *GetName());
+      ResetPendingReadyPromptState();
+      return;
+    }
+
     if (!ShouldDisplayPrepareForBattlePrompt(PromptData)) {
       UE_LOG(LogSkaldReady, Log,
              TEXT("Discarding prepare-for-battle prompt for %s; ready state no longer requires confirmation."),
@@ -7516,6 +7540,10 @@ void ASkaldPlayerController::ClientEnemyRetreated_Implementation() {
   NotifyEnemyRetreated();
 }
 
+void ASkaldPlayerController::ClientRetreatSuccessful_Implementation() {
+  NotifyRetreatSuccessful();
+}
+
 void ASkaldPlayerController::ClientShowPrepareForBattle_Implementation(
     const FPrepareForBattlePromptData &PromptData) {
   ShowPrepareForBattlePromptLocal(PromptData);
@@ -7537,6 +7565,16 @@ void ASkaldPlayerController::HidePrepareForBattlePromptLocal() {
   }
 
   ResetPendingReadyPromptState();
+}
+
+bool ASkaldPlayerController::IsPrepareForBattlePromptSuppressed() const {
+  const UWorld *World = GetWorld();
+  if (!World) {
+    return false;
+  }
+
+  return SuppressPreparePromptUntilTime > 0.f &&
+         World->GetTimeSeconds() < SuppressPreparePromptUntilTime;
 }
 
 void ASkaldPlayerController::ClientHidePrepareForBattle_Implementation() {
