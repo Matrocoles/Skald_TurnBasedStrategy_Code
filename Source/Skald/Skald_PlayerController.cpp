@@ -6092,6 +6092,21 @@ void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
   if (!CachedGameInstance) {
     CachedGameInstance = GetGameInstance<USkaldGameInstance>();
   }
+
+  // Streamed battles can keep the game-instance battle-map flag false until
+  // the streaming manager reports the level as fully loaded/visible. Promote
+  // the flag at lock-in time so post-selection interaction (camera/click
+  // handling) can transition to battle mode reliably without waiting on
+  // unrelated world-travel style state changes.
+  if (CachedGameInstance && !CachedGameInstance->bIsInBattleMap) {
+    const USkaldBattleLevelManager* BattleLevelManager =
+        CachedGameInstance->GetBattleLevelManager();
+    if (BattleLevelManager && BattleLevelManager->IsBattleLevelFullyReady()) {
+      CachedGameInstance->SetBattleMapActive(true);
+      DetectBattleMap();
+    }
+  }
+
   if (CachedGameInstance && CachedGameInstance->GridBattleManager &&
       !bBattleHUDVisible) {
     EnsureBattleHUDVisible();
