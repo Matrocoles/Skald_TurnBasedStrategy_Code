@@ -2625,10 +2625,14 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
                                                   ? CachedGameInstance->PendingBattle
                                                   : FS_BattlePayload();
 
+  // Only the replicated battle phase (or the authoritative Client_Show RPC)
+  // may open fighter selection. Treating a generic pending battle context as
+  // selection-ready lets the local controller display and interact with the
+  // widget before the streamed BattleGameMode has reset participants/budgets,
+  // which races with setup and causes duplicate UI/input-mode churn.
   const bool bInSelectionPhase =
-      !CachedGameState ||
-      CachedGameState->BattlePhase == EBattlePhase::FighterSelection ||
-      (CachedGameState->BattlePhase == EBattlePhase::None && bHasBattleContext);
+      CachedGameState &&
+      CachedGameState->BattlePhase == EBattlePhase::FighterSelection;
 
   ASkaldPlayerState *SelectionPS = GetPlayerState<ASkaldPlayerState>();
   int32 LocalPlayerId = SelectionPS ? ResolveStablePlayerId(SelectionPS) : INDEX_NONE;
@@ -2714,14 +2718,13 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
       CachedGameInstance ? CachedGameInstance->GetBattleLevelManager() : nullptr;
   const bool bBattleStreamReady =
       !BattleLevelManager || BattleLevelManager->IsBattleLevelFullyReady();
-  // Streaming readiness can occasionally lag a frame behind map activation.
-  // Once the local controller is on the battle map, treat streaming as ready so
-  // we don't permanently gate fighter selection / input behind a stale flag.
-  const bool bEffectiveStreamReady = bBattleStreamReady || bOnBattleMap;
-  const bool bLikelyBattleContextReady =
-      bOnBattleMap || (bHasBattleContext && bInSelectionPhase && bEffectiveStreamReady);
+  // Streaming readiness can occasionally lag a frame behind the server phase
+  // transition, but do not use bOnBattleMap alone as readiness: GameInstance
+  // marks the map active before BattleGameMode setup has reset participants and
+  // assigned final budgets. The direct Client_Show RPC remains the immediate
+  // authority path; this self-heal path waits for both phase and stream-ready.
   const bool bCanShowSelectionUI =
-      bLikelyBattleContextReady && bInSelectionPhase && bEffectiveStreamReady &&
+      bInSelectionPhase && bBattleStreamReady &&
       !CachedGameInstance->IsTravelPending();
   if (!bIsParticipant || PendingBudget <= 0 || !bCanShowSelectionUI) {
     UE_LOG(LogSkaldBattle, Log,
