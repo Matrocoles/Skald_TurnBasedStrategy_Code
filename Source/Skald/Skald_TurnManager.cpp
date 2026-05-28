@@ -969,6 +969,12 @@ void ATurnManager::StartArmyPlacementPhase() {
   CurrentIndex = 0;
   bHasTurnsStarted = false;
 
+  // Army placement must begin from the initiative-sorted roster leader.
+  // Re-sync replicated turn ownership immediately so ActivePlayerId reflects
+  // Controllers[0] for this phase instead of any stale value left from prior
+  // startup/travel state.
+  SyncGameStateTurnIndex();
+
   for (const TWeakObjectPtr<ASkaldPlayerController> &ControllerPtr :
        Controllers) {
     if (ASkaldPlayerController *Controller = ControllerPtr.Get()) {

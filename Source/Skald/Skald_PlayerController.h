@@ -1095,6 +1095,8 @@ private:
 
   void RequestBattleStateIfNeeded();
   void ReconcileBattleInputState(const TCHAR* Context);
+  void SchedulePostLockInBattleInputReconcile();
+  void HandlePostLockInBattleInputReconcileTick();
 
   void BuildPlayerDataArray(TArray<FS_PlayerData> &OutPlayers) const;
 
@@ -1372,6 +1374,10 @@ private:
 
   /** Timer used to retry showing a pending prepare-for-battle prompt. */
   FTimerHandle PendingReadyPromptRetryHandle;
+
+  /** Timer that retries post-lock-in battle-map activation for streamed levels. */
+  FTimerHandle PostLockInBattleInputRetryHandle;
+  int32 PostLockInBattleInputRetryCount = 0;
 
   /** Timer that defers hiding the prepare prompt after an enemy retreat. */
   FTimerHandle EnemyRetreatHidePromptHandle;
