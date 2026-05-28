@@ -1709,6 +1709,7 @@ void ATurnManager::RequestDefenderRetreat(
   HidePreparePrompt(RequestingController);
 
   if (AttackerController) {
+    HidePreparePrompt(AttackerController);
     NotifyEnemyRetreated(AttackerController);
   }
 
@@ -1720,6 +1721,7 @@ void ATurnManager::RequestDefenderRetreat(
       continue;
     }
 
+    HidePreparePrompt(Controller);
     NotifyEnemyRetreated(Controller);
   }
 
