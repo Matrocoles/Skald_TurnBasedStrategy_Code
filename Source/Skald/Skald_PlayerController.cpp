@@ -5579,7 +5579,9 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
   const bool bBattleTravelPending =
       CachedGameInstance && CachedGameInstance->IsTravelPending();
   const bool bInBattleInputFlow =
-      bIsBattleMap || BattlePhase != EBattlePhase::None || bBattleTravelPending;
+      bIsBattleMap ||
+      (CachedGameInstance && CachedGameInstance->bIsInBattleMap) ||
+      BattlePhase != EBattlePhase::None || bBattleTravelPending;
   const int32 ReportedActiveId =
       CachedGameState ? CachedGameState->ActivePlayerId : INDEX_NONE;
 
@@ -6040,9 +6042,10 @@ void ASkaldPlayerController::UpdateBattleCameraMode() {
   }
 }
 
-void ASkaldPlayerController::ReconcileBattleInputState(const TCHAR* Context) {
+bool ASkaldPlayerController::ApplyBattleInteractionInputState(
+    const TCHAR* Context) {
   if (!IsLocalController() || !CanCreateLocalUIWidget()) {
-    return;
+    return false;
   }
 
   if (!CachedGameInstance) {
@@ -6053,14 +6056,93 @@ void ASkaldPlayerController::ReconcileBattleInputState(const TCHAR* Context) {
   const bool bBattleMapActive =
       bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap);
   if (!bBattleMapActive) {
-    return;
+    return false;
   }
 
   UpdateBattleCameraMode();
 
+  const ASkald_PlayerCharacter* CameraPawn =
+      Cast<ASkald_PlayerCharacter>(GetPawn());
+  const bool bCameraReady =
+      CameraPawn && CameraPawn->IsBattleCameraActive();
+
+  auto IsVisibleInViewport = [](const UUserWidget* Widget) {
+    return Widget && Widget->IsInViewport() &&
+           Widget->GetVisibility() != ESlateVisibility::Collapsed &&
+           Widget->GetVisibility() != ESlateVisibility::Hidden;
+  };
+
+  UUserWidget* ModalFocusWidget = nullptr;
+  const TCHAR* ModalReason = TEXT("None");
+  if (IsVisibleInViewport(FighterSelectionWidget)) {
+    ModalFocusWidget = FighterSelectionWidget;
+    ModalReason = TEXT("FighterSelection");
+  } else if (IsVisibleInViewport(InGameMenuWidget)) {
+    ModalFocusWidget = InGameMenuWidget;
+    ModalReason = TEXT("InGameMenu");
+  } else if (IsVisibleInViewport(BattleResultWidget)) {
+    ModalFocusWidget = BattleResultWidget;
+    ModalReason = TEXT("BattleResult");
+  } else if (IsVisibleInViewport(MainHUD) &&
+             (MainHUD->IsAwaitingStrategicInitiative() ||
+              MainHUD->HasActivePrepareForBattlePrompt())) {
+    ModalFocusWidget = MainHUD;
+    ModalReason = MainHUD->HasActivePrepareForBattlePrompt()
+                      ? TEXT("PrepareForBattle")
+                      : TEXT("StrategicInitiative");
+  } else if (IsVisibleInViewport(BattleHudWidget) &&
+             BattleHudWidget->IsInitiativePromptActive()) {
+    ModalFocusWidget = BattleHudWidget;
+    ModalReason = TEXT("BattleInitiative");
+  }
+
+  if (ModalFocusWidget) {
+    // Replicated battle payloads/map-state changes can show a modal battle UI
+    // and then immediately reconcile input in the same frame. Preserve Game+UI
+    // focus for that modal instead of switching to GameOnly and starving normal
+    // widget input before the player can lock in or respond to the prompt.
+    UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
+        this, ModalFocusWidget, EMouseLockMode::DoNotLock,
+        /*bHideCursorDuringCapture*/ false);
+    bShowMouseCursor = true;
+    bEnableClickEvents = true;
+    bEnableMouseOverEvents = true;
+    DefaultMouseCaptureMode = EMouseCaptureMode::NoCapture;
+  } else {
+    // Once modal battle setup UI is gone, explicitly return focus to the
+    // viewport and keep click traces enabled so camera axes plus grid/fighter
+    // picks recover after streamed map activation.
+    UWidgetBlueprintLibrary::SetInputMode_GameOnly(this);
+    FocusGameViewport(this);
+    bShowMouseCursor = true;
+    bEnableClickEvents = true;
+    bEnableMouseOverEvents = true;
+    DefaultMouseCaptureMode = EMouseCaptureMode::CaptureDuringMouseDown;
+  }
+
+  if (UGameViewportClient* GameViewport =
+          GetWorld() ? GetWorld()->GetGameViewport() : nullptr) {
+    GameViewport->SetMouseCaptureMode(DefaultMouseCaptureMode);
+  }
+  SetIgnoreMoveInput(false);
+  SetIgnoreLookInput(false);
+
+  const bool bInputReady =
+      bShowMouseCursor && bEnableClickEvents && bEnableMouseOverEvents &&
+      !IsMoveInputIgnored() && !IsLookInputIgnored();
+
   UE_LOG(LogSkaldBattle, Verbose,
-         TEXT("BattleInputReconciler[%s]: Controller=%s BattleMap=%d"),
-         Context ? Context : TEXT("Unknown"), *GetName(), bBattleMapActive ? 1 : 0);
+         TEXT("BattleInputReconciler[%s]: Controller=%s BattleMap=%d CameraReady=%d InputReady=%d Modal=%s Pawn=%s"),
+         Context ? Context : TEXT("Unknown"), *GetName(),
+         bBattleMapActive ? 1 : 0, bCameraReady ? 1 : 0,
+         bInputReady ? 1 : 0, ModalReason,
+         GetPawn() ? *GetPawn()->GetName() : TEXT("null"));
+
+  return bCameraReady && bInputReady;
+}
+
+void ASkaldPlayerController::ReconcileBattleInputState(const TCHAR* Context) {
+  ApplyBattleInteractionInputState(Context);
 }
 
 void ASkaldPlayerController::SchedulePostLockInBattleInputReconcile() {
@@ -6103,18 +6185,31 @@ void ASkaldPlayerController::HandlePostLockInBattleInputReconcileTick() {
     }
   }
 
-  ReconcileBattleInputState(TEXT("PostLockInBattleInputRetry"));
-
   const bool bBattleMapActive =
       bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap);
+
+  if (bBattleMapActive) {
+    InitializeBattleHUD();
+    if (CachedGameInstance && CachedGameInstance->GridBattleManager &&
+        !bBattleHUDVisible) {
+      EnsureBattleHUDVisible();
+    }
+    UpdateBattleHUDButtons();
+  }
+
+  const bool bBattleInteractionReady =
+      ApplyBattleInteractionInputState(TEXT("PostLockInBattleInputRetry"));
+
   constexpr int32 MaxRetries = 20;
   ++PostLockInBattleInputRetryCount;
 
-  if (bBattleMapActive || PostLockInBattleInputRetryCount >= MaxRetries) {
+  if ((bBattleMapActive && bBattleInteractionReady) ||
+      PostLockInBattleInputRetryCount >= MaxRetries) {
     World->GetTimerManager().ClearTimer(PostLockInBattleInputRetryHandle);
     UE_LOG(LogSkaldBattle, Verbose,
-           TEXT("PostLockInReconcile: Completed for %s (BattleMapActive=%d Retries=%d)"),
-           *GetName(), bBattleMapActive ? 1 : 0, PostLockInBattleInputRetryCount);
+           TEXT("PostLockInReconcile: Completed for %s (BattleMapActive=%d InteractionReady=%d Retries=%d)"),
+           *GetName(), bBattleMapActive ? 1 : 0,
+           bBattleInteractionReady ? 1 : 0, PostLockInBattleInputRetryCount);
   }
 }
 
@@ -6131,29 +6226,9 @@ void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
 
   bBattleHUDReadyToShow = true;
 
-  // Ensure the HUD is initialized so the controller is bound to active-fighter
-  // updates even if no pawn has been selected yet.
-  InitializeBattleHUD();
-
   SelectedFighter = nullptr;
   LockedActiveFighter = nullptr;
   CancelCommandMode();
-  UpdateBattleHUDButtons();
-
-  // Lock-in closes the selection modal and hands control back to battle input.
-  // Use game-only input so camera drag/rotate works immediately, while still
-  // keeping cursor + click traces enabled for pawn selection.
-  UWidgetBlueprintLibrary::SetInputMode_GameOnly(this);
-  FocusGameViewport(this);
-  bShowMouseCursor = true;
-  bEnableClickEvents = true;
-  bEnableMouseOverEvents = true;
-  DefaultMouseCaptureMode = EMouseCaptureMode::CaptureDuringMouseDown;
-  if (UGameViewportClient* GameViewport = GetWorld() ? GetWorld()->GetGameViewport() : nullptr) {
-    GameViewport->SetMouseCaptureMode(DefaultMouseCaptureMode);
-  }
-  SetIgnoreMoveInput(false);
-  SetIgnoreLookInput(false);
 
   if (!CachedGameInstance) {
     CachedGameInstance = GetGameInstance<USkaldGameInstance>();
@@ -6173,12 +6248,26 @@ void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
     }
   }
 
-  if (CachedGameInstance && CachedGameInstance->GridBattleManager &&
-      !bBattleHUDVisible) {
-    EnsureBattleHUDVisible();
+  DetectBattleMap();
+  const bool bBattleMapActive =
+      bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap);
+
+  if (bBattleMapActive) {
+    // Ensure the HUD/camera/input stack is initialized only after battle-map
+    // activation is visible on this controller.
+    InitializeBattleHUD();
+    if (CachedGameInstance && CachedGameInstance->GridBattleManager &&
+        !bBattleHUDVisible) {
+      EnsureBattleHUDVisible();
+    }
+    UpdateBattleHUDButtons();
+    ApplyBattleInteractionInputState(TEXT("HandleFighterSelectionLockedIn"));
+  } else {
+    UE_LOG(LogSkaldBattle, Verbose,
+           TEXT("HandleFighterSelectionLockedIn: Waiting for battle-map active flag before HUD/camera/input setup on %s"),
+           *GetName());
   }
 
-  ReconcileBattleInputState(TEXT("HandleFighterSelectionLockedIn"));
   SchedulePostLockInBattleInputReconcile();
 
   if (CachedGameInstance && CachedGameInstance->GridBattleManager)

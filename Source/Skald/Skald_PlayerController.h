@@ -1094,6 +1094,7 @@ private:
   void DetectBattleMap();
 
   void RequestBattleStateIfNeeded();
+  bool ApplyBattleInteractionInputState(const TCHAR* Context);
   void ReconcileBattleInputState(const TCHAR* Context);
   void SchedulePostLockInBattleInputReconcile();
   void HandlePostLockInBattleInputReconcileTick();
