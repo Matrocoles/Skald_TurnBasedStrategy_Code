@@ -452,6 +452,10 @@ void ASkaldPlayerController::CacheGameReferences() {
         this, &ASkaldPlayerController::HandleBattleMapStateChanged);
     CachedGameInstance->OnBattleMapStateChanged.AddDynamic(
         this, &ASkaldPlayerController::HandleBattleMapStateChanged);
+
+    if (CachedGameInstance->bIsInBattleMap && !bIsBattleMap) {
+      HandleBattleMapStateChanged(true);
+    }
   } else {
     bNeedsRetry = true;
     UE_LOG(LogSkald, Verbose,

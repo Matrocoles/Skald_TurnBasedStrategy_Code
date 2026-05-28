@@ -1169,6 +1169,8 @@ void USkaldGameInstance::SetBattleMapActive(bool bInBattleMap) {
   }
 
   bIsInBattleMap = bInBattleMap;
+  UE_LOG(LogSkald, Log, TEXT("GameInstance battle-map active -> %d"),
+         bIsInBattleMap ? 1 : 0);
   OnBattleMapStateChanged.Broadcast(bIsInBattleMap);
 
   if (bIsInBattleMap) {
