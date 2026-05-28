@@ -10,7 +10,7 @@ FBox CalculateRelevantBounds(const AActor *Actor) {
   }
 
   FBox Bounds = Actor->GetComponentsBoundingBox(false);
-  if (!Bounds.IsValid) {
+  if (Bounds.IsValid == 0) {
     Bounds = Actor->GetComponentsBoundingBox(true);
   }
   return Bounds;
@@ -60,7 +60,7 @@ bool UGridObstacleComponent::GetCustomGridFootprint(const UGridOverlayComponent 
   }
 
   const FBox Bounds = Skald::GridObstacle::CalculateRelevantBounds(Owner);
-  const FVector AnchorLocation = Bounds.IsValid
+  const FVector AnchorLocation = Bounds.IsValid != 0
                                      ? Bounds.GetCenter()
                                      : Owner->GetActorLocation();
 

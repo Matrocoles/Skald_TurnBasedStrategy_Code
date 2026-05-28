@@ -253,7 +253,7 @@ void AGridOverlayActor::SpawnRandomObstacles() {
 
     if (!bHasCustomFootprint) {
       const FBox Bounds = Skald::GridObstacle::CalculateRelevantBounds(Obstacle);
-      if (Bounds.IsValid) {
+      if (Bounds.IsValid != 0) {
         const FIntPoint RawMin = LocalGridComponent->WorldToGrid(Bounds.Min);
         const FIntPoint RawMax = LocalGridComponent->WorldToGrid(Bounds.Max);
         Min.X = FMath::Min(RawMin.X, RawMax.X);

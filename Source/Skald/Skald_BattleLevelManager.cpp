@@ -949,12 +949,12 @@ bool USkaldBattleLevelManager::CalculateActiveBattleLevelBounds(FBox& OutBounds)
     }
 
     const FBox ActorBounds = Actor->GetComponentsBoundingBox(/*bNonColliding=*/true);
-    if (ActorBounds.IsValid) {
+    if (ActorBounds.IsValid != 0) {
       OutBounds += ActorBounds;
     }
   }
 
-  return OutBounds.IsValid;
+  return OutBounds.IsValid != 0;
 }
 
 void USkaldBattleLevelManager::RecenterLocalBattleCameras() {
