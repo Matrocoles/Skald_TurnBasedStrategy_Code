@@ -892,6 +892,18 @@ void UBattleHUDWidget::HideInitiativePrompt() {
   }
 }
 
+bool UBattleHUDWidget::IsInitiativePromptActive() const {
+  const bool bPromptVisible =
+      InitiativePromptText &&
+      InitiativePromptText->GetVisibility() != ESlateVisibility::Collapsed &&
+      InitiativePromptText->GetVisibility() != ESlateVisibility::Hidden;
+  const bool bRollButtonVisible =
+      RollInitiativeButton &&
+      RollInitiativeButton->GetVisibility() != ESlateVisibility::Collapsed &&
+      RollInitiativeButton->GetVisibility() != ESlateVisibility::Hidden;
+  return bPromptVisible || bRollButtonVisible;
+}
+
 void UBattleHUDWidget::RefreshStats() { UpdateStatPanel(); }
 
 void UBattleHUDWidget::BindToFighter(AFighterPawn *Fighter) {

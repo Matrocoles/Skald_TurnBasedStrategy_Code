@@ -519,6 +519,8 @@ public:
   /** Hide the initiative prompt and roll button. */
   void HideInitiativePrompt();
 
+  bool IsInitiativePromptActive() const;
+
   /** Update the round and initiative labels. */
   void SetRoundInfo(const FText &RoundLabel, const FText &InitiativeLabel);
 

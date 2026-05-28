@@ -277,6 +277,10 @@ public:
     return bAwaitingStrategicInitiative;
   }
 
+  bool HasActivePrepareForBattlePrompt() const {
+    return bHasActivePreparePrompt;
+  }
+
   /** Show an in-progress enemy turn message without auto-hiding. */
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD")
   void ShowEnemyTurnInProgress(const FString &Message);

@@ -6066,17 +6066,60 @@ bool ASkaldPlayerController::ApplyBattleInteractionInputState(
   const bool bCameraReady =
       CameraPawn && CameraPawn->IsBattleCameraActive();
 
-  // Fighter selection uses Game+UI with a modal widget. Once that modal closes
-  // and the streamed battle-map flag is visible, explicitly return focus to the
-  // viewport and keep click traces enabled. This prevents the removed selection
-  // widget (or a later turn-ownership refresh) from leaving camera axes and
-  // grid/fighter picks starved even though the HUD is visible.
-  UWidgetBlueprintLibrary::SetInputMode_GameOnly(this);
-  FocusGameViewport(this);
-  bShowMouseCursor = true;
-  bEnableClickEvents = true;
-  bEnableMouseOverEvents = true;
-  DefaultMouseCaptureMode = EMouseCaptureMode::CaptureDuringMouseDown;
+  auto IsVisibleInViewport = [](const UUserWidget* Widget) {
+    return Widget && Widget->IsInViewport() &&
+           Widget->GetVisibility() != ESlateVisibility::Collapsed &&
+           Widget->GetVisibility() != ESlateVisibility::Hidden;
+  };
+
+  UUserWidget* ModalFocusWidget = nullptr;
+  const TCHAR* ModalReason = TEXT("None");
+  if (IsVisibleInViewport(FighterSelectionWidget)) {
+    ModalFocusWidget = FighterSelectionWidget;
+    ModalReason = TEXT("FighterSelection");
+  } else if (IsVisibleInViewport(InGameMenuWidget)) {
+    ModalFocusWidget = InGameMenuWidget;
+    ModalReason = TEXT("InGameMenu");
+  } else if (IsVisibleInViewport(BattleResultWidget)) {
+    ModalFocusWidget = BattleResultWidget;
+    ModalReason = TEXT("BattleResult");
+  } else if (IsVisibleInViewport(MainHUD) &&
+             (MainHUD->IsAwaitingStrategicInitiative() ||
+              MainHUD->HasActivePrepareForBattlePrompt())) {
+    ModalFocusWidget = MainHUD;
+    ModalReason = MainHUD->HasActivePrepareForBattlePrompt()
+                      ? TEXT("PrepareForBattle")
+                      : TEXT("StrategicInitiative");
+  } else if (IsVisibleInViewport(BattleHudWidget) &&
+             BattleHudWidget->IsInitiativePromptActive()) {
+    ModalFocusWidget = BattleHudWidget;
+    ModalReason = TEXT("BattleInitiative");
+  }
+
+  if (ModalFocusWidget) {
+    // Replicated battle payloads/map-state changes can show a modal battle UI
+    // and then immediately reconcile input in the same frame. Preserve Game+UI
+    // focus for that modal instead of switching to GameOnly and starving normal
+    // widget input before the player can lock in or respond to the prompt.
+    UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
+        this, ModalFocusWidget, EMouseLockMode::DoNotLock,
+        /*bHideCursorDuringCapture*/ false);
+    bShowMouseCursor = true;
+    bEnableClickEvents = true;
+    bEnableMouseOverEvents = true;
+    DefaultMouseCaptureMode = EMouseCaptureMode::NoCapture;
+  } else {
+    // Once modal battle setup UI is gone, explicitly return focus to the
+    // viewport and keep click traces enabled so camera axes plus grid/fighter
+    // picks recover after streamed map activation.
+    UWidgetBlueprintLibrary::SetInputMode_GameOnly(this);
+    FocusGameViewport(this);
+    bShowMouseCursor = true;
+    bEnableClickEvents = true;
+    bEnableMouseOverEvents = true;
+    DefaultMouseCaptureMode = EMouseCaptureMode::CaptureDuringMouseDown;
+  }
+
   if (UGameViewportClient* GameViewport =
           GetWorld() ? GetWorld()->GetGameViewport() : nullptr) {
     GameViewport->SetMouseCaptureMode(DefaultMouseCaptureMode);
@@ -6089,10 +6132,11 @@ bool ASkaldPlayerController::ApplyBattleInteractionInputState(
       !IsMoveInputIgnored() && !IsLookInputIgnored();
 
   UE_LOG(LogSkaldBattle, Verbose,
-         TEXT("BattleInputReconciler[%s]: Controller=%s BattleMap=%d CameraReady=%d InputReady=%d Pawn=%s"),
+         TEXT("BattleInputReconciler[%s]: Controller=%s BattleMap=%d CameraReady=%d InputReady=%d Modal=%s Pawn=%s"),
          Context ? Context : TEXT("Unknown"), *GetName(),
          bBattleMapActive ? 1 : 0, bCameraReady ? 1 : 0,
-         bInputReady ? 1 : 0, GetPawn() ? *GetPawn()->GetName() : TEXT("null"));
+         bInputReady ? 1 : 0, ModalReason,
+         GetPawn() ? *GetPawn()->GetName() : TEXT("null"));
 
   return bCameraReady && bInputReady;
 }
