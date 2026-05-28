@@ -2625,10 +2625,14 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
                                                   ? CachedGameInstance->PendingBattle
                                                   : FS_BattlePayload();
 
+  // Only the replicated battle phase (or the authoritative Client_Show RPC)
+  // may open fighter selection. Treating a generic pending battle context as
+  // selection-ready lets the local controller display and interact with the
+  // widget before the streamed BattleGameMode has reset participants/budgets,
+  // which races with setup and causes duplicate UI/input-mode churn.
   const bool bInSelectionPhase =
-      !CachedGameState ||
-      CachedGameState->BattlePhase == EBattlePhase::FighterSelection ||
-      (CachedGameState->BattlePhase == EBattlePhase::None && bHasBattleContext);
+      CachedGameState &&
+      CachedGameState->BattlePhase == EBattlePhase::FighterSelection;
 
   ASkaldPlayerState *SelectionPS = GetPlayerState<ASkaldPlayerState>();
   int32 LocalPlayerId = SelectionPS ? ResolveStablePlayerId(SelectionPS) : INDEX_NONE;
@@ -2714,14 +2718,13 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
       CachedGameInstance ? CachedGameInstance->GetBattleLevelManager() : nullptr;
   const bool bBattleStreamReady =
       !BattleLevelManager || BattleLevelManager->IsBattleLevelFullyReady();
-  // Streaming readiness can occasionally lag a frame behind map activation.
-  // Once the local controller is on the battle map, treat streaming as ready so
-  // we don't permanently gate fighter selection / input behind a stale flag.
-  const bool bEffectiveStreamReady = bBattleStreamReady || bOnBattleMap;
-  const bool bLikelyBattleContextReady =
-      bOnBattleMap || (bHasBattleContext && bInSelectionPhase && bEffectiveStreamReady);
+  // Streaming readiness can occasionally lag a frame behind the server phase
+  // transition, but do not use bOnBattleMap alone as readiness: GameInstance
+  // marks the map active before BattleGameMode setup has reset participants and
+  // assigned final budgets. The direct Client_Show RPC remains the immediate
+  // authority path; this self-heal path waits for both phase and stream-ready.
   const bool bCanShowSelectionUI =
-      bLikelyBattleContextReady && bInSelectionPhase && bEffectiveStreamReady &&
+      bInSelectionPhase && bBattleStreamReady &&
       !CachedGameInstance->IsTravelPending();
   if (!bIsParticipant || PendingBudget <= 0 || !bCanShowSelectionUI) {
     UE_LOG(LogSkaldBattle, Log,
@@ -6076,8 +6079,27 @@ void ASkaldPlayerController::UpdateBattleCameraMode() {
     return;
   }
 
+  if (!CachedGameInstance) {
+    CachedGameInstance = GetGameInstance<USkaldGameInstance>();
+  }
+
   ASkald_PlayerCharacter *CameraPawn = Cast<ASkald_PlayerCharacter>(GetPawn());
   if (!CameraPawn) {
+    return;
+  }
+
+  const ASkaldPlayerState *LocalPS = GetPlayerState<ASkaldPlayerState>();
+  const bool bSelectionWidgetActive =
+      FighterSelectionWidget && FighterSelectionWidget->IsInViewport();
+  const bool bSelectionLockedIn =
+      bBattleHUDReadyToShow || bBattleHUDVisible ||
+      (LocalPS && LocalPS->bArmyLockedIn);
+
+  // Do not let battle replication/setup callbacks lock or unlock the camera
+  // while the player is still choosing fighters. The overview camera should
+  // continue naturally until lock-in; after lock-in, battle camera focus can
+  // follow the normal active-fighter flow without stream/phase gates.
+  if (bSelectionWidgetActive && !bSelectionLockedIn) {
     return;
   }
 
@@ -6087,13 +6109,12 @@ void ASkaldPlayerController::UpdateBattleCameraMode() {
   CameraPawn->SetBattleCameraActive(bBattleMapActive);
 
   if (!bBattleMapActive) {
-    CameraPawn->ClearCameraFocus();
     return;
   }
 
   if (LockedActiveFighter && LockedActiveFighter->IsAlive()) {
     CameraPawn->FocusCameraOnActor(LockedActiveFighter.Get());
-  } else {
+  } else if (bSelectionLockedIn) {
     CameraPawn->ClearCameraFocus();
   }
 }
@@ -6230,20 +6251,12 @@ void ASkaldPlayerController::HandlePostLockInBattleInputReconcileTick() {
     CachedGameInstance = GetGameInstance<USkaldGameInstance>();
   }
 
-  bool bReady = false;
-  if (CachedGameInstance) {
-    if (const USkaldBattleLevelManager* BattleLevelManager =
-            CachedGameInstance->GetBattleLevelManager()) {
-      bReady = BattleLevelManager->IsBattleLevelFullyReady();
-    }
-
-    if (bReady && !CachedGameInstance->bIsInBattleMap) {
-      CachedGameInstance->SetBattleMapActive(true);
-      DetectBattleMap();
-      UE_LOG(LogSkaldBattle, Log,
-             TEXT("PostLockInReconcile: Promoted streamed battle-map active for %s"),
-             *GetName());
-    }
+  if (CachedGameInstance && !CachedGameInstance->bIsInBattleMap) {
+    CachedGameInstance->SetBattleMapActive(true);
+    DetectBattleMap();
+    UE_LOG(LogSkaldBattle, Log,
+           TEXT("PostLockInReconcile: Promoted battle-map active after lock-in for %s"),
+           *GetName());
   }
 
   const bool bBattleMapActive =
@@ -6295,18 +6308,12 @@ void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
     CachedGameInstance = GetGameInstance<USkaldGameInstance>();
   }
 
-  // Streamed battles can keep the game-instance battle-map flag false until
-  // the streaming manager reports the level as fully loaded/visible. Promote
-  // the flag at lock-in time so post-selection interaction (camera/click
-  // handling) can transition to battle mode reliably without waiting on
-  // unrelated world-travel style state changes.
+  // Fighter lock-in is the only local gate for transitioning camera/input to
+  // battle mode. Do not wait on streamed-level readiness here; the overview
+  // camera has already carried the player into the battle context, and
+  // post-lock-in reconciliation will settle HUD/input as actors arrive.
   if (CachedGameInstance && !CachedGameInstance->bIsInBattleMap) {
-    const USkaldBattleLevelManager* BattleLevelManager =
-        CachedGameInstance->GetBattleLevelManager();
-    if (BattleLevelManager && BattleLevelManager->IsBattleLevelFullyReady()) {
-      CachedGameInstance->SetBattleMapActive(true);
-      DetectBattleMap();
-    }
+    CachedGameInstance->SetBattleMapActive(true);
   }
 
   DetectBattleMap();
