@@ -144,10 +144,14 @@ bool USkaldBattleLevelManager::RequestBattleLevel(
     const ULevelStreaming *StreamingLevel = ActiveStreamingLevel.Get();
     const bool bLevelAlreadyLoaded =
         StreamingLevel && StreamingLevel->IsLevelLoaded();
+    const bool bLevelAlreadyReady =
+        bLevelAlreadyLoaded && StreamingLevel->IsLevelVisible();
 
     if (USkaldGameInstance *GI = OwningInstance.Get()) {
-      GI->SetTravelPending(!bLevelAlreadyLoaded);
-      GI->SetBattleMapActive(true);
+      GI->SetTravelPending(!bLevelAlreadyReady);
+      if (bLevelAlreadyReady) {
+        GI->SetBattleMapActive(true);
+      }
     }
 
     RegisterStreamingTicker();
@@ -254,13 +258,10 @@ bool USkaldBattleLevelManager::RequestBattleLevel(
   bActiveLevelShouldBeLoaded = true;
 
   if (USkaldGameInstance *GI = OwningInstance.Get()) {
-    // A successful streaming request means the local world is entering tactical
-    // battle flow even before the level finishes becoming visible. Promote the
-    // battle-map flag here so player controllers bind battle input/camera state
-    // during the streamed sublevel load instead of waiting on a later callback
-    // that may be missed by pre-existing sublevels.
+    // Keep the battle-map flag false while the streamed sublevel is only
+    // requested/loading. HandleLevelLoaded promotes it after the level has been
+    // loaded, made visible, and non-battle levels have been hidden.
     GI->SetTravelPending(true);
-    GI->SetBattleMapActive(true);
   }
 
   RegisterWorldDelegates();
