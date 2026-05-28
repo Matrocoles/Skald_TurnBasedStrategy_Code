@@ -42,6 +42,9 @@ public:
   bool IsBattleLevelActive() const { return ActiveStreamingLevel.IsValid(); }
   bool IsBattleLevelFullyReady() const;
 
+  /** Marks the active streamed battle level visible/active when it has finished loading. */
+  bool PromoteLoadedBattleLevelIfReady(const TCHAR* ContextLabel = TEXT("ManualPromotion"));
+
 private:
   void HideNonBattleLevels();
   void RestoreNonBattleLevels();
@@ -61,6 +64,7 @@ private:
   void RegisterStreamingTicker();
   void UnregisterStreamingTicker();
   bool TickStreamingStatus(float DeltaTime);
+  bool IsActiveStreamingLevelLoaded() const;
 
   TWeakObjectPtr<USkaldGameInstance> OwningInstance;
   TWeakObjectPtr<ULevelStreaming> ActiveStreamingLevel;

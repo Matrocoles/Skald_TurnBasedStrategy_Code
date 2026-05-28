@@ -3652,15 +3652,17 @@ void ASkaldPlayerController::DetectBattleMap() {
     bDetectedBattleMap = CachedGameInstance->bIsInBattleMap;
 
     if (!bDetectedBattleMap) {
-      if (const USkaldBattleLevelManager* BattleLevelManager =
+      if (USkaldBattleLevelManager* BattleLevelManager =
               CachedGameInstance->GetBattleLevelManager()) {
-        bDetectedBattleMap = BattleLevelManager->IsBattleLevelFullyReady();
+        bDetectedBattleMap = BattleLevelManager->PromoteLoadedBattleLevelIfReady(
+            TEXT("DetectBattleMap"));
       }
     }
 
-    if (!bDetectedBattleMap) {
-      bDetectedBattleMap = CachedGameInstance->GetActiveBattleGameMode() != nullptr;
-    }
+    // An active battle GameMode alone is not enough to promote the local battle
+    // flag. Streamed GameMode actors can BeginPlay while Unreal is still
+    // finalizing level visibility, so promotion remains owned by the streaming
+    // manager readiness check above.
 
     if (bDetectedBattleMap && !CachedGameInstance->bIsInBattleMap) {
       UE_LOG(LogSkaldBattle, Warning,
