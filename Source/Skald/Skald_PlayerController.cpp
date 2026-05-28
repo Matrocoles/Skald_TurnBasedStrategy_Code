@@ -2478,6 +2478,35 @@ void ASkaldPlayerController::PlayerTick(float DeltaTime) {
     }
   }
 
+  if (!CachedGameInstance) {
+    CachedGameInstance = GetGameInstance<USkaldGameInstance>();
+  }
+  if (!CachedGameState && GetWorld()) {
+    CachedGameState = GetWorld()->GetGameState<ASkaldGameState>();
+  }
+
+  const FS_BattlePayload TickBattle = CachedGameState
+                                          ? CachedGameState->GetActiveBattlePayload()
+                                          : CachedGameInstance
+                                                ? CachedGameInstance->PendingBattle
+                                                : FS_BattlePayload();
+  const bool bHasTickBattlePayload =
+      TickBattle.AttackerPlayerID > 0 || TickBattle.DefenderPlayerID > 0 ||
+      TickBattle.FromTerritoryID > 0 || TickBattle.TargetTerritoryID > 0;
+  const bool bTickBattleContext =
+      bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap) ||
+      (CachedGameState && CachedGameState->BattlePhase != EBattlePhase::None) ||
+      bHasTickBattlePayload || bBattleHUDReadyToShow || bBattleHUDVisible ||
+      (FighterSelectionWidget && FighterSelectionWidget->IsInViewport()) ||
+      (BattleHudWidget && BattleHudWidget->IsInViewport());
+  const ASkald_PlayerCharacter* CameraPawn =
+      Cast<ASkald_PlayerCharacter>(GetPawn());
+  if (bTickBattleContext &&
+      (!CameraPawn || !CameraPawn->IsBattleCameraActive() ||
+       IsMoveInputIgnored() || IsLookInputIgnored())) {
+    ApplyBattleInteractionInputState(TEXT("PlayerTickBattleCameraKeepAlive"));
+  }
+
   UpdateCursorFX();
 
   const bool bIsHoveringInteractable = IsCursorOverInteractableSlateWidget();
@@ -6082,33 +6111,38 @@ void ASkaldPlayerController::UpdateBattleCameraMode() {
   if (!CachedGameInstance) {
     CachedGameInstance = GetGameInstance<USkaldGameInstance>();
   }
+  if (!CachedGameState && GetWorld()) {
+    CachedGameState = GetWorld()->GetGameState<ASkaldGameState>();
+  }
 
   ASkald_PlayerCharacter *CameraPawn = Cast<ASkald_PlayerCharacter>(GetPawn());
   if (!CameraPawn) {
     return;
   }
 
-  const ASkaldPlayerState *LocalPS = GetPlayerState<ASkaldPlayerState>();
-  const bool bSelectionWidgetActive =
-      FighterSelectionWidget && FighterSelectionWidget->IsInViewport();
-  const bool bSelectionLockedIn =
-      bBattleHUDReadyToShow || bBattleHUDVisible ||
-      (LocalPS && LocalPS->bArmyLockedIn);
+  const FS_BattlePayload ActiveBattle = CachedGameState
+                                            ? CachedGameState->GetActiveBattlePayload()
+                                            : CachedGameInstance
+                                                  ? CachedGameInstance->PendingBattle
+                                                  : FS_BattlePayload();
+  const bool bHasBattlePayload =
+      ActiveBattle.AttackerPlayerID > 0 || ActiveBattle.DefenderPlayerID > 0 ||
+      ActiveBattle.FromTerritoryID > 0 || ActiveBattle.TargetTerritoryID > 0;
+  const bool bBattleCameraContext =
+      bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap) ||
+      (CachedGameState && CachedGameState->BattlePhase != EBattlePhase::None) ||
+      bHasBattlePayload || bBattleHUDReadyToShow || bBattleHUDVisible ||
+      (FighterSelectionWidget && FighterSelectionWidget->IsInViewport()) ||
+      (BattleHudWidget && BattleHudWidget->IsInViewport());
 
-  // Do not let battle replication/setup callbacks lock or unlock the camera
-  // while the player is still choosing fighters. The overview camera should
-  // continue naturally until lock-in; after lock-in, battle camera focus can
-  // follow the normal active-fighter flow without stream/phase gates.
-  if (bSelectionWidgetActive && !bSelectionLockedIn) {
-    return;
-  }
+  // Keep battle camera availability tied to battle context only. Do not gate it
+  // on streamed-level readiness, replicated phase ordering, or fighter
+  // selection state; those systems can lag behind travel and make the camera
+  // appear frozen even though the player has already entered battle flow.
+  CameraPawn->SetBattleCameraActive(bBattleCameraContext);
 
-  const bool bBattleMapActive =
-      bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap);
-
-  CameraPawn->SetBattleCameraActive(bBattleMapActive);
-
-  if (!bBattleMapActive) {
+  if (!bBattleCameraContext) {
+    CameraPawn->ClearCameraFocus();
     return;
   }
 
@@ -6130,9 +6164,27 @@ bool ASkaldPlayerController::ApplyBattleInteractionInputState(
   }
 
   DetectBattleMap();
+  if (!CachedGameState && GetWorld()) {
+    CachedGameState = GetWorld()->GetGameState<ASkaldGameState>();
+  }
+
+  const FS_BattlePayload ActiveBattle = CachedGameState
+                                            ? CachedGameState->GetActiveBattlePayload()
+                                            : CachedGameInstance
+                                                  ? CachedGameInstance->PendingBattle
+                                                  : FS_BattlePayload();
+  const bool bHasBattlePayload =
+      ActiveBattle.AttackerPlayerID > 0 || ActiveBattle.DefenderPlayerID > 0 ||
+      ActiveBattle.FromTerritoryID > 0 || ActiveBattle.TargetTerritoryID > 0;
   const bool bBattleMapActive =
       bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap);
-  if (!bBattleMapActive) {
+  const bool bBattleInputContext =
+      bBattleMapActive ||
+      (CachedGameState && CachedGameState->BattlePhase != EBattlePhase::None) ||
+      bHasBattlePayload || bBattleHUDReadyToShow || bBattleHUDVisible ||
+      (FighterSelectionWidget && FighterSelectionWidget->IsInViewport()) ||
+      (BattleHudWidget && BattleHudWidget->IsInViewport());
+  if (!bBattleInputContext) {
     return false;
   }
 
@@ -6214,10 +6266,10 @@ bool ASkaldPlayerController::ApplyBattleInteractionInputState(
       !IsMoveInputIgnored() && !IsLookInputIgnored();
 
   UE_LOG(LogSkaldBattle, Verbose,
-         TEXT("BattleInputReconciler[%s]: Controller=%s BattleMap=%d CameraReady=%d InputReady=%d Modal=%s Pawn=%s"),
+         TEXT("BattleInputReconciler[%s]: Controller=%s BattleContext=%d BattleMap=%d CameraReady=%d InputReady=%d Modal=%s Pawn=%s"),
          Context ? Context : TEXT("Unknown"), *GetName(),
-         bBattleMapActive ? 1 : 0, bCameraReady ? 1 : 0,
-         bInputReady ? 1 : 0, ModalReason,
+         bBattleInputContext ? 1 : 0, bBattleMapActive ? 1 : 0,
+         bCameraReady ? 1 : 0, bInputReady ? 1 : 0, ModalReason,
          GetPawn() ? *GetPawn()->GetName() : TEXT("null"));
 
   return bCameraReady && bInputReady;
