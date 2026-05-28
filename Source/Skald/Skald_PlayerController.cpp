@@ -2459,15 +2459,6 @@ void ASkaldPlayerController::PlayerTick(float DeltaTime) {
     return;
   }
 
-  DetectBattleMap();
-  if (bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap)) {
-    APawn* ControlledPawn = GetPawn();
-    if (ControlledPawn && GetViewTarget() != ControlledPawn) {
-      SetViewTarget(ControlledPawn);
-      ReconcileBattleInputState(TEXT("PlayerTick.ViewTargetRepair"));
-    }
-  }
-
   // If the player has locked in their fighters and the battle manager became
   // available after the selection UI closed, ensure the battle HUD is
   // constructed and displayed.
@@ -6052,52 +6043,11 @@ void ASkaldPlayerController::ReconcileBattleInputState(const TCHAR* Context) {
     return;
   }
 
-  UWidget* FocusWidget = nullptr;
-  if (FighterSelectionWidget && FighterSelectionWidget->IsInViewport()) {
-    FocusWidget = FighterSelectionWidget;
-  } else if (BattleHUD && BattleHUD->IsInViewport()) {
-    FocusWidget = BattleHUD;
-  } else if (MainHUD && MainHUD->IsInViewport()) {
-    FocusWidget = MainHUD;
-  }
-
-  UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
-      this, FocusWidget, EMouseLockMode::DoNotLock,
-      /*bHideCursorDuringCapture*/ false);
-  if (!FocusWidget) {
-    FocusGameViewport(this);
-  }
-  bShowMouseCursor = true;
-  bEnableClickEvents = true;
-  bEnableMouseOverEvents = true;
-  DefaultMouseCaptureMode = EMouseCaptureMode::CaptureDuringMouseDown;
-  if (UGameViewportClient* GameViewport = GetWorld() ? GetWorld()->GetGameViewport() : nullptr) {
-    GameViewport->SetMouseCaptureMode(DefaultMouseCaptureMode);
-  }
-  SetIgnoreMoveInput(false);
-  SetIgnoreLookInput(false);
-  const bool bBattleUIActive =
-      (FighterSelectionWidget && FighterSelectionWidget->IsInViewport()) ||
-      (BattleHUD && BattleHUD->IsInViewport()) || bBattleHUDReadyToShow ||
-      bBattleHUDVisible;
-
-  APawn* ControlledPawn = GetPawn();
-  if (bBattleUIActive && ControlledPawn) {
-    if (GetViewTarget() != ControlledPawn) {
-      SetViewTarget(ControlledPawn);
-    }
-  } else if (bBattleUIActive && !ControlledPawn) {
-    UE_LOG(LogSkaldBattle, Verbose,
-           TEXT("BattleInputReconciler[%s]: no possessed pawn yet for %s"),
-           Context ? Context : TEXT("Unknown"), *GetName());
-  }
-
   UpdateBattleCameraMode();
 
   UE_LOG(LogSkaldBattle, Verbose,
-         TEXT("BattleInputReconciler[%s]: Controller=%s BattleMap=%d FocusWidget=%s"),
-         Context ? Context : TEXT("Unknown"), *GetName(), bBattleMapActive ? 1 : 0,
-         *GetNameSafe(FocusWidget));
+         TEXT("BattleInputReconciler[%s]: Controller=%s BattleMap=%d"),
+         Context ? Context : TEXT("Unknown"), *GetName(), bBattleMapActive ? 1 : 0);
 }
 
 void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
