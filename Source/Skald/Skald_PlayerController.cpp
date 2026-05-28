@@ -3773,6 +3773,23 @@ bool ASkaldPlayerController::IsMyTurn() const {
     return Current->GetStablePlayerId() == MyStableId;
   }
 
+  // Fallback startup guard: only apply the TurnManager started-state check on
+  // authority. On remote clients, TurnManager doesn't replicate its started
+  // flag, so HasTurnsStarted() can stay false while replicated CurrentTurnIndex
+  // and CurrentPlayer are already valid.
+  if (HasAuthority()) {
+    const ATurnManager* LocalTurnManager = TurnManager;
+    if (!LocalTurnManager && World) {
+      if (const ASkaldGameMode* LocalGameMode =
+              World->GetAuthGameMode<ASkaldGameMode>()) {
+        LocalTurnManager = LocalGameMode->GetTurnManager();
+      }
+    }
+    if (LocalTurnManager && !LocalTurnManager->HasTurnsStarted()) {
+      return false;
+    }
+  }
+
   return false;
 }
 
@@ -5558,12 +5575,53 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
     MainHUD->SyncPhaseButtons(bIsMyTurn);
   }
 
+  const bool bHudAwaitingStrategicInitiative =
+      MainHUD && MainHUD->IsAwaitingStrategicInitiative();
+  const bool bNeedsStrategicInitiativeUI =
+      bAwaitingStrategicInitiativeRoll || PendingStrategicInitiativeRoll > 0 ||
+      bHudAwaitingStrategicInitiative;
+  auto ApplyHudCapturePolicy = [this](bool bModalUIActive) {
+    const EMouseCaptureMode DesiredCaptureMode =
+        bModalUIActive ? EMouseCaptureMode::NoCapture
+                       : EMouseCaptureMode::CaptureDuringMouseDown;
+    if (DefaultMouseCaptureMode != DesiredCaptureMode) {
+      DefaultMouseCaptureMode = DesiredCaptureMode;
+      UE_LOG(LogSkald, Verbose,
+             TEXT("[InputPolicy] %s capture mode -> %s"),
+             *GetName(),
+             DesiredCaptureMode == EMouseCaptureMode::NoCapture
+                 ? TEXT("NoCapture")
+                 : TEXT("CaptureDuringMouseDown"));
+    }
+    if (UGameViewportClient* GameViewport =
+            GetWorld() ? GetWorld()->GetGameViewport() : nullptr) {
+      GameViewport->SetMouseCaptureMode(DefaultMouseCaptureMode);
+    }
+  };
+
+  // Strategic initiative can become active while turn ownership is still
+  // settling. Force UI-focused input mode whenever that overlay is visible so
+  // the first click is consumed by the button action instead of just restoring
+  // focus/capture to the PIE viewport.
+  if (bNeedsStrategicInitiativeUI && MainHUD && MainHUD->IsInViewport()) {
+    ApplyHudCapturePolicy(/*bModalUIActive*/ true);
+    UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
+        this, MainHUD, EMouseLockMode::DoNotLock,
+        /*bHideCursorDuringCapture*/ false);
+    bShowMouseCursor = true;
+    bEnableClickEvents = true;
+    bEnableMouseOverEvents = true;
+    SetIgnoreMoveInput(false);
+    SetIgnoreLookInput(false);
+  }
+
   // Keep fighter-selection interaction stable even if replicated turn/battle
   // flags momentarily lag. Without this guard, turn-ownership refreshes can
   // fall through to the non-active-player branch and force GameOnly input,
   // which hides the cursor on click until focus changes.
   if (FighterSelectionWidget && FighterSelectionWidget->IsInViewport()) {
     if (!bShowMouseCursor || !bEnableClickEvents || !bEnableMouseOverEvents) {
+      ApplyHudCapturePolicy(/*bModalUIActive*/ true);
       UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
           this, FighterSelectionWidget, EMouseLockMode::DoNotLock,
           /*bHideCursorDuringCapture*/ false);
@@ -5577,6 +5635,7 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
   // Battle preparation/selection controls are managed by battle flow. Avoid
   // having overworld turn ownership logic steal input mode or cursor state.
   if (bInBattleInputFlow) {
+    ApplyHudCapturePolicy(/*bModalUIActive*/ false);
     if (!bIsMyTurn && bLocalTurnActive) {
       UE_LOG(LogSkald, Verbose,
              TEXT("[TurnState] Controller %s clearing stale local turn while battle flow is active."),
@@ -5624,11 +5683,6 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
       }
     }
 
-    const bool bHudAwaitingStrategicInitiative =
-        MainHUD && MainHUD->IsAwaitingStrategicInitiative();
-    const bool bNeedsStrategicInitiativeUI =
-        bAwaitingStrategicInitiativeRoll || PendingStrategicInitiativeRoll > 0 ||
-        bHudAwaitingStrategicInitiative;
     if (bNeedsBattlePrepUI || bNeedsStrategicInitiativeUI) {
       // Keep focus anchored to the active UI surface when strategic initiative
       // is awaiting input. Passing nullptr can leave focus on the viewport and
@@ -5645,6 +5699,7 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
       UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
           this, InputFocusWidget, EMouseLockMode::DoNotLock,
           /*bHideCursorDuringCapture*/ false);
+      ApplyHudCapturePolicy(/*bModalUIActive*/ true);
       bShowMouseCursor = true;
       bEnableClickEvents = true;
       bEnableMouseOverEvents = true;
@@ -5656,6 +5711,7 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
       SetIgnoreMoveInput(false);
       SetIgnoreLookInput(false);
     } else {
+      ApplyHudCapturePolicy(/*bModalUIActive*/ false);
       // Ensure non-active players fully release world input and phase buttons
       // instead of inheriting the host's UI state.
       if (bShowMouseCursor || bEnableClickEvents || bEnableMouseOverEvents) {
