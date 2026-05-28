@@ -2493,10 +2493,17 @@ void ASkaldPlayerController::PlayerTick(float DeltaTime) {
   const bool bHasTickBattlePayload =
       TickBattle.AttackerPlayerID > 0 || TickBattle.DefenderPlayerID > 0 ||
       TickBattle.FromTerritoryID > 0 || TickBattle.TargetTerritoryID > 0;
+  const USkaldBattleLevelManager* TickBattleLevelManager =
+      CachedGameInstance ? CachedGameInstance->GetBattleLevelManager() : nullptr;
+  const bool bTickStreamedBattleContext =
+      TickBattleLevelManager && (TickBattleLevelManager->IsBattleLevelActive() ||
+                                 TickBattleLevelManager->IsBattleLevelFullyReady());
   const bool bTickBattleContext =
       bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap) ||
       (CachedGameState && CachedGameState->BattlePhase != EBattlePhase::None) ||
-      bHasTickBattlePayload || bBattleHUDReadyToShow || bBattleHUDVisible ||
+      bHasTickBattlePayload || bTickStreamedBattleContext ||
+      (CachedGameInstance && CachedGameInstance->GridBattleManager) ||
+      bBattleHUDReadyToShow || bBattleHUDVisible ||
       (FighterSelectionWidget && FighterSelectionWidget->IsInViewport()) ||
       (BattleHudWidget && BattleHudWidget->IsInViewport());
   const ASkald_PlayerCharacter* CameraPawn =
@@ -3624,10 +3631,16 @@ void ASkaldPlayerController::HandleLockedInEntrySelected(AFighterPawn *Fighter) 
   }
   UpdateLockedInSelectionHighlight();
 
+  const USkaldBattleLevelManager* SelectBattleLevelManager =
+      CachedGameInstance ? CachedGameInstance->GetBattleLevelManager() : nullptr;
   const bool bBattleMapActive =
-      bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap);
+      bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap) ||
+      (SelectBattleLevelManager &&
+       (SelectBattleLevelManager->IsBattleLevelActive() ||
+        SelectBattleLevelManager->IsBattleLevelFullyReady()));
 
   if (IsLocalController() && bBattleMapActive) {
+    UpdateBattleCameraMode();
     if (Fighter->IsAlive()) {
       if (ASkald_PlayerCharacter *CameraPawn = Cast<ASkald_PlayerCharacter>(GetPawn())) {
         CameraPawn->FocusCameraOnActor(Fighter);
@@ -3653,10 +3666,16 @@ void ASkaldPlayerController::HandleEnemyLockedInEntrySelected(
   }
   UpdateLockedInSelectionHighlight();
 
+  const USkaldBattleLevelManager* SelectBattleLevelManager =
+      CachedGameInstance ? CachedGameInstance->GetBattleLevelManager() : nullptr;
   const bool bBattleMapActive =
-      bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap);
+      bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap) ||
+      (SelectBattleLevelManager &&
+       (SelectBattleLevelManager->IsBattleLevelActive() ||
+        SelectBattleLevelManager->IsBattleLevelFullyReady()));
 
   if (IsLocalController() && bBattleMapActive) {
+    UpdateBattleCameraMode();
     if (Fighter->IsAlive()) {
       if (ASkald_PlayerCharacter *CameraPawn = Cast<ASkald_PlayerCharacter>(GetPawn())) {
         CameraPawn->FocusCameraOnActor(Fighter);
@@ -6117,6 +6136,9 @@ void ASkaldPlayerController::UpdateBattleCameraMode() {
 
   ASkald_PlayerCharacter *CameraPawn = Cast<ASkald_PlayerCharacter>(GetPawn());
   if (!CameraPawn) {
+    CameraPawn = Cast<ASkald_PlayerCharacter>(GetViewTarget());
+  }
+  if (!CameraPawn) {
     return;
   }
 
@@ -6128,18 +6150,38 @@ void ASkaldPlayerController::UpdateBattleCameraMode() {
   const bool bHasBattlePayload =
       ActiveBattle.AttackerPlayerID > 0 || ActiveBattle.DefenderPlayerID > 0 ||
       ActiveBattle.FromTerritoryID > 0 || ActiveBattle.TargetTerritoryID > 0;
+  USkaldBattleLevelManager* BattleLevelManager =
+      CachedGameInstance ? CachedGameInstance->GetBattleLevelManager() : nullptr;
+  const bool bStreamedBattleLevelActive =
+      BattleLevelManager && (BattleLevelManager->IsBattleLevelActive() ||
+                             BattleLevelManager->IsBattleLevelFullyReady());
+  const bool bStreamedBattleLevelReady =
+      BattleLevelManager && BattleLevelManager->IsBattleLevelFullyReady();
   const bool bBattleCameraContext =
       bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap) ||
       (CachedGameState && CachedGameState->BattlePhase != EBattlePhase::None) ||
-      bHasBattlePayload || bBattleHUDReadyToShow || bBattleHUDVisible ||
+      bHasBattlePayload || bStreamedBattleLevelActive ||
+      (CachedGameInstance && CachedGameInstance->GridBattleManager) ||
+      bBattleHUDReadyToShow || bBattleHUDVisible ||
       (FighterSelectionWidget && FighterSelectionWidget->IsInViewport()) ||
       (BattleHudWidget && BattleHudWidget->IsInViewport());
 
+  if (bStreamedBattleLevelReady) {
+    bIsBattleMap = true;
+    if (CachedGameInstance && !CachedGameInstance->bIsInBattleMap) {
+      CachedGameInstance->SetBattleMapActive(true);
+    }
+  }
+
   // Keep battle camera availability tied to battle context only. Do not gate it
-  // on streamed-level readiness, replicated phase ordering, or fighter
-  // selection state; those systems can lag behind travel and make the camera
-  // appear frozen even though the player has already entered battle flow.
+  // on replicated phase ordering or fighter selection state; those systems can
+  // lag behind streaming and make the camera appear frozen even though the
+  // player has already entered battle flow.
   CameraPawn->SetBattleCameraActive(bBattleCameraContext);
+
+  if (bBattleCameraContext && GetViewTarget() != CameraPawn) {
+    SetViewTarget(CameraPawn);
+  }
 
   if (!bBattleCameraContext) {
     CameraPawn->ClearCameraFocus();
@@ -6177,12 +6219,20 @@ bool ASkaldPlayerController::ApplyBattleInteractionInputState(
   const bool bHasBattlePayload =
       ActiveBattle.AttackerPlayerID > 0 || ActiveBattle.DefenderPlayerID > 0 ||
       ActiveBattle.FromTerritoryID > 0 || ActiveBattle.TargetTerritoryID > 0;
+  const USkaldBattleLevelManager* BattleLevelManager =
+      CachedGameInstance ? CachedGameInstance->GetBattleLevelManager() : nullptr;
+  const bool bStreamedBattleMapActive =
+      BattleLevelManager && (BattleLevelManager->IsBattleLevelActive() ||
+                             BattleLevelManager->IsBattleLevelFullyReady());
   const bool bBattleMapActive =
-      bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap);
+      bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap) ||
+      bStreamedBattleMapActive;
   const bool bBattleInputContext =
       bBattleMapActive ||
       (CachedGameState && CachedGameState->BattlePhase != EBattlePhase::None) ||
-      bHasBattlePayload || bBattleHUDReadyToShow || bBattleHUDVisible ||
+      bHasBattlePayload ||
+      (CachedGameInstance && CachedGameInstance->GridBattleManager) ||
+      bBattleHUDReadyToShow || bBattleHUDVisible ||
       (FighterSelectionWidget && FighterSelectionWidget->IsInViewport()) ||
       (BattleHudWidget && BattleHudWidget->IsInViewport());
   if (!bBattleInputContext) {
@@ -8582,10 +8632,19 @@ bool ASkaldPlayerController::BeginManualDiceSequence(AFighterPawn *Attacker) {
     return false;
   }
 
+  UpdateBattleCameraMode();
+
   ASkald_PlayerCharacter *CameraPawn =
       Cast<ASkald_PlayerCharacter>(GetPawn());
+  const USkaldBattleLevelManager* BattleLevelManager =
+      CachedGameInstance ? CachedGameInstance->GetBattleLevelManager() : nullptr;
+  const bool bBattleMapActive =
+      bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap) ||
+      (BattleLevelManager &&
+       (BattleLevelManager->IsBattleLevelActive() ||
+        BattleLevelManager->IsBattleLevelFullyReady()));
   const bool bHasBattleCamera =
-      CameraPawn && bIsBattleMap && CameraPawn->IsBattleCameraActive();
+      CameraPawn && bBattleMapActive && CameraPawn->IsBattleCameraActive();
   if (!bHasBattleCamera) {
     return false;
   }
@@ -8784,9 +8843,18 @@ void ASkaldPlayerController::StartAttackDiceSequence(
 
   EnsureDiceManagerBindings();
 
+  UpdateBattleCameraMode();
+
   ASkald_PlayerCharacter *CameraPawn = Cast<ASkald_PlayerCharacter>(GetPawn());
+  const USkaldBattleLevelManager* BattleLevelManager =
+      CachedGameInstance ? CachedGameInstance->GetBattleLevelManager() : nullptr;
+  const bool bBattleMapActive =
+      bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap) ||
+      (BattleLevelManager &&
+       (BattleLevelManager->IsBattleLevelActive() ||
+        BattleLevelManager->IsBattleLevelFullyReady()));
   const bool bHasBattleCamera =
-      CameraPawn && bIsBattleMap && CameraPawn->IsBattleCameraActive();
+      CameraPawn && bBattleMapActive && CameraPawn->IsBattleCameraActive();
 
   if (!bHasBattleCamera) {
     FGuid RollId = TriggerAttackDicePresentation(Attacker, Defender, Result);
@@ -9632,8 +9700,17 @@ void ASkaldPlayerController::PrimeInitiativeDiceOverview()
     return;
   }
 
+  UpdateBattleCameraMode();
+
   ASkald_PlayerCharacter *CameraPawn = Cast<ASkald_PlayerCharacter>(GetPawn());
-  if (!CameraPawn || !bIsBattleMap || !CameraPawn->IsBattleCameraActive()) {
+  const USkaldBattleLevelManager* BattleLevelManager =
+      CachedGameInstance ? CachedGameInstance->GetBattleLevelManager() : nullptr;
+  const bool bBattleMapActive =
+      bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap) ||
+      (BattleLevelManager &&
+       (BattleLevelManager->IsBattleLevelActive() ||
+        BattleLevelManager->IsBattleLevelFullyReady()));
+  if (!CameraPawn || !bBattleMapActive || !CameraPawn->IsBattleCameraActive()) {
     return;
   }
 
@@ -9695,10 +9772,19 @@ void ASkaldPlayerController::StartInitiativeDiceSequence(int32 AttackerRoll,
 
   EnsureDiceManagerBindings();
 
+  UpdateBattleCameraMode();
+
   ASkald_PlayerCharacter *CameraPawn =
       Cast<ASkald_PlayerCharacter>(GetPawn());
+  const USkaldBattleLevelManager* BattleLevelManager =
+      CachedGameInstance ? CachedGameInstance->GetBattleLevelManager() : nullptr;
+  const bool bBattleMapActive =
+      bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap) ||
+      (BattleLevelManager &&
+       (BattleLevelManager->IsBattleLevelActive() ||
+        BattleLevelManager->IsBattleLevelFullyReady()));
   const bool bHasBattleCamera =
-      CameraPawn && bIsBattleMap && CameraPawn->IsBattleCameraActive();
+      CameraPawn && bBattleMapActive && CameraPawn->IsBattleCameraActive();
 
   if (!bHasBattleCamera) {
     TriggerInitiativeDicePresentation(AttackerRoll, DefenderRoll);
