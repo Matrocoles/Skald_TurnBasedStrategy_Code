@@ -6072,13 +6072,19 @@ void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
   CancelCommandMode();
   UpdateBattleHUDButtons();
 
-  UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
-      this, nullptr, EMouseLockMode::DoNotLock, false);
+  // Lock-in closes the selection modal and hands control back to battle input.
+  // Use game-only input so camera drag/rotate works immediately, while still
+  // keeping cursor + click traces enabled for pawn selection.
+  UWidgetBlueprintLibrary::SetInputMode_GameOnly(this);
   FocusGameViewport(this);
   bShowMouseCursor = true;
   bEnableClickEvents = true;
   bEnableMouseOverEvents = true;
-  DefaultMouseCaptureMode = EMouseCaptureMode::NoCapture;
+  DefaultMouseCaptureMode = EMouseCaptureMode::CaptureDuringMouseDown;
+  if (UGameViewportClient* GameViewport = GetWorld() ? GetWorld()->GetGameViewport() : nullptr) {
+    GameViewport->SetMouseCaptureMode(DefaultMouseCaptureMode);
+    GameViewport->SetMouseLockMode(EMouseLockMode::LockOnCapture);
+  }
   SetIgnoreMoveInput(false);
   SetIgnoreLookInput(false);
 
