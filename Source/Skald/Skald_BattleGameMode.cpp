@@ -984,35 +984,41 @@ void ASkald_BattleGameMode::BeginPreBattleSelection(ASkaldPlayerState *AttackerP
     AttackerPS->PendingArmyBudget = AttackerBudget;
     AttackerPS->PendingArmy.Reset();
     AttackerPS->bArmyLockedIn = false;
-
-    if (!AttackerPS->bIsAI) {
-      if (ASkaldPlayerController *APC =
-              Cast<ASkaldPlayerController>(AttackerPS->GetOwner())) {
-        if (!IsAIControllerIdentity(APC)) {
-          APC->Client_ShowFighterSelection(AttackerBudget, AttackerPS->Faction);
-        }
-      }
-    }
   }
 
   if (DefenderPS) {
     DefenderPS->PendingArmyBudget = DefenderBudget;
     DefenderPS->PendingArmy.Reset();
     DefenderPS->bArmyLockedIn = false;
-
-    if (!DefenderPS->bIsAI) {
-      if (ASkaldPlayerController *DPC =
-              Cast<ASkaldPlayerController>(DefenderPS->GetOwner())) {
-        if (!IsAIControllerIdentity(DPC)) {
-          DPC->Client_ShowFighterSelection(DefenderBudget, DefenderPS->Faction);
-        }
-      }
-    }
   }
+
+  // Replicate the final budgets/participant rows before clients react to the
+  // FighterSelection phase. The old ordering showed the widget first, then
+  // reset/upserted participants, which let InitializeFighterSelectionIfNeeded
+  // see Phase=None/Budget=0 and churn input flags during streamed-map startup.
+  SyncBattlePlayerEntry(AttackerPS);
+  SyncBattlePlayerEntry(DefenderPS);
 
   if (ASkaldGameState *GS = GetGameState<ASkaldGameState>()) {
     GS->SetBattlePhase(EBattlePhase::FighterSelection);
   }
+
+  auto ShowSelectionForHuman = [](ASkaldPlayerState *PlayerState,
+                                  int32 Budget) {
+    if (!PlayerState || PlayerState->bIsAI) {
+      return;
+    }
+
+    if (ASkaldPlayerController *PC =
+            Cast<ASkaldPlayerController>(PlayerState->GetOwner())) {
+      if (!IsAIControllerIdentity(PC)) {
+        PC->Client_ShowFighterSelection(Budget, PlayerState->Faction);
+      }
+    }
+  };
+
+  ShowSelectionForHuman(AttackerPS, AttackerBudget);
+  ShowSelectionForHuman(DefenderPS, DefenderBudget);
 
   LogParticipantLockState(TEXT("BeginPreBattleSelection"));
 }
