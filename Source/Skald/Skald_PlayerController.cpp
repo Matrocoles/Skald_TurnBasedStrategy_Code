@@ -3265,17 +3265,18 @@ void ASkaldPlayerController::EnsureBattleHUDVisible() {
     return;
   }
 
-  BattleHudWidget->SetVisibility(ESlateVisibility::Visible);
+  // The battle HUD spans the viewport, so the widget itself must not be a
+  // hit-test target.  Keeping only its children hit-testable lets HUD buttons
+  // consume clicks while empty HUD space still falls through to grid/fighter
+  // traces.
+  BattleHudWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
   bBattleHUDVisible = true;
 
-  // Keep HUD focused so mouse interactions stay responsive while Game+UI
-  // input mode still allows camera controls.
-  UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
-      this, BattleHudWidget, EMouseLockMode::DoNotLock, false);
-  bShowMouseCursor = true;
-  bEnableClickEvents = true;
-  bEnableMouseOverEvents = true;
-  DefaultMouseCaptureMode = EMouseCaptureMode::NoCapture;
+  // After selection lock-in/deploy, the player is in world interaction mode:
+  // camera axes should reach the possessed camera pawn and mouse clicks should
+  // still trace the battle grid.  Modal battle prompts are handled inside the
+  // reconciler and will keep Game+UI focus only while they are actually active.
+  ApplyBattleInteractionInputState(TEXT("EnsureBattleHUDVisible"));
 }
 
 UGridOverlayComponent *ASkaldPlayerController::FindGridOverlay() const {
