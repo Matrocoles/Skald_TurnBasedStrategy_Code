@@ -2852,7 +2852,9 @@ void ASkaldPlayerController::ShowFighterSelectionUI(int32 MaxBudget,
   }
   FighterSelectionWidget->UpdateCostDisplay();
 
-  FighterSelectionWidget->AddToViewport(30);
+  if (!FighterSelectionWidget->IsInViewport()) {
+    FighterSelectionWidget->AddToViewport(30);
+  }
   FighterSelectionWidget->SetIsFocusable(true);
   FighterSelectionWidget->SetFocus();
   UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
@@ -6083,7 +6085,6 @@ void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
   DefaultMouseCaptureMode = EMouseCaptureMode::CaptureDuringMouseDown;
   if (UGameViewportClient* GameViewport = GetWorld() ? GetWorld()->GetGameViewport() : nullptr) {
     GameViewport->SetMouseCaptureMode(DefaultMouseCaptureMode);
-    GameViewport->SetMouseLockMode(EMouseLockMode::LockOnCapture);
   }
   SetIgnoreMoveInput(false);
   SetIgnoreLookInput(false);
