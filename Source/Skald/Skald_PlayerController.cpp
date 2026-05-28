@@ -190,8 +190,10 @@ bool IsCursorOverInteractableSlateWidget() {
       continue;
     }
 
-    if (Widget->IsInteractable() || Widget->SupportsKeyboardFocus() ||
-        Widget->IsEnabled()) {
+    // Treat only interactive/focusable widgets as input blockers. Using
+    // IsEnabled() here is too broad because many layout-only Slate widgets are
+    // enabled by default, which can incorrectly swallow world-map/battle clicks.
+    if (Widget->IsInteractable() || Widget->SupportsKeyboardFocus()) {
       return true;
     }
   }
