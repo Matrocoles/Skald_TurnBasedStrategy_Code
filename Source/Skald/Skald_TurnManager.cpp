@@ -1047,6 +1047,27 @@ void ATurnManager::SyncGameStateTurnIndex() {
       }
     }
 
+    if (const USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+      const FSkaldTravelState &TravelState = GI->GetTravelState();
+      const bool bBattleTurnStateFrozen =
+          GI->bTurnStateFrozenForTravel || GI->IsTravelPending();
+      const int32 FrozenActivePlayerId =
+          TravelState.AttackerPlayerId > 0 ? TravelState.AttackerPlayerId
+                                           : GS->ActivePlayerId;
+
+      if (bBattleTurnStateFrozen && FrozenActivePlayerId > 0 &&
+          NewActivePlayerId != FrozenActivePlayerId) {
+        GS->CurrentTurnIndex = GS->FindTurnIndexForStableId(FrozenActivePlayerId);
+        GS->SetActivePlayerId(FrozenActivePlayerId);
+        UE_LOG(LogSkald, Log,
+               TEXT("[TurnFreeze] Ctx=SyncGameStateTurnIndex Frozen=1 PreserveActiveId=%d SuppressedActiveId=%d Phase=%s BattlePhase=%s"),
+               FrozenActivePlayerId, NewActivePlayerId,
+               *UEnum::GetValueAsString(CurrentPhase),
+               *UEnum::GetValueAsString(GS->BattlePhase));
+        return;
+      }
+    }
+
     // Avoid thrashing the replicated ActivePlayerId while players reconnect to
     // the overview map after travel. If we previously had a valid active
     // player, keep broadcasting that stable value until the controllers have
