@@ -492,7 +492,7 @@ void ATurnManager::BeginPlay() {
       ResolveGridBattleResult();
     }
 
-    // On the battle map, listen for battle end and travel back on event
+    // While the streamed battle map is active, listen for its battle-end event.
     if (!bOnWorldMap) {
       AttemptBindBattleEnd(GI);
     }
@@ -524,12 +524,12 @@ void ATurnManager::EndPlay(const EEndPlayReason::Type EndPlayReason) {
 
   if (UWorld *World = GetWorld()) {
     FTimerManager &TimerManager = World->GetTimerManager();
-    TimerManager.ClearTimer(BattleReturnDelayHandle);
+    TimerManager.ClearTimer(BattleConclusionDelayHandle);
     TimerManager.ClearTimer(BattleEndBindingRetryHandle);
     TimerManager.ClearTimer(PhaseBroadcastRetryHandle);
   }
   bPhaseBroadcastRetryActive = false;
-  bBattleReturnPending = false;
+  bBattleConclusionPending = false;
 
   Super::EndPlay(EndPlayReason);
 }
@@ -546,20 +546,20 @@ void ATurnManager::HandleGridBattleEnded(ESkaldFaction /*WinningFaction*/, int32
     ClearBattleEndBinding(GI);
   }
 
-  if (bBattleReturnPending) {
+  if (bBattleConclusionPending) {
     return;
   }
 
   UWorld *World = GetWorld();
   if (World) {
-    World->GetTimerManager().ClearTimer(BattleReturnDelayHandle);
+    World->GetTimerManager().ClearTimer(BattleConclusionDelayHandle);
   }
 
-  bBattleReturnPending = true;
+  bBattleConclusionPending = true;
 
   if (World && BattleResultReturnDelaySeconds > 0.f) {
     World->GetTimerManager().SetTimer(
-        BattleReturnDelayHandle, this, &ATurnManager::CompleteBattleConclusion,
+        BattleConclusionDelayHandle, this, &ATurnManager::CompleteBattleConclusion,
         BattleResultReturnDelaySeconds, false);
   } else {
     CompleteBattleConclusion();
@@ -569,117 +569,43 @@ void ATurnManager::HandleGridBattleEnded(ESkaldFaction /*WinningFaction*/, int32
 void ATurnManager::CompleteBattleConclusion() {
   UWorld *World = GetWorld();
   if (World) {
-    World->GetTimerManager().ClearTimer(BattleReturnDelayHandle);
+    World->GetTimerManager().ClearTimer(BattleConclusionDelayHandle);
   }
 
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
   if (GI && !GI->bIsInBattleMap) {
     UE_LOG(LogSkald, Verbose,
-           TEXT("CompleteBattleConclusion aborted: battle map already inactive."));
-    bBattleReturnPending = false;
+           TEXT("CompleteBattleConclusion aborted: streamed battle map already inactive."));
+    bBattleConclusionPending = false;
     return;
   }
-
-  if (GI && GI->bTravelPending) {
-    UE_LOG(LogSkald, Warning,
-           TEXT("CompleteBattleConclusion aborted: travel already pending."));
-    bBattleReturnPending = false;
-    return;
-  }
-
-  FString ReturnMapName;
-  FString ReturnMapSource;
-  if (!ResolveBattleReturnMapName(ReturnMapName, ReturnMapSource)) {
-    const FString PendingBattleValue = PendingBattle.ReturnMap;
-    const FString GameInstanceValue = GI ? GI->PendingBattle.ReturnMap : FString();
-    const TCHAR *PendingValueForLog =
-        PendingBattleValue.IsEmpty() ? TEXT("<Empty>") : *PendingBattleValue;
-    const TCHAR *GameInstanceValueForLog =
-        GameInstanceValue.IsEmpty() ? TEXT("<Empty>") : *GameInstanceValue;
-    UE_LOG(LogSkald, Error,
-           TEXT("HandleGridBattleEnded: unable to resolve return map (Pending='%s', GI='%s')."),
-           PendingValueForLog, GameInstanceValueForLog);
-    bBattleReturnPending = false;
-    return;
-  }
-
-  if (ReturnMapSource == TEXT("FallbackOverviewMap") && GI) {
-    GI->SetPendingReturnMap(ReturnMapName);
-  }
-
-  UE_LOG(LogSkald, Verbose,
-         TEXT("HandleGridBattleEnded: resolved return map '%s' from %s."),
-         *ReturnMapName, *ReturnMapSource);
 
   const bool bHasPendingResolution =
       GI && GI->bPendingBattleResolution && GI->PendingBattleResolution.bValid;
   if (bHasPendingResolution) {
     UE_LOG(LogSkald, Verbose,
-           TEXT("HandleGridBattleEnded: reusing already captured pending battle resolution."));
+           TEXT("CompleteBattleConclusion: reusing already captured pending battle resolution."));
   } else {
     ResolveGridBattleResult();
   }
 
   if (GI) {
-    GI->SetTravelPending(true);
+    if (USkaldBattleLevelManager *BattleLevelManager =
+            GI->GetBattleLevelManager()) {
+      BattleLevelManager->ReleaseBattleLevel();
+    }
+
+    GI->SetTravelPending(false);
   }
 
-  if (!World) {
-    World = GetWorld();
+  if (HasAuthority()) {
+    MulticastSetBattleMapActive(false);
   }
 
-  if (World) {
-    const ENetMode NetMode = World->GetNetMode();
-    auto NetModeToString = [](ENetMode InNetMode) {
-      switch (InNetMode) {
-      case NM_Standalone:
-        return TEXT("NM_Standalone");
-      case NM_DedicatedServer:
-        return TEXT("NM_DedicatedServer");
-      case NM_ListenServer:
-        return TEXT("NM_ListenServer");
-      case NM_Client:
-        return TEXT("NM_Client");
-      case NM_MAX:
-        return TEXT("NM_MAX");
-      default:
-        return TEXT("Unknown");
-      }
-    };
-    const TCHAR *NetModeStringPtr = NetModeToString(NetMode);
+  UE_LOG(LogSkald, Log,
+         TEXT("CompleteBattleConclusion: resolved battle and released streamed battle sublevel without map travel."));
 
-    UE_LOG(LogSkald, Log,
-           TEXT("HandleGridBattleEnded: travelling to '%s' (source=%s, NetMode=%s)."),
-           *ReturnMapName, *ReturnMapSource,
-           NetModeStringPtr);
-
-    switch (NetMode) {
-    case NM_Standalone: {
-      const FName LevelName(*ReturnMapName);
-      UGameplayStatics::OpenLevel(World, LevelName, /*bAbsolute=*/true);
-      break;
-    }
-    case NM_DedicatedServer:
-    case NM_ListenServer: {
-      FString ListenTarget = ReturnMapName;
-      if (!ListenTarget.Contains(TEXT("?listen"))) {
-        ListenTarget.Append(TEXT("?listen"));
-      }
-      World->ServerTravel(ListenTarget);
-      break;
-    }
-    case NM_Client:
-      // Clients should wait for the server's travel notification instead of
-      // loading the map locally with an incomplete URL. The pending server
-      // travel initiated above will automatically move connected clients.
-      break;
-    default:
-      World->ServerTravel(ReturnMapName);
-      break;
-    }
-  }
-
-  bBattleReturnPending = false;
+  bBattleConclusionPending = false;
 }
 
 bool ATurnManager::ResolveBattleReturnMapName(FString &OutReturnMapName,
@@ -2408,11 +2334,11 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
     DeferredPendingBattle = SeededBattle;
 
     if (UWorld *World = GetWorld()) {
-      if (!World->GetTimerManager().IsTimerActive(PendingBattleTravelRetryHandle)) {
+      if (!World->GetTimerManager().IsTimerActive(PendingBattleStreamRetryHandle)) {
         FTimerDelegate RetryDelegate =
-            FTimerDelegate::CreateUObject(this, &ATurnManager::RetryPendingBattleTravel);
+            FTimerDelegate::CreateUObject(this, &ATurnManager::RetryPendingBattleStream);
         constexpr float RetryDelaySeconds = 0.1f;
-        World->GetTimerManager().SetTimer(PendingBattleTravelRetryHandle, RetryDelegate,
+        World->GetTimerManager().SetTimer(PendingBattleStreamRetryHandle, RetryDelegate,
                                           RetryDelaySeconds, false);
       }
     }
@@ -2422,7 +2348,7 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
   bool bGameModeHasSnapshotAfterCall = GI && GI->CachedWorldMapTerritories.Num() > 0;
 
   if (UWorld *ExistingWorld = GetWorld()) {
-    ExistingWorld->GetTimerManager().ClearTimer(PendingBattleTravelRetryHandle);
+    ExistingWorld->GetTimerManager().ClearTimer(PendingBattleStreamRetryHandle);
   }
 
   if (UWorld *World = GetWorld()) {
@@ -2443,7 +2369,7 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
              *SeededBattle.ReturnMap);
     } else {
       UE_LOG(LogSkald, Log,
-             TEXT("TriggerGridBattle: storing return map '%s' before travelling to battle."),
+             TEXT("TriggerGridBattle: storing overview map '%s' before streaming battle sublevel."),
              *SeededBattle.ReturnMap);
       if (GI) {
         GI->SetPendingReturnMap(SeededBattle.ReturnMap);
@@ -2507,9 +2433,8 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
     }
 
     const bool bIsCapitalAttack = SeededBattle.IsCapitalAttack;
-    // Prefer in-world streamed battle transitions so turn/payload state remains
-    // in the same persistent world rather than relying on map travel.
-    bool bShouldStreamSelectedMap = true;
+    // Battle transitions are always in-world streamed sublevels so turn/payload
+    // state remains in the same persistent world.
     TSoftObjectPtr<UWorld> SelectedBattleMap;
     if (bIsCapitalAttack && CapitalMaps.Num() > 0) {
       const int32 Index = FMath::RandRange(0, CapitalMaps.Num() - 1);
@@ -2533,18 +2458,10 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
           FSoftObjectPath(TEXT("/Game/Blueprints/Maps/BattleMap.BattleMap")));
     }
 
-    // Keep this guard for environments where streaming may be disabled and we
-    // need to fall back to travel.
     const ENetMode NetMode = World->GetNetMode();
     UE_LOG(LogSkald, Log,
-           TEXT("TriggerGridBattle: streaming battle map transition enabled (net mode %d)."),
+           TEXT("TriggerGridBattle: streaming battle sublevel transition required (net mode %d)."),
            static_cast<int32>(NetMode));
-
-    FString MapToLoad =
-        SelectedBattleMap.ToSoftObjectPath().GetLongPackageName();
-    if (MapToLoad.IsEmpty()) {
-      MapToLoad = TEXT("/Game/Blueprints/Maps/BattleMap");
-    }
 
     ASkaldGameState *GS = World->GetGameState<ASkaldGameState>();
 
@@ -2755,7 +2672,7 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
 
     if (TravelState.CachedTerritories.Num() == 0) {
       UE_LOG(LogSkald, Warning,
-             TEXT("TriggerGridBattle deferred: territory snapshot unavailable; retrying before travel."));
+             TEXT("TriggerGridBattle deferred: territory snapshot unavailable; retrying before streaming."));
 
       if (GI) {
         GI->SetTravelPending(false);
@@ -2763,11 +2680,11 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
         GI->bResumeTurns = false;
       }
 
-      if (World && !World->GetTimerManager().IsTimerActive(PendingBattleTravelRetryHandle)) {
+      if (World && !World->GetTimerManager().IsTimerActive(PendingBattleStreamRetryHandle)) {
         FTimerDelegate RetryDelegate = FTimerDelegate::CreateUObject(
-            this, &ATurnManager::RetryPendingBattleTravel);
+            this, &ATurnManager::RetryPendingBattleStream);
         constexpr float RetryDelaySeconds = 0.1f;
-        World->GetTimerManager().SetTimer(PendingBattleTravelRetryHandle, RetryDelegate,
+        World->GetTimerManager().SetTimer(PendingBattleStreamRetryHandle, RetryDelegate,
                                           RetryDelaySeconds, false);
       }
 
@@ -2775,7 +2692,7 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
     }
 
     if (World) {
-      World->GetTimerManager().ClearTimer(PendingBattleTravelRetryHandle);
+      World->GetTimerManager().ClearTimer(PendingBattleStreamRetryHandle);
     }
 
     FS_BattlePayload PendingPayload = SeededBattle;
@@ -2868,33 +2785,17 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
 
       if (USkaldBattleLevelManager *BattleLevelManager =
               GI->GetBattleLevelManager()) {
-        if (bShouldStreamSelectedMap) {
-          bStreamingBattle = BattleLevelManager->RequestBattleLevel(
-              World, SelectedBattleMap, PendingPayload);
-        }
+        bStreamingBattle = BattleLevelManager->RequestBattleLevel(
+            World, SelectedBattleMap, PendingPayload);
       }
 
-      if (bShouldStreamSelectedMap) {
-        if (bStreamingBattle) {
-          if (World->GetNetMode() != NM_Standalone) {
-            MulticastStreamBattleLevel(SelectedBattleMap.ToSoftObjectPath(),
-                                       TravelState, PendingPayload);
-          }
-        } else {
-          GI->SetTravelPending(true);
+      if (bStreamingBattle) {
+        if (World->GetNetMode() != NM_Standalone) {
+          MulticastStreamBattleLevel(SelectedBattleMap.ToSoftObjectPath(),
+                                     TravelState, PendingPayload);
         }
       } else {
         GI->SetTravelPending(true);
-      }
-
-      // Streamed battle-map activation is owned by the battle level manager as
-      // soon as its sublevel request is accepted. Non-streamed travel still
-      // needs the turn manager to publish the active battle-map flag directly.
-      if (!bShouldStreamSelectedMap) {
-        GI->SetBattleMapActive(true);
-        if (World->GetNetMode() != NM_Standalone) {
-          MulticastSetBattleMapActive(true);
-        }
       }
     }
 
@@ -2907,40 +2808,22 @@ void ATurnManager::TriggerGridBattle(const FS_BattlePayload &Battle) {
            TravelState.HumanOwnedTerritories.Num(),
            TravelState.CachedTerritories.Num());
 
-    if (bShouldStreamSelectedMap && !bStreamingBattle) {
+    if (!bStreamingBattle) {
       UE_LOG(LogSkald, Warning,
-             TEXT("TriggerGridBattle: battle level streaming failed for %s; scheduling retry instead of map travel."),
+             TEXT("TriggerGridBattle: battle sublevel streaming failed for %s; scheduling retry."),
              *SelectedBattleMap.ToSoftObjectPath().ToString());
       if (GI) {
-        // Clear the in-flight travel gate before scheduling a retry. Streaming
-        // failure marks travel pending earlier in this function to block
-        // premature battle flow, but leaving it set would cause the retry path
-        // to immediately defer again at the TriggerGridBattle guard.
+        // Clear the in-flight streaming gate before scheduling a retry.
         GI->SetTravelPending(false);
       }
       DeferredPendingBattle = PendingPayload;
       if (World &&
-          !World->GetTimerManager().IsTimerActive(PendingBattleTravelRetryHandle)) {
+          !World->GetTimerManager().IsTimerActive(PendingBattleStreamRetryHandle)) {
         FTimerDelegate RetryDelegate = FTimerDelegate::CreateUObject(
-            this, &ATurnManager::RetryPendingBattleTravel);
+            this, &ATurnManager::RetryPendingBattleStream);
         constexpr float RetryDelaySeconds = 0.15f;
-        World->GetTimerManager().SetTimer(PendingBattleTravelRetryHandle,
+        World->GetTimerManager().SetTimer(PendingBattleStreamRetryHandle,
                                           RetryDelegate, RetryDelaySeconds, false);
-      }
-    } else if (!bShouldStreamSelectedMap) {
-      if (World->GetNetMode() != NM_Standalone) {
-        MulticastPrepareBattleTravel(TravelState, PendingPayload);
-      }
-      if (IsRunningDedicatedServer() ||
-          World->GetNetMode() != NM_Standalone) {
-        FString ListenMap = MapToLoad;
-        if (!ListenMap.Contains(TEXT("?"))) {
-          ListenMap.Append(TEXT("?listen"));
-        }
-        World->ServerTravel(ListenMap);
-      } else {
-        const FName LevelName = FName(*MapToLoad);
-        UGameplayStatics::OpenLevel(World, LevelName, /*bAbsolute=*/true);
       }
     }
   }
@@ -3560,7 +3443,7 @@ bool ATurnManager::TryAdvanceFromReadyToBattle(const TCHAR *Context) {
   CommitPendingBattleReadyState(TEXT("TryAdvanceFromReadyToBattle_Clear"));
 
   UE_LOG(LogSkaldReady, Log,
-         TEXT("AllReady=true -> StartBattleTravel Battle=%d->%d (Context=%s)"),
+         TEXT("AllReady=true -> StartBattleStream Battle=%d->%d (Context=%s)"),
          BattleToLaunch.FromTerritoryID, BattleToLaunch.TargetTerritoryID,
          Context ? Context : TEXT("TryAdvanceFromReadyToBattle"));
 
@@ -3568,9 +3451,9 @@ bool ATurnManager::TryAdvanceFromReadyToBattle(const TCHAR *Context) {
   return true;
 }
 
-void ATurnManager::RetryPendingBattleTravel() {
+void ATurnManager::RetryPendingBattleStream() {
   if (UWorld *World = GetWorld()) {
-    World->GetTimerManager().ClearTimer(PendingBattleTravelRetryHandle);
+    World->GetTimerManager().ClearTimer(PendingBattleStreamRetryHandle);
   }
 
   const FS_BattlePayload PendingPayload = DeferredPendingBattle;
@@ -3619,22 +3502,6 @@ void ATurnManager::MulticastStreamBattleLevel_Implementation(
   }
 }
 
-void ATurnManager::MulticastPrepareBattleTravel_Implementation(
-    const FSkaldTravelState &TravelState,
-    const FS_BattlePayload &BattlePayload) {
-  if (HasAuthority()) {
-    return;
-  }
-
-  if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
-    GI->SetTravelState(TravelState);
-    GI->PendingBattle = BattlePayload;
-    GI->SetBattleMapActive(true);
-    GI->SetPendingReturnMap(TravelState.ReturnMap);
-    GI->SetTravelPending(true);
-  }
-}
-
 void ATurnManager::MulticastOnReadyStateChanged_Implementation(
     const FSkaldBattleReadyState &ReadyState,
     const FS_BattlePayload &BattlePayload) {
@@ -3661,6 +3528,12 @@ void ATurnManager::MulticastSetBattleMapActive_Implementation(bool bInBattleMap)
   }
 
   if (USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+    if (!bInBattleMap) {
+      if (USkaldBattleLevelManager *BattleLevelManager =
+              GI->GetBattleLevelManager()) {
+        BattleLevelManager->ReleaseBattleLevel();
+      }
+    }
     GI->SetBattleMapActive(bInBattleMap);
   }
 }
@@ -3698,7 +3571,7 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
     UWorld *World = GetWorld();
     if (!World) {
       UE_LOG(LogSkald, Verbose,
-             TEXT("ResolveGridBattleResult: World unavailable; awaiting travel completion before retry."));
+             TEXT("ResolveGridBattleResult: World unavailable; awaiting streaming completion before retry."));
       return;
     }
 
@@ -3713,9 +3586,8 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
   };
 
   if (GameMode && GameMode->IsA(ASkald_BattleGameMode::StaticClass())) {
-    // Still on the battle map; wait for travel to finish before updating the
-    // overworld. The pending resolution will be applied once the world map
-    // has been rebuilt.
+    // Still inside a standalone battle game mode; wait until the persistent
+    // overworld is available before applying the pending resolution.
     QueueRetry();
     return;
   }
@@ -3998,7 +3870,7 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
 
   // Ensure no stale retry timers trigger another battle after resolution
   if (UWorld *World = GetWorld()) {
-    World->GetTimerManager().ClearTimer(PendingBattleTravelRetryHandle);
+    World->GetTimerManager().ClearTimer(PendingBattleStreamRetryHandle);
   }
   DeferredPendingBattle = FS_BattlePayload();
 
