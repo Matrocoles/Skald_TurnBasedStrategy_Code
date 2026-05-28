@@ -1957,6 +1957,7 @@ void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
     }
     World->GetTimerManager().ClearTimer(LobbyAutoInitHandle);
     World->GetTimerManager().ClearTimer(GameReferenceRetryHandle);
+    World->GetTimerManager().ClearTimer(PostLockInBattleInputRetryHandle);
   }
 
   if (BattleResultWidget) {
@@ -6056,6 +6057,61 @@ void ASkaldPlayerController::ReconcileBattleInputState(const TCHAR* Context) {
          Context ? Context : TEXT("Unknown"), *GetName(), bBattleMapActive ? 1 : 0);
 }
 
+void ASkaldPlayerController::SchedulePostLockInBattleInputReconcile() {
+  UWorld* World = GetWorld();
+  if (!World || !IsLocalController()) {
+    return;
+  }
+
+  PostLockInBattleInputRetryCount = 0;
+  World->GetTimerManager().ClearTimer(PostLockInBattleInputRetryHandle);
+  World->GetTimerManager().SetTimer(
+      PostLockInBattleInputRetryHandle, this,
+      &ASkaldPlayerController::HandlePostLockInBattleInputReconcileTick,
+      0.2f, true, 0.2f);
+}
+
+void ASkaldPlayerController::HandlePostLockInBattleInputReconcileTick() {
+  UWorld* World = GetWorld();
+  if (!World) {
+    return;
+  }
+
+  if (!CachedGameInstance) {
+    CachedGameInstance = GetGameInstance<USkaldGameInstance>();
+  }
+
+  bool bReady = false;
+  if (CachedGameInstance) {
+    if (const USkaldBattleLevelManager* BattleLevelManager =
+            CachedGameInstance->GetBattleLevelManager()) {
+      bReady = BattleLevelManager->IsBattleLevelFullyReady();
+    }
+
+    if (bReady && !CachedGameInstance->bIsInBattleMap) {
+      CachedGameInstance->SetBattleMapActive(true);
+      DetectBattleMap();
+      UE_LOG(LogSkaldBattle, Log,
+             TEXT("PostLockInReconcile: Promoted streamed battle-map active for %s"),
+             *GetName());
+    }
+  }
+
+  ReconcileBattleInputState(TEXT("PostLockInBattleInputRetry"));
+
+  const bool bBattleMapActive =
+      bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap);
+  constexpr int32 MaxRetries = 20;
+  ++PostLockInBattleInputRetryCount;
+
+  if (bBattleMapActive || PostLockInBattleInputRetryCount >= MaxRetries) {
+    World->GetTimerManager().ClearTimer(PostLockInBattleInputRetryHandle);
+    UE_LOG(LogSkaldBattle, Verbose,
+           TEXT("PostLockInReconcile: Completed for %s (BattleMapActive=%d Retries=%d)"),
+           *GetName(), bBattleMapActive ? 1 : 0, PostLockInBattleInputRetryCount);
+  }
+}
+
 void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
   UE_LOG(LogSkaldUI, Log,
          TEXT("HandleFighterSelectionLockedIn: Controller=%s Local=%s Pawn=%s"),
@@ -6117,6 +6173,7 @@ void ASkaldPlayerController::HandleFighterSelectionLockedIn() {
   }
 
   ReconcileBattleInputState(TEXT("HandleFighterSelectionLockedIn"));
+  SchedulePostLockInBattleInputReconcile();
 
   if (CachedGameInstance && CachedGameInstance->GridBattleManager)
   {
