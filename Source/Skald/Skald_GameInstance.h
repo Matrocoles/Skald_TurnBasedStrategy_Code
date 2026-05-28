@@ -56,7 +56,7 @@ struct FSkaldTravelState
   UPROPERTY(BlueprintReadWrite, EditAnywhere)
   int32 DefenderTerritory = -1;
 
-  /** Canonical map to return to once battle travel completes. */
+  /** Canonical overview map associated with the active streamed battle. */
   UPROPERTY(BlueprintReadWrite, EditAnywhere)
   FString ReturnMap;
 
@@ -191,11 +191,11 @@ public:
             meta = (DisplayName = "Dice Board Streamed Sublevel", AllowedClasses = "/Script/Engine.World"))
   TSoftObjectPtr<UWorld> DiceBoardSublevel;
 
-  /** True when the game has travelled to a dedicated battle map. */
+  /** True when a streamed battle sublevel is active. */
   UPROPERTY(BlueprintReadWrite, Category = "Battle")
   bool bIsInBattleMap = false;
 
-  /** True while a ServerTravel call is in flight. */
+  /** True while a battle/overworld streaming transition is in flight. */
   UPROPERTY(Transient)
   bool bTravelPending = false;
 
@@ -206,12 +206,12 @@ public:
   UPROPERTY(Transient)
   TWeakObjectPtr<ASkald_BattleGameMode> ActiveBattleGameMode;
 
-  /** Snapshot of the overworld territories captured before travelling. */
+  /** Snapshot of the overworld territories captured before battle streaming. */
   UPROPERTY(BlueprintReadWrite, Category = "Battle")
   TArray<FS_Territory> CachedWorldMapTerritories;
 
-  /** Snapshot captured immediately before travelling so the overworld can be
-   *  restored when returning from a battle map. */
+  /** Snapshot captured immediately before battle streaming so the overworld can be
+   *  restored after unloading a battle sublevel. */
   UPROPERTY(BlueprintReadWrite, Category = "Battle")
   TArray<FS_Territory> PendingTravelTerritories;
 
@@ -227,7 +227,7 @@ public:
   UPROPERTY(BlueprintReadWrite, Category = "Turn")
   int32 SavedTurnPlayerId = 0;
 
-  /** Phase of the turn cycle that was active before travelling. */
+  /** Phase of the turn cycle that was active before battle streaming. */
   UPROPERTY(BlueprintReadWrite, Category = "Turn")
   ETurnPhase SavedTurnPhase = ETurnPhase::Reinforcement;
 
@@ -315,21 +315,20 @@ public:
     return PendingTravelTerritories;
   }
 
-  /** Store the canonical map path we should travel back to once combat
-   *  concludes. */
+  /** Store the canonical overview map path associated with combat cleanup. */
   void SetPendingReturnMap(const FString &InReturnMap);
 
-  /** Return the currently cached travel destination, if any. */
+  /** Return the currently cached overview map path, if any. */
   const FString &GetPendingReturnMap() const { return PendingReturnMap; }
 
-  /** Clear any cached return destination once travel has completed. */
+  /** Clear any cached overview map path once battle cleanup has completed. */
   void ClearPendingReturnMap();
 
-  /** Toggle the travel pending guard and log the change. */
+  /** Toggle the streaming pending guard and log the change. */
   UFUNCTION(BlueprintCallable)
   void SetTravelPending(bool bInPending);
 
-  /** Whether the game instance currently expects a travel to complete. */
+  /** Whether the game instance currently expects streaming to complete. */
   UFUNCTION(BlueprintCallable, BlueprintPure)
   bool IsTravelPending() const;
 

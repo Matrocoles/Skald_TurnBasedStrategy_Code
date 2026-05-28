@@ -139,11 +139,11 @@ struct SKALD_API FS_BattlePayload
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     int32 DefenderArmyCount = 0;
 
-    /** Cached display name for the attacking player when travelling to the battle map. */
+    /** Cached display name for the attacking player when streaming the battle map. */
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     FString AttackerDisplayName;
 
-    /** Cached display name for the defending player when travelling to the battle map. */
+    /** Cached display name for the defending player when streaming the battle map. */
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     FString DefenderDisplayName;
 
@@ -187,7 +187,7 @@ struct SKALD_API FS_BattlePayload
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     int32 RandomSeed = 0;
 
-    /** Map name to travel back to once the battle concludes. */
+    /** Overview map name associated with the streamed battle context. */
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     FString ReturnMap;
 };

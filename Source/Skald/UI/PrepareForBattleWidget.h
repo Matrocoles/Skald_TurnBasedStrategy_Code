@@ -14,7 +14,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FPrepareForBattleRetreatClicked);
 
 /**
  * Confirmation widget shown after an attack is approved on the world map.
- * Allows both participants to confirm they are ready before travelling to
+ * Allows both participants to confirm they are ready before streaming to
  * the grid battle map.
  */
 UCLASS(BlueprintType, Blueprintable)

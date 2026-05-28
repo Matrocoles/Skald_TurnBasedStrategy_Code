@@ -53,6 +53,9 @@ private:
                             ULevelStreaming*& OutStreamingLevel, const TCHAR* ContextLabel);
   void ApplyVisibilityForCurrentMode();
   bool IsStreamingLevelPartOfDiceBoard(ULevelStreaming* Level) const;
+  bool ShouldKeepPersistentActorForBattle(AActor* Actor) const;
+  void RecenterLocalBattleCameras();
+  bool CalculateActiveBattleLevelBounds(FBox& OutBounds) const;
 
   void HandleLevelLoaded();
   void HandleLevelUnloaded();

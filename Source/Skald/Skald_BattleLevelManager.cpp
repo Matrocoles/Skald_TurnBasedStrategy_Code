@@ -9,10 +9,14 @@
 #include "Engine/LevelStreamingDynamic.h"
 #include "Misc/PackageName.h"
 #include "GameFramework/Actor.h"
+#include "GameFramework/Controller.h"
 #include "GameFramework/GameModeBase.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
 #include "GameFramework/WorldSettings.h"
 #include "Skald_BattleGameMode.h"
 #include "Skald_GameInstance.h"
+#include "Skald_PlayerCharacter.h"
 #include "SkaldLogging.h"
 #include "UObject/Package.h"
 #include "UObject/SoftObjectPath.h"
@@ -38,21 +42,6 @@ static ULevelStreaming *FindStreamingLevelFor(ULevel *Level)
   }
 
   return nullptr;
-}
-
-static void SetPersistentLevelVisibility(UWorld *World, ULevel *PersistentLevel,
-                                         bool bShouldBeVisible)
-{
-  if (!PersistentLevel) {
-    return;
-  }
-
-  if (ULevelStreaming *StreamingLevel = FindStreamingLevelFor(PersistentLevel)) {
-    StreamingLevel->SetShouldBeVisible(bShouldBeVisible);
-    if (World) {
-      World->UpdateLevelStreaming();
-    }
-  }
 }
 
 static FString ResolveStreamingLevelPackageName(const ULevelStreaming *Level)
@@ -499,6 +488,8 @@ void USkaldBattleLevelManager::HandleLevelLoaded() {
       }
     }
     ASkald_BattleGameMode *BattleGM = ActiveBattleGameMode.Get();
+    RecenterLocalBattleCameras();
+
     if (BattleGM) {
       BattleGM->NotifyBattleLevelActivated();
     } else {
@@ -783,9 +774,9 @@ void USkaldBattleLevelManager::HideNonBattleLevels() {
           continue;
         }
 
-        // Skip world settings so the world retains its authoritative
-        // configuration while the overworld is hidden.
-        if (Actor->IsA<AWorldSettings>()) {
+        // Skip world settings and player-owned camera pawns/controllers so the
+        // persistent player view keeps ticking while only the battle map is visible.
+        if (ShouldKeepPersistentActorForBattle(Actor)) {
           continue;
         }
 
@@ -807,9 +798,8 @@ void USkaldBattleLevelManager::HideNonBattleLevels() {
         }
       }
 
-      SetPersistentLevelVisibility(StreamingWorld, PersistentLevel, false);
       UE_LOG(LogSkald, Verbose,
-             TEXT("BattleLevelManager: Hiding persistent level %s"),
+             TEXT("BattleLevelManager: Hid persistent overworld actors in %s while keeping camera actors active"),
              *PersistentLevel->GetOutermost()->GetName());
     }
   }
@@ -852,12 +842,9 @@ void USkaldBattleLevelManager::RestoreNonBattleLevels() {
         StreamingWorld = PersistentLevel->GetWorld();
       }
 
-      SetPersistentLevelVisibility(StreamingWorld, PersistentLevel,
-                                   bPersistentLevelWasVisible);
-
       if (bPersistentLevelWasVisible) {
         UE_LOG(LogSkald, Verbose,
-               TEXT("BattleLevelManager: Restored persistent level %s"),
+               TEXT("BattleLevelManager: Restored persistent overworld actors in %s"),
                *PersistentLevel->GetOutermost()->GetName());
       }
     }
@@ -928,6 +915,81 @@ bool USkaldBattleLevelManager::IsStreamingLevelPartOfBattleMap(
   }
 
   return false;
+}
+
+bool USkaldBattleLevelManager::ShouldKeepPersistentActorForBattle(AActor* Actor) const {
+  if (!Actor) {
+    return false;
+  }
+
+  if (Actor->IsA<AWorldSettings>() || Actor->IsA<ASkald_PlayerCharacter>()) {
+    return true;
+  }
+
+  const APawn* Pawn = Cast<APawn>(Actor);
+  if (Pawn && Pawn->GetController()) {
+    return true;
+  }
+
+  return Actor->IsA<AController>();
+}
+
+bool USkaldBattleLevelManager::CalculateActiveBattleLevelBounds(FBox& OutBounds) const {
+  OutBounds.Init();
+
+  const ULevelStreaming* StreamingLevel = ActiveStreamingLevel.Get();
+  ULevel* LoadedLevel = StreamingLevel ? StreamingLevel->GetLoadedLevel() : nullptr;
+  if (!LoadedLevel) {
+    return false;
+  }
+
+  for (AActor* Actor : LoadedLevel->Actors) {
+    if (!Actor || Actor->IsA<AWorldSettings>() || Actor->IsA<AGameModeBase>()) {
+      continue;
+    }
+
+    const FBox ActorBounds = Actor->GetComponentsBoundingBox(/*bNonColliding=*/true);
+    if (ActorBounds.IsValid) {
+      OutBounds += ActorBounds;
+    }
+  }
+
+  return OutBounds.IsValid;
+}
+
+void USkaldBattleLevelManager::RecenterLocalBattleCameras() {
+  UWorld* World = nullptr;
+  if (ULevelStreaming* StreamingLevel = ActiveStreamingLevel.Get()) {
+    World = StreamingLevel->GetWorld();
+  }
+  if (!World) {
+    return;
+  }
+
+  FBox BattleBounds;
+  const bool bHasBounds = CalculateActiveBattleLevelBounds(BattleBounds);
+  const FVector BattleCenter = bHasBounds ? BattleBounds.GetCenter() : FVector::ZeroVector;
+  const FVector CameraLocation(BattleCenter.X, BattleCenter.Y,
+                               bHasBounds ? FMath::Max(BattleCenter.Z, BattleBounds.Max.Z) : BattleCenter.Z);
+
+  for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It) {
+    APlayerController* PC = It->Get();
+    if (!PC || !PC->IsLocalController()) {
+      continue;
+    }
+
+    ASkald_PlayerCharacter* CameraPawn = Cast<ASkald_PlayerCharacter>(PC->GetPawn());
+    if (!CameraPawn) {
+      CameraPawn = Cast<ASkald_PlayerCharacter>(PC->GetViewTarget());
+    }
+    if (!CameraPawn) {
+      continue;
+    }
+
+    CameraPawn->SetBattleCameraActive(true);
+    CameraPawn->SetActorLocation(CameraLocation);
+    PC->SetViewTarget(CameraPawn);
+  }
 }
 
 bool USkaldBattleLevelManager::ResolveOrStreamLevel(

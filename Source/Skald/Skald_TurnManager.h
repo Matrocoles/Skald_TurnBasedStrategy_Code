@@ -19,16 +19,11 @@ struct FBattleMapDescriptor {
   GENERATED_BODY()
 
 public:
-  // Battle maps are travelled to rather than streamed as sub-levels.
-  FBattleMapDescriptor() : bStreamAsSubLevel(false) {}
+  // Battle maps are always streamed as sub-levels of the persistent overworld.
+  FBattleMapDescriptor() = default;
 
   UPROPERTY(EditAnywhere, BlueprintReadWrite)
   TSoftObjectPtr<UWorld> Map;
-
-  UPROPERTY(EditAnywhere, BlueprintReadWrite, meta =
-                (Tooltip =
-                     "If true the map will be streamed instead of travelling"))
-  bool bStreamAsSubLevel;
 };
 
 // Broadcast whenever the overall world state changes so HUDs can refresh.
@@ -56,7 +51,7 @@ public:
 
   void RestoreControllerOrderFromSnapshots(const TArray<FS_PlayerData> &Snapshots);
 
-  /** Attempt to resume the saved turn state captured before travelling. */
+  /** Attempt to resume the saved turn state captured before battle streaming. */
   bool AttemptResumeSavedTurnState();
 
   /** Begin the pre-game army placement phase. */
@@ -108,7 +103,7 @@ public:
   /** Query the number of remaining movement actions for the specified player. */
   int32 GetMovementActionsRemaining(int32 PlayerID) const;
 
-  /** Request that both players confirm readiness before travelling to battle. */
+  /** Request that both players confirm readiness before streaming the battle sublevel. */
   UFUNCTION(BlueprintCallable, Category = "Battle")
   void RequestPrepareBattle(const FS_BattlePayload &Battle);
 
@@ -135,12 +130,6 @@ public:
   void MulticastStreamBattleLevel(const FSoftObjectPath &BattleLevelPath,
                                   const FSkaldTravelState &TravelState,
                                   const FS_BattlePayload &BattlePayload);
-
-  /** Multicast notification to prepare clients for travelling to a battle map
-   *  when a streaming level is not being used. */
-  UFUNCTION(NetMulticast, Reliable)
-  void MulticastPrepareBattleTravel(const FSkaldTravelState &TravelState,
-                                    const FS_BattlePayload &BattlePayload);
 
   /** Multicast notification whenever the pending battle readiness changes. */
   UFUNCTION(NetMulticast, Reliable)
@@ -231,7 +220,7 @@ public:
   /** Restore the cached ready state from a saved game. */
   void SetPendingBattleReadyState(const FSkaldBattleReadyState &ReadyState);
 
-  /** Mark the specified player as ready to travel to the battle map. */
+  /** Mark the specified player as ready to stream the battle sublevel. */
   UFUNCTION(BlueprintCallable, Category = "Battle")
   void NotifyPlayerReadyForBattle(int32 PlayerID, bool bReady);
 
@@ -247,7 +236,7 @@ public:
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category = "Battle")
   TArray<TSoftObjectPtr<UWorld>> CapitalMaps;
 
-  /** Optional per-map configuration including streaming preferences. */
+  /** Optional per-map configuration; every battle map is streamed as a sublevel. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category = "Battle",
             meta = (TitleProperty = "Map"))
   TArray<FBattleMapDescriptor> BattleMapEntries;
@@ -277,7 +266,7 @@ protected:
   bool TryAutoReadyAI(const TCHAR *Context);
   ASkaldPlayerController *FindControllerByPlayerId(int32 PlayerId) const;
   void ClearActiveRetreatContext();
-  /** Payload for the next battle waiting on travel/resolution to finish. */
+  /** Payload for the next battle waiting on streaming/resolution to finish. */
   FS_BattlePayload DeferredPendingBattle;
   /** Last battle payload hash processed by TriggerGridBattle for duplicate suppression. */
   uint32 LastTriggeredBattlePayloadHash = 0;
@@ -288,14 +277,14 @@ protected:
   /** Retry handle used when deferring battle resolution until the world map has been restored. */
   FTimerHandle PendingBattleResolutionRetryHandle;
 
-  /** Retry handle used when a battle travel request must wait for a territory snapshot. */
-  FTimerHandle PendingBattleTravelRetryHandle;
+  /** Retry handle used when a battle stream request must wait for a territory snapshot. */
+  FTimerHandle PendingBattleStreamRetryHandle;
 
-  /** Retry handle used when waiting for the battle manager to become available on the battle map. */
+  /** Retry handle used when waiting for the battle manager in the streamed battle map. */
   FTimerHandle BattleEndBindingRetryHandle;
 
-  /** Delay handle ensuring the battle result remains visible before returning to the overworld. */
-  FTimerHandle BattleReturnDelayHandle;
+  /** Delay handle ensuring the battle result remains visible before unloading the battle sublevel. */
+  FTimerHandle BattleConclusionDelayHandle;
 
   /** Retry handle used when a phase broadcast must wait for initialization gates to clear. */
   FTimerHandle PhaseBroadcastRetryHandle;
@@ -352,8 +341,8 @@ protected:
   /** Returns true if the currently active controller represents an AI. */
   bool IsCurrentControllerAI() const;
 
-  /** Attempt to continue travelling to the battle map after capturing the world snapshot. */
-  void RetryPendingBattleTravel();
+  /** Attempt to continue streaming the battle sublevel after capturing the world snapshot. */
+  void RetryPendingBattleStream();
 
   UFUNCTION()
   void HandleGridBattleEnded(ESkaldFaction WinningFaction, int32 AttackerCasualties, int32 DefenderCasualties);
@@ -393,16 +382,16 @@ protected:
   /** Internal: set GameState.CurrentTurnIndex (and broadcast) to match CurrentIndex. */
   void SyncGameStateTurnIndex();
 
-  /** Attempt to restore a saved turn state captured before travelling. */
+  /** Attempt to restore a saved turn state captured before battle streaming. */
   bool TryResumeSavedTurnState(USkaldGameInstance *GameInstance = nullptr);
 
   /** Ensure the cached world map pointer references a valid actor. */
   AWorldMap *ResolveWorldMap();
 
-  /** Capture the most recent grid battle resolution before travelling back. */
+  /** Capture the most recent grid battle resolution before unloading the battle sublevel. */
   bool CapturePendingBattleResolution(USkaldGameInstance *GameInstance);
 
-  bool bBattleReturnPending = false;
+  bool bBattleConclusionPending = false;
 
   /** True when an AI-controlled turn must pause for player acknowledgements. */
   bool bAwaitingBattleResultAcknowledgements = false;
