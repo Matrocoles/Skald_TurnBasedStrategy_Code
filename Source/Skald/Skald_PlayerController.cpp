@@ -1995,9 +1995,8 @@ void ASkaldPlayerController::ShowMainHUD() {
   }
 
   UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
-      this, nullptr, EMouseLockMode::DoNotLock, /*bHideCursorDuringCapture*/
+      this, MainHUD, EMouseLockMode::DoNotLock, /*bHideCursorDuringCapture*/
       false);
-  FocusGameViewport(this);
   bShowMouseCursor = true;
   bEnableClickEvents = true;
   bEnableMouseOverEvents = true;
@@ -3260,11 +3259,10 @@ void ASkaldPlayerController::EnsureBattleHUDVisible() {
   BattleHudWidget->SetVisibility(ESlateVisibility::Visible);
   bBattleHUDVisible = true;
 
-  // Don't focus the HUD itself or it will consume keyboard input needed for
-  // camera controls; leave the viewport focused instead.
+  // Keep HUD focused so mouse interactions stay responsive while Game+UI
+  // input mode still allows camera controls.
   UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
       this, BattleHudWidget, EMouseLockMode::DoNotLock, false);
-  FocusGameViewport(this);
   bShowMouseCursor = true;
   bEnableClickEvents = true;
   bEnableMouseOverEvents = true;
@@ -6053,7 +6051,9 @@ void ASkaldPlayerController::ReconcileBattleInputState(const TCHAR* Context) {
   UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
       this, FocusWidget, EMouseLockMode::DoNotLock,
       /*bHideCursorDuringCapture*/ false);
-  FocusGameViewport(this);
+  if (!FocusWidget) {
+    FocusGameViewport(this);
+  }
   bShowMouseCursor = true;
   bEnableClickEvents = true;
   bEnableMouseOverEvents = true;
