@@ -170,7 +170,7 @@ bool IsCursorOverInteractableSlateWidget() {
   FSlateApplication &SlateApp = FSlateApplication::Get();
   const FVector2D CursorPos = SlateApp.GetCursorPos();
 
-  TArray<TSharedRef<SWindow>> Windows = SlateApp.GetInteractiveTopLevelWindows();
+  TArray<TSharedRef<SWindow>> Windows = SlateApp.GetTopLevelWindows();
   if (Windows.Num() == 0) {
     return false;
   }
@@ -179,8 +179,19 @@ bool IsCursorOverInteractableSlateWidget() {
       SlateApp.LocateWindowUnderMouse(CursorPos, Windows);
 
   for (int32 Index = WidgetPath.Widgets.Num() - 1; Index >= 0; --Index) {
-    const FArrangedWidget &ArrangedWidget = WidgetPath.Widgets[Index];
-    if (ArrangedWidget.Widget->IsInteractable()) {
+    const TSharedRef<SWidget> Widget = WidgetPath.Widgets[Index].Widget;
+    if (!Widget->GetVisibility().IsHitTestVisible()) {
+      continue;
+    }
+
+    // Ignore the underlying viewport; everything else should block world
+    // clicks so UI buttons don't lose their press/release sequence.
+    if (Widget->GetTypeAsString() == TEXT("SViewport")) {
+      continue;
+    }
+
+    if (Widget->IsInteractable() || Widget->SupportsKeyboardFocus() ||
+        Widget->IsEnabled()) {
       return true;
     }
   }
