@@ -246,6 +246,8 @@ bool USkaldBattleLevelManager::RequestBattleLevel(
   PendingPayload = BattlePayload;
   ActiveStreamingLevel = StreamingLevel;
   bActiveLevelShouldBeLoaded = true;
+  bActiveLevelVisibilityRequested = false;
+  bActiveLevelActivationComplete = false;
 
   if (USkaldGameInstance *GI = OwningInstance.Get()) {
     // Keep the battle-map flag false while the streamed sublevel is only
@@ -273,6 +275,9 @@ void USkaldBattleLevelManager::ReleaseBattleLevel() {
     UnregisterWorldDelegates();
     UnregisterStreamingTicker();
     RestoreNonBattleLevels();
+    bActiveLevelShouldBeLoaded = false;
+    bActiveLevelVisibilityRequested = false;
+    bActiveLevelActivationComplete = false;
     return;
   }
 
@@ -286,6 +291,8 @@ void USkaldBattleLevelManager::ReleaseBattleLevel() {
   }
 
   bActiveLevelShouldBeLoaded = false;
+  bActiveLevelVisibilityRequested = false;
+  bActiveLevelActivationComplete = false;
 
   UE_LOG(LogSkald, Log, TEXT("BattleLevelManager: Unloading battle level"));
 
@@ -344,11 +351,29 @@ void USkaldBattleLevelManager::HandleLevelLoaded() {
     LevelAddedToWorldHandle.Reset();
   }
 
-  ActiveStreamingLevel->SetShouldBeVisible(true);
-  if (UWorld* World = ActiveStreamingLevel->GetWorld()) {
-    World->UpdateLevelStreaming();
+  ULevelStreaming *StreamingLevel = ActiveStreamingLevel.Get();
+  if (!StreamingLevel) {
+    return;
   }
-  HideNonBattleLevels();
+
+  if (!bActiveLevelVisibilityRequested) {
+    StreamingLevel->SetShouldBeVisible(true);
+    bActiveLevelVisibilityRequested = true;
+    if (UWorld* World = StreamingLevel->GetWorld()) {
+      World->UpdateLevelStreaming();
+    }
+    HideNonBattleLevels();
+    UE_LOG(LogSkald, Log, TEXT("BattleLevelManager: Battle level streamed; visibility requested"));
+  }
+
+  if (!StreamingLevel->IsLevelVisible()) {
+    return;
+  }
+
+  if (bActiveLevelActivationComplete) {
+    return;
+  }
+
   UE_LOG(LogSkald, Log, TEXT("BattleLevelManager: Battle level streamed and visible"));
 
   if (USkaldGameInstance *GI = OwningInstance.Get()) {
@@ -484,6 +509,8 @@ void USkaldBattleLevelManager::HandleLevelLoaded() {
       }
     }
   }
+
+  bActiveLevelActivationComplete = true;
 }
 
 void USkaldBattleLevelManager::HandleLevelUnloaded() {
@@ -494,6 +521,8 @@ void USkaldBattleLevelManager::HandleLevelUnloaded() {
   RestoreNonBattleLevels();
 
   bActiveLevelShouldBeLoaded = false;
+  bActiveLevelVisibilityRequested = false;
+  bActiveLevelActivationComplete = false;
   bLastKnownLoadedState = false;
   ActiveStreamingLevel.Reset();
   RequestedBattleLevel.Reset();
@@ -679,8 +708,8 @@ bool USkaldBattleLevelManager::IsBattleLevelFullyReady() const {
     return false;
   }
 
-  return bActiveLevelShouldBeLoaded && IsActiveStreamingLevelLoaded() &&
-         (StreamingLevel->IsLevelVisible() || StreamingLevel->ShouldBeVisible());
+  return bActiveLevelShouldBeLoaded && bActiveLevelActivationComplete &&
+         IsActiveStreamingLevelLoaded() && StreamingLevel->IsLevelVisible();
 }
 
 void USkaldBattleLevelManager::HideNonBattleLevels() {
