@@ -3643,22 +3643,23 @@ void ASkaldPlayerController::DetectBattleMap() {
   }
   // Battle maps are streamed into the persistent world, so the current UWorld
   // name is not a reliable indicator. Prefer the game-instance battle flag, but
-  // recover if it was cleared by a persistent-world BeginPlay after the streamed
-  // battle level/manager was already initialized.
+  // only recover it once the streamed battle level is fully loaded and visible.
+  // TriggerGridBattle creates GridBattleManager before requesting the stream;
+  // treating that allocation (or a mere active streaming request) as proof that
+  // the battle map is active bypasses the loading guard and can switch clients
+  // into battle mode before the map is ready.
   if (CachedGameInstance) {
     bDetectedBattleMap = CachedGameInstance->bIsInBattleMap;
 
     if (!bDetectedBattleMap) {
       if (const USkaldBattleLevelManager* BattleLevelManager =
               CachedGameInstance->GetBattleLevelManager()) {
-        bDetectedBattleMap = BattleLevelManager->IsBattleLevelActive() ||
-                             BattleLevelManager->IsBattleLevelFullyReady();
+        bDetectedBattleMap = BattleLevelManager->IsBattleLevelFullyReady();
       }
     }
 
     if (!bDetectedBattleMap) {
-      bDetectedBattleMap = CachedGameInstance->GridBattleManager != nullptr ||
-                           CachedGameInstance->GetActiveBattleGameMode() != nullptr;
+      bDetectedBattleMap = CachedGameInstance->GetActiveBattleGameMode() != nullptr;
     }
 
     if (bDetectedBattleMap && !CachedGameInstance->bIsInBattleMap) {
