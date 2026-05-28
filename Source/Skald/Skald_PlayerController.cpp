@@ -3272,10 +3272,9 @@ void ASkaldPlayerController::EnsureBattleHUDVisible() {
   BattleHudWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
   bBattleHUDVisible = true;
 
-  // After selection lock-in/deploy, the player is in world interaction mode:
-  // camera axes should reach the possessed camera pawn and mouse clicks should
-  // still trace the battle grid.  Modal battle prompts are handled inside the
-  // reconciler and will keep Game+UI focus only while they are actually active.
+  // After selection lock-in/deploy, restore the battle input policy. This keeps
+  // Game+UI active for HUD buttons while allowing empty HUD space to fall through
+  // to grid/fighter traces and camera controls.
   ApplyBattleInteractionInputState(TEXT("EnsureBattleHUDVisible"));
 }
 
@@ -5695,11 +5694,24 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
   // Battle preparation/selection controls are managed by battle flow. Avoid
   // having overworld turn ownership logic steal input mode or cursor state.
   if (bInBattleInputFlow) {
-    ApplyHudCapturePolicy(/*bModalUIActive*/ false);
+    const bool bOnBattleMapNow =
+        bIsBattleMap ||
+        (CachedGameInstance && CachedGameInstance->bIsInBattleMap);
+
+    if (bOnBattleMapNow) {
+      ApplyBattleInteractionInputState(
+          TEXT("HandleReplicatedTurnOwnershipBattleFlow"));
+    } else {
+      ApplyHudCapturePolicy(/*bModalUIActive*/ false);
+    }
+
     // Battle interaction (camera pan/rotate + world picks) must stay enabled
     // for both participants while streamed battle state settles. Without this
     // guard, a stale non-active-turn update can leave look/move input ignored
     // after lock-in and make the battle map appear frozen.
+    bShowMouseCursor = true;
+    bEnableClickEvents = true;
+    bEnableMouseOverEvents = true;
     SetIgnoreMoveInput(false);
     SetIgnoreLookInput(false);
     if (!bIsMyTurn && bLocalTurnActive) {
@@ -6126,11 +6138,16 @@ bool ASkaldPlayerController::ApplyBattleInteractionInputState(
     bEnableMouseOverEvents = true;
     DefaultMouseCaptureMode = EMouseCaptureMode::NoCapture;
   } else {
-    // Once modal battle setup UI is gone, explicitly return focus to the
-    // viewport and keep click traces enabled so camera axes plus grid/fighter
-    // picks recover after streamed map activation.
-    UWidgetBlueprintLibrary::SetInputMode_GameOnly(this);
-    FocusGameViewport(this);
+    // Normal battle play still needs a live Game+UI input mode: unhandled WASD,
+    // mouse-axis, and wheel input fall through to the camera pawn, while the
+    // visible UBattleHUDWidget buttons continue to receive UI clicks.  The HUD
+    // root is made SelfHitTestInvisible when shown, so empty HUD space still
+    // falls through to grid/fighter traces.
+    UWidget* BattleFocusWidget =
+        IsVisibleInViewport(BattleHudWidget) ? BattleHudWidget.Get() : nullptr;
+    UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
+        this, BattleFocusWidget, EMouseLockMode::DoNotLock,
+        /*bHideCursorDuringCapture*/ false);
     bShowMouseCursor = true;
     bEnableClickEvents = true;
     bEnableMouseOverEvents = true;
