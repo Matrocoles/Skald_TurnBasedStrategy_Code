@@ -176,6 +176,22 @@ void ASkald_PlayerCharacter::RefreshOverviewPivot()
         }
 }
 
+
+bool ASkald_PlayerCharacter::ShouldProcessBattleMouseInput() const
+{
+        if (!bBattleCameraActive)
+        {
+                return false;
+        }
+
+        if (const APlayerController* PlayerController = Cast<APlayerController>(Controller))
+        {
+                return PlayerController->IsInputKeyDown(EKeys::RightMouseButton);
+        }
+
+        return false;
+}
+
 bool ASkald_PlayerCharacter::ShouldProcessOverviewMouseInput() const
 {
         if (bBattleCameraActive)
@@ -376,7 +392,7 @@ void ASkald_PlayerCharacter::Turn(float Value)
 {
 	if (bBattleCameraActive)
         {
-                if (!FMath::IsNearlyZero(Value))
+                if (!FMath::IsNearlyZero(Value) && ShouldProcessBattleMouseInput())
                 {
                         if (bBattleCameraLocked)
                         {
@@ -408,7 +424,7 @@ void ASkald_PlayerCharacter::LookUp(float Value)
 {
 	if (bBattleCameraActive)
         {
-                if (!FMath::IsNearlyZero(Value))
+                if (!FMath::IsNearlyZero(Value) && ShouldProcessBattleMouseInput())
                 {
                         if (bBattleCameraLocked)
                         {

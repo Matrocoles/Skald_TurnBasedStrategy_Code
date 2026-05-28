@@ -1621,7 +1621,8 @@ void ASkaldAIController::DetermineControlledBattleSide() {
   }
 
   FS_BattlePayload &Battle = GameInstance->PendingBattle;
-  const int32 PlayerId = PS->GetPlayerId();
+  const int32 StablePlayerId = PS->GetStablePlayerId();
+  const int32 PlayerId = StablePlayerId > 0 ? StablePlayerId : PS->GetPlayerId();
   FString PlayerName = PS->PlayerDisplayName;
   if (PlayerName.IsEmpty()) {
     PlayerName = PS->GetResolvedPlayerName(TEXT("SkaldAIController"));
@@ -3286,6 +3287,8 @@ void ASkaldAIController::TryActivateNextFighter() {
   if (CachedBattleManager->GetActiveFighter()) {
     return;
   }
+
+  DetermineControlledBattleSide();
 
   if (!IsMyTurn()) {
     return;
