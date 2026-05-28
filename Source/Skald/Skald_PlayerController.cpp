@@ -7550,15 +7550,15 @@ void ASkaldPlayerController::ShowPrepareForBattlePromptLocal_Internal(
 
   ShowMainHUD();
 
-  if (MainHUD) {
-    if (IsPrepareForBattlePromptSuppressed()) {
-      UE_LOG(LogSkaldReady, Verbose,
-             TEXT("Discarding prepare-for-battle prompt for %s because prompts are temporarily suppressed after retreat."),
-             *GetName());
-      ResetPendingReadyPromptState();
-      return;
-    }
+  if (IsPrepareForBattlePromptSuppressed()) {
+    UE_LOG(LogSkaldReady, Verbose,
+           TEXT("Discarding prepare-for-battle prompt for %s because prompts are temporarily suppressed after retreat."),
+           *GetName());
+    ResetPendingReadyPromptState();
+    return;
+  }
 
+  if (MainHUD) {
     if (!ShouldDisplayPrepareForBattlePrompt(PromptData)) {
       UE_LOG(LogSkaldReady, Log,
              TEXT("Discarding prepare-for-battle prompt for %s; ready state no longer requires confirmation."),
