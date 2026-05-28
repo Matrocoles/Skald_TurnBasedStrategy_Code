@@ -5677,6 +5677,12 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
   // having overworld turn ownership logic steal input mode or cursor state.
   if (bInBattleInputFlow) {
     ApplyHudCapturePolicy(/*bModalUIActive*/ false);
+    // Battle interaction (camera pan/rotate + world picks) must stay enabled
+    // for both participants while streamed battle state settles. Without this
+    // guard, a stale non-active-turn update can leave look/move input ignored
+    // after lock-in and make the battle map appear frozen.
+    SetIgnoreMoveInput(false);
+    SetIgnoreLookInput(false);
     if (!bIsMyTurn && bLocalTurnActive) {
       UE_LOG(LogSkald, Verbose,
              TEXT("[TurnState] Controller %s clearing stale local turn while battle flow is active."),
