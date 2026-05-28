@@ -6076,17 +6076,6 @@ void ASkaldPlayerController::ReconcileBattleInputState(const TCHAR* Context) {
   }
   SetIgnoreMoveInput(false);
   SetIgnoreLookInput(false);
-  APawn* ControlledPawn = GetPawn();
-  if (ControlledPawn) {
-    if (GetViewTarget() != ControlledPawn) {
-      SetViewTarget(ControlledPawn);
-    }
-  } else {
-    UE_LOG(LogSkaldBattle, Verbose,
-           TEXT("BattleInputReconciler[%s]: no possessed pawn yet for %s"),
-           Context ? Context : TEXT("Unknown"), *GetName());
-  }
-
   UpdateBattleCameraMode();
 
   UE_LOG(LogSkaldBattle, Verbose,
