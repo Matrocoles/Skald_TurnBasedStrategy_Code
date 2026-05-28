@@ -77,6 +77,8 @@ private:
   FTSTicker::FDelegateHandle StreamingStatusTickerHandle;
   FS_BattlePayload PendingPayload;
   bool bActiveLevelShouldBeLoaded = false;
+  bool bActiveLevelVisibilityRequested = false;
+  bool bActiveLevelActivationComplete = false;
   bool bLastKnownLoadedState = false;
   TWeakObjectPtr<ASkald_BattleGameMode> ActiveBattleGameMode;
 
