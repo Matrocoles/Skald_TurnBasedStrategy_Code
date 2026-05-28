@@ -7278,6 +7278,14 @@ bool ASkaldPlayerController::TryShowPendingReadyPrompt() {
     return false;
   }
 
+  if (IsPrepareForBattlePromptSuppressed()) {
+    UE_LOG(LogSkaldReady, Verbose,
+           TEXT("Discarding cached prepare-for-battle prompt for %s because prompts are temporarily suppressed after retreat."),
+           *GetName());
+    ResetPendingReadyPromptState();
+    return true;
+  }
+
   if (!ShouldDisplayPrepareForBattlePrompt(PendingReadyPrompt)) {
     UE_LOG(LogSkaldReady, Log,
            TEXT("Discarding cached prepare-for-battle prompt for %s because ready state changed."),
@@ -7338,6 +7346,9 @@ void ASkaldPlayerController::NotifyEnemyRetreated() {
   }
 
   HidePrepareForBattlePromptLocal();
+  if (UWorld *World = GetWorld()) {
+    SuppressPreparePromptUntilTime = World->GetTimeSeconds() + 2.f;
+  }
 
   if (UWorld *World = GetWorld()) {
     World->GetTimerManager().ClearTimer(EnemyRetreatHidePromptHandle);
@@ -7350,6 +7361,9 @@ void ASkaldPlayerController::NotifyEnemyRetreated() {
 
 void ASkaldPlayerController::NotifyRetreatSuccessful() {
   HidePrepareForBattlePromptLocal();
+  if (UWorld *World = GetWorld()) {
+    SuppressPreparePromptUntilTime = World->GetTimeSeconds() + 2.f;
+  }
 
   if (UWorld *World = GetWorld()) {
     World->GetTimerManager().ClearTimer(EnemyRetreatHidePromptHandle);
@@ -7531,6 +7545,14 @@ void ASkaldPlayerController::ShowPrepareForBattlePromptLocal_Internal(
   ShowMainHUD();
 
   if (MainHUD) {
+    if (IsPrepareForBattlePromptSuppressed()) {
+      UE_LOG(LogSkaldReady, Verbose,
+             TEXT("Discarding prepare-for-battle prompt for %s because prompts are temporarily suppressed after retreat."),
+             *GetName());
+      ResetPendingReadyPromptState();
+      return;
+    }
+
     if (!ShouldDisplayPrepareForBattlePrompt(PromptData)) {
       UE_LOG(LogSkaldReady, Log,
              TEXT("Discarding prepare-for-battle prompt for %s; ready state no longer requires confirmation."),
@@ -7600,6 +7622,16 @@ void ASkaldPlayerController::HidePrepareForBattlePromptLocal() {
   }
 
   ResetPendingReadyPromptState();
+}
+
+bool ASkaldPlayerController::IsPrepareForBattlePromptSuppressed() const {
+  const UWorld *World = GetWorld();
+  if (!World) {
+    return false;
+  }
+
+  return SuppressPreparePromptUntilTime > 0.f &&
+         World->GetTimeSeconds() < SuppressPreparePromptUntilTime;
 }
 
 void ASkaldPlayerController::ClientHidePrepareForBattle_Implementation() {

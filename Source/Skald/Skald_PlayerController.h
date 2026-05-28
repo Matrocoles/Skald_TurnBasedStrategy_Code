@@ -977,6 +977,7 @@ public:
   bool TryShowPendingReadyPrompt();
   bool ShouldDisplayPrepareForBattlePrompt(
       const FPrepareForBattlePromptData &PromptData);
+  bool IsPrepareForBattlePromptSuppressed() const;
   void ResetPendingReadyPromptState();
   void ShowPrepareForBattlePromptLocal_Internal(
       const FPrepareForBattlePromptData &PromptData);
@@ -1352,6 +1353,7 @@ private:
 
   /** Whether a prepare-for-battle prompt is awaiting HUD initialization. */
   bool bPendingReadyPrompt = false;
+  float SuppressPreparePromptUntilTime = -1.f;
 
   /** Last strategic round index that triggered the initiative prompt audio. */
   int32 LastStrategicInitiativeSoundRound = INDEX_NONE;
