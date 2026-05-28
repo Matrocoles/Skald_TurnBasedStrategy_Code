@@ -1310,6 +1310,15 @@ void USkaldMainHUDWidget::ShowStrategicInitiativeRoll(int32 RollValue,
 }
 
 void USkaldMainHUDWidget::HandleStrategicInitiativeRollPressed() {
+  if (!OnStrategicInitiativeRollRequested.IsBound()) {
+    UE_LOG(LogSkaldUI, Warning,
+           TEXT("Strategic initiative roll button pressed but no listeners are bound; ignoring click to avoid losing the prompt."));
+    if (RollInitiativeButton) {
+      RollInitiativeButton->SetIsEnabled(true);
+    }
+    return;
+  }
+
   if (RollInitiativeButton) {
     RollInitiativeButton->SetIsEnabled(false);
   }
