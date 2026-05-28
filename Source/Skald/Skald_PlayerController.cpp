@@ -3780,7 +3780,8 @@ bool ASkaldPlayerController::IsMyTurn() const {
         LocalTurnManager = LocalGameMode->GetTurnManager();
       }
     }
-    if (LocalTurnManager && !LocalTurnManager->HasTurnsStarted()) {
+    if (LocalTurnManager && !LocalTurnManager->HasTurnsStarted() &&
+        LocalTurnManager->GetCurrentPhase() != ETurnPhase::ArmyPlacement) {
       return false;
     }
   }
@@ -3821,7 +3822,8 @@ bool ASkaldPlayerController::IsMyTurn() const {
         LocalTurnManager = LocalGameMode->GetTurnManager();
       }
     }
-    if (LocalTurnManager && !LocalTurnManager->HasTurnsStarted()) {
+    if (LocalTurnManager && !LocalTurnManager->HasTurnsStarted() &&
+        LocalTurnManager->GetCurrentPhase() != ETurnPhase::ArmyPlacement) {
       return false;
     }
   }
