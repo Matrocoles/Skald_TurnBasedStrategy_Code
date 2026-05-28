@@ -1919,6 +1919,15 @@ void ATurnManager::ConfirmDefenderRetreatDestination(
   DispatchToControllerConfirm(
       RequestingController,
       [](ASkaldPlayerController *LocalController) {
+        LocalController->NotifyRetreatSuccessful();
+      },
+      [](ASkaldPlayerController *RemoteController) {
+        RemoteController->ClientRetreatSuccessful();
+      });
+
+  DispatchToControllerConfirm(
+      RequestingController,
+      [](ASkaldPlayerController *LocalController) {
         LocalController->HandleWorldStateChanged();
       },
       [](ASkaldPlayerController *RemoteController) {

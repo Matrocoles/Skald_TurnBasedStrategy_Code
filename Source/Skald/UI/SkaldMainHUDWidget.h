@@ -264,6 +264,7 @@ public:
    * after the message has been visible for a short duration.
    */
   bool ShowEnemyRetreatedMessage();
+  void ShowRetreatSuccessfulMessage();
 
   /** Display the rolled initiative value using the configured dice visuals. */
   UFUNCTION(BlueprintCallable, Category = "Skald|HUD|Initiative")

@@ -833,6 +833,8 @@ public:
 
   UFUNCTION(Client, Reliable)
   void ClientEnemyRetreated();
+  UFUNCTION(Client, Reliable)
+  void ClientRetreatSuccessful();
 
   UFUNCTION(Client, Reliable)
   void ClientShowTurnAnnouncement(const FString &PlayerName, bool bIsMyTurn);
@@ -994,6 +996,7 @@ public:
   void CompleteRetreatSelectionLocal();
   virtual void NotifyRetreatFailed(const FText &Message);
   void NotifyEnemyRetreated();
+  void NotifyRetreatSuccessful();
 private:
   /** Display the stored strategic initiative roll if one is pending. */
   void ShowPendingStrategicInitiativeResult();
