@@ -141,20 +141,14 @@ bool USkaldBattleLevelManager::RequestBattleLevel(
     PendingPayload = BattlePayload;
     bActiveLevelShouldBeLoaded = true;
 
-    const ULevelStreaming *StreamingLevel = ActiveStreamingLevel.Get();
-    const bool bLevelAlreadyLoaded =
-        StreamingLevel && StreamingLevel->IsLevelLoaded();
+    const bool bLevelAlreadyReady =
+        PromoteLoadedBattleLevelIfReady(TEXT("RequestBattleLevelReuse"));
 
     if (USkaldGameInstance *GI = OwningInstance.Get()) {
-      GI->SetTravelPending(!bLevelAlreadyLoaded);
-      GI->SetBattleMapActive(true);
+      GI->SetTravelPending(!bLevelAlreadyReady);
     }
 
     RegisterStreamingTicker();
-
-    if (bLevelAlreadyLoaded) {
-      HandleLevelLoaded();
-    }
 
     UE_LOG(LogSkald, Log,
            TEXT("BattleLevelManager: Battle level %s already streaming, reusing active request"),
@@ -254,13 +248,10 @@ bool USkaldBattleLevelManager::RequestBattleLevel(
   bActiveLevelShouldBeLoaded = true;
 
   if (USkaldGameInstance *GI = OwningInstance.Get()) {
-    // A successful streaming request means the local world is entering tactical
-    // battle flow even before the level finishes becoming visible. Promote the
-    // battle-map flag here so player controllers bind battle input/camera state
-    // during the streamed sublevel load instead of waiting on a later callback
-    // that may be missed by pre-existing sublevels.
+    // Keep the battle-map flag false while the streamed sublevel is only
+    // requested/loading. HandleLevelLoaded promotes it after the level has been
+    // loaded, made visible, and non-battle levels have been hidden.
     GI->SetTravelPending(true);
-    GI->SetBattleMapActive(true);
   }
 
   RegisterWorldDelegates();
@@ -270,9 +261,7 @@ bool USkaldBattleLevelManager::RequestBattleLevel(
   StreamingLevel->SetShouldBeLoaded(true);
   World->UpdateLevelStreaming();
 
-  if (StreamingLevel->IsLevelLoaded()) {
-    HandleLevelLoaded();
-  }
+  PromoteLoadedBattleLevelIfReady(TEXT("RequestBattleLevelInitial"));
 
   UE_LOG(LogSkald, Log,
          TEXT("BattleLevelManager: Streaming battle level %s"), *MapName);
@@ -628,19 +617,60 @@ bool USkaldBattleLevelManager::TickStreamingStatus(float DeltaTime) {
     return false;
   }
 
-  const bool bIsLoaded = StreamingLevel->IsLevelLoaded();
+  const bool bIsLoaded = IsActiveStreamingLevelLoaded();
   if (bIsLoaded != bLastKnownLoadedState) {
     bLastKnownLoadedState = bIsLoaded;
 
-    if (bIsLoaded) {
-      HandleLevelLoaded();
-    } else {
+    if (!bIsLoaded) {
       HandleLevelUnloaded();
       return false;
     }
   }
 
+  if (bIsLoaded) {
+    PromoteLoadedBattleLevelIfReady(TEXT("StreamingTicker"));
+  }
+
   return ActiveStreamingLevel.IsValid();
+}
+
+bool USkaldBattleLevelManager::IsActiveStreamingLevelLoaded() const {
+  const ULevelStreaming *StreamingLevel = ActiveStreamingLevel.Get();
+  if (!StreamingLevel) {
+    return false;
+  }
+
+  return StreamingLevel->IsLevelLoaded() || StreamingLevel->GetLoadedLevel() != nullptr;
+}
+
+bool USkaldBattleLevelManager::PromoteLoadedBattleLevelIfReady(
+    const TCHAR* ContextLabel) {
+  if (!ActiveStreamingLevel.IsValid() || !bActiveLevelShouldBeLoaded) {
+    return false;
+  }
+
+  if (IsBattleLevelFullyReady()) {
+    return true;
+  }
+
+  if (!IsActiveStreamingLevelLoaded()) {
+    return false;
+  }
+
+  ULevelStreaming *StreamingLevel = ActiveStreamingLevel.Get();
+  if (!StreamingLevel) {
+    return false;
+  }
+
+  UE_LOG(LogSkald, Verbose,
+         TEXT("BattleLevelManager: promoting loaded battle level (Context=%s Loaded=%d Visible=%d ShouldVisible=%d)"),
+         ContextLabel ? ContextLabel : TEXT("Unknown"),
+         StreamingLevel->IsLevelLoaded() ? 1 : 0,
+         StreamingLevel->IsLevelVisible() ? 1 : 0,
+         StreamingLevel->ShouldBeVisible() ? 1 : 0);
+
+  HandleLevelLoaded();
+  return IsBattleLevelFullyReady();
 }
 
 bool USkaldBattleLevelManager::IsBattleLevelFullyReady() const {
@@ -649,8 +679,8 @@ bool USkaldBattleLevelManager::IsBattleLevelFullyReady() const {
     return false;
   }
 
-  return bActiveLevelShouldBeLoaded && StreamingLevel->IsLevelLoaded() &&
-         StreamingLevel->IsLevelVisible();
+  return bActiveLevelShouldBeLoaded && IsActiveStreamingLevelLoaded() &&
+         (StreamingLevel->IsLevelVisible() || StreamingLevel->ShouldBeVisible());
 }
 
 void USkaldBattleLevelManager::HideNonBattleLevels() {
