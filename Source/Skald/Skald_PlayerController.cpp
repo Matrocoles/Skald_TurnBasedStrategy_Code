@@ -3764,6 +3764,23 @@ bool ASkaldPlayerController::IsMyTurn() const {
     return false;
   }
 
+  // Startup guard for authority: block local-turn ownership until turns have
+  // officially started. This must run before active-player/current-player
+  // ownership checks; otherwise startup ordering can mark a host as active
+  // while StartTurns has not run yet.
+  if (HasAuthority()) {
+    const ATurnManager* LocalTurnManager = TurnManager;
+    if (!LocalTurnManager && World) {
+      if (const ASkaldGameMode* LocalGameMode =
+              World->GetAuthGameMode<ASkaldGameMode>()) {
+        LocalTurnManager = LocalGameMode->GetTurnManager();
+      }
+    }
+    if (LocalTurnManager && !LocalTurnManager->HasTurnsStarted()) {
+      return false;
+    }
+  }
+
   const int32 MyStableId = MyPlayerState->GetStablePlayerId();
   if (GameState->ActivePlayerId != INDEX_NONE) {
     return GameState->ActivePlayerId == MyStableId;
