@@ -358,6 +358,9 @@ protected:
   bool ResolveBattleReturnMapName(FString &OutReturnMapName,
                                   FString &OutReturnMapSource) const;
 
+  /** True while streamed battle flow owns input/state and overworld turns must not mutate. */
+  bool ShouldSuspendOverworldTurnFlow() const;
+
   /** Notify controllers and HUDs of a phase change. */
   bool BroadcastCurrentPhase();
 
