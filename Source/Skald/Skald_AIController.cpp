@@ -14,6 +14,7 @@
 #include "SkaldLogging.h"
 #include "Skald_BattleGameMode.h"
 #include "Skald_GameInstance.h"
+#include "Skald_GameState.h"
 #include "Skald_GameUserSettings.h"
 #include "Skald_GameMode.h"
 #include "Skald_PlayerState.h"
@@ -1620,7 +1621,18 @@ void ASkaldAIController::DetermineControlledBattleSide() {
     return;
   }
 
-  FS_BattlePayload &Battle = GameInstance->PendingBattle;
+  FS_BattlePayload Battle = GameInstance->PendingBattle;
+  if (const UWorld *World = GetWorld()) {
+    if (const ASkaldGameState *GameState = World->GetGameState<ASkaldGameState>()) {
+      const FS_BattlePayload &ReplicatedBattle = GameState->GetActiveBattlePayload();
+      if (ReplicatedBattle.AttackerPlayerID > 0 ||
+          ReplicatedBattle.DefenderPlayerID > 0 ||
+          ReplicatedBattle.AttackerFaction != ESkaldFaction::None ||
+          ReplicatedBattle.DefenderFaction != ESkaldFaction::None) {
+        Battle = ReplicatedBattle;
+      }
+    }
+  }
   const int32 StablePlayerId = PS->GetStablePlayerId();
   const int32 PlayerId = StablePlayerId > 0 ? StablePlayerId : PS->GetPlayerId();
   FString PlayerName = PS->PlayerDisplayName;
@@ -1714,11 +1726,11 @@ void ASkaldAIController::DetermineControlledBattleSide() {
   }
 
   if (bAIControlsAttackerSide && bIsAIPlayer) {
-    Battle.bAttackerIsAI = true;
+    GameInstance->PendingBattle.bAttackerIsAI = true;
   }
 
   if (bAIControlsDefenderSide && bIsAIPlayer) {
-    Battle.bDefenderIsAI = true;
+    GameInstance->PendingBattle.bDefenderIsAI = true;
   }
 
   if (!bAIControlsAttackerSide && !bAIControlsDefenderSide && bIsAIPlayer) {

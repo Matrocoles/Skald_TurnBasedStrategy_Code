@@ -1726,7 +1726,17 @@ bool UGridBattleManager::IsSideAIControlled(bool bForAttackers) const
 
     if (GameInstance)
     {
-        const FS_BattlePayload& Battle = GameInstance->PendingBattle;
+        FS_BattlePayload Battle = GameInstance->PendingBattle;
+        if (const ASkaldGameState* SkaldGameState = World->GetGameState<ASkaldGameState>())
+        {
+            const FS_BattlePayload& ReplicatedBattle = SkaldGameState->GetActiveBattlePayload();
+            if (ReplicatedBattle.AttackerPlayerID > 0 || ReplicatedBattle.DefenderPlayerID > 0 ||
+                ReplicatedBattle.AttackerFaction != ESkaldFaction::None || ReplicatedBattle.DefenderFaction != ESkaldFaction::None)
+            {
+                Battle = ReplicatedBattle;
+            }
+        }
+
         TargetPlayerId = bForAttackers ? Battle.AttackerPlayerID : Battle.DefenderPlayerID;
         bPendingBattleAIFlag = bForAttackers ? Battle.bAttackerIsAI : Battle.bDefenderIsAI;
         ParticipantDisplayName = bForAttackers ? Battle.AttackerDisplayName : Battle.DefenderDisplayName;
