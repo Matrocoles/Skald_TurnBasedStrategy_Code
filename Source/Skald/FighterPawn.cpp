@@ -74,6 +74,10 @@ AFighterPawn::AFighterPawn() : MaxHealth(0) {
   CollisionComponent->InitCapsuleSize(40.f, 88.f);
   CollisionComponent->SetCollisionProfileName(
       UCollisionProfile::Pawn_ProfileName);
+  // Battle selection uses visibility traces from the player controller. Make
+  // fighter capsules explicit visibility blockers so clicking the displayed
+  // pawn is not lost to the terrain/grid plane behind it on streamed sublevels.
+  CollisionComponent->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
   CollisionComponent->SetCanEverAffectNavigation(false);
   RootComponent = CollisionComponent;
 

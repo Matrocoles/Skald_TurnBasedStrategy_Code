@@ -502,7 +502,14 @@ void ASkald_BattleGameMode::InitGame(const FString &Map, const FString &Options,
 
 void ASkald_BattleGameMode::BeginPlay() {
   if (const USkaldGameInstance* GI = GetGameInstance<USkaldGameInstance>()) { UE_LOG(LogSkaldBattle, Log, TEXT("[TravelToken] Token=%s Stage=BattleGM.BeginPlay World=%s Ctx=BeginPlay PayloadValid=%d"), *GI->GetTravelSessionToken(), *GetNameSafe(GetWorld()), GI->GetTravelState().bValid ? 1 : 0); }
-  Super::BeginPlay();
+
+  // Intentionally bypass ASkaldGameMode::BeginPlay here. The overworld mode
+  // registers controllers with ATurnManager during BeginPlay, but tactical
+  // battles are driven by UGridBattleManager. Registering battle participants
+  // with the overworld turn manager creates a second authority over the same
+  // controllers and can desync activation/turn flow on streamed battle maps.
+  AGameModeBase::BeginPlay();
+  TurnManager = nullptr;
 
   if (!BattleManager) {
     UClass *ClassToUse = BattleManagerClass ? *BattleManagerClass
@@ -2103,7 +2110,7 @@ void ASkald_BattleGameMode::HandleStartingNewPlayer_Implementation(
          TEXT("HandleStartingNewPlayer: %s (HasAuthority=%d)"),
          *GetNameSafe(NewPlayer), HasAuthority() ? 1 : 0);
 
-  Super::HandleStartingNewPlayer_Implementation(NewPlayer);
+  AGameModeBase::HandleStartingNewPlayer_Implementation(NewPlayer);
 
   if (!HasAuthority()) {
     return;
@@ -2143,7 +2150,7 @@ void ASkald_BattleGameMode::HandleSeamlessTravelPlayer(AController *&C) {
          TEXT("HandleSeamlessTravelPlayer: %s (HasAuthority=%d)"),
          *GetNameSafe(C), HasAuthority() ? 1 : 0);
 
-  Super::HandleSeamlessTravelPlayer(C);
+  AGameModeBase::HandleSeamlessTravelPlayer(C);
 
   if (!HasAuthority()) {
     return;
@@ -2159,7 +2166,7 @@ void ASkald_BattleGameMode::HandleSeamlessTravelPlayer(AController *&C) {
 }
 
 void ASkald_BattleGameMode::PostLogin(APlayerController *NewPlayer) {
-  Super::PostLogin(NewPlayer);
+  AGameModeBase::PostLogin(NewPlayer);
 
   UE_LOG(LogSkaldBattle, Log, TEXT("PostLogin: %s"), *GetNameSafe(NewPlayer));
   if (ASkaldPlayerState *PS = NewPlayer->GetPlayerState<ASkaldPlayerState>()) {
