@@ -366,9 +366,11 @@ void USkaldBattleLevelManager::HandleLevelLoaded() {
   UE_LOG(LogSkald, Log, TEXT("BattleLevelManager: Battle level streamed and visible"));
 
   if (USkaldGameInstance *GI = OwningInstance.Get()) {
-    GI->SetTravelPending(false);
-    GI->SetBattleMapActive(true);
-
+    // Do not publish the battle map as active until after the streamed level
+    // has a battle game mode and activation callbacks have run.  Several
+    // controllers immediately reconcile input/turn state when bIsInBattleMap
+    // flips; doing that before the sublevel BattleGameMode bootstraps leaves
+    // fighter selection and AI automation observing a half-initialized battle.
     if (!GI->GetActiveBattleGameMode() && ActiveStreamingLevel.IsValid()) {
       UWorld *OwningWorld = ActiveStreamingLevel->GetWorld();
       ULevel *LoadedLevel = ActiveStreamingLevel->GetLoadedLevel();
@@ -502,6 +504,11 @@ void USkaldBattleLevelManager::HandleLevelLoaded() {
   }
 
   bActiveLevelActivationComplete = true;
+
+  if (USkaldGameInstance *GI = OwningInstance.Get()) {
+    GI->SetTravelPending(false);
+    GI->SetBattleMapActive(true);
+  }
 }
 
 void USkaldBattleLevelManager::HandleLevelUnloaded() {
