@@ -8343,7 +8343,10 @@ void ASkaldPlayerController::UpdateBattlePlayersTurnDisplay() {
   }
 
   bool bAttackerTurn = true;
+  bool bWaitingForInitiative = false;
   if (GI->GridBattleManager) {
+    bWaitingForInitiative = GI->GridBattleManager->IsAwaitingInitiativeRoll() ||
+                            GI->GridBattleManager->GetInitiativeWinner() == ESkaldFaction::None;
     bAttackerTurn = GI->GridBattleManager->IsAttackerTurn();
   } else {
     ASkaldGameState *GameState = CachedGameState;
@@ -8353,10 +8356,19 @@ void ASkaldPlayerController::UpdateBattlePlayersTurnDisplay() {
     }
 
     if (GameState && GameState->GetReplicatedBattleRound() > 0) {
+      bWaitingForInitiative =
+          GameState->GetBattleInitiativeWinner() == ESkaldFaction::None;
       bAttackerTurn = GameState->IsBattleAttackerTurn();
     } else if (LockedActiveFighter) {
       bAttackerTurn = LockedActiveFighter->bIsAttacker;
     }
+  }
+
+  if (bWaitingForInitiative) {
+    BattleHudWidget->SetPlayersTurnLabel(
+        NSLOCTEXT("Skald", "BattleWaitingForInitiative",
+                  "Waiting for initiative"));
+    return;
   }
 
   const FS_BattlePayload &Battle = GI->PendingBattle;

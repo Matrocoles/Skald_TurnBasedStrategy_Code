@@ -247,6 +247,13 @@ void UBattleHUDWidget::NativeConstruct() {
 
 FReply UBattleHUDWidget::NativeOnMouseButtonDown(
     const FGeometry &InGeometry, const FPointerEvent &InMouseEvent) {
+  if (InMouseEvent.GetEffectingButton() == EKeys::RightMouseButton) {
+    // Keep RMB available for the battle camera drag-rotate binding.  The HUD
+    // spans the viewport, so explicitly leave right-clicks unhandled instead
+    // of allowing this root widget to take pointer focus/capture.
+    return FReply::Unhandled();
+  }
+
   if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton &&
       !IsInitiativePromptActive() && !IsManualAttackRollPromptActive() &&
       !IsManualDiceResolutionActive() && !IsCombatPresentationActive()) {

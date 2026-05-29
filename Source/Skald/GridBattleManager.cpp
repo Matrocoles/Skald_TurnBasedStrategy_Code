@@ -1122,6 +1122,15 @@ void UGridBattleManager::AdvanceTurn()
         return;
     }
 
+    if (bAwaitingInitiativeRoll || InitiativeWinnerFaction == ESkaldFaction::None)
+    {
+        UE_LOG(LogSkaldBattle, Verbose,
+            TEXT("[Battle] AdvanceTurn ignored while waiting for initiative resolution (Round=%d, Awaiting=%s, Winner=%s)."),
+            CurrentRound, bAwaitingInitiativeRoll ? TEXT("true") : TEXT("false"),
+            *UEnum::GetValueAsString(InitiativeWinnerFaction));
+        return;
+    }
+
     const bool bPreviousWasAttacker = bIsAttackerTurn;
     EvaluateRoundProgress(bPreviousWasAttacker);
     OnActiveFighterChanged.Broadcast(nullptr);
@@ -1623,6 +1632,16 @@ void UGridBattleManager::EvaluateRoundProgress(bool bPreviousWasAttacker)
 
     if (CurrentRound <= 0)
     {
+        ClearInactiveFighters();
+        return;
+    }
+
+    if (bAwaitingInitiativeRoll || InitiativeWinnerFaction == ESkaldFaction::None)
+    {
+        UE_LOG(LogSkaldBattle, Verbose,
+            TEXT("[Battle] EvaluateRoundProgress paused until initiative resolves (Round=%d, Awaiting=%s, Winner=%s)."),
+            CurrentRound, bAwaitingInitiativeRoll ? TEXT("true") : TEXT("false"),
+            *UEnum::GetValueAsString(InitiativeWinnerFaction));
         ClearInactiveFighters();
         return;
     }
