@@ -8807,11 +8807,18 @@ void ASkaldPlayerController::HandleAttackResolved(AFighterPawn *Attacker,
       return;
     }
 
+    if (Result.bResolvedFromPhysicalRoll) {
+      ProcessAttackResolutionPresentation(Attacker, Defender, Result);
+      return;
+    }
+
     StartAttackDiceSequence(Attacker, Defender, Result);
     return;
   }
 
-  TriggerAttackDicePresentation(Attacker, Defender, Result);
+  if (!Result.bResolvedFromPhysicalRoll) {
+    TriggerAttackDicePresentation(Attacker, Defender, Result);
+  }
   ProcessAttackResolutionPresentation(Attacker, Defender, Result);
 }
 

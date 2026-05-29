@@ -3238,6 +3238,7 @@ void AFighterPawn::ProcessPhysicalDiceRollResults(
   FDiceRollResult DiceResult =
       UGridBattleManager::ResolveAttackDice(AttackerStats, DefenderStatsSnapshot,
                                             *RandomStream, Results);
+  DiceResult.bResolvedFromPhysicalRoll = true;
 
   TArray<int32> SanitizedResults = Results;
   if (SanitizedResults.Num() > DiceResult.DiceOutcomes.Num()) {
@@ -3267,6 +3268,7 @@ void AFighterPawn::ProcessPhysicalDiceRollResults(
             : (Target ? Target->Stats : FFighterStats());
 
     PendingAttackDiceResult.HighStakesFaction = Faction;
+    PendingAttackDiceResult.bResolvedFromPhysicalRoll = true;
     bPendingPhysicalRollValuesApplied = false;
     ApplyPendingPhysicalRollValues();
 
