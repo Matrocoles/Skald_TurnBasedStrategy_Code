@@ -3362,7 +3362,12 @@ UGridBattleManager *ASkaldPlayerController::GetBattleManager() const {
 
 void ASkaldPlayerController::HandleActiveFighterChanged(
     AFighterPawn *NewFighter) {
-  if (NewFighter && NewFighter->IsAlive()) {
+  AFighterPawn *PreviousActiveFighter = LockedActiveFighter.Get();
+  const bool bHasValidNewFighter = NewFighter && NewFighter->IsAlive();
+  const bool bHadActiveFighter = PreviousActiveFighter != nullptr;
+  const bool bActiveFighterChanged = PreviousActiveFighter != NewFighter;
+
+  if (bHasValidNewFighter) {
     LockedActiveFighter = NewFighter;
     SetSelectedFighter(NewFighter, true);
     if (bBattleHUDReadyToShow && !bBattleHUDVisible) {
@@ -3375,23 +3380,23 @@ void ASkaldPlayerController::HandleActiveFighterChanged(
   CancelCommandMode();
   UpdateBattleHUDButtons();
   UpdateBattlePlayersTurnDisplay();
-  if (!NewFighter) {
+  if (!bHasValidNewFighter) {
     UpdateBattleHUDSelection();
   }
 
   if (UGridOverlayComponent *Grid = FindGridOverlay()) {
-    if (NewFighter && NewFighter->IsAlive()) {
+    if (bHasValidNewFighter) {
       Grid->HighlightSelection(NewFighter);
-    } else {
+    } else if (bHadActiveFighter || !SelectedFighter.IsValid()) {
       Grid->ClearSelectionHighlight();
     }
   }
 
   if (IsLocalController()) {
     if (ASkald_PlayerCharacter *CameraPawn = Cast<ASkald_PlayerCharacter>(GetPawn())) {
-      if (bIsBattleMap && NewFighter && NewFighter->IsAlive()) {
+      if (bIsBattleMap && bHasValidNewFighter) {
         CameraPawn->FocusCameraOnActor(NewFighter);
-      } else {
+      } else if (bHadActiveFighter && bActiveFighterChanged) {
         CameraPawn->ClearCameraFocus();
       }
     }
@@ -7166,7 +7171,9 @@ void ASkaldPlayerController::HandleRoundStarted(int32 RoundNumber,
   LastBattleTurnSoundAvailableCount = INDEX_NONE;
 
   LockedActiveFighter = nullptr;
-  ClearSelectedFighter();
+  if (SelectedFighter.IsValid() && !SelectedFighter->IsAlive()) {
+    ClearSelectedFighter();
+  }
   CancelCommandMode();
   UpdateBattleRoundDisplay(RoundNumber, InitiativeWinner);
   UpdateBattlePlayersTurnDisplay();
