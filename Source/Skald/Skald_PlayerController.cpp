@@ -6386,6 +6386,31 @@ void ASkaldPlayerController::ReconcileBattleInputState(const TCHAR* Context) {
   ApplyBattleInteractionInputState(Context);
 }
 
+void ASkaldPlayerController::ReconcileBattleInputStateNextTick() {
+  ApplyBattleInteractionInputState(TEXT("BattleHudCommandNextTick"));
+}
+
+void ASkaldPlayerController::ReconcileBattleInputStateAfterHudCommand(
+    const TCHAR* Context) {
+  if (!IsLocalController()) {
+    return;
+  }
+
+  ApplyBattleInteractionInputState(Context);
+
+  // Slate/PIE can restore the project default viewport capture policy after a
+  // UButton click finishes its press/release sequence.  In battle this is fatal
+  // because the very next empty-grid click is interpreted as viewport capture:
+  // the cursor hides and the click never reaches HandleGridClick().  Re-assert
+  // the battle interaction policy on the next tick, after Slate has unwound, so
+  // HUD button clicks can safely hand off to world/grid clicks.
+  if (UWorld* World = GetWorld()) {
+    FTimerDelegate ReconcileDelegate = FTimerDelegate::CreateUObject(
+        this, &ASkaldPlayerController::ReconcileBattleInputStateNextTick);
+    World->GetTimerManager().SetTimerForNextTick(ReconcileDelegate);
+  }
+}
+
 void ASkaldPlayerController::SchedulePostLockInBattleInputReconcile() {
   UWorld* World = GetWorld();
   if (!World || !IsLocalController()) {
@@ -6551,6 +6576,8 @@ void ASkaldPlayerController::SetupInputComponent() {
 }
 
 void ASkaldPlayerController::BeginMoveMode() {
+  ReconcileBattleInputStateAfterHudCommand(TEXT("BeginMoveMode"));
+
   if (!LockedActiveFighter || !IsFriendlyFighter(LockedActiveFighter))
     return;
   if (LockedActiveFighter->IsEngaged()) {
@@ -6567,6 +6594,8 @@ void ASkaldPlayerController::BeginMoveMode() {
 }
 
 void ASkaldPlayerController::BeginDisengageMode() {
+  ReconcileBattleInputStateAfterHudCommand(TEXT("BeginDisengageMode"));
+
   if (!LockedActiveFighter || !IsFriendlyFighter(LockedActiveFighter))
     return;
   if (!LockedActiveFighter->IsEngaged()) {
@@ -6584,6 +6613,8 @@ void ASkaldPlayerController::BeginDisengageMode() {
 }
 
 void ASkaldPlayerController::BeginAttackMode() {
+  ReconcileBattleInputStateAfterHudCommand(TEXT("BeginAttackMode"));
+
   if (!LockedActiveFighter || !IsFriendlyFighter(LockedActiveFighter))
     return;
   CurrentCommandMode = EBattleCommandMode::Attack;
@@ -7120,7 +7151,12 @@ void ASkaldPlayerController::HandleGridClick() {
 }
 
 void ASkaldPlayerController::HandleActivatePressed() {
-  if (!IsLocalController() || !SelectedFighter)
+  if (!IsLocalController())
+    return;
+
+  ReconcileBattleInputStateAfterHudCommand(TEXT("HandleActivatePressed"));
+
+  if (!SelectedFighter)
     return;
 
   UE_LOG(LogSkaldBattle, Log,
@@ -7195,6 +7231,8 @@ void ASkaldPlayerController::HandleActivatePressed() {
 }
 
 void ASkaldPlayerController::HandleEndTurnPressed() {
+  ReconcileBattleInputStateAfterHudCommand(TEXT("HandleEndTurnPressed"));
+
   UE_LOG(LogSkaldBattle, Log,
          TEXT("[BattleHUD] End Turn pressed. Locked=%s"),
          LockedActiveFighter ? *LockedActiveFighter->GetHumanReadableName()
