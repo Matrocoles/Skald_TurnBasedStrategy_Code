@@ -102,6 +102,10 @@ struct FDiceRollResult
     UPROPERTY(BlueprintReadOnly, Category="Skald|Battle|Dice")
     bool bHighStakesCritical = false;
 
+    /** True when the displayed combat dice were already rolled through the physical dice arena. */
+    UPROPERTY(BlueprintReadOnly, Category="Skald|Battle|Dice")
+    bool bResolvedFromPhysicalRoll = false;
+
     UPROPERTY(BlueprintReadOnly, Category="Skald|Battle|Dice")
     ESkaldFaction HighStakesFaction = ESkaldFaction::None;
 };
