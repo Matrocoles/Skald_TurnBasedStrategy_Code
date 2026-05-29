@@ -247,12 +247,17 @@ void ASkaldPlayerController::BroadcastPhysicalDiceRoll(
   // If another authoritative flow already started this RollId (for example
   // initiative via RollDice_D6), leave that roll alone. Replaying it here would
   // spawn a second server-side arena and overwrite the active roll, causing
-  // duplicate dice in overview/battle initiative and orphaned actors. For attack
-  // broadcasts that only render on clients, schedule server callbacks without
-  // spawning presentation actors so AFighterPawn still receives completion.
+  // duplicate dice in overview/battle initiative and orphaned actors. Dedicated
+  // servers only need authoritative callbacks, but standalone/listen hosts also
+  // need visible physical dice because their authority RPC implementation skips
+  // the client-side duplicate presentation below.
   if (DiceManager && !DiceManager->IsRollActive(RollId)) {
-    const FGuid ServerRollId = DiceManager->PlayScriptedRollWithoutPresentation(
-        PlayerResults, EnemyResults, bForInitiative, -1.f, RollId);
+    const bool bCanPresentOnAuthority = World->GetNetMode() != NM_DedicatedServer;
+    const FGuid ServerRollId = bCanPresentOnAuthority
+        ? DiceManager->PlayScriptedRoll(PlayerResults, EnemyResults, bForInitiative,
+                                        -1.f, PlayerColor, EnemyColor, RollId)
+        : DiceManager->PlayScriptedRollWithoutPresentation(
+              PlayerResults, EnemyResults, bForInitiative, -1.f, RollId);
     ensure(!ServerRollId.IsValid() || ServerRollId == RollId);
   }
 
@@ -3739,10 +3744,16 @@ void ASkaldPlayerController::DetectBattleMap() {
     bDetectedBattleMap = CachedGameInstance->bIsInBattleMap;
 
     if (!bDetectedBattleMap) {
-      if (USkaldBattleLevelManager* BattleLevelManager =
-              CachedGameInstance->GetBattleLevelManager()) {
-        bDetectedBattleMap = BattleLevelManager->PromoteLoadedBattleLevelIfReady(
-            TEXT("DetectBattleMap"));
+      const bool bBattleTravelOrResolutionPending =
+          CachedGameInstance->IsTravelPending() ||
+          CachedGameInstance->bPendingBattleResolution ||
+          CachedGameInstance->PendingBattleResolution.bValid;
+      if (!bBattleTravelOrResolutionPending) {
+        if (USkaldBattleLevelManager* BattleLevelManager =
+                CachedGameInstance->GetBattleLevelManager()) {
+          bDetectedBattleMap = BattleLevelManager->PromoteLoadedBattleLevelIfReady(
+              TEXT("DetectBattleMap"));
+        }
       }
     }
 
