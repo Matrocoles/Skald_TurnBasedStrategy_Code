@@ -3387,7 +3387,7 @@ void ASkaldPlayerController::HandleActiveFighterChanged(
   if (UGridOverlayComponent *Grid = FindGridOverlay()) {
     if (bHasValidNewFighter) {
       Grid->HighlightSelection(NewFighter);
-    } else if (bHadActiveFighter || !SelectedFighter.IsValid()) {
+    } else if (bHadActiveFighter || SelectedFighter == nullptr) {
       Grid->ClearSelectionHighlight();
     }
   }
@@ -7171,7 +7171,7 @@ void ASkaldPlayerController::HandleRoundStarted(int32 RoundNumber,
   LastBattleTurnSoundAvailableCount = INDEX_NONE;
 
   LockedActiveFighter = nullptr;
-  if (SelectedFighter.IsValid() && !SelectedFighter->IsAlive()) {
+  if (SelectedFighter && !SelectedFighter->IsAlive()) {
     ClearSelectedFighter();
   }
   CancelCommandMode();
