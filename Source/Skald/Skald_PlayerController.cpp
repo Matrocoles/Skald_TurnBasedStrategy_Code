@@ -244,15 +244,15 @@ void ASkaldPlayerController::BroadcastPhysicalDiceRoll(
          TEXT("[DiceArena] Broadcasting roll %s (PlayerDice=%d EnemyDice=%d)"),
          *RollId.ToString(), PlayerDice, EnemyDice);
 
-  // Drive the authoritative dice manager with the same RollId/results that are
-  // sent to clients.  The previous server path only broadcast the client RPC,
-  // while authority-side listeners such as AFighterPawn waited on
-  // OnDiceRollCompleted forever.  That left physical attack rolls stuck after
-  // the arena spawned because ProcessPhysicalDiceRollResults never ran.
-  if (DiceManager) {
-    const FGuid ServerRollId = DiceManager->PlayScriptedRoll(
-        PlayerResults, EnemyResults, bForInitiative, -1.f, PlayerColor,
-        EnemyColor, RollId);
+  // If another authoritative flow already started this RollId (for example
+  // initiative via RollDice_D6), leave that roll alone. Replaying it here would
+  // spawn a second server-side arena and overwrite the active roll, causing
+  // duplicate dice in overview/battle initiative and orphaned actors. For attack
+  // broadcasts that only render on clients, schedule server callbacks without
+  // spawning presentation actors so AFighterPawn still receives completion.
+  if (DiceManager && !DiceManager->IsRollActive(RollId)) {
+    const FGuid ServerRollId = DiceManager->PlayScriptedRollWithoutPresentation(
+        PlayerResults, EnemyResults, bForInitiative, -1.f, RollId);
     ensure(!ServerRollId.IsValid() || ServerRollId == RollId);
   }
 
