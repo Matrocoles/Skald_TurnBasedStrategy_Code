@@ -37,8 +37,19 @@ public:
         FLinearColor EnemyColor = FLinearColor::Transparent,
         FGuid OverrideRollId = FGuid());
 
+    /** Returns whether a given roll is still tracked by the dice manager. */
+    bool IsRollActive(const FGuid& RollId) const;
+
     /** Returns whether a given roll spawned physical dice actors. */
     bool DidRollUsePhysicalDice(const FGuid& RollId) const;
+
+    /**
+     * Schedule authoritative roll callbacks for results rendered elsewhere.
+     * This intentionally does not spawn an arena or dice actors.
+     */
+    FGuid PlayScriptedRollWithoutPresentation(const TArray<int32>& PlayerResults,
+        const TArray<int32>& EnemyResults, bool bForInitiative,
+        float DurationOverride = -1.f, const FGuid& ForcedRollId = FGuid());
 
     UFUNCTION(BlueprintCallable, Category = "Dice")
     void SetConfig(UDiceRollConfig* InConfig);

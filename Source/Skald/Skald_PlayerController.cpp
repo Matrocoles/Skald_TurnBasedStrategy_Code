@@ -244,6 +244,18 @@ void ASkaldPlayerController::BroadcastPhysicalDiceRoll(
          TEXT("[DiceArena] Broadcasting roll %s (PlayerDice=%d EnemyDice=%d)"),
          *RollId.ToString(), PlayerDice, EnemyDice);
 
+  // If another authoritative flow already started this RollId (for example
+  // initiative via RollDice_D6), leave that roll alone. Replaying it here would
+  // spawn a second server-side arena and overwrite the active roll, causing
+  // duplicate dice in overview/battle initiative and orphaned actors. For attack
+  // broadcasts that only render on clients, schedule server callbacks without
+  // spawning presentation actors so AFighterPawn still receives completion.
+  if (DiceManager && !DiceManager->IsRollActive(RollId)) {
+    const FGuid ServerRollId = DiceManager->PlayScriptedRollWithoutPresentation(
+        PlayerResults, EnemyResults, bForInitiative, -1.f, RollId);
+    ensure(!ServerRollId.IsValid() || ServerRollId == RollId);
+  }
+
   for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It;
        ++It) {
     if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(*It)) {

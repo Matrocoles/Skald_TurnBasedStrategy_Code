@@ -148,6 +148,11 @@ TArray<int32> USkaldDiceManager::RollDiceBlocking_D6(int32 NumDice)
     return GenerateResults(FMath::Max(0, NumDice));
 }
 
+bool USkaldDiceManager::IsRollActive(const FGuid& RollId) const
+{
+    return RollId.IsValid() && ActiveRolls.Contains(RollId);
+}
+
 bool USkaldDiceManager::DidRollUsePhysicalDice(const FGuid& RollId) const
 {
     if (const FActiveRoll* Roll = ActiveRolls.Find(RollId))
@@ -156,6 +161,61 @@ bool USkaldDiceManager::DidRollUsePhysicalDice(const FGuid& RollId) const
     }
 
     return false;
+}
+
+FGuid USkaldDiceManager::PlayScriptedRollWithoutPresentation(const TArray<int32>& PlayerResults,
+    const TArray<int32>& EnemyResults, bool bForInitiative, float DurationOverride,
+    const FGuid& ForcedRollId)
+{
+    const int32 PlayerDice = PlayerResults.Num();
+    const int32 EnemyDice = EnemyResults.Num();
+    const int32 TotalDice = PlayerDice + EnemyDice;
+    if (TotalDice <= 0)
+    {
+        UE_LOG(LogSkaldDice, Warning, TEXT("PlayScriptedRollWithoutPresentation called with no results."));
+        return FGuid();
+    }
+
+    UWorld* World = GetWorld();
+    if (!World)
+    {
+        UE_LOG(LogSkaldDice, Error, TEXT("SkaldDiceManager has no world context."));
+        return FGuid();
+    }
+
+    const FGuid RollId = ForcedRollId.IsValid() ? ForcedRollId : FGuid::NewGuid();
+    if (ActiveRolls.Contains(RollId))
+    {
+        return RollId;
+    }
+
+    const float MinDuration = Config ? Config->RollDurationMin : 0.75f;
+    const float MaxDuration = Config ? Config->RollDurationMax : 1.5f;
+    const float Duration = DurationOverride > 0.f
+        ? DurationOverride
+        : FMath::Clamp(FMath::FRandRange(MinDuration, MaxDuration), MinDuration, MaxDuration);
+
+    FActiveRoll& Roll = AddRoll(PlayerDice, EnemyDice, Duration, RollId,
+        bForInitiative, FLinearColor::Transparent, FLinearColor::Transparent);
+    Roll.RollId = RollId;
+    Roll.StartTime = World->GetTimeSeconds();
+    Roll.Duration = Duration;
+    Roll.bUseScriptedResults = true;
+    Roll.bSpawnedPhysicalDice = false;
+    Roll.ScriptedResults.Reset(TotalDice);
+    Roll.ScriptedResults.Append(PlayerResults);
+    Roll.ScriptedResults.Append(EnemyResults);
+
+    OnDiceRollStarted.Broadcast(RollId);
+
+    World->GetTimerManager().SetTimer(Roll.CompletionTimerHandle,
+        FTimerDelegate::CreateUObject(this, &USkaldDiceManager::CompleteRoll, RollId),
+        Duration, false);
+    World->GetTimerManager().SetTimer(Roll.UpdateTimerHandle,
+        FTimerDelegate::CreateUObject(this, &USkaldDiceManager::BroadcastInterim, RollId),
+        0.1f, true);
+
+    return RollId;
 }
 
 FGuid USkaldDiceManager::PlayScriptedRoll(const TArray<int32>& PlayerResults,
