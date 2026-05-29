@@ -2168,6 +2168,25 @@ void ASkaldPlayerController::TryBindWorldMap() {
     return;
   }
 
+  if (!CachedGameInstance) {
+    CachedGameInstance = GetGameInstance<USkaldGameInstance>();
+  }
+  const bool bBattleMapActive =
+      bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap);
+  if (bBattleMapActive) {
+    if (AWorldMap *WorldMap = CachedWorldMap.Get()) {
+      if (WorldMap->OnTerritorySelected.IsAlreadyBound(
+              this, &ASkaldPlayerController::HandleTerritorySelected)) {
+        WorldMap->OnTerritorySelected.RemoveDynamic(
+            this, &ASkaldPlayerController::HandleTerritorySelected);
+      }
+    }
+    CachedWorldMap.Reset();
+    World->GetTimerManager().ClearTimer(WorldMapSearchHandle);
+    bPendingLocalSelectionRefresh = false;
+    return;
+  }
+
   if (CachedWorldMap.IsValid()) {
     World->GetTimerManager().ClearTimer(WorldMapSearchHandle);
     return;
@@ -5392,6 +5411,18 @@ void ASkaldPlayerController::ClientHandleMoveOutcome_Implementation(
 }
 
 bool ASkaldPlayerController::EnsureTurnManager(const TCHAR *Caller) {
+  if (!CachedGameInstance) {
+    CachedGameInstance = GetGameInstance<USkaldGameInstance>();
+  }
+  const bool bBattleMapActive =
+      bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap);
+  if (bBattleMapActive) {
+    UE_LOG(LogSkaldBattle, Verbose,
+           TEXT("%s ignored while battle map flow is active; GridBattleManager owns tactical turns."),
+           Caller);
+    return false;
+  }
+
   if (TurnManager) {
     return true;
   }
@@ -6597,19 +6628,66 @@ void ASkaldPlayerController::HandleGridClick() {
   }
 
   // Terrain/grid clicks can arrive while the viewport is in Game+UI mode and no
-  // visible actor blocks the cursor trace.  Fall back to intersecting the mouse
-  // ray with the grid plane so empty movement cells are still valid targets
-  // instead of turning into a viewport-capture/cursor-hide click.
+  // visible actor blocks the cursor trace. Trace the whole cursor ray so fighter
+  // capsules on streamed battle sublevels win over terrain, while stale
+  // overworld WorldMap/Territory hits are ignored during tactical play. If the
+  // ray does not hit usable battle geometry, fall back to intersecting the grid
+  // plane so empty movement cells remain valid targets.
+  FVector MouseWorldLocation = FVector::ZeroVector;
+  FVector MouseWorldDirection = FVector::ZeroVector;
+  if (!DeprojectMousePositionToWorld(MouseWorldLocation, MouseWorldDirection)) {
+    ApplyBattleInteractionInputState(TEXT("HandleGridClickTraceFailed"));
+    return;
+  }
+
+  FVector TraceStart = MouseWorldLocation;
+  if (APlayerCameraManager *CameraManager = PlayerCameraManager) {
+    TraceStart = CameraManager->GetCameraLocation();
+  }
+  const FVector TraceEnd = TraceStart + MouseWorldDirection * 100000.f;
+
+  AFighterPawn *DirectHitFighter = nullptr;
   FVector WorldLocation = FVector::ZeroVector;
-  const bool bHasCursorHit =
-      GetHitResultUnderCursor(ECC_Visibility, /*bTraceComplex*/ false, Hit);
-  if (bHasCursorHit) {
-    WorldLocation = Hit.bBlockingHit ? Hit.ImpactPoint : Hit.Location;
-  } else {
-    FVector MouseWorldLocation = FVector::ZeroVector;
-    FVector MouseWorldDirection = FVector::ZeroVector;
-    if (!DeprojectMousePositionToWorld(MouseWorldLocation, MouseWorldDirection) ||
-        FMath::IsNearlyZero(MouseWorldDirection.Z)) {
+  bool bHasUsableBattleHit = false;
+
+  if (UWorld *World = GetWorld()) {
+    TArray<FHitResult> CursorHits;
+    FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(HandleGridClickBattle),
+                                      /*bTraceComplex*/ false);
+    if (World->LineTraceMultiByChannel(CursorHits, TraceStart, TraceEnd,
+                                       ECC_Visibility, QueryParams)) {
+      for (const FHitResult &CandidateHit : CursorHits) {
+        AActor *HitActor = CandidateHit.GetActor();
+        if (!HitActor) {
+          continue;
+        }
+
+        if (!DirectHitFighter) {
+          if (AFighterPawn *Fighter = Cast<AFighterPawn>(HitActor)) {
+            if (Fighter->IsAlive()) {
+              DirectHitFighter = Fighter;
+            }
+          }
+        }
+
+        if (!bHasUsableBattleHit &&
+            !HitActor->IsA<AWorldMap>() &&
+            !HitActor->IsA<ATerritory>()) {
+          Hit = CandidateHit;
+          WorldLocation = CandidateHit.bBlockingHit ? CandidateHit.ImpactPoint
+                                                    : CandidateHit.Location;
+          bHasUsableBattleHit = true;
+        }
+
+        if (DirectHitFighter && bHasUsableBattleHit) {
+          break;
+        }
+      }
+    }
+  }
+
+  if (!bHasUsableBattleHit) {
+    if (FMath::IsNearlyZero(MouseWorldDirection.Z)) {
       ApplyBattleInteractionInputState(TEXT("HandleGridClickTraceFailed"));
       return;
     }
@@ -6623,13 +6701,20 @@ void ASkaldPlayerController::HandleGridClick() {
     }
 
     WorldLocation = MouseWorldLocation + MouseWorldDirection * DistanceAlongRay;
+    Hit.TraceStart = TraceStart;
+    Hit.TraceEnd = TraceEnd;
+    Hit.Location = WorldLocation;
+    Hit.ImpactPoint = WorldLocation;
   }
-  const FIntPoint Cell = Grid->WorldToGrid(WorldLocation);
+
+  FIntPoint Cell = DirectHitFighter ? DirectHitFighter->GetCurrentCell()
+                                   : Grid->WorldToGrid(WorldLocation);
   if (!Grid->IsCellInBounds(Cell)) {
     return;
   }
 
-  AFighterPawn *CellFighter = FindFighterAtCell(Cell);
+  AFighterPawn *CellFighter = DirectHitFighter ? DirectHitFighter
+                                               : FindFighterAtCell(Cell);
 
   switch (CurrentCommandMode) {
   case EBattleCommandMode::Move: {
