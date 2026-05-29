@@ -618,6 +618,9 @@ protected:
   /** Ensures ServerInitPlayerState and lock-in handling run only once. */
   bool bHasInitialized;
 
+  /** True while the Battle HUD is explicitly forwarding an empty-space world click. */
+  bool bHandlingBattleHudForwardedClick = false;
+
   /** Default mouse capture behavior for this controller. */
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
   EMouseCaptureMode DefaultMouseCaptureMode;
@@ -679,6 +682,9 @@ protected:
   void HandleRightClick();
 
 public:
+  /** Forward an empty-space Battle HUD click into the tactical grid handler. */
+  void HandleBattleHudWorldClick();
+
   /** Handle HUD attack submissions.
    *  Bound to USkaldMainHUDWidget::OnAttackRequested in the HUD.
    *  Blueprint widgets invoke this when an attack is submitted.

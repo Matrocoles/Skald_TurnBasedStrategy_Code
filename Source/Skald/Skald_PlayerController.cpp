@@ -58,6 +58,7 @@
 #include "Sound/SoundBase.h"
 
 #include "Misc/EngineVersionComparison.h"
+#include "Misc/ScopeExit.h"
 #include "Misc/CoreDelegates.h"
 #if UE_VERSION_OLDER_THAN(5, 5, 0)
 #include "UObject/CoreUObjectDelegates.h"
@@ -3327,16 +3328,15 @@ void ASkaldPlayerController::EnsureBattleHUDVisible() {
     return;
   }
 
-  // The battle HUD spans the viewport, so the widget itself must not be a
-  // hit-test target.  Keeping only its children hit-testable lets HUD buttons
-  // consume clicks while empty HUD space still falls through to grid/fighter
-  // traces.
-  BattleHudWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+  // The battle HUD spans the viewport. Keep it hit-testable so empty-space
+  // clicks that Slate routes to the HUD can be forwarded explicitly into the
+  // tactical grid handler, while child buttons still consume their own clicks.
+  BattleHudWidget->SetVisibility(ESlateVisibility::Visible);
   bBattleHUDVisible = true;
 
   // After selection lock-in/deploy, restore the battle input policy. This keeps
-  // Game+UI active for HUD buttons while allowing empty HUD space to fall through
-  // to grid/fighter traces and camera controls.
+  // Game+UI active for HUD buttons while letting the HUD forward empty-space
+  // clicks to grid/fighter traces and preserve camera controls.
   ApplyBattleInteractionInputState(TEXT("EnsureBattleHUDVisible"));
 }
 
@@ -6342,9 +6342,9 @@ bool ASkaldPlayerController::ApplyBattleInteractionInputState(
   } else {
     // Normal battle play still needs a live Game+UI input mode: unhandled WASD,
     // mouse-axis, and wheel input fall through to the camera pawn, while the
-    // visible UBattleHUDWidget buttons continue to receive UI clicks.  The HUD
-    // root is made SelfHitTestInvisible when shown, so empty HUD space still
-    // falls through to grid/fighter traces.
+    // visible UBattleHUDWidget buttons continue to receive UI clicks. Empty
+    // HUD-space left clicks are forwarded by the HUD into HandleGridClick(),
+    // which keeps grid/fighter traces alive even when Slate owns the click.
     //
     // Keep the viewport in NoCapture for battle interaction.  Using
     // CaptureDuringMouseDown makes landscape/empty-grid clicks capture the PIE
@@ -6623,6 +6623,15 @@ void ASkaldPlayerController::BeginAttackMode() {
   }
 }
 
+void ASkaldPlayerController::HandleBattleHudWorldClick() {
+  if (!IsLocalController()) {
+    return;
+  }
+
+  TGuardValue<bool> ForwardedClickGuard(bHandlingBattleHudForwardedClick, true);
+  HandleGridClick();
+}
+
 void ASkaldPlayerController::HandleGridClick() {
   if (!IsLocalController())
     return;
@@ -6631,7 +6640,8 @@ void ASkaldPlayerController::HandleGridClick() {
   const bool bBattleMapActive =
       bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap);
 
-  if (IsCursorOverInteractableSlateWidget()) {
+  if (!bHandlingBattleHudForwardedClick &&
+      IsCursorOverInteractableSlateWidget()) {
     return;
   }
 
