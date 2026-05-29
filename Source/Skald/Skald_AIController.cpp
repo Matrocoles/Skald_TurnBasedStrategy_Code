@@ -3302,11 +3302,13 @@ void ASkaldAIController::TryActivateNextFighter() {
 
   DetermineControlledBattleSide();
 
-  if (!IsMyTurn()) {
+  const bool bAttackerTurn = CachedBattleManager->IsAttackerTurn();
+  const bool bControlsCurrentSide =
+      bAttackerTurn ? bAIControlsAttackerSide : bAIControlsDefenderSide;
+  if (!bControlsCurrentSide) {
     return;
   }
 
-  const bool bAttackerTurn = CachedBattleManager->IsAttackerTurn();
   AFighterPawn *NextFighter = FindNextFriendlyFighter(bAttackerTurn);
   if (!NextFighter) {
     CachedBattleManager->AdvanceTurn();
