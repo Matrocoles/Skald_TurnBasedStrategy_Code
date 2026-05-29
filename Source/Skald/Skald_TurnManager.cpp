@@ -878,14 +878,36 @@ void ATurnManager::RestoreControllerOrderFromSnapshots(const TArray<FS_PlayerDat
   Controllers = MoveTemp(Reordered);
 }
 
+
+bool ATurnManager::ShouldSuspendOverworldTurnFlow() const {
+  const UWorld *World = GetWorld();
+  const USkaldGameInstance *GI =
+      World ? World->GetGameInstance<USkaldGameInstance>() : nullptr;
+  if (!GI) {
+    return false;
+  }
+
+  const USkaldBattleLevelManager *BattleLevelManager =
+      GI->GetBattleLevelManager();
+  const bool bBattleLevelActive =
+      BattleLevelManager && (BattleLevelManager->IsBattleLevelActive() ||
+                             BattleLevelManager->IsBattleLevelFullyReady());
+  return GI->bTravelPending || GI->bIsInBattleMap ||
+         GI->bTurnStateFrozenForTravel || bBattleLevelActive;
+}
+
 bool ATurnManager::AttemptResumeSavedTurnState() {
   return TryResumeSavedTurnState();
 }
 
 void ATurnManager::StartArmyPlacementPhase() {
+  if (ShouldSuspendOverworldTurnFlow()) {
+    return;
+  }
+
   if (const UWorld *W = GetWorld()) {
     if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
-      if (GI->bTravelPending || GI->bResumeTurns) {
+      if (GI->bResumeTurns) {
         return;
       }
     }
@@ -1078,12 +1100,8 @@ bool ATurnManager::TryResumeSavedTurnState(USkaldGameInstance *GameInstance) {
 }
 
 void ATurnManager::StartTurns(ASkaldPlayerController *StartingController) {
-  if (const UWorld *W = GetWorld()) {
-    if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
-      if (GI->bTravelPending) {
-        return;
-      }
-    }
+  if (ShouldSuspendOverworldTurnFlow()) {
+    return;
   }
 
   SortControllersByInitiative();
@@ -1157,12 +1175,8 @@ void ATurnManager::StartTurns(ASkaldPlayerController *StartingController) {
 }
 
 void ATurnManager::AdvanceTurn() {
-  if (const UWorld *W = GetWorld()) {
-    if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
-      if (GI->bTravelPending) {
-        return;
-      }
-    }
+  if (ShouldSuspendOverworldTurnFlow()) {
+    return;
   }
 
   ASkaldPlayerController *PreviousController =
@@ -4119,12 +4133,8 @@ bool ATurnManager::CapturePendingBattleResolution(
 }
 
 void ATurnManager::BeginAttackPhase() {
-  if (const UWorld *W = GetWorld()) {
-    if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
-      if (GI->bTravelPending) {
-        return;
-      }
-    }
+  if (ShouldSuspendOverworldTurnFlow()) {
+    return;
   }
 
   // Enter the attack phase and notify all listeners so they can swap controls.
@@ -4139,12 +4149,8 @@ void ATurnManager::BeginAttackPhase() {
 }
 
 void ATurnManager::AdvancePhase() {
-  if (const UWorld *W = GetWorld()) {
-    if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
-      if (GI->bTravelPending) {
-        return;
-      }
-    }
+  if (ShouldSuspendOverworldTurnFlow()) {
+    return;
   }
 
   const ETurnPhase PreviousPhase = CurrentPhase;
@@ -4192,14 +4198,8 @@ void ATurnManager::EndCurrentPhase() {
     return;
   }
 
-  if (!bArmyPlacement) {
-    if (const UWorld *W = GetWorld()) {
-      if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
-        if (GI->bTravelPending) {
-          return;
-        }
-      }
-    }
+  if (!bArmyPlacement && ShouldSuspendOverworldTurnFlow()) {
+    return;
   }
 
   if (bArmyPlacement) {
@@ -4259,12 +4259,8 @@ void ATurnManager::EndCurrentPhase() {
 }
 
 void ATurnManager::BroadcastDeployableUnits(ASkaldPlayerState *ForPlayer) {
-  if (const UWorld *W = GetWorld()) {
-    if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
-      if (GI->bTravelPending) {
-        return;
-      }
-    }
+  if (ShouldSuspendOverworldTurnFlow()) {
+    return;
   }
 
   if (!ForPlayer) {
@@ -4286,12 +4282,8 @@ void ATurnManager::BroadcastDeployableUnits(ASkaldPlayerState *ForPlayer) {
 }
 
 void ATurnManager::BroadcastResources(ASkaldPlayerState *ForPlayer) {
-  if (const UWorld *W = GetWorld()) {
-    if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
-      if (GI->bTravelPending) {
-        return;
-      }
-    }
+  if (ShouldSuspendOverworldTurnFlow()) {
+    return;
   }
 
   if (!ForPlayer) {
@@ -4315,12 +4307,11 @@ void ATurnManager::BroadcastResources(ASkaldPlayerState *ForPlayer) {
 }
 
 bool ATurnManager::BroadcastCurrentPhase() {
+  if (ShouldSuspendOverworldTurnFlow()) {
+    return false;
+  }
+
   if (const UWorld *W = GetWorld()) {
-    if (const auto *GI = W->GetGameInstance<USkaldGameInstance>()) {
-      if (GI->bTravelPending || GI->bIsInBattleMap) {
-        return false;
-      }
-    }
     if (ASkaldGameMode *GameMode = W->GetAuthGameMode<ASkaldGameMode>()) {
       if (!GameMode->IsWorldInitialized() ||
           GameMode->IsAwaitingStrategicInitiative()) {

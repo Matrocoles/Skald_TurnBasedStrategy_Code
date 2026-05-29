@@ -5677,10 +5677,23 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
       CachedGameState ? CachedGameState->BattlePhase : EBattlePhase::None;
   const bool bBattleTravelPending =
       CachedGameInstance && CachedGameInstance->IsTravelPending();
+  const USkaldBattleLevelManager* BattleLevelManager =
+      CachedGameInstance ? CachedGameInstance->GetBattleLevelManager() : nullptr;
+  const bool bStreamedBattleLevelActive =
+      BattleLevelManager && (BattleLevelManager->IsBattleLevelActive() ||
+                             BattleLevelManager->IsBattleLevelFullyReady());
+  const bool bFrozenForBattleTravel =
+      CachedGameInstance && CachedGameInstance->bTurnStateFrozenForTravel;
+  const bool bPendingBattleTravelContext =
+      CachedGameInstance && CachedGameInstance->HasPendingBattleTravelContext();
   const bool bInBattleInputFlow =
       bIsBattleMap ||
       (CachedGameInstance && CachedGameInstance->bIsInBattleMap) ||
-      BattlePhase != EBattlePhase::None || bBattleTravelPending;
+      BattlePhase != EBattlePhase::None || bBattleTravelPending ||
+      bStreamedBattleLevelActive || bFrozenForBattleTravel ||
+      bPendingBattleTravelContext || bBattleHUDReadyToShow || bBattleHUDVisible ||
+      (FighterSelectionWidget && FighterSelectionWidget->IsInViewport()) ||
+      (BattleHudWidget && BattleHudWidget->IsInViewport());
   const int32 ReportedActiveId =
       CachedGameState ? CachedGameState->ActivePlayerId : INDEX_NONE;
 
@@ -5722,10 +5735,8 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
   const bool bNeedsStrategicInitiativeUI =
       bAwaitingStrategicInitiativeRoll || PendingStrategicInitiativeRoll > 0 ||
       bHudAwaitingStrategicInitiative;
-  auto ApplyHudCapturePolicy = [this](bool bModalUIActive) {
-    const EMouseCaptureMode DesiredCaptureMode =
-        bModalUIActive ? EMouseCaptureMode::NoCapture
-                       : EMouseCaptureMode::CaptureDuringMouseDown;
+  auto ApplyHudCapturePolicy = [this](bool /*bModalUIActive*/) {
+    const EMouseCaptureMode DesiredCaptureMode = EMouseCaptureMode::NoCapture;
     if (DefaultMouseCaptureMode != DesiredCaptureMode) {
       DefaultMouseCaptureMode = DesiredCaptureMode;
       UE_LOG(LogSkald, Verbose,
@@ -6232,10 +6243,14 @@ bool ASkaldPlayerController::ApplyBattleInteractionInputState(
   const bool bBattleMapActive =
       bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap) ||
       bStreamedBattleMapActive;
+  const bool bFrozenForBattleTravel =
+      CachedGameInstance && CachedGameInstance->bTurnStateFrozenForTravel;
+  const bool bPendingBattleTravelContext =
+      CachedGameInstance && CachedGameInstance->HasPendingBattleTravelContext();
   const bool bBattleInputContext =
       bBattleMapActive ||
       (CachedGameState && CachedGameState->BattlePhase != EBattlePhase::None) ||
-      bHasBattlePayload ||
+      bHasBattlePayload || bFrozenForBattleTravel || bPendingBattleTravelContext ||
       (CachedGameInstance && CachedGameInstance->GridBattleManager) ||
       bBattleHUDReadyToShow || bBattleHUDVisible ||
       (FighterSelectionWidget && FighterSelectionWidget->IsInViewport()) ||
@@ -6574,16 +6589,41 @@ void ASkaldPlayerController::HandleGridClick() {
     return;
   }
 
-  // Get active fighter
-  if (!GetHitResultUnderCursor(ECC_Visibility, /*bTraceComplex*/ false, Hit)) {
+  ApplyBattleInteractionInputState(TEXT("HandleGridClickBattle"));
+
+  UGridOverlayComponent *Grid = FindGridOverlay();
+  if (!Grid) {
     return;
   }
 
-  UGridOverlayComponent *Grid = FindGridOverlay();
-  if (!Grid)
-    return;
+  // Terrain/grid clicks can arrive while the viewport is in Game+UI mode and no
+  // visible actor blocks the cursor trace.  Fall back to intersecting the mouse
+  // ray with the grid plane so empty movement cells are still valid targets
+  // instead of turning into a viewport-capture/cursor-hide click.
+  FVector WorldLocation = FVector::ZeroVector;
+  const bool bHasCursorHit =
+      GetHitResultUnderCursor(ECC_Visibility, /*bTraceComplex*/ false, Hit);
+  if (bHasCursorHit) {
+    WorldLocation = Hit.bBlockingHit ? Hit.ImpactPoint : Hit.Location;
+  } else {
+    FVector MouseWorldLocation = FVector::ZeroVector;
+    FVector MouseWorldDirection = FVector::ZeroVector;
+    if (!DeprojectMousePositionToWorld(MouseWorldLocation, MouseWorldDirection) ||
+        FMath::IsNearlyZero(MouseWorldDirection.Z)) {
+      ApplyBattleInteractionInputState(TEXT("HandleGridClickTraceFailed"));
+      return;
+    }
 
-  const FVector WorldLocation = Hit.bBlockingHit ? Hit.ImpactPoint : Hit.Location;
+    const float GridPlaneZ = Grid->GetOrigin().Z;
+    const float DistanceAlongRay =
+        (GridPlaneZ - MouseWorldLocation.Z) / MouseWorldDirection.Z;
+    if (DistanceAlongRay < 0.f) {
+      ApplyBattleInteractionInputState(TEXT("HandleGridClickBehindCamera"));
+      return;
+    }
+
+    WorldLocation = MouseWorldLocation + MouseWorldDirection * DistanceAlongRay;
+  }
   const FIntPoint Cell = Grid->WorldToGrid(WorldLocation);
   if (!Grid->IsCellInBounds(Cell)) {
     return;
