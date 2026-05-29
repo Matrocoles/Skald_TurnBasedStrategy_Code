@@ -10240,16 +10240,65 @@ void ASkaldPlayerController::DetermineControlledBattleSide() {
     return;
 
   FS_BattlePayload Battle = CachedGameInstance->PendingBattle;
-  if (CachedGameState)
-  {
-    Battle = CachedGameState->GetActiveBattlePayload();
+  if (CachedGameState) {
+    const FS_BattlePayload &ReplicatedBattle = CachedGameState->GetActiveBattlePayload();
+    const bool bReplicatedBattleValid =
+        ReplicatedBattle.AttackerPlayerID > 0 ||
+        ReplicatedBattle.DefenderPlayerID > 0 ||
+        ReplicatedBattle.AttackerFaction != ESkaldFaction::None ||
+        ReplicatedBattle.DefenderFaction != ESkaldFaction::None ||
+        !ReplicatedBattle.AttackerDisplayName.IsEmpty() ||
+        !ReplicatedBattle.DefenderDisplayName.IsEmpty();
+    if (bReplicatedBattleValid) {
+      Battle = ReplicatedBattle;
+    }
   }
-  const int32 PlayerID = ResolveStablePlayerId(PS);
-  if (PlayerID == Battle.AttackerPlayerID) {
+
+  const int32 StablePlayerID = ResolveStablePlayerId(PS);
+  const int32 RuntimePlayerID = PS->GetPlayerId();
+  const int32 AuthoritativePlayerID = PS->GetAuthoritativePlayerId();
+
+  auto MatchesPlayerId = [&](int32 CandidateId) {
+    return CandidateId > 0 &&
+           (CandidateId == StablePlayerID || CandidateId == RuntimePlayerID ||
+            CandidateId == AuthoritativePlayerID);
+  };
+
+  if (MatchesPlayerId(Battle.AttackerPlayerID)) {
     bControlsAttackerSide = true;
   }
-  if (PlayerID == Battle.DefenderPlayerID) {
+  if (MatchesPlayerId(Battle.DefenderPlayerID)) {
     bControlsDefenderSide = true;
+  }
+
+  FString PlayerName = PS->PlayerDisplayName;
+  if (PlayerName.IsEmpty()) {
+    PlayerName = PS->GetResolvedPlayerName(TEXT("DetermineControlledBattleSide"));
+  }
+
+  if (!PlayerName.IsEmpty() && !bControlsAttackerSide &&
+      !bControlsDefenderSide) {
+    const bool bDisplayNameMatchesAttacker =
+        !Battle.AttackerDisplayName.IsEmpty() &&
+        PlayerName.Equals(Battle.AttackerDisplayName, ESearchCase::IgnoreCase);
+    const bool bDisplayNameMatchesDefender =
+        !Battle.DefenderDisplayName.IsEmpty() &&
+        PlayerName.Equals(Battle.DefenderDisplayName, ESearchCase::IgnoreCase);
+
+    if (bDisplayNameMatchesAttacker != bDisplayNameMatchesDefender) {
+      bControlsAttackerSide = bDisplayNameMatchesAttacker;
+      bControlsDefenderSide = bDisplayNameMatchesDefender;
+    }
+  }
+
+  if (!bControlsAttackerSide && !bControlsDefenderSide &&
+      PS->Faction != ESkaldFaction::None) {
+    const bool bFactionMatchesAttacker = Battle.AttackerFaction == PS->Faction;
+    const bool bFactionMatchesDefender = Battle.DefenderFaction == PS->Faction;
+    if (bFactionMatchesAttacker != bFactionMatchesDefender) {
+      bControlsAttackerSide = bFactionMatchesAttacker;
+      bControlsDefenderSide = bFactionMatchesDefender;
+    }
   }
 }
 

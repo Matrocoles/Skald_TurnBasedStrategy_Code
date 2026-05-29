@@ -1261,6 +1261,13 @@ bool UGridBattleManager::CanActivateFighter(AFighterPawn* Fighter) const
         return false;
     }
 
+    if (CurrentRound <= 0 || InitiativeWinnerFaction == ESkaldFaction::None)
+    {
+        UE_LOG(LogSkaldBattle, Verbose, TEXT("[Battle] CanActivateFighter rejected (Initiative not resolved. Round=%d Winner=%s) -> %s"),
+            CurrentRound, *UEnum::GetValueAsString(InitiativeWinnerFaction), *DescribeFighter(Fighter));
+        return false;
+    }
+
     if (!Fighter->IsAlive() || !InitiativeOrder.Contains(Fighter))
     {
         UE_LOG(LogSkaldBattle, Verbose, TEXT("[Battle] CanActivateFighter rejected (Alive=%s, InOrder=%s) -> %s"),
@@ -1747,17 +1754,11 @@ bool UGridBattleManager::IsSideAIControlled(bool bForAttackers) const
             return true;
         }
 
-        if (TargetPlayerId <= 0)
+        if (TargetPlayerId <= 0 && ParticipantDisplayName.IsEmpty() && ParticipantFaction == ESkaldFaction::None)
         {
-            const int32 OpponentPlayerId = bForAttackers ? Battle.DefenderPlayerID : Battle.AttackerPlayerID;
-            const FString& OpponentDisplayName = bForAttackers ? Battle.DefenderDisplayName : Battle.AttackerDisplayName;
-            const bool bOpponentIdentified = OpponentPlayerId > 0 || !OpponentDisplayName.IsEmpty();
-
-            if (bOpponentIdentified)
-            {
-                return true;
-            }
-
+            UE_LOG(LogSkaldBattle, Verbose,
+                TEXT("[Battle] Unable to resolve controller identity for %s; assuming player control until payload is populated."),
+                bForAttackers ? TEXT("attackers") : TEXT("defenders"));
             return false;
         }
     }
