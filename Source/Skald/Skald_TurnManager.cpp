@@ -3558,13 +3558,17 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
     return;
   }
 
-  GI->SetBattleMapActive(false);
-  if (HasAuthority()) {
-    MulticastSetBattleMapActive(false);
-  }
+  // Start unloading before clearing the battle-map flag. Otherwise local
+  // controllers can observe a still-visible, fully-ready streamed battle level
+  // and immediately promote the flag back to active while the conclusion is
+  // trying to return to the overworld.
   if (USkaldBattleLevelManager *BattleLevelManager =
           GI->GetBattleLevelManager()) {
     BattleLevelManager->ReleaseBattleLevel();
+  }
+  GI->SetBattleMapActive(false);
+  if (HasAuthority()) {
+    MulticastSetBattleMapActive(false);
   }
 
   // Always mirror the pending payload locally for reference.
