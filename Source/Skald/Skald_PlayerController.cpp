@@ -10276,14 +10276,18 @@ void ASkaldPlayerController::DetermineControlledBattleSide() {
     PlayerName = PS->GetResolvedPlayerName(TEXT("DetermineControlledBattleSide"));
   }
 
-  if (!PlayerName.IsEmpty()) {
-    if (!bControlsAttackerSide && !Battle.AttackerDisplayName.IsEmpty() &&
-        PlayerName.Equals(Battle.AttackerDisplayName, ESearchCase::IgnoreCase)) {
-      bControlsAttackerSide = true;
-    }
-    if (!bControlsDefenderSide && !Battle.DefenderDisplayName.IsEmpty() &&
-        PlayerName.Equals(Battle.DefenderDisplayName, ESearchCase::IgnoreCase)) {
-      bControlsDefenderSide = true;
+  if (!PlayerName.IsEmpty() && !bControlsAttackerSide &&
+      !bControlsDefenderSide) {
+    const bool bDisplayNameMatchesAttacker =
+        !Battle.AttackerDisplayName.IsEmpty() &&
+        PlayerName.Equals(Battle.AttackerDisplayName, ESearchCase::IgnoreCase);
+    const bool bDisplayNameMatchesDefender =
+        !Battle.DefenderDisplayName.IsEmpty() &&
+        PlayerName.Equals(Battle.DefenderDisplayName, ESearchCase::IgnoreCase);
+
+    if (bDisplayNameMatchesAttacker != bDisplayNameMatchesDefender) {
+      bControlsAttackerSide = bDisplayNameMatchesAttacker;
+      bControlsDefenderSide = bDisplayNameMatchesDefender;
     }
   }
 
