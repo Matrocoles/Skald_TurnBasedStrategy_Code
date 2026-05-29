@@ -16,6 +16,7 @@
 #include "Engine/World.h"
 #include "FighterPawn.h"
 #include "GridOverlayComponent.h"
+#include "InputCoreTypes.h"
 #include "UI/CombatFloaterPoolSubsystem.h"
 #include "UI/LockedInFighterEntryWidget.h"
 #include "UI/SkaldTooltipStatics.h"
@@ -242,6 +243,21 @@ void UBattleHUDWidget::NativeConstruct() {
   CacheDefaultTextColor(EnemyAttackDiceText);
 
   UpgradeStatIconTooltips();
+}
+
+FReply UBattleHUDWidget::NativeOnMouseButtonDown(
+    const FGeometry &InGeometry, const FPointerEvent &InMouseEvent) {
+  if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton &&
+      !IsInitiativePromptActive() && !IsManualAttackRollPromptActive() &&
+      !IsManualDiceResolutionActive() && !IsCombatPresentationActive()) {
+    if (ASkaldPlayerController *SkaldPC =
+            Cast<ASkaldPlayerController>(GetOwningPlayer())) {
+      SkaldPC->HandleBattleHudWorldClick();
+      return FReply::Handled();
+    }
+  }
+
+  return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
 }
 
 void UBattleHUDWidget::NativeTick(const FGeometry &MyGeometry,

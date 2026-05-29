@@ -94,6 +94,8 @@ public:
   virtual void NativeTick(const FGeometry &MyGeometry,
                           float InDeltaTime) override;
   virtual void NativeDestruct() override;
+  virtual FReply NativeOnMouseButtonDown(
+      const FGeometry &InGeometry, const FPointerEvent &InMouseEvent) override;
 
   /** Refresh all stat text from the currently bound fighter. */
   UFUNCTION(BlueprintCallable, Category = "Skald|Battle")
