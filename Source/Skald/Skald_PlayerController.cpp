@@ -6299,6 +6299,11 @@ bool ASkaldPlayerController::ApplyBattleInteractionInputState(
     // visible UBattleHUDWidget buttons continue to receive UI clicks.  The HUD
     // root is made SelfHitTestInvisible when shown, so empty HUD space still
     // falls through to grid/fighter traces.
+    //
+    // Keep the viewport in NoCapture for battle interaction.  Using
+    // CaptureDuringMouseDown makes landscape/empty-grid clicks capture the PIE
+    // viewport when Slate does not consume the press, which hides the cursor
+    // and drops the first intended grid click until input is reconciled again.
     UWidget* BattleFocusWidget =
         IsVisibleInViewport(BattleHudWidget) ? BattleHudWidget.Get() : nullptr;
     UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
@@ -6307,7 +6312,7 @@ bool ASkaldPlayerController::ApplyBattleInteractionInputState(
     bShowMouseCursor = true;
     bEnableClickEvents = true;
     bEnableMouseOverEvents = true;
-    DefaultMouseCaptureMode = EMouseCaptureMode::CaptureDuringMouseDown;
+    DefaultMouseCaptureMode = EMouseCaptureMode::NoCapture;
   }
 
   if (UGameViewportClient* GameViewport =
