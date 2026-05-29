@@ -348,6 +348,7 @@ private:
         void InitializeOverviewCamera();
         FVector ComputeOverviewPivotLocation() const;
         void RefreshOverviewPivot();
+        bool ShouldProcessBattleMouseInput() const;
         bool ShouldProcessOverviewMouseInput() const;
         FVector2D GetLockedOverviewPitchRange() const;
 

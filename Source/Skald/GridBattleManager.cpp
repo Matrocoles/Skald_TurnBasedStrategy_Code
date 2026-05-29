@@ -1831,7 +1831,10 @@ bool UGridBattleManager::IsSideAIControlled(bool bForAttackers) const
         {
             if (const ASkaldPlayerState* SkaldPlayerState = Cast<ASkaldPlayerState>(PlayerState))
             {
-                if (TargetPlayerId > 0 && SkaldPlayerState->GetPlayerId() == TargetPlayerId)
+                const int32 StablePlayerId = SkaldPlayerState->GetStablePlayerId();
+                const int32 RuntimePlayerId = SkaldPlayerState->GetPlayerId();
+                if (TargetPlayerId > 0 &&
+                    (StablePlayerId == TargetPlayerId || RuntimePlayerId == TargetPlayerId))
                 {
                     bMatchedPlayerState = true;
                     return SkaldPlayerState->bIsAI;
