@@ -192,6 +192,52 @@ bool ASkald_PlayerCharacter::ShouldProcessBattleMouseInput() const
         return false;
 }
 
+
+void ASkald_PlayerCharacter::ApplyBattleMouseDragInput()
+{
+        APlayerController* PlayerController = Cast<APlayerController>(Controller);
+        if (!bBattleCameraActive || !PlayerController || !PlayerController->IsInputKeyDown(EKeys::RightMouseButton))
+        {
+                bBattleRightMouseDragActive = false;
+                return;
+        }
+
+        float MouseX = 0.f;
+        float MouseY = 0.f;
+        if (!PlayerController->GetMousePosition(MouseX, MouseY))
+        {
+                bBattleRightMouseDragActive = false;
+                return;
+        }
+
+        const FVector2D CurrentMousePosition(MouseX, MouseY);
+        if (!bBattleRightMouseDragActive)
+        {
+                LastBattleRightMousePosition = CurrentMousePosition;
+                bBattleRightMouseDragActive = true;
+                return;
+        }
+
+        const FVector2D MouseDelta = CurrentMousePosition - LastBattleRightMousePosition;
+        LastBattleRightMousePosition = CurrentMousePosition;
+
+        if (MouseDelta.IsNearlyZero())
+        {
+                return;
+        }
+
+        if (bBattleCameraLocked)
+        {
+                bHasManuallyRotatedWhileLocked = true;
+        }
+
+        DesiredBattleRotation.Yaw = FRotator::NormalizeAxis(
+                DesiredBattleRotation.Yaw + (MouseDelta.X * BattleMouseYawSpeed));
+        DesiredBattleRotation.Pitch = FMath::Clamp(
+                DesiredBattleRotation.Pitch + (MouseDelta.Y * BattleMousePitchSpeed),
+                MinBattlePitch, MaxBattlePitch);
+}
+
 bool ASkald_PlayerCharacter::ShouldProcessOverviewMouseInput() const
 {
         if (bBattleCameraActive)
@@ -298,6 +344,7 @@ void ASkald_PlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerIn
         PlayerInputComponent->BindAxis("MoveUp", this, &ASkald_PlayerCharacter::MoveUp);
         PlayerInputComponent->BindAxis("Turn", this, &ASkald_PlayerCharacter::Turn);
         PlayerInputComponent->BindAxis("LookUp", this, &ASkald_PlayerCharacter::LookUp);
+        PlayerInputComponent->BindAxis("BattleRotate", this, &ASkald_PlayerCharacter::BattleRotateCamera);
         PlayerInputComponent->BindAxis("BattleZoom", this, &ASkald_PlayerCharacter::AdjustZoom);
 
         PlayerInputComponent->BindAction("Ability1", IE_Pressed, this, &ASkald_PlayerCharacter::AbilityOne);
@@ -392,16 +439,9 @@ void ASkald_PlayerCharacter::Turn(float Value)
 {
 	if (bBattleCameraActive)
         {
-                if (!FMath::IsNearlyZero(Value) && ShouldProcessBattleMouseInput())
-                {
-                        if (bBattleCameraLocked)
-                        {
-                                bHasManuallyRotatedWhileLocked = true;
-                        }
-
-                        DesiredBattleRotation.Yaw = FRotator::NormalizeAxis(
-                                DesiredBattleRotation.Yaw + (Value * BattleMouseYawSpeed));
-                }
+                // Battle RMB drag rotation is sampled in UpdateBattleCamera so it
+                // still works while the battle HUD keeps the viewport in
+                // NoCapture/Game+UI mode for clickable widgets.
                 return;
         }
 
@@ -424,16 +464,9 @@ void ASkald_PlayerCharacter::LookUp(float Value)
 {
 	if (bBattleCameraActive)
         {
-                if (!FMath::IsNearlyZero(Value) && ShouldProcessBattleMouseInput())
-                {
-                        if (bBattleCameraLocked)
-                        {
-                                bHasManuallyRotatedWhileLocked = true;
-                        }
-
-                        const float NewPitch = DesiredBattleRotation.Pitch + (Value * BattleMousePitchSpeed);
-                        DesiredBattleRotation.Pitch = FMath::Clamp(NewPitch, MinBattlePitch, MaxBattlePitch);
-                }
+                // Battle RMB drag rotation is sampled in UpdateBattleCamera so it
+                // still works while the battle HUD keeps the viewport in
+                // NoCapture/Game+UI mode for clickable widgets.
                 return;
         }
 
@@ -458,6 +491,29 @@ void ASkald_PlayerCharacter::LookUp(float Value)
         {
                 OverviewDefaultPitch = NewPitch;
         }
+}
+
+
+void ASkald_PlayerCharacter::BattleRotateCamera(float Value)
+{
+        if (!bBattleCameraActive || FMath::IsNearlyZero(Value))
+        {
+                return;
+        }
+
+        const float DeltaTime = GetWorld() ? GetWorld()->GetDeltaSeconds() : 0.f;
+        if (DeltaTime <= 0.f)
+        {
+                return;
+        }
+
+        if (bBattleCameraLocked)
+        {
+                bHasManuallyRotatedWhileLocked = true;
+        }
+
+        const float YawDelta = Value * BattleKeyboardYawSpeed * DeltaTime;
+        DesiredBattleRotation.Yaw = FRotator::NormalizeAxis(DesiredBattleRotation.Yaw + YawDelta);
 }
 
 void ASkald_PlayerCharacter::Select()
@@ -809,6 +865,7 @@ void ASkald_PlayerCharacter::SetBattleCameraActive(bool bActive)
 
                 BattleMoveInput = FVector2D::ZeroVector;
                 BattleCameraVelocity = FVector::ZeroVector;
+                bBattleRightMouseDragActive = false;
 
                 if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
                 {
@@ -840,6 +897,7 @@ void ASkald_PlayerCharacter::SetBattleCameraActive(bool bActive)
 
                 BattleMoveInput = FVector2D::ZeroVector;
                 BattleCameraVelocity = FVector::ZeroVector;
+                bBattleRightMouseDragActive = false;
 
                 bBattleCameraActive = false;
         }
@@ -960,6 +1018,8 @@ void ASkald_PlayerCharacter::UpdateBattleCamera(float DeltaTime)
                 MovementComponent->Velocity = FVector::ZeroVector;
         }
 
+        ApplyBattleMouseDragInput();
+
         CurrentBattleRotation = FMath::RInterpTo(CurrentBattleRotation, DesiredBattleRotation, DeltaTime, BattleRotationInterpSpeed);
         CameraBoom->SetWorldRotation(CurrentBattleRotation);
 
@@ -1013,6 +1073,7 @@ void ASkald_PlayerCharacter::ClearBattleCameraLock()
         LockedBattleActor = nullptr;
         BattleCameraVelocity = FVector::ZeroVector;
         bHasManuallyRotatedWhileLocked = false;
+        bBattleRightMouseDragActive = false;
 
         DesiredBattleZoom = FMath::Clamp(DefaultBattleZoom, MinBattleZoom, MaxBattleZoom);
         const float ClampedPitch = FMath::Clamp(DefaultBattlePitch, MinBattlePitch, MaxBattlePitch);

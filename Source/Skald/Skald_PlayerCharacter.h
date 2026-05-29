@@ -122,6 +122,10 @@ public:
         UFUNCTION(BlueprintCallable, Category="Input")
         void LookUp(float Value);
 
+        /** Rotate the battle camera with keyboard input. */
+        UFUNCTION(BlueprintCallable, Category="Input")
+        void BattleRotateCamera(float Value);
+
         /** Adjust zoom level when the battle camera is active. */
         UFUNCTION(BlueprintCallable, Category="Input")
         void AdjustZoom(float Value);
@@ -349,6 +353,7 @@ private:
         FVector ComputeOverviewPivotLocation() const;
         void RefreshOverviewPivot();
         bool ShouldProcessBattleMouseInput() const;
+        void ApplyBattleMouseDragInput();
         bool ShouldProcessOverviewMouseInput() const;
         FVector2D GetLockedOverviewPitchRange() const;
 
@@ -412,6 +417,12 @@ private:
 
         /** Tracks if the player has manually rotated the camera while locked on. */
         bool bHasManuallyRotatedWhileLocked = false;
+
+        /** Tracks RMB drag deltas while viewport mouse capture is disabled. */
+        bool bBattleRightMouseDragActive = false;
+
+        /** Last observed mouse position for the battle RMB drag camera. */
+        FVector2D LastBattleRightMousePosition = FVector2D::ZeroVector;
 
         /** Convert the configured relative lock offset into world space. */
         FVector GetBattleLockWorldOffset(const AActor* FocusActor) const;

@@ -244,6 +244,18 @@ void ASkaldPlayerController::BroadcastPhysicalDiceRoll(
          TEXT("[DiceArena] Broadcasting roll %s (PlayerDice=%d EnemyDice=%d)"),
          *RollId.ToString(), PlayerDice, EnemyDice);
 
+  // Drive the authoritative dice manager with the same RollId/results that are
+  // sent to clients.  The previous server path only broadcast the client RPC,
+  // while authority-side listeners such as AFighterPawn waited on
+  // OnDiceRollCompleted forever.  That left physical attack rolls stuck after
+  // the arena spawned because ProcessPhysicalDiceRollResults never ran.
+  if (DiceManager) {
+    const FGuid ServerRollId = DiceManager->PlayScriptedRoll(
+        PlayerResults, EnemyResults, bForInitiative, -1.f, PlayerColor,
+        EnemyColor, RollId);
+    ensure(!ServerRollId.IsValid() || ServerRollId == RollId);
+  }
+
   for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It;
        ++It) {
     if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(*It)) {
