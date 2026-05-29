@@ -6970,18 +6970,20 @@ void ASkaldPlayerController::HandleGridClick() {
     if (!IsValidEnemyTarget(TargetPawn)) {
       TargetPawn = nullptr;
 
-      FVector TraceStart = Hit.TraceStart;
-      FVector TraceEnd = Hit.TraceEnd;
+      FVector AttackTraceStart = Hit.TraceStart;
+      FVector AttackTraceEnd = Hit.TraceEnd;
 
-      if (TraceStart == TraceEnd) {
-        FVector MouseWorldLocation, MouseWorldDirection;
-        if (DeprojectMousePositionToWorld(MouseWorldLocation, MouseWorldDirection)) {
+      if (AttackTraceStart == AttackTraceEnd) {
+        FVector AttackMouseWorldLocation = FVector::ZeroVector;
+        FVector AttackMouseWorldDirection = FVector::ZeroVector;
+        if (DeprojectMousePositionToWorld(AttackMouseWorldLocation,
+                                          AttackMouseWorldDirection)) {
           if (APlayerCameraManager *CameraManager = PlayerCameraManager) {
-            TraceStart = CameraManager->GetCameraLocation();
+            AttackTraceStart = CameraManager->GetCameraLocation();
           } else {
-            TraceStart = MouseWorldLocation;
+            AttackTraceStart = AttackMouseWorldLocation;
           }
-          TraceEnd = TraceStart + MouseWorldDirection * 100000.f;
+          AttackTraceEnd = AttackTraceStart + AttackMouseWorldDirection * 100000.f;
         }
       }
 
@@ -6993,8 +6995,9 @@ void ASkaldPlayerController::HandleGridClick() {
           QueryParams.AddIgnoredActor(LockedActiveFighter);
         }
 
-        if (World->LineTraceMultiByChannel(AdditionalHits, TraceStart, TraceEnd,
-                                           ECC_Visibility, QueryParams)) {
+        if (World->LineTraceMultiByChannel(AdditionalHits, AttackTraceStart,
+                                           AttackTraceEnd, ECC_Visibility,
+                                           QueryParams)) {
           for (const FHitResult &CandidateHit : AdditionalHits) {
             AFighterPawn *CandidatePawn =
                 Cast<AFighterPawn>(CandidateHit.GetActor());
