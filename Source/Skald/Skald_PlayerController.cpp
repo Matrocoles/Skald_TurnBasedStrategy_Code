@@ -8866,6 +8866,9 @@ bool ASkaldPlayerController::BeginManualDiceSequence(AFighterPawn *Attacker) {
 
   ASkald_PlayerCharacter *CameraPawn =
       Cast<ASkald_PlayerCharacter>(GetPawn());
+  if (!CameraPawn) {
+    CameraPawn = Cast<ASkald_PlayerCharacter>(GetViewTarget());
+  }
   const USkaldBattleLevelManager* BattleLevelManager =
       CachedGameInstance ? CachedGameInstance->GetBattleLevelManager() : nullptr;
   const bool bBattleMapActive =
@@ -8977,6 +8980,9 @@ void ASkaldPlayerController::HandleManualDiceCleanupFinished() {
 
   ASkald_PlayerCharacter *CameraPawn =
       Cast<ASkald_PlayerCharacter>(GetPawn());
+  if (!CameraPawn) {
+    CameraPawn = Cast<ASkald_PlayerCharacter>(GetViewTarget());
+  }
   if (!CameraPawn || !PendingManualSequence.bHadBattleCamera) {
     HandleManualDiceReturnComplete();
     return;
@@ -9011,6 +9017,9 @@ void ASkaldPlayerController::HandleManualDiceReturnComplete() {
 
   ASkald_PlayerCharacter *CameraPawn =
       Cast<ASkald_PlayerCharacter>(GetPawn());
+  if (!CameraPawn) {
+    CameraPawn = Cast<ASkald_PlayerCharacter>(GetViewTarget());
+  }
   if (CameraPawn) {
     if (PendingManualSequence.Attacker.IsValid()) {
       CameraPawn->FocusCameraOnActor(PendingManualSequence.Attacker.Get());
@@ -10615,9 +10624,19 @@ void ASkaldPlayerController::ClientShowAttackRollButton_Implementation(
         return;
     }
 
-    // AI-triggered attack rolls are resolved by the authoritative fighter pawn.
-    // Human presenter clients should acknowledge camera/presentation readiness,
-    // not invoke the manual roll RPC that requires fighter ownership.
+    // AI-triggered attack rolls use the same camera overview sequence as a
+    // player-initiated manual roll. The sequence acknowledges the authoritative
+    // fighter only after the local camera has panned/zoomed out, preventing the
+    // dice arena from spawning before the presenter has reached the battlefield
+    // overview.
+    if (BeginManualDiceSequence(Attacker))
+    {
+        return;
+    }
+
+    UE_LOG(LogTemp, Warning,
+        TEXT("[ManualDice] Auto-trigger requested for %s but no camera overview sequence could start; acknowledging directly."),
+        *GetNameSafe(Attacker));
     ServerNotifyAIAttackOverviewComplete(Attacker);
 }
 

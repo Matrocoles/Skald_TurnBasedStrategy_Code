@@ -13,6 +13,8 @@ class ULevel;
 class UWorld;
 class ASkald_BattleGameMode;
 class AActor;
+class APlayerController;
+class ASkald_PlayerCharacter;
 
 /**
  * Helper object responsible for loading and unloading tactical battle levels
@@ -54,6 +56,8 @@ private:
   void ApplyVisibilityForCurrentMode();
   bool IsStreamingLevelPartOfDiceBoard(ULevelStreaming* Level) const;
   bool ShouldKeepPersistentActorForBattle(AActor* Actor) const;
+  void CacheLocalBattleCameraStates(UWorld* World);
+  void RestoreLocalBattleCameraStates();
   void RecenterLocalBattleCameras();
   bool CalculateActiveBattleLevelBounds(FBox& OutBounds) const;
 
@@ -98,6 +102,16 @@ private:
     bool bWasTickEnabled = false;
   };
 
+  struct FLocalBattleCameraState {
+    TWeakObjectPtr<APlayerController> Controller;
+    TWeakObjectPtr<ASkald_PlayerCharacter> CameraPawn;
+    TWeakObjectPtr<AActor> ViewTarget;
+    FVector Location = FVector::ZeroVector;
+    FRotator ActorRotation = FRotator::ZeroRotator;
+    FRotator ControlRotation = FRotator::ZeroRotator;
+  };
+
+  TArray<FLocalBattleCameraState> LocalBattleCameraStates;
   TArray<FHiddenStreamingLevelState> HiddenStreamingLevels;
   TWeakObjectPtr<ULevel> HiddenPersistentLevel;
   TWeakObjectPtr<UWorld> CachedStreamingWorld;
