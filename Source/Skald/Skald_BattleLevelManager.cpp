@@ -264,6 +264,7 @@ void USkaldBattleLevelManager::ReleaseBattleLevel() {
     UnregisterWorldDelegates();
     UnregisterStreamingTicker();
     RestoreNonBattleLevels();
+    RestoreLocalBattleCameraStates();
     bActiveLevelShouldBeLoaded = false;
     bActiveLevelVisibilityRequested = false;
     bActiveLevelActivationComplete = false;
@@ -517,6 +518,7 @@ void USkaldBattleLevelManager::HandleLevelUnloaded() {
   UnregisterWorldDelegates();
   UnregisterStreamingTicker();
   RestoreNonBattleLevels();
+  RestoreLocalBattleCameraStates();
 
   bActiveLevelShouldBeLoaded = false;
   bActiveLevelVisibilityRequested = false;
@@ -964,6 +966,67 @@ bool USkaldBattleLevelManager::CalculateActiveBattleLevelBounds(FBox& OutBounds)
   return OutBounds.IsValid != 0;
 }
 
+
+void USkaldBattleLevelManager::CacheLocalBattleCameraStates(UWorld* World) {
+  if (!World) {
+    return;
+  }
+
+  for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It) {
+    APlayerController* PC = It->Get();
+    if (!PC || !PC->IsLocalController()) {
+      continue;
+    }
+
+    ASkald_PlayerCharacter* CameraPawn = Cast<ASkald_PlayerCharacter>(PC->GetPawn());
+    if (!CameraPawn) {
+      CameraPawn = Cast<ASkald_PlayerCharacter>(PC->GetViewTarget());
+    }
+    if (!CameraPawn) {
+      continue;
+    }
+
+    const bool bAlreadyCached = LocalBattleCameraStates.ContainsByPredicate(
+        [PC](const FLocalBattleCameraState& State) {
+          return State.Controller.Get() == PC;
+        });
+    if (bAlreadyCached) {
+      continue;
+    }
+
+    FLocalBattleCameraState State;
+    State.Controller = PC;
+    State.CameraPawn = CameraPawn;
+    State.ViewTarget = PC->GetViewTarget();
+    State.Location = CameraPawn->GetActorLocation();
+    State.ActorRotation = CameraPawn->GetActorRotation();
+    State.ControlRotation = PC->GetControlRotation();
+    LocalBattleCameraStates.Add(State);
+  }
+}
+
+void USkaldBattleLevelManager::RestoreLocalBattleCameraStates() {
+  for (const FLocalBattleCameraState& State : LocalBattleCameraStates) {
+    APlayerController* PC = State.Controller.Get();
+    ASkald_PlayerCharacter* CameraPawn = State.CameraPawn.Get();
+    if (!PC || !CameraPawn) {
+      continue;
+    }
+
+    CameraPawn->SetBattleCameraActive(false);
+    CameraPawn->SetActorLocationAndRotation(State.Location, State.ActorRotation, false,
+                                            nullptr, ETeleportType::TeleportPhysics);
+    PC->SetControlRotation(State.ControlRotation);
+
+    AActor* DesiredViewTarget = State.ViewTarget.Get();
+    PC->SetViewTarget(DesiredViewTarget ? DesiredViewTarget : CameraPawn);
+    PC->SetIgnoreMoveInput(false);
+    PC->SetIgnoreLookInput(false);
+  }
+
+  LocalBattleCameraStates.Reset();
+}
+
 void USkaldBattleLevelManager::RecenterLocalBattleCameras() {
   UWorld* World = nullptr;
   if (ULevelStreaming* StreamingLevel = ActiveStreamingLevel.Get()) {
@@ -972,6 +1035,8 @@ void USkaldBattleLevelManager::RecenterLocalBattleCameras() {
   if (!World) {
     return;
   }
+
+  CacheLocalBattleCameraStates(World);
 
   FBox BattleBounds;
   const bool bHasBounds = CalculateActiveBattleLevelBounds(BattleBounds);
