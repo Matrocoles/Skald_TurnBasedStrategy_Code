@@ -13,6 +13,7 @@
 #include "Skald.h"
 #include "SkaldLogging.h"
 #include "Skald_BattleGameMode.h"
+#include "Skald_BattleLevelManager.h"
 #include "Skald_GameInstance.h"
 #include "Skald_GameState.h"
 #include "Skald_GameUserSettings.h"
@@ -383,6 +384,20 @@ void ASkaldAIController::ProcessCurrentPhase() {
     BroadcastEnemyTurnStatus(FString(EnemyAwaitingResultsMessage));
     ScheduleNextDecisionStep(EnemyBattleTransitionPollDelay);
     return;
+  }
+
+  if (const USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>()) {
+    const USkaldBattleLevelManager *BattleLevelManager =
+        GI->GetBattleLevelManager();
+    const bool bBattleLevelActive =
+        BattleLevelManager &&
+        (BattleLevelManager->IsBattleLevelActive() ||
+         BattleLevelManager->IsBattleLevelFullyReady());
+    if (GI->bTravelPending || GI->bIsInBattleMap || bBattleLevelActive) {
+      BroadcastEnemyTurnStatus(FString(EnemyBattleTransitionMessage));
+      ScheduleNextDecisionStep(EnemyBattleTransitionPollDelay);
+      return;
+    }
   }
 
   if (bPendingPhaseAdvance) {

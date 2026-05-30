@@ -590,12 +590,16 @@ void ATurnManager::CompleteBattleConclusion() {
   }
 
   if (GI) {
+    bool bBattleLevelStillActive = false;
     if (USkaldBattleLevelManager *BattleLevelManager =
             GI->GetBattleLevelManager()) {
       BattleLevelManager->ReleaseBattleLevel();
+      bBattleLevelStillActive = BattleLevelManager->IsBattleLevelActive();
     }
 
-    GI->SetTravelPending(false);
+    if (!bBattleLevelStillActive) {
+      GI->SetTravelPending(false);
+    }
   }
 
   if (HasAuthority()) {
@@ -3582,10 +3586,22 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
   // Always mirror the pending payload locally for reference.
   PendingBattle = GI->PendingBattle;
 
+  auto HasActiveBattleLevel = [&]() {
+    const USkaldBattleLevelManager *BattleLevelManager =
+        GI ? GI->GetBattleLevelManager() : nullptr;
+    return BattleLevelManager && BattleLevelManager->IsBattleLevelActive();
+  };
+
+  auto ClearTravelPendingIfBattleLevelReleased = [&]() {
+    if (!HasActiveBattleLevel()) {
+      GI->SetTravelPending(false);
+    }
+  };
+
   const bool bHasResolution = CapturePendingBattleResolution(GI);
 
   if (!bHasResolution) {
-    GI->SetTravelPending(false);
+    ClearTravelPendingIfBattleLevelReleased();
     return;
   }
 
@@ -3619,7 +3635,7 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
   }
 
   if (!GI->bPendingBattleResolution || !GI->PendingBattleResolution.bValid) {
-    GI->SetTravelPending(false);
+    ClearTravelPendingIfBattleLevelReleased();
     return;
   }
   if (GameMode && !GameMode->IsWorldInitialized()) {
@@ -3904,7 +3920,7 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
 
   GI->bPendingBattleResolution = false;
   GI->PendingBattleResolution = FGridBattleResolution();
-  GI->SetTravelPending(false);
+  ClearTravelPendingIfBattleLevelReleased();
 
   // Resume the saved turn sequence now that the battle has been resolved.
   TryResumeSavedTurnState(GI);
