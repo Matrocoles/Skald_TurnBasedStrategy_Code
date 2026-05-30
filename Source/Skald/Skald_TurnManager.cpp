@@ -3558,6 +3558,14 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
     return;
   }
 
+  UWorld *World = GetWorld();
+  if (!World || World->bIsTearingDown) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("ResolveGridBattleResult: World unavailable or tearing down; deferring resolution."));
+    GI->SetTravelPending(true);
+    return;
+  }
+
   // Start unloading before clearing the battle-map flag. Otherwise local
   // controllers can observe a still-visible, fully-ready streamed battle level
   // and immediately promote the flag back to active while the conclusion is
@@ -3581,19 +3589,19 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
     return;
   }
 
-  ASkaldGameMode *GameMode = GetWorld()->GetAuthGameMode<ASkaldGameMode>();
+  ASkaldGameMode *GameMode = World->GetAuthGameMode<ASkaldGameMode>();
 
   auto QueueRetry = [&]() {
     GI->SetTravelPending(true);
 
-    UWorld *World = GetWorld();
-    if (!World) {
+    UWorld *RetryWorld = GetWorld();
+    if (!RetryWorld || RetryWorld->bIsTearingDown) {
       UE_LOG(LogSkald, Verbose,
              TEXT("ResolveGridBattleResult: World unavailable; awaiting streaming completion before retry."));
       return;
     }
 
-    FTimerManager &TimerManager = World->GetTimerManager();
+    FTimerManager &TimerManager = RetryWorld->GetTimerManager();
     if (!TimerManager.IsTimerActive(PendingBattleResolutionRetryHandle)) {
       FTimerDelegate RetryDelegate = FTimerDelegate::CreateUObject(
           this, &ATurnManager::ResolveGridBattleResult);
@@ -3779,7 +3787,7 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
     if (PlayerId <= 0) {
       return nullptr;
     }
-    if (ASkaldGameState *GS = GetWorld()->GetGameState<ASkaldGameState>()) {
+    if (ASkaldGameState *GS = World->GetGameState<ASkaldGameState>()) {
       return GS->GetPlayerById(PlayerId);
     }
     return nullptr;
@@ -3813,8 +3821,7 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
     }
   }
 
-  GetWorld()->GetTimerManager().ClearTimer(
-      PendingBattleResolutionRetryHandle);
+  World->GetTimerManager().ClearTimer(PendingBattleResolutionRetryHandle);
 
   FGridBattleResolution Resolution = GI->PendingBattleResolution;
 
@@ -3926,11 +3933,11 @@ void ATurnManager::ClientBattleResolved_Implementation(
   if (AWorldMap *WorldMapForClient = ResolveWorldMap()) {
     ATerritory *Source = WorldMapForClient->GetTerritoryById(FromTerritoryID);
     ATerritory *Target = WorldMapForClient->GetTerritoryById(TargetTerritoryID);
-    if (Source) {
+    if (IsValid(Source)) {
       Source->ArmyUnits = SourceArmy;
       Source->RefreshAppearance();
     }
-    if (Target) {
+    if (IsValid(Target)) {
       ASkaldPlayerState *NewOwner = nullptr;
       if (ASkaldGameState *GS = GetWorld()->GetGameState<ASkaldGameState>()) {
         NewOwner = GS->GetPlayerById(NewOwnerPlayerID);
@@ -3992,7 +3999,7 @@ bool ATurnManager::CaptureWorldSnapshot(
   OutSnapshot.Reserve(WorldMapForSnapshot->Territories.Num());
 
     for (ATerritory *Territory : WorldMapForSnapshot->Territories) {
-      if (!Territory) {
+      if (!IsValid(Territory)) {
         continue;
       }
 
@@ -4020,7 +4027,7 @@ bool ATurnManager::CaptureWorldSnapshot(
         ReadBoolProperty(Territory, TEXT("IsNeutralSpawn"));
     Snapshot.AdjacentIDs.Reset();
     for (ATerritory *Adjacent : Territory->AdjacentTerritories) {
-      if (Adjacent) {
+      if (IsValid(Adjacent)) {
         Snapshot.AdjacentIDs.Add(Adjacent->TerritoryID);
       }
     }

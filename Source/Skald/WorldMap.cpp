@@ -572,7 +572,7 @@ bool AWorldMap::IsSelectingPlayerLocal(int32 SelectingPlayerId) const {
 ATerritory *AWorldMap::GetTerritoryById(int32 TerritoryId) const {
   const TObjectPtr<ATerritory> *Found = Territories.FindByPredicate(
       [TerritoryId](const TObjectPtr<ATerritory> &Territory) {
-        return Territory && Territory->TerritoryID == TerritoryId;
+        return IsValid(Territory.Get()) && Territory->TerritoryID == TerritoryId;
       });
   return Found ? *Found : nullptr;
 }

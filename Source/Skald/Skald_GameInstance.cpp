@@ -534,7 +534,7 @@ bool USkaldGameInstance::CacheWorldMapSnapshot(UWorld *InWorldContext) {
   TerritorySnapshots.Reserve(WorldMap->Territories.Num());
 
   for (ATerritory *Territory : WorldMap->Territories) {
-    if (!Territory) {
+    if (!IsValid(Territory)) {
       continue;
     }
 
@@ -550,7 +550,7 @@ bool USkaldGameInstance::CacheWorldMapSnapshot(UWorld *InWorldContext) {
     TerrData.ContinentID = Territory->ContinentID;
     TerrData.AdjacentIDs.Reset();
     for (ATerritory *Adj : Territory->AdjacentTerritories) {
-      if (Adj) {
+      if (IsValid(Adj)) {
         TerrData.AdjacentIDs.Add(Adj->TerritoryID);
       }
     }
@@ -699,7 +699,7 @@ bool USkaldGameInstance::RestoreWorldFromSnapshot(UWorld *InWorldContext) {
   TMap<int32, ATerritory *> TerritoryById;
   TerritoryById.Reserve(WorldMap->Territories.Num());
   for (ATerritory *Territory : WorldMap->Territories) {
-    if (!Territory) {
+    if (!IsValid(Territory)) {
       continue;
     }
     TerritoryById.Add(Territory->TerritoryID, Territory);
@@ -729,6 +729,10 @@ bool USkaldGameInstance::RestoreWorldFromSnapshot(UWorld *InWorldContext) {
     }
 
     ATerritory *Territory = *FoundTerritory;
+    if (!IsValid(Territory)) {
+      continue;
+    }
+
     Territory->TerritoryName = Snapshot.TerritoryName;
     Territory->ArmyUnits = Snapshot.ArmyUnits;
     Territory->bIsCapital = Snapshot.IsCapital;
@@ -753,7 +757,9 @@ bool USkaldGameInstance::RestoreWorldFromSnapshot(UWorld *InWorldContext) {
     Territory->AdjacentTerritories.Reset();
     for (int32 NeighborId : Snapshot.AdjacentIDs) {
       if (ATerritory *Neighbor = TerritoryById.FindRef(NeighborId)) {
-        Territory->AdjacentTerritories.AddUnique(Neighbor);
+        if (IsValid(Neighbor)) {
+          Territory->AdjacentTerritories.AddUnique(Neighbor);
+        }
       }
     }
 
@@ -824,7 +830,8 @@ bool USkaldGameInstance::RestoreWorldFromSnapshot(UWorld *InWorldContext) {
   }
 
   if (WorldMap->SelectedTerritory &&
-      !TerritoryById.Contains(WorldMap->SelectedTerritory->TerritoryID)) {
+      (!IsValid(WorldMap->SelectedTerritory) ||
+       !TerritoryById.Contains(WorldMap->SelectedTerritory->TerritoryID))) {
     WorldMap->SelectedTerritory = nullptr;
   }
 
