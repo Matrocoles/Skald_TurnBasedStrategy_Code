@@ -271,6 +271,13 @@ void USkaldBattleLevelManager::ReleaseBattleLevel() {
     return;
   }
 
+  if (!bActiveLevelShouldBeLoaded && !bActiveLevelVisibilityRequested &&
+      !bActiveLevelActivationComplete) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("BattleLevelManager: ReleaseBattleLevel ignored; battle level is already unloading"));
+    return;
+  }
+
   if (USkaldGameInstance *GI = OwningInstance.Get()) {
     GI->SetTravelPending(true);
   }
