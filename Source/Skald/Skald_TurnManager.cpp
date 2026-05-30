@@ -573,15 +573,15 @@ void ATurnManager::CompleteBattleConclusion() {
   }
 
   USkaldGameInstance *GI = GetGameInstance<USkaldGameInstance>();
-  if (GI && !GI->bIsInBattleMap) {
+  const bool bHasPendingResolution =
+      GI && GI->bPendingBattleResolution && GI->PendingBattleResolution.bValid;
+  if (GI && !GI->bIsInBattleMap && !bHasPendingResolution) {
     UE_LOG(LogSkald, Verbose,
-           TEXT("CompleteBattleConclusion aborted: streamed battle map already inactive."));
+           TEXT("CompleteBattleConclusion aborted: streamed battle map already inactive and no pending resolution was captured."));
     bBattleConclusionPending = false;
     return;
   }
 
-  const bool bHasPendingResolution =
-      GI && GI->bPendingBattleResolution && GI->PendingBattleResolution.bValid;
   if (bHasPendingResolution) {
     UE_LOG(LogSkald, Verbose,
            TEXT("CompleteBattleConclusion: reusing already captured pending battle resolution."));
