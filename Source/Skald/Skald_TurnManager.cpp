@@ -3894,9 +3894,7 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
   GI->ClearPendingReturnMap();
 
   // Ensure no stale retry timers trigger another battle after resolution
-  if (UWorld *World = GetWorld()) {
-    World->GetTimerManager().ClearTimer(PendingBattleStreamRetryHandle);
-  }
+  World->GetTimerManager().ClearTimer(PendingBattleStreamRetryHandle);
   DeferredPendingBattle = FS_BattlePayload();
 
   const int32 WinningPlayerID = Resolution.WinningPlayerID;
