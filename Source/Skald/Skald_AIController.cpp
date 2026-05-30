@@ -1831,6 +1831,51 @@ AFighterPawn *ASkaldAIController::FindNearestEnemy(AFighterPawn *Fighter) const 
   return BestEnemy;
 }
 
+
+AFighterPawn *ASkaldAIController::FindBestTacticalEnemy(
+    AFighterPawn *Fighter) const {
+  if (!Fighter) {
+    return nullptr;
+  }
+
+  UWorld *World = GetWorld();
+  if (!World) {
+    return nullptr;
+  }
+
+  AFighterPawn *BestEnemy = nullptr;
+  float BestScore = TNumericLimits<float>::Lowest();
+  for (TActorIterator<AFighterPawn> It(World); It; ++It) {
+    AFighterPawn *Candidate = *It;
+    if (!Candidate || Candidate == Fighter || !Candidate->IsAlive() ||
+        ControlsFighter(Candidate)) {
+      continue;
+    }
+
+    const int32 Distance = Fighter->GetFootprintDistanceToFighter(Candidate);
+    const int32 AlliesThreatening = CountAlliesThreateningTarget(Candidate);
+    const int32 ThreatenedAllies =
+        CountEnemiesThreateningAllyNearTarget(Candidate);
+    const float ThreatScore =
+        static_cast<float>(Candidate->Stats.AttackDamage) * 5.f +
+        Candidate->Stats.Strength * 3.f + Candidate->Stats.Health;
+    float Score = ThreatScore - Distance * 8.f;
+    Score += AlliesThreatening * 45.f;
+    Score += ThreatenedAllies * 35.f;
+
+    if (Candidate->Stats.Health <= Fighter->Stats.AttackDamage) {
+      Score += 60.f;
+    }
+
+    if (!BestEnemy || Score > BestScore) {
+      BestScore = Score;
+      BestEnemy = Candidate;
+    }
+  }
+
+  return BestEnemy ? BestEnemy : FindNearestEnemy(Fighter);
+}
+
 bool ASkaldAIController::GatherEnemiesInRange(
     AFighterPawn *Fighter, TArray<AFighterPawn *> &OutTargets) const {
   OutTargets.Reset();
@@ -1874,6 +1919,69 @@ bool ASkaldAIController::GatherEnemiesInRange(
   }
 
   return bFoundTarget;
+}
+
+
+int32 ASkaldAIController::CountAlliesThreateningTarget(
+    const AFighterPawn *Target) const {
+  if (!Target) {
+    return 0;
+  }
+
+  UWorld *World = GetWorld();
+  if (!World) {
+    return 0;
+  }
+
+  int32 Count = 0;
+  for (TActorIterator<AFighterPawn> It(World); It; ++It) {
+    AFighterPawn *Candidate = *It;
+    if (!Candidate || Candidate == Target || !Candidate->IsAlive() ||
+        !ControlsFighter(Candidate)) {
+      continue;
+    }
+
+    const int32 Range = FMath::Max(1, Candidate->Stats.AttackRange);
+    if (Candidate->GetFootprintDistanceToFighter(Target) > Range) {
+      continue;
+    }
+
+    UGridOverlayComponent *Grid = Candidate->GetGrid();
+    if (Grid && !Candidate->HasLineOfSightToFighter(Target, Range, Grid)) {
+      continue;
+    }
+
+    ++Count;
+  }
+
+  return Count;
+}
+
+int32 ASkaldAIController::CountEnemiesThreateningAllyNearTarget(
+    const AFighterPawn *Target) const {
+  if (!Target) {
+    return 0;
+  }
+
+  UWorld *World = GetWorld();
+  if (!World) {
+    return 0;
+  }
+
+  int32 Count = 0;
+  for (TActorIterator<AFighterPawn> It(World); It; ++It) {
+    AFighterPawn *Ally = *It;
+    if (!Ally || !Ally->IsAlive() || !ControlsFighter(Ally)) {
+      continue;
+    }
+
+    const int32 AllyThreatRange = FMath::Max(1, Target->Stats.AttackRange);
+    if (Target->GetFootprintDistanceToFighter(Ally) <= AllyThreatRange) {
+      ++Count;
+    }
+  }
+
+  return Count;
 }
 
 float ASkaldAIController::EvaluateAttackTargetScore(
@@ -1933,6 +2041,16 @@ float ASkaldAIController::EvaluateAttackTargetScoreInternal(
   Score += EffectiveAttackerStats.AttackDice * 5.f;
   Score += EffectiveAttackerStats.Strength * 2.f;
   Score += FMath::Min(Attacker->ActionsRemaining, 3) * 6.f;
+
+  const int32 AlliesThreatening = CountAlliesThreateningTarget(Target);
+  if (AlliesThreatening > 0) {
+    Score += AlliesThreatening * 30.f;
+  }
+
+  const int32 ThreatenedAllies = CountEnemiesThreateningAllyNearTarget(Target);
+  if (ThreatenedAllies > 0) {
+    Score += ThreatenedAllies * 20.f;
+  }
   Score += FMath::Min(Target->ActionsRemaining, 3) * 4.f;
 
   if (bIncludeRandom) {
@@ -2123,13 +2241,22 @@ ASkaldAIController::TryUseFactionAbilityBeforeAttack(AFighterPawn *Fighter,
       ResolveAIAbilityTargeting(AbilityId);
 
   FText FailureReason;
+  if (Targeting.CommandMode == EBattleCommandMode::AbilityTargetEnemy) {
+    FSkaldAbilityContext AbilityContext;
+    AbilityContext.AbilityId = AbilityId;
+    AbilityContext.TargetFighter = Target;
+    AbilityComponent->SetPendingAbilityContext(AbilityContext);
+  }
+
   if (!AbilityComponent->CanActivateAbility(ESkaldAbilitySlot::Ability1,
                                             &FailureReason)) {
+    AbilityComponent->ClearPendingAbilityContext();
     return EAIAttackAbilityResult::None;
   }
 
   if (!ShouldTriggerAbilityForAttack(Fighter, Target, *AbilityState,
                                      Targeting)) {
+    AbilityComponent->ClearPendingAbilityContext();
     return EAIAttackAbilityResult::None;
   }
 
@@ -2139,6 +2266,7 @@ ASkaldAIController::TryUseFactionAbilityBeforeAttack(AFighterPawn *Fighter,
            TEXT("[AI] Failed to trigger ability %s for %s: %s"),
            *AbilityId.ToString(), *Fighter->GetHumanReadableName(),
            *FailureReason.ToString());
+    AbilityComponent->ClearPendingAbilityContext();
     return EAIAttackAbilityResult::None;
   }
 
@@ -2187,7 +2315,8 @@ bool ASkaldAIController::TryUseMovementAbility(AFighterPawn *Fighter,
 
   const FSkaldAbilityTargetingInfo Targeting =
       ResolveAIAbilityTargeting(AbilityId);
-  if (Targeting.CommandMode != EBattleCommandMode::None) {
+  if (Targeting.CommandMode != EBattleCommandMode::None &&
+      Targeting.CommandMode != EBattleCommandMode::AbilityTargetEnemy) {
     return false;
   }
 
@@ -2211,13 +2340,21 @@ bool ASkaldAIController::TryUseMovementAbility(AFighterPawn *Fighter,
     ExpectedBonus = 2;
   }
 
-  if (Distance > Fighter->Stats.Movement + ExpectedBonus) {
+  if (Distance > Fighter->Stats.Movement + ExpectedBonus + AttackRange) {
     return false;
+  }
+
+  if (Targeting.CommandMode == EBattleCommandMode::AbilityTargetEnemy) {
+    FSkaldAbilityContext AbilityContext;
+    AbilityContext.AbilityId = AbilityId;
+    AbilityContext.TargetFighter = Target;
+    AbilityComponent->SetPendingAbilityContext(AbilityContext);
   }
 
   FText FailureReason;
   if (!AbilityComponent->CanActivateAbility(ESkaldAbilitySlot::Ability1,
                                             &FailureReason)) {
+    AbilityComponent->ClearPendingAbilityContext();
     return false;
   }
 
@@ -2227,6 +2364,7 @@ bool ASkaldAIController::TryUseMovementAbility(AFighterPawn *Fighter,
            TEXT("[AI] Failed to trigger movement ability %s for %s: %s"),
            *AbilityId.ToString(), *Fighter->GetHumanReadableName(),
            *FailureReason.ToString());
+    AbilityComponent->ClearPendingAbilityContext();
     return false;
   }
 
@@ -2504,7 +2642,7 @@ bool ASkaldAIController::TryMoveTowardsNearestEnemy(AFighterPawn *Fighter) {
     return false;
   }
 
-  AFighterPawn *Enemy = FindNearestEnemy(Fighter);
+  AFighterPawn *Enemy = FindBestTacticalEnemy(Fighter);
   if (!Enemy) {
     return false;
   }

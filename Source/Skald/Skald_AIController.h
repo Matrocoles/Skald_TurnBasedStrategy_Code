@@ -162,6 +162,7 @@ private:
 
   AFighterPawn *FindNextFriendlyFighter(bool bExpectAttacker) const;
   AFighterPawn *FindNearestEnemy(AFighterPawn *Fighter) const;
+  AFighterPawn *FindBestTacticalEnemy(AFighterPawn *Fighter) const;
   AFighterPawn *FindBestAttackTarget(AFighterPawn *Fighter) const;
   float EvaluateAttackTargetScore(const AFighterPawn *Attacker,
                                   const AFighterPawn *Target) const;
@@ -170,6 +171,8 @@ private:
                                           bool bIncludeRandom) const;
   bool GatherEnemiesInRange(AFighterPawn *Fighter,
                             TArray<AFighterPawn *> &OutTargets) const;
+  int32 CountAlliesThreateningTarget(const AFighterPawn *Target) const;
+  int32 CountEnemiesThreateningAllyNearTarget(const AFighterPawn *Target) const;
   bool TryAttackNearestEnemy(AFighterPawn *Fighter);
   bool TryMoveTowardsNearestEnemy(AFighterPawn *Fighter);
   bool TryMoveTowardsSupportAlly(AFighterPawn *Fighter);

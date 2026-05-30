@@ -159,6 +159,16 @@ constexpr const TCHAR *PendingBattlePhaseError =
     TEXT("Cannot end the phase while a battle is awaiting confirmation.");
 
 constexpr float FighterDeathEffectHeightOffset = 120.f;
+
+namespace {
+
+bool IsImmediateMovementAbilityId(const FName &AbilityId) {
+  return AbilityId == TEXT("Ability_Orc_Skirmish") ||
+         AbilityId == TEXT("Ability_Goblin_Elite");
+}
+
+} // namespace
+
 constexpr int32 VeilStepRange = 3;
 const FColor VeilStepHighlightColor(128, 64, 255, 215);
 const FName VeilStepAbilityId(TEXT("Ability_Elf_Skirmish"));
@@ -509,7 +519,26 @@ bool ASkaldPlayerController::TryUseAbilitySlot(ESkaldAbilitySlot Slot) {
                                "Cannot trigger abilities on enemy fighters.");
   } else if (USkaldAbilityComponent *AbilityComponent =
                  SelectedFighter->GetAbilityComponent()) {
+    const FSkaldAbilityState *AbilityState =
+        AbilityComponent->FindAbilityState(Slot);
+    const FName AbilityId = AbilityState && AbilityState->Definition.IsValid()
+                                ? AbilityState->Definition.AbilityId
+                                : NAME_None;
+    const ESkaldAbilityCostType CostType =
+        AbilityState && AbilityState->Definition.IsValid()
+            ? AbilityState->Definition.CostType
+            : ESkaldAbilityCostType::Free;
+
     if (AbilityComponent->TryBeginAbility(Slot, FailureReason)) {
+      if (IsImmediateMovementAbilityId(AbilityId)) {
+        if (CostType == ESkaldAbilityCostType::Action) {
+          SelectedFighter->TryRestoreAction();
+        }
+        if (SelectedFighter->IsCurrentlyActive()) {
+          LockedActiveFighter = SelectedFighter;
+          BeginMoveMode();
+        }
+      }
       UpdateBattleHUDButtons();
       return true;
     }
@@ -1081,8 +1110,10 @@ FSkaldAbilityTargetingInfo ASkaldPlayerController::GetAbilityTargetingInfo(
        {EBattleCommandMode::AbilityTargetAlly, 1, false}},
       {TEXT("Ability_Human_Elite"),
        {EBattleCommandMode::AbilityTargetAlly, 5, false, false, false, false}},
+      // Brutal Charge is consumed first, then immediately hands the fighter
+      // back to normal movement with its temporary Movement bonus applied.
       {TEXT("Ability_Orc_Skirmish"),
-       {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
+       {EBattleCommandMode::None, INDEX_NONE}},
       {TEXT("Ability_Inflicted_Skirmish"),
        {EBattleCommandMode::AbilityTargetEnemy, INDEX_NONE}},
       {TEXT("Ability_Ravpack_Skirmish"),
