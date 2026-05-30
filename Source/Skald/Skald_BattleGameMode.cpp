@@ -1910,6 +1910,11 @@ void ASkald_BattleGameMode::SpawnFighterSide(const TArray<FFighterDefinition> &R
     FActorSpawnParameters Params;
     Params.SpawnCollisionHandlingOverride =
         ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+    // Spawn tactical fighters into the streamed battle level, not the persistent
+    // overworld. Without an override, SpawnActor places them in the persistent
+    // root, so unloading the battle sublevel leaves fighters behind on the
+    // overview map.
+    Params.OverrideLevel = GetLevel();
 
     AFighterPawn *Pawn = GetWorld()->SpawnActor<AFighterPawn>(
         DesiredClass, SpawnLoc, FRotator::ZeroRotator, Params);
