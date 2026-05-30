@@ -278,6 +278,9 @@ void USkaldBattleLevelManager::ReleaseBattleLevel() {
   if (ULevelStreaming *StreamingLevel = ActiveStreamingLevel.Get()) {
     StreamingLevel->SetShouldBeVisible(false);
     StreamingLevel->SetShouldBeLoaded(false);
+    if (UWorld *World = StreamingLevel->GetWorld()) {
+      World->UpdateLevelStreaming();
+    }
   }
 
   bActiveLevelShouldBeLoaded = false;
@@ -762,11 +765,16 @@ void USkaldBattleLevelManager::HideNonBattleLevels() {
       LevelLabel = OtherLevel->GetWorldAsset().ToSoftObjectPath().ToString();
     }
 
-    OtherLevel->SetShouldBeLoaded(false);
+    // Keep overworld streaming levels loaded while the battle map is visible.
+    // Runtime territories are spawned/owned by the overview map and unloading the
+    // overview level destroys them, causing the return transition to briefly show
+    // an empty table and forcing reconstruction from cached snapshots.  Hiding
+    // visibility/collision is enough to make the tactical map feel isolated, and
+    // restoring visibility after the battle is immediate/seamless.
     OtherLevel->SetShouldBeVisible(false);
     UE_LOG(LogSkald, Verbose,
-           TEXT("BattleLevelManager: Hiding streaming level %s while battle map active"),
-           *LevelLabel);
+           TEXT("BattleLevelManager: Hiding streaming level %s while battle map active (kept loaded=%d)"),
+           *LevelLabel, State.bWasLoaded ? 1 : 0);
   }
 
   HiddenPersistentLevel.Reset();
@@ -865,6 +873,10 @@ void USkaldBattleLevelManager::RestoreNonBattleLevels() {
       Actor->SetActorEnableCollision(State.bHadCollision);
       Actor->SetActorTickEnabled(State.bWasTickEnabled);
     }
+  }
+
+  if (StreamingWorld) {
+    StreamingWorld->UpdateLevelStreaming();
   }
 
   HiddenPersistentActors.Reset();

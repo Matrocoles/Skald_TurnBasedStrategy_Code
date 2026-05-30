@@ -275,6 +275,9 @@ bool AWorldMap::GenerateTerritoriesFromTable() {
 
     FActorSpawnParameters Params;
     Params.Owner = this;
+    // Keep generated territory actors in the same level as their WorldMap so
+    // overview visibility/streaming transitions move the map as one unit.
+    Params.OverrideLevel = GetLevel();
     ATerritory *Territory = GetWorld()->SpawnActor<ATerritory>(
         TerritoryClass, SpawnLocation, FRotator::ZeroRotator, Params);
     if (Territory) {
