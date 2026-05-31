@@ -537,15 +537,8 @@ void ASkaldAIController::ProcessCurrentPhase() {
     SchedulePhaseAdvance(EnemyTurnStepDelay);
     return;
   } else if (Phase == ETurnPhase::Movement) {
-    const bool bMoved = ExecuteStrategicMovement(WorldMap, PS);
-    if (bMoved) {
-      const float MoveDelay =
-          FMath::Max(EnemyTurnStepDelay * StrategyPlanningDelayFraction,
-                     MinimumStrategyPlanningDelay);
-      ScheduleNextDecisionStep(MoveDelay);
-    } else {
-      SchedulePhaseAdvance(EnemyTurnStepDelay);
-    }
+    ExecuteStrategicMovement(WorldMap, PS);
+    SchedulePhaseAdvance(EnemyTurnStepDelay);
     return;
   } else if (Phase == ETurnPhase::EndTurn) {
     SchedulePhaseAdvance(EnemyTurnStepDelay);
@@ -1301,17 +1294,92 @@ bool ASkaldAIController::ExecuteStrategicMovement(AWorldMap *WorldMap,
     return false;
   }
 
-  const int32 PlayerID = InPlayerState->GetPlayerId();
+  int32 PlayerID = InPlayerState->GetStablePlayerId();
+  if (PlayerID <= 0) {
+    PlayerID = InPlayerState->GetPlayerId();
+  }
+
   if (PlayerID <= 0 ||
       TurnManager->GetMovementActionsRemaining(PlayerID) <= 0) {
     return false;
   }
+
+  RefreshStrategicContext(WorldMap, InPlayerState);
 
   struct FMovementOption {
     ATerritory *Source = nullptr;
     ATerritory *Target = nullptr;
     float Score = 0.f;
     int32 UnitsToMove = 0;
+  };
+
+  const auto IsBorder = [this](ATerritory *Territory) {
+    return CachedStrategicContext.BorderTerritories.Contains(Territory);
+  };
+
+  const auto IsCapitalDefense = [this](ATerritory *Territory) {
+    return Territory == CachedStrategicContext.Capital ||
+           CachedStrategicContext.CapitalDefenseRing.Contains(Territory);
+  };
+
+  const auto ComputeMovementPriority = [this, &IsBorder, &IsCapitalDefense](
+                                           ATerritory *Territory) {
+    if (!Territory) {
+      return 0.f;
+    }
+
+    const int32 EnemyPressure =
+        CachedStrategicContext.EnemyPressure.FindRef(Territory);
+    const bool bBorder = IsBorder(Territory);
+    const bool bCapitalDefense = IsCapitalDefense(Territory);
+    const bool bEnemyCapitalApproach =
+        CachedStrategicContext.EnemyCapitalApproach.Contains(Territory);
+
+    float Priority = 0.f;
+    switch (CurrentStrategy) {
+    case EAIStrategy::Offensive:
+      Priority += bEnemyCapitalApproach ? 65.f : 0.f;
+      Priority += bBorder ? 35.f : 0.f;
+      Priority += static_cast<float>(EnemyPressure) * 2.f;
+      Priority += bCapitalDefense ? 10.f : 0.f;
+      break;
+    case EAIStrategy::Defensive:
+      Priority += Territory == CachedStrategicContext.Capital ? 90.f : 0.f;
+      Priority += CachedStrategicContext.CapitalDefenseRing.Contains(Territory)
+                      ? 45.f
+                      : 0.f;
+      Priority += bBorder ? 30.f : 0.f;
+      Priority += static_cast<float>(EnemyPressure) * 4.f;
+      break;
+    case EAIStrategy::Hybrid:
+    default:
+      Priority += bEnemyCapitalApproach ? 35.f : 0.f;
+      Priority += bCapitalDefense ? 30.f : 0.f;
+      Priority += bBorder ? 25.f : 0.f;
+      Priority += static_cast<float>(EnemyPressure) * 3.f;
+      break;
+    }
+
+    return Priority;
+  };
+
+  const auto ComputeSourceReserve = [this, &IsBorder, &IsCapitalDefense](
+                                        ATerritory *Territory) {
+    if (!Territory) {
+      return 1;
+    }
+
+    const int32 EnemyPressure =
+        CachedStrategicContext.EnemyPressure.FindRef(Territory);
+    int32 Reserve = 1;
+    if (IsBorder(Territory)) {
+      Reserve = FMath::Max(Reserve, EnemyPressure + 1);
+    }
+    if (IsCapitalDefense(Territory)) {
+      Reserve = FMath::Max(Reserve, EnemyPressure + 2);
+    }
+
+    return FMath::Clamp(Reserve, 1, Territory->ArmyUnits);
   };
 
   FMovementOption BestOption;
@@ -1324,74 +1392,46 @@ bool ASkaldAIController::ExecuteStrategicMovement(AWorldMap *WorldMap,
       continue;
     }
 
+    const int32 SourceReserve = ComputeSourceReserve(Source);
+    const int32 MaxMovable = Source->ArmyUnits - SourceReserve;
+    if (MaxMovable <= 0) {
+      continue;
+    }
+
+    const float SourcePriority = ComputeMovementPriority(Source);
     const int32 SourceEnemyPressure =
         CachedStrategicContext.EnemyPressure.FindRef(Source);
-    const bool bSourceBorder =
-        CachedStrategicContext.BorderTerritories.Contains(Source);
 
-    for (ATerritory *Neighbor : Source->AdjacentTerritories) {
-      if (!Neighbor || Neighbor->OwningPlayer != InPlayerState) {
+    for (ATerritory *Target : CachedStrategicContext.OwnedTerritories) {
+      if (!Target || Target == Source || Target->OwningPlayer != InPlayerState) {
         continue;
       }
 
+      TArray<ATerritory *> Path;
+      if (!WorldMap->FindPath(Source, Target, Path) || Path.Num() < 2) {
+        continue;
+      }
+
+      const float TargetPriority = ComputeMovementPriority(Target);
       const int32 TargetEnemyPressure =
-          CachedStrategicContext.EnemyPressure.FindRef(Neighbor);
-      const bool bTargetBorder =
-          CachedStrategicContext.BorderTerritories.Contains(Neighbor);
-
-      float Score = 0.f;
-      switch (CurrentStrategy) {
-      case EAIStrategy::Offensive:
-        Score = (TargetEnemyPressure - SourceEnemyPressure) * 2.f;
-        Score += bTargetBorder ? 20.f : 0.f;
-        Score +=
-            CachedStrategicContext.EnemyCapitalApproach.Contains(Neighbor)
-                ? 25.f
-                : 0.f;
-        Score += !bSourceBorder ? 10.f : 0.f;
-        break;
-      case EAIStrategy::Defensive:
-        if (Source == CachedStrategicContext.Capital) {
-          continue;
-        }
-        Score = (SourceEnemyPressure - TargetEnemyPressure) * 2.f;
-        Score += Neighbor == CachedStrategicContext.Capital ? 60.f : 0.f;
-        Score += CachedStrategicContext.CapitalDefenseRing.Contains(Neighbor)
-                     ? 25.f
-                     : 0.f;
-        Score += static_cast<float>(TargetEnemyPressure) * 1.5f;
-        break;
-      case EAIStrategy::Hybrid:
-      default:
-        Score = (TargetEnemyPressure - SourceEnemyPressure) * 1.5f;
-        Score += bTargetBorder ? 15.f : 0.f;
-        Score += Neighbor == CachedStrategicContext.Capital ? 25.f : 0.f;
-        break;
-      }
-
-      if (Score <= 0.f) {
+          CachedStrategicContext.EnemyPressure.FindRef(Target);
+      const float PriorityDelta = TargetPriority - SourcePriority;
+      if (PriorityDelta <= 0.f) {
         continue;
       }
 
-      const int32 MaxMovable = Source->ArmyUnits - 1;
-      if (MaxMovable <= 0) {
-        continue;
-      }
-
+      const int32 TargetNeed = FMath::Max(1, TargetEnemyPressure + 1);
       int32 UnitsToMove = 0;
       switch (CurrentStrategy) {
       case EAIStrategy::Offensive:
-        UnitsToMove = FMath::Clamp(TargetEnemyPressure + 2, 1, MaxMovable);
+        UnitsToMove = FMath::Clamp(TargetNeed + 1, 1, MaxMovable);
         break;
       case EAIStrategy::Defensive:
-        UnitsToMove = Neighbor == CachedStrategicContext.Capital
-                           ? MaxMovable
-                           : FMath::Clamp(TargetEnemyPressure + 1, 1, MaxMovable);
-        UnitsToMove = FMath::Min(UnitsToMove, MaxMovable);
+        UnitsToMove = FMath::Clamp(TargetNeed, 1, MaxMovable);
         break;
       case EAIStrategy::Hybrid:
       default:
-        UnitsToMove = FMath::Clamp((TargetEnemyPressure + MaxMovable) / 2, 1,
+        UnitsToMove = FMath::Clamp((TargetNeed + MaxMovable) / 2, 1,
                                    MaxMovable);
         break;
       }
@@ -1400,9 +1440,13 @@ bool ASkaldAIController::ExecuteStrategicMovement(AWorldMap *WorldMap,
         continue;
       }
 
+      const float Score = PriorityDelta * 10.f +
+                          static_cast<float>(MaxMovable) * 1.5f -
+                          static_cast<float>(SourceEnemyPressure) +
+                          (Path.Num() == 2 ? 5.f : 0.f);
       if (!bFoundOption || Score > BestOption.Score) {
         BestOption.Source = Source;
-        BestOption.Target = Neighbor;
+        BestOption.Target = Target;
         BestOption.Score = Score;
         BestOption.UnitsToMove = UnitsToMove;
         bFoundOption = true;
@@ -1414,9 +1458,20 @@ bool ASkaldAIController::ExecuteStrategicMovement(AWorldMap *WorldMap,
     return false;
   }
 
-  HandleMoveRequested(BestOption.Source->TerritoryID,
-                      BestOption.Target->TerritoryID,
-                      BestOption.UnitsToMove);
+  if (!WorldMap->MoveBetween(BestOption.Source, BestOption.Target,
+                             BestOption.UnitsToMove)) {
+    UE_LOG(LogSkald, Warning,
+           TEXT("AI strategic movement failed from territory %d to %d with %d troops"),
+           BestOption.Source->TerritoryID, BestOption.Target->TerritoryID,
+           BestOption.UnitsToMove);
+    return false;
+  }
+
+  TurnManager->RecordMovementAction(PlayerID);
+  UE_LOG(LogSkald, Log,
+         TEXT("AI moved %d troops from territory %d to connected territory %d"),
+         BestOption.UnitsToMove, BestOption.Source->TerritoryID,
+         BestOption.Target->TerritoryID);
   return true;
 }
 
