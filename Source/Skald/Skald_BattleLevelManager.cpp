@@ -522,12 +522,12 @@ void USkaldBattleLevelManager::HandleLevelLoaded() {
   }
 }
 
-void USkaldBattleLevelManager::HandleLevelUnloaded() {
+void USkaldBattleLevelManager::HandleLevelUnloaded(bool bRequestStreamingUpdate) {
   UE_LOG(LogSkald, Log, TEXT("BattleLevelManager: Battle level unloaded"));
 
   UnregisterWorldDelegates();
   UnregisterStreamingTicker();
-  RestoreNonBattleLevels();
+  RestoreNonBattleLevels(bRequestStreamingUpdate);
   RestoreLocalBattleCameraStates();
 
   bActiveLevelShouldBeLoaded = false;
@@ -568,7 +568,12 @@ void USkaldBattleLevelManager::HandleLevelRemovedFromWorld(ULevel *InLevel,
     return;
   }
 
-  HandleLevelUnloaded();
+  // This delegate is broadcast while UWorld::RemoveFromWorld is already
+  // inside a level-streaming update.  Requesting another UpdateLevelStreaming
+  // from the restore path re-enters RemoveFromWorld and can leave the engine
+  // unregistering components against an invalid world pointer.  Restore the
+  // desired flags now and let the in-flight streaming update continue naturally.
+  HandleLevelUnloaded(false);
 }
 
 bool USkaldBattleLevelManager::DoesEventMatchActiveLevel(ULevel *InLevel,
@@ -829,7 +834,7 @@ void USkaldBattleLevelManager::HideNonBattleLevels() {
   }
 }
 
-void USkaldBattleLevelManager::RestoreNonBattleLevels() {
+void USkaldBattleLevelManager::RestoreNonBattleLevels(bool bRequestStreamingUpdate) {
   if (!HiddenStreamingLevels.Num() && !HiddenPersistentLevel.IsValid() &&
       !HiddenPersistentActors.Num()) {
     CachedStreamingWorld.Reset();
@@ -882,7 +887,7 @@ void USkaldBattleLevelManager::RestoreNonBattleLevels() {
     }
   }
 
-  if (StreamingWorld) {
+  if (bRequestStreamingUpdate && StreamingWorld) {
     StreamingWorld->UpdateLevelStreaming();
   }
 
