@@ -117,6 +117,12 @@ void ATerritory::BeginPlay() {
   }
 
   if (MeshComponent) {
+    MeshComponent->OnBeginCursorOver.RemoveDynamic(
+        this, &ATerritory::HandleMouseEnter);
+    MeshComponent->OnEndCursorOver.RemoveDynamic(
+        this, &ATerritory::HandleMouseLeave);
+    MeshComponent->OnClicked.RemoveDynamic(this, &ATerritory::HandleClicked);
+
     MeshComponent->OnBeginCursorOver.AddDynamic(this,
                                                 &ATerritory::HandleMouseEnter);
     MeshComponent->OnEndCursorOver.AddDynamic(this,
@@ -197,6 +203,14 @@ void ATerritory::Deselect() {
 }
 
 void ATerritory::EndPlay(const EEndPlayReason::Type Reason) {
+  if (MeshComponent) {
+    MeshComponent->OnBeginCursorOver.RemoveDynamic(
+        this, &ATerritory::HandleMouseEnter);
+    MeshComponent->OnEndCursorOver.RemoveDynamic(
+        this, &ATerritory::HandleMouseLeave);
+    MeshComponent->OnClicked.RemoveDynamic(this, &ATerritory::HandleClicked);
+  }
+
   if (AWorldMap *Map = Cast<AWorldMap>(GetOwner())) {
     if (Map->SelectedTerritory == this) {
       Map->SelectTerritory(nullptr, false);
