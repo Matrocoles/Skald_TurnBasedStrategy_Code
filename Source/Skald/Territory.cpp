@@ -235,18 +235,30 @@ void ATerritory::Select(int32 SelectingPlayerId) {
   }
 
   bIsSelected = true;
-  UpdateSelectionVisuals(bShouldShow);
+  UpdateSelectionVisuals(bShouldShow || bLocalVisualSelectionActive);
 }
 
 void ATerritory::Deselect() {
   bIsSelected = false;
   LastSelectingPlayerId = INDEX_NONE;
-  UpdateSelectionVisuals(false);
+  UpdateSelectionVisuals(bLocalVisualSelectionActive);
   if (AWorldMap *Map = Cast<AWorldMap>(GetOwner())) {
     if (Map->SelectedTerritory == this) {
       Map->SelectedTerritory = nullptr;
     }
   }
+}
+
+void ATerritory::SetLocalVisualSelection(bool bEnabled) {
+  if (bLocalVisualSelectionActive == bEnabled) {
+    return;
+  }
+
+  bLocalVisualSelectionActive = bEnabled;
+  const bool bReplicatedSelectionVisible =
+      bIsSelected && ShouldShowSelectionVisuals(LastSelectingPlayerId);
+  UpdateSelectionVisuals(bLocalVisualSelectionActive ||
+                         bReplicatedSelectionVisible);
 }
 
 void ATerritory::EndPlay(const EEndPlayReason::Type Reason) {
@@ -551,6 +563,10 @@ bool ATerritory::ShouldShowSelectionVisuals(int32 SelectingPlayerId) const {
 }
 
 bool ATerritory::IsSelectionVisibleToLocalPlayer() const {
+  if (bLocalVisualSelectionActive) {
+    return true;
+  }
+
   if (!bIsSelected) {
     return false;
   }

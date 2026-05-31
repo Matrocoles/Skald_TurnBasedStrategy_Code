@@ -1060,6 +1060,9 @@ private:
   /** Queued territory selection to replay once the world map finishes spawning. */
   int32 PendingTerritorySelectionId = INDEX_NONE;
 
+  /** Territory highlighted locally while inspecting the map outside our turn. */
+  TWeakObjectPtr<ATerritory> VisualOnlySelectedTerritory;
+
   /** Timer used to poll for world map readiness after an early selection arrives. */
   FTimerHandle PendingTerritorySelectionHandle;
 
