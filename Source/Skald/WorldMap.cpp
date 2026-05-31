@@ -850,6 +850,7 @@ int32 AWorldMap::AutoPlaceUnitsForAI(ASkaldPlayerState *PlayerState) {
   int32 Remaining = PlayerState->DeployableUnits;
   int32 Index = 0;
   int32 ConsecutiveSkips = 0;
+  TMap<ATerritory *, int32> DeploymentsByTerritory;
 
   const int32 MaxPerTerritory = Skald::ArmyPlacement::DeployPerTerritoryLimit;
 
@@ -880,10 +881,17 @@ int32 AWorldMap::AutoPlaceUnitsForAI(ASkaldPlayerState *PlayerState) {
 
     ++Target->ArmyUnits;
     Target->RefreshAppearance();
+    DeploymentsByTerritory.FindOrAdd(Target) += 1;
     ++UnitsPlaced;
     --Remaining;
     PlayerState->AddArmyPlacementDeployment(TerritoryId, 1);
     ++Index;
+  }
+
+  for (const TPair<ATerritory *, int32> &Deployment : DeploymentsByTerritory) {
+    if (Deployment.Key) {
+      Deployment.Key->MulticastShowDeploymentFloat(Deployment.Value);
+    }
   }
 
   PlayerState->DeployableUnits = Remaining;
@@ -1009,6 +1017,7 @@ int32 AWorldMap::DistributeUnplacedArmyPlacementUnits(
 
     Territory->ArmyUnits += Assignment.Value;
     Territory->RefreshAppearance();
+    Territory->MulticastShowDeploymentFloat(Assignment.Value);
   }
 
   Remaining = FMath::Max(Remaining, 0);

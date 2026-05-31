@@ -17,6 +17,7 @@
 #include "Skald_PlayerController.h"
 #include "Skald_PlayerState.h"
 #include "Skald_GameInstance.h"
+#include "Skald_GameState.h"
 #include "UObject/ConstructorHelpers.h"
 #include "WorldMap.h"
 
@@ -35,7 +36,8 @@ FLinearColor ResolveFactionColor(const UObject *WorldContext,
 } // namespace
 
 ATerritory::ATerritory() {
-  PrimaryActorTick.bCanEverTick = false;
+  PrimaryActorTick.bCanEverTick = true;
+  PrimaryActorTick.bStartWithTickEnabled = false;
   bReplicates = true;
   MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
   MeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
@@ -69,6 +71,18 @@ ATerritory::ATerritory() {
   LabelComponent->SetRelativeLocation(FVector(0.f, 0.f, 100.f));
   LabelComponent->SetText(FText::GetEmpty());
 
+  DeploymentFloatComponent =
+      CreateDefaultSubobject<UTextRenderComponent>(TEXT("DeploymentFloat"));
+  DeploymentFloatComponent->SetupAttachment(RootComponent);
+  DeploymentFloatComponent->SetHorizontalAlignment(EHTA_Center);
+  DeploymentFloatComponent->SetVerticalAlignment(EVRTA_TextCenter);
+  DeploymentFloatComponent->SetRelativeLocation(DeploymentFloatBaseOffset);
+  DeploymentFloatComponent->SetWorldSize(24.f);
+  DeploymentFloatComponent->SetText(FText::GetEmpty());
+  DeploymentFloatComponent->SetTextRenderColor(FColor::Green);
+  DeploymentFloatComponent->SetVisibility(false);
+  DeploymentFloatComponent->SetHiddenInGame(true);
+
   SelectionDecal = CreateDefaultSubobject<UDecalComponent>(TEXT("SelectionDecal"));
   if (SelectionDecal) {
     SelectionDecal->SetupAttachment(RootComponent);
@@ -101,6 +115,11 @@ void ATerritory::BeginPlay() {
   Super::BeginPlay();
 
   ApplySelectionDecalMaterial();
+  if (DeploymentFloatComponent) {
+    DeploymentFloatComponent->SetRelativeLocation(DeploymentFloatBaseOffset);
+    DeploymentFloatComponent->SetVisibility(false);
+    DeploymentFloatComponent->SetHiddenInGame(true);
+  }
 
   if (!CapitalMesh) {
     CapitalMesh = NewObject<UStaticMeshComponent>(this, TEXT("CapitalMesh"));
@@ -159,6 +178,34 @@ void ATerritory::BeginPlay() {
     if (!WorldMap->Territories.Contains(this)) {
       WorldMap->RegisterTerritory(this);
     }
+  }
+}
+
+void ATerritory::Tick(float DeltaSeconds) {
+  Super::Tick(DeltaSeconds);
+
+  if (!bDeploymentFloatActive || !DeploymentFloatComponent) {
+    SetActorTickEnabled(false);
+    return;
+  }
+
+  const float Duration = FMath::Max(DeploymentFloatDuration, KINDA_SMALL_NUMBER);
+  DeploymentFloatElapsed += DeltaSeconds;
+  const float Alpha = FMath::Clamp(DeploymentFloatElapsed / Duration, 0.f, 1.f);
+
+  FVector FloatOffset = DeploymentFloatBaseOffset;
+  FloatOffset.Z += DeploymentFloatRiseDistance * Alpha;
+  DeploymentFloatComponent->SetRelativeLocation(FloatOffset);
+
+  const uint8 TextAlpha =
+      static_cast<uint8>(FMath::RoundToInt(255.f * (1.f - Alpha)));
+  DeploymentFloatComponent->SetTextRenderColor(FColor(80, 255, 80, TextAlpha));
+
+  if (DeploymentFloatElapsed >= Duration) {
+    bDeploymentFloatActive = false;
+    DeploymentFloatComponent->SetVisibility(false);
+    DeploymentFloatComponent->SetHiddenInGame(true);
+    SetActorTickEnabled(false);
   }
 }
 
@@ -360,6 +407,28 @@ void ATerritory::RefreshAppearance() {
   }
 }
 
+void ATerritory::ShowDeploymentFloat(int32 UnitsAdded) {
+  if (UnitsAdded <= 0 || !DeploymentFloatComponent ||
+      GetNetMode() == NM_DedicatedServer) {
+    return;
+  }
+
+  DeploymentFloatElapsed = 0.f;
+  bDeploymentFloatActive = true;
+
+  DeploymentFloatComponent->SetText(
+      FText::FromString(FString::Printf(TEXT("+%d"), UnitsAdded)));
+  DeploymentFloatComponent->SetRelativeLocation(DeploymentFloatBaseOffset);
+  DeploymentFloatComponent->SetTextRenderColor(FColor(80, 255, 80, 255));
+  DeploymentFloatComponent->SetVisibility(true);
+  DeploymentFloatComponent->SetHiddenInGame(false);
+  SetActorTickEnabled(true);
+}
+
+void ATerritory::MulticastShowDeploymentFloat_Implementation(int32 UnitsAdded) {
+  ShowDeploymentFloat(UnitsAdded);
+}
+
 void ATerritory::OnRep_OwningPlayer() { RefreshAppearance(); }
 
 void ATerritory::OnRep_IsCapital() { RefreshAppearance(); }
@@ -451,6 +520,10 @@ bool ATerritory::ShouldShowSelectionVisuals(int32 SelectingPlayerId) const {
     return false;
   }
 
+  const ASkaldGameState *SkaldGameState = World->GetGameState<ASkaldGameState>();
+  const bool bSelectingPlayerHasTurn =
+      SkaldGameState && SkaldGameState->ActivePlayerId == SelectingPlayerId;
+
   for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It;
        ++It) {
     const APlayerController *PC = It->Get();
@@ -463,7 +536,13 @@ bool ATerritory::ShouldShowSelectionVisuals(int32 SelectingPlayerId) const {
       continue;
     }
 
-    if (PS->GetStablePlayerId() == SelectingPlayerId) {
+    const int32 LocalStableId = PS->GetStablePlayerId();
+    if (LocalStableId == SelectingPlayerId) {
+      return true;
+    }
+
+    if (bSelectingPlayerHasTurn && LocalStableId != INDEX_NONE &&
+        LocalStableId != SelectingPlayerId) {
       return true;
     }
   }

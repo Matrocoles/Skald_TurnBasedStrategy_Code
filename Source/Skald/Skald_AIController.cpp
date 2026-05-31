@@ -939,6 +939,7 @@ void ASkaldAIController::HandleArmyPlacementAnimationStep() {
     if (UnitsToDeploy > 0) {
       Target->ArmyUnits += UnitsToDeploy;
       Target->RefreshAppearance();
+      Target->MulticastShowDeploymentFloat(UnitsToDeploy);
       AnimatedPlayerState->DeployableUnits -= UnitsToDeploy;
       AnimatedPlayerState->AddArmyPlacementDeployment(
           Target->GetTerritoryId(), UnitsToDeploy);
