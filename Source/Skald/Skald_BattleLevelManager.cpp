@@ -7,12 +7,14 @@
 #include "Containers/Ticker.h"
 #include "Engine/Level.h"
 #include "Engine/LevelStreamingDynamic.h"
+#include "EngineUtils.h"
 #include "Misc/PackageName.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/GameModeBase.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/PlayerStart.h"
 #include "GameFramework/WorldSettings.h"
 #include "Skald_BattleGameMode.h"
 #include "Skald_GameInstance.h"
@@ -42,6 +44,42 @@ static ULevelStreaming *FindStreamingLevelFor(ULevel *Level)
   }
 
   return nullptr;
+}
+
+
+static APlayerStart *FindOverviewPlayerStart(UWorld *World, const TSoftObjectPtr<UWorld> &ConfiguredOverviewLevel)
+{
+  if (!World) {
+    return nullptr;
+  }
+
+  const FString OverviewPackage = ConfiguredOverviewLevel.ToSoftObjectPath().GetLongPackageName();
+  APlayerStart *FallbackStart = nullptr;
+
+  for (TActorIterator<APlayerStart> It(World); It; ++It) {
+    APlayerStart *Start = *It;
+    if (!Start) {
+      continue;
+    }
+
+    if (!FallbackStart) {
+      FallbackStart = Start;
+    }
+
+    if (OverviewPackage.IsEmpty()) {
+      continue;
+    }
+
+    const ULevel *StartLevel = Start->GetLevel();
+    const UPackage *LevelPackage = StartLevel ? StartLevel->GetOutermost() : nullptr;
+    const FString StartPackage = LevelPackage ? LevelPackage->GetName() : FString();
+    if (StartPackage.Equals(OverviewPackage, ESearchCase::IgnoreCase) ||
+        StartPackage.StartsWith(OverviewPackage + TEXT("."), ESearchCase::IgnoreCase)) {
+      return Start;
+    }
+  }
+
+  return FallbackStart;
 }
 
 static FString ResolveStreamingLevelPackageName(const ULevelStreaming *Level)
@@ -1038,9 +1076,24 @@ void USkaldBattleLevelManager::RestoreLocalBattleCameraStates() {
     }
 
     CameraPawn->SetBattleCameraActive(false);
-    CameraPawn->SetActorLocationAndRotation(State.Location, State.ActorRotation, false,
+
+    FVector RestoreLocation = State.Location;
+    FRotator RestoreRotation = State.ActorRotation;
+    FRotator RestoreControlRotation = State.ControlRotation;
+
+    if (APlayerStart *OverviewStart =
+            FindOverviewPlayerStart(PC->GetWorld(), ConfiguredOverviewLevel)) {
+      RestoreLocation = OverviewStart->GetActorLocation();
+      RestoreRotation = OverviewStart->GetActorRotation();
+      RestoreControlRotation = RestoreRotation;
+      UE_LOG(LogSkald, Verbose,
+             TEXT("BattleLevelManager: restoring local overview camera for %s to PlayerStart %s"),
+             *GetNameSafe(PC), *GetNameSafe(OverviewStart));
+    }
+
+    CameraPawn->SetActorLocationAndRotation(RestoreLocation, RestoreRotation, false,
                                             nullptr, ETeleportType::TeleportPhysics);
-    PC->SetControlRotation(State.ControlRotation);
+    PC->SetControlRotation(RestoreControlRotation);
 
     AActor* DesiredViewTarget = State.ViewTarget.Get();
     PC->SetViewTarget(DesiredViewTarget ? DesiredViewTarget : CameraPawn);

@@ -2008,6 +2008,7 @@ void ASkaldPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason) {
     BattleHudWidget->RemoveFromParent();
     BattleHudWidget = nullptr;
   }
+  BattleHUD = nullptr;
 
   if (DiceOverlayWidget) {
     DiceOverlayWidget->RemoveFromParent();
@@ -2095,7 +2096,13 @@ void ASkaldPlayerController::ShowMainHUD() {
   bShowMouseCursor = true;
   bEnableClickEvents = true;
   bEnableMouseOverEvents = true;
+  SetIgnoreMoveInput(false);
+  SetIgnoreLookInput(false);
   DefaultMouseCaptureMode = EMouseCaptureMode::NoCapture;
+  if (UGameViewportClient *GameViewport =
+          GetWorld() ? GetWorld()->GetGameViewport() : nullptr) {
+    GameViewport->SetMouseCaptureMode(DefaultMouseCaptureMode);
+  }
 }
 
 void ASkaldPlayerController::HideMainHUD() {
@@ -2150,7 +2157,14 @@ void ASkaldPlayerController::ShowBattleResultWidget(
 
     BattleResultWidget = Widget;
     BattleResultWidget->AddToViewport();
-    HideMainHUD();
+    if (MainHUD) {
+      MainHUD->SetVisibility(ESlateVisibility::Collapsed);
+    }
+    UWidgetBlueprintLibrary::SetInputMode_UIOnlyEx(
+        this, BattleResultWidget, EMouseLockMode::DoNotLock, false);
+    bShowMouseCursor = true;
+    bEnableClickEvents = true;
+    bEnableMouseOverEvents = true;
   }
 }
 
@@ -3380,6 +3394,7 @@ void ASkaldPlayerController::ShowOverworldHUD() {
     BattleHudWidget->RemoveFromParent();
     BattleHudWidget = nullptr;
   }
+  BattleHUD = nullptr;
 
   if (FighterSelectionWidget) {
     FighterSelectionWidget->RemoveFromParent();
