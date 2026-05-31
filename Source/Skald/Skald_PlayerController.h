@@ -578,7 +578,7 @@ protected:
   bool bWasHoveringInteractable = false;
 
   virtual void ShowBattleResultWidget(const FBattleResultDisplayData &DisplayData);
-  void ClearBattleResultWidget();
+  void ClearBattleResultWidget(bool bNotifyAcknowledgement = true);
 
   UFUNCTION()
   void HandleBattleResultWidgetClosed();

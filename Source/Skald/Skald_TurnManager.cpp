@@ -584,9 +584,18 @@ void ATurnManager::CompleteBattleConclusion() {
 
   if (bHasPendingResolution) {
     UE_LOG(LogSkald, Verbose,
-           TEXT("CompleteBattleConclusion: reusing already captured pending battle resolution."));
-  } else {
-    ResolveGridBattleResult();
+           TEXT("CompleteBattleConclusion: applying already captured pending battle resolution."));
+  }
+
+  ResolveGridBattleResult();
+
+  const bool bResolutionStillPending =
+      GI && GI->bPendingBattleResolution && GI->PendingBattleResolution.bValid;
+  if (bResolutionStillPending) {
+    UE_LOG(LogSkald, Verbose,
+           TEXT("CompleteBattleConclusion: battle resolution is still pending; deferring level cleanup until the retry resolves it."));
+    bBattleConclusionPending = false;
+    return;
   }
 
   if (GI) {
@@ -3917,6 +3926,10 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
   const int32 NewOwnerPlayerID = Resolution.NewOwnerPlayerID;
   const int32 AttackerCasualties = Resolution.AttackerCasualties;
   const int32 DefenderCasualties = Resolution.DefenderCasualties;
+  const int32 ResolvedFromTerritoryID = Source->TerritoryID;
+  const int32 ResolvedTargetTerritoryID = Target->TerritoryID;
+  const int32 ResolvedSourceArmy = Source->ArmyUnits;
+  const int32 ResolvedTargetArmy = Target->ArmyUnits;
 
   GI->bPendingBattleResolution = false;
   GI->PendingBattleResolution = FGridBattleResolution();
@@ -3931,19 +3944,27 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
     ClearBattleResultAcknowledgements();
   }
 
-  if (ASkaldGameMode *GM = GetWorld()->GetAuthGameMode<ASkaldGameMode>()) {
+  // Push the resolved world-state values before checking victory conditions.
+  // CheckVictoryConditions can ServerTravel to the end screen, so do not touch
+  // Source/Target actors or issue the resolution RPC after that point.
+  ClientBattleResolved(WinningPlayerID, AttackerCasualties, DefenderCasualties,
+                       ResolvedFromTerritoryID, ResolvedTargetTerritoryID,
+                       NewOwnerPlayerID, ResolvedSourceArmy, ResolvedTargetArmy);
+
+  if (ASkaldGameMode *GM = World->GetAuthGameMode<ASkaldGameMode>()) {
     GM->CheckVictoryConditions();
   }
-
-  ClientBattleResolved(WinningPlayerID, AttackerCasualties, DefenderCasualties,
-                       Source->TerritoryID, Target->TerritoryID,
-                       NewOwnerPlayerID, Source->ArmyUnits, Target->ArmyUnits);
 }
 
 void ATurnManager::ClientBattleResolved_Implementation(
     int32 WinningPlayerID, int32 AttackerCasualties, int32 DefenderCasualties,
     int32 FromTerritoryID, int32 TargetTerritoryID, int32 NewOwnerPlayerID,
     int32 SourceArmy, int32 TargetArmy) {
+  UWorld *World = GetWorld();
+  if (!World || World->bIsTearingDown) {
+    return;
+  }
+
   if (AWorldMap *WorldMapForClient = ResolveWorldMap()) {
     ATerritory *Source = WorldMapForClient->GetTerritoryById(FromTerritoryID);
     ATerritory *Target = WorldMapForClient->GetTerritoryById(TargetTerritoryID);
@@ -3953,7 +3974,7 @@ void ATurnManager::ClientBattleResolved_Implementation(
     }
     if (IsValid(Target)) {
       ASkaldPlayerState *NewOwner = nullptr;
-      if (ASkaldGameState *GS = GetWorld()->GetGameState<ASkaldGameState>()) {
+      if (ASkaldGameState *GS = World->GetGameState<ASkaldGameState>()) {
         NewOwner = GS->GetPlayerById(NewOwnerPlayerID);
       }
       Target->OwningPlayer = NewOwner;
@@ -3963,13 +3984,13 @@ void ATurnManager::ClientBattleResolved_Implementation(
   }
 
   for (FConstPlayerControllerIterator It =
-           GetWorld()->GetPlayerControllerIterator();
+           World->GetPlayerControllerIterator();
        It; ++It) {
     if (ASkaldPlayerController *PC = Cast<ASkaldPlayerController>(It->Get())) {
       if (USkaldMainHUDWidget *HUD = PC->GetHUDWidget()) {
         FString WinnerName = TEXT("Unknown");
         if (ASkaldGameState *GSLocal =
-                GetWorld()->GetGameState<ASkaldGameState>()) {
+                World->GetGameState<ASkaldGameState>()) {
           if (ASkaldPlayerState *WinnerPS =
                   GSLocal->GetPlayerById(WinningPlayerID)) {
             WinnerName =
