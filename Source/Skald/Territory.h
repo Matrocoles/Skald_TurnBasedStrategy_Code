@@ -33,6 +33,8 @@ public:
 
     virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 
+    virtual void Tick(float DeltaSeconds) override;
+
     virtual void GetLifetimeReplicatedProps(
         TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
@@ -146,6 +148,14 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Territory")
     void RefreshAppearance();
 
+    /** Show a short-lived floating text label for newly deployed units. */
+    UFUNCTION(BlueprintCallable, Category = "Territory|Deployment")
+    void ShowDeploymentFloat(int32 UnitsAdded);
+
+    /** Broadcast a deployment float to every client viewing this territory. */
+    UFUNCTION(NetMulticast, Unreliable)
+    void MulticastShowDeploymentFloat(int32 UnitsAdded);
+
     UFUNCTION()
     void OnRep_OwningPlayer();
 
@@ -172,6 +182,10 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Territory|Selection")
     UDecalComponent* SelectionDecal = nullptr;
 
+    /** Text that briefly displays the number of units deployed here. */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Territory|Deployment")
+    UTextRenderComponent* DeploymentFloatComponent = nullptr;
+
     /** Material applied to the territory selection decal. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory|Selection")
     TObjectPtr<UMaterialInterface> SelectionDecalMaterial = nullptr;
@@ -195,6 +209,18 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory|Selection", meta = (ClampMin = "0.0"))
     float SelectionSoundVolumeMultiplier = 1.f;
 
+    /** How long deployed-unit floating text remains visible. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory|Deployment", meta = (ClampMin = "0.01"))
+    float DeploymentFloatDuration = 0.6f;
+
+    /** Position of the deployed-unit floating text above the territory label. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory|Deployment")
+    FVector DeploymentFloatBaseOffset = FVector(0.f, 0.f, 145.f);
+
+    /** How far the deployed-unit text drifts upward while visible. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Territory|Deployment", meta = (ClampMin = "0.0"))
+    float DeploymentFloatRiseDistance = 30.f;
+
     /** Dynamic material used for highlighting. */
     UPROPERTY()
     UMaterialInstanceDynamic* DynamicMaterial = nullptr;
@@ -216,4 +242,7 @@ protected:
     void SetSelectionDecalVisible(bool bVisible);
     void UpdateSelectionVisuals(bool bVisible);
     bool ShouldShowSelectionVisuals(int32 SelectingPlayerId) const;
+
+    float DeploymentFloatElapsed = 0.f;
+    bool bDeploymentFloatActive = false;
 };

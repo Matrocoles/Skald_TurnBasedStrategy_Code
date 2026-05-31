@@ -4918,6 +4918,7 @@ void ASkaldPlayerController::ServerDeployUnits_Implementation(int32 TerritoryID,
 
   Terr->ArmyUnits += Amount;
   Terr->RefreshAppearance();
+  Terr->MulticastShowDeploymentFloat(Amount);
 
   PS->DeployableUnits -= Amount;
 
