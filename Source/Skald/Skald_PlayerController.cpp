@@ -4948,6 +4948,30 @@ void ASkaldPlayerController::RequestSelectTerritory(ATerritory *Territory) {
                                                  *Territory->GetName(),
                                                  Territory->TerritoryID)
                                : FString(TEXT("None"));
+
+  if (!IsMyTurn()) {
+    if (ATerritory *PreviousVisual = VisualOnlySelectedTerritory.Get()) {
+      PreviousVisual->SetLocalVisualSelection(false);
+    }
+
+    ATerritory *NewVisualSelection = nullptr;
+    if (IsValid(Territory) && VisualOnlySelectedTerritory.Get() != Territory) {
+      NewVisualSelection = Territory;
+      NewVisualSelection->SetLocalVisualSelection(true);
+    }
+    VisualOnlySelectedTerritory = NewVisualSelection;
+
+    UE_LOG(LogSkald, Verbose,
+           TEXT("RequestSelectTerritory applied visual-only off-turn selection of %s for %s"),
+           *TerrDesc, *GetName());
+    return;
+  }
+
+  if (ATerritory *PreviousVisual = VisualOnlySelectedTerritory.Get()) {
+    PreviousVisual->SetLocalVisualSelection(false);
+    VisualOnlySelectedTerritory.Reset();
+  }
+
   UE_LOG(LogSkald, Log,
          TEXT("RequestSelectTerritory forwarding %s from client controller %s"),
          *TerrDesc, *GetName());
@@ -5973,6 +5997,13 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
     return;
   }
 
+  if (bIsMyTurn) {
+    if (ATerritory *PreviousVisual = VisualOnlySelectedTerritory.Get()) {
+      PreviousVisual->SetLocalVisualSelection(false);
+      VisualOnlySelectedTerritory.Reset();
+    }
+  }
+
   if (bIsMyTurn && !bLocalTurnActive) {
     UE_LOG(LogSkald, Log,
            TEXT("[TurnState] Controller %s starting local turn from replicated state."),
@@ -6201,8 +6232,6 @@ void ASkaldPlayerController::HandleWorldStateChanged() {
   if (!bIsBattleMap && bPendingOverworldBattleResults &&
       CachedBattleResultDisplayData.bValid) {
     bPendingOverworldBattleResults = false;
-    bAwaitingBattleResultCloseAck = true;
-    ShowBattleResultWidget(CachedBattleResultDisplayData);
   }
 
   // Update territory info for the currently selected territory if available.
@@ -10657,9 +10686,9 @@ void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,
   DisplayData.EnemyFactionText = EnemyFactionText;
 
   CachedBattleResultDisplayData = DisplayData;
+  bPendingOverworldBattleResults = false;
+  bAwaitingBattleResultCloseAck = true;
   ShowBattleResultWidget(DisplayData);
-  bPendingOverworldBattleResults = true;
-  bAwaitingBattleResultCloseAck = false;
 
   if (!CachedGameInstance)
   {

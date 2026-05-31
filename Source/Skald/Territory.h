@@ -93,6 +93,9 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Territory")
     void Deselect();
 
+    /** Toggle a local-only selection preview without changing replicated selection. */
+    void SetLocalVisualSelection(bool bEnabled);
+
     /** True if the local player should currently see selection visuals. */
     bool IsSelectionVisibleToLocalPlayer() const;
 
@@ -153,7 +156,7 @@ public:
     void ShowDeploymentFloat(int32 UnitsAdded);
 
     /** Broadcast a deployment float to every client viewing this territory. */
-    UFUNCTION(NetMulticast, Unreliable)
+    UFUNCTION(NetMulticast, Reliable)
     void MulticastShowDeploymentFloat(int32 UnitsAdded);
 
     UFUNCTION()
@@ -227,6 +230,9 @@ protected:
 
     /** Base color of the territory mesh. */
     FLinearColor DefaultColor;
+
+    /** Local-only visual preview used for off-turn inspection clicks. */
+    bool bLocalVisualSelectionActive = false;
 
     /** Whether the territory has been selected. */
     bool bIsSelected = false;
