@@ -1768,6 +1768,26 @@ bool ASkaldPlayerController::CanCreateLocalUIWidget() const {
          !IsAIControllerIdentity_PlayerController(this);
 }
 
+bool ASkaldPlayerController::HasActiveBattleRuntimeContext() const {
+  const USkaldGameInstance *GI = CachedGameInstance;
+  if (!GI) {
+    if (UWorld *World = GetWorld()) {
+      GI = World->GetGameInstance<USkaldGameInstance>();
+    }
+  }
+
+  const USkaldBattleLevelManager *BattleLevelManager =
+      GI ? GI->GetBattleLevelManager() : nullptr;
+  const bool bBattleLevelActive =
+      BattleLevelManager && (BattleLevelManager->IsBattleLevelActive() ||
+                             BattleLevelManager->IsBattleLevelFullyReady());
+
+  return bIsBattleMap || (GI && GI->bIsInBattleMap) || bBattleLevelActive ||
+         (GI && GI->GridBattleManager) || bBattleHUDReadyToShow ||
+         bBattleHUDVisible ||
+         (BattleHudWidget && BattleHudWidget->IsInViewport());
+}
+
 void ASkaldPlayerController::InitializeChoosePlayerWidget() {
   if (!CanCreateLocalUIWidget()) {
     return;
@@ -2731,10 +2751,9 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
 
   const bool bOnBattleMap =
       bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap);
-  const bool bHasBattleContext =
-      bOnBattleMap || (CachedGameInstance &&
-                       (CachedGameInstance->IsTravelPending() ||
-                        CachedGameInstance->HasPendingBattleTravelContext()));
+  const bool bTravelPending =
+      CachedGameInstance && CachedGameInstance->IsTravelPending();
+  const bool bHasBattleContext = bOnBattleMap || bTravelPending;
   const FS_BattlePayload CachedBattle = CachedGameState
                                             ? CachedGameState->GetActiveBattlePayload()
                                             : CachedGameInstance
@@ -2749,6 +2768,14 @@ void ASkaldPlayerController::InitializeFighterSelectionIfNeeded() {
   const bool bInSelectionPhase =
       CachedGameState &&
       CachedGameState->BattlePhase == EBattlePhase::FighterSelection;
+
+  if (!bOnBattleMap && bTravelPending && !bInSelectionPhase) {
+    if (FighterSelectionWidget) {
+      FighterSelectionWidget->RemoveFromParent();
+      FighterSelectionWidget = nullptr;
+    }
+    return;
+  }
 
   ASkaldPlayerState *SelectionPS = GetPlayerState<ASkaldPlayerState>();
   int32 LocalPlayerId = SelectionPS ? ResolveStablePlayerId(SelectionPS) : INDEX_NONE;
@@ -3208,6 +3235,18 @@ void ASkaldPlayerController::Server_CommitArmy_Implementation(
 void ASkaldPlayerController::InitializeBattleHUD() {
   if (IsAIControllerIdentity_PlayerController(this) || !Player || !GetLocalPlayer() || !CanCreateLocalUIWidget())
     return;
+
+  if (!HasActiveBattleRuntimeContext()) {
+    UE_LOG(LogSkaldBattle, Verbose,
+           TEXT("InitializeBattleHUD: skipped outside active battle runtime (Controller=%s BattleMap=%d GIMap=%d TravelPending=%d Phase=%d HasGrid=%d)."),
+           *GetNameSafe(this), bIsBattleMap ? 1 : 0,
+           CachedGameInstance && CachedGameInstance->bIsInBattleMap ? 1 : 0,
+           CachedGameInstance && CachedGameInstance->IsTravelPending() ? 1 : 0,
+           CachedGameState ? static_cast<int32>(CachedGameState->BattlePhase) : -1,
+           CachedGameInstance && CachedGameInstance->GridBattleManager ? 1 : 0);
+    return;
+  }
+
   if (!BattleHUDWidgetClass)
     return;
   if (!BattleHudWidget) {
@@ -5740,7 +5779,9 @@ void ASkaldPlayerController::HandleReplicatedBattlePayload() {
   }
 
   DetectBattleMap();
-  InitializeBattleHUD();
+  if (HasActiveBattleRuntimeContext()) {
+    InitializeBattleHUD();
+  }
   RefreshFactionCursorFromState();
   RequestBattleStateIfNeeded();
   DetermineControlledBattleSide();
@@ -5782,13 +5823,15 @@ void ASkaldPlayerController::HandleReplicatedTurnOwnership() {
   const bool bFrozenForBattleTravel =
       CachedGameInstance && CachedGameInstance->bTurnStateFrozenForTravel;
   const bool bPendingBattleTravelContext =
-      CachedGameInstance && CachedGameInstance->HasPendingBattleTravelContext();
+      CachedGameInstance && CachedGameInstance->IsTravelPending() &&
+      CachedGameInstance->HasPendingBattleTravelContext();
+  const bool bActiveBattleRuntime =
+      bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap) ||
+      bStreamedBattleLevelActive || (CachedGameInstance && CachedGameInstance->GridBattleManager);
   const bool bInBattleInputFlow =
-      bIsBattleMap ||
-      (CachedGameInstance && CachedGameInstance->bIsInBattleMap) ||
-      BattlePhase != EBattlePhase::None || bBattleTravelPending ||
-      bStreamedBattleLevelActive || bFrozenForBattleTravel ||
-      bPendingBattleTravelContext || bBattleHUDReadyToShow || bBattleHUDVisible ||
+      bActiveBattleRuntime || bFrozenForBattleTravel ||
+      (bPendingBattleTravelContext && bBattleTravelPending) ||
+      bBattleHUDReadyToShow || bBattleHUDVisible ||
       (FighterSelectionWidget && FighterSelectionWidget->IsInViewport()) ||
       (BattleHudWidget && BattleHudWidget->IsInViewport());
   const int32 ReportedActiveId =
@@ -6088,7 +6131,11 @@ void ASkaldPlayerController::HandleFactionsUpdated() {
 
 void ASkaldPlayerController::HandleBattleMapStateChanged(bool /*bInBattleMap*/) {
   DetectBattleMap();
-  InitializeBattleHUD();
+  if (HasActiveBattleRuntimeContext()) {
+    InitializeBattleHUD();
+  } else if (!bAwaitingBattleResultCloseAck) {
+    ShowOverworldHUD();
+  }
   InitializeFighterSelectionIfNeeded();
   RefreshFactionCursorFromState();
   RequestBattleStateIfNeeded();
@@ -6343,12 +6390,13 @@ bool ASkaldPlayerController::ApplyBattleInteractionInputState(
   const bool bFrozenForBattleTravel =
       CachedGameInstance && CachedGameInstance->bTurnStateFrozenForTravel;
   const bool bPendingBattleTravelContext =
-      CachedGameInstance && CachedGameInstance->HasPendingBattleTravelContext();
+      CachedGameInstance && CachedGameInstance->IsTravelPending() &&
+      CachedGameInstance->HasPendingBattleTravelContext();
+  const bool bActiveBattleRuntime =
+      bBattleMapActive || (CachedGameInstance && CachedGameInstance->GridBattleManager);
   const bool bBattleInputContext =
-      bBattleMapActive ||
-      (CachedGameState && CachedGameState->BattlePhase != EBattlePhase::None) ||
-      bHasBattlePayload || bFrozenForBattleTravel || bPendingBattleTravelContext ||
-      (CachedGameInstance && CachedGameInstance->GridBattleManager) ||
+      bActiveBattleRuntime || bFrozenForBattleTravel ||
+      (bPendingBattleTravelContext && bBattleMapActive) ||
       bBattleHUDReadyToShow || bBattleHUDVisible ||
       (FighterSelectionWidget && FighterSelectionWidget->IsInViewport()) ||
       (BattleHudWidget && BattleHudWidget->IsInViewport());

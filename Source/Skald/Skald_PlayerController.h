@@ -997,6 +997,9 @@ public:
   /** True when this controller is allowed to create viewport/UI widgets. */
   bool CanCreateLocalUIWidget() const;
 
+  /** True while a streamed battle level or grid manager is still active. */
+  bool HasActiveBattleRuntimeContext() const;
+
 public:
   void BeginRetreatSelectionLocal(int32 DefendingTerritoryID,
                                   const TArray<int32> &CandidateTerritoryIDs);
