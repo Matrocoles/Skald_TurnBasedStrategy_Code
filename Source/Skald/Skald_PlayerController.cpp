@@ -2101,7 +2101,11 @@ void ASkaldPlayerController::ShowBattleResultWidget(
     VictoryWidgetClass = UBattleResultWidget::StaticClass();
   }
 
-  ClearBattleResultWidget();
+  // Replacing an existing result widget as part of showing/re-showing results
+  // must not acknowledge the result. Acknowledgement is reserved for the
+  // player's explicit close action; acknowledging here can let AI turns resume
+  // while the modal is still being constructed.
+  ClearBattleResultWidget(/*bNotifyAcknowledgement=*/false);
 
   if (!VictoryWidgetClass) {
     return;
@@ -2130,7 +2134,7 @@ void ASkaldPlayerController::ShowBattleResultWidget(
   }
 }
 
-void ASkaldPlayerController::ClearBattleResultWidget() {
+void ASkaldPlayerController::ClearBattleResultWidget(bool bNotifyAcknowledgement) {
   if (UBattleResultWidget *ResultWidget =
           Cast<UBattleResultWidget>(BattleResultWidget)) {
     ResultWidget->OnBattleResultClosed.RemoveAll(this);
@@ -2141,7 +2145,7 @@ void ASkaldPlayerController::ClearBattleResultWidget() {
     BattleResultWidget = nullptr;
   }
 
-  if (bAwaitingBattleResultCloseAck) {
+  if (bAwaitingBattleResultCloseAck && bNotifyAcknowledgement) {
     bAwaitingBattleResultCloseAck = false;
     CachedBattleResultDisplayData = FBattleResultDisplayData();
     ServerAcknowledgeBattleResults();
