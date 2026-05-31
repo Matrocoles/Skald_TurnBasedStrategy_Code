@@ -49,7 +49,7 @@ public:
 
 private:
   void HideNonBattleLevels();
-  void RestoreNonBattleLevels();
+  void RestoreNonBattleLevels(bool bRequestStreamingUpdate = true);
   bool IsStreamingLevelPartOfBattleMap(ULevelStreaming *Level) const;
   bool ResolveOrStreamLevel(UWorld* World, const TSoftObjectPtr<UWorld>& LevelAsset,
                             ULevelStreaming*& OutStreamingLevel, const TCHAR* ContextLabel);
@@ -62,7 +62,7 @@ private:
   bool CalculateActiveBattleLevelBounds(FBox& OutBounds) const;
 
   void HandleLevelLoaded();
-  void HandleLevelUnloaded();
+  void HandleLevelUnloaded(bool bRequestStreamingUpdate = true);
   void HandleLevelAddedToWorld(ULevel *InLevel, UWorld *InWorld);
   void HandleLevelRemovedFromWorld(ULevel *InLevel, UWorld *InWorld);
   bool DoesEventMatchActiveLevel(ULevel *InLevel, UWorld *InWorld) const;
