@@ -3951,6 +3951,17 @@ void ATurnManager::ResolveGridBattleResult_Implementation() {
                        ResolvedFromTerritoryID, ResolvedTargetTerritoryID,
                        NewOwnerPlayerID, ResolvedSourceArmy, ResolvedTargetArmy);
 
+  // The battle result multicast above is the final consumer of the replicated
+  // battle context. Clear it before normal overworld play resumes so local
+  // controllers do not continue treating the post-battle overview as an active
+  // battle map because BattlePhase/ActiveBattlePayload are still set to Deploy.
+  if (ASkaldGameState *ResolvedGameState =
+          World->GetGameState<ASkaldGameState>()) {
+    ResolvedGameState->SetActiveBattlePayload(FS_BattlePayload());
+    ResolvedGameState->SetBattlePhase(EBattlePhase::None);
+    ResolvedGameState->ResetBattleParticipants();
+  }
+
   if (ASkaldGameMode *GM = World->GetAuthGameMode<ASkaldGameMode>()) {
     GM->CheckVictoryConditions();
   }
