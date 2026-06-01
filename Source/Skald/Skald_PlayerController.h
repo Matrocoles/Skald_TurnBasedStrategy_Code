@@ -577,7 +577,7 @@ protected:
   /** Tracks whether the cursor was hovering an interactable widget last tick. */
   bool bWasHoveringInteractable = false;
 
-  virtual void ShowBattleResultWidget(const FBattleResultDisplayData &DisplayData);
+  virtual bool ShowBattleResultWidget(const FBattleResultDisplayData &DisplayData);
   void ClearBattleResultWidget(bool bNotifyAcknowledgement = true);
 
   UFUNCTION()
