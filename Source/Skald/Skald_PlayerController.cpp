@@ -2602,14 +2602,9 @@ void ASkaldPlayerController::PlayerTick(float DeltaTime) {
     CachedGameState = GetWorld()->GetGameState<ASkaldGameState>();
   }
 
-  const FS_BattlePayload TickBattle = CachedGameState
-                                          ? CachedGameState->GetActiveBattlePayload()
-                                          : CachedGameInstance
-                                                ? CachedGameInstance->PendingBattle
-                                                : FS_BattlePayload();
-  const bool bHasTickBattlePayload =
-      TickBattle.AttackerPlayerID > 0 || TickBattle.DefenderPlayerID > 0 ||
-      TickBattle.FromTerritoryID > 0 || TickBattle.TargetTerritoryID > 0;
+  const bool bTickPendingBattleTravelContext =
+      CachedGameInstance && CachedGameInstance->IsTravelPending() &&
+      CachedGameInstance->HasPendingBattleTravelContext();
   const USkaldBattleLevelManager* TickBattleLevelManager =
       CachedGameInstance ? CachedGameInstance->GetBattleLevelManager() : nullptr;
   const bool bTickStreamedBattleContext =
@@ -2617,8 +2612,7 @@ void ASkaldPlayerController::PlayerTick(float DeltaTime) {
                                  TickBattleLevelManager->IsBattleLevelFullyReady());
   const bool bTickBattleContext =
       bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap) ||
-      (CachedGameState && CachedGameState->BattlePhase != EBattlePhase::None) ||
-      bHasTickBattlePayload || bTickStreamedBattleContext ||
+      bTickStreamedBattleContext || bTickPendingBattleTravelContext ||
       (CachedGameInstance && CachedGameInstance->GridBattleManager) ||
       bBattleHUDReadyToShow || bBattleHUDVisible ||
       (FighterSelectionWidget && FighterSelectionWidget->IsInViewport()) ||
@@ -3391,7 +3385,14 @@ void ASkaldPlayerController::InitializeBattleHUD() {
 }
 
 void ASkaldPlayerController::ShowOverworldHUD() {
-  ShowMainHUD();
+  const bool bBattleResultVisible =
+      BattleResultWidget && BattleResultWidget->IsInViewport() &&
+      BattleResultWidget->GetVisibility() != ESlateVisibility::Collapsed &&
+      BattleResultWidget->GetVisibility() != ESlateVisibility::Hidden;
+
+  if (!bAwaitingBattleResultCloseAck && !bBattleResultVisible) {
+    ShowMainHUD();
+  }
 
   if (BattleHudWidget) {
     BattleHudWidget->RemoveFromParent();
@@ -6353,14 +6354,9 @@ void ASkaldPlayerController::UpdateBattleCameraMode() {
     return;
   }
 
-  const FS_BattlePayload ActiveBattle = CachedGameState
-                                            ? CachedGameState->GetActiveBattlePayload()
-                                            : CachedGameInstance
-                                                  ? CachedGameInstance->PendingBattle
-                                                  : FS_BattlePayload();
-  const bool bHasBattlePayload =
-      ActiveBattle.AttackerPlayerID > 0 || ActiveBattle.DefenderPlayerID > 0 ||
-      ActiveBattle.FromTerritoryID > 0 || ActiveBattle.TargetTerritoryID > 0;
+  const bool bPendingBattleTravelContext =
+      CachedGameInstance && CachedGameInstance->IsTravelPending() &&
+      CachedGameInstance->HasPendingBattleTravelContext();
   USkaldBattleLevelManager* BattleLevelManager =
       CachedGameInstance ? CachedGameInstance->GetBattleLevelManager() : nullptr;
   const bool bStreamedBattleLevelActive =
@@ -6370,8 +6366,7 @@ void ASkaldPlayerController::UpdateBattleCameraMode() {
       BattleLevelManager && BattleLevelManager->IsBattleLevelFullyReady();
   const bool bBattleCameraContext =
       bIsBattleMap || (CachedGameInstance && CachedGameInstance->bIsInBattleMap) ||
-      (CachedGameState && CachedGameState->BattlePhase != EBattlePhase::None) ||
-      bHasBattlePayload || bStreamedBattleLevelActive ||
+      bStreamedBattleLevelActive || bPendingBattleTravelContext ||
       (CachedGameInstance && CachedGameInstance->GridBattleManager) ||
       bBattleHUDReadyToShow || bBattleHUDVisible ||
       (FighterSelectionWidget && FighterSelectionWidget->IsInViewport()) ||
@@ -6422,14 +6417,6 @@ bool ASkaldPlayerController::ApplyBattleInteractionInputState(
     CachedGameState = GetWorld()->GetGameState<ASkaldGameState>();
   }
 
-  const FS_BattlePayload ActiveBattle = CachedGameState
-                                            ? CachedGameState->GetActiveBattlePayload()
-                                            : CachedGameInstance
-                                                  ? CachedGameInstance->PendingBattle
-                                                  : FS_BattlePayload();
-  const bool bHasBattlePayload =
-      ActiveBattle.AttackerPlayerID > 0 || ActiveBattle.DefenderPlayerID > 0 ||
-      ActiveBattle.FromTerritoryID > 0 || ActiveBattle.TargetTerritoryID > 0;
   const USkaldBattleLevelManager* BattleLevelManager =
       CachedGameInstance ? CachedGameInstance->GetBattleLevelManager() : nullptr;
   const bool bStreamedBattleMapActive =
