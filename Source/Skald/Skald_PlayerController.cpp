@@ -2117,11 +2117,11 @@ void ASkaldPlayerController::HideMainHUD() {
   }
 }
 
-void ASkaldPlayerController::ShowBattleResultWidget(
+bool ASkaldPlayerController::ShowBattleResultWidget(
     const FBattleResultDisplayData &DisplayData) {
   if (IsAIControllerIdentity_PlayerController(this) || !Player || !GetLocalPlayer() ||
       !CanCreateLocalUIWidget() || !DisplayData.bValid) {
-    return;
+    return false;
   }
 
   if (!VictoryWidgetClass) {
@@ -2135,11 +2135,11 @@ void ASkaldPlayerController::ShowBattleResultWidget(
   ClearBattleResultWidget(/*bNotifyAcknowledgement=*/false);
 
   if (!VictoryWidgetClass) {
-    return;
+    return false;
   }
 
   if (!CanCreateLocalUIWidget()) {
-    return;
+    return false;
   }
 
   if (UUserWidget *Widget = CreateWidget<UUserWidget>(this, VictoryWidgetClass)) {
@@ -2165,7 +2165,10 @@ void ASkaldPlayerController::ShowBattleResultWidget(
     bShowMouseCursor = true;
     bEnableClickEvents = true;
     bEnableMouseOverEvents = true;
+    return true;
   }
+
+  return false;
 }
 
 void ASkaldPlayerController::ClearBattleResultWidget(bool bNotifyAcknowledgement) {
@@ -6231,7 +6234,10 @@ void ASkaldPlayerController::HandleWorldStateChanged() {
 
   if (!bIsBattleMap && bPendingOverworldBattleResults &&
       CachedBattleResultDisplayData.bValid) {
-    bPendingOverworldBattleResults = false;
+    const bool bResultWidgetShown =
+        ShowBattleResultWidget(CachedBattleResultDisplayData);
+    bPendingOverworldBattleResults = !bResultWidgetShown;
+    bAwaitingBattleResultCloseAck = bResultWidgetShown;
   }
 
   // Update territory info for the currently selected territory if available.
@@ -10686,9 +10692,9 @@ void ASkaldPlayerController::HandleBattleEnded(ESkaldFaction WinningFaction,
   DisplayData.EnemyFactionText = EnemyFactionText;
 
   CachedBattleResultDisplayData = DisplayData;
-  bPendingOverworldBattleResults = false;
-  bAwaitingBattleResultCloseAck = true;
-  ShowBattleResultWidget(DisplayData);
+  const bool bResultWidgetShown = ShowBattleResultWidget(DisplayData);
+  bPendingOverworldBattleResults = !bResultWidgetShown;
+  bAwaitingBattleResultCloseAck = bResultWidgetShown;
 
   if (!CachedGameInstance)
   {

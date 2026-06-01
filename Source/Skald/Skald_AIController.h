@@ -44,7 +44,7 @@ public:
   virtual void InitializeHUDWidget() override;
   virtual void ShowMainHUD() override;
   virtual void HideMainHUD() override;
-  virtual void ShowBattleResultWidget(
+  virtual bool ShowBattleResultWidget(
       const FBattleResultDisplayData &DisplayData) override;
   virtual void InitializeBattleHUD() override;
   virtual void ShowFighterSelectionUI(

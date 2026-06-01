@@ -203,9 +203,10 @@ void ASkaldAIController::HideMainHUD() {
   // AI controllers do not own local HUD/UI.
 }
 
-void ASkaldAIController::ShowBattleResultWidget(
+bool ASkaldAIController::ShowBattleResultWidget(
     const FBattleResultDisplayData & /*DisplayData*/) {
   // AI controllers do not display local battle-result widgets.
+  return false;
 }
 
 void ASkaldAIController::InitializeBattleHUD() {
