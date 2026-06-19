@@ -5,6 +5,7 @@
 
 #include "Algo/RandomShuffle.h"
 #include "Algo/Sort.h"
+#include "HAL/NumericLimits.h"
 #include "AIController.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -1746,6 +1747,16 @@ void ASkald_BattleGameMode::AutoCommitAIArmy(ASkaldPlayerState *PlayerState,
     return;
   }
 
+  int32 CheapestCost = TNumericLimits<int32>::Max();
+  const FFighterDefinition *CheapestDefinition = nullptr;
+  for (const FFighterDefinition &Def : Definitions) {
+    const int32 Cost = FMath::Max(Def.Stats.ArmyCost, 0);
+    if (Cost < CheapestCost) {
+      CheapestCost = Cost;
+      CheapestDefinition = &Def;
+    }
+  }
+
   Algo::RandomShuffle(Definitions);
 
   TArray<FFighterDefinition> Selection;
@@ -1766,8 +1777,23 @@ void ASkald_BattleGameMode::AutoCommitAIArmy(ASkaldPlayerState *PlayerState,
     }
   }
 
+  int32 EffectiveBudget = Budget;
+  if (Selection.Num() == 0 && Budget > 0 && CheapestDefinition) {
+    Selection.Add(*CheapestDefinition);
+    if (CheapestCost > 0) {
+      CurrentCost = CheapestCost;
+      if (EffectiveBudget >= 0 && CheapestCost > EffectiveBudget) {
+        EffectiveBudget = CheapestCost;
+      }
+    }
+
+    UE_LOG(LogSkald, Warning,
+           TEXT("BattleGM AutoCommitAIArmy: No fighters affordable within budget %d for PlayerId=%d; using cheapest option (Cost=%d)."),
+           Budget, PlayerState->GetPlayerId(), CheapestCost);
+  }
+
   PlayerState->PendingArmy = Selection;
-  PlayerState->PendingArmyBudget = Budget;
+  PlayerState->PendingArmyBudget = EffectiveBudget;
   PlayerState->bArmyLockedIn = true;
 
   UE_LOG(LogSkald, Log,
