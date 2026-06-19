@@ -834,6 +834,8 @@ private:
     TWeakObjectPtr<AFighterPawn> Attacker;
     TWeakObjectPtr<AFighterPawn> Defender;
     FDiceRollResult Result;
+    FLinearColor PlayerColor = FLinearColor::White;
+    FLinearColor EnemyColor = FLinearColor::White;
     bool bManualReveal = false;
     int32 PendingManualReveals = 0;
   };

@@ -94,6 +94,10 @@ public:
     UFUNCTION(BlueprintCallable, Category="Skald|Battle|Dice")
     void SetManualRevealEnabled(bool bEnabled);
 
+    /** Apply faction-aware colours to the player/enemy result labels. */
+    UFUNCTION(BlueprintCallable, Category="Skald|Battle|Dice")
+    void SetParticipantColors(const FLinearColor& PlayerColor, const FLinearColor& EnemyColor);
+
     /** Trigger the next reveal step when manual reveal is enabled. */
     UFUNCTION(BlueprintCallable, Category="Skald|Battle|Dice")
     bool AdvanceManualReveal();
@@ -135,6 +139,14 @@ protected:
     UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
     UTextBlock* HealthSummaryText;
 
+    /** Text describing the local player's outcome summary. */
+    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+    UTextBlock* PlayerResultsText;
+
+    /** Text describing the opposing team's outcome summary. */
+    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+    UTextBlock* EnemyResultsText;
+
     /** Container for per-die outcome entries. */
     UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
     UVerticalBox* OutcomeList;
@@ -165,6 +177,7 @@ private:
     void InitializeOutcomeScrollContainer();
     void ConfigureOutcomeScrollBox(class UScrollBox& ScrollBox) const;
     float GetOutcomeScrollWindowHeight() const;
+    void ApplyParticipantTextColors();
 
     /** Copy of the current result used for playback. */
     FDiceRollResult ActiveResult;
@@ -195,6 +208,15 @@ private:
 
     /** Timer managing the anticipation pause before completion broadcast. */
     FTimerHandle CompletionTimerHandle;
+
+    /** Cached colour to apply to the local player's result text. */
+    FLinearColor PendingPlayerTextColor = FLinearColor::White;
+
+    /** Cached colour to apply to the opposing player's result text. */
+    FLinearColor PendingEnemyTextColor = FLinearColor::White;
+
+    /** Whether new participant colours have been provided. */
+    bool bHasParticipantColors = false;
 };
 
 /**
