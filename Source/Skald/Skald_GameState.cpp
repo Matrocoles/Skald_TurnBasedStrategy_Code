@@ -673,15 +673,15 @@ void ASkaldGameState::SortAndDedupPlayers()
     // Stable order by persistent StablePlayerId for deterministic turns/HUD
     // lists even across travel. Fall back to engine PlayerId if a stable value
     // has not yet been assigned.
-    Players.Sort([](const ASkaldPlayerState& PlayerA, const ASkaldPlayerState& PlayerB)
+    Players.Sort([](const ASkaldPlayerState* PlayerA, const ASkaldPlayerState* PlayerB)
     {
-        if (&PlayerA == &PlayerB)
+        if (PlayerA == PlayerB)
         {
             return false;
         }
 
-        const int32 StableA = PlayerA.GetStablePlayerId();
-        const int32 StableB = PlayerB.GetStablePlayerId();
+        const int32 StableA = PlayerA->GetStablePlayerId();
+        const int32 StableB = PlayerB->GetStablePlayerId();
         if (StableA != StableB)
         {
             if (StableA <= 0)
@@ -694,7 +694,7 @@ void ASkaldGameState::SortAndDedupPlayers()
             }
             return StableA < StableB;
         }
-        return PlayerA.GetPlayerId() < PlayerB.GetPlayerId();
+        return PlayerA->GetPlayerId() < PlayerB->GetPlayerId();
     });
 
     // Dedup in case the engine calls AddPlayerState twice for the same actor
