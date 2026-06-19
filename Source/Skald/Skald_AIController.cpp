@@ -1753,14 +1753,21 @@ void ASkaldAIController::DetermineControlledBattleSide() {
   }
 
   if (bIsAIPlayer) {
-    if (!bMatchedAttacker && MatchesFaction(Battle.AttackerFaction)) {
-      bAIControlsAttackerSide = true;
-      bMatchedAttacker = true;
-    }
+    if (!bMatchedAttacker && !bMatchedDefender) {
+      // Only fall back to faction matching when we have not already
+      // identified a battle side. Otherwise we may accidentally claim
+      // both attacker and defender when they share the same faction,
+      // leaving the AI with no opposing fighters to target.
+      const bool bAttackerFactionMatch = MatchesFaction(Battle.AttackerFaction);
+      const bool bDefenderFactionMatch = MatchesFaction(Battle.DefenderFaction);
 
-    if (!bMatchedDefender && MatchesFaction(Battle.DefenderFaction)) {
-      bAIControlsDefenderSide = true;
-      bMatchedDefender = true;
+      if (bAttackerFactionMatch && !bDefenderFactionMatch) {
+        bAIControlsAttackerSide = true;
+        bMatchedAttacker = true;
+      } else if (bDefenderFactionMatch && !bAttackerFactionMatch) {
+        bAIControlsDefenderSide = true;
+        bMatchedDefender = true;
+      }
     }
 
     auto SideHasPlayerIdentity = [](const FS_BattlePayload &Payload,
